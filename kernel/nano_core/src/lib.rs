@@ -136,6 +136,8 @@ pub extern "C" fn nano_core_start(
 
     println_raw!("nano_core_start(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
+    let kernel_stack_start =
+        try_exit!(VirtualAddress::new(early_double_fault_stack_top - try_exit!(boot_info.stack_size())).ok_or("invalid kernel stack start"));
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
         kernel_mmi_ref,
@@ -145,7 +147,7 @@ pub extern "C" fn nano_core_start(
         stack,
         bootloader_modules,
         identity_mapped_pages
-    ) = try_exit!(memory_initialization::init_memory_management(boot_info));
+    ) = try_exit!(memory_initialization::init_memory_management(boot_info, kernel_stack_start));
     println_raw!("nano_core_start(): initialized memory subsystem."); 
 
     state_store::init();

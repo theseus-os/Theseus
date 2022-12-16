@@ -28,11 +28,12 @@ use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET};
+    get_vga_mem_addr, KERNEL_OFFSET, Page
+};
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
-use kernel_config::memory::{RECURSIVE_P4_INDEX};
+use kernel_config::memory::RECURSIVE_P4_INDEX;
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
@@ -214,6 +215,7 @@ pub fn get_current_p4() -> Frame {
 /// Otherwise, it returns a str error message. 
 pub fn init(
     boot_info: &impl BootInformation,
+    stack_start_virt: VirtualAddress,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
@@ -254,6 +256,22 @@ pub fn init(
     let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
     let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
+    let stack_end_virt = stack_start_virt + boot_info.stack_size()?;
+    // Stack frames are not guaranteed to be contiguous.
+    let mut stack_mappings = [None; 34];
+    // + 1 accounts for the guard page which does not have a corresponding frame.
+    for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt - 1)).enumerate() {
+        let frame = page_table.translate_page(page).ok_or("couldn't translate stack page")?;
+        stack_mappings[i] = Some((page, frame));
+    }
+
+    // Boot info frames are not guaranteed to be contiguous.
+    let mut boot_info_mappings = [None; 10];
+    for (i, page) in (Page::containing_address(boot_info_start_vaddr)..=Page::containing_address(boot_info_start_vaddr + boot_info_size - 1)).enumerate() {
+        let frame = page_table.translate_page(page).ok_or("couldn't translate boot info page")?;
+        boot_info_mappings[i] = Some((page, frame));
+    }
+
     // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
     page_table.with(&mut new_table, |mapper| {
         
@@ -277,8 +295,6 @@ pub fn init(
         let (rodata_end_virt,    rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
         let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
         let (data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
-        let (stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
-        let (stack_end_virt,     _stack_end_phys)    = aggregated_section_memory_bounds.stack.end;
 
         let text_flags    = aggregated_section_memory_bounds.text.flags;
         let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
@@ -317,18 +333,20 @@ pub fn init(
 
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
-        let stack_pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())?;
-        let start_of_stack_pages = *stack_pages.start() + 1; 
-        let (stack_guard_page, stack_allocated_pages) = stack_pages.split(start_of_stack_pages)
-            .map_err(|_ap| "BUG: initial stack's allocated pages were not split correctly after guard page")?;
-        let stack_start_frame = Frame::containing_address(stack_start_phys) + 1; // skip 1st frame, which corresponds to the guard page
-        let stack_allocated_frames = frame_allocator::allocate_frames_at(stack_start_frame.start_address(), stack_allocated_pages.size_in_pages())?;
-        let stack_mapped_pages = mapper.map_allocated_pages_to(
-            stack_allocated_pages,
-            stack_allocated_frames,
-            data_flags,
-        )?;
-        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages)));
+        let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1)?;
+        let mut stack_mapped_pages: Option<MappedPages> = None;
+        let mut iter = stack_mappings.iter();
+        while let Some(Some((page, frame))) = iter.next() {
+            let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
+            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
+            let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
+            if let Some(ref mut stack_mapped_pages) = stack_mapped_pages {
+                stack_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge stack mapped pages")?;
+            } else {
+                stack_mapped_pages = Some(mapped_pages);
+            }
+        }
+        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.ok_or("no pages were allocated for the stack")?)));
 
         // Map the VGA display memory as writable. 
         // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
@@ -343,15 +361,17 @@ pub fn init(
         higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
-
-        // Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
-        let boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)?;
-        let boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)?;
-        boot_info_mapped_pages = Some(mapper.map_allocated_pages_to(
-            boot_info_pages,
-            boot_info_frames,
-            PteFlags::new(),
-        )?);
+        let mut iter = boot_info_mappings.iter();
+        while let Some(Some((page, frame))) = iter.next() {
+            let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
+            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
+            let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
+            if let Some(ref mut boot_info_mapped_pages) = boot_info_mapped_pages {
+                boot_info_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge boot info pages")?;
+            } else {
+                boot_info_mapped_pages = Some(mapped_pages);
+            }
+        }
 
         debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
         debug!("higher_half_mapped_pages: {:?}", &higher_half_mapped_pages[..index]);
