@@ -430,14 +430,12 @@ impl E1000Nic {
 
         if !handled {
             error!("e1000::handle_interrupt(): unhandled interrupt!  status: {:#X}", status);
+        } else if let Some(ref deferred_task) = self.deferred_task {
+            let _ = deferred_task
+                .unblock()
+                .expect("BUG: e1000::handle_interrupt(): couldn't unblock deferred task");
         } else {
-            if let Some(ref deferred_task) = self.deferred_task {
-                let _ = deferred_task
-                    .unblock()
-                    .expect("BUG: e1000::handle_interrupt(): couldn't unblock deferred task");
-            } else {
-                error!("e1000::handle_interrupt(): no deferred task");
-            }
+            error!("e1000::handle_interrupt(): no deferred task");
         }
         //regs.icr.read(); //clear interrupt
         Ok(())
