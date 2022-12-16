@@ -1311,6 +1311,28 @@
 <span id="1311">1311</span>
 <span id="1312">1312</span>
 <span id="1313">1313</span>
+<span id="1314">1314</span>
+<span id="1315">1315</span>
+<span id="1316">1316</span>
+<span id="1317">1317</span>
+<span id="1318">1318</span>
+<span id="1319">1319</span>
+<span id="1320">1320</span>
+<span id="1321">1321</span>
+<span id="1322">1322</span>
+<span id="1323">1323</span>
+<span id="1324">1324</span>
+<span id="1325">1325</span>
+<span id="1326">1326</span>
+<span id="1327">1327</span>
+<span id="1328">1328</span>
+<span id="1329">1329</span>
+<span id="1330">1330</span>
+<span id="1331">1331</span>
+<span id="1332">1332</span>
+<span id="1333">1333</span>
+<span id="1334">1334</span>
+<span id="1335">1335</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.
 //! 
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
@@ -1501,7 +1523,6 @@
 
 <span class="comment">// A trait which contains common functionalities for a NIC
 </span><span class="kw">impl </span>NetworkInterfaceCard <span class="kw">for </span>IxgbeNic {
-
     <span class="kw">fn </span>send_packet(<span class="kw-2">&amp;mut </span><span class="self">self</span>, transmit_buffer: TransmitBuffer) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="comment">// by default, when using the physical NIC interface, we send on queue 0.
         </span><span class="kw">let </span>qid = <span class="number">0</span>;
@@ -1520,6 +1541,29 @@
         <span class="comment">// by default, when using the physical NIC interface, we receive on queue 0.
         </span><span class="kw">let </span>qid = <span class="number">0</span>;
         <span class="self">self</span>.rx_queues[qid].poll_queue_and_store_received_packets()
+    }
+
+    <span class="kw">fn </span>mac_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">6</span>] {
+        <span class="self">self</span>.mac_spoofed.unwrap_or(<span class="self">self</span>.mac_hardware)
+    }
+}
+
+<span class="kw">impl </span>net::NetworkDevice <span class="kw">for </span>IxgbeNic {
+    <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;(), net::Error&gt; {
+        <span class="comment">// TODO: This is just a workaround to make the new API work with the old machinery.
+        </span><span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(buf.len() <span class="kw">as </span>u16).map_err(|<span class="kw">_</span>| net::Error::Exhausted)<span class="question-mark">?</span>;
+        <span class="kw">let </span>transmit_buffer_mut = <span class="kw-2">&amp;mut </span>transmit_buffer;
+        transmit_buffer_mut.clone_from_slice(buf);
+        <span class="comment">// TODO: Return specific error.
+        </span><span class="self">self</span>.send_packet(transmit_buffer).map_err(|<span class="kw">_</span>| net::Error::Unknown)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt; {
+        <span class="comment">// by default, when using the physical NIC interface, we receive on queue 0.
+        </span><span class="kw">let </span>qid = <span class="number">0</span>;
+        <span class="comment">// return one frame from the queue&#39;s received frames
+        </span><span class="self">self</span>.rx_queues[qid].received_frames.pop_front()
     }
 
     <span class="kw">fn </span>mac_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">6</span>] {

@@ -308,6 +308,7 @@
 <span id="308">308</span>
 <span id="309">309</span>
 <span id="310">310</span>
+<span id="311">311</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(trait_alias)]
 
@@ -508,6 +509,7 @@
             <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP
         )<span class="question-mark">?</span>;
         add_to_network_interfaces(ixgbe_interface);
+        net::register_device(ixgbe_nic_ref);
     }
 
     <span class="comment">// Convenience notification for developers to inform them of no networking devices
