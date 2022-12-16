@@ -36,9 +36,7 @@ pub use frame_allocator::{
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::{
-    find_section_memory_bounds,
-    get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4,
-    set_as_active_page_table_root,
+    find_section_memory_bounds, get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4,
 };
 
 pub use pte_flags::*;

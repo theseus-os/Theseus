@@ -19,8 +19,7 @@ use pte_flags::PteFlags;
 
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
-use x86_64::{PhysAddr, registers::control::{Cr3, Cr3Flags},
-    instructions::tlb, structures::paging::frame::PhysFrame};
+use x86_64::{registers::control::Cr3, instructions::tlb};
 
 
 /// The address bounds and mapping flags of a section's memory region.
@@ -296,14 +295,4 @@ fn convert_to_pte_flags(section: &impl ElfSection) -> PteFlags {
         .valid(section.flags().contains(ElfSectionFlags::ALLOCATED))
         .writable(section.flags().contains(ElfSectionFlags::WRITABLE))
         .executable(section.flags().contains(ElfSectionFlags::EXECUTABLE))
-}
-
-/// Installs a P4 table in the CR3 register
-pub fn set_as_active_page_table_root(page_table: PhysicalAddress) {
-    unsafe { 
-        Cr3::write(
-            PhysFrame::containing_address(PhysAddr::new_truncate(page_table.value() as u64)),
-            Cr3Flags::empty(),
-        )
-    };
 }
