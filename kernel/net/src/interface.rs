@@ -1,4 +1,4 @@
-use crate::{device::DeviceWrapper, NetworkDevice, Result};
+use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
 use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
 use irq_safety::MutexIrqSafe;
 use mutex_sleep::MutexSleep;
@@ -14,7 +14,7 @@ pub use wire::{IpAddress, IpCidr};
 pub struct NetworkInterface {
     inner: MutexSleep<iface::Interface<'static>>,
     device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
-    sockets: MutexSleep<Vec<Arc<MutexSleep<crate::Socket<dyn AnySocket<'static> + Send>>>>>,
+    sockets: MutexSleep<Vec<Arc<MutexSleep<Socket<dyn AnySocket<'static> + Send>>>>>,
 }
 
 impl NetworkInterface {
@@ -55,16 +55,16 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(&self, socket: T) -> Arc<MutexSleep<crate::Socket<T>>>
+    pub fn add_socket<T>(&self, socket: T) -> Arc<MutexSleep<Socket<T>>>
     where
         T: AnySocket<'static> + Send,
     {
         let mut socket_set = SocketSet::new([iface::SocketStorage::default(); 1]);
         socket_set.add(socket);
-        let socket_arc = Arc::new(MutexSleep::new(crate::Socket::<T>::new(socket_set)));
+        let socket_arc = Arc::new(MutexSleep::new(Socket::<T>::new(socket_set)));
         self.sockets
             .lock()
-            .expect("couldn't write to interface sockets")
+            .expect("failed to lock interface sockets")
             // SAFETY: Socket has a transparent representation, so the memory layout is identical
             // regardless of T. The Send bound on T ensures that transmuting to a type that
             // implements Send is sound.
@@ -86,17 +86,17 @@ impl NetworkInterface {
         // NOTE: If some application decides to lock a socket for an extended period of
         // time, this will prevent all other sockets from being polled. Not sure if
         // there's a great way around this.
-        for socket_set in self
+        for socket in self
             .sockets
             .lock()
-            .expect("failed to read interface sockets")
+            .expect("failed to lock interface sockets")
             .iter()
         {
-            let mut socket_set = socket_set.lock().expect("failed to lock socket set");
+            let mut socket = socket.lock().expect("failed to lock socket");
             inner.poll(
                 smoltcp::time::Instant::ZERO,
                 &mut wrapper,
-                &mut socket_set.inner,
+                &mut socket.inner,
             )?;
         }
 
@@ -106,7 +106,7 @@ impl NetworkInterface {
     // TODO: This is a temporary workaround while crate::Socket dereferences to a
     // smoltcp socket. In the future, the send method on crate::Socket will poll the
     // socket automatically.
-    pub fn poll_socket<T>(&self, socket: &mut crate::Socket<T>) -> Result<()>
+    pub fn poll_socket<T>(&self, socket: &mut Socket<T>) -> Result<()>
     where
         T: AnySocket<'static>,
     {
