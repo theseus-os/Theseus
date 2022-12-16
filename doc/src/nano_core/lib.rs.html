@@ -499,7 +499,7 @@
     }
     <span class="attr">#[cfg(loadable)] </span>{
         <span class="kw">use </span>alloc::vec::Vec;
-        <span class="kw">use </span>memory::{MmiRef, MappedPages, PhysicalMemory};
+        <span class="kw">use </span>memory::{MmiRef, MappedPages, PhysicalAddress};
         <span class="kw">use </span>no_drop::NoDrop;
 
         <span class="kw">let </span>section = <span class="macro">try_exit!</span>(
