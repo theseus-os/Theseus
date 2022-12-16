@@ -471,6 +471,17 @@
 <span id="471">471</span>
 <span id="472">472</span>
 <span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -637,20 +648,31 @@
 </span><span class="kw">mod </span>canonical_address {
     <span class="kw">use </span>bit_field::BitField;
 
-    <span class="comment">// aarch64 doesn&#39;t have a concept of canonical VA
-    // so this always returns true
+    <span class="doccomment">/// On aarch64, VAs are composed of an ASID
+    /// which is 8 or 16 bits long depending
+    /// on MMU config. In Theseus, we use 8-bits
+    /// and the next 8 bits are unused.
+    /// Our ASID is zero, so a &quot;canonical&quot; VA has
+    /// the 16 most significant bits cleared.
     </span><span class="attr">#[inline]
-    </span><span class="kw">pub fn </span>is_canonical_virtual_address(_virt_addr: usize) -&gt; bool {
-        <span class="bool-val">true
-    </span>}
-    
-    <span class="comment">// aarch64 doesn&#39;t have a concept of canonical VA
-    // so this returns the address as-is
+    </span><span class="kw">pub fn </span>is_canonical_virtual_address(virt_addr: usize) -&gt; bool {
+        <span class="kw">match </span>virt_addr.get_bits(<span class="number">48</span>..<span class="number">64</span>) {
+            <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
+            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="doccomment">/// On aarch64, VAs are composed of an ASID
+    /// which is 8 or 16 bits long depending
+    /// on MMU config. In Theseus, we use 8-bits
+    /// and the next 8 bits are unused.
+    /// Our ASID is zero, so a &quot;canonical&quot; VA has
+    /// the 16 most significant bits cleared.
     </span><span class="attr">#[inline]
     </span><span class="kw">pub const fn </span>canonicalize_virtual_address(virt_addr: usize) -&gt; usize {
-        virt_addr
-    }
-    
+        virt_addr &amp; <span class="number">0x0000_FFFF_FFFF_FFFF
+    </span>}
+
     <span class="doccomment">/// On aarch64, we configure the MMU to use 48-bit
     /// physical addresses; &quot;canonical&quot; physical addresses
     /// have the 16 most significant bits cleared.
@@ -661,7 +683,7 @@
             <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
         }
     }
-    
+
     <span class="doccomment">/// On aarch64, we configure the MMU to use 48-bit
     /// physical addresses; &quot;canonical&quot; physical addresses
     /// have the 16 most significant bits cleared.
