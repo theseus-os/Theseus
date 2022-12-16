@@ -225,7 +225,7 @@ pub extern "C" fn nano_core_start(
     }
     #[cfg(loadable)] {
         use alloc::vec::Vec;
-        use memory::{MmiRef, MappedPages, PhysicalMemory};
+        use memory::{MmiRef, MappedPages, PhysicalAddress};
         use no_drop::NoDrop;
 
         let section = try_exit!(
