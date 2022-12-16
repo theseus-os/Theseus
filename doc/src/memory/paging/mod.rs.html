@@ -384,8 +384,6 @@
 <span id="384">384</span>
 <span id="385">385</span>
 <span id="386">386</span>
-<span id="387">387</span>
-<span id="388">388</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -452,19 +450,18 @@
 }
 
 <span class="kw">impl </span>PageTable {
-    <span class="doccomment">/// An internal function to bootstrap a new top-level PageTable 
-    /// based on the given currently-active P4 frame (the frame holding the page table root).
+    <span class="doccomment">/// An internal function to bootstrap a new top-level `PageTable` from
+    /// the currently-active P4 frame (the root page table frame).
     /// 
-    /// Returns an error if the given `active_p4_frame` is not the currently active page table.
-    </span><span class="kw">fn </span>from_current(active_p4_frame: AllocatedFrames) -&gt; <span class="prelude-ty">Result</span>&lt;PageTable, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="macro">assert!</span>(active_p4_frame.size_in_frames() == <span class="number">1</span>);
-        <span class="kw">let </span>current_p4 = get_current_p4();
-        <span class="kw">if </span>active_p4_frame.start() != <span class="kw-2">&amp;</span>current_p4 {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;PageTable::from_current(): the active_p4_frame must be the root of the currently-active page table.&quot;</span>);
-        }
+    /// Returns an error if unable to allocate the `Frame` of the
+    /// currently active page table root from the frame allocator.
+    </span><span class="kw">fn </span>from_current() -&gt; <span class="prelude-ty">Result</span>&lt;PageTable, ()&gt; {
+        <span class="kw">let </span>current_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), <span class="number">1</span>)
+            .map_err(|<span class="kw">_</span>| ())<span class="question-mark">?</span>;
+    
         <span class="prelude-val">Ok</span>(PageTable { 
-            mapper: Mapper::with_p4_frame(current_p4),
-            p4_table: active_p4_frame,
+            mapper: Mapper::with_p4_frame(<span class="kw-2">*</span>current_p4.start()),
+            p4_table: current_p4,
         })
     }
 
@@ -623,9 +620,8 @@
     <span class="macro">debug!</span>(<span class="string">&quot;{:X?}\n{:X?}&quot;</span>, aggregated_section_memory_bounds, _sections_memory_bounds);
     
     <span class="comment">// bootstrap a PageTable from the currently-loaded page table
-    </span><span class="kw">let </span>current_active_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), <span class="number">1</span>)
+    </span><span class="kw">let </span><span class="kw-2">mut </span>page_table = PageTable::from_current()
         .map_err(|<span class="kw">_</span>| <span class="string">&quot;Failed to allocate frame for initial page table; is it merged with another section?&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>page_table = PageTable::from_current(current_active_p4)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Bootstrapped initial {:?}&quot;</span>, page_table);
 
     <span class="kw">let </span>boot_info_start_vaddr = boot_info.start().ok_or(<span class="string">&quot;boot_info start virtual address was invalid&quot;</span>)<span class="question-mark">?</span>;
