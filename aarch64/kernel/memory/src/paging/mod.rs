@@ -137,8 +137,10 @@ impl PageTable {
         let table = unsafe { (p4_frame as *mut Table<Level4>).as_mut().unwrap() };
         table.zero();
 
-        let rec_top_level_flags = PteFlags::VALID | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
-        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), rec_top_level_flags.into());
+        let rec_flags = PteFlagsArch::VALID
+                      | PteFlagsArch::ACCESSED
+                      | PteFlagsArch::PAGE_DESCRIPTOR;
+        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), rec_flags);
 
         Ok(PageTable {
             mapper: Mapper::with_p4_frame(*new_p4_frame.as_allocated_frame()),
