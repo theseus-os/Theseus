@@ -11,7 +11,6 @@ extern crate memory_structs;
 extern crate memory;
 extern crate kernel_config;
 
-use core::mem::size_of;
 use core::arch::asm;
 use alloc::vec::Vec;
 use alloc::vec;
@@ -28,7 +27,7 @@ use log::{info, error};
 mod uefi_conv;
 mod context_switch;
 
-use context_switch::{SavedContext, create_stack, switch_to_task, landing_pad};
+use context_switch::{create_stack, switch_to_task, landing_pad};
 
 #[inline(never)]
 extern "C" fn inf_loop_0xbeef() -> ! {
@@ -98,14 +97,10 @@ fn main(
     info!("page table: {:?}", page_table);
 
     info!("Creating new stack");
-    let mut new_stack = create_stack(&mut page_table, landing_pad as *const () as _)?;
-
-    // getting a pointer to the top of the stack
-    let new_stack: &mut [u8] = new_stack.as_slice_mut(0, 16 * 4096)?;
-    let new_stack = new_stack.as_ptr() as usize + 16 * 4096 - size_of::<SavedContext>();
+    let (_new_stack, stack_ptr) = create_stack(&mut page_table, landing_pad as *const () as _, 16)?;
 
     info!("Switching to new task");
-    switch_to_task(new_stack);
+    switch_to_task(stack_ptr);
 
     info!("[in main]");
     info!("Going to infinite loop now.");

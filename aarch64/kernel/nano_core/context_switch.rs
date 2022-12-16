@@ -1,33 +1,42 @@
 use core::mem::size_of;
 use core::arch::asm;
 
-use log::info;
+use log::{info, error};
 
 use memory::{MappedPages, PageTable};
 use pte_flags::PteFlags;
 
 static mut PREV_STACK: usize = 0xdeadbeef;
 
-pub type SavedContext = [usize; 30];
-
+/// Sample Task Function
+///
+/// It simply re-triggers a context switch to return to the original main task.
 pub extern "C" fn landing_pad() {
-    info!("[in landing_pad]");
     let main_task_stack = unsafe { PREV_STACK };
+
+    info!("[in landing_pad]");
     info!("main_task_stack: 0x{:x}", main_task_stack);
     info!("switching back to the main task");
     switch_to_task(main_task_stack);
+
+    error!("This should never be printed");
     loop {}
 }
 
+// This:
+// - saves general pupose regs,
+// - saves the current SP to an arbitrary address expected to be in x0 (= parameter `_prev_stack_pointer`),
+// - installs the new one expected to be in x1 (= parameter `_next_stack_pointer_value`),
+// - restores GP regs from the just-installed stack
+// - jumps to address in x30
 #[naked]
 unsafe extern "C" fn context_switch_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
     asm!(
         // Make room on the stack for the exception context.
-        // this is 8 bytes too much, but has
-        // better alignment
+        // This is 8 bytes too much, but has better alignment.
         "sub sp,  sp,  #8 * 29",
 
-        // push registers on the stack
+        // Push general-purpose registers on the stack.
         "stp x2,  x3,  [sp, #8 *  0 * 2]",
         "stp x4,  x5,  [sp, #8 *  1 * 2]",
         "stp x6,  x7,  [sp, #8 *  2 * 2]",
@@ -43,17 +52,17 @@ unsafe extern "C" fn context_switch_regular(_prev_stack_pointer: *mut usize, _ne
         "stp x26, x27, [sp, #8 * 12 * 2]",
         "stp x28, x29, [sp, #8 * 13 * 2]",
 
-        // x30 stores the return address
+        // x30 stores the return address.
         "str x30,      [sp, #8 * 14 * 2]",
 
-        // save current stack pointer to first argument
+        // Save current stack pointer to address in 1st argument.
         "mov x2, sp",
         "str x2, [x0, 0]",
 
-        // set the stack pointer to the passed value
+        // Set the stack pointer to value in 2nd argument.
         "mov sp, x1",
 
-        // pop registers from the stack
+        // Pop general-purpose registers from the stack.
         "ldp x2,  x3,  [sp, #8 *  0 * 2]",
         "ldp x4,  x5,  [sp, #8 *  1 * 2]",
         "ldp x6,  x7,  [sp, #8 *  2 * 2]",
@@ -69,19 +78,21 @@ unsafe extern "C" fn context_switch_regular(_prev_stack_pointer: *mut usize, _ne
         "ldp x26, x27, [sp, #8 * 12 * 2]",
         "ldp x28, x29, [sp, #8 * 13 * 2]",
 
-        // x30 stores the return address
+        // x30 stores the return address.
         "ldr x30,      [sp, #8 * 14 * 2]",
 
-        // this is 8 bytes too much, but has
-        // better alignment
+        // Move the stack pointer back up.
         "add sp,  sp,  #8 * 30",
 
-        // return to address (in x30 by default)
+        // return (to address in x30 by default).
         "ret",
         options(noreturn)
     );
 }
 
+/// Utility function to switch to another task
+///
+/// The task's stack pointer is required.
 pub fn switch_to_task(new_stack: usize) {
     unsafe {
         let prev_stack_ptr = (&mut PREV_STACK) as *mut usize;
@@ -89,10 +100,19 @@ pub fn switch_to_task(new_stack: usize) {
     }
 }
 
-pub fn create_stack(page_table: &mut PageTable, start_address: usize) -> Result<MappedPages, &'static str> {
+/// Utility function which allocates a 16-page long
+/// initial task stack; you have to give it a function
+/// pointer (such as the address of `landing_pad`)
+/// which will be executed if you use
+/// `context_switch_regular` with that new stack.
+pub fn create_stack(
+    page_table: &mut PageTable,
+    start_address: usize,
+    pages: usize,
+) -> Result<(MappedPages, usize), &'static str> {
     // x30 stores the return address
     // it's used by the `ret` instruction
-    let saved_context = [
+    let artificial_ctx = [
         // [lower address]
 
                     0, 0, //  x2,  x3,
@@ -115,16 +135,20 @@ pub fn create_stack(page_table: &mut PageTable, start_address: usize) -> Result<
         // [top of stack]
     ];
 
-    let stack = page_allocator::allocate_pages(16).ok_or("couldn't allocate new stack")?;
+    let stack = page_allocator::allocate_pages(pages).ok_or("couldn't allocate new stack")?;
     let mut stack = page_table.map_allocated_pages(stack, PteFlags::WRITABLE | PteFlags::NOT_EXECUTABLE)?;
 
+    let stack_ptr;
     {
-        let stack: &mut [usize] = stack.as_slice_mut(0, 16 * (4096 / size_of::<usize>()))?;
+        let stack: &mut [usize] = stack.as_slice_mut(0, pages * (4096 / size_of::<usize>()))?;
 
-        // inserting an artificial SavedContext;
-        let offset = stack.len() - saved_context.len();
-        stack[offset..].copy_from_slice(saved_context.as_slice());
+        // inserting an artificial SavedContext
+        // at the top of the stack
+        let offset = stack.len() - artificial_ctx.len();
+        let stack_top = &mut stack[offset..];
+        stack_ptr = stack_top.as_ptr() as usize;
+        stack_top.copy_from_slice(artificial_ctx.as_slice());
     }
 
-    Ok(stack)
+    Ok((stack, stack_ptr))
 }
