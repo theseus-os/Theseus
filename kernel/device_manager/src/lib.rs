@@ -198,6 +198,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             &DEFAULT_GATEWAY_IP
         )?;
         add_to_network_interfaces(ixgbe_interface);
+        net::register_device(ixgbe_nic_ref);
     }
 
     // Convenience notification for developers to inform them of no networking devices

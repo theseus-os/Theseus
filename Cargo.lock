@@ -1488,6 +1488,7 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
+ "net",
  "network_interface_card",
  "nic_buffers",
  "nic_initialization",
