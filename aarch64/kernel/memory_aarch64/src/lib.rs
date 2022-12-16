@@ -102,12 +102,12 @@ pub fn configure_translation_registers() {
         // For more information on MAIR, See section D17.2.97
         // of [DDI0487l.a](https://l0.pm/arm-ddi0487l.a.pdf).
         MAIR_EL1.write(
-            // Attribute 1 - Cacheable normal DRAM.
-            MAIR_EL1::Attr1_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc +
-            MAIR_EL1::Attr1_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc +
+            // Attribute 1 - Device.
+            MAIR_EL1::Attr1_Device::nonGathering_nonReordering_EarlyWriteAck +
 
-            // Attribute 0 - Device.
-            MAIR_EL1::Attr0_Device::nonGathering_nonReordering_EarlyWriteAck,
+            // Attribute 0 - Cacheable normal DRAM.
+            MAIR_EL1::Attr0_Normal_Outer::WriteBack_NonTransient_ReadWriteAlloc +
+            MAIR_EL1::Attr0_Normal_Inner::WriteBack_NonTransient_ReadWriteAlloc,
         );
 
         // The translation control register contains most of
