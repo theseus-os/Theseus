@@ -21,8 +21,8 @@ impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
         task.block()?;
         Ok(WaitGuard { task })
@@ -31,8 +31,8 @@ impl WaitGuard {
     /// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     pub fn block_again(&self) -> Result<RunState, RunState> {
         self.task.block()
     }
@@ -188,6 +188,15 @@ impl WaitQueue {
     /// * returns `false` if there was no such `Task` waiting.
     pub fn notify_specific(&self, task_to_wakeup: &TaskRef) -> bool {
         self.notify(Some(task_to_wakeup))
+    }
+
+    /// Wake up all `Task`s that are waiting on this queue.
+    pub fn notify_all(&self) {
+        for t in self.0.lock().drain(..) {
+            if t.unblock().is_err() {
+                warn!("WaitQueue::notify_all(): failed to unblock {:?}", t);
+            }
+        }
     }
     
     /// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. 

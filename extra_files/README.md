@@ -13,11 +13,12 @@ Examples include:
 
 ## How it works
 All files and directories here will be copied as-is without modification into the `/extra_files/` directory within Theseus.
-Directory hierarchies are preserved as well, but empty directories are ignored.
+Directory hierarchies are preserved as well, but empty directories are ignored. Hierarchies are encoded using an exclamation
+mark when creating the bootloader modules.
 
-Here are some examples of how a hypothetical file in this directory will appear in Theseus at runtime:
-```
-./hello.txt       -->  /extra_files/hello.txt
-./wasm/test.wasm  -->  /extra_files/wasm/test.wasm
-./foo/bar/me.o    -->  /extra_files/foo/bar/me.o
-```
+Here are some examples of how file paths would work:
+| Host machine     | Bootloader module          | Runtime path                |
+|------------------|----------------------------|-----------------------------|
+| ./hello.txt      | extra_files!hello.txt      | /extra_files/hello.txt      |
+| ./wasm/test.wasm | extra_files!wasm!test.wasm | /extra_files/wasm/test.wasm |
+| ./foo/bar/me.o   | extra_files!foo!bar!me.o   | /extra_files/foo/bar/me.o   |

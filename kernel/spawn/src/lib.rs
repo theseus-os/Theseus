@@ -49,8 +49,9 @@ pub fn init(
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
-    let task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
-    BOOTSTRAP_TASKS.lock().push(task_ref.clone());
+    let joinable_bootstrap_task = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+    let task_ref = joinable_bootstrap_task.clone();
+    BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 
@@ -60,7 +61,7 @@ pub fn init(
 
 /// The set of bootstrap tasks that are created using `task::bootstrap_task()`.
 /// These require special cleanup; see [`cleanup_bootstrap_tasks()`].
-static BOOTSTRAP_TASKS: Mutex<Vec<TaskRef>> = Mutex::new(Vec::new());
+static BOOTSTRAP_TASKS: Mutex<Vec<JoinableTaskRef>> = Mutex::new(Vec::new());
 
 /// Spawns a dedicated task to cleanup all bootstrap tasks
 /// by reaping them, i.e., taking their exit value.
@@ -77,12 +78,12 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
             let mut num_tasks_cleaned = 0;
             while num_tasks_cleaned < total_tasks {
                 if let Some(task) = BOOTSTRAP_TASKS.lock().pop() {
-                    task.join().unwrap();
-                    if let Some(_) = task.take_exit_value() {
-                        // trace!("Cleaned up bootstrap task {:?}", task);
-                        num_tasks_cleaned += 1;
-                    } else {
-                        panic!("BUG: bootstrap task didn't exit before cleanup: {:?}", task);
+                    match task.join() {
+                        Ok(_exit_val) => num_tasks_cleaned += 1,
+                        Err(_e) => panic!(
+                            "BUG: failed to join bootstrap task {:?}, error: {:?}",
+                            task, _e,
+                        ),
                     }
                 }
             }
@@ -109,7 +110,7 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
-    task_ref: JoinableTaskRef,
+    task_ref: TaskRef,
 }
 impl Deref for BootstrapTaskRef {
     type Target = TaskRef;
@@ -123,9 +124,7 @@ impl BootstrapTaskRef {
     /// This function does the following:
     /// 1. Consumes this bootstrap task such that it can no longer be accessed.
     /// 2. Marks this bootstrap task as exited.
-    /// 3. Removes this bootstrap task from all this CPU's runqueue.
-    /// 
-    /// This function consumes this bootstrap task, marks it as exited
+    /// 3. Removes this bootstrap task from this CPU's runqueue.
     pub fn finish(self) {
         drop(self);
     }
@@ -851,7 +850,7 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
     // Third, reap the task if it has been orphaned (if it's non-joinable).
     if !current_task.is_joinable() {
         // trace!("Reaping orphaned task... {:?}", current_task);
-        let _exit_value = current_task.take_exit_value();
+        let _exit_value = current_task.retrieve_exit_value();
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
 }

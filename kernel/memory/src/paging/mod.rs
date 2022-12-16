@@ -31,6 +31,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     get_vga_mem_addr, set_as_active_page_table_root, KERNEL_OFFSET};
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
+use boot_info::BootInformation;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
@@ -63,19 +64,18 @@ impl DerefMut for PageTable {
 }
 
 impl PageTable {
-    /// An internal function to bootstrap a new top-level PageTable 
-    /// based on the given currently-active P4 frame (the frame holding the page table root).
+    /// An internal function to bootstrap a new top-level `PageTable` from
+    /// the currently-active P4 frame (the root page table frame).
     /// 
-    /// Returns an error if the given `active_p4_frame` is not the currently active page table.
-    fn from_current(active_p4_frame: AllocatedFrames) -> Result<PageTable, &'static str> {
-        assert!(active_p4_frame.size_in_frames() == 1);
-        let current_p4 = get_current_p4();
-        if active_p4_frame.start() != &current_p4 {
-            return Err("PageTable::from_current(): the active_p4_frame must be the root of the currently-active page table.");
-        }
+    /// Returns an error if unable to allocate the `Frame` of the
+    /// currently active page table root from the frame allocator.
+    fn from_current() -> Result<PageTable, ()> {
+        let current_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), 1)
+            .map_err(|_| ())?;
+    
         Ok(PageTable { 
-            mapper: Mapper::with_p4_frame(current_p4),
-            p4_table: active_p4_frame,
+            mapper: Mapper::with_p4_frame(*current_p4.start()),
+            p4_table: current_p4,
         })
     }
 
@@ -206,7 +206,7 @@ pub fn get_current_p4() -> Frame {
 ///
 /// Otherwise, it returns a str error message. 
 pub fn init(
-    boot_info: &multiboot2::BootInformation,
+    boot_info: &impl BootInformation,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
@@ -227,13 +227,13 @@ pub fn init(
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     
     // bootstrap a PageTable from the currently-loaded page table
-    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
-    let mut page_table = PageTable::from_current(current_active_p4)?;
+    let mut page_table = PageTable::from_current()
+        .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;
     debug!("Bootstrapped initial {:?}", page_table);
 
-    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or("boot_info start virtual address was invalid")?;
+    let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_size = boot_info.total_size();
+    let boot_info_size = boot_info.len();
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 

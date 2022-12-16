@@ -8,7 +8,7 @@
 //! To make a crate (or folder of crates) optional, do the following:
 //! 1. Add it to the set of `exclude`s in the top-level Theseus `Cargo.toml` file.
 //! 2. Add it as an optional dependency in this crate's `Cargo.toml` file, ensuring `optional = true`.
-//! 3. [Optional] Add it as a feature below, in order to give it a specific name.
+//! 3. (Optional) Add it as a feature below, in order to give it a specific name.
 //!    * Technically this isn't required, but it can offer a clearer/different name.
 //!    * You can optionally add it to the `default` set of features,
 //!      or create a new group of features that includes it, 

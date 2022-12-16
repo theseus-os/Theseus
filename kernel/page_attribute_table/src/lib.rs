@@ -11,6 +11,7 @@ use log::*;
 use modular_bitfield::{specifiers::{B3, B5}, bitfield};
 use msr::IA32_PAT;
 use raw_cpuid::CpuId;
+use spin::Once;
 // use x86_64::registers::control::{Cr0, Cr0Flags};
 
 /// Theseus's fixed [`PageAttributeTable`] has slots that align with
@@ -124,21 +125,28 @@ impl MemoryCachingType {
     }
 }
 
+/// Returns `true` if the Page Attribute Table is supported on this system.
+pub fn is_supported() -> bool {
+    // Cache the result of CpuId 
+    static PAT_SUPPORT: Once<bool> = Once::new();
+    
+    *PAT_SUPPORT.call_once(|| CpuId::new()
+        .get_feature_info()
+        .map(|finfo| finfo.has_pat())
+        .unwrap_or(false)
+    )
+}
 
-/// Sets up the Page Attribute Table (PAT) for this CPU.
+
+/// Sets up and enables the Page Attribute Table (PAT) for this (the current) CPU.
 ///
 /// This works by setting the [`IA32_PAT`] MSR to the value
-/// specified by [`FIXED_PAT`].
+/// specified by [`FIXED_PAT`];
+/// thus, it must be done separately on each and every CPU.
 ///
 /// Returns `Ok(())` upon success, and `Err(())` if PAT is unsupported.
 pub fn init() -> Result<(), ()> {
-    let has_pat = CpuId::new()
-        .get_feature_info()
-        .map(|finfo| finfo.has_pat())
-        .ok_or(())?;
-    
-    if !has_pat {
-        error!("This CPU does not support the Page Attribute Table");
+    if !is_supported() {
         return Err(());
     }
 
@@ -149,6 +157,6 @@ pub fn init() -> Result<(), ()> {
         pat_msr.write(FIXED_PAT.into());
     }
 
-    debug!("Enabled the Page Attribute Table");
+    debug!("Enabled the Page Attribute Table for the current CPU.");
     Ok(())
 }
