@@ -2093,7 +2093,6 @@ dependencies = [
  "no_drop",
  "panic_entry",
  "serial_port_basic",
- "spin 0.9.4",
  "stack",
  "state_store",
  "vga_buffer",
