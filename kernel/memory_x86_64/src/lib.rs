@@ -178,6 +178,7 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
             }
             // This appears when compiling for BIOS.
             ".page_table" | ".stack" => {
+                debug!("     no need to map this section, it is mapped separately later");
                 continue;
             }
             // This appears when compiling for UEFI.
