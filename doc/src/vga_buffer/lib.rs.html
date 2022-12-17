@@ -178,6 +178,7 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
+<span id="181">181</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
 //!
 //! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
@@ -219,14 +220,15 @@
 <span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>print_raw {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
-        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+        <span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)]
+        </span><span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
 <span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>println_raw {
-    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
-    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro">print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
+    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
 }
 
 <span class="attr">#[doc(hidden)]

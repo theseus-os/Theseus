@@ -223,55 +223,6 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-<span id="252">252</span>
-<span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -290,125 +241,86 @@
 //! 
 
 </span><span class="attr">#![no_std]
+#![no_main]
+#![feature(naked_functions)]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>multiboot2;
-<span class="kw">extern crate </span>kernel_config; <span class="comment">// our configuration options, just a set of const definitions.
-</span><span class="kw">extern crate </span>irq_safety; <span class="comment">// for irq-safe locking and interrupt utilities
-</span><span class="kw">extern crate </span>logger;
-<span class="kw">extern crate </span>state_store;
-<span class="kw">extern crate </span>memory; <span class="comment">// the virtual memory subsystem
-</span><span class="kw">extern crate </span>no_drop;
-<span class="kw">extern crate </span>stack;
-<span class="kw">extern crate </span>serial_port_basic;
-<span class="kw">extern crate </span>mod_mgmt;
-<span class="kw">extern crate </span>exceptions_early;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>vga_buffer;
-<span class="kw">extern crate </span>panic_entry; <span class="comment">// contains required panic-related lang items
-</span><span class="attr">#[cfg(not(loadable))] </span><span class="kw">extern crate </span>captain;
-<span class="kw">extern crate </span>memory_initialization;
-<span class="kw">extern crate </span>boot_info;
-
+</span><span class="kw">extern crate </span>panic_entry;
 
 <span class="kw">use </span>core::ops::DerefMut;
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
-<span class="kw">use </span>serial_port_basic::{take_serial_port, SerialPortAddress};
-<span class="kw">use </span>boot_info::BootInformation;
+<span class="kw">use </span>vga_buffer::println_raw;
+
+<span class="kw">mod </span>bios;
 
 <span class="doccomment">/// Used to obtain information about this build of Theseus.
 </span><span class="kw">mod </span>build_info {
     <span class="macro">include!</span>(<span class="macro">concat!</span>(<span class="macro">env!</span>(<span class="string">&quot;OUT_DIR&quot;</span>), <span class="string">&quot;/built.rs&quot;</span>));
 }
 
-<span class="doccomment">/// Just like Rust&#39;s `try!()` macro, but instead of performing an early return upon an error,
-/// it invokes the `shutdown()` function upon an error in order to cleanly exit Theseus OS.
+<span class="doccomment">/// Just like Rust&#39;s `try!()` macro, but instead of performing an early return
+/// upon an error, it invokes the `shutdown()` function upon an error in order
+/// to cleanly exit Theseus OS.
+</span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>try_exit {
-    (<span class="macro-nonterminal">$expr</span>:expr) =&gt; (<span class="kw">match </span><span class="macro-nonterminal">$expr </span>{
-        <span class="prelude-val">Ok</span>(val) =&gt; val,
-        <span class="prelude-val">Err</span>(err_msg) =&gt; {
-            <span class="macro-nonterminal">$crate::shutdown</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, err_msg));
+    (<span class="macro-nonterminal">$expr</span>:expr) =&gt; {
+        <span class="kw">match </span><span class="macro-nonterminal">$expr </span>{
+            <span class="prelude-val">Ok</span>(val) =&gt; val,
+            <span class="prelude-val">Err</span>(err_msg) =&gt; {
+                <span class="macro-nonterminal">$crate::shutdown</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, err_msg));
+            }
         }
-    });
-    <span class="comment">// ($expr:expr,) =&gt; (try!($expr));
-</span>}
-
+    };
+}
 
 <span class="doccomment">/// Shuts down Theseus and prints the given formatted arguuments.
 </span><span class="kw">fn </span>shutdown(msg: core::fmt::Arguments) -&gt; ! {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg); 
-    <span class="macro">warn!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
+    <span class="macro">println_raw!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
+    <span class="macro">log::error!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
 
     <span class="comment">// TODO: handle shutdowns properly with ACPI commands
     </span><span class="macro">panic!</span>(<span class="string">&quot;{}&quot;</span>, msg);
 }
 
+<span class="doccomment">/// Early setup that must be done prior to loading the boot information.
+///
+/// This involves:
+/// 1. Setting up logging
+/// 2. Dumping basic information about the Theseus build
+/// 3. Initialising early exceptions
+</span><span class="kw">fn </span>early_setup(early_double_fault_stack_top: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    irq_safety::disable_interrupts();
+    <span class="macro">println_raw!</span>(<span class="string">&quot;Entered early_setup(). Interrupts disabled.&quot;</span>);
 
-
-<span class="doccomment">/// The main entry point into Theseus, that is, the first Rust code that the Theseus kernel runs. 
-///
-/// This is called from assembly code entry point for Theseus, found in `nano_core/src/boot/arch_x86_64/boot.asm`.
-///
-/// This function does the following things: 
-///
-/// * Bootstraps the OS, including [logging](../logger/index.html) 
-///   and basic early [exception handlers](../exceptions_early/fn.init.html)
-/// * Sets up basic [virtual memory](../memory/fn.init.html)
-/// * Initializes the [state_store](../state_store/index.html) module
-/// * Finally, calls the Captain module, which initializes and configures the rest of Theseus.
-///
-/// If a failure occurs and is propagated back up to this function, the OS is shut down.
-/// 
-/// # Note
-/// In general, you never need to modify the `nano_core` to change Theseus&#39;s behavior,
-/// because the `nano_core` is essentially logic-agnostic boilerplate code and set up routines. 
-/// If you want to customize or change how the OS components are initialized, 
-/// then change the [`captain::init`](../captain/fn.init.html) routine.
-/// 
-</span><span class="attr">#[no_mangle]
-</span><span class="kw">pub extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>nano_core_start(
-    multiboot_information_virtual_address: usize,
-    early_double_fault_stack_top: usize,
-) {
-    <span class="comment">// start the kernel with interrupts disabled
-	</span>irq_safety::disable_interrupts();
-    <span class="macro">println_raw!</span>(<span class="string">&quot;Entered nano_core_start(). Interrupts disabled.&quot;</span>);
-
-    <span class="comment">// Initialize the logger up front so we can see early log messages for debugging.
-    </span><span class="kw">let </span>logger_ports = [take_serial_port(SerialPortAddress::COM1)]; <span class="comment">// some servers use COM2 instead. 
-    </span><span class="macro">try_exit!</span>(logger::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten()).map_err(|_a| <span class="string">&quot;logger::early_init() failed.&quot;</span>));
-    <span class="macro">info!</span>(<span class="string">&quot;Logger initialized.&quot;</span>);
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized logger.&quot;</span>); 
+    <span class="kw">let </span>logger_ports = [serial_port_basic::take_serial_port(
+        serial_port_basic::SerialPortAddress::COM1,
+    )];
+    logger::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten())
+        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialise early logging&quot;</span>)<span class="question-mark">?</span>;
+    <span class="macro">log::info!</span>(<span class="string">&quot;initialised early logging&quot;</span>);
+    <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized logger.&quot;</span>);
 
     <span class="comment">// Dump basic information about this build of Theseus.
-    </span><span class="macro">info!</span>(<span class="string">&quot;\n    \
+    </span><span class="macro">log::info!</span>(<span class="string">&quot;\n    \
         ===================== Theseus build info: =====================\n    \
         CUSTOM CFGs: {} \n    \
         ===============================================================&quot;</span>,
         build_info::CUSTOM_CFG_STR,
     );
 
-    <span class="comment">// initialize basic exception handlers
-    </span>exceptions_early::init(<span class="prelude-val">Some</span>(VirtualAddress::new_canonical(early_double_fault_stack_top)));
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized early IDT with exception handlers.&quot;</span>); 
+    exceptions_early::init(<span class="prelude-val">Some</span>(VirtualAddress::new_canonical(early_double_fault_stack_top)));
+    <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized early IDT with exception handlers.&quot;</span>);
 
-    <span class="comment">// safety-wise, we have to trust the multiboot address we get from the boot-up asm code, but we can check its validity
-    </span><span class="kw">if </span>VirtualAddress::new(multiboot_information_virtual_address).is_none() {
-        <span class="macro">try_exit!</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;multiboot info virtual address was invalid! Ensure that nano_core_start() is being invoked properly from boot.asm!&quot;</span>));
-    }
-    <span class="kw">let </span>boot_info = <span class="macro">try_exit!</span>(
-        <span class="kw">unsafe </span>{ multiboot2::load(multiboot_information_virtual_address) }.map_err(|e| {
-            <span class="macro">error!</span>(<span class="string">&quot;Error loading multiboot2 info: {:?}&quot;</span>, e);
-            <span class="string">&quot;Error loading multiboot2 info&quot;
-        </span>})
-    );
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): booted via multiboot2 with boot info at {:#X}.&quot;</span>, multiboot_information_virtual_address); 
+    <span class="prelude-val">Ok</span>(())
+}
 
+<span class="doccomment">/// The nano core routine. See crate-level documentation for more information.
+</span><span class="kw">fn </span>nano_core&lt;T&gt;(boot_info: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+<span class="kw">where
+    </span>T: boot_info::BootInformation
+{
     <span class="kw">let </span>rsdp_address = boot_info.rsdp();
-
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
+    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
 
     <span class="comment">// init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     </span><span class="kw">let </span>(
@@ -419,24 +331,19 @@
         stack,
         bootloader_modules,
         identity_mapped_pages
-    ) = <span class="macro">try_exit!</span>(memory_initialization::init_memory_management(boot_info));
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized memory subsystem.&quot;</span>); 
+    ) = memory_initialization::init_memory_management(boot_info)<span class="question-mark">?</span>;
+    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized memory subsystem.&quot;</span>);
 
     state_store::init();
-    <span class="macro">trace!</span>(<span class="string">&quot;state_store initialized.&quot;</span>);
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized state store.&quot;</span>);     
+    <span class="macro">log::trace!</span>(<span class="string">&quot;state_store initialized.&quot;</span>);
+    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized state store.&quot;</span>);
 
     <span class="comment">// initialize the module management subsystem, so we can create the default crate namespace
-    </span><span class="kw">let </span>default_namespace = <span class="kw">match </span>mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut()) {
-        <span class="prelude-val">Ok</span>(namespace) =&gt; namespace,
-        <span class="prelude-val">Err</span>(err) =&gt; {
-            shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, err));
-        }
-    };
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): initialized crate namespace subsystem.&quot;</span>); 
+    </span><span class="kw">let </span>default_namespace = mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut())<span class="question-mark">?</span>;
+    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized crate namespace subsystem.&quot;</span>);
 
     <span class="comment">// Parse the nano_core crate (the code we&#39;re already running) since we need it to load and run applications.
-    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): parsing nano_core crate, please wait ...&quot;</span>); 
+    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): parsing nano_core crate, please wait ...&quot;</span>);
     <span class="kw">let </span>(nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = <span class="kw">match </span>mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
@@ -447,16 +354,14 @@
         <span class="prelude-val">Ok</span>((nano_core_crate_ref, init_symbols, _num_new_syms)) =&gt; {
             <span class="comment">// Get symbols from the boot assembly code that defines where the ap_start code are.
             // They will be present in the &quot;.init&quot; sections, i.e., in the `init_symbols` list. 
-            </span><span class="kw">let </span>ap_realmode_begin = <span class="macro">try_exit!</span>(
-                init_symbols.get(<span class="string">&quot;ap_start_realmode&quot;</span>)
-                    .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
-                    .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)
-            );
-            <span class="kw">let </span>ap_realmode_end   = <span class="macro">try_exit!</span>(
-                init_symbols.get(<span class="string">&quot;ap_start_realmode_end&quot;</span>)
-                    .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
-                    .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)
-            );
+            </span><span class="kw">let </span>ap_realmode_begin = init_symbols
+                .get(<span class="string">&quot;ap_start_realmode&quot;</span>)
+                .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
+                .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>ap_realmode_end = init_symbols
+                .get(<span class="string">&quot;ap_start_realmode_end&quot;</span>)
+                .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
+                .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)<span class="question-mark">?</span>;
             <span class="comment">// debug!(&quot;ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}&quot;, ap_realmode_begin, ap_realmode_end);
             </span>(nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)
         }
@@ -464,10 +369,10 @@
             <span class="comment">// Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
             // we have to make sure these mapped_pages aren&#39;t dropped.
             </span>core::mem::forget(mapped_pages_array);
-            shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;parse_nano_core() failed! error: {}&quot;</span>, msg));
+            <span class="kw">return </span><span class="prelude-val">Err</span>(msg);
         }
     };
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): finished parsing the nano_core crate.&quot;</span>); 
+    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): finished parsing the nano_core crate.&quot;</span>);
 
     <span class="attr">#[cfg(loadable)] </span>{
         <span class="comment">// This isn&#39;t currently necessary; we can always add it in back later if/when needed.
@@ -480,45 +385,42 @@
     <span class="comment">// if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     </span><span class="attr">#[cfg(loadable)] </span>{
         <span class="kw">use </span>mod_mgmt::CrateNamespace;
-        <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): loading the \&quot;captain\&quot; crate...&quot;</span>);     
-        <span class="kw">let </span>(captain_file, _ns) = <span class="macro">try_exit!</span>(CrateNamespace::get_crate_object_file_starting_with(default_namespace, <span class="string">&quot;captain-&quot;</span>).ok_or(<span class="string">&quot;couldn&#39;t find the singular \&quot;captain\&quot; crate object file&quot;</span>));
-        <span class="kw">let </span>(_captain_crate, _num_captain_syms) = <span class="macro">try_exit!</span>(default_namespace.load_crate(<span class="kw-2">&amp;</span>captain_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>));
-        <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): loading the panic handling crate(s)...&quot;</span>);     
-        <span class="kw">let </span>(panic_wrapper_file, _ns) = <span class="macro">try_exit!</span>(CrateNamespace::get_crate_object_file_starting_with(default_namespace, <span class="string">&quot;panic_wrapper-&quot;</span>).ok_or(<span class="string">&quot;couldn&#39;t find the singular \&quot;panic_wrapper\&quot; crate object file&quot;</span>));
-        <span class="kw">let </span>(_pw_crate, _num_pw_syms) = <span class="macro">try_exit!</span>(default_namespace.load_crate(<span class="kw-2">&amp;</span>panic_wrapper_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>));
+        <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): loading the \&quot;captain\&quot; crate...&quot;</span>);
+        <span class="kw">let </span>(captain_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, <span class="string">&quot;captain-&quot;</span>).ok_or(<span class="string">&quot;couldn&#39;t find the singular \&quot;captain\&quot; crate object file&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(_captain_crate, _num_captain_syms) = default_namespace.load_crate(<span class="kw-2">&amp;</span>captain_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
+        <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): loading the panic handling crate(s)...&quot;</span>);
+        <span class="kw">let </span>(panic_wrapper_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, <span class="string">&quot;panic_wrapper-&quot;</span>).ok_or(<span class="string">&quot;couldn&#39;t find the singular \&quot;panic_wrapper\&quot; crate object file&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(_pw_crate, _num_pw_syms) = default_namespace.load_crate(<span class="kw-2">&amp;</span>panic_wrapper_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
     }
 
 
     <span class="comment">// at this point, we load and jump directly to the Captain, which will take it from here. 
     // That&#39;s it, the nano_core is done! That&#39;s really all it does! 
-    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core_start(): invoking the captain...&quot;</span>);     
+    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): invoking the captain...&quot;</span>);
     <span class="attr">#[cfg(not(loadable))] </span>{
-        <span class="macro">try_exit!</span>(
-            captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)
-        );
+        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)<span class="question-mark">?</span>;
     }
     <span class="attr">#[cfg(loadable)] </span>{
+        <span class="kw">extern crate </span>alloc;
+
         <span class="kw">use </span>alloc::vec::Vec;
         <span class="kw">use </span>memory::{MmiRef, MappedPages, PhysicalAddress};
         <span class="kw">use </span>no_drop::NoDrop;
 
-        <span class="kw">let </span>section = <span class="macro">try_exit!</span>(
-            default_namespace.get_symbol_starting_with(<span class="string">&quot;captain::init::&quot;</span>)
+        <span class="kw">let </span>section = default_namespace
+            .get_symbol_starting_with(<span class="string">&quot;captain::init::&quot;</span>)
             .upgrade()
-            .ok_or(<span class="string">&quot;no single symbol matching \&quot;captain::init\&quot;&quot;</span>)
-        );
-        <span class="macro">info!</span>(<span class="string">&quot;The nano_core (in loadable mode) is invoking the captain init function: {:?}&quot;</span>, section.name);
+            .ok_or(<span class="string">&quot;no single symbol matching \&quot;captain::init\&quot;&quot;</span>)<span class="question-mark">?</span>;
+        <span class="macro">log::info!</span>(<span class="string">&quot;The nano_core (in loadable mode) is invoking the captain init function: {:?}&quot;</span>, section.name);
 
         <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;Vec&lt;MappedPages&gt;&gt;, NoDrop&lt;stack::Stack&gt;, VirtualAddress, VirtualAddress, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
-        <span class="kw">let </span>func: <span class="kw-2">&amp;</span>CaptainInitFunc = <span class="macro">try_exit!</span>(<span class="kw">unsafe </span>{ section.as_func() });
+        <span class="kw">let </span>func: <span class="kw-2">&amp;</span>CaptainInitFunc = <span class="kw">unsafe </span>{ section.as_func() }<span class="question-mark">?</span>;
 
-        <span class="macro">try_exit!</span>(
-            func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)
-        );
+        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)<span class="question-mark">?</span>;
     }
 
     <span class="comment">// the captain shouldn&#39;t return ...
-    </span><span class="macro">try_exit!</span>(<span class="prelude-val">Err</span>(<span class="string">&quot;captain::init returned unexpectedly... it should be an infinite loop (diverging function)&quot;</span>));
+    </span><span class="prelude-val">Err</span>(<span class="string">&quot;captain::init returned unexpectedly... it should be an infinite loop (diverging function)&quot;</span>)
 }
 
 
