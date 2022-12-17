@@ -185,6 +185,7 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
             ".bootloader-config" => {
                 // TODO: Ideally we'd mark .bootloader-config as not allocated
                 // so the bootloader doesn't load it.
+                debug!("     no need to map this section, it is only used by the bootloader for config.");
                 continue;
             }
             _ =>  {
