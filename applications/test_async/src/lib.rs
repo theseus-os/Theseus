@@ -20,8 +20,8 @@ pub fn main(_: Vec<String>) -> isize {
         };
         assert_eq!(result, 1);
 
-        let handle_1 = spawn(async { 1855 });
-        let handle_2 = spawn(async { loop {} });
+        let handle_1 = spawn(async { 1855 }).unwrap();
+        let handle_2 = spawn(async { loop {} }).unwrap();
 
         assert_eq!(handle_1.await.unwrap(), 1855);
         handle_2.abort();
