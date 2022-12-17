@@ -35,7 +35,7 @@ impl Instant {
         Self { counter }
     }
 
-    /// Returns the amout of time elapsed from another instant to this one, or
+    /// Returns the amount of time elapsed from another instant to this one, or
     /// zero duration if that instant is later than this one.
     pub fn duration_since(&self, earlier: Self) -> Duration {
         let instant = Instant {
@@ -48,7 +48,7 @@ impl Instant {
         Duration::from_nanos((femtos / FEMTOS_TO_NANOS) as u64)
     }
 
-    pub fn checked_duraction_since(&self, earlier: Self) -> Option<Duration> {
+    pub fn checked_duration_since(&self, earlier: Self) -> Option<Duration> {
         let instant = Instant {
             counter: self.counter.checked_sub(earlier.counter)?,
         };
@@ -102,9 +102,9 @@ pub struct Period(u64);
 impl Period {
     const MAX: Self = Self(u64::MAX);
 
-    /// Creates a new frequency with the specified femtoseconds.
-    pub fn new(frequency: u64) -> Self {
-        Self(frequency)
+    /// Creates a new period with the specified femtoseconds.
+    pub fn new(period: u64) -> Self {
+        Self(period)
     }
 }
 
@@ -123,17 +123,17 @@ impl From<Period> for u128 {
 }
 
 impl From<u64> for Period {
-    /// Creates a new frequency with the specified femtoseconds.
-    fn from(f: u64) -> Self {
-        Self(f)
+    /// Creates a new period with the specified femtoseconds.
+    fn from(period: u64) -> Self {
+        Self(period)
     }
 }
 
 /// Register the clock source that can be used to sleep when interrupts are
 /// disabled.
 ///
-/// The current early sleeper will only be overwritten by `T` if `frequency` is
-/// larger than the frequency of the current early sleeper.
+/// The provided early sleeper will overwrite the current early sleeper only if
+/// `period` is smaller than that of the current early sleeper.
 ///
 /// Returns whether the early sleeper was overwritten.
 pub fn register_early_sleeper<T>(period: Period) -> bool
@@ -165,10 +165,10 @@ pub fn early_sleep(duration: Duration) {
 
 /// Register a clock source.
 ///
-/// The provided source will overwrite the previous source only if `frequency`
-/// is larger than that of the previous source.
+/// The provided clock source will overwrite the current clock source only if
+/// `period` is smaller than that of the current clock source.
 ///
-/// Returns whether the previous source was overwritten.
+/// Returns whether the clock source was overwritten.
 pub fn register_clock_source<T>(period: Period) -> bool
 where
     T: ClockSource,
@@ -245,7 +245,7 @@ pub trait ClockType: private::Sealed {
     #[doc(hidden)]
     fn now_fn() -> &'static AtomicCell<fn() -> Self::Unit>;
     #[doc(hidden)]
-    fn period_atomic() -> &'static AtomicCell<Period> ;
+    fn period_atomic() -> &'static AtomicCell<Period>;
 }
 
 pub struct Monotonic;
