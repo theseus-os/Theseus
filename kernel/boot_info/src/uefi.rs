@@ -7,7 +7,8 @@ use core::{
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
-// TODO: Ideally this would be defined in nano_core.
+// TODO: Ideally this would be defined in nano_core. However, that would
+// introduce a circular dependency as the boot information needs the stack size.
 /// The total stack size including the guard page, and additional page for the
 /// double fault handler stack.
 pub const STACK_SIZE: usize = (KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE;
