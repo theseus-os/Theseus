@@ -823,11 +823,9 @@ fn frame_is_in_list(
 ) -> bool {
     match &list.0 {
         Inner::Array(ref arr) => {
-            for elem in arr.iter() {
-                if let Some(chunk) = elem {
-                    if chunk.contains(frame) { 
-                        return true;
-                    }
+            for chunk in arr.iter().flatten() {
+                if chunk.contains(frame) {
+                    return true;
                 }
             }
         }
@@ -861,14 +859,12 @@ fn add_reserved_region(
     // Check whether the reserved region overlaps any existing regions.
     match &mut list.0 {
         Inner::Array(ref mut arr) => {
-            for elem in arr.iter() {
-                if let Some(chunk) = elem {
-                    if let Some(_overlap) = chunk.overlap(&frames) {
-                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                        //     frames, _overlap, chunk
-                        // );
-                        return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
-                    }
+            for chunk in arr.iter().flatten() {
+                if let Some(_overlap) = chunk.overlap(&frames) {
+                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                    //     frames, _overlap, chunk
+                    // );
+                    return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
                 }
             }
         }

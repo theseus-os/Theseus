@@ -146,8 +146,6 @@ impl IoApic {
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
     pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
-        let vector = irq_vector as u8;
-
         let low_index: u32 = 0x10 + (ioapic_irq as u32) * 2;
         let high_index: u32 = 0x10 + (ioapic_irq as u32) * 2 + 1;
 
@@ -161,7 +159,7 @@ impl IoApic {
         low &= !(1<<11);
         low &= !0x700;
         low &= !0xff;
-        low |= vector as u32;
+        low |= irq_vector as u32;
         self.write_reg(low_index, low);
     }
 }

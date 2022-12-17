@@ -209,7 +209,7 @@ impl Mapper {
 
         Ok((
             MappedPages {
-                page_table_p4: self.target_p4.clone(),
+                page_table_p4: self.target_p4,
                 pages,
                 flags: actual_flags,
             },
@@ -275,7 +275,7 @@ impl Mapper {
         }
 
         Ok(MappedPages {
-            page_table_p4: self.target_p4.clone(),
+            page_table_p4: self.target_p4,
             pages,
             flags: actual_flags,
         })

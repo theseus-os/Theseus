@@ -124,33 +124,34 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
     BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
 }
 
-
+/// Information returned after initialising the memory subsystem.
+pub struct MemoryMappings {
+    /// The currently active page table.
+    pub page_table: PageTable,
+    /// The kernel's text section mappings.
+    pub text: NoDrop<MappedPages>,
+    /// The kernel's rodata section mappings.
+    pub rodata: NoDrop<MappedPages>,
+    /// The kernel's data section mappings.
+    pub data: NoDrop<MappedPages>,
+    /// The kernel stack's guard page.
+    pub stack_guard: AllocatedPages,
+    /// The kernel's stack mappings.
+    pub stack: NoDrop<MappedPages>,
+    /// The boot information mappings.
+    pub boot_info: MappedPages,
+    /// The list of other higher-half mapping that must be converted to a vec after heap initialization, and kept forever e.g. VGA buffer.
+    pub higher_half: [Option<NoDrop<MappedPages>>; 32],
+    /// The list of identity mappings that must be converted to a vec after heap initialization, and dropped before starting the first userspace program.
+    pub identity: [Option<NoDrop<MappedPages>>; 32],
+}
 
 /// Initializes the virtual memory management system.
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
-/// 
-/// Returns the following tuple, if successful:
-///  1. the kernel's new `PageTable`, which is now currently active,
-///  2. the `MappedPages` of the kernel's text section,
-///  3. the `MappedPages` of the kernel's rodata section,
-///  4. the `MappedPages` of the kernel's data section,
-///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  6. the `MappedPages` holding the bootloader info,
-///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 pub fn init(
     boot_info: &impl BootInformation
-) -> Result<(
-    PageTable,
-    NoDrop<MappedPages>,
-    NoDrop<MappedPages>,
-    NoDrop<MappedPages>,
-    (AllocatedPages, NoDrop<MappedPages>),
-    MappedPages,
-    [Option<NoDrop<MappedPages>>; 32],
-    [Option<NoDrop<MappedPages>>; 32],
-), &'static str> {
+) -> Result<MemoryMappings, &'static str> {
     // Get the start and end addresses of the kernel, boot info, boot modules, etc.
     // These are all physical addresses.
     let kernel_memory = boot_info.kernel_memory_range()?;
@@ -211,8 +212,8 @@ pub fn init(
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     paging::init(boot_info, into_alloc_frames_fn)
-        .inspect(|(new_page_table, ..)| {
-            debug!("Done with paging::init(). new page table: {:?}", new_page_table);
+        .inspect(|MemoryMappings { page_table, .. } | {
+            debug!("Done with paging::init(). new page table: {:?}", page_table);
         })
 }
 

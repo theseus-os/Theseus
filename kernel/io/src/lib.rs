@@ -324,7 +324,6 @@ impl<R> From<R> for ByteReaderWrapper<R> where R: BlockReader {
 impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
-        let offset = offset as usize;
 
         let transfers = blocks_from_bytes(offset .. offset + buffer.len(), self.block_size());
         for transfer in transfers.iter().flatten() {
