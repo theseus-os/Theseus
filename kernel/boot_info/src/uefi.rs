@@ -13,6 +13,9 @@ use memory_structs::{PhysicalAddress, VirtualAddress};
 /// double fault handler stack.
 pub const STACK_SIZE: usize = (KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE;
 
+/// A custom memory region kind used by the bootloader for the modules.
+const MODULES_MEMORY_KIND: info::MemoryRegionKind = info::MemoryRegionKind::UnknownUefi(0x80000000);
+
 pub struct MemoryRegion {
     start: PhysicalAddress,
     len: usize,
@@ -100,7 +103,7 @@ impl crate::Module for Module {
         PhysicalAddress::new_canonical(
             self.regions
                 .iter()
-                .find(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
+                .find(|region| region.kind == MODULES_MEMORY_KIND)
                 .expect("no modules region")
                 .start as usize
                 + self.inner.offset,
@@ -205,7 +208,7 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         let area = self
             .memory_regions
             .iter()
-            .find(|region| region.kind == info::MemoryRegionKind::UnknownUefi(0x80000000))
+            .find(|region| region.kind == MODULES_MEMORY_KIND)
             .ok_or("no modules memory region")?;
         let start = PhysicalAddress::new_canonical(area.start as usize);
         let end = PhysicalAddress::new_canonical(area.end as usize);
