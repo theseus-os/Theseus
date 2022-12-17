@@ -1,5 +1,6 @@
 %include "defines.asm"
 
+%ifdef BIOS
 ABSOLUTE 0x5000
 VBECardInfo:
 	.signature             resb 4
@@ -64,6 +65,7 @@ best_mode:
     .physaddr              resd 1
 	.attributes            resw 1
 	.totalmemory64KiB      resw 1
+%endif
 
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
@@ -86,6 +88,7 @@ ap_start_realmode:
     ; in which PhysicalAddr = Segment * 16 + Offset
     ; Address is <SegmentHex:OffsetHex>, so B000:8000 => 0xB8000
 
+%ifdef BIOS
     ; need to use BIOS interrupts to write to vga buffer, not mem-mapped 0xb8000
     mov ah, 0x0E
     mov al, "A"
@@ -265,6 +268,7 @@ graphic_mode_done:
     mov di, 0x900
     mov byte [es:di], 5
     ; move on (fall through) to the next step, setting up our GDT
+%endif
 
 
 ; Here, we create a GDT manually by writing its contents directly, starting at address 0x800.
@@ -347,6 +351,7 @@ prot_mode:
     mov gs, ax
     mov ss, ax
 
+%ifdef BIOS
     ; each character is reversed in the dword cuz of little endianness
     ; prints "AP_PROTECTED"
     mov dword [0xb8000], 0x4f504f41 ; "AP"
@@ -355,6 +360,7 @@ prot_mode:
     mov dword [0xb800c], 0x4f454f54 ; "TE"
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
+%endif
     
  
     jmp 0x08:ap_start_protected_mode

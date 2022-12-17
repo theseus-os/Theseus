@@ -131,14 +131,21 @@ fn compile_asm() {
             let mut output_path = out_dir.join(file.path().file_name().unwrap());
             assert!(output_path.set_extension("o"));
 
-            assert!(Command::new("nasm")
+            let mut command = Command::new("nasm");
+            command
                 .args(["-f", "elf64"])
                 .arg("-i")
                 .arg(&include_path)
                 .arg("-o")
                 .arg(&output_path)
                 .arg(file.path())
-                .args(cflags.split(' '))
+                .args(cflags.split(' '));
+
+            if BOOT_SPECIFICATION == "bios" {
+                command.arg("-DBIOS");
+            }
+
+            assert!(command
                 .status()
                 .expect("failed to acquire nasm output status")
                 .success());
