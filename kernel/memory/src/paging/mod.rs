@@ -28,12 +28,12 @@ use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET, Page
+    get_vga_mem_addr, KERNEL_OFFSET,
 };
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
-use kernel_config::memory::RECURSIVE_P4_INDEX;
+use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE};
 // use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
@@ -259,15 +259,21 @@ pub fn init(
     let stack_end_virt = stack_start_virt + boot_info.stack_size()?;
     // Stack frames are not guaranteed to be contiguous.
     let mut stack_mappings = [None; 34];
-    // + 1 accounts for the guard page which does not have a corresponding frame.
-    for (i, page) in ((Page::containing_address(stack_start_virt) + 1)..=Page::containing_address(stack_end_virt - 1)).enumerate() {
+    // + PAGE_SIZE accounts for the guard page which does not have a corresponding frame.
+    for (i, page) in PageRange::from_virt_addr(
+        stack_start_virt + PAGE_SIZE,
+        stack_end_virt.value() - (stack_start_virt.value() + PAGE_SIZE),
+    )
+    .into_iter()
+    .enumerate()
+    {
         let frame = page_table.translate_page(page).ok_or("couldn't translate stack page")?;
         stack_mappings[i] = Some((page, frame));
     }
 
     // Boot info frames are not guaranteed to be contiguous.
     let mut boot_info_mappings = [None; 10];
-    for (i, page) in (Page::containing_address(boot_info_start_vaddr)..=Page::containing_address(boot_info_start_vaddr + boot_info_size - 1)).enumerate() {
+    for (i, page) in PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size).into_iter().enumerate() {
         let frame = page_table.translate_page(page).ok_or("couldn't translate boot info page")?;
         boot_info_mappings[i] = Some((page, frame));
     }
