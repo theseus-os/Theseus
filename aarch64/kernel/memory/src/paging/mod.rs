@@ -27,14 +27,23 @@ use core::{
 use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET};
+    tlb_flush_all, tlb_flush_virt_addr, get_p4, set_as_active_page_table_root};
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
-use boot_info::BootInformation;
 use kernel_config::memory::{RECURSIVE_P4_INDEX};
-// use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
+#[cfg(target_arch = "x86_64")]
+use super::{find_section_memory_bounds, get_vga_mem_addr, KERNEL_OFFSET};
+
+#[cfg(target_arch = "aarch64")]
+use {
+    super::{
+        disable_mmu, enable_mmu, allocate_frames_at, allocate_frames,
+        allocate_pages_at, configure_translation_registers, MemoryRegionType
+    },
+    log::warn,
+    table::{Table, Level4},
+};
 
 /// A top-level root (P4) page table.
 /// 
@@ -64,21 +73,23 @@ impl DerefMut for PageTable {
 }
 
 impl PageTable {
-    /// An internal function to bootstrap a new top-level `PageTable` from
-    /// the currently-active P4 frame (the root page table frame).
+    /// An internal function to bootstrap a new top-level PageTable 
+    /// based on the given currently-active P4 frame (the frame holding the page table root).
     /// 
-    /// Returns an error if unable to allocate the `Frame` of the
-    /// currently active page table root from the frame allocator.
-    fn from_current() -> Result<PageTable, ()> {
-        let current_p4 = frame_allocator::allocate_frames_at(get_current_p4().start_address(), 1)
-            .map_err(|_| ())?;
-    
+    /// Returns an error if the given `active_p4_frame` is not the currently active page table.
+    fn from_current(active_p4_frame: AllocatedFrames) -> Result<PageTable, &'static str> {
+        assert!(active_p4_frame.size_in_frames() == 1);
+        let current_p4 = get_current_p4();
+        if active_p4_frame.start() != &current_p4 {
+            return Err("PageTable::from_current(): the active_p4_frame must be the root of the currently-active page table.");
+        }
         Ok(PageTable { 
-            mapper: Mapper::with_p4_frame(*current_p4.start()),
-            p4_table: current_p4,
+            mapper: Mapper::with_p4_frame(current_p4),
+            p4_table: active_p4_frame,
         })
     }
 
+    #[cfg(target_arch = "x86_64")]
     /// Initializes a new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`.
     /// It requires using the given `current_active_table` to set up its initial mapping contents.
     /// 
@@ -110,6 +121,30 @@ impl PageTable {
         Ok(PageTable {
             mapper: Mapper::with_p4_frame(p4_frame),
             p4_table: inited_new_p4_frame.ok_or("BUG: PageTable::new_table(): failed to take back unmapped Frame for p4_table")?,
+        })
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    /// Initializes a new top-level P4 `PageTable` whose root is located in the given `new_p4_frame`.
+    /// 
+    /// Returns the new `PageTable` that exists in physical memory at the given `new_p4_frame`. 
+    /// Note that this new page table has no current mappings beyond the recursive P4 mapping,
+    /// so you will need to create or copy over any relevant mappings 
+    /// before using (switching) to this new page table in order to ensure the system keeps running.
+    pub fn new_table(new_p4_frame: AllocatedFrames) -> Result<PageTable, &'static str> {
+        let p4_frame = new_p4_frame.start_address().value();
+        // assumes that we are in identity-mapping
+        let table = unsafe { (p4_frame as *mut Table<Level4>).as_mut().unwrap() };
+        table.zero();
+
+        let rec_flags = PteFlagsArch::VALID
+                      | PteFlagsArch::ACCESSED
+                      | PteFlagsArch::PAGE_DESCRIPTOR;
+        table[RECURSIVE_P4_INDEX].set_entry(new_p4_frame.as_allocated_frame(), rec_flags);
+
+        Ok(PageTable {
+            mapper: Mapper::with_p4_frame(*new_p4_frame.as_allocated_frame()),
+            p4_table: new_p4_frame,
         })
     }
 
@@ -175,14 +210,7 @@ impl PageTable {
     pub fn switch(&mut self, new_table: &PageTable) {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
-        // perform the actual page table switch
-        unsafe { 
-            use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
-            Cr3::write(
-                PhysFrame::containing_address(PhysAddr::new_truncate(new_table.p4_table.start_address().value() as u64)),
-                Cr3Flags::empty(),
-            )
-        };
+        set_as_active_page_table_root(new_table.physical_address());
     }
 
 
@@ -198,7 +226,7 @@ pub fn get_current_p4() -> Frame {
     Frame::containing_address(get_p4())
 }
 
-
+#[cfg(target_arch = "x86_64")]
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
 /// Returns the following tuple, if successful:
 /// 
@@ -213,7 +241,7 @@ pub fn get_current_p4() -> Frame {
 ///
 /// Otherwise, it returns a str error message. 
 pub fn init(
-    boot_info: &impl BootInformation,
+    boot_info: &multiboot2::BootInformation,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<(
         PageTable,
@@ -234,13 +262,13 @@ pub fn init(
     debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
     
     // bootstrap a PageTable from the currently-loaded page table
-    let mut page_table = PageTable::from_current()
-        .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;
+    let current_active_p4 = frame_allocator::allocate_frames_at(aggregated_section_memory_bounds.page_table.start.1, 1)?;
+    let mut page_table = PageTable::from_current(current_active_p4)?;
     debug!("Bootstrapped initial {:?}", page_table);
 
-    let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
+    let boot_info_start_vaddr = VirtualAddress::new(boot_info.start_address()).ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
-    let boot_info_size = boot_info.len();
+    let boot_info_size = boot_info.total_size();
     debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
@@ -383,4 +411,77 @@ pub fn init(
         higher_half_mapped_pages,
         identity_mapped_pages
     ))
+}
+
+#[cfg(target_arch = "aarch64")]
+/// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
+/// Returns the kernel's current PageTable, if successful.
+/// Otherwise, it returns a str error message. 
+pub fn init(
+    into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
+    layout: &[(FrameRange, MemoryRegionType, Option<PteFlags>)],
+) -> Result<PageTable, &'static str> {
+    // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
+    // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
+    mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
+
+    // Modifying the established page table could lead to
+    // unwanted faults because we don't know if it uses
+    // 4 levels and it could contain block mappings, which
+    // we don't support. UEFI makes our code run in an
+    // identity-mapped AS anyway, so by disabling the MMU
+    // we don't have to map frames temporarily while building
+    // the new theseus-made page table.
+    disable_mmu();
+
+    // bootstrap a PageTable from the currently-loaded page table
+    let current_p4 = get_current_p4().start_address();
+    let current_active_p4 = allocate_frames_at(current_p4, 1)?;
+    let mut page_table = PageTable::from_current(current_active_p4)?;
+    debug!("Bootstrapped initial {:?}", page_table);
+
+    let new_p4_frame = allocate_frames(1).ok_or("couldn't allocate frame for new page table")?;
+    debug!("new_p4_frame {:?}", new_p4_frame);
+
+    let mut new_table = PageTable::new_table(new_p4_frame)?;
+    debug!("Created new table {:?}", new_table);
+
+    let mut map_region = |phys_addr: PhysicalAddress, num_frames, flags| -> Result<(), &'static str> {
+        let virt_addr = VirtualAddress::new(phys_addr.value())
+            .ok_or("VirtualAddress::new failed - paging/mod.rs")?;
+
+        let frames = allocate_frames_at(phys_addr, num_frames)?;
+        let pages = allocate_pages_at(virt_addr, num_frames)?;
+
+        NoDrop::new(new_table.map_allocated_pages_to_frames_identity(pages, frames, flags)?);
+
+        Ok(())
+    };
+
+    // As a UEFI app we are in an identity mapped AS so virt_addr = phys_addr
+    // either that or the MMU is disabled, which works the same
+    for (range, _mem_type, flags) in layout {
+        if let Some(flags) = flags {
+            let phys_addr = range.start_address();
+            let num_frames = range.size_in_frames();
+            if let Err(error_msg) = map_region(phys_addr, num_frames, *flags) {
+                warn!("Early remapping: {}; addr={:?} n={} flags={:?}",
+                    error_msg, phys_addr, num_frames, flags);
+            }
+        }
+    }
+
+    debug!("Switching to the new page table");
+    page_table.switch(&new_table);
+
+    debug!("Configuring translation registers");
+    configure_translation_registers();
+
+    debug!("Re-enabling the MMU");
+    enable_mmu();
+
+    debug!("Flushing the TLB");
+    tlb_flush_all();
+
+    Ok(new_table)
 }

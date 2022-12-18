@@ -323,6 +323,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "boot_info"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "kernel_config",
+ "memory_structs",
+ "multiboot2",
+]
+
+[[package]]
 name = "bootloader_modules"
 version = "0.1.0"
 dependencies = [
@@ -581,17 +591,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeaa953eaad386a53111e47172c2fedba671e5684c8dd601a5f474f4f118710f"
 dependencies = [
  "cfg-if 1.0.0",
-]
-
-[[package]]
-name = "cpu"
-version = "0.1.0"
-dependencies = [
- "apic",
- "getopts",
- "runqueue",
- "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -1480,6 +1479,7 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
+ "net",
  "network_interface_card",
  "nic_buffers",
  "nic_initialization",
@@ -1794,6 +1794,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "boot_info",
  "frame_allocator",
  "irq_safety",
  "kernel_config",
@@ -1801,7 +1802,6 @@ dependencies = [
  "log",
  "memory_structs",
  "memory_x86_64",
- "multiboot2",
  "no_drop",
  "owned_borrowed_trait",
  "page_allocator",
@@ -1817,13 +1817,13 @@ dependencies = [
 name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "bootloader_modules",
  "heap",
  "irq_safety",
  "kernel_config",
  "log",
  "memory",
- "multiboot2",
  "no_drop",
  "stack",
 ]
@@ -1849,10 +1849,10 @@ checksum = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "kernel_config",
  "log",
  "memory_structs",
- "multiboot2",
  "pte_flags",
  "x86_64",
 ]
@@ -2080,6 +2080,7 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "captain",
  "exceptions_early",
  "irq_safety",
@@ -2094,7 +2095,6 @@ dependencies = [
  "no_drop",
  "panic_entry",
  "serial_port_basic",
- "spin 0.9.4",
  "stack",
  "state_store",
  "vga_buffer",
@@ -2810,6 +2810,17 @@ dependencies = [
  "lazy_static",
  "log",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "rq"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "getopts",
+ "runqueue",
+ "task",
+ "terminal_print",
 ]
 
 [[package]]
@@ -3743,7 +3754,6 @@ dependencies = [
  "cat",
  "cd",
  "channel_eval",
- "cpu",
  "date",
  "deps",
  "example",
@@ -3767,6 +3777,7 @@ dependencies = [
  "ps",
  "pwd",
  "rm",
+ "rq",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",

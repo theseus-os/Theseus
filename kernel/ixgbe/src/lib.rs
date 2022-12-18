@@ -188,7 +188,6 @@ pub struct IxgbeNic {
 
 // A trait which contains common functionalities for a NIC
 impl NetworkInterfaceCard for IxgbeNic {
-
     fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
         // by default, when using the physical NIC interface, we send on queue 0.
         let qid = 0;
@@ -207,6 +206,29 @@ impl NetworkInterfaceCard for IxgbeNic {
         // by default, when using the physical NIC interface, we receive on queue 0.
         let qid = 0;
         self.rx_queues[qid].poll_queue_and_store_received_packets()
+    }
+
+    fn mac_address(&self) -> [u8; 6] {
+        self.mac_spoofed.unwrap_or(self.mac_hardware)
+    }
+}
+
+impl net::NetworkDevice for IxgbeNic {
+    fn send(&mut self, buf: &[u8]) -> Result<(), net::Error> {
+        // TODO: This is just a workaround to make the new API work with the old machinery.
+        let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
+        let transmit_buffer_mut = &mut transmit_buffer;
+        transmit_buffer_mut.clone_from_slice(buf);
+        // TODO: Return specific error.
+        self.send_packet(transmit_buffer).map_err(|_| net::Error::Unknown)?;
+        Ok(())
+    }
+
+    fn receive(&mut self) -> Option<ReceivedFrame> {
+        // by default, when using the physical NIC interface, we receive on queue 0.
+        let qid = 0;
+        // return one frame from the queue's received frames
+        self.rx_queues[qid].received_frames.pop_front()
     }
 
     fn mac_address(&self) -> [u8; 6] {

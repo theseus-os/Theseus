@@ -57,6 +57,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
 use no_drop::NoDrop;
+use memory::PhysicalAddress;
 
 
 #[cfg(mirror_log_to_vga)]
@@ -86,6 +87,7 @@ pub fn init(
     bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
     {
@@ -99,7 +101,7 @@ pub fn init(
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
+    device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
