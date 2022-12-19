@@ -8,7 +8,7 @@ extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate wait_condition;
-extern crate multicore;
+extern crate cpu;
 
 // use core::sync::atomic::{Ordering, AtomicBool};
 use alloc::{
@@ -32,7 +32,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 
 fn rmain() -> Result<(), &'static str> {
-    let my_cpu = multicore::current_cpu();
+    let my_cpu = cpu::current_cpu();
 
     let ready = Arc::new(Mutex::new(false));
     let ready2 = ready.clone();

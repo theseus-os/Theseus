@@ -10,7 +10,7 @@ extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;
 extern crate async_channel;
-extern crate multicore;
+extern crate cpu;
 extern crate runqueue;
 extern crate window;
 extern crate framebuffer;
@@ -43,7 +43,7 @@ pub struct PassStruct {
 }
 
 macro_rules! CPU_ID {
-	() => (multicore::current_cpu())
+	() => (cpu::current_cpu())
 }
 
 // ------------------------- Window fault injection section -------------------------------------------
@@ -360,7 +360,7 @@ pub fn pick_child_core() -> u8 {
 	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 
 	// if failed, try from the last to the first
-    let last_core = multicore::cpu_count().max(u8::MAX as u32);
+    let last_core = cpu::cpu_count().max(u8::MAX as u32);
 	for child_core in (0..last_core).rev() {
 		if nr_tasks_in_rq(child_core as u8) == Some(1) {
             return child_core as u8;

@@ -1,6 +1,6 @@
 [package]
 authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
-name = "multicore"
+name = "cpu"
 description = "An abstraction over the discovery of processor cores"
 version = "0.1.0"
 edition = "2021"

@@ -16,7 +16,7 @@
 extern crate memory;
 extern crate util;
 extern crate gdt;
-extern crate multicore;
+extern crate cpu;
 extern crate alloc;
 extern crate x86_64;
 extern crate task;
@@ -131,7 +131,7 @@ unsafe extern "C" fn syscall_handler() {
     
     let curr_id = ::task::get_my_current_task_id();
     trace!("syscall_handler: (AP {}) task id={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
-           multicore::current_cpu(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
+           cpu::current_cpu(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
     // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack

@@ -345,6 +345,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "console",
+ "cpu",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -357,7 +358,6 @@ dependencies = [
  "logger",
  "memory",
  "mod_mgmt",
- "multicore",
  "multicore_bringup",
  "multiple_heaps",
  "network_manager",
@@ -433,9 +433,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "channel_eval"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "getopts",
  "log",
- "multicore",
  "spawn",
  "task",
  "terminal_print",
@@ -578,6 +578,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeaa953eaad386a53111e47172c2fedba671e5684c8dd601a5f474f4f118710f"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "cpu"
+version = "0.1.0"
+dependencies = [
+ "apic",
 ]
 
 [[package]]
@@ -985,12 +992,12 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "debug_info",
  "fault_log",
  "locked_idt",
  "log",
  "memory",
- "multicore",
  "pmu_x86",
  "print",
  "runqueue",
@@ -1057,10 +1064,10 @@ dependencies = [
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "irq_safety",
  "log",
  "memory",
- "multicore",
  "print",
  "task",
  "vga_buffer",
@@ -2012,13 +2019,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "multicore"
-version = "0.1.0"
-dependencies = [
- "apic",
-]
-
-[[package]]
 name = "multicore_bringup"
 version = "0.1.0"
 dependencies = [
@@ -2819,11 +2819,11 @@ dependencies = [
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "getopts",
  "hpet",
  "libtest",
  "log",
- "multicore",
  "runqueue",
  "spawn",
  "task",
@@ -3147,11 +3147,11 @@ name = "simd_personality"
 version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
+ "cpu",
  "fs_node",
  "log",
  "memory",
  "mod_mgmt",
- "multicore",
  "pit_clock",
  "spawn",
  "task",
@@ -3256,6 +3256,7 @@ version = "0.1.0"
 dependencies = [
  "catch_unwind",
  "context_switch",
+ "cpu",
  "debugit",
  "fault_crate_swap",
  "fault_log",
@@ -3265,7 +3266,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "multicore",
  "no_drop",
  "path",
  "pause",
@@ -3454,6 +3454,7 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3461,7 +3462,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "multicore",
  "no_drop",
  "preemption",
  "root",
@@ -3525,9 +3525,9 @@ name = "test_channel"
 version = "0.1.0"
 dependencies = [
  "async_channel",
+ "cpu",
  "getopts",
  "log",
- "multicore",
  "rendezvous",
  "scheduler",
  "spawn",
@@ -3542,12 +3542,12 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "color",
+ "cpu",
  "framebuffer",
  "framebuffer_drawer",
  "getopts",
  "hpet",
  "log",
- "multicore",
  "rendezvous",
  "runqueue",
  "scheduler",
@@ -3605,8 +3605,8 @@ dependencies = [
 name = "test_mutex_sleep"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "log",
- "multicore",
  "mutex_sleep",
  "scheduler",
  "spawn",
@@ -3680,8 +3680,8 @@ dependencies = [
 name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "log",
- "multicore",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -3877,9 +3877,9 @@ name = "tss"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
+ "cpu",
  "log",
  "memory",
- "multicore",
  "spin 0.9.4",
  "x86_64",
 ]

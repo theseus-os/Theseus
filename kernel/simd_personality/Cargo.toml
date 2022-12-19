@@ -22,8 +22,8 @@ path = "../task"
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.multicore]
-path = "../multicore"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

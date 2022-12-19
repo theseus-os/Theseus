@@ -14,8 +14,8 @@ log = "0.4.8"
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
 
-[dependencies.multicore]
-path = "../multicore"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.tss]
 path = "../tss"
