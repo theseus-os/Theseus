@@ -33,7 +33,7 @@ static NETWORK_INTERFACES: Mutex<Vec<NetworkInterface>> = Mutex::new(Vec::new())
 /// Registers a network device.
 ///
 /// The function will convert the device to an interface and it will then be
-/// accessible using [`get_interface`].
+/// accessible using [`get_interfaces()`].
 pub fn register_device<T>(device: &'static MutexIrqSafe<T>)
 where
     T: 'static + NetworkDevice + Send,

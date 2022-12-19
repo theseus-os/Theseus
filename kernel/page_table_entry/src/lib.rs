@@ -65,7 +65,7 @@ impl PageTableEntry {
 
     /// Returns this `PageTableEntry`'s flags.
     pub fn flags(&self) -> PteFlagsArch {
-        PteFlagsArch::from_bits_truncate(self.0)
+        PteFlagsArch::from_bits_truncate(self.0 & !PTE_FRAME_MASK)
     }
 
     /// Returns the physical `Frame` pointed to (mapped by) this `PageTableEntry`.

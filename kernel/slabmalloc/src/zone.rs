@@ -69,7 +69,7 @@ impl<'a> ZoneAllocator<'a> {
     /// e.g. this is 8 KiB - bytes of meta-data.
     pub const MAX_BASE_ALLOC_SIZE: usize = ZoneAllocator::MAX_ALLOC_SIZE;
 
-    /// How many allocators of type SCAllocator<ObjectPage8k> we have.
+    /// How many allocators of type `SCAllocator<ObjectPage8k>` we have.
     pub const MAX_BASE_SIZE_CLASSES: usize = 11;
 
     /// The set of sizes the allocator has lists for.

@@ -103,18 +103,14 @@ check-rustc:
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
-## This is the default output path defined by cargo.
+## The default file path where cargo outputs the nano_core's static library.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
-## The directory where the nano_core source files are
-NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
-## The output directory of where the nano_core binary should go
+## The output file path of the fully-linked nano_core kernel binary.
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
-## The linker script for linking the nano_core_binary to the assembly files
-linker_script := $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/linker_higher_half.ld
-assembly_source_files := $(wildcard $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/*.asm)
-assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm, \
-	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
-
+## The linker script for linking the `nano_core_binary` with the compiled assembly files.
+linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half.ld
+## The assembly files compiled by the nano_core build script.
+compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/bios/*.o
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -288,12 +284,21 @@ endif
 
 ## This target invokes the actual Rust build process via `cargo`.
 cargo: check-rustc 
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(NANO_CORE_BUILD_DIR)
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@mkdir -p $(DEPS_BUILD_DIR)
+
+ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
+	$(eval CFLAGS += -DVGA_TEXT_MODE)
+endif
+
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)'	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET) --features nano_core/bios
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -322,13 +327,8 @@ cargo: check-rustc
 
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
-$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
-	@mkdir -p $(BUILD_DIR)
-	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@mkdir -p $(DEPS_BUILD_DIR)
-
-	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+$(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
+	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -348,23 +348,6 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 ## `.bin`: this doesn't parse the object file at compile time, instead including the nano_core binary as a boot module so it can then be parsed during
 ## boot. See pull request #542 for more details. 
 ##	@cp $(nano_core_binary) $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.bin
-
-### This compiles the assembly files in the nano_core. 
-### This target is currently rebuilt every time to accommodate changing CFLAGS.
-$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
-	@mkdir -p $(shell dirname $@)
-    ## If the user chose to enable VGA text mode by means of setting `THESEUS_CONFIG`,
-    ## then we need to set CFLAGS such that the assembly code can know about it.
-    ## TODO: move this whole part about invoking `nasm` into a dedicated build.rs script in the nano_core.
-ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
-	$(eval CFLAGS += -DVGA_TEXT_MODE)
-endif
-	@nasm -f elf64 \
-		-i "$(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/" \
-		$< \
-		-o $@ \
-		$(CFLAGS)
-
 
 
 ### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
@@ -393,13 +376,13 @@ limine:
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
-### collapsing their directory structure into a single file name with `?` as the directory delimiter.
+### collapsing their directory structure into a single file name with `!` as the directory delimiter.
 ### The contents of the EXTRA_FILES directory will be available at runtime within Theseus's root fs, too.
 ### See the `README.md` in the `extra_files` directory for more info.
 extra_files:
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
 	@for f in $(shell cd $(EXTRA_FILES) && find * -type f); do \
-		ln -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//?/g'`  & \
+		ln -f  $(EXTRA_FILES)/$${f}  $(OBJECT_FILES_BUILD_DIR)/`echo -n $${f} | sed 's/\//!/g'`  & \
 	done; wait
 
 
@@ -606,7 +589,7 @@ doc: check-rustc
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
 ## Now, build the docs for all of Theseus's main kernel crates.
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
