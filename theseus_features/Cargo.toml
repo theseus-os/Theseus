@@ -14,7 +14,7 @@ theseus_std = { path = "../ports/theseus_std", optional = true }
 ## Regular applications.
 cat = { path = "../applications/cat", optional = true }
 cd = { path = "../applications/cd", optional = true }
-cpu = { path = "../applications/cpu", optional = true }
+lscpu = { path = "../applications/lscpu", optional = true }
 date = { path = "../applications/date", optional = true }
 deps = { path = "../applications/deps", optional = true }
 kill = { path = "../applications/kill", optional = true }
@@ -95,7 +95,7 @@ wasmtime = [ "test_wasmtime" ]
 theseus_apps = [
     "cat",
     "cd",
-    "cpu",
+    "lscpu",
     "date",
     "deps",
     "kill",

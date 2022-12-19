@@ -581,17 +581,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu"
-version = "0.1.0"
-dependencies = [
- "apic",
- "getopts",
- "runqueue",
- "task",
- "terminal_print",
-]
-
-[[package]]
 name = "cranelift-entity"
 version = "0.77.0"
 dependencies = [
@@ -1701,6 +1690,17 @@ dependencies = [
  "getopts",
  "log",
  "path",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
+name = "lscpu"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "getopts",
+ "runqueue",
  "task",
  "terminal_print",
 ]
@@ -3738,7 +3738,6 @@ dependencies = [
  "cat",
  "cd",
  "channel_eval",
- "cpu",
  "date",
  "deps",
  "example",
@@ -3752,6 +3751,7 @@ dependencies = [
  "libtest",
  "loadc",
  "ls",
+ "lscpu",
  "mkdir",
  "ns",
  "ping",
