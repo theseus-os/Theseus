@@ -14,7 +14,7 @@ use alloc::sync::{Arc, Weak};
 use log::{debug, info};
 use spin::{Mutex, MutexGuard, Once};
 
-use event_types::{Event, MousePositionEvent};
+use event_types::Event;
 use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mpmc::Queue;
 
@@ -24,7 +24,6 @@ use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use hpet::get_hpet;
 use memory::{BorrowedSliceMappedPages, Mutable, PhysicalAddress, PteFlags, PteFlagsArch};
 use mouse_data::MouseEvent;
-use task::{ExitValue, JoinableTaskRef, KillReason};
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 
 static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
@@ -310,9 +309,7 @@ impl FrameBuffer {
     pub fn draw_rectangle(&mut self, rect: &Rect) {
         for y in rect.start_y()..rect.end_y() {
             for x in rect.start_x()..rect.end_x() {
-                if x > 0 && x < self.width as isize && y > 0 && y < self.height as isize {
-                    self.draw_something(x, y, 0xF123999);
-                }
+                self.draw_something(x, y, 0xF123999);
             }
         }
     }
@@ -332,20 +329,17 @@ impl FrameBuffer {
     }
 
     fn copy_window_only(&mut self, window: &MutexGuard<Window>) {
+        let mut it = window.frame_buffer.buffer.iter();
         for y in 0..window.rect.height {
             for x in 0..window.rect.width {
-                let pixel = window.frame_buffer.get_pixel(x as isize, y as isize);
                 let x = x as isize;
                 let y = y as isize;
-                if (x + window.rect.x) > 0
-                    && (window.rect.x + x) < self.width as isize
-                    && (y + window.rect.y) > 0
-                    && (y + window.rect.y) < self.height as isize
                 {
                     self.draw_something(
                         x as isize + window.rect.x,
                         y as isize + window.rect.y,
-                        pixel,
+                        // This is safe because size of Window's framebuffer same as it's width * height
+                        *it.next().unwrap(),
                     );
                 }
             }
@@ -381,11 +375,20 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 }
 
+#[derive(PartialEq, Eq)]
+pub enum Holding {
+    Background,
+    Nothing,
+    Window(usize),
+}
+
 pub struct WindowManager {
     windows: Vec<Weak<Mutex<Window>>>,
+    window_rendering_order: Vec<usize>,
     v_framebuffer: FrameBuffer,
     p_framebuffer: FrameBuffer,
     pub mouse: Rect,
+    mouse_holding: Holding,
 }
 
 impl WindowManager {
@@ -397,19 +400,20 @@ impl WindowManager {
 
         let window_manager = WindowManager {
             windows: Vec::new(),
+            window_rendering_order: Vec::new(),
             v_framebuffer,
             p_framebuffer,
             mouse,
+            mouse_holding: Holding::Nothing,
         };
         WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
     }
 
     fn new_window(dimensions: &Rect) -> Arc<Mutex<Window>> {
         let mut manager = WINDOW_MANAGER.get().unwrap().lock();
+        let len = manager.windows.len();
 
-        let buffer_width = manager.p_framebuffer.width as usize;
-        let buffer_height = manager.p_framebuffer.height as usize;
-
+        manager.window_rendering_order.push(len);
         let window = Window::new(
             *dimensions,
             FrameBuffer::new(dimensions.width, dimensions.height, None).unwrap(),
@@ -420,9 +424,9 @@ impl WindowManager {
     }
 
     fn draw_windows(&mut self) {
-        for window in self.windows.iter() {
+        for order in self.window_rendering_order.iter() {
             self.v_framebuffer
-                .copy_window_only(&window.upgrade().unwrap().lock());
+                .copy_window_only(&self.windows[*order].upgrade().unwrap().lock());
         }
         for window in self.windows.iter() {
             window.upgrade().unwrap().lock().blank();
@@ -476,19 +480,36 @@ impl WindowManager {
 
     fn drag_windows(&mut self, x: isize, y: isize, mouse_event: &MouseEvent) {
         if mouse_event.buttons.left() {
-            for window in self.windows.iter_mut() {
-                if window
-                    .upgrade()
-                    .unwrap()
-                    .lock()
-                    .rect
-                    .detect_collision(&Rect::new(
-                        self.mouse.width,
-                        self.mouse.height,
-                        self.mouse.x,
-                        self.mouse.y,
-                    ))
-                {
+            match self.mouse_holding {
+                Holding::Background => todo!(),
+                Holding::Nothing => {
+                    let rendering_o = self.window_rendering_order.clone();
+                    for &i in rendering_o.iter().rev() {
+                        let window = &mut self.windows[i];
+                        if window
+                            .upgrade()
+                            .unwrap()
+                            .lock()
+                            .rect
+                            .detect_collision(&self.mouse)
+                        {
+                            if i != *self.window_rendering_order.last().unwrap() {
+                                let wind_index = self
+                                    .window_rendering_order
+                                    .iter()
+                                    .position(|ii| ii == &i)
+                                    .unwrap();
+                                self.window_rendering_order.remove(wind_index);
+                                self.window_rendering_order.push(i);
+                            }
+                            self.mouse_holding = Holding::Window(i);
+                            break;
+                        }
+                        self.mouse_holding = Holding::Nothing;
+                    }
+                }
+                Holding::Window(i) => {
+                    let window = &mut self.windows[i];
                     let window_rect = window.upgrade().unwrap().lock().rect;
                     let mut new_pos_x = window_rect.x + x;
                     let mut new_pos_y = window_rect.y - y;
@@ -517,9 +538,6 @@ impl WindowManager {
                 }
             }
         } else if mouse_event.buttons.right() {
-            let pos_x = self.mouse.x;
-            let pos_y = self.mouse.y;
-
             for window in self.windows.iter_mut() {
                 if window
                     .upgrade()
@@ -538,6 +556,9 @@ impl WindowManager {
                     window.upgrade().unwrap().lock().resized = true;
                 }
             }
+        }
+        if !mouse_event.buttons.left() {
+            self.mouse_holding = Holding::Nothing;
         }
     }
 
@@ -571,12 +592,6 @@ impl Window {
     }
 
     pub fn blank_with_color(&mut self, rect: &Rect, col: u32) {
-        let start_x = rect.x;
-        let end_x = start_x + rect.width as isize;
-
-        let start_y = rect.y;
-        let end_y = start_y + rect.height as isize;
-
         for y in rect.x..rect.height as isize {
             for x in rect.y..rect.width as isize {
                 self.draw_something(x as isize, y as isize, col);
@@ -585,9 +600,7 @@ impl Window {
     }
 
     pub fn draw_absolute(&mut self, x: isize, y: isize, col: u32) {
-        if x <= self.rect.width as isize && y <= self.rect.height as isize {
-            self.draw_something(x, y, col);
-        }
+        self.draw_something(x, y, col);
     }
 
     pub fn draw_relative(&mut self, x: isize, y: isize, col: u32) {
@@ -610,10 +623,8 @@ impl Window {
             self.resize_framebuffer();
             self.resized = false;
         }
-        for y in 0..self.rect.height {
-            for x in 0..self.rect.width {
-                self.draw_something(x as isize, y as isize, col);
-            }
+        for pixel in self.frame_buffer.buffer.iter_mut() {
+            *pixel = col;
         }
     }
     pub fn set_position(&mut self, x: isize, y: isize) {
@@ -630,7 +641,8 @@ fn port_loop(
     (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
     let window_manager = WINDOW_MANAGER.get().unwrap();
-    let window_2 = WindowManager::new_window(&Rect::new(400, 400, 0, 0));
+    let window_3 = WindowManager::new_window(&Rect::new(400, 200, 0, 0));
+    let window_2 = WindowManager::new_window(&Rect::new(200, 200, 20, 20));
     let text = TextDisplay {
         width: 400,
         height: 400,
@@ -649,11 +661,11 @@ fn port_loop(
     let hpet_freq = hpet.as_ref().ok_or("ss")?.counter_period_femtoseconds() as u64;
 
     loop {
-        let mut end = hpet
+        let end = hpet
             .as_ref()
             .ok_or("couldn't get HPET timer")?
             .get_counter();
-        let mut diff = (end - start) * hpet_freq / 1_000_000_000_00;
+        let diff = (end - start) * hpet_freq / 1_000_000_000_000;
         let event_opt = key_consumer
             .pop()
             .or_else(|| mouse_consumer.pop())
@@ -693,14 +705,15 @@ fn port_loop(
                     }
                     if x != 0 || y != 0 {
                         window_manager.lock().update_mouse_position(x, y);
-                        window_manager.lock().drag_windows(x, y, &mouse_event);
                     }
+                    window_manager.lock().drag_windows(x, y, &mouse_event);
                 }
                 _ => (),
             }
         }
 
-        if diff >= 0 {
+        if diff >= 1 {
+            window_3.lock().draw_rectangle(0x194888);
             app.draw();
             window_manager.lock().update();
             window_manager.lock().render();
