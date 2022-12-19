@@ -116,6 +116,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "gic"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "irq_safety",
+ "memory",
+ "static_assertions",
+ "zerocopy",
+]
+
+[[package]]
+name = "interrupts"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "gic",
+ "irq_safety",
+ "log",
+ "memory",
+ "spin 0.9.4",
+ "tock-registers",
+]
+
+[[package]]
 name = "intrusive-collections"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -240,7 +264,9 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "cortex-a",
  "frame_allocator",
+ "interrupts",
  "kernel_config",
  "log",
  "logger",
@@ -248,6 +274,7 @@ dependencies = [
  "memory_structs",
  "page_allocator",
  "pte_flags",
+ "tock-registers",
  "uefi",
  "uefi-services",
 ]
@@ -300,7 +327,6 @@ dependencies = [
 name = "page_table_entry"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0",
  "frame_allocator",
  "kernel_config",
  "memory_structs",

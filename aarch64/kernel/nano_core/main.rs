@@ -10,6 +10,7 @@ extern crate page_allocator;
 extern crate memory_structs;
 extern crate memory;
 extern crate kernel_config;
+extern crate interrupts;
 
 use alloc::vec;
 use core::arch::asm;
@@ -25,6 +26,9 @@ use pte_flags::PteFlags;
 use log::{info, error};
 
 mod uefi_conv;
+mod multiprocessor;
+
+const UART_MMIO: PhysicalAddress = PhysicalAddress::new_canonical(0x0900_0000);
 
 #[inline(never)]
 extern "C" fn inf_loop_0xbeef() -> ! {
@@ -59,6 +63,7 @@ fn main(
             }
         }
     }
+
     let mut layout_vec = Vec::with_capacity(layout_len + safety);
 
     let (_runtime_svc, mem_iter) = system_table.exit_boot_services(handle, &mut mmap)
@@ -79,18 +84,25 @@ fn main(
         }
     }
 
-    // I'm also using this utility function for GIC mmio mapping
-    let mmio_region = |phys_addr, num_pages| {
-        let phys_addr = PhysicalAddress::new(phys_addr).unwrap();
-        let range = FrameRange::from_phys_addr(phys_addr, num_pages);
-        let flags = PteFlags::DEVICE_MEMORY | PteFlags::NOT_EXECUTABLE | PteFlags::WRITABLE;
-        (range, MemoryRegionType::Free, Some(flags))
-    };
+    let mmio_flags = PteFlags::DEVICE_MEMORY
+                   | PteFlags::NOT_EXECUTABLE
+                   | PteFlags::WRITABLE;
 
-    layout_vec.push(mmio_region(0x0900_0000, 1));
+    layout_vec.push({
+        let range = FrameRange::from_phys_addr(UART_MMIO, 1);
+        (range, MemoryRegionType::Free, Some(mmio_flags))
+    });
 
     info!("Calling memory::init();");
-    info!("page table: {:?}", memory::init(&layout_vec));
+    let mut page_table = memory::init(&layout_vec)?;
+    info!("page table: {:?}", page_table);
+
+    info!("Multicore: {}", multiprocessor::is_multicore());
+    info!("Core id: {}", multiprocessor::get_core_num());
+
+    info!("Setting interrupts up");
+    interrupts::init(&mut page_table)?;
+    interrupts::enable_timer_interrupts()?;
 
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();
