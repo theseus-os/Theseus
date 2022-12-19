@@ -31,8 +31,8 @@ pub fn main(args: Vec<String>) -> isize {
         let lapic = lapic.1;
         let apic_id = lapic.read().apic_id();
         let processor = lapic.read().processor_id();
-        let is_bootstrap_core = lapic.read().is_bootstrap_core();
-        let core_type = if is_bootstrap_core {"BSP Core"}
+        let is_bootstrap_cpu = lapic.read().is_bootstrap_cpu();
+        let core_type = if is_bootstrap_cpu {"BSP Core"}
                         else {"AP Core"};
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 

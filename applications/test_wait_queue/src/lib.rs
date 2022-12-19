@@ -32,7 +32,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 
 fn rmain() -> Result<(), &'static str> {
-    let my_cpu = multicore::get_my_core_id();
+    let my_cpu = multicore::current_cpu();
 
     let ready = Arc::new(Mutex::new(false));
     let ready2 = ready.clone();

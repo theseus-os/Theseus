@@ -25,7 +25,7 @@ static TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'static str> {
-    let my_apic_id = multicore::get_my_core_id();
+    let my_apic_id = multicore::current_cpu();
     let mut tss_entry = TSS.get(&my_apic_id).ok_or_else(|| {
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 

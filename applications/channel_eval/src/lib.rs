@@ -65,7 +65,7 @@ fn rmain(_matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = multicore::get_my_core_id();
+    let my_cpu = multicore::current_cpu();
 
     let (sender, receiver) = unified_channel::new_string_channel(2);
 

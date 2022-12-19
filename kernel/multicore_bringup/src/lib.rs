@@ -30,7 +30,7 @@ use volatile::Volatile;
 use zerocopy::FromBytes;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
-use apic::{LocalApic, get_lapics, get_my_core_id, has_x2apic, get_bootstrap_core_id, cores_count};
+use apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;
@@ -129,7 +129,7 @@ pub fn handle_ap_cores(
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,
-) -> Result<usize, &'static str> {
+) -> Result<u32, &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;
@@ -168,7 +168,7 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = get_my_core_id();
+    let me = current_cpu();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {
@@ -215,7 +215,7 @@ pub fn handle_ap_cores(
 
                 // start up this AP, and have it create a new LocalApic for itself. 
                 // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                let bsp_lapic_ref = get_bootstrap_core_id()
+                let bsp_lapic_ref = bootstrap_cpu()
                     .and_then(|bsp_id| all_lapics.get(&bsp_id))
                     .ok_or("Couldn't get BSP's LocalApic!")?;
                 let mut bsp_lapic = bsp_lapic_ref.write();
@@ -250,11 +250,11 @@ pub fn handle_ap_cores(
     // Wait for all CPUs to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
     let expected_cpus = ap_count + 1;
-    let mut num_known_cpus = cores_count();
+    let mut num_known_cpus = cpu_count();
     let mut iter = 0;
     while num_known_cpus < expected_cpus {
         spin_loop_hint();
-        num_known_cpus = cores_count();
+        num_known_cpus = cpu_count();
         if iter == 100000 {
             trace!("BSP is waiting for APs to boot ({} of {})", num_known_cpus, expected_cpus);
             iter = 0;

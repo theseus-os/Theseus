@@ -43,7 +43,7 @@ pub struct PassStruct {
 }
 
 macro_rules! CPU_ID {
-	() => (multicore::get_my_core_id())
+	() => (multicore::current_cpu())
 }
 
 // ------------------------- Window fault injection section -------------------------------------------
@@ -360,7 +360,7 @@ pub fn pick_child_core() -> u8 {
 	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
 
 	// if failed, try from the last to the first
-    let last_core = multicore::cores_count().max(u8::MAX as usize);
+    let last_core = multicore::cpu_count().max(u8::MAX as u32);
 	for child_core in (0..last_core).rev() {
 		if nr_tasks_in_rq(child_core as u8) == Some(1) {
             return child_core as u8;

@@ -114,7 +114,7 @@ pub fn init(
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // get BSP's apic id
-    let bsp_apic_id = multicore::get_bootstrap_core_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
+    let bsp_apic_id = multicore::bootstrap_cpu().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
@@ -130,8 +130,8 @@ pub fn init(
         ap_start_realmode_end,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
-    let cores_count = ap_count + 1;
-    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cores_count);
+    let cpu_count = ap_count + 1;
+    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
@@ -177,7 +177,7 @@ pub fn init(
     // 2. Create the idle task for this CPU.
     spawn::create_idle_task()?;
     // 3. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
-    spawn::cleanup_bootstrap_tasks(cores_count as usize)?;
+    spawn::cleanup_bootstrap_tasks(cpu_count as usize)?;
     // 4. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
     bootstrap_task.finish();
     // 5. Enable interrupts such that other tasks can be scheduled in.

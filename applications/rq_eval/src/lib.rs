@@ -164,7 +164,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _i in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(multicore::get_my_core_id(), taskref.clone())?;
+        runqueue::add_task_to_specific_runqueue(multicore::current_cpu(), taskref.clone())?;
 
         #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {

@@ -141,7 +141,7 @@ fn update_and_insert_fault_entry_internal(
 ) {
 
     // Add the core the fault was detected
-    fe.core = Some(multicore::get_my_core_id());
+    fe.core = Some(multicore::current_cpu());
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.

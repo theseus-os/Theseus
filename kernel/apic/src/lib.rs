@@ -1,11 +1,11 @@
 #![no_std]
 #![feature(let_chains)]
 
-use core::{fmt, sync::atomic::{AtomicUsize, Ordering}};
+use core::{fmt, sync::atomic::{AtomicU32, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 use spin::Once;
-use raw_cpuid::CpuId;
+use raw_cpuid::CpuId as X86CpuId;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
 use memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
@@ -17,7 +17,7 @@ use bit_field::BitField;
 use static_assertions::{const_assert, const_assert_eq};
 use log::{error, info, debug, trace};
 
-pub type CoreId = u8;
+pub type CpuId = u8;
 
 /// The IRQ number reserved for Local APIC timer interrupts in the IDT.
 pub const LOCAL_APIC_LVT_IRQ: u8 = 0x22;
@@ -41,22 +41,22 @@ pub enum InterruptChip {
 const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
 /// The set of system-wide `LocalApic`s, one per CPU core.
-static LOCAL_APICS: AtomicMap<CoreId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
+static LOCAL_APICS: AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 
 /// The number of CPUs currently initialized in the system.
 /// This must match the number of Local APICs initialized in the system.
-static CPU_COUNT: AtomicUsize = AtomicUsize::new(0);
+static CPU_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// The processor id (from the ACPI MADT table) of the bootstrap CPU.
-static BSP_PROCESSOR_ID: Once<CoreId> = Once::new(); 
+static BSP_PROCESSOR_ID: Once<CpuId> = Once::new(); 
 
-pub fn get_bootstrap_core_id() -> Option<CoreId> {
+pub fn bootstrap_cpu() -> Option<CpuId> {
     BSP_PROCESSOR_ID.get().cloned()
 }
 
 /// Returns true if the currently executing processor core is the bootstrap processor, 
 /// i.e., the first procesor to run 
-pub fn is_bootstrap_core() -> bool {
+pub fn is_bootstrap_cpu() -> bool {
     rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
 }
 
@@ -64,31 +64,31 @@ pub fn is_bootstrap_core() -> bool {
 pub fn has_x2apic() -> bool {
     static IS_X2APIC: Once<bool> = Once::new(); // caches the result
     let res: &bool = IS_X2APIC.call_once( || {
-        CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
+        X86CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
     });
     *res // because call_once returns a reference to the cached IS_X2APIC value
 }
 
 /// Returns a reference to the list of LocalApics, one per CPU core.
-pub fn get_lapics() -> &'static AtomicMap<CoreId, RwLockIrqSafe<LocalApic>> {
+pub fn get_lapics() -> &'static AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
 }
 
 /// Returns the number of CPUs (cores, or local APICs) that exist 
 /// and are currently initialized on this system.
 #[doc(alias = "cores")]
-pub fn cores_count() -> usize {
+pub fn cpu_count() -> u32 {
     CPU_COUNT.load(Ordering::Relaxed)
 }
 
 /// Returns the APIC ID of the currently executing CPU core.
-pub fn get_my_core_id() -> CoreId {
-    rdmsr(IA32_TSC_AUX) as CoreId
+pub fn current_cpu() -> CpuId {
+    rdmsr(IA32_TSC_AUX) as CpuId
 }
 
 /// Returns a reference to the LocalApic for the currently executing CPU core.
 pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
-    LOCAL_APICS.get(&get_my_core_id())
+    LOCAL_APICS.get(&current_cpu())
 }
 
 
@@ -97,7 +97,7 @@ pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
 /// See Intel manual Figure 10-28, Vol. 3A, 10-45. (PDF page 3079) 
 pub enum LapicIpiDestination {
     /// Send IPI to a specific APIC 
-    One(CoreId),
+    One(CpuId),
     /// Send IPI to my own (the current) APIC  
     Me,
     /// Send IPI to all APICs, including myself
@@ -328,7 +328,7 @@ pub struct LocalApic {
     /// This is currently not used for anything in Theseus.
     processor_id: u8,
     /// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
-    is_bootstrap_core: bool,
+    is_bootstrap_cpu: bool,
 }
 impl fmt::Debug for LocalApic {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -336,7 +336,7 @@ impl fmt::Debug for LocalApic {
             .field("type", &self.inner)
             .field("apic_id", &self.apic_id)
             .field("processor_id", &self.processor_id)
-            .field("is_bootstrap_core", &self.is_bootstrap_core)
+            .field("is_bootstrap_cpu", &self.is_bootstrap_cpu)
             .finish()
     }
 }
@@ -391,11 +391,11 @@ impl LocalApic {
         };
 
         // Check whether the caller's expectations about BSP vs AP were met.
-        let is_bootstrap_core = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
-        if should_be_bsp && !is_bootstrap_core {
+        let is_bootstrap_cpu = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
+        if should_be_bsp && !is_bootstrap_cpu {
             return Err(LapicInitError::NotBSP);
         }
-        if !should_be_bsp && is_bootstrap_core {
+        if !should_be_bsp && is_bootstrap_cpu {
             return Err(LapicInitError::NotAP);
         }
 
@@ -424,8 +424,8 @@ impl LocalApic {
 		let mut lapic = LocalApic {
             inner,
             processor_id,
-            apic_id: u8::MAX, // placeholder, is replaced below.
-            is_bootstrap_core,
+            apic_id: CpuId::MAX, // placeholder, is replaced below.
+            is_bootstrap_cpu,
         };
 
         // Now that the APIC hardware is enabled, we can safely obtain this Local APIC's ID.
@@ -442,7 +442,7 @@ impl LocalApic {
 
         // Theseus uses this MSR to hold each CPU's ID (which is an OS-chosen value).
         unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id as u64); }
-        if is_bootstrap_core {
+        if is_bootstrap_cpu {
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
 
@@ -466,18 +466,18 @@ impl LocalApic {
     /// i.e., the first CPU to boot and run the OS code.
     /// 
     /// There is only one BSP per system.
-    pub fn is_bootstrap_core(&self) -> bool { self.is_bootstrap_core }
+    pub fn is_bootstrap_cpu(&self) -> bool { self.is_bootstrap_cpu }
 
     /// Set this Local APIC to a known "clean state" and enable its spurious interrupt vector.
     fn clean_enable(&mut self) {
-        let is_bootstrap_core = self.is_bootstrap_core;
+        let is_bootstrap_cpu = self.is_bootstrap_cpu;
         let id = self.read_apic_id();
         let version = self.version();
 
         match &mut self.inner {
             LapicType::X2Apic => {
-                info!("LAPIC x2 ID {:#x}, version: {:#x}, is_bootstrap_core: {}", id, version, is_bootstrap_core);
-                if is_bootstrap_core {
+                info!("LAPIC x2 ID {:#x}, version: {:#x}, is_bootstrap_cpu: {}", id, version, is_bootstrap_cpu);
+                if is_bootstrap_cpu {
                     INTERRUPT_CHIP.store(InterruptChip::X2APIC);
                 }
 
@@ -487,8 +487,8 @@ impl LocalApic {
                 let ldr = rdmsr(IA32_X2APIC_LDR);
                 let cluster_id = (ldr >> 16) & 0xFFFF; // highest 16 bits
                 let logical_id = ldr & 0xFFFF; // lowest 16 bits
-                info!("x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bootstrap_core: {}",
-                    id, version, cluster_id, logical_id, is_bootstrap_core
+                info!("x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bootstrap_cpu: {}",
+                    id, version, cluster_id, logical_id, is_bootstrap_cpu
                 );
                 // NOTE: we're not yet using logical or cluster mode APIC addressing, only physical APIC addressing.
                 
@@ -504,8 +504,8 @@ impl LocalApic {
                 }
             }
             LapicType::XApic(regs) => {
-                info!("LAPIC ID {:#x}, version: {:#x}, is_bootstrap_core: {}", id, version, is_bootstrap_core);
-                if is_bootstrap_core {
+                info!("LAPIC ID {:#x}, version: {:#x}, is_bootstrap_cpu: {}", id, version, is_bootstrap_cpu);
+                if is_bootstrap_cpu {
                     INTERRUPT_CHIP.store(InterruptChip::APIC);
                 }
 

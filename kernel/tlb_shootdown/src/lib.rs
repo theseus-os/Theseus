@@ -10,15 +10,15 @@ extern crate x86_64;
 extern crate pause;
 
 
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::PageRange;
-use apic::{LocalApic, get_my_apic, cores_count, LapicIpiDestination};
+use apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
 /// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
-pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicUsize = AtomicUsize::new(0);
+pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 /// The range of pages for a TLB shootdown IPI.
@@ -48,7 +48,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 /// 
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_core_id(), pages_to_invalidate);
+    // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::current_cpu(), pages_to_invalidate);
 
     for page in pages_to_invalidate {
         x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() as u64));
@@ -61,12 +61,12 @@ pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
 /// a TLB flush of the given pages' virtual addresses.
 pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: PageRange) {        
     // skip sending IPIs if there are no other cores running
-    let cores_count = cores_count();
-    if cores_count <= 1 {
+    let cpu_count = cpu_count();
+    if cpu_count <= 1 {
         return;
     }
 
-    // log::trace!("send_tlb_shootdown_ipi(): from AP {}, cores_count: {}, {:?}", my_lapic.apic_id(), cores_count, pages_to_invalidate);
+    // log::trace!("send_tlb_shootdown_ipi(): from AP {}, cpu_count: {}, {:?}", my_lapic.apic_id(), cpu_count, pages_to_invalidate);
 
     // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
     // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
@@ -84,7 +84,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
     }
 
     *TLB_SHOOTDOWN_IPI_PAGES.write() = Some(pages_to_invalidate);
-    TLB_SHOOTDOWN_IPI_COUNT.store(cores_count - 1, Ordering::SeqCst); // -1 to exclude this core 
+    TLB_SHOOTDOWN_IPI_COUNT.store(cpu_count - 1, Ordering::SeqCst); // -1 to exclude this core 
 
     // let's try to use NMI instead, since it will interrupt everyone forcibly and result in the fastest handling
     my_lapic.send_nmi_ipi(LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
