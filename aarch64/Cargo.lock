@@ -120,7 +120,6 @@ name = "gic"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "irq_safety",
  "memory",
  "static_assertions",
  "zerocopy",
