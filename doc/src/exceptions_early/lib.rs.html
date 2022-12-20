@@ -271,7 +271,7 @@
 };
 <span class="kw">use </span>locked_idt::LockedIdt;
 <span class="kw">use </span>gdt::{Gdt, create_gdt};
-<span class="kw">use </span>vga_buffer::{print_raw, println_raw};
+<span class="kw">use </span>vga_buffer::println_raw;
 
 <span class="doccomment">/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
 /// This is no longer used after interrupts are set up properly, it&#39;s just a failsafe.

@@ -127,6 +127,7 @@
 <span id="127">127</span>
 <span id="128">128</span>
 <span id="129">129</span>
+<span id="130">130</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -169,7 +170,8 @@
 ///     which must not be dropped until all AP (additional CPUs) are fully booted,
 ///     but *should* be dropped before starting the first user application.
 </span><span class="kw">pub fn </span>init_memory_management(
-    boot_info: <span class="kw">impl </span>BootInformation
+    boot_info: <span class="kw">impl </span>BootInformation,
+    kernel_stack_start: VirtualAddress,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(
         MmiRef,
         NoDrop&lt;MappedPages&gt;,
@@ -190,7 +192,7 @@
         boot_info_mapped_pages,
         higher_half_mapped_pages, 
         identity_mapped_pages
-    ) = memory::init(<span class="kw-2">&amp;</span>boot_info)<span class="question-mark">?</span>;
+    ) = memory::init(<span class="kw-2">&amp;</span>boot_info, kernel_stack_start)<span class="question-mark">?</span>;
     <span class="comment">// After this point, at which `memory::init()` has returned new objects that represent
     // the currently-executing code/data/stack, we must ensure they aren&#39;t dropped if an error occurs,
     // because that will cause them to be auto-unmapped.

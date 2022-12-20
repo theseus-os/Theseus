@@ -384,6 +384,30 @@
 <span id="384">384</span>
 <span id="385">385</span>
 <span id="386">386</span>
+<span id="387">387</span>
+<span id="388">388</span>
+<span id="389">389</span>
+<span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
+<span id="407">407</span>
+<span id="408">408</span>
+<span id="409">409</span>
+<span id="410">410</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -414,15 +438,15 @@
 <span class="kw">use super</span>::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET};
+    get_vga_mem_addr, KERNEL_OFFSET,
+};
 <span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>no_drop::NoDrop;
 <span class="kw">use </span>boot_info::BootInformation;
-<span class="kw">use </span>kernel_config::memory::{RECURSIVE_P4_INDEX};
-<span class="comment">// use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
+<span class="kw">use </span>kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE};
 
 
-</span><span class="doccomment">/// A top-level root (P4) page table.
+<span class="doccomment">/// A top-level root (P4) page table.
 /// 
 /// Auto-derefs into a `Mapper` for easy invocation of memory mapping functions.
 </span><span class="kw">pub struct </span>PageTable {
@@ -600,6 +624,7 @@
 /// Otherwise, it returns a str error message. 
 </span><span class="kw">pub fn </span>init(
     boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation,
+    stack_start_virt: VirtualAddress,
     into_alloc_frames_fn: <span class="kw">fn</span>(FrameRange) -&gt; AllocatedFrames,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(
         PageTable,
@@ -640,6 +665,29 @@
     <span class="kw">let </span><span class="kw-2">mut </span>higher_half_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>] = Default::default();
     <span class="kw">let </span><span class="kw-2">mut </span>identity_mapped_pages:    [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>] = Default::default();
 
+    <span class="comment">// Stack frames are not guaranteed to be contiguous.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>stack_mappings = [<span class="prelude-val">None</span>; <span class="number">34</span>];
+    <span class="kw">let </span>stack_size = boot_info.stack_size()<span class="question-mark">?</span>;
+    <span class="kw">let </span>stack_page_range = PageRange::from_virt_addr(
+        <span class="comment">// `PAGE_SIZE` accounts for the guard page, which does not have a corresponding frame.
+        </span>stack_start_virt + PAGE_SIZE,
+        stack_size - PAGE_SIZE,
+    );
+    <span class="macro">debug!</span>(<span class="string">&quot;Initial stack start {stack_start_virt:#X}, size: {stack_size:#X} bytes, {stack_page_range:X?}&quot;</span>);
+    <span class="kw">for </span>(i, page) <span class="kw">in </span>stack_page_range.into_iter().enumerate() {
+        <span class="kw">let </span>frame = page_table.translate_page(page).ok_or(<span class="string">&quot;couldn&#39;t translate stack page&quot;</span>)<span class="question-mark">?</span>;
+        stack_mappings[i] = <span class="prelude-val">Some</span>((page, frame));
+    }
+
+    <span class="comment">// Boot info frames are not guaranteed to be contiguous.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>boot_info_mappings = [<span class="prelude-val">None</span>; <span class="number">10</span>];
+    <span class="kw">let </span>boot_info_page_range = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
+    <span class="macro">debug!</span>(<span class="string">&quot;Boot info start: {boot_info_start_vaddr:#X}, size: {boot_info_size:#X}, {boot_info_page_range:#X?}&quot;</span>);
+    <span class="kw">for </span>(i, page) <span class="kw">in </span>boot_info_page_range.into_iter().enumerate() {
+        <span class="kw">let </span>frame = page_table.translate_page(page).ok_or(<span class="string">&quot;couldn&#39;t translate boot info page&quot;</span>)<span class="question-mark">?</span>;
+        boot_info_mappings[i] = <span class="prelude-val">Some</span>((page, frame));
+    }
+
     <span class="comment">// Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
     </span>page_table.with(<span class="kw-2">&amp;mut </span>new_table, |mapper| {
         
@@ -663,8 +711,6 @@
         <span class="kw">let </span>(rodata_end_virt,    rodata_end_phys)    = aggregated_section_memory_bounds.rodata.end;
         <span class="kw">let </span>(data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
         <span class="kw">let </span>(data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
-        <span class="kw">let </span>(stack_start_virt,   stack_start_phys)   = aggregated_section_memory_bounds.stack.start;
-        <span class="kw">let </span>(stack_end_virt,     _stack_end_phys)    = aggregated_section_memory_bounds.stack.end;
 
         <span class="kw">let </span>text_flags    = aggregated_section_memory_bounds.text.flags;
         <span class="kw">let </span>rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
@@ -697,24 +743,24 @@
         data_mapped_pages = <span class="prelude-val">Some</span>(NoDrop::new(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)<span class="question-mark">?</span>));
         index += <span class="number">1</span>;
 
-        <span class="comment">// We don&#39;t need to do any mapping for the initial root (P4) page table stack (a separate data section),
-        // which was initially set up and created by the bootstrap assembly code. 
-        // It was used to bootstrap the initial page table at the beginning of this function. 
-
-        // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
+        <span class="comment">// Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
-        </span><span class="kw">let </span>stack_pages = page_allocator::allocate_pages_by_bytes_at(stack_start_virt, (stack_end_virt - stack_start_virt).value())<span class="question-mark">?</span>;
-        <span class="kw">let </span>start_of_stack_pages = <span class="kw-2">*</span>stack_pages.start() + <span class="number">1</span>; 
-        <span class="kw">let </span>(stack_guard_page, stack_allocated_pages) = stack_pages.split(start_of_stack_pages)
-            .map_err(|_ap| <span class="string">&quot;BUG: initial stack&#39;s allocated pages were not split correctly after guard page&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>stack_start_frame = Frame::containing_address(stack_start_phys) + <span class="number">1</span>; <span class="comment">// skip 1st frame, which corresponds to the guard page
-        </span><span class="kw">let </span>stack_allocated_frames = frame_allocator::allocate_frames_at(stack_start_frame.start_address(), stack_allocated_pages.size_in_pages())<span class="question-mark">?</span>;
-        <span class="kw">let </span>stack_mapped_pages = mapper.map_allocated_pages_to(
-            stack_allocated_pages,
-            stack_allocated_frames,
-            data_flags,
-        )<span class="question-mark">?</span>;
-        stack_page_group = <span class="prelude-val">Some</span>((stack_guard_page, NoDrop::new(stack_mapped_pages)));
+        </span><span class="kw">let </span>stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, <span class="number">1</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>stack_mapped_pages: <span class="prelude-ty">Option</span>&lt;MappedPages&gt; = <span class="prelude-val">None</span>;
+        <span class="kw">for </span>(page, frame) <span class="kw">in </span>stack_mappings.into_iter().flatten() {
+            <span class="kw">let </span>allocated_page = page_allocator::allocate_pages_at(page.start_address(), <span class="number">1</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), <span class="number">1</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)<span class="question-mark">?</span>;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>stack_mapped_pages) = stack_mapped_pages {
+                stack_mapped_pages.merge(mapped_pages).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to merge stack mapped pages&quot;</span>)<span class="question-mark">?</span>;
+            } <span class="kw">else </span>{
+                stack_mapped_pages = <span class="prelude-val">Some</span>(mapped_pages);
+            }
+        }
+        stack_page_group = <span class="prelude-val">Some</span>((
+            stack_guard_page,
+            NoDrop::new(stack_mapped_pages.ok_or(<span class="string">&quot;no pages were allocated for the stack&quot;</span>)<span class="question-mark">?</span>),
+        ));
 
         <span class="comment">// Map the VGA display memory as writable. 
         // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
@@ -729,15 +775,17 @@
         higher_half_mapped_pages[index] = <span class="prelude-val">Some</span>(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)<span class="question-mark">?</span>));
         index += <span class="number">1</span>;
 
-
-        <span class="comment">// Map the multiboot boot_info at the same address it is currently at, so we can continue to validly access `boot_info`
-        </span><span class="kw">let </span>boot_info_pages = page_allocator::allocate_pages_by_bytes_at(boot_info_start_vaddr, boot_info_size)<span class="question-mark">?</span>;
-        <span class="kw">let </span>boot_info_frames = frame_allocator::allocate_frames_by_bytes_at(boot_info_start_paddr, boot_info_size)<span class="question-mark">?</span>;
-        boot_info_mapped_pages = <span class="prelude-val">Some</span>(mapper.map_allocated_pages_to(
-            boot_info_pages,
-            boot_info_frames,
-            PteFlags::new(),
-        )<span class="question-mark">?</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>iter = boot_info_mappings.iter();
+        <span class="kw">while let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Some</span>((page, frame))) = iter.next() {
+            <span class="kw">let </span>allocated_page = page_allocator::allocate_pages_at(page.start_address(), <span class="number">1</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), <span class="number">1</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())<span class="question-mark">?</span>;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>boot_info_mapped_pages) = boot_info_mapped_pages {
+                boot_info_mapped_pages.merge(mapped_pages).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to merge boot info pages&quot;</span>)<span class="question-mark">?</span>;
+            } <span class="kw">else </span>{
+                boot_info_mapped_pages = <span class="prelude-val">Some</span>(mapped_pages);
+            }
+        }
 
         <span class="macro">debug!</span>(<span class="string">&quot;identity_mapped_pages: {:?}&quot;</span>, <span class="kw-2">&amp;</span>identity_mapped_pages[..index]);
         <span class="macro">debug!</span>(<span class="string">&quot;higher_half_mapped_pages: {:?}&quot;</span>, <span class="kw-2">&amp;</span>higher_half_mapped_pages[..index]);

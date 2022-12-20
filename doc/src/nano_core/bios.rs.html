@@ -13,7 +13,13 @@
 <span id="13">13</span>
 <span id="14">14</span>
 <span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{early_setup, nano_core, shutdown, try_exit};
+<span class="kw">use </span>boot_info::BootInformation;
 <span class="kw">use </span>memory::VirtualAddress;
 
 <span class="attr">#[no_mangle]
@@ -26,7 +32,11 @@
         <span class="prelude-val">Ok</span>(i) =&gt; i,
         <span class="prelude-val">Err</span>(e) =&gt; shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;failed to load multiboot 2 info: {e:?}&quot;</span>)),
     };
-    <span class="macro">try_exit!</span>(nano_core(boot_info));
+    <span class="kw">let </span>kernel_stack_start = <span class="macro">try_exit!</span>(VirtualAddress::new(
+        double_fault_stack - <span class="macro">try_exit!</span>(boot_info.stack_size())
+    )
+    .ok_or(<span class="string">&quot;invalid kernel stack start&quot;</span>));
+    <span class="macro">try_exit!</span>(nano_core(boot_info, kernel_stack_start));
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="nano_core" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

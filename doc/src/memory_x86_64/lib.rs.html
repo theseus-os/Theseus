@@ -285,17 +285,6 @@
 <span id="285">285</span>
 <span id="286">286</span>
 <span id="287">287</span>
-<span id="288">288</span>
-<span id="289">289</span>
-<span id="290">290</span>
-<span id="291">291</span>
-<span id="292">292</span>
-<span id="293">293</span>
-<span id="294">294</span>
-<span id="295">295</span>
-<span id="296">296</span>
-<span id="297">297</span>
-<span id="298">298</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //!
 //! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
@@ -342,15 +331,11 @@
 ///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
 ///     because they can be mapped using the same page table flags.
 /// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
-/// It also contains:
-/// * The `stack` section bounds cover the initial stack, which are maintained separately.
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>AggregatedSectionMemoryBounds {
    <span class="kw">pub </span>text:        SectionMemoryBounds,
    <span class="kw">pub </span>rodata:      SectionMemoryBounds,
    <span class="kw">pub </span>data:        SectionMemoryBounds,
-   <span class="kw">pub </span>stack:       SectionMemoryBounds,
 }
 
 
@@ -369,8 +354,6 @@
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_end:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>data_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>data_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>stack_start:       <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>stack_end:         <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>text_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_flags:      <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
@@ -480,15 +463,18 @@
                 data_flags = <span class="prelude-val">Some</span>(flags);
                 <span class="string">&quot;nano_core .bss&quot;
             </span>}
-            <span class="string">&quot;.page_table&quot; </span>=&gt; {
-                <span class="comment">// We bootstrap the page table from the CR3 register.
-                </span><span class="kw">continue</span>;
+            <span class="comment">// This appears when compiling for BIOS.
+            </span><span class="string">&quot;.page_table&quot; </span>| <span class="string">&quot;.stack&quot; </span>=&gt; {
+                <span class="macro">debug!</span>(<span class="string">&quot;     no need to map this section, it is mapped separately later&quot;</span>);
+                <span class="kw">continue</span>;
             }
-            <span class="string">&quot;.stack&quot; </span>=&gt; {
-                stack_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
-                stack_end   = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
-                <span class="string">&quot;initial stack&quot;
-            </span>}
+            <span class="comment">// This appears when compiling for UEFI.
+            </span><span class="string">&quot;.bootloader-config&quot; </span>=&gt; {
+                <span class="comment">// TODO: Ideally we&#39;d mark .bootloader-config as not allocated
+                // so the bootloader doesn&#39;t load it.
+                </span><span class="macro">debug!</span>(<span class="string">&quot;     no need to map this section, it is only used by the bootloader for config.&quot;</span>);
+                <span class="kw">continue</span>;
+            }
             <span class="kw">_ </span>=&gt;  {
                 <span class="macro">error!</span>(<span class="string">&quot;Section {} at {:#X}, size {:#X} was not an expected section&quot;</span>, 
                         section.name(), section.start(), section.len());
@@ -512,8 +498,6 @@
     <span class="kw">let </span>rodata_end         = rodata_end       .ok_or(<span class="string">&quot;Couldn&#39;t find end of .rodata section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>data_start         = data_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>data_end           = data_end         .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>stack_start        = stack_start      .ok_or(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>stack_end          = stack_end        .ok_or(<span class="string">&quot;Couldn&#39;t find start of .stack section&quot;</span>)<span class="question-mark">?</span>;
      
     <span class="kw">let </span>text_flags    = text_flags  .ok_or(<span class="string">&quot;Couldn&#39;t find .text section flags&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>rodata_flags  = rodata_flags.ok_or(<span class="string">&quot;Couldn&#39;t find .rodata section flags&quot;</span>)<span class="question-mark">?</span>;
@@ -534,17 +518,11 @@
         end: data_end,
         flags: data_flags,
     };
-    <span class="kw">let </span>stack = SectionMemoryBounds {
-        start: stack_start,
-        end: stack_end,
-        flags: data_flags, <span class="comment">// same flags as data sections
-    </span>};
 
     <span class="kw">let </span>aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
         text,
         rodata,
         data,
-        stack,
     };
     <span class="prelude-val">Ok</span>((aggregated_sections_memory_bounds, sections_memory_bounds))
 }

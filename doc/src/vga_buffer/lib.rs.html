@@ -179,6 +179,22 @@
 <span id="179">179</span>
 <span id="180">180</span>
 <span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
+<span id="188">188</span>
+<span id="189">189</span>
+<span id="190">190</span>
+<span id="191">191</span>
+<span id="192">192</span>
+<span id="193">193</span>
+<span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
 //!
 //! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
@@ -217,11 +233,27 @@
     }
 );
 
-<span class="attr">#[macro_export]
+
+<span class="comment">// Note: we can&#39;t put this cfg block inside the macro, because then it will be
+//       enabled based on the chosen features of the foreign crate that
+//       *calls* this macro, rather than the features activated in *this* crate.
+</span><span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)]
+#[macro_export]
 </span><span class="macro">macro_rules! </span>print_raw {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
-        <span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)]
-        </span><span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+    });
+}
+
+<span class="comment">// Note: we can&#39;t put this cfg block inside the macro, because then it will be
+//       enabled based on the chosen features of the foreign crate that
+//       *calls* this macro, rather than the features activated in *this* crate.
+</span><span class="attr">#[cfg(not(feature = <span class="string">&quot;bios&quot;</span>))]
+#[macro_export]
+</span><span class="macro">macro_rules! </span>print_raw {
+    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
+        <span class="comment">// to silence warnings about unused variables
+        </span>drop(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
