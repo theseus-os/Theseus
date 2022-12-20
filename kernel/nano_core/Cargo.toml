@@ -59,6 +59,7 @@ path = "../memory_initialization"
 path = "../boot_info"
 
 [features]
+default = [ "bios" ]
 bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
 
 [lib]

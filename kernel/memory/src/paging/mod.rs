@@ -34,7 +34,6 @@ use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
 use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE};
-// use kernel_config::memory::{KERNEL_TEXT_P4_INDEX, KERNEL_HEAP_P4_INDEX, KERNEL_STACK_P4_INDEX};
 
 
 /// A top-level root (P4) page table.
@@ -256,24 +255,25 @@ pub fn init(
     let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
     let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
-    let stack_end_virt = stack_start_virt + boot_info.stack_size()?;
     // Stack frames are not guaranteed to be contiguous.
     let mut stack_mappings = [None; 34];
-    // + PAGE_SIZE accounts for the guard page which does not have a corresponding frame.
-    for (i, page) in PageRange::from_virt_addr(
+    let stack_size = boot_info.stack_size()?;
+    let stack_page_range = PageRange::from_virt_addr(
+        // `PAGE_SIZE` accounts for the guard page, which does not have a corresponding frame.
         stack_start_virt + PAGE_SIZE,
-        stack_end_virt.value() - (stack_start_virt.value() + PAGE_SIZE),
-    )
-    .into_iter()
-    .enumerate()
-    {
+        stack_size - PAGE_SIZE,
+    );
+    debug!("Initial stack start {stack_start_virt:#X}, size: {stack_size:#X} bytes, {stack_page_range:X?}");
+    for (i, page) in stack_page_range.into_iter().enumerate() {
         let frame = page_table.translate_page(page).ok_or("couldn't translate stack page")?;
         stack_mappings[i] = Some((page, frame));
     }
 
     // Boot info frames are not guaranteed to be contiguous.
     let mut boot_info_mappings = [None; 10];
-    for (i, page) in PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size).into_iter().enumerate() {
+    let boot_info_page_range = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
+    debug!("Boot info start: {boot_info_start_vaddr:#X}, size: {boot_info_size:#X}, {boot_info_page_range:#X?}");
+    for (i, page) in boot_info_page_range.into_iter().enumerate() {
         let frame = page_table.translate_page(page).ok_or("couldn't translate boot info page")?;
         boot_info_mappings[i] = Some((page, frame));
     }
@@ -333,16 +333,11 @@ pub fn init(
         data_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
         index += 1;
 
-        // We don't need to do any mapping for the initial root (P4) page table stack (a separate data section),
-        // which was initially set up and created by the bootstrap assembly code. 
-        // It was used to bootstrap the initial page table at the beginning of this function. 
-
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
         // It does not need to be identity mapped because each AP core will have its own stack.
         let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1)?;
         let mut stack_mapped_pages: Option<MappedPages> = None;
-        let mut iter = stack_mappings.iter();
-        while let Some(Some((page, frame))) = iter.next() {
+        for (page, frame) in stack_mappings.into_iter().flatten() {
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
@@ -352,7 +347,10 @@ pub fn init(
                 stack_mapped_pages = Some(mapped_pages);
             }
         }
-        stack_page_group = Some((stack_guard_page, NoDrop::new(stack_mapped_pages.ok_or("no pages were allocated for the stack")?)));
+        stack_page_group = Some((
+            stack_guard_page,
+            NoDrop::new(stack_mapped_pages.ok_or("no pages were allocated for the stack")?),
+        ));
 
         // Map the VGA display memory as writable. 
         // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
