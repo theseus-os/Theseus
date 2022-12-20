@@ -24,7 +24,7 @@ pub struct Queue<T> {
 }
 
 struct Pointers<T> {
-    head: Option<Box<Node<T>>>,
+    head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
 }
 
@@ -32,7 +32,7 @@ unsafe impl<T> Send for Pointers<T> {}
 
 struct Node<T> {
     item: T,
-    next: Option<Box<Node<T>>>,
+    next: Option<NonNull<Node<T>>>,
 }
 
 impl<T> Node<T> {
@@ -64,8 +64,8 @@ impl<T> Queue<T> {
 
     /// Appends an item to the queue.
     pub fn push(&self, item: T) {
-        let (node, node_pointer) = box_pointer(Node::new(item));
-        unsafe { self.push_inner(node, node_pointer, 1) };
+        let node = box_pointer(Node::new(item));
+        unsafe { self.push_inner(node, node, 1) };
     }
 
     /// Appends several items to the queue.
@@ -73,21 +73,21 @@ impl<T> Queue<T> {
     where
         I: Iterator<Item = T>,
     {
-        let (first, first_pointer) = match iterator.next() {
+        let first = match iterator.next() {
             Some(item) => box_pointer(Node::new(item)),
             None => return,
         };
 
-        let mut tail = first_pointer;
+        let mut tail = first;
         let mut len = 1;
 
         for next in iterator {
-            let (next, next_pointer) = box_pointer(Node::new(next));
+            let next = box_pointer(Node::new(next));
             // SAEFTY: The only other pointer to the tail is stored in the second-to-last
             // node. We own first, hence we own all the nodes, hence that reference is not
             // being used.
             unsafe { tail.as_mut() }.next = Some(next);
-            tail = next_pointer;
+            tail = next;
             len += 1;
         }
 
@@ -100,7 +100,7 @@ impl<T> Queue<T> {
     ///
     /// `head` must be the start of the batch, and `tail` must point to the end
     /// of the batch. The batch must be `len` nodes long.
-    unsafe fn push_inner(&self, head: Box<Node<T>>, tail: NonNull<Node<T>>, len: usize) {
+    unsafe fn push_inner(&self, head: NonNull<Node<T>>, tail: NonNull<Node<T>>, len: usize) {
         let mut pointers = self.pointers.lock();
 
         if let Some(mut tail_pointer) = pointers.tail {
@@ -129,7 +129,8 @@ impl<T> Queue<T> {
         // This will return none if another thread popped the last task between us
         // checking the fast path and now.
         let current_head = pointers.head.take()?;
-        pointers.head = current_head.next;
+        // SAFETY: current_head is a valid pointer.
+        pointers.head = unsafe { current_head.as_ref() }.next;
 
         // If we are the last node in the list:
         if pointers.head.is_none() {
@@ -137,21 +138,17 @@ impl<T> Queue<T> {
         }
 
         self.len.fetch_sub(1, Ordering::Release);
-        Some(current_head.item)
+        // SAFETY: current_head is a valid pointer.
+        Some(unsafe { Box::from_raw(current_head.as_ptr()) }.item)
     }
 }
 
-/// Returns the item boxed and a non-null pointer to the box.
-fn box_pointer<T>(item: T) -> (Box<T>, NonNull<T>) {
+/// Boxes the item and returns a non-null pointer to the box.
+fn box_pointer<T>(item: T) -> NonNull<T> {
     let item = Box::new(item);
     let item_pointer = Box::into_raw(item);
     // SAFETY: We just constructed the box.
-    unsafe {
-        (
-            Box::from_raw(item_pointer),
-            NonNull::new_unchecked(item_pointer),
-        )
-    }
+    unsafe { NonNull::new_unchecked(item_pointer) }
 }
 
 #[cfg(test)]
