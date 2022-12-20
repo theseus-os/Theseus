@@ -36,11 +36,27 @@ static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
     }
 );
 
+
+// Note: we can't put this cfg block inside the macro, because then it will be
+//       enabled based on the chosen features of the foreign crate that
+//       *calls* this macro, rather than the features activated in *this* crate.
+#[cfg(feature = "bios")]
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
-        #[cfg(feature = "bios")]
         let _ = $crate::print_args_raw(format_args!($($arg)*));
+    });
+}
+
+// Note: we can't put this cfg block inside the macro, because then it will be
+//       enabled based on the chosen features of the foreign crate that
+//       *calls* this macro, rather than the features activated in *this* crate.
+#[cfg(not(feature = "bios"))]
+#[macro_export]
+macro_rules! print_raw {
+    ($($arg:tt)*) => ({
+        // to silence warnings about unused variables
+        drop(format_args!($($arg)*));
     });
 }
 

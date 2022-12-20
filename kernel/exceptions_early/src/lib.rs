@@ -16,7 +16,7 @@ use x86_64::{
 };
 use locked_idt::LockedIdt;
 use gdt::{Gdt, create_gdt};
-use vga_buffer::{print_raw, println_raw};
+use vga_buffer::println_raw;
 
 /// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.

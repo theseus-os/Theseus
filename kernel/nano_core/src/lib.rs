@@ -90,7 +90,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
 }
 
 /// The nano core routine. See crate-level documentation for more information.
-fn nano_core<T>(boot_info: T) -> Result<(), &'static str>
+fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation
 {
@@ -106,7 +106,7 @@ where
         stack,
         bootloader_modules,
         identity_mapped_pages
-    ) = memory_initialization::init_memory_management(boot_info)?;
+    ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
     println_raw!("nano_core(): initialized memory subsystem.");
 
     state_store::init();
