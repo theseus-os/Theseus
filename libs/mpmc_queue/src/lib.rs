@@ -5,7 +5,6 @@
 //! [Tokio inject queue]: https://github.com/tokio-rs/tokio/blob/master/tokio/src/runtime/task/inject.rs
 
 #![cfg_attr(not(test), no_std)]
-#![feature(box_into_inner)]
 
 extern crate alloc;
 
