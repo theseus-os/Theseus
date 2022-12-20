@@ -10,7 +10,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 
-pub fn main(_args: Vec<String>) -> (){
+pub fn main(_args: Vec<String>) -> isize {
     let taskref1 = spawn::new_task_builder(test1 ,1)
         .name(String::from("test1"))
         .pin_on_core(1)
@@ -60,6 +60,8 @@ pub fn main(_args: Vec<String>) -> (){
     taskref1.join().expect("Task 1 join failed");
     taskref2.join().expect("Task 2 join failed");
     taskref3.join().expect("Task 3 join failed");
+
+    0
 }
 
 fn test1(_a: u32) -> u32 {

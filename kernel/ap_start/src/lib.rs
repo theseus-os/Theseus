@@ -90,7 +90,6 @@ pub fn kstart_ap(
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // task management subsystem and create the idle task for this CPU.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
-    spawn::create_idle_task().unwrap();
 
     // The PAT must be initialized explicitly on every CPU,
     // but it is not a fatal error if it doesn't exist.
@@ -110,8 +109,8 @@ pub fn kstart_ap(
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
-    loop { 
-        error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", apic_id);
+    loop {
+        // The core may enter this loop for a bit prior to the captain creating the idle tasks.
+        spawn::idle_task_entry(apic_id);
     }
 }

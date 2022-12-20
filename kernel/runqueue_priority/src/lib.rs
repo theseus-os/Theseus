@@ -3,20 +3,22 @@
 //! that it used for scheduling purposes.
 //! 
 
+#![feature(new_uninit)]
 #![no_std]
 
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate mutex_preemption;
-extern crate atomic_linked_list;
 extern crate task;
+extern crate spin;
 
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;
 
+use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use mutex_preemption::RwLockPreempt;
-use atomic_linked_list::atomic_map::AtomicMap;
+use spin::Once;
 use task::TaskRef;
 use core::ops::{Deref, DerefMut};
 
@@ -83,7 +85,7 @@ impl PriorityTaskRef {
 
 /// There is one runqueue per core, each core only accesses its own private runqueue
 /// and allows the scheduler to select a task from that runqueue to schedule in.
-static RUNQUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
+static RUNQUEUES: Once<Box<[RwLockPreempt<RunQueue>]>> = Once::new();
 
 /// A list of references to `Task`s (`PriorityTaskRef`s) 
 /// that is used to store the `Task`s (and associated scheduler related data) 
@@ -127,13 +129,23 @@ impl RunQueue {
         }
     }
 
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`
-    pub fn init(which_core: u8) -> Result<(), &'static str> {
+    /// Initialises `num_cores` runqueues.
+    ///
+    /// `num_cores` must be equal to the largest CPU ID i.e. `num_cores` must include disabled cores.
+    pub fn init(num_cores: u8) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
-        trace!("Created runqueue (priority) for core {}", which_core);
-        let new_rq = RwLockPreempt::new(RunQueue {
-            core: which_core,
-            queue: VecDeque::new(),
+        trace!("Created {} runqueues (priority)", num_cores);
+        RUNQUEUES.call_once(|| {
+            let mut runqueues = Box::new_uninit_slice(num_cores.into());
+            for core in 0..num_cores {
+                let runqueue = RwLockPreempt::new(RunQueue {
+                    core,
+                    queue: VecDeque::new(),
+                });
+                runqueues[usize::from(core)].write(runqueue);
+            }
+            // SAFETY: We just initialised all the runqueues.
+            unsafe { runqueues.assume_init() }
         });
 
         #[cfg(runqueue_spillful)] 
@@ -141,19 +153,12 @@ impl RunQueue {
             task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
         }
 
-        if RUNQUEUES.insert(which_core, new_rq).is_some() {
-            error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
-            Err("runqueue already exists for this core")
-        }
-        else {
-            // there shouldn't already be a RunQueue for this core
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Returns `RunQueue` for the given core, which is an `apic_id`.
     pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
-        RUNQUEUES.get(&which_core)
+        RUNQUEUES.get()?.get(usize::from(which_core))
     }
 
 
@@ -168,7 +173,7 @@ impl RunQueue {
     fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<RunQueue>> {
         let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
 
-        for (_, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get()?.iter() {
             let rq_size = rq.read().queue.len();
 
             if let Some(min) = min_rq {
@@ -188,7 +193,7 @@ impl RunQueue {
     /// and adds the given `Task` reference to that core's runqueue.
     pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
-            .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
+            .or_else(|| RUNQUEUES.get()?.iter().next())
             .ok_or("couldn't find any runqueues to add the task to!")?;
 
         rq.write().add_task(task)
@@ -260,7 +265,7 @@ impl RunQueue {
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
     pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
-        for (_core, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get().ok_or("Run queues not initialised")?.iter() {
             rq.write().remove_task(task)?;
         }
         Ok(())
@@ -273,7 +278,10 @@ impl RunQueue {
     pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
         // warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
         task.set_on_runqueue(None);
-        RUNQUEUES.get(&core)
+        RUNQUEUES
+            .get()
+            .ok_or("Run queues not initialised")?
+            .get(usize::from(core))
             .ok_or("Couldn't get runqueue for specified core")
             .and_then(|rq| {
                 // Instead of calling `remove_task`, we directly call `remove_internal`
@@ -299,7 +307,7 @@ impl RunQueue {
     /// Sets the priority of the given `Task` in all the `RunQueue` structures 
     pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
         // debug!("assign priority wrapper. called once per call");
-        for (_core, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get().ok_or("Run queues not initialised")?.iter() {
             rq.write().set_priority_internal(task, priority)?;
         }
         Ok(())
@@ -321,7 +329,7 @@ impl RunQueue {
     /// Outputs None if the task is not found in any of the runqueues.
     pub fn get_priority(task: &TaskRef) -> Option<u8> {
         // debug!("assign priority wrapper. called once per call");
-        for (_core, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get()?.iter() {
             let return_priority = rq.read().get_priority_internal(task);
             match return_priority {
                 //If a matching task is found the iteration terminates

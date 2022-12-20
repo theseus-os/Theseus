@@ -48,6 +48,7 @@ extern crate tlb_shootdown;
 extern crate multiple_heaps;
 extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
+extern crate runqueue;
 
 
 use alloc::vec::Vec;
@@ -126,14 +127,19 @@ pub fn init(
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
-    let ap_count = multicore_bringup::handle_ap_cores(
+    let (num_enabled, num_disabled) = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
         ap_start_realmode_begin,
         ap_start_realmode_end,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
-    let cpu_count = ap_count + 1;
-    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
+    info!("Discovered {} AP cores; Booted {} AP cores; {} total CPUs are running.", num_enabled + num_disabled, num_enabled, num_enabled + 1);
+
+    let num_cpus = num_enabled + num_disabled + 1;
+    runqueue::init(num_cpus)?;
+    for core in 0..num_cpus {
+        spawn::create_idle_task(core)?;
+    }
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
@@ -182,13 +188,11 @@ pub fn init(
     // The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     drop(kernel_mmi_ref);
-    // 2. Create the idle task for this CPU.
-    spawn::create_idle_task()?;
-    // 3. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
-    spawn::cleanup_bootstrap_tasks(cpu_count as usize)?;
-    // 4. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    // 2. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
+    spawn::cleanup_bootstrap_tasks(num_enabled as usize + 1)?;
+    // 3. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
     bootstrap_task.finish();
-    // 5. Enable interrupts such that other tasks can be scheduled in.
+    // 4. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!

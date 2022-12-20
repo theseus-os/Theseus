@@ -31,7 +31,6 @@ use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
-use apic::get_my_apic_id;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
@@ -47,12 +46,9 @@ pub fn init(
     apic_id: u8,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    runqueue::init(apic_id)?;
-    
     let joinable_bootstrap_task = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     let task_ref = joinable_bootstrap_task.clone();
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
-    runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 
         task_ref,
@@ -124,7 +120,6 @@ impl BootstrapTaskRef {
     /// This function does the following:
     /// 1. Consumes this bootstrap task such that it can no longer be accessed.
     /// 2. Marks this bootstrap task as exited.
-    /// 3. Removes this bootstrap task from this CPU's runqueue.
     pub fn finish(self) {
         drop(self);
     }
@@ -133,7 +128,6 @@ impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
         // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
-        remove_current_task_from_runqueue(&self.task_ref);
         self.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
 
@@ -983,9 +977,8 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     }
 }
 
-/// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let apic_id = get_my_apic_id();
+/// Spawns an idle task on the CPU with the given ID.
+pub fn create_idle_task(apic_id: u8) -> Result<JoinableTaskRef, &'static str> {
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
@@ -999,7 +992,7 @@ pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
 /// so we use `()` here instead. 
 #[inline(never)]
-fn idle_task_entry(_apic_id: u8) {
+pub fn idle_task_entry(_apic_id: u8) {
     info!("Entered idle task loop on core {}: {:?}", apic::get_my_apic_id(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state

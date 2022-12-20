@@ -17,14 +17,7 @@ use runqueue_round_robin::RunQueue;
 /// This defines the round robin scheduler policy.
 /// Returns None if there is no schedule-able task
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
-
-    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            error!("BUG: select_next_task_round_robin(): couldn't get runqueue for core {}", apic_id); 
-            return None;
-        }
-    };
+    let mut runqueue_locked = RunQueue::get_runqueue(apic_id)?.write();
     
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;

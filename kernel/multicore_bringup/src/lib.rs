@@ -129,7 +129,7 @@ pub fn handle_ap_cores(
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,
-) -> Result<u8, &'static str> {
+) -> Result<(u8, u8), &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;
@@ -187,7 +187,8 @@ pub fn handle_ap_cores(
     }
     // Now, the AP startup code is at the PhysicalAddress `AP_STARTUP`.
 
-    let mut ap_count = 0; // the number of AP cores we have successfully booted.
+    let mut num_enabled = 0; // the number of AP cores we have successfully booted.
+    let mut num_disabled = 0;
     let ap_trampoline_data: &mut ApTrampolineData = trampoline_mapped_pages.as_type_mut(0)?;
     // Here, we set up the data items that will be accessible to the APs when they boot up.
     // We only set the values of fields that are the same for ALL APs here;
@@ -210,6 +211,7 @@ pub fn handle_ap_cores(
                 if lapic_entry.flags & 0x1 != 0x1 {
                     warn!("Processor {} apic_id {} is disabled by the hardware, cannot initialize or use it.", 
                             lapic_entry.processor, lapic_entry.apic_id);
+                    num_disabled += 1;
                     continue;
                 }
 
@@ -235,7 +237,7 @@ pub fn handle_ap_cores(
                     nmi_lint,
                     nmi_flags 
                 );
-                ap_count += 1;
+                num_enabled += 1;
             }
         }
     }
@@ -249,7 +251,7 @@ pub fn handle_ap_cores(
     
     // Wait for all CPUs to finish booting and init
     info!("handle_ap_cores(): BSP is waiting for APs to boot...");
-    let expected_cpus = ap_count + 1;
+    let expected_cpus = num_enabled + 1;
     let mut num_known_cpus = cpu_count();
     let mut iter = 0;
     while num_known_cpus < expected_cpus {
@@ -262,7 +264,7 @@ pub fn handle_ap_cores(
         iter += 1;
     }
     
-    Ok(ap_count)  
+    Ok((num_enabled, num_disabled))
 }
 
 

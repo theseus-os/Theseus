@@ -16,19 +16,21 @@
 //! lower-period tasks are "higher priority" and will be selected first, 
 //! with aperiodic tasks being selected only when no periodic tasks are runnable.
 
+#![feature(new_uninit)]
 #![no_std]
 
 extern crate task;
 extern crate mutex_preemption;
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate atomic_linked_list;
+extern crate spin;
 
+use alloc::boxed::Box;
 use task::TaskRef;
 use mutex_preemption::RwLockPreempt;
 use alloc::collections::VecDeque;
 use core::ops::{Deref, DerefMut};
-use atomic_linked_list::atomic_map::AtomicMap;
+use spin::Once;
 
 /// A reference to a task with its period for realtime scheduling.
 ///
@@ -60,8 +62,8 @@ impl RealtimeTaskRef {
     /// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
     pub fn new(taskref: TaskRef, period: Option<usize>) -> RealtimeTaskRef {
         RealtimeTaskRef {
-            taskref: taskref,
-            period: period,
+            taskref,
+            period,
             context_switches: 0,
         }
     }
@@ -95,7 +97,7 @@ impl RealtimeTaskRef {
 
 /// There is one runqueue per core, each core only accesses its own private runqueue
 /// and allows the scheduler to select a task from that runqueue to schedule in
-static RUNQUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
+static RUNQUEUES: Once<Box<[RwLockPreempt<RunQueue>]>> = Once::new();
 
 /// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
 ///
@@ -145,28 +147,31 @@ impl RunQueue {
         }
     }
 
-    /// Creates a new `RunQueue` for the given core, which is an `apic_id`
-    pub fn init(which_core: u8) -> Result<(), &'static str> {
+    /// Initialises `num_cores` runqueues.
+    ///
+    /// `num_cores` must be equal to the largest CPU ID i.e. `num_cores` must include disabled cores.
+    pub fn init(num_cores: u8) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
-        trace!("Created runqueue (realtime) for core {}", which_core);
-        let new_rq = RwLockPreempt::new(RunQueue {
-            core: which_core,
-            queue: VecDeque::new(),
+        trace!("Created {} runqueues (realtime)", num_cores);
+        RUNQUEUES.call_once(|| {
+            let mut runqueues = Box::new_uninit_slice(num_cores.into());
+            for core in 0..num_cores {
+                let runqueue = RwLockPreempt::new(RunQueue {
+                    core,
+                    queue: VecDeque::new(),
+                });
+                runqueues[usize::from(core)].write(runqueue);
+            }
+            // SAFETY: We just initialised all the runqueues.
+            unsafe { runqueues.assume_init() }
         });
 
-        if RUNQUEUES.insert(which_core, new_rq).is_some() {
-            error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
-            Err("runqueue already exists for this core")
-        }
-        else {
-            // there shouldn't already be a RunQueue for this core
-            Ok(())
-        }
+        Ok(())
     }
 
     /// Returns `RunQueue` for the given core, which is an `apic_id`.
     pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
-        RUNQUEUES.get(&which_core)
+        RUNQUEUES.get()?.get(usize::from(which_core))
     } 
 
     /// Returns the "least busy" core, which is currently very simple, based on runqueue size.
@@ -179,7 +184,7 @@ impl RunQueue {
     fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<RunQueue>> {
         let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
 
-        for (_, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get()?.iter() {
             let rq_size = rq.read().queue.len();
 
             if let Some(min) = min_rq {
@@ -199,7 +204,7 @@ impl RunQueue {
     /// and adds the given `Task` reference to that core's runqueue.
     pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
-            .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
+            .or_else(|| RUNQUEUES.get()?.iter().next())
             .ok_or("couldn't find any runqueues to add the task to!")?;
 
         rq.write().add_task(task, None)
@@ -268,7 +273,7 @@ impl RunQueue {
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
     pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
-        for (_core, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get().ok_or("Run queues not initialised")?.iter() {
             rq.write().remove_task(task)?;
         }
         Ok(())
@@ -296,7 +301,7 @@ impl RunQueue {
 
 /// Set the periodicity of a given `Task` in all the `RunQueue` structures
 pub fn set_periodicity(task: &TaskRef, period: usize) -> Result<(), &'static str> {
-    for (_core, rq) in RUNQUEUES.iter() {
+        for rq in RUNQUEUES.get().ok_or("Run queues not initialised")?.iter() {
         rq.write().set_periodicity_internal(task, period)?;
     }
     Ok(())
