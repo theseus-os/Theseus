@@ -5,7 +5,7 @@ use core::{fmt, sync::atomic::{AtomicU32, Ordering}};
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 use spin::Once;
-use raw_cpuid::CpuId as X86CpuId;
+use raw_cpuid::CpuId as X86CpuIdInstr;
 use msr::*;
 use irq_safety::RwLockIrqSafe;
 use memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
@@ -67,7 +67,7 @@ pub fn is_bootstrap_cpu() -> bool {
 pub fn has_x2apic() -> bool {
     static IS_X2APIC: Once<bool> = Once::new(); // caches the result
     let res: &bool = IS_X2APIC.call_once( || {
-        X86CpuId::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
+        X86CpuIdInstr::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
     });
     *res // because call_once returns a reference to the cached IS_X2APIC value
 }
