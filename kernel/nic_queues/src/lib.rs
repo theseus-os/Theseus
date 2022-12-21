@@ -63,7 +63,7 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     /// The queue of received Ethernet frames, ready for consumption by a higher layer.
     /// Just like a regular FIFO queue, newly-received frames are pushed onto the back
     /// and frames are popped off of the front.
-    /// Each frame is represented by a Vec<ReceiveBuffer>, because a single frame can span multiple receive buffers.
+    /// Each frame is represented by a `Vec<ReceiveBuffer>`, because a single frame can span multiple receive buffers.
     /// TODO: improve this? probably not the best cleanest way to expose received frames to higher layers   
     pub received_frames: VecDeque<ReceivedFrame>,
     /// The cpu which this queue is mapped to. 

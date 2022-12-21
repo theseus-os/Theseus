@@ -547,7 +547,7 @@ impl<'a, P: AllocablePage + 'a> Iterator for ObjectPageIterMut<'a, P> {
     }
 }
 
-/// Rawlink is a type like Option<T> but for holding a raw pointer.
+/// Rawlink is a type like `Option<T>` but for holding a raw pointer.
 ///
 /// We use it to link AllocablePages together. You probably won't need
 /// to use this type if you're not implementing AllocablePage

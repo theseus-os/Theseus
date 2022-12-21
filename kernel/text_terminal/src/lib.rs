@@ -405,7 +405,7 @@ pub struct TextTerminal<Backend> where Backend: TerminalBackend {
     /// The VTE parser for parsing VT100/ANSI/xterm control and escape sequences.
     ///
     /// The event handler for the [`Parser`] is a transient zero-cost object 
-    /// of type [`TerminalParserHandler`] that is created on demand in 
+    /// of type `TerminalParserHandler` that is created on demand in 
     /// [`TextTerminal::handle_input()`] every time an input byte needs to be handled.
     parser: Parser,
 }

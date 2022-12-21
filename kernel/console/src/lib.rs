@@ -65,8 +65,6 @@ pub struct Console<I, O, Backend>
 ///
 /// The terminal created by this function will use a [`TtyBackend`]
 /// that writes terminal output and control commands to the given `output_stream`.
-///
-/// To start running the console, invoke the [`Console::spawn()`] function.
 pub fn new_serial_console<S, I, O>(
 	name: S,
 	input_stream: I,

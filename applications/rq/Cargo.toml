@@ -1,5 +1,5 @@
 [package]
-name = "lscpu"
+name = "rq"
 version = "0.1.0"
 authors = ["Christine Wang <chrissywang54@gmail.com>"]
 

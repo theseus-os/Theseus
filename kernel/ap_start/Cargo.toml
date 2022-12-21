@@ -34,6 +34,8 @@ path = "../apic"
 [dependencies.no_drop]
 path = "../no_drop"
 
+[dependencies.page_attribute_table]
+path = "../page_attribute_table"
 
 [lib]
 crate-type = ["rlib"]

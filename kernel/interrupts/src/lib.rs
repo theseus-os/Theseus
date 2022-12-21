@@ -15,7 +15,7 @@ use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use locked_idt::LockedIdt;
 use log::{error, warn, info, debug};
-use vga_buffer::{print_raw, println_raw};
+use vga_buffer::println_raw;
 
 
 /// The single system-wide Interrupt Descriptor Table (IDT).

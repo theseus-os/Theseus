@@ -123,7 +123,6 @@ pub fn main(_args: Vec<String>) -> isize {
     //     Err(err) => {error!("{}", err)}
     // }
     // warn!("shell::main(): the `shell_loop` task exited unexpectedly.");
-    // warn!("SHELL_LOOP exit value: {:?}", _task_ref.take_exit_value());
     // return 0;
 }
 
@@ -1057,64 +1056,71 @@ impl Shell {
             for task_ref in task_refs {
                 if task_ref.has_exited() { // a task has exited
                     let exited_task_id = task_ref.id;
-                    if let Some(exit_val) = task_ref.take_exit_value() {
-                        match exit_val {
-                            ExitValue::Completed(exit_status) => {
-                                // here: the task ran to completion successfully, so it has an exit value.
-                                // we know the return type of this task is `isize`,
-                                // so we need to downcast it from Any to isize.
-                                let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
-                                if let Some(val) = val {
-                                    self.terminal.lock().print_to_terminal(
-                                        format!("task [{}] exited with code {} ({:#X})\n", exited_task_id, val, val)
-                                    );
-                                }
-                            },
-
-                            ExitValue::Killed(KillReason::Requested) => {
-                                // Nothing to do. We have already print "^C" while handling keyboard event.
-                            },
-                            // If the user manually aborts the task
-                            ExitValue::Killed(kill_reason) => {
-                                warn!("task [{}] was killed because {:?}", exited_task_id, kill_reason);
+                    match task_ref.join() {
+                        Ok(ExitValue::Completed(exit_status)) => {
+                            // here: the task ran to completion successfully, so it has an exit value.
+                            // we know the return type of this task is `isize`,
+                            // so we need to downcast it from Any to isize.
+                            let val: Option<&isize> = exit_status.downcast_ref::<isize>();
+                            info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
+                            if let Some(val) = val {
                                 self.terminal.lock().print_to_terminal(
-                                    format!("task [{}] was killed because {:?}\n", exited_task_id, kill_reason)
+                                    format!("task [{}] exited with code {} ({:#X})\n", exited_task_id, val, val)
                                 );
                             }
+                        },
+
+                        Ok(ExitValue::Killed(KillReason::Requested)) => {
+                            // Nothing to do. We have already print "^C" while handling keyboard event.
+                        },
+
+                        // If the user manually aborts the task
+                        Ok(ExitValue::Killed(kill_reason)) => {
+                            warn!("task [{}] was killed because {:?}", exited_task_id, kill_reason);
+                            self.terminal.lock().print_to_terminal(
+                                format!("task [{}] was killed because {:?}\n", exited_task_id, kill_reason)
+                            );
                         }
 
-                        // Remove the queue for legacy terminal print
-                        terminal_print::remove_child(exited_task_id)?;
+                        Err(_e) => {
+                            let err_msg = format!("Failed to `join` task [{}] {:?}, error: {:?}",
+                                exited_task_id, task_ref, _e,
+                            );
+                            error!("{}", err_msg);
+                            self.terminal.lock().print_to_terminal(err_msg);
+                        }
+                    }
 
-                        need_refresh = true;
+                    // Remove the queue for legacy terminal print
+                    terminal_print::remove_child(exited_task_id)?;
 
-                        // Set EOF flag for the stdin, stdout of the exited task.
-                        let mut pipe_queue_iter = job.pipe_queues.iter();
-                        let mut stderr_queue_iter = job.stderr_queues.iter();
-                        let mut task_id_iter = job.task_ids.iter();
-                        while let (Some(pipe_queue), Some(stderr_queue), Some(task_id))
-                            = (pipe_queue_iter.next(), stderr_queue_iter.next(), task_id_iter.next()) {
+                    need_refresh = true;
 
-                            // Find the exited task by matching task id.
-                            if *task_id == exited_task_id {
+                    // Set EOF flag for the stdin, stdout of the exited task.
+                    let mut pipe_queue_iter = job.pipe_queues.iter();
+                    let mut stderr_queue_iter = job.stderr_queues.iter();
+                    let mut task_id_iter = job.task_ids.iter();
+                    while let (Some(pipe_queue), Some(stderr_queue), Some(task_id))
+                        = (pipe_queue_iter.next(), stderr_queue_iter.next(), task_id_iter.next()) {
 
-                                // Set the EOF flag of its `stdin`, which effectively prevents it's
-                                // producer from writing more. (It returns an error upon writing to
-                                // the queue which has the EOF flag set.)
+                        // Find the exited task by matching task id.
+                        if *task_id == exited_task_id {
+
+                            // Set the EOF flag of its `stdin`, which effectively prevents it's
+                            // producer from writing more. (It returns an error upon writing to
+                            // the queue which has the EOF flag set.)
+                            pipe_queue.get_writer().lock().set_eof();
+
+                            // Also set the EOF of `stderr`.
+                            stderr_queue.get_writer().lock().set_eof();
+
+                            // Set the EOF flag of its `stdout`, which effectively notifies the reader
+                            // of the queue that the stream has ended. The `if let` clause should not
+                            // fail.
+                            if let Some(pipe_queue) = pipe_queue_iter.next() {
                                 pipe_queue.get_writer().lock().set_eof();
-
-                                // Also set the EOF of `stderr`.
-                                stderr_queue.get_writer().lock().set_eof();
-
-                                // Set the EOF flag of its `stdout`, which effectively notifies the reader
-                                // of the queue that the stream has ended. The `if let` clause should not
-                                // fail.
-                                if let Some(pipe_queue) = pipe_queue_iter.next() {
-                                    pipe_queue.get_writer().lock().set_eof();
-                                }
-                                break;
                             }
+                            break;
                         }
                     }
 
