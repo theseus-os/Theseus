@@ -10,7 +10,7 @@ extern crate no_drop;
 extern crate bootloader_modules;
 extern crate boot_info;
 
-use memory::{MmiRef, MappedPages, VirtualAddress, MemoryMappings};
+use memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use boot_info::{BootInformation, Module};
 use alloc::{
@@ -52,7 +52,7 @@ pub fn init_memory_management(
     ), &'static str>
 {
     // Initialize memory management: paging (create a new page table), essential kernel mappings
-    let MemoryMappings {
+    let InitialMemoryMappings {
         mut page_table,
         text: text_mapped_pages,
         rodata: rodata_mapped_pages,

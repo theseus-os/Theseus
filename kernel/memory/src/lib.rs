@@ -125,7 +125,7 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 }
 
 /// Information returned after initialising the memory subsystem.
-pub struct MemoryMappings {
+pub struct InitialMemoryMappings {
     /// The currently active page table.
     pub page_table: PageTable,
     /// The kernel's text section mappings.
@@ -151,7 +151,7 @@ pub struct MemoryMappings {
 /// the original BootInformation will be unmapped and inaccessible.
 pub fn init(
     boot_info: &impl BootInformation
-) -> Result<MemoryMappings, &'static str> {
+) -> Result<InitialMemoryMappings, &'static str> {
     // Get the start and end addresses of the kernel, boot info, boot modules, etc.
     // These are all physical addresses.
     let kernel_memory = boot_info.kernel_memory_range()?;
@@ -212,7 +212,7 @@ pub fn init(
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     paging::init(boot_info, into_alloc_frames_fn)
-        .inspect(|MemoryMappings { page_table, .. } | {
+        .inspect(|InitialMemoryMappings { page_table, .. } | {
             debug!("Done with paging::init(). new page table: {:?}", page_table);
         })
 }

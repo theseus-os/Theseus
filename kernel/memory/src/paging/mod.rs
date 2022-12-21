@@ -29,7 +29,7 @@ use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET, MemoryMappings};
+    get_vga_mem_addr, KERNEL_OFFSET, InitialMemoryMappings};
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
@@ -204,7 +204,7 @@ pub fn get_current_p4() -> Frame {
 pub fn init(
     boot_info: &impl BootInformation,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
-) -> Result<MemoryMappings, &'static str> {
+) -> Result<InitialMemoryMappings, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
@@ -352,7 +352,7 @@ pub fn init(
     // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
 
     // Return the new page table because that's the one that should be used by the kernel in future mappings. 
-    Ok(MemoryMappings {
+    Ok(InitialMemoryMappings {
         page_table: new_table,
         text: text_mapped_pages,
         rodata: rodata_mapped_pages,
