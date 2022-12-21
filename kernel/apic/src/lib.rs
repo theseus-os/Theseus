@@ -65,10 +65,13 @@ pub fn is_bootstrap_cpu() -> bool {
 
 /// Returns true if the machine has support for x2apic
 pub fn has_x2apic() -> bool {
-    static IS_X2APIC: Once<bool> = Once::new(); // caches the result
-    let res: &bool = IS_X2APIC.call_once( || {
-        X86CpuIdInstr::new().get_feature_info().expect("Couldn't get CpuId feature info").has_x2apic()
-    });
+    static IS_X2APIC: Once<bool> = Once::new(); // cache the result
+    let res: &bool = IS_X2APIC.call_once(||
+        X86CpuIdInstr::new()
+            .get_feature_info()
+            .expect("Couldn't get CpuId feature info")
+            .has_x2apic()
+    );
     *res // because call_once returns a reference to the cached IS_X2APIC value
 }
 
@@ -79,7 +82,7 @@ pub fn get_lapics() -> &'static AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> {
 
 /// Returns the number of CPUs (SMP cores) that exist 
 /// and are currently initialized on this system.
-#[doc(alias = "cores")]
+#[doc(alias("cores", "numcpus"))]
 pub fn cpu_count() -> u32 {
     CPU_COUNT.load(Ordering::Relaxed)
 }

@@ -17,7 +17,7 @@ use apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
-/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
+/// The number of remaining cores that still need to handle the current TLB shootdown IPI
 pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);

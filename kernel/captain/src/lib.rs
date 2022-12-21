@@ -116,7 +116,7 @@ pub fn init(
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // get BSP's apic id
-    let bsp_apic_id = cpu::bootstrap_cpu().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
+    let bsp_apic_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
