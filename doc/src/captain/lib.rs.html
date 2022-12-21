@@ -230,7 +230,7 @@
 <span class="kw">extern crate </span>memory; <span class="comment">// the virtual memory subsystem 
 </span><span class="kw">extern crate </span>no_drop;
 <span class="kw">extern crate </span>stack;
-<span class="kw">extern crate </span>apic; 
+<span class="kw">extern crate </span>cpu; 
 <span class="kw">extern crate </span>mod_mgmt;
 <span class="kw">extern crate </span>spawn;
 <span class="kw">extern crate </span>tsc;
@@ -317,7 +317,7 @@
     <span class="kw">let </span>idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())<span class="question-mark">?</span>;
     
     <span class="comment">// get BSP&#39;s apic id
-    </span><span class="kw">let </span>bsp_apic_id = apic::get_bsp_id().ok_or(<span class="string">&quot;captain::init(): Coudln&#39;t get BSP&#39;s apic_id!&quot;</span>)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>bsp_apic_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// create the initial `Task`, which is bootstrapped from this execution context.
     </span><span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)<span class="question-mark">?</span>;

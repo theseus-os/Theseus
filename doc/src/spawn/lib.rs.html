@@ -1006,7 +1006,6 @@
 <span id="1006">1006</span>
 <span id="1007">1007</span>
 <span id="1008">1008</span>
-<span id="1009">1009</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1040,7 +1039,6 @@
 <span class="kw">use </span>task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 <span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 <span class="kw">use </span>path::Path;
-<span class="kw">use </span>apic::get_my_apic_id;
 <span class="kw">use </span>fs_node::FileOrDir;
 <span class="kw">use </span>preemption::{hold_preemption, PreemptionGuard};
 <span class="kw">use </span>no_drop::NoDrop;
@@ -1983,7 +1981,7 @@
     <span class="comment">// In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core&#39;s runqueue.
     </span><span class="attr">#[cfg(not(rq_eval))] </span>{
-        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = runqueue::get_runqueue(apic::get_my_apic_id())
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = runqueue::get_runqueue(cpu::current_cpu())
             .ok_or(<span class="string">&quot;couldn&#39;t get this core&#39;s ID or runqueue to remove exited task from it&quot;</span>)
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
@@ -1994,7 +1992,7 @@
 
 <span class="doccomment">/// Spawns an idle task on the current CPU and adds it to this CPU&#39;s runqueue.
 </span><span class="kw">pub fn </span>create_idle_task() -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>apic_id = get_my_apic_id();
+    <span class="kw">let </span>apic_id = cpu::current_cpu();
     <span class="macro">debug!</span>(<span class="string">&quot;Spawning a new idle task on core {}&quot;</span>, apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
@@ -2009,7 +2007,7 @@
 /// so we use `()` here instead. 
 </span><span class="attr">#[inline(never)]
 </span><span class="kw">fn </span>idle_task_entry(_apic_id: u8) {
-    <span class="macro">info!</span>(<span class="string">&quot;Entered idle task loop on core {}: {:?}&quot;</span>, apic::get_my_apic_id(), task::get_my_current_task());
+    <span class="macro">info!</span>(<span class="string">&quot;Entered idle task loop on core {}: {:?}&quot;</span>, cpu::current_cpu(), task::get_my_current_task());
     <span class="kw">loop </span>{
         <span class="comment">// TODO: put this core into a low-power state
         </span>pause::spin_loop_hint();

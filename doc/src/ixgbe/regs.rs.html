@@ -1138,7 +1138,7 @@
 #[repr(C)]
 </span><span class="kw">pub struct </span>MsixVectorEntry {
     <span class="doccomment">/// The lower portion of the address for the memory write transaction.
-    /// This part contains the apic id which the interrupt will be redirected to.
+    /// This part contains the CPU ID which the interrupt will be redirected to.
     </span><span class="kw">pub </span>msg_lower_addr:         Volatile&lt;u32&gt;,
     <span class="doccomment">/// The upper portion of the address for the memory write transaction.
     </span><span class="kw">pub </span>msg_upper_addr:         Volatile&lt;u32&gt;,

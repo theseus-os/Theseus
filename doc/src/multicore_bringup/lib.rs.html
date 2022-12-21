@@ -443,7 +443,7 @@
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
 <span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
-<span class="kw">use </span>apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id, cpu_count};
+<span class="kw">use </span>apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 <span class="kw">use </span>ap_start::{kstart_ap, AP_READY_FLAG};
 <span class="kw">use </span>madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 <span class="kw">use </span>pause::spin_loop_hint;
@@ -542,7 +542,7 @@
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     max_framebuffer_resolution: <span class="prelude-ty">Option</span>&lt;(u16, u16)&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;u8, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;u32, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     <span class="kw">let </span>page_table_phys_addr: PhysicalAddress;
@@ -581,7 +581,7 @@
     }
 
     <span class="kw">let </span>all_lapics = get_lapics();
-    <span class="kw">let </span>me = get_my_apic_id();
+    <span class="kw">let </span>me = current_cpu();
 
     <span class="comment">// Copy the AP startup code (from the kernel&#39;s text section pages) into the AP_STARTUP physical address entry point.
     </span>{
@@ -628,7 +628,7 @@
 
                 <span class="comment">// start up this AP, and have it create a new LocalApic for itself. 
                 // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                </span><span class="kw">let </span>bsp_lapic_ref = get_bsp_id()
+                </span><span class="kw">let </span>bsp_lapic_ref = bootstrap_cpu()
                     .and_then(|bsp_id| all_lapics.get(<span class="kw-2">&amp;</span>bsp_id))
                     .ok_or(<span class="string">&quot;Couldn&#39;t get BSP&#39;s LocalApic!&quot;</span>)<span class="question-mark">?</span>;
                 <span class="kw">let </span><span class="kw-2">mut </span>bsp_lapic = bsp_lapic_ref.write();

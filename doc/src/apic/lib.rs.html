@@ -815,14 +815,22 @@
 <span id="815">815</span>
 <span id="816">816</span>
 <span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
-</span><span class="kw">use </span>core::{fmt, sync::atomic::{AtomicU8, Ordering}};
+</span><span class="kw">use </span>core::{fmt, sync::atomic::{AtomicU32, Ordering}};
 <span class="kw">use </span>volatile::{Volatile, ReadOnly, WriteOnly};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>raw_cpuid::CpuId;
+<span class="kw">use </span>raw_cpuid::CpuId <span class="kw">as </span>X86CpuIdInstr;
 <span class="kw">use </span>msr::<span class="kw-2">*</span>;
 <span class="kw">use </span>irq_safety::RwLockIrqSafe;
 <span class="kw">use </span>memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
@@ -833,6 +841,9 @@
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>static_assertions::{const_assert, const_assert_eq};
 <span class="kw">use </span>log::{error, info, debug, trace};
+
+<span class="doccomment">/// A unique identifier for a CPU core.
+</span><span class="kw">pub type </span>CpuId = u8;
 
 <span class="doccomment">/// The IRQ number reserved for Local APIC timer interrupts in the IDT.
 </span><span class="kw">pub const </span>LOCAL_APIC_LVT_IRQ: u8 = <span class="number">0x22</span>;
@@ -856,54 +867,59 @@
 </span><span class="macro">const_assert!</span>(AtomicCell::&lt;InterruptChip&gt;::is_lock_free());
 
 <span class="doccomment">/// The set of system-wide `LocalApic`s, one per CPU core.
-</span><span class="kw">static </span>LOCAL_APICS: AtomicMap&lt;u8, RwLockIrqSafe&lt;LocalApic&gt;&gt; = AtomicMap::new();
+</span><span class="kw">static </span>LOCAL_APICS: AtomicMap&lt;CpuId, RwLockIrqSafe&lt;LocalApic&gt;&gt; = AtomicMap::new();
 
 <span class="doccomment">/// The number of CPUs currently initialized in the system.
 /// This must match the number of Local APICs initialized in the system.
-</span><span class="kw">static </span>CPU_COUNT: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
+</span><span class="kw">static </span>CPU_COUNT: AtomicU32 = AtomicU32::new(<span class="number">0</span>);
 
 <span class="doccomment">/// The processor id (from the ACPI MADT table) of the bootstrap CPU.
-</span><span class="kw">static </span>BSP_PROCESSOR_ID: Once&lt;u8&gt; = Once::new(); 
+</span><span class="kw">static </span>BSP_PROCESSOR_ID: Once&lt;CpuId&gt; = Once::new(); 
 
-<span class="kw">pub fn </span>get_bsp_id() -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+<span class="doccomment">/// Returns the ID of the bootstrap CPU (if known),
+/// which is the first CPU to run after system power-on.
+</span><span class="kw">pub fn </span>bootstrap_cpu() -&gt; <span class="prelude-ty">Option</span>&lt;CpuId&gt; {
     BSP_PROCESSOR_ID.get().cloned()
 }
 
-<span class="doccomment">/// Returns true if the currently executing processor core is the bootstrap processor, 
-/// i.e., the first procesor to run 
-</span><span class="kw">pub fn </span>is_bsp() -&gt; bool {
+<span class="doccomment">/// Returns true if the currently executing CPU is the bootstrap CPU, 
+/// i.e., the first procesor to run after system power-on.
+</span><span class="kw">pub fn </span>is_bootstrap_cpu() -&gt; bool {
     rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
 }
 
 <span class="doccomment">/// Returns true if the machine has support for x2apic
 </span><span class="kw">pub fn </span>has_x2apic() -&gt; bool {
-    <span class="kw">static </span>IS_X2APIC: Once&lt;bool&gt; = Once::new(); <span class="comment">// caches the result
-    </span><span class="kw">let </span>res: <span class="kw-2">&amp;</span>bool = IS_X2APIC.call_once( || {
-        CpuId::new().get_feature_info().expect(<span class="string">&quot;Couldn&#39;t get CpuId feature info&quot;</span>).has_x2apic()
-    });
+    <span class="kw">static </span>IS_X2APIC: Once&lt;bool&gt; = Once::new(); <span class="comment">// cache the result
+    </span><span class="kw">let </span>res: <span class="kw-2">&amp;</span>bool = IS_X2APIC.call_once(||
+        X86CpuIdInstr::new()
+            .get_feature_info()
+            .expect(<span class="string">&quot;Couldn&#39;t get CpuId feature info&quot;</span>)
+            .has_x2apic()
+    );
     <span class="kw-2">*</span>res <span class="comment">// because call_once returns a reference to the cached IS_X2APIC value
 </span>}
 
 <span class="doccomment">/// Returns a reference to the list of LocalApics, one per CPU core.
-</span><span class="kw">pub fn </span>get_lapics() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicMap&lt;u8, RwLockIrqSafe&lt;LocalApic&gt;&gt; {
+</span><span class="kw">pub fn </span>get_lapics() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicMap&lt;CpuId, RwLockIrqSafe&lt;LocalApic&gt;&gt; {
 	<span class="kw-2">&amp;</span>LOCAL_APICS
 }
 
-<span class="doccomment">/// Returns the number of CPUs (cores, or local APICs) that exist 
+<span class="doccomment">/// Returns the number of CPUs (SMP cores) that exist 
 /// and are currently initialized on this system.
-</span><span class="attr">#[doc(alias = <span class="string">&quot;cpus&quot;</span>)]
-</span><span class="kw">pub fn </span>cpu_count() -&gt; u8 {
+</span><span class="attr">#[doc(alias(<span class="string">&quot;cores&quot;</span>, <span class="string">&quot;numcpus&quot;</span>))]
+</span><span class="kw">pub fn </span>cpu_count() -&gt; u32 {
     CPU_COUNT.load(Ordering::Relaxed)
 }
 
-<span class="doccomment">/// Returns the APIC ID of the currently executing CPU core.
-</span><span class="kw">pub fn </span>get_my_apic_id() -&gt; u8 {
-    rdmsr(IA32_TSC_AUX) <span class="kw">as </span>u8
+<span class="doccomment">/// Returns the ID of the currently executing CPU.
+</span><span class="kw">pub fn </span>current_cpu() -&gt; CpuId {
+    rdmsr(IA32_TSC_AUX) <span class="kw">as </span>CpuId
 }
 
 <span class="doccomment">/// Returns a reference to the LocalApic for the currently executing CPU core.
 </span><span class="kw">pub fn </span>get_my_apic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockIrqSafe&lt;LocalApic&gt;&gt; {
-    LOCAL_APICS.get(<span class="kw-2">&amp;</span>get_my_apic_id())
+    LOCAL_APICS.get(<span class="kw-2">&amp;</span>current_cpu())
 }
 
 
@@ -912,7 +928,7 @@
 /// See Intel manual Figure 10-28, Vol. 3A, 10-45. (PDF page 3079) 
 </span><span class="kw">pub enum </span>LapicIpiDestination {
     <span class="doccomment">/// Send IPI to a specific APIC 
-    </span>One(u8),
+    </span>One(CpuId),
     <span class="doccomment">/// Send IPI to my own (the current) APIC  
     </span>Me,
     <span class="doccomment">/// Send IPI to all APICs, including myself
@@ -1143,7 +1159,7 @@
     /// This is currently not used for anything in Theseus.
     </span>processor_id: u8,
     <span class="doccomment">/// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
-    </span>is_bsp: bool,
+    </span>is_bootstrap_cpu: bool,
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>LocalApic {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
@@ -1151,7 +1167,7 @@
             .field(<span class="string">&quot;type&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.inner)
             .field(<span class="string">&quot;apic_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.apic_id)
             .field(<span class="string">&quot;processor_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.processor_id)
-            .field(<span class="string">&quot;is_bsp&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.is_bsp)
+            .field(<span class="string">&quot;is_bootstrap_cpu&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.is_bootstrap_cpu)
             .finish()
     }
 }
@@ -1206,11 +1222,11 @@
         };
 
         <span class="comment">// Check whether the caller&#39;s expectations about BSP vs AP were met.
-        </span><span class="kw">let </span>is_bsp = rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
-        <span class="kw">if </span>should_be_bsp &amp;&amp; !is_bsp {
+        </span><span class="kw">let </span>is_bootstrap_cpu = rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
+        <span class="kw">if </span>should_be_bsp &amp;&amp; !is_bootstrap_cpu {
             <span class="kw">return </span><span class="prelude-val">Err</span>(LapicInitError::NotBSP);
         }
-        <span class="kw">if </span>!should_be_bsp &amp;&amp; is_bsp {
+        <span class="kw">if </span>!should_be_bsp &amp;&amp; is_bootstrap_cpu {
             <span class="kw">return </span><span class="prelude-val">Err</span>(LapicInitError::NotAP);
         }
 
@@ -1239,8 +1255,8 @@
 		<span class="kw">let </span><span class="kw-2">mut </span>lapic = LocalApic {
             inner,
             processor_id,
-            apic_id: u8::MAX, <span class="comment">// placeholder, is replaced below.
-            </span>is_bsp,
+            apic_id: CpuId::MAX, <span class="comment">// placeholder, is replaced below.
+            </span>is_bootstrap_cpu,
         };
 
         <span class="comment">// Now that the APIC hardware is enabled, we can safely obtain this Local APIC&#39;s ID.
@@ -1257,7 +1273,7 @@
 
         <span class="comment">// Theseus uses this MSR to hold each CPU&#39;s ID (which is an OS-chosen value).
         </span><span class="kw">unsafe </span>{ wrmsr(IA32_TSC_AUX, actual_apic_id <span class="kw">as </span>u64); }
-        <span class="kw">if </span>is_bsp {
+        <span class="kw">if </span>is_bootstrap_cpu {
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
 
@@ -1281,18 +1297,18 @@
     /// i.e., the first CPU to boot and run the OS code.
     /// 
     /// There is only one BSP per system.
-    </span><span class="kw">pub fn </span>is_bsp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool { <span class="self">self</span>.is_bsp }
+    </span><span class="kw">pub fn </span>is_bootstrap_cpu(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool { <span class="self">self</span>.is_bootstrap_cpu }
 
     <span class="doccomment">/// Set this Local APIC to a known &quot;clean state&quot; and enable its spurious interrupt vector.
     </span><span class="kw">fn </span>clean_enable(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="kw">let </span>is_bsp = <span class="self">self</span>.is_bsp;
+        <span class="kw">let </span>is_bootstrap_cpu = <span class="self">self</span>.is_bootstrap_cpu;
         <span class="kw">let </span>id = <span class="self">self</span>.read_apic_id();
         <span class="kw">let </span>version = <span class="self">self</span>.version();
 
         <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
             LapicType::X2Apic =&gt; {
-                <span class="macro">info!</span>(<span class="string">&quot;LAPIC x2 ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, id, version, is_bsp);
-                <span class="kw">if </span>is_bsp {
+                <span class="macro">info!</span>(<span class="string">&quot;LAPIC x2 ID {:#x}, version: {:#x}, is_bootstrap_cpu: {}&quot;</span>, id, version, is_bootstrap_cpu);
+                <span class="kw">if </span>is_bootstrap_cpu {
                     INTERRUPT_CHIP.store(InterruptChip::X2APIC);
                 }
 
@@ -1302,8 +1318,8 @@
                 </span><span class="kw">let </span>ldr = rdmsr(IA32_X2APIC_LDR);
                 <span class="kw">let </span>cluster_id = (ldr &gt;&gt; <span class="number">16</span>) &amp; <span class="number">0xFFFF</span>; <span class="comment">// highest 16 bits
                 </span><span class="kw">let </span>logical_id = ldr &amp; <span class="number">0xFFFF</span>; <span class="comment">// lowest 16 bits
-                </span><span class="macro">info!</span>(<span class="string">&quot;x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bsp: {}&quot;</span>,
-                    id, version, cluster_id, logical_id, is_bsp
+                </span><span class="macro">info!</span>(<span class="string">&quot;x2LAPIC ID {:#x}, version {:#X}, (cluster {:#X} logical {:#X}), is_bootstrap_cpu: {}&quot;</span>,
+                    id, version, cluster_id, logical_id, is_bootstrap_cpu
                 );
                 <span class="comment">// NOTE: we&#39;re not yet using logical or cluster mode APIC addressing, only physical APIC addressing.
                 
@@ -1319,8 +1335,8 @@
                 }
             }
             LapicType::XApic(regs) =&gt; {
-                <span class="macro">info!</span>(<span class="string">&quot;LAPIC ID {:#x}, version: {:#x}, is_bsp: {}&quot;</span>, id, version, is_bsp);
-                <span class="kw">if </span>is_bsp {
+                <span class="macro">info!</span>(<span class="string">&quot;LAPIC ID {:#x}, version: {:#x}, is_bootstrap_cpu: {}&quot;</span>, id, version, is_bootstrap_cpu);
+                <span class="kw">if </span>is_bootstrap_cpu {
                     INTERRUPT_CHIP.store(InterruptChip::APIC);
                 }
 

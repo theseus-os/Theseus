@@ -109,23 +109,23 @@
     <span class="comment">// If preemption was not previously enabled (before we disabled it above),
     // then we shouldn&#39;t perform a task switch here.
     </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {
-        <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, get_my_apic_id());
+        <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, current_cpu());
         </span><span class="kw">return </span><span class="bool-val">false</span>;
     }
 
-    <span class="kw">let </span>apic_id = preemption_guard.apic_id();
+    <span class="kw">let </span>cpu_id = preemption_guard.cpu_id();
 
-    <span class="kw">let </span><span class="prelude-val">Some</span>(next_task) = scheduler::select_next_task(apic_id) <span class="kw">else </span>{
+    <span class="kw">let </span><span class="prelude-val">Some</span>(next_task) = scheduler::select_next_task(cpu_id) <span class="kw">else </span>{
         <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// keep running the same current task
     </span>};
 
     <span class="kw">let </span>(did_switch, recovered_preemption_guard) = task::task_switch(
         next_task,
-        apic_id,
+        cpu_id,
         preemption_guard,
     ); 
 
-    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}&quot;, apic_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
+    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}&quot;, cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
 
     </span>drop(recovered_preemption_guard);
     did_switch

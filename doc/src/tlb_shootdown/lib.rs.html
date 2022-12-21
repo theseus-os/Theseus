@@ -114,15 +114,15 @@
 <span class="kw">extern crate </span>pause;
 
 
-<span class="kw">use </span>core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+<span class="kw">use </span>core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 <span class="kw">use </span>irq_safety::{hold_interrupts, RwLockIrqSafe};
 <span class="kw">use </span>memory::PageRange;
 <span class="kw">use </span>apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
 <span class="kw">use </span>pause::spin_loop_hint;
 
 
-<span class="doccomment">/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
-</span><span class="kw">pub static </span>TLB_SHOOTDOWN_IPI_COUNT: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
+<span class="doccomment">/// The number of remaining cores that still need to handle the current TLB shootdown IPI
+</span><span class="kw">pub static </span>TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(<span class="number">0</span>);
 <span class="doccomment">/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 </span><span class="kw">pub static </span>TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(<span class="bool-val">false</span>);
 <span class="doccomment">/// The range of pages for a TLB shootdown IPI.
@@ -152,7 +152,7 @@
 /// 
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
 </span><span class="kw">pub fn </span>handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    <span class="comment">// log::trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::get_my_apic_id(), pages_to_invalidate);
+    <span class="comment">// log::trace!(&quot;handle_tlb_shootdown_ipi(): AP {}, pages: {:?}&quot;, apic::current_cpu(), pages_to_invalidate);
 
     </span><span class="kw">for </span>page <span class="kw">in </span>pages_to_invalidate {
         x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() <span class="kw">as </span>u64));

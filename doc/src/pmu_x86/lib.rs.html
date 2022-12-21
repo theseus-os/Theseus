@@ -1121,7 +1121,7 @@
 /// This function should only be called after all the cores have been booted up.
 </span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>cores_initialized = CORES_INITIALIZED.lock();
-    <span class="kw">let </span>core_id = apic::get_my_apic_id();
+    <span class="kw">let </span>core_id = apic::current_cpu();
 
     <span class="kw">if </span>cores_initialized.contains(<span class="kw-2">&amp;</span>core_id) {
         <span class="macro">warn!</span>(<span class="string">&quot;PMU has already been intitialized on core {}&quot;</span>, core_id);
@@ -1454,7 +1454,7 @@
 
 <span class="doccomment">/// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 </span><span class="kw">fn </span>programmable_start(event_mask: u64) -&gt; <span class="prelude-ty">Result</span>&lt;Counter, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>my_core = apic::get_my_apic_id();
+    <span class="kw">let </span>my_core = apic::current_cpu();
     <span class="kw">let </span>num_pmc = num_general_purpose_counters();
 
     <span class="kw">for </span>pmc <span class="kw">in </span><span class="number">0</span>..num_pmc {
@@ -1481,7 +1481,7 @@
 
 <span class="doccomment">/// Creates a counter object for a fixed hardware counter
 </span><span class="kw">fn </span>create_fixed_counter(msr_mask: u32) -&gt; <span class="prelude-ty">Result</span>&lt;Counter, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>my_core = apic::get_my_apic_id();
+    <span class="kw">let </span>my_core = apic::current_cpu();
     <span class="kw">let </span>count = rdpmc(msr_mask);
     
     <span class="kw">return </span><span class="prelude-val">Ok</span>(Counter {
@@ -1495,7 +1495,7 @@
 <span class="doccomment">/// Checks that the PMU has been initialized. If it has been,
 /// the version ID tells whether the system has performance monitoring capabilities. 
 </span><span class="kw">fn </span>check_pmu_availability() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;  {
-    <span class="kw">let </span>core_id = apic::get_my_apic_id();
+    <span class="kw">let </span>core_id = apic::current_cpu();
     <span class="kw">if </span>!CORES_INITIALIZED.lock().contains(<span class="kw-2">&amp;</span>core_id) {
         <span class="kw">if </span><span class="kw-2">*</span>PMU_VERSION &gt;= MIN_PMU_VERSION {
             <span class="macro">error!</span>(<span class="string">&quot;PMU version {} is available. It still needs to be initialized on this core&quot;</span>, <span class="kw-2">*</span>PMU_VERSION);
@@ -1551,7 +1551,7 @@
     check_pmu_availability()<span class="question-mark">?</span>;
 
     <span class="comment">// perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
-    </span><span class="kw">let </span>my_core_id = apic::get_my_apic_id();
+    </span><span class="kw">let </span>my_core_id = apic::current_cpu();
 
     <span class="macro">trace!</span>(<span class="string">&quot;start_samples: the core id is : {}&quot;</span>, my_core_id);
 
@@ -1650,7 +1650,7 @@
 <span class="doccomment">/// Returns the samples that were stored during sampling in the form of a SampleResults object. 
 /// If samples are not yet finished, forces them to stop.  
 </span><span class="kw">pub fn </span>retrieve_samples() -&gt; <span class="prelude-ty">Result</span>&lt;SampleResults, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>my_core_id = apic::get_my_apic_id();
+    <span class="kw">let </span>my_core_id = apic::current_cpu();
 
     <span class="kw">let </span><span class="kw-2">mut </span>sampling_info = SAMPLING_INFO.lock();
     <span class="kw">let </span><span class="kw-2">mut </span>samples = sampling_info.get_mut(<span class="kw-2">&amp;</span>my_core_id).ok_or(<span class="string">&quot;pmu_x86::retrieve_samples: could not retrieve sampling information for this core&quot;</span>)<span class="question-mark">?</span>;
@@ -1734,7 +1734,7 @@
 
     <span class="kw">unsafe </span>{ Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR); }
 
-    <span class="kw">let </span>my_core_id = apic::get_my_apic_id();
+    <span class="kw">let </span>my_core_id = apic::current_cpu();
 
     <span class="kw">let </span><span class="kw-2">mut </span>sampling_info = SAMPLING_INFO.lock();
     <span class="kw">let </span><span class="kw-2">mut </span>samples = sampling_info.get_mut(<span class="kw-2">&amp;</span>my_core_id)

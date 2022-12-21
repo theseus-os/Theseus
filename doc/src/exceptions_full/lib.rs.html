@@ -731,7 +731,7 @@
     </span>{
         <span class="kw">let </span>pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
         <span class="kw">if let </span><span class="prelude-val">Some</span>(pages) = pages_to_invalidate {
-            <span class="comment">// trace!(&quot;nmi_handler (AP {})&quot;, apic::get_my_apic_id());
+            <span class="comment">// trace!(&quot;nmi_handler (AP {})&quot;, cpu::current_cpu());
             </span>tlb_shootdown::handle_tlb_shootdown_ipi(pages);
             expected_nmi = <span class="bool-val">true</span>;
         }

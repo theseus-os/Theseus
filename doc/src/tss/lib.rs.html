@@ -60,7 +60,7 @@
 <span class="kw">extern crate </span>atomic_linked_list;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>x86_64;
-<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>cpu;
 <span class="kw">extern crate </span>spin;
 
 <span class="kw">use </span>x86_64::structures::tss::TaskStateSegment;
@@ -81,7 +81,7 @@
 /// Should be set to an address within the current userspace task&#39;s kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 </span><span class="kw">pub fn </span>tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>my_apic_id = apic::get_my_apic_id();
+    <span class="kw">let </span>my_apic_id = cpu::current_cpu();
     <span class="kw">let </span><span class="kw-2">mut </span>tss_entry = TSS.get(<span class="kw-2">&amp;</span>my_apic_id).ok_or_else(|| {
         <span class="macro">error!</span>(<span class="string">&quot;tss_set_rsp0(): couldn&#39;t find TSS for apic {}&quot;</span>, my_apic_id);
         <span class="string">&quot;No TSS for the current core&#39;s apid id&quot; 

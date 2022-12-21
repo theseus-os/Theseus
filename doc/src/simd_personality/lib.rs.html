@@ -280,7 +280,7 @@ extern crate compiler_builtins as _compiler_builtins;
 <span class="kw">extern crate </span>mod_mgmt;
 <span class="kw">extern crate </span>task;
 <span class="kw">extern crate </span>spawn;
-<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>cpu;
 <span class="kw">extern crate </span>fs_node;
 
 
@@ -362,7 +362,7 @@ extern crate compiler_builtins as _compiler_builtins;
 	simd_app_namespace.disable_fuzzy_symbol_matching();
 
 
-	<span class="kw">let </span>this_core = apic::get_my_apic_id();
+	<span class="kw">let </span>this_core = cpu::current_cpu();
 	
 	<span class="kw">type </span>SimdTestFunc = <span class="kw">fn</span>(());
 	<span class="kw">let </span>section_ref1 = simd_app_namespace.get_symbol_starting_with(<span class="string">&quot;simd_test::test1::&quot;</span>)

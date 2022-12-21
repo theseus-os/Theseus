@@ -468,7 +468,7 @@
     double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>LockedIdt, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>bsp_id = apic::get_bsp_id().ok_or(<span class="string">&quot;couldn&#39;t get BSP&#39;s id&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bsp_id = apic::bootstrap_cpu().ok_or(<span class="string">&quot;couldn&#39;t get BSP&#39;s id&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Setting up TSS &amp; GDT for BSP (id {})&quot;</span>, bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
@@ -692,7 +692,7 @@
 <span class="doccomment">/// 0x22
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>lapic_timer_handler(_stack_frame: InterruptStackFrame) {
     <span class="kw">let </span>_ticks = APIC_TIMER_TICKS.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
-    <span class="comment">// info!(&quot; ({}) APIC TIMER HANDLER! TICKS = {}&quot;, apic::get_my_apic_id(), _ticks);
+    <span class="comment">// info!(&quot; ({}) APIC TIMER HANDLER! TICKS = {}&quot;, apic::current_cpu(), _ticks);
 
     // Callback to the sleep API to unblock tasks whose waiting time is over
     // and alert to update the number of ticks elapsed

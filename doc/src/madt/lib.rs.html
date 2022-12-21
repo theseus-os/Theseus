@@ -425,7 +425,7 @@
 <span class="kw">use </span>alloc::{boxed::Box, format};
 <span class="kw">use </span>log::{error, warn, trace};
 <span class="kw">use </span>memory::{MappedPages, PageTable, PhysicalAddress}; 
-<span class="kw">use </span>apic::{LocalApic, get_bsp_id, LapicInitError, get_my_apic_id};
+<span class="kw">use </span>apic::{LocalApic, bootstrap_cpu, LapicInitError, current_cpu};
 <span class="kw">use </span>sdt::Sdt;
 <span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
 <span class="kw">use </span>zerocopy::FromBytes;
@@ -744,7 +744,7 @@
                 <span class="prelude-val">Ok</span>(()) =&gt; { } <span class="comment">// fall through
             </span>};
 
-            <span class="macro">assert!</span>(get_my_apic_id() == lapic_entry.apic_id);
+            <span class="macro">assert!</span>(current_cpu() == lapic_entry.apic_id);
             <span class="kw">let </span>bsp_id = lapic_entry.apic_id;
 
             <span class="comment">// redirect every IoApic&#39;s interrupts to the one BSP
@@ -766,7 +766,7 @@
         }
     }
 
-    <span class="kw">let </span>bsp_id = get_bsp_id().ok_or(<span class="string">&quot;handle_bsp_lapic_entry(): Couldn&#39;t find BSP LocalApic in Madt!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bsp_id = bootstrap_cpu().ok_or(<span class="string">&quot;handle_bsp_lapic_entry(): Couldn&#39;t find BSP LocalApic in Madt!&quot;</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// now that we&#39;ve established the BSP, go through the interrupt source override entries
     </span><span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter {

@@ -1551,7 +1551,6 @@
 <span id="1551">1551</span>
 <span id="1552">1552</span>
 <span id="1553">1553</span>
-<span id="1554">1554</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -2351,7 +2350,7 @@
 <span class="kw">impl </span>Drop <span class="kw">for </span>Task {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="attr">#[cfg(not(any(rq_eval, downtime_eval)))]
-        </span><span class="macro">trace!</span>(<span class="string">&quot;[CPU {}] Task::drop(): {}&quot;</span>, apic::get_my_apic_id(), <span class="self">self</span>);
+        </span><span class="macro">trace!</span>(<span class="string">&quot;[CPU {}] Task::drop(): {}&quot;</span>, cpu::current_cpu(), <span class="self">self</span>);
 
         <span class="comment">// We must consume/drop the Task&#39;s kill handler BEFORE a Task can possibly be dropped.
         // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
@@ -2421,8 +2420,7 @@
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(early_retval)) =&gt; <span class="kw">return </span>early_retval,
         <span class="prelude-val">Err</span>(preemption_guard) =&gt; {
             <span class="comment">// Here, the closure returned an error, meaning we couldn&#39;t get the current task
-            </span><span class="macro">error!</span>(<span class="string">&quot;BUG: task_switch(): couldn&#39;t get current task.&quot;</span>);
-            <span class="kw">return </span>(<span class="bool-val">false</span>, preemption_guard); <span class="comment">// keep running the same current task
+            </span><span class="kw">return </span>(<span class="bool-val">false</span>, preemption_guard); <span class="comment">// keep running the same current task
         </span>}
     };
     

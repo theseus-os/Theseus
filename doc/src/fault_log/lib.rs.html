@@ -270,7 +270,6 @@
 <span id="270">270</span>
 <span id="271">271</span>
 <span id="272">272</span>
-<span id="273">273</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate logs all the faults occuring within Theseus. 
 //! Maintains a list of exceptions and panics that has occured since booting up. 
 //! This crate does not hold reference to any task or app. 
@@ -285,7 +284,7 @@
 <span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>apic;
+<span class="kw">extern crate </span>cpu;
 <span class="kw">extern crate </span>irq_safety;
 
 <span class="kw">use </span>alloc::{
@@ -293,7 +292,6 @@
     vec::Vec,
 };
 <span class="kw">use </span>memory::VirtualAddress;
-<span class="kw">use </span>apic::get_my_apic_id;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>core::panic::PanicInfo;
 
@@ -415,7 +413,7 @@
 ) {
 
     <span class="comment">// Add the core the fault was detected
-    </span>fe.core = <span class="prelude-val">Some</span>(get_my_apic_id());
+    </span>fe.core = <span class="prelude-val">Some</span>(cpu::current_cpu());
 
     <span class="comment">// If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
