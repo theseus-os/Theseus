@@ -2034,7 +2034,7 @@
 
         <span class="comment">// we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
-        </span><span class="kw">let </span>task_id = TASKID_COUNTER.fetch_add(<span class="number">1</span>, Ordering::Acquire);
+        </span><span class="kw">let </span>task_id = TASKID_COUNTER.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
 
         <span class="comment">// Obtain a new copied instance of the TLS data image for this task.
         </span><span class="kw">let </span>tls_area = namespace.get_tls_initializer_data();
