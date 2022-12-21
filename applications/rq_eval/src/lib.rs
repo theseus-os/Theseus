@@ -30,7 +30,6 @@ extern crate hpet;
 extern crate libtest;
 
 use alloc::{
-    boxed::Box,
     string::String,
     vec::Vec,
 };
@@ -188,10 +187,6 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         elapsed_ticks, hpet_period);
     println!("Elapsed time:{} us", elapsed_time);
 
-    // cleanup the dummy task we created earlier
-    taskref.mark_as_exited(Box::new(0usize))?;
-    taskref.join()?;
-    
     Ok(())
 }
 
