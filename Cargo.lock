@@ -361,8 +361,8 @@ name = "captain"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "console",
+ "cpu",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -451,7 +451,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "channel_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "getopts",
  "log",
  "spawn",
@@ -596,6 +596,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eeaa953eaad386a53111e47172c2fedba671e5684c8dd601a5f474f4f118710f"
 dependencies = [
  "cfg-if 1.0.0",
+]
+
+[[package]]
+name = "cpu"
+version = "0.1.0"
+dependencies = [
+ "apic",
 ]
 
 [[package]]
@@ -1003,7 +1010,7 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "debug_info",
  "fault_log",
  "locked_idt",
@@ -1075,7 +1082,7 @@ dependencies = [
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
@@ -1471,7 +1478,6 @@ name = "ixgbe"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "bit_field 0.7.0",
  "hashbrown",
  "hpet",
@@ -2831,7 +2837,7 @@ dependencies = [
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "getopts",
  "hpet",
  "libtest",
@@ -3158,8 +3164,8 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 0.1.10",
+ "cpu",
  "fs_node",
  "log",
  "memory",
@@ -3266,9 +3272,9 @@ dependencies = [
 name = "spawn"
 version = "0.1.0"
 dependencies = [
- "apic",
  "catch_unwind",
  "context_switch",
+ "cpu",
  "debugit",
  "fault_crate_swap",
  "fault_log",
@@ -3465,8 +3471,8 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic",
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3536,8 +3542,8 @@ dependencies = [
 name = "test_channel"
 version = "0.1.0"
 dependencies = [
- "apic",
  "async_channel",
+ "cpu",
  "getopts",
  "log",
  "rendezvous",
@@ -3552,9 +3558,9 @@ dependencies = [
 name = "test_downtime"
 version = "0.1.0"
 dependencies = [
- "apic",
  "async_channel",
  "color",
+ "cpu",
  "framebuffer",
  "framebuffer_drawer",
  "getopts",
@@ -3617,7 +3623,7 @@ dependencies = [
 name = "test_mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "log",
  "mutex_sleep",
  "scheduler",
@@ -3692,7 +3698,7 @@ dependencies = [
 name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "log",
  "scheduler",
  "spawn",
@@ -3888,8 +3894,8 @@ dependencies = [
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",

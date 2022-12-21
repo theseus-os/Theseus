@@ -71,7 +71,7 @@ extern crate memory;
 extern crate mod_mgmt;
 extern crate task;
 extern crate spawn;
-extern crate apic;
+extern crate cpu;
 extern crate fs_node;
 
 
@@ -153,7 +153,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	simd_app_namespace.disable_fuzzy_symbol_matching();
 
 
-	let this_core = apic::get_my_apic_id();
+	let this_core = cpu::current_cpu();
 	
 	type SimdTestFunc = fn(());
 	let section_ref1 = simd_app_namespace.get_symbol_starting_with("simd_test::test1::")
