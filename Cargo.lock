@@ -2824,6 +2824,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rq_access_eval"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "app_io",
+ "getopts",
+ "irq_safety",
+ "runqueue",
+ "time",
+]
+
+[[package]]
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
@@ -3778,6 +3790,7 @@ dependencies = [
  "pwd",
  "rm",
  "rq",
+ "rq_access_eval",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
