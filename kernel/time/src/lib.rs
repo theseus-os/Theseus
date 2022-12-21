@@ -2,35 +2,22 @@
 
 #![no_std]
 
+use crossbeam_utils::atomic::AtomicCell;
+
 mod dummy;
 
 pub use core::time::Duration;
 
-use core::sync::atomic::{AtomicU64, Ordering};
-use crossbeam_utils::atomic::AtomicCell;
+const FEMTOS_TO_NANOS: u128 = 1_000_000;
 
 static EARLY_SLEEP_FUNCTION: AtomicCell<fn(Duration)> = AtomicCell::new(dummy::early_sleep);
-static EARLY_SLEEPER_FREQUENCY: AtomicU64 = AtomicU64::new(0);
+static EARLY_SLEEPER_PERIOD: AtomicCell<Period> = AtomicCell::new(Period::MAX);
 
 static MONOTONIC_NOW_FUNCTION: AtomicCell<fn() -> Instant> = AtomicCell::new(dummy::monotonic_now);
-static INSTANT_TO_DURATION_FUNCTION: AtomicCell<fn(Instant) -> Duration> =
-    AtomicCell::new(dummy::instant_to_duration);
-static DURATION_TO_INSTANT_FUNCTION: AtomicCell<fn(Duration) -> Instant> =
-    AtomicCell::new(dummy::duration_to_instant);
-static MONOTONIC_FREQUENCY: AtomicU64 = AtomicU64::new(0);
+static MONOTONIC_PERIOD: AtomicCell<Period> = AtomicCell::new(Period::MAX);
 
 static WALL_TIME_NOW_FUNCTION: AtomicCell<fn() -> Duration> = AtomicCell::new(dummy::wall_time_now);
-static WALL_TIME_FREQUENCY: AtomicU64 = AtomicU64::new(0);
-
-fn duration_to_instant(duration: Duration) -> Instant {
-    let f = DURATION_TO_INSTANT_FUNCTION.load();
-    f(duration)
-}
-
-fn instant_to_duration(instant: Instant) -> Duration {
-    let f = INSTANT_TO_DURATION_FUNCTION.load();
-    f(instant)
-}
+static WALL_TIME_PERIOD: AtomicCell<Period> = AtomicCell::new(Period::MAX);
 
 /// A measurement of a monotonically nondecreasing clock.
 ///
@@ -44,7 +31,11 @@ pub struct Instant {
 impl Instant {
     const ZERO: Self = Self { counter: 0 };
 
-    /// Returns the amout of time elapsed from another instant to this one, or
+    pub fn new(counter: u64) -> Self {
+        Self { counter }
+    }
+
+    /// Returns the amount of time elapsed from another instant to this one, or
     /// zero duration if that instant is later than this one.
     pub fn duration_since(&self, earlier: Self) -> Duration {
         let instant = Instant {
@@ -53,14 +44,16 @@ impl Instant {
                 None => return Duration::ZERO,
             },
         };
-        instant_to_duration(instant)
+        let femtos = u128::from(instant.counter) * u128::from(MONOTONIC_PERIOD.load());
+        Duration::from_nanos((femtos / FEMTOS_TO_NANOS) as u64)
     }
 
-    pub fn checked_duraction_since(&self, earlier: Self) -> Option<Duration> {
+    pub fn checked_duration_since(&self, earlier: Self) -> Option<Duration> {
         let instant = Instant {
             counter: self.counter.checked_sub(earlier.counter)?,
         };
-        Some(instant_to_duration(instant))
+        let femtos = u128::from(instant.counter) * u128::from(MONOTONIC_PERIOD.load());
+        Some(Duration::from_nanos((femtos / FEMTOS_TO_NANOS) as u64))
     }
 }
 
@@ -68,11 +61,12 @@ impl core::ops::Add<Duration> for Instant {
     type Output = Self;
 
     fn add(self, rhs: Duration) -> Self::Output {
-        let instant = duration_to_instant(rhs);
+        let femtos = rhs.as_nanos() * FEMTOS_TO_NANOS;
+        let ticks = (femtos / u128::from(MONOTONIC_PERIOD.load())) as u64;
         Self {
             counter: self
                 .counter
-                .checked_add(instant.counter)
+                .checked_add(ticks)
                 .expect("overflow when adding duration to instant"),
         }
     }
@@ -82,11 +76,12 @@ impl core::ops::Sub<Duration> for Instant {
     type Output = Self;
 
     fn sub(self, rhs: Duration) -> Self::Output {
-        let instant = duration_to_instant(rhs);
+        let femtos = rhs.as_nanos() * FEMTOS_TO_NANOS;
+        let ticks = (femtos / u128::from(MONOTONIC_PERIOD.load())) as u64;
         Self {
             counter: self
                 .counter
-                .checked_sub(instant.counter)
+                .checked_sub(ticks)
                 .expect("overflow when subtracting duration from instant"),
         }
     }
@@ -100,46 +95,55 @@ impl core::ops::Sub<Instant> for Instant {
     }
 }
 
-/// A clock frequency.
+/// A clock period, measured in femtoseconds.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-pub struct Frequency(u64);
+pub struct Period(u64);
 
-impl Frequency {
-    /// Creates a new frequency with the specified hertz.
-    pub fn new(frequency: u64) -> Self {
-        Self(frequency)
+impl Period {
+    const MAX: Self = Self(u64::MAX);
+
+    /// Creates a new period with the specified femtoseconds.
+    pub fn new(period: u64) -> Self {
+        Self(period)
     }
 }
 
-impl From<Frequency> for u64 {
-    /// Returns the frequency in hertz.
-    fn from(f: Frequency) -> Self {
+impl From<Period> for u64 {
+    /// Returns the period in femtoseconds.
+    fn from(f: Period) -> Self {
         f.0
     }
 }
 
-impl From<u64> for Frequency {
-    /// Creates a new frequency with the specified hertz.
-    fn from(f: u64) -> Self {
-        Self(f)
+impl From<Period> for u128 {
+    /// Returns the period in femtoseconds.
+    fn from(f: Period) -> Self {
+        f.0.into()
+    }
+}
+
+impl From<u64> for Period {
+    /// Creates a new period with the specified femtoseconds.
+    fn from(period: u64) -> Self {
+        Self(period)
     }
 }
 
 /// Register the clock source that can be used to sleep when interrupts are
 /// disabled.
 ///
-/// The current early sleeper will only be overwritten by `T` if `frequency` is
-/// larger than the frequency of the current early sleeper.
+/// The provided early sleeper will overwrite the current early sleeper only if
+/// `period` is smaller than that of the current early sleeper.
 ///
 /// Returns whether the early sleeper was overwritten.
-pub fn register_early_sleeper<T>(frequency: Frequency) -> bool
+pub fn register_early_sleeper<T>(period: Period) -> bool
 where
     T: EarlySleeper,
 {
-    let old_frequency = EARLY_SLEEPER_FREQUENCY.load(Ordering::SeqCst);
-    if frequency > Frequency::new(old_frequency) {
+    let old_period = EARLY_SLEEPER_PERIOD.load();
+    if period < old_period {
         EARLY_SLEEP_FUNCTION.store(T::sleep);
-        EARLY_SLEEPER_FREQUENCY.store(frequency.into(), Ordering::SeqCst);
+        EARLY_SLEEPER_PERIOD.store(period.into());
         true
     } else {
         false
@@ -161,23 +165,19 @@ pub fn early_sleep(duration: Duration) {
 
 /// Register a clock source.
 ///
-/// The provided source will overwrite the previous source only if `frequency`
-/// is larger than that of the previous source.
+/// The provided clock source will overwrite the current clock source only if
+/// `period` is smaller than that of the current clock source.
 ///
-/// Returns whether the previous source was overwritten.
-pub fn register_clock_source<T>(frequency: Frequency) -> bool
+/// Returns whether the clock source was overwritten.
+pub fn register_clock_source<T>(period: Period) -> bool
 where
     T: ClockSource,
 {
-    let old_frequency = Frequency::new(T::ClockType::frequency_atomic().load(Ordering::SeqCst));
-    if frequency > old_frequency {
+    let old_period = T::ClockType::period_atomic().load();
+    if period < old_period {
         let now_fn = T::ClockType::now_fn();
         now_fn.store(T::now);
-
-        T::ClockType::store_unit_to_duration_func(T::unit_to_duration);
-        T::ClockType::store_duration_to_unit_func(T::duration_to_unit);
-
-        T::ClockType::frequency_atomic().store(frequency.into(), Ordering::SeqCst);
+        T::ClockType::period_atomic().store(period);
 
         true
     } else {
@@ -212,16 +212,6 @@ pub trait ClockSource {
     /// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e.
     /// Unix time).
     fn now() -> <Self::ClockType as ClockType>::Unit;
-
-    /// Converts a [`ClockType::Unit`] into a [`Duration`].
-    ///
-    /// Wall time clocks should just return the [`ClockType::Unit`].
-    fn unit_to_duration(unit: <Self::ClockType as ClockType>::Unit) -> Duration;
-
-    /// Converts a [`Duration`] into a [`ClockType::Unit`].
-    ///
-    /// Wall time clocks should just return the [`Duration`].
-    fn duration_to_unit(duration: Duration) -> <Self::ClockType as ClockType>::Unit;
 }
 
 /// A hardware clock that can sleep without relying on interrupts.
@@ -255,12 +245,7 @@ pub trait ClockType: private::Sealed {
     #[doc(hidden)]
     fn now_fn() -> &'static AtomicCell<fn() -> Self::Unit>;
     #[doc(hidden)]
-    fn frequency_atomic() -> &'static AtomicU64;
-
-    #[doc(hidden)]
-    fn store_unit_to_duration_func(f: fn(Self::Unit) -> Duration);
-    #[doc(hidden)]
-    fn store_duration_to_unit_func(f: fn(Duration) -> Self::Unit);
+    fn period_atomic() -> &'static AtomicCell<Period>;
 }
 
 pub struct Monotonic;
@@ -274,16 +259,8 @@ impl ClockType for Monotonic {
         &MONOTONIC_NOW_FUNCTION
     }
 
-    fn frequency_atomic() -> &'static AtomicU64 {
-        &MONOTONIC_FREQUENCY
-    }
-
-    fn store_unit_to_duration_func(f: fn(Self::Unit) -> Duration) {
-        INSTANT_TO_DURATION_FUNCTION.store(f);
-    }
-
-    fn store_duration_to_unit_func(f: fn(Duration) -> Self::Unit) {
-        DURATION_TO_INSTANT_FUNCTION.store(f);
+    fn period_atomic() -> &'static AtomicCell<Period> {
+        &MONOTONIC_PERIOD
     }
 }
 
@@ -298,16 +275,8 @@ impl ClockType for WallTime {
         &WALL_TIME_NOW_FUNCTION
     }
 
-    fn frequency_atomic() -> &'static AtomicU64 {
-        &WALL_TIME_FREQUENCY
-    }
-
-    fn store_unit_to_duration_func(_: fn(Self::Unit) -> Duration) {
-        // We intentionally don't store the function for wall time clocks.
-    }
-
-    fn store_duration_to_unit_func(_: fn(Duration) -> Self::Unit) {
-        // We intentionally don't store the function for wall time clocks.
+    fn period_atomic() -> &'static AtomicCell<Period> {
+        &WALL_TIME_PERIOD
     }
 }
 
