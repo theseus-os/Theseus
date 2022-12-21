@@ -4,16 +4,40 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 use app_io::println;
-use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
 use time::{now, Monotonic};
 
-static COUNTER: AtomicUsize = AtomicUsize::new(0);
+pub fn main(args: Vec<String>) -> isize {
+    let mut options = getopts::Options::new();
+    options
+        .optflag("h", "help", "Display this message")
+        .optopt("t", "threads", "Spawn <num> threads", "<num>")
+        .optopt("y", "yield", "Yield <num> times in each thread", "<num>");
 
-pub fn main(_: Vec<String>) -> isize {
-    let mut tasks = Vec::with_capacity(32);
-    for _ in 0..32 {
+    let matches = match options.parse(args) {
+        Ok(matches) => matches,
+        Err(e) => {
+            println!("{}", e);
+            print_usage(options);
+            return 1;
+        }
+    };
+
+    if matches.opt_present("h") {
+        print_usage(options);
+        return 0;
+    }
+
+    let num_threads = matches
+        .opt_get_default("t", 8)
+        .expect("failed to parse the number of threads");
+    let num_yields = matches
+        .opt_get_default("y", 512)
+        .expect("failed to parse the number of yields");
+
+    let mut tasks = Vec::with_capacity(num_threads);
+    for _ in 0..num_threads {
         tasks.push(
-            spawn::new_task_builder(worker, ())
+            spawn::new_task_builder(worker, num_yields)
                 .block()
                 .spawn()
                 .expect("failed to spawn task"),
@@ -35,12 +59,13 @@ pub fn main(_: Vec<String>) -> isize {
     0
 }
 
-fn worker(_: ()) {
-    let counter = COUNTER.fetch_add(1, Relaxed);
+fn print_usage(options: getopts::Options) {
+    let brief = alloc::format!("Usage: {} [OPTIONS]", env!("CARGO_CRATE_NAME"));
+    println!("{}", options.usage(&brief));
+}
 
-    if counter > 10000 {
-        return;
-    } else {
+fn worker(num_yields: u32) {
+    for _ in 0..num_yields {
         scheduler::schedule();
     }
 }
