@@ -25,3 +25,6 @@ path = "../sdt"
 
 [dependencies.acpi_table]
 path = "../acpi_table"
+
+[dependencies.time]
+path = "../../time"
