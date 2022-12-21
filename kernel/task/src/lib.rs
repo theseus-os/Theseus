@@ -480,7 +480,7 @@ impl Task {
 
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
-        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
+        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         // Obtain a new copied instance of the TLS data image for this task.
         let tls_area = namespace.get_tls_initializer_data();
