@@ -1,5 +1,8 @@
-//! This crate contains no definition; it
-//! just re-exports types and functions from `apic` on x86_64
+//! An abstraction for querying about CPUs (cores) in an SMP multicore system.
+//!
+//! This crate contains no extra functionality.
+//! Currently it just re-exports types and functions from:
+//! * [`apic`] on x86_64
 
 #![no_std]
 

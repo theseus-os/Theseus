@@ -17,6 +17,7 @@ use bit_field::BitField;
 use static_assertions::{const_assert, const_assert_eq};
 use log::{error, info, debug, trace};
 
+/// A unique identifier for a CPU core.
 pub type CpuId = u8;
 
 /// The IRQ number reserved for Local APIC timer interrupts in the IDT.
@@ -50,12 +51,14 @@ static CPU_COUNT: AtomicU32 = AtomicU32::new(0);
 /// The processor id (from the ACPI MADT table) of the bootstrap CPU.
 static BSP_PROCESSOR_ID: Once<CpuId> = Once::new(); 
 
+/// Returns the ID of the bootstrap CPU (if known),
+/// which is the first CPU to run after system power-on.
 pub fn bootstrap_cpu() -> Option<CpuId> {
     BSP_PROCESSOR_ID.get().cloned()
 }
 
-/// Returns true if the currently executing processor core is the bootstrap processor, 
-/// i.e., the first procesor to run 
+/// Returns true if the currently executing CPU is the bootstrap CPU, 
+/// i.e., the first procesor to run after system power-on.
 pub fn is_bootstrap_cpu() -> bool {
     rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
 }
@@ -74,14 +77,14 @@ pub fn get_lapics() -> &'static AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
 }
 
-/// Returns the number of CPUs (cores, or local APICs) that exist 
+/// Returns the number of CPUs (SMP cores) that exist 
 /// and are currently initialized on this system.
 #[doc(alias = "cores")]
 pub fn cpu_count() -> u32 {
     CPU_COUNT.load(Ordering::Relaxed)
 }
 
-/// Returns the APIC ID of the currently executing CPU core.
+/// Returns the ID of the currently executing CPU.
 pub fn current_cpu() -> CpuId {
     rdmsr(IA32_TSC_AUX) as CpuId
 }

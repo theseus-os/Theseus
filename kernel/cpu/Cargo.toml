@@ -1,7 +1,7 @@
 [package]
 authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "cpu"
-description = "An abstraction over the discovery of processor cores"
+description = "An abstraction for querying about CPUs (cores) in an SMP multicore system."
 version = "0.1.0"
 edition = "2021"
 
