@@ -101,6 +101,8 @@
 <span id="101">101</span>
 <span id="102">102</span>
 <span id="103">103</span>
+<span id="104">104</span>
+<span id="105">105</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate provides an abstraction over multiboot2 and UEFI boot
 //! information.
 //!
@@ -112,6 +114,8 @@
 
 #[cfg(feature = <span class="string">&quot;multiboot2&quot;</span>)]
 </span><span class="kw">pub mod </span>multiboot2;
+<span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)]
+</span><span class="kw">pub mod </span>uefi;
 
 <span class="kw">use </span>core::{iter::Iterator, ops::Range};
 <span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
