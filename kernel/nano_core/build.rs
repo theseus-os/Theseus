@@ -109,7 +109,11 @@ fn compile_asm() {
 
     let asm_path = include_path.join(BOOT_SPECIFICATION);
 
-    let cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
+    let mut cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
+    if BOOT_SPECIFICATION == "bios" {
+        cflags.push_str(" -DBIOS");
+    }
+
 
     for file in include_path
         .read_dir()
@@ -140,10 +144,6 @@ fn compile_asm() {
                 .arg(&output_path)
                 .arg(file.path())
                 .args(cflags.split(' '));
-
-            if BOOT_SPECIFICATION == "bios" {
-                command.arg("-DBIOS");
-            }
 
             assert!(command
                 .status()

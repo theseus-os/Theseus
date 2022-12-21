@@ -65,7 +65,7 @@ best_mode:
     .physaddr              resd 1
 	.attributes            resw 1
 	.totalmemory64KiB      resw 1
-%endif
+%endif ; BIOS
 
 section .init.realmodetext16 progbits alloc exec nowrite
 bits 16 ; we're in real mode, that's how APs boot up
@@ -268,7 +268,7 @@ graphic_mode_done:
     mov di, 0x900
     mov byte [es:di], 5
     ; move on (fall through) to the next step, setting up our GDT
-%endif
+%endif ; BIOS
 
 
 ; Here, we create a GDT manually by writing its contents directly, starting at address 0x800.
