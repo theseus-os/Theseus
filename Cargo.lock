@@ -2967,11 +2967,10 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log",
- "logger",
+ "app_io",
  "scheduler",
  "spawn",
- "task",
+ "time",
 ]
 
 [[package]]

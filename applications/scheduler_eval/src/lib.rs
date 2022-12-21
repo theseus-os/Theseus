@@ -1,99 +1,46 @@
 #![no_std]
 
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate spawn;
-extern crate scheduler;
-extern crate task;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
+use app_io::println;
+use core::sync::atomic::{AtomicUsize, Ordering::Relaxed};
+use time::{now, Monotonic};
 
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-pub fn main(_args: Vec<String>) -> (){
-    let taskref1 = spawn::new_task_builder(test1 ,1)
-        .name(String::from("test1"))
-        .pin_on_core(1)
-        .spawn().expect("failed to initiate task");
-
-    if let Err(e) = scheduler::set_priority(&taskref1, 30) {
-        error!("scheduler_eval(): Could not set priority to taskref1: {}", e);
+pub fn main(_: Vec<String>) -> isize {
+    let mut tasks = Vec::with_capacity(32);
+    for _ in 0..32 {
+        tasks.push(
+            spawn::new_task_builder(worker, ())
+                .block()
+                .spawn()
+                .expect("failed to spawn task"),
+        );
     }
 
-    debug!("Spawned Task 1");
-
-    let taskref2 = spawn::new_task_builder(test2 ,2)
-        .name(String::from("test2"))
-        .pin_on_core(1)
-        .spawn().expect("failed to initiate task");
-
-    if let Err(e) = scheduler::set_priority(&taskref2, 20) {
-        error!("scheduler_eval(): Could not set priority to taskref2: {}", e);
+    let start = now::<Monotonic>();
+    for task in tasks.iter() {
+        task.unblock().expect("failed to unblock task");
     }
 
-    debug!("Spawned Task 2");
-
-    let taskref3 = spawn::new_task_builder(test3 ,3)
-        .name(String::from("test3"))
-        .pin_on_core(1)
-        .spawn().expect("failed to initiate task");
-
-    if let Err(e) = scheduler::set_priority(&taskref3, 10) {
-        error!("scheduler_eval(): Could not set priority to taskref3: {}", e);
+    for task in tasks {
+        task.join().expect("failed to join task");
     }
+    let end = now::<Monotonic>();
 
-    debug!("Spawned Task 3");
+    println!("time: {:#?}", end - start);
 
-    debug!("Spawned all tasks");
-
-    let _priority1 = scheduler::get_priority(&taskref1);
-    let _priority2 = scheduler::get_priority(&taskref2);
-    let _priority3 = scheduler::get_priority(&taskref3);
-
-    #[cfg(priority_scheduler)]
-    {
-        assert_eq!(_priority1,Some(30));
-        assert_eq!(_priority2,Some(20));
-        assert_eq!(_priority3,Some(10));
-    }
-
-    taskref1.join().expect("Task 1 join failed");
-    taskref2.join().expect("Task 2 join failed");
-    taskref3.join().expect("Task 3 join failed");
+    0
 }
 
-fn test1(_a: u32) -> u32 {
-    //let mut i = 1;
-    //loop{
-    for i in 0..1000 {
-       let task_id = task::get_my_current_task_id();
-       debug!("Task_ID : {} , Instance : {}", task_id, i);
-       scheduler::schedule();
-       //i = i + 1; 
-    }
-    _a
-}
+fn worker(_: ()) {
+    let counter = COUNTER.fetch_add(1, Relaxed);
 
-fn test2(_a: u32) -> u32 {
-    //let mut i = 1;
-    //loop{
-    for i in 0..1000 {
-       let task_id = task::get_my_current_task_id();
-       debug!("Task_ID : {} , Instance : {}", task_id, i);
-       scheduler::schedule();
-       //i = i + 1; 
+    if counter > 10000 {
+        return;
+    } else {
+        scheduler::schedule();
     }
-    _a
-}
-
-fn test3(_a: u32) -> u32 {
-    //let mut i = 1;
-    //loop{
-    for i in 0..1000 {
-       let task_id = task::get_my_current_task_id();
-       debug!("Task_ID : {} , Instance : {}", task_id, i);
-       scheduler::schedule();
-       //i = i + 1; 
-    }
-    _a
 }
