@@ -61,6 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
         // JoinableTaskRef::join is inlined so that we can yield if the worker hasn't
         // exited minimising the impact our task has on the worker tasks.
         // TODO: Call join directly once it is properly implemented.
+        // TODO: Remove dependency on scheduler.
         while !task.has_exited() {
             scheduler::schedule();
         }
