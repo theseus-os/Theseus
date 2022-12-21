@@ -4,7 +4,7 @@
 extern crate atomic_linked_list;
 extern crate memory;
 extern crate x86_64;
-extern crate apic;
+extern crate cpu;
 extern crate spin;
 
 use x86_64::structures::tss::TaskStateSegment;
@@ -25,7 +25,7 @@ static TSS: AtomicMap<u8, Mutex<TaskStateSegment>> = AtomicMap::new();
 /// Should be set to an address within the current userspace task's kernel stack.
 /// WARNING: If set incorrectly, the OS will crash upon an interrupt from userspace into kernel space!!
 pub fn tss_set_rsp0(new_privilege_stack_top: VirtualAddress) -> Result<(), &'static str> {
-    let my_apic_id = apic::get_my_apic_id();
+    let my_apic_id = cpu::current_cpu();
     let mut tss_entry = TSS.get(&my_apic_id).ok_or_else(|| {
         error!("tss_set_rsp0(): couldn't find TSS for apic {}", my_apic_id);
         "No TSS for the current core's apid id" 

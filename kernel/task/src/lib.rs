@@ -480,7 +480,7 @@ impl Task {
 
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
-        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
+        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         // Obtain a new copied instance of the TLS data image for this task.
         let tls_area = namespace.get_tls_initializer_data();
@@ -797,7 +797,7 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         #[cfg(not(any(rq_eval, downtime_eval)))]
-        trace!("[CPU {}] Task::drop(): {}", apic::get_my_apic_id(), self);
+        trace!("[CPU {}] Task::drop(): {}", cpu::current_cpu(), self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
         // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
@@ -867,7 +867,6 @@ pub fn task_switch(
         Ok(Err(early_retval)) => return early_retval,
         Err(preemption_guard) => {
             // Here, the closure returned an error, meaning we couldn't get the current task
-            error!("BUG: task_switch(): couldn't get current task.");
             return (false, preemption_guard); // keep running the same current task
         }
     };

@@ -150,7 +150,8 @@ pub struct InitialMemoryMappings {
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
 pub fn init(
-    boot_info: &impl BootInformation
+    boot_info: &impl BootInformation,
+    kernel_stack_start: VirtualAddress,
 ) -> Result<InitialMemoryMappings, &'static str> {
     // Get the start and end addresses of the kernel, boot info, boot modules, etc.
     // These are all physical addresses.
@@ -211,7 +212,7 @@ pub fn init(
     page_allocator::dump_page_allocator_state();
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
-    paging::init(boot_info, into_alloc_frames_fn)
+    paging::init(boot_info, kernel_stack_start, into_alloc_frames_fn)
         .inspect(|InitialMemoryMappings { page_table, .. } | {
             debug!("Done with paging::init(). new page table: {:?}", page_table);
         })

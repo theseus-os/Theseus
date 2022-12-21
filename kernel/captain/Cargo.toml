@@ -46,8 +46,8 @@ path = "../exceptions_full"
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.spawn]
 path = "../spawn"

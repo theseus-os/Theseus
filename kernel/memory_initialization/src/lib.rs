@@ -40,7 +40,8 @@ use bootloader_modules::BootloaderModule;
 ///     which must not be dropped until all AP (additional CPUs) are fully booted,
 ///     but *should* be dropped before starting the first user application.
 pub fn init_memory_management(
-    boot_info: impl BootInformation
+    boot_info: impl BootInformation,
+    kernel_stack_start: VirtualAddress,
 ) -> Result<(
         MmiRef,
         NoDrop<MappedPages>,
@@ -62,7 +63,7 @@ pub fn init_memory_management(
         boot_info: boot_info_mapped_pages,
         higher_half: higher_half_mapped_pages,
         identity: identity_mapped_pages
-    } = memory::init(&boot_info)?;
+    } = memory::init(&boot_info, kernel_stack_start)?;
     // After this point, at which `memory::init()` has returned new objects that represent
     // the currently-executing code/data/stack, we must ensure they aren't dropped if an error occurs,
     // because that will cause them to be auto-unmapped.

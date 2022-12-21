@@ -22,7 +22,6 @@ extern crate pit_clock_basic;
 extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
-extern crate apic;
 extern crate pic;
 extern crate acpi;
 extern crate volatile;
