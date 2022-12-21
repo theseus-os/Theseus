@@ -42,23 +42,21 @@ pub fn main(args: Vec<String>) -> isize {
             },
             num,
         )
+    } else if let Some(core) = core {
+        run(
+            |_| {
+                runqueue::get_runqueue(core);
+            },
+            num,
+        )
     } else {
-        if let Some(core) = core {
-            run(
-                |_| {
-                    runqueue::get_runqueue(core);
-                },
-                num,
-            )
-        } else {
-            let cpu_count = apic::cpu_count();
-            run(
-                |count| {
-                    runqueue::get_runqueue((count % cpu_count as u32) as u8);
-                },
-                num,
-            )
-        }
+        let cpu_count = apic::cpu_count();
+        run(
+            |count| {
+                runqueue::get_runqueue((count % cpu_count as u32) as u8);
+            },
+            num,
+        )
     };
     drop(guard);
 
