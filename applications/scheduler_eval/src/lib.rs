@@ -28,16 +28,24 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     let num_threads = matches
-        .opt_get_default("t", 8)
+        .opt_get_default("t", 32)
         .expect("failed to parse the number of threads");
     let num_yields = matches
-        .opt_get_default("y", 512)
+        .opt_get_default("y", 16384)
         .expect("failed to parse the number of yields");
 
     let mut tasks = Vec::with_capacity(num_threads);
     for _ in 0..num_threads {
         tasks.push(
             spawn::new_task_builder(worker, num_yields)
+                // Currently, if the tasks aren't pinned to a core, the workers on the same core as
+                // the shell finish significantly slower. The majority of the runtime is taken up by
+                // the shell rather than by our workers, invalidating the benchmark. To fix this we
+                // pin the workers on core 3, assuming the shell is on some other core. This means
+                // the benchmark doesn't incorporate work stealing, but the only reason we're having
+                // this problem in the first place is because work stealing isn't implemented so...
+                // TODO: Remove this when work stealing is implemented.
+                .pin_on_core(3)
                 .block()
                 .spawn()
                 .expect("failed to spawn task"),
@@ -50,7 +58,18 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     for task in tasks {
-        task.join().expect("failed to join task");
+        // JoinableTaskRef::join is inlined so that we can yield if the worker hasn't
+        // exited minimising the impact our task has on the worker tasks.
+        // TODO: Call join directly once it is properly implemented.
+        while !task.has_exited() {
+            scheduler::schedule();
+        }
+
+        while task.is_running() {
+            scheduler::schedule();
+        }
+
+        task.retrieve_exit_value().unwrap();
     }
     let end = now::<Monotonic>();
 
