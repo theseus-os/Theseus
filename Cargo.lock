@@ -322,6 +322,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "boot_info"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "bootloader_api",
+ "kernel_config",
+ "memory_structs",
+ "multiboot2",
+]
+
+[[package]]
+name = "bootloader_api"
+version = "0.11.0"
+source = "git+https://github.com/theseus-os/bootloader?branch=theseus#6cc130e2f9dc633445846a1e2c4d961b1daddd78"
+
+[[package]]
 name = "bootloader_modules"
 version = "0.1.0"
 dependencies = [
@@ -345,8 +361,8 @@ name = "captain"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "console",
+ "cpu",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -435,7 +451,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "channel_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "getopts",
  "log",
  "spawn",
@@ -587,10 +603,6 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
- "getopts",
- "runqueue",
- "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -1010,7 +1022,7 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "debug_info",
  "fault_log",
  "locked_idt",
@@ -1082,7 +1094,7 @@ dependencies = [
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
@@ -1551,7 +1563,6 @@ name = "ixgbe"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "bit_field 0.7.0",
  "hashbrown",
  "hpet",
@@ -1563,6 +1574,7 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
+ "net",
  "network_interface_card",
  "nic_buffers",
  "nic_initialization",
@@ -1877,6 +1889,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "boot_info",
  "frame_allocator",
  "irq_safety",
  "kernel_config",
@@ -1884,7 +1897,6 @@ dependencies = [
  "log",
  "memory_structs",
  "memory_x86_64",
- "multiboot2",
  "no_drop",
  "owned_borrowed_trait",
  "page_allocator",
@@ -1900,13 +1912,13 @@ dependencies = [
 name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "bootloader_modules",
  "heap",
  "irq_safety",
  "kernel_config",
  "log",
  "memory",
- "multiboot2",
  "no_drop",
  "stack",
 ]
@@ -1932,10 +1944,10 @@ checksum = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "kernel_config",
  "log",
  "memory_structs",
- "multiboot2",
  "pte_flags",
  "x86_64",
 ]
@@ -2163,6 +2175,7 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "captain",
  "exceptions_early",
  "irq_safety",
@@ -2177,7 +2190,6 @@ dependencies = [
  "no_drop",
  "panic_entry",
  "serial_port_basic",
- "spin 0.9.4",
  "stack",
  "state_store",
  "vga_buffer",
@@ -2908,10 +2920,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "rq_eval"
+name = "rq"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "getopts",
+ "runqueue",
+ "task",
+ "terminal_print",
+]
+
+[[package]]
+name = "rq_eval"
+version = "0.1.0"
+dependencies = [
+ "cpu",
  "getopts",
  "hpet",
  "libtest",
@@ -3238,8 +3261,8 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 0.1.10",
+ "cpu",
  "fs_node",
  "log",
  "memory",
@@ -3346,9 +3369,9 @@ dependencies = [
 name = "spawn"
 version = "0.1.0"
 dependencies = [
- "apic",
  "catch_unwind",
  "context_switch",
+ "cpu",
  "debugit",
  "fault_crate_swap",
  "fault_log",
@@ -3545,8 +3568,8 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic",
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3624,8 +3647,8 @@ dependencies = [
 name = "test_channel"
 version = "0.1.0"
 dependencies = [
- "apic",
  "async_channel",
+ "cpu",
  "getopts",
  "log",
  "rendezvous",
@@ -3640,9 +3663,9 @@ dependencies = [
 name = "test_downtime"
 version = "0.1.0"
 dependencies = [
- "apic",
  "async_channel",
  "color",
+ "cpu",
  "framebuffer",
  "framebuffer_drawer",
  "getopts",
@@ -3705,7 +3728,7 @@ dependencies = [
 name = "test_mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "log",
  "mutex_sleep",
  "scheduler",
@@ -3780,7 +3803,7 @@ dependencies = [
 name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "log",
  "scheduler",
  "spawn",
@@ -3838,7 +3861,6 @@ dependencies = [
  "cat",
  "cd",
  "channel_eval",
- "cpu",
  "date",
  "deps",
  "example",
@@ -3862,6 +3884,7 @@ dependencies = [
  "ps",
  "pwd",
  "rm",
+ "rq",
  "rq_eval",
  "scheduler_eval",
  "shell",
@@ -3977,8 +4000,8 @@ dependencies = [
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",

@@ -1,0 +1,12 @@
+[package]
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
+name = "cpu"
+description = "An abstraction for querying about CPUs (cores) in an SMP multicore system."
+version = "0.1.0"
+edition = "2021"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic" }
+
+[lib]
+crate-type = ["rlib"]

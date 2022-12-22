@@ -37,10 +37,14 @@ pub fn get_acpi_tables() -> &'static Mutex<AcpiTables> {
 }
 
 /// Parses the system's ACPI tables 
-pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
+pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -> Result<(), &'static str> {
     // The first step is to search for the RSDP (Root System Descriptor Pointer),
     // which contains the physical address of the RSDT/XSDG (Root/Extended System Descriptor Table).
-    let rsdp = Rsdp::get_rsdp(page_table)?;
+    let rsdp = rsdp_address
+        // This error message will be overwritten by the or_else statement.
+        .ok_or("")
+        .and_then(|rsdp_address| Rsdp::from_address(rsdp_address, page_table))
+        .or_else(|_| Rsdp::get_rsdp(page_table))?;
     let rsdt_phys_addr = rsdp.sdt_address();
     debug!("RXSDT is located in Frame {:#X}", rsdt_phys_addr);
 

@@ -14,7 +14,6 @@ theseus_std = { path = "../ports/theseus_std", optional = true }
 ## Regular applications.
 cat = { path = "../applications/cat", optional = true }
 cd = { path = "../applications/cd", optional = true }
-cpu = { path = "../applications/cpu", optional = true }
 date = { path = "../applications/date", optional = true }
 deps = { path = "../applications/deps", optional = true }
 kill = { path = "../applications/kill", optional = true }
@@ -30,6 +29,7 @@ pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
 ps = { path = "../applications/ps", optional = true }
 pwd = { path = "../applications/pwd", optional = true }
 rm = { path = "../applications/rm", optional = true }
+rq = { path = "../applications/rq", optional = true }
 shell = { path = "../applications/shell", optional = true }
 swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
@@ -96,7 +96,6 @@ wasmtime = [ "test_wasmtime" ]
 theseus_apps = [
     "cat",
     "cd",
-    "cpu",
     "date",
     "deps",
     "kill",
@@ -112,6 +111,7 @@ theseus_apps = [
     "ps",
     "pwd",
     "rm",
+    "rq",
     "shell",
     "swap",
     "upd",
