@@ -7,8 +7,8 @@ description = "removes the directory from the virtual filesystem"
 [dependencies]
 getopts = "0.2.21"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.task]
 path = "../../kernel/task"

@@ -350,6 +350,12 @@ pub struct Task {
     ///
     /// This is not public because it permits interior mutability.
     runstate: AtomicCell<RunState>,
+    /// Whether the task is suspended.
+    ///
+    /// This is only triggered by a Ctrl + Z in the terminal.
+    ///
+    /// This is not public because it permits interior mutability.
+    suspended: AtomicBool,
     /// Whether this Task is joinable.
     /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
     ///   by [`TaskRef::new()`], which indicates that that other task is able to
@@ -505,6 +511,7 @@ impl Task {
             name: format!("task_{}", task_id),
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
+            suspended: AtomicBool::new(false),
             // Tasks are not considered "joinable" until passed to `TaskRef::new()`
             joinable: AtomicBool::new(false),
             mmi,
@@ -749,7 +756,7 @@ impl Task {
             Err(self.runstate.load())
         }
     }
-
+    
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -765,6 +772,21 @@ impl Task {
         }
     }
 
+    /// Suspends this `Task`.
+    pub fn suspend(&self) {
+        self.suspended.store(true, Ordering::Release);
+    }
+
+    /// Unsuspends this `Task`.
+    pub fn unsuspend(&self) {
+        self.suspended.store(false, Ordering::Release);
+    }
+
+    /// Returns whether this `Task` is suspended.
+    pub fn is_suspended(&self) -> bool {
+        self.suspended.load(Ordering::Acquire)
+    }
+    
     /// Sets the waker to be awoken when this task exits.
     pub fn set_waker(&self, waker: Waker) {
         self.inner.lock().waker = Some(waker);

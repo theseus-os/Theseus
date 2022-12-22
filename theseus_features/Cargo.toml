@@ -16,8 +16,8 @@ cat = { path = "../applications/cat", optional = true }
 cd = { path = "../applications/cd", optional = true }
 date = { path = "../applications/date", optional = true }
 deps = { path = "../applications/deps", optional = true }
+hull = { path = "../applications/hull", optional = true }
 kill = { path = "../applications/kill", optional = true }
-less = { path = "../applications/less", optional = true }
 loadc = { path = "../applications/loadc", optional = true }
 ls = { path = "../applications/ls", optional = true }
 mkdir = { path = "../applications/mkdir", optional = true }
@@ -45,9 +45,7 @@ unified_channel = { path = "../kernel/unified_channel", optional = true }
 ## Test applications.
 example = { path = "../applications/example", optional = true }
 hello = { path = "../applications/hello", optional = true }
-immediate_input_echo = { path = "../applications/immediate_input_echo", optional = true }
-input_echo = { path = "../applications/input_echo", optional = true }
-keyboard_echo = { path = "../applications/keyboard_echo", optional = true }
+raw_mode = { path = "../applications/raw_mode", optional = true }
 print_fault_log = { path = "../applications/print_fault_log", optional = true }
 test_async = { path = "../applications/test_async", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
@@ -98,8 +96,8 @@ theseus_apps = [
     "cd",
     "date",
     "deps",
+    "hull",
     "kill",
-    "less",
     "loadc",
     "ls",
     "mkdir",
@@ -131,9 +129,7 @@ theseus_benchmarks = [
 theseus_tests = [
     "example",
     "hello",
-    "immediate_input_echo",
-    "input_echo",
-    "keyboard_echo",
+    "raw_mode",
     "test_async",
     "test_backtrace",
     "test_block_io",

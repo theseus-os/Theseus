@@ -14,8 +14,8 @@ path = "../memory"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
-[dependencies.print]
-path = "../print"
+[dependencies.app_io]
+path = "../app_io"
 
 [dependencies.task]
 path = "../task"
