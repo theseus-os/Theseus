@@ -1,6 +1,9 @@
-//! Theseus' shell i.e. the shell of a ship i.e. the hull.
+//! `hull` is Theseus's shell for basic interactive systems operations.
 //!
-//! This is equivalent to bash, zsh, fish, etc. on Linux.
+//! Just as the hull is the outermost layer or "shell" of a boat or ship,
+//! this crate `hull` is the shell of the "Ship of Theseus" (this OS).
+//!
+//! Functionally, this is similar to bash, zsh, fish, etc.
 //!
 //! This shell will eventually supercede the shell located at
 //! `applications/shell`.
