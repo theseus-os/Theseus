@@ -154,42 +154,63 @@
 <span id="154">154</span>
 <span id="155">155</span>
 <span id="156">156</span>
+<span id="157">157</span>
+<span id="158">158</span>
+<span id="159">159</span>
+<span id="160">160</span>
+<span id="161">161</span>
+<span id="162">162</span>
+<span id="163">163</span>
+<span id="164">164</span>
+<span id="165">165</span>
+<span id="166">166</span>
+<span id="167">167</span>
+<span id="168">168</span>
+<span id="169">169</span>
+<span id="170">170</span>
+<span id="171">171</span>
+<span id="172">172</span>
+<span id="173">173</span>
+<span id="174">174</span>
+<span id="175">175</span>
+<span id="176">176</span>
+<span id="177">177</span>
+<span id="178">178</span>
+<span id="179">179</span>
+<span id="180">180</span>
+<span id="181">181</span>
+<span id="182">182</span>
+<span id="183">183</span>
+<span id="184">184</span>
+<span id="185">185</span>
+<span id="186">186</span>
+<span id="187">187</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Creation and management of virtual consoles or terminals atop Theseus.
 
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>irq_safety;
-<span class="kw">extern crate </span>core2;
-<span class="kw">extern crate </span>mpmc;
 
-<span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>spawn;
-<span class="kw">extern crate </span>async_channel;
-<span class="kw">extern crate </span>serial_port;
-<span class="kw">extern crate </span>io;
-<span class="kw">extern crate </span>text_terminal;
-
-<span class="kw">use </span>core::{marker::PhantomData, sync::atomic::{AtomicU16, Ordering}};
-<span class="kw">use </span>alloc::string::String;
-<span class="kw">use </span>task::JoinableTaskRef;
+<span class="kw">use </span>alloc::{format, sync::Arc};
 <span class="kw">use </span>async_channel::Receiver;
-<span class="kw">use </span>serial_port::{SerialPort, SerialPortAddress, get_serial_port, DataChunk};
-<span class="kw">use </span>io::LockableIo;
-<span class="kw">use </span>text_terminal::{TerminalBackend, TextTerminal, TtyBackend};
+<span class="kw">use </span>core::sync::atomic::{AtomicU16, Ordering};
+<span class="kw">use </span>core2::io::Write;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>log::{error, info, warn};
+<span class="kw">use </span>serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
+<span class="kw">use </span>task::{JoinableTaskRef, KillReason};
 
-
-<span class="doccomment">/// The serial port being used for the default system logger can optionally ignore inputs.
+<span class="doccomment">/// The serial port being used for the default system logger can optionally
+/// ignore inputs.
 </span><span class="kw">static </span>IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(<span class="number">0</span>);
 
-<span class="doccomment">/// Configures the console connection listener to ignore inputs from the given serial port.
-/// 
-/// Only one serial port can be ignored, typically the one used for system logging.
+<span class="doccomment">/// Configures the console connection listener to ignore inputs from the given
+/// serial port.
+///
+/// Only one serial port can be ignored, typically the one used for system
+/// logging.
 </span><span class="kw">pub fn </span>ignore_serial_port_input(serial_port_address: u16) {
-	IGNORED_SERIAL_PORT_INPUT.store(serial_port_address, Ordering::Relaxed)
+    IGNORED_SERIAL_PORT_INPUT.store(serial_port_address, Ordering::Relaxed)
 }
 
 <span class="doccomment">/// Starts a new task that detects new console connections
@@ -197,118 +218,159 @@
 ///
 /// Returns the newly-spawned detection task.
 </span><span class="kw">pub fn </span>start_connection_detection() -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-	<span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">4</span>);
-	serial_port::set_connection_listener(sender);
+    <span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">4</span>);
+    serial_port::set_connection_listener(sender);
 
-	spawn::new_task_builder(console_connection_detector, receiver)
-		.name(<span class="string">&quot;console_connection_detector&quot;</span>.into())
-		.spawn()
+    spawn::new_task_builder(console_connection_detector, receiver)
+        .name(<span class="string">&quot;console_connection_detector&quot;</span>.into())
+        .spawn()
 }
-
-<span class="kw">pub struct </span>Console&lt;I, O, Backend&gt; 
-	<span class="kw">where </span>I: core2::io::Read,
-	      O: core2::io::Write,
-		  Backend: TerminalBackend,
-{
-	name: String,
-	_input: I,
-	terminal: TextTerminal&lt;Backend&gt;,
-	_output: PhantomData&lt;O&gt;,
-}
-
-<span class="doccomment">/// Creates a new console and a new [`TextTerminal`] that reads input data 
-/// from the given `input_stream`.
-///
-/// The terminal created by this function will use a [`TtyBackend`]
-/// that writes terminal output and control commands to the given `output_stream`.
-</span><span class="kw">pub fn </span>new_serial_console&lt;S, I, O&gt;(
-	name: S,
-	input_stream: I,
-	output_stream: O,
-) -&gt; Console&lt;I, O, TtyBackend&lt;O&gt;&gt; 
-	<span class="kw">where </span>S: Into&lt;String&gt;,
-		  I: core2::io::Read,
-	      O: core2::io::Write + Send + <span class="lifetime">&#39;static</span>,
-{
-	Console {
-		name: name.into(),
-		_input: input_stream,
-		terminal: TextTerminal::new(<span class="number">80</span>, <span class="number">25</span>, TtyBackend::new(<span class="prelude-val">None</span>, output_stream)),
-		_output: PhantomData,
-	}
-}
-
 
 <span class="doccomment">/// The entry point for the console connection detector task.
-</span><span class="kw">fn </span>console_connection_detector(connection_listener: Receiver&lt;SerialPortAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">fn </span>console_connection_detector(
+    connection_listener: Receiver&lt;SerialPortAddress&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">loop </span>{
+        <span class="kw">let </span>serial_port_address = connection_listener.receive().map_err(|e| {
+            <span class="macro">error!</span>(<span class="string">&quot;Error receiving console connection request: {:?}&quot;</span>, e);
+            <span class="string">&quot;error receiving console connection request&quot;
+        </span>})<span class="question-mark">?</span>;
 
-	<span class="kw">loop </span>{
-		<span class="kw">let </span>serial_port_address = connection_listener.receive().map_err(|e| {
-			<span class="macro">error!</span>(<span class="string">&quot;Error receiving console connection request: {:?}&quot;</span>, e);
-			<span class="string">&quot;error receiving console connection request&quot;
-		</span>})<span class="question-mark">?</span>;
-		
-		<span class="kw">if </span>IGNORED_SERIAL_PORT_INPUT.load(Ordering::Relaxed) == serial_port_address <span class="kw">as </span>u16 {
-			<span class="macro">warn!</span>(
+        <span class="kw">if </span>IGNORED_SERIAL_PORT_INPUT.load(Ordering::Relaxed) == serial_port_address <span class="kw">as </span>u16 {
+            <span class="macro">warn!</span>(
 				<span class="string">&quot;Currently ignoring inputs on serial port {:?}. \
 				 \n --&gt; Note: QEMU is forwarding control sequences (like Ctrl+C) to Theseus. To exit QEMU, press Ctrl+A then X.&quot;</span>,
 				serial_port_address,
 			);
-			<span class="kw">continue</span>;
-		}
-		
-		<span class="kw">let </span>serial_port = <span class="kw">match </span>get_serial_port(serial_port_address) {
-			<span class="prelude-val">Some</span>(sp) =&gt; sp.clone(),
-			<span class="kw">_ </span>=&gt; {
-				<span class="macro">error!</span>(<span class="string">&quot;Serial port {:?} was not initialized, skipping console connection request&quot;</span>, serial_port_address);
-				<span class="kw">continue</span>;
-			}
-		};
-	
-		<span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">16</span>);
-		<span class="kw">if let </span><span class="prelude-val">Err</span>(<span class="kw">_</span>) = serial_port.lock().set_data_sender(sender) {
-			<span class="macro">warn!</span>(<span class="string">&quot;Serial port {:?} already had a data sender, skipping console connection request&quot;</span>, serial_port_address);
-			<span class="kw">continue</span>;
-		}
+            <span class="kw">continue</span>;
+        }
 
-		<span class="kw">let </span>new_console = new_serial_console(
-			<span class="macro">alloc::format!</span>(<span class="string">&quot;console_{:?}&quot;</span>, serial_port_address),
-			LockableIo::&lt;<span class="kw">_</span>, MutexIrqSafe&lt;SerialPort&gt;, <span class="kw">_</span>&gt;::from(serial_port.clone()),
-			LockableIo::&lt;<span class="kw">_</span>, MutexIrqSafe&lt;SerialPort&gt;, <span class="kw">_</span>&gt;::from(serial_port.clone()),
-		);
+        <span class="kw">let </span>serial_port = <span class="kw">match </span>get_serial_port(serial_port_address) {
+            <span class="prelude-val">Some</span>(sp) =&gt; sp.clone(),
+            <span class="kw">_ </span>=&gt; {
+                <span class="macro">error!</span>(
+                    <span class="string">&quot;Serial port {:?} was not initialized, skipping console connection request&quot;</span>,
+                    serial_port_address
+                );
+                <span class="kw">continue</span>;
+            }
+        };
 
-		<span class="kw">let </span>_taskref = spawn::new_task_builder(console_entry, (new_console, receiver))
-			.name(<span class="macro">alloc::format!</span>(<span class="string">&quot;console_loop_{:?}&quot;</span>, serial_port_address))
-			.spawn()<span class="question-mark">?</span>;
-	}
+        <span class="kw">let </span>(sender, receiver) = async_channel::new_channel(<span class="number">16</span>);
+        <span class="kw">if </span>serial_port.lock().set_data_sender(sender).is_err() {
+            <span class="macro">warn!</span>(
+                <span class="string">&quot;Serial port {:?} already had a data sender, skipping console connection request&quot;</span>,
+                serial_port_address
+            );
+            <span class="kw">continue</span>;
+        }
 
-	<span class="comment">// Err(&quot;console_connection_detector task returned unexpectedly&quot;)
-</span>}
+        <span class="kw">if </span>spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
+            .name(<span class="macro">format!</span>(<span class="string">&quot;{:?}_manager&quot;</span>, serial_port_address))
+            .spawn()
+            .is_err()
+        {
+            <span class="macro">warn!</span>(
+                <span class="string">&quot;failed to spawn manager for serial port {:?}&quot;</span>,
+                serial_port_address
+            );
+        }
+    }
+}
 
+<span class="kw">fn </span>shell_loop(
+    (port, address, receiver): (
+        Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;,
+        SerialPortAddress,
+        Receiver&lt;DataChunk&gt;,
+    ),
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="macro">info!</span>(<span class="string">&quot;creating new tty for serial port {:?}&quot;</span>, address);
 
-<span class="doccomment">/// The entry point for the each new [`Console`] task.
-</span><span class="kw">fn </span>console_entry&lt;I, O, Backend&gt;(
-	(<span class="kw-2">mut </span>console, input_receiver): (Console&lt;I, O, Backend&gt;, Receiver&lt;DataChunk&gt;),
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
-	<span class="kw">where </span>I: core2::io::Read,
-	      O: core2::io::Write,
-		  Backend: TerminalBackend,
-{
-	<span class="kw">loop </span>{
-		<span class="comment">// Block until we receive the next data chunk from the sender.
-		</span><span class="kw">match </span>input_receiver.receive() {
-			<span class="prelude-val">Ok</span>(DataChunk { len, data }) =&gt; {
-				<span class="kw">let </span>_res = console.terminal.handle_input(<span class="kw-2">&amp;mut &amp;</span>data[.. (len <span class="kw">as </span>usize)]);
-			}
-			<span class="prelude-val">Err</span>(_e) =&gt; {
-				<span class="macro">error!</span>(<span class="string">&quot;[LIKELY BUG] Error receiving input data on {:?}: {:?}. Retrying...&quot;</span>,
-					_e, console.name
-				);
-			}
-		}
-	}	
+    <span class="kw">let </span>tty = tty::Tty::new();
 
-	<span class="comment">// Err(&quot;console_entry task returned unexpectedly&quot;)
-</span>}
+    <span class="kw">let </span>reader_task = spawn::new_task_builder(tty_to_port_loop, (port.clone(), tty.master()))
+        .name(<span class="macro">format!</span>(<span class="string">&quot;tty_to_{:?}&quot;</span>, address))
+        .spawn()<span class="question-mark">?</span>;
+    <span class="kw">let </span>writer_task = spawn::new_task_builder(port_to_tty_loop, (receiver, tty.master()))
+        .name(<span class="macro">format!</span>(<span class="string">&quot;{:?}_to_tty&quot;</span>, address))
+        .spawn()<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>new_app_ns = mod_mgmt::create_application_namespace(<span class="prelude-val">None</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>(app_file, _ns) =
+        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(<span class="kw-2">&amp;</span>new_app_ns, <span class="string">&quot;hull-&quot;</span>)
+            .expect(<span class="string">&quot;Couldn&#39;t find shell in default app namespace&quot;</span>);
+
+    <span class="kw">let </span>path = path::Path::new(app_file.lock().get_absolute_path());
+    <span class="kw">let </span>task = spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_ns))<span class="question-mark">?
+        </span>.name(<span class="macro">format!</span>(<span class="string">&quot;{:?}_shell&quot;</span>, address))
+        .block()
+        .spawn()<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>id = task.id;
+    <span class="kw">let </span>stream = Arc::new(tty.slave());
+    app_io::insert_child_streams(
+        id,
+        app_io::IoStreams {
+            discipline: <span class="prelude-val">Some</span>(stream.discipline()),
+            stdin: stream.clone(),
+            stdout: stream.clone(),
+            stderr: stream,
+        },
+    );
+
+    task.unblock().map_err(|<span class="kw">_</span>| <span class="string">&quot;couldn&#39;t unblock shell task&quot;</span>)<span class="question-mark">?</span>;
+    task.join()<span class="question-mark">?</span>;
+
+    reader_task.kill(KillReason::Requested).unwrap();
+    writer_task.kill(KillReason::Requested).unwrap();
+
+    <span class="comment">// Flush the tty in case the reader task didn&#39;t run between the last time the
+    // shell wrote something to the slave end and us killing the task.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>data = [<span class="number">0</span>; <span class="number">256</span>];
+    <span class="kw">if let </span><span class="prelude-val">Ok</span>(len) = tty.master().try_read(<span class="kw-2">&amp;mut </span>data) {
+        port.lock()
+            .write(<span class="kw-2">&amp;</span>data[..len])
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;couldn&#39;t write to serial port&quot;</span>)<span class="question-mark">?</span>;
+    };
+
+    <span class="comment">// TODO: Close port?
+
+    </span><span class="prelude-val">Ok</span>(())
+}
+
+<span class="kw">fn </span>tty_to_port_loop((port, master): (Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;, tty::Master)) {
+    <span class="kw">let </span><span class="kw-2">mut </span>data = [<span class="number">0</span>; <span class="number">256</span>];
+    <span class="kw">loop </span>{
+        <span class="kw">let </span>len = <span class="kw">match </span>master.read(<span class="kw-2">&amp;mut </span>data) {
+            <span class="prelude-val">Ok</span>(l) =&gt; l,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;couldn&#39;t read from master: {e}&quot;</span>);
+                <span class="kw">continue</span>;
+            }
+        };
+
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = port.lock().write(<span class="kw-2">&amp;</span>data[..len]) {
+            <span class="macro">error!</span>(<span class="string">&quot;couldn&#39;t write to port: {e}&quot;</span>);
+        }
+    }
+}
+
+<span class="kw">fn </span>port_to_tty_loop((receiver, master): (Receiver&lt;DataChunk&gt;, tty::Master)) {
+    <span class="kw">loop </span>{
+        <span class="kw">let </span>DataChunk { data, len } = <span class="kw">match </span>receiver.receive() {
+            <span class="prelude-val">Ok</span>(d) =&gt; d,
+            <span class="prelude-val">Err</span>(e) =&gt; {
+                <span class="macro">error!</span>(<span class="string">&quot;couldn&#39;t read from port: {e:?}&quot;</span>);
+                <span class="kw">continue</span>;
+            },
+        };
+
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = master.write(<span class="kw-2">&amp;</span>data[..len <span class="kw">as </span>usize]) {
+            <span class="macro">error!</span>(<span class="string">&quot;couldn&#39;t write to master: {e}&quot;</span>);
+        }
+    }
+}
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="console" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

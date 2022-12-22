@@ -91,7 +91,7 @@
         }
 
         <span class="comment">// must be runnable
-        </span><span class="kw">if </span>!t.is_runnable() {
+        </span><span class="kw">if </span>!t.is_runnable() || t.is_suspended() {
             <span class="kw">continue</span>;
         }
             

@@ -223,400 +223,193 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
-<span id="226">226</span>
-<span id="227">227</span>
-<span id="228">228</span>
-<span id="229">229</span>
-<span id="230">230</span>
-<span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
-<span id="234">234</span>
-<span id="235">235</span>
-<span id="236">236</span>
-<span id="237">237</span>
-<span id="238">238</span>
-<span id="239">239</span>
-<span id="240">240</span>
-<span id="241">241</span>
-<span id="242">242</span>
-<span id="243">243</span>
-<span id="244">244</span>
-<span id="245">245</span>
-<span id="246">246</span>
-<span id="247">247</span>
-<span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-<span id="252">252</span>
-<span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
-<span id="262">262</span>
-<span id="263">263</span>
-<span id="264">264</span>
-<span id="265">265</span>
-<span id="266">266</span>
-<span id="267">267</span>
-<span id="268">268</span>
-<span id="269">269</span>
-<span id="270">270</span>
-<span id="271">271</span>
-<span id="272">272</span>
-<span id="273">273</span>
-<span id="274">274</span>
-<span id="275">275</span>
-<span id="276">276</span>
-<span id="277">277</span>
-<span id="278">278</span>
-<span id="279">279</span>
-<span id="280">280</span>
-<span id="281">281</span>
-<span id="282">282</span>
-<span id="283">283</span>
-<span id="284">284</span>
-<span id="285">285</span>
-<span id="286">286</span>
-<span id="287">287</span>
-<span id="288">288</span>
-<span id="289">289</span>
-<span id="290">290</span>
-<span id="291">291</span>
-<span id="292">292</span>
-<span id="293">293</span>
-<span id="294">294</span>
-<span id="295">295</span>
-<span id="296">296</span>
-<span id="297">297</span>
-<span id="298">298</span>
-<span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
-<span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-<span id="306">306</span>
-<span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
-<span id="321">321</span>
-<span id="322">322</span>
-<span id="323">323</span>
-<span id="324">324</span>
-<span id="325">325</span>
-<span id="326">326</span>
-<span id="327">327</span>
-</pre><pre class="rust"><code><span class="doccomment">//! A simple library that handles stdio queues for applications running in terminal instances.
-//! 
-//! This provides some APIs similar to Rust&#39;s `std::io` for applications to access those queues.
-//! 
-//! Usage example:
-//! 1. shell spawns a new app, and creates queues of `stdin`, `stdout`, and `stderr` for that app.
-//! 2. shell stores the reader for `stdin` and writers for `stdout` and `stderr` to `app_io`,
-//!    along with the reader of the key events queue and references to the running terminal instance.
-//! 3. app calls [`stdin()`] to get the reader of `stdin`, and can perform reading just like
-//!    using the standard library
-//! 4. app calls [`stdout()`] to get the writer of `stdin`, and can perform output just like
-//!    using the standard library
-//! 5. after app exits, shell would set `EOF` flags to its `stdin`, `stdout`, and `stderr` queues.
-//! 6. once all apps in a job exit, app shell removes all the structure stored in `app_io` and
-//!    destructs all stdio queues
+</pre><pre class="rust"><code><span class="doccomment">//! A simple library that handles stdio queues for applications invoked by a
+//! shell.
+//!
+//! The shell is responsible for setting the correct stdio queues prior to
+//! spawning the application, and destroying them after the application has
+//! completed.
+//!
+//! Applications can access their queues using [`stdin`], [`stdout`], and
+//! [`stderr`]. This crate also has support for line disciplines, which can be
+//! accessed using [`line_discipline`].
 
 </span><span class="attr">#![no_std]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>stdio;
-<span class="kw">extern crate </span>spin;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>keycodes_ascii;
-<span class="kw">extern crate </span>libterm;
-<span class="kw">extern crate </span>logger;
-<span class="kw">extern crate </span>core2;
-<span class="kw">extern crate </span>window_manager;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>stdio::{StdioReader, StdioWriter, KeyEventReadGuard,
-            KeyEventQueueReader};
-<span class="kw">use </span>spin::{Mutex, MutexGuard};
-<span class="kw">use </span>alloc::boxed::Box;
-<span class="kw">use </span>alloc::collections::BTreeMap;
-<span class="kw">use </span>alloc::sync::Arc;
-<span class="kw">use </span>libterm::Terminal;
+<span class="kw">use </span>alloc::{format, sync::Arc};
+<span class="kw">use </span>core2::io::{<span class="self">self</span>, Error, ErrorKind, Read, Write};
+<span class="kw">use </span>stdio::{StdioReader, StdioWriter};
+<span class="kw">use </span>tty::{LineDiscipline, Slave};
 
-<span class="doccomment">/// Stores the stdio queues, key event queue and the pointer to the terminal
-/// for applications. This structure is provided for application&#39;s use and only
-/// contains necessary one-end readers/writers to queues. On the shell side, we have
-/// full control to queues.
+<span class="kw">pub trait </span>ImmutableRead: Send + Sync + <span class="lifetime">&#39;static </span>{
+    <span class="kw">fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; io::Result&lt;usize&gt;;
+}
+
+<span class="kw">pub trait </span>ImmutableWrite: Send + Sync + <span class="lifetime">&#39;static </span>{
+    <span class="kw">fn </span>write(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; io::Result&lt;usize&gt;;
+
+    <span class="kw">fn </span>write_all(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>buf: <span class="kw-2">&amp;</span>[u8]) -&gt; io::Result&lt;()&gt; {
+        <span class="kw">while </span>!buf.is_empty() {
+            <span class="kw">match </span><span class="self">self</span>.write(buf) {
+                <span class="prelude-val">Ok</span>(<span class="number">0</span>) =&gt; {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
+                        ErrorKind::WriteZero,
+                        <span class="string">&quot;failed to write whole buffer&quot;</span>,
+                    ));
+                }
+                <span class="prelude-val">Ok</span>(n) =&gt; buf = <span class="kw-2">&amp;</span>buf[n..],
+                <span class="prelude-val">Err</span>(<span class="kw-2">ref </span>e) <span class="kw">if </span>e.kind() == ErrorKind::Interrupted =&gt; {}
+                <span class="prelude-val">Err</span>(e) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(e),
+            }
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}
+
+<span class="kw">impl </span>ImmutableRead <span class="kw">for </span>StdioReader {
+    <span class="kw">fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; io::Result&lt;usize&gt; {
+        <span class="self">self</span>.lock().read(buf)
+    }
+}
+
+<span class="kw">impl </span>ImmutableWrite <span class="kw">for </span>StdioWriter {
+    <span class="kw">fn </span>write(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; io::Result&lt;usize&gt; {
+        <span class="self">self</span>.lock().write(buf)
+    }
+}
+
+<span class="kw">impl </span>ImmutableRead <span class="kw">for </span>Slave {
+    <span class="kw">fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;mut </span>[u8]) -&gt; io::Result&lt;usize&gt; {
+        <span class="self">self</span>.read(buf)
+    }
+}
+
+<span class="kw">impl </span>ImmutableWrite <span class="kw">for </span>Slave {
+    <span class="kw">fn </span>write(<span class="kw-2">&amp;</span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; io::Result&lt;usize&gt; {
+        <span class="self">self</span>.write(buf)
+    }
+}
+
+<span class="doccomment">/// Stores the stdio queues and line discipline. The stored queues are for use
+/// by applications e.g. `stdin` is a reader. The other end of the queue is held
+/// by the shell.
+</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>IoStreams {
     <span class="doccomment">/// The reader to stdin.
-    </span>stdin: StdioReader,
+    </span><span class="kw">pub </span>stdin: Arc&lt;<span class="kw">dyn </span>ImmutableRead&gt;,
     <span class="doccomment">/// The writer to stdout.
-    </span>stdout: StdioWriter,
+    </span><span class="kw">pub </span>stdout: Arc&lt;<span class="kw">dyn </span>ImmutableWrite&gt;,
     <span class="doccomment">/// The writer to stderr.
-    </span>stderr: StdioWriter,
-    <span class="doccomment">/// The reader to key event queue. This is the same reader as that in
-    /// shell. Apps can take this reader to directly access keyboard events.
-    </span>key_event_reader: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;&gt;&gt;,
-    <span class="doccomment">/// Points to the terminal.
-    </span>terminal: Arc&lt;Mutex&lt;Terminal&gt;&gt;
-}
-
-<span class="doccomment">/// Applications set the flags in this structure to inform the parent shell to
-/// perform IO accordingly.
-</span><span class="kw">pub struct </span>IoControlFlags {
-    <span class="doccomment">/// When set to be `true`, the shell will immediately flush received character
-    /// input to stdin rather than waiting for enter keystrike.
-    </span>stdin_instant_flush: bool
-}
-
-<span class="kw">impl </span>IoControlFlags {
-    <span class="doccomment">/// Create a new `IoControlFlags` instance. `stdin_instant_flush` is set to
-    /// be `false` on default.
-    </span><span class="kw">pub fn </span>new() -&gt; IoControlFlags {
-        IoControlFlags {
-            stdin_instant_flush: <span class="bool-val">false
-        </span>}
-    }
-}
-
-<span class="kw">impl </span>IoStreams {
-    <span class="kw">pub fn </span>new(stdin: StdioReader, stdout: StdioWriter,
-               stderr: StdioWriter,
-               key_event_reader: Arc&lt;Mutex&lt;<span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;&gt;&gt;,
-               terminal: Arc&lt;Mutex&lt;Terminal&gt;&gt;) -&gt; IoStreams {
-        IoStreams {
-            stdin,
-            stdout,
-            stderr,
-            key_event_reader,
-            terminal
-        }
-    }
+    </span><span class="kw">pub </span>stderr: Arc&lt;<span class="kw">dyn </span>ImmutableWrite&gt;,
+    <span class="kw">pub </span>discipline: <span class="prelude-ty">Option</span>&lt;Arc&lt;LineDiscipline&gt;&gt;,
 }
 
 <span class="kw">mod </span>shared_maps {
-    <span class="kw">use </span>spin::{Mutex, MutexGuard};
-    <span class="kw">use </span>alloc::collections::BTreeMap;
-    <span class="kw">use </span>IoControlFlags;
-    <span class="kw">use </span>IoStreams;
+    <span class="kw">use </span><span class="kw">super</span>::IoStreams;
+    <span class="kw">use </span>hashbrown::HashMap;
+    <span class="kw">use </span>mutex_sleep::{MutexSleep <span class="kw">as </span>Mutex, MutexSleepGuard <span class="kw">as </span>MutexGuard};
 
-    <span class="doccomment">/// Map a task to its IoControlFlags structure.
-    /// When shells call `insert_child_streams`, the default value is automatically inserted for that task.
-    /// When shells call `remove_child_streams`, the corresponding structure is removed from this map.
-    </span><span class="kw">static </span>APP_IO_CTRL_FLAGS: Mutex&lt;BTreeMap&lt;usize, IoControlFlags&gt;&gt; = Mutex::new(BTreeMap::new());
-
-    <span class="doccomment">/// Map a task id to its IoStreams structure.
-    /// Shells should call `insert_child_streams` when spawning a new app,
-    /// which effectively stores a new key value pair to this map. 
-    /// After a shell&#39;s child app exits, the shell should call `remove_child_streams` to clean it up.
-    </span><span class="kw">static </span>APP_IO_STREAMS: Mutex&lt;BTreeMap&lt;usize, IoStreams&gt;&gt; = Mutex::new(BTreeMap::new());
-
-    <span class="doccomment">/// Lock and returns the `MutexGuard` of `APP_IO_CTRL_FLAGS`. Use `lock_all_maps()` if
-    /// you want to lock both of the maps to avoid deadlock.
-    </span><span class="kw">pub fn </span>lock_flag_map() -&gt; MutexGuard&lt;<span class="lifetime">&#39;static</span>, BTreeMap&lt;usize, IoControlFlags&gt;&gt; {
-        APP_IO_CTRL_FLAGS.lock()
+    <span class="macro">lazy_static::lazy_static! </span>{
+        <span class="doccomment">/// Map a task id to its IoStreams structure.
+        /// Shells should call `insert_child_streams` when spawning a new app,
+        /// which effectively stores a new key value pair to this map.
+        /// After a shell&#39;s child app exits, the shell should call
+        /// `remove_child_streams` to clean it up.
+        </span><span class="kw">static </span><span class="kw-2">ref </span>APP_IO_STREAMS: Mutex&lt;HashMap&lt;usize, IoStreams&gt;&gt; = Mutex::new(HashMap::new());
     }
 
-    <span class="doccomment">/// Lock and returns the `MutexGuard` of `APP_IO_STREAMS`. Use `lock_all_maps()` if
-    /// you want to lock both of the maps to avoid deadlock.
-    </span><span class="kw">pub fn </span>lock_stream_map() -&gt; MutexGuard&lt;<span class="lifetime">&#39;static</span>, BTreeMap&lt;usize, IoStreams&gt;&gt; {
-        APP_IO_STREAMS.lock()
-    }
-
-    <span class="doccomment">/// Lock two maps `APP_IO_CTRL_FLAGS` and `APP_IO_STREAMS` at the same time and returns a
-    /// tuple containing their `MutexGuard`s. This function exerts a sequence of locking when
-    /// we need to lock more than one of them. This prevents deadlock.
-    </span><span class="kw">pub fn </span>lock_all_maps() -&gt; (MutexGuard&lt;<span class="lifetime">&#39;static</span>, BTreeMap&lt;usize, IoControlFlags&gt;&gt;,
-                               MutexGuard&lt;<span class="lifetime">&#39;static</span>, BTreeMap&lt;usize, IoStreams&gt;&gt;) {
-        (APP_IO_CTRL_FLAGS.lock(), APP_IO_STREAMS.lock())
+    <span class="doccomment">/// Lock and returns the `MutexGuard` of `APP_IO_STREAMS`. Use
+    /// `lock_all_maps()` if you want to lock both of the maps to avoid
+    /// deadlock.
+    </span><span class="kw">pub fn </span>lock_stream_map() -&gt; MutexGuard&lt;<span class="lifetime">&#39;static</span>, HashMap&lt;usize, IoStreams&gt;&gt; {
+        APP_IO_STREAMS.lock().unwrap()
     }
 }
 
-
-<span class="doccomment">/// An application can call this function to get the terminal to which it should print.
-</span><span class="kw">pub fn </span>get_my_terminal() -&gt; <span class="prelude-ty">Option</span>&lt;Arc&lt;Mutex&lt;Terminal&gt;&gt;&gt; {
-    shared_maps::lock_stream_map()
-        .get(<span class="kw-2">&amp;</span>task::get_my_current_task_id())
-        .map(|property| property.terminal.clone())
-}
-
-<span class="doccomment">/// Lock all shared states (i.e. those defined as `static`s) and execute the closure.
-/// This function is mainly provided for the shell to clean up the pointers stored in the map
-/// without causing a deadlock. In other words, by using this function, shell can prevent the
-/// application from holding the lock of these shared maps before killing it. Otherwise, the
-/// lock will never get a chance to be released. Since we currently don&#39;t have stack unwinding.
-</span><span class="kw">pub fn </span>lock_and_execute&lt;<span class="lifetime">&#39;a</span>, F&gt;(f: <span class="kw-2">&amp;</span>F)
-    <span class="kw">where </span>F: Fn(MutexGuard&lt;<span class="lifetime">&#39;a</span>, BTreeMap&lt;usize, IoControlFlags&gt;&gt;,
-                MutexGuard&lt;<span class="lifetime">&#39;a</span>, BTreeMap&lt;usize, IoStreams&gt;&gt;) {
-    <span class="kw">let </span>(locked_flags, locked_streams) = shared_maps::lock_all_maps();
-    f(locked_flags, locked_streams);
-}
-
-<span class="doccomment">/// Shells call this function to store queue readers/writers and the pointer to terminal for
-/// applications. If there is any existing readers/writers for the task (which should not
+<span class="doccomment">/// Shells call this function to store queue stdio streams for applications. If
+/// there are any existing readers/writers for the task (which should not
 /// happen in normal practice), it returns the old one, otherwise returns None.
 </span><span class="kw">pub fn </span>insert_child_streams(task_id: usize, streams: IoStreams) -&gt; <span class="prelude-ty">Option</span>&lt;IoStreams&gt; {
-    shared_maps::lock_flag_map().insert(task_id, IoControlFlags::new());
     shared_maps::lock_stream_map().insert(task_id, streams)
 }
 
-<span class="doccomment">/// Shells call this function to remove queues and pointer to terminal for applications. It returns
-/// the removed streams in the return value if the key matches, otherwise returns None.
-</span><span class="kw">pub fn </span>remove_child_streams(task_id: <span class="kw-2">&amp;</span>usize) -&gt; <span class="prelude-ty">Option</span>&lt;IoStreams&gt; {
-    shared_maps::lock_flag_map().remove(task_id);
-    shared_maps::lock_stream_map().remove(task_id)
+<span class="doccomment">/// Shells call this function to remove queues and pointer to terminal for
+/// applications. It returns the removed streams in the return value if the key
+/// matches, otherwise returns None.
+</span><span class="kw">pub fn </span>remove_child_streams(task_id: usize) -&gt; <span class="prelude-ty">Option</span>&lt;IoStreams&gt; {
+    shared_maps::lock_stream_map().remove(<span class="kw-2">&amp;</span>task_id)
+}
+
+<span class="kw">pub fn </span>streams() -&gt; <span class="prelude-ty">Result</span>&lt;IoStreams, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>task_id = task::get_my_current_task_id();
+    <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
+    <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
+        <span class="prelude-val">Some</span>(streams) =&gt; <span class="prelude-val">Ok</span>(streams.clone()),
+        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stdin for this task&quot;</span>),
+    }
 }
 
 <span class="doccomment">/// Applications call this function to acquire a reader to its stdin queue.
-/// 
-/// Errors can occur in two cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there&#39;s no stdin reader stored in the map. Shells should
-/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
-/// to let it run.
-</span><span class="kw">pub fn </span>stdin() -&gt; <span class="prelude-ty">Result</span>&lt;StdioReader, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+///
+/// Errors can occur in two cases. One is when it fails to get the task_id of
+/// the calling task, and the second is that there&#39;s no stdin reader stored in
+/// the map. Shells should make sure to store IoStreams for the newly spawned
+/// app first, and then unblocks the app to let it run.
+</span><span class="kw">pub fn </span>stdin() -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;<span class="kw">dyn </span>ImmutableRead&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; <span class="prelude-val">Ok</span>(queues.stdin.clone()),
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stdin for this task&quot;</span>)
+        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stdin for this task&quot;</span>),
     }
 }
 
 <span class="doccomment">/// Applications call this function to acquire a writer to its stdout queue.
-/// 
-/// Errors can occur in two cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there&#39;s no stdout writer stored in the map. Shells should
-/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
-/// to let it run.
-</span><span class="kw">pub fn </span>stdout() -&gt; <span class="prelude-ty">Result</span>&lt;StdioWriter, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+///
+/// Errors can occur in two cases. One is when it fails to get the task_id of
+/// the calling task, and the second is that there&#39;s no stdout writer stored in
+/// the map. Shells should make sure to store IoStreams for the newly spawned
+/// app first, and then unblocks the app to let it run.
+</span><span class="kw">pub fn </span>stdout() -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;<span class="kw">dyn </span>ImmutableWrite&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; <span class="prelude-val">Ok</span>(queues.stdout.clone()),
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stdout for this task&quot;</span>)
+        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stdout for this task&quot;</span>),
     }
 }
 
 <span class="doccomment">/// Applications call this function to acquire a writer to its stderr queue.
-/// 
-/// Errors can occur in two cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there&#39;s no stderr writer stored in the map. Shells should
-/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
-/// to let it run.
-</span><span class="kw">pub fn </span>stderr() -&gt; <span class="prelude-ty">Result</span>&lt;StdioWriter, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+///
+/// Errors can occur in two cases. One is when it fails to get the task_id of
+/// the calling task, and the second is that there&#39;s no stderr writer stored in
+/// the map. Shells should make sure to store IoStreams for the newly spawned
+/// app first, and then unblocks the app to let it run.
+</span><span class="kw">pub fn </span>stderr() -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;<span class="kw">dyn </span>ImmutableWrite&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; <span class="prelude-val">Ok</span>(queues.stderr.clone()),
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stderr for this task&quot;</span>)
+        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no stderr for this task&quot;</span>),
     }
 }
 
-<span class="doccomment">/// Applications call this function to take reader to the key event queue to directly
-/// access keyboard events.
-/// 
-/// Errors can occur in three cases. One is when it fails to get the task_id of the calling
-/// task, and the second is that there&#39;s no key event reader stored in the map. Shells should
-/// make sure to store IoStreams for the newly spawned app first, and then unblocks the app
-/// to let it run. The third case happens when the reader of the key event queue has
-/// already been taken by some other task, which may be running simultaneously, or be killed
-/// prematurely so that it cannot return the key event reader on exit.
-</span><span class="kw">pub fn </span>take_key_event_queue() -&gt; <span class="prelude-ty">Result</span>&lt;KeyEventReadGuard, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+<span class="doccomment">/// Returns the application&#39;s line discipline.
+</span><span class="kw">pub fn </span>line_discipline() -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;LineDiscipline&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>task_id = task::get_my_current_task_id();
     <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
-        <span class="prelude-val">Some</span>(queues) =&gt; {
-            <span class="kw">match </span>queues.key_event_reader.lock().take() {
-                <span class="prelude-val">Some</span>(reader) =&gt; <span class="prelude-val">Ok</span>(KeyEventReadGuard::new(
-                    reader,
-                    Box::new(|reader: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;|  { return_event_queue(reader); }),
-                )),
-                <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;currently the reader to key event queue is not available&quot;</span>)
-            }
-        },
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no key event queue reader for this task&quot;</span>)
+        <span class="prelude-val">Some</span>(IoStreams {
+            discipline: <span class="prelude-val">Some</span>(discipline),
+            ..
+        }) =&gt; <span class="prelude-val">Ok</span>(discipline.clone()),
+        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no line discipline for this task&quot;</span>),
     }
 }
 
-<span class="doccomment">/// This function is automatically invoked upon dropping of `KeyEventReadGuard`.
-/// It returns the reader of key event queue back to the shell.
-</span><span class="kw">fn </span>return_event_queue(reader: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;KeyEventQueueReader&gt;) {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id();
-    <span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
-    <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
-        <span class="prelude-val">Some</span>(queues) =&gt; {
-            core::mem::swap(<span class="kw-2">&amp;mut *</span>queues.key_event_reader.lock(), reader);
-        },
-        <span class="prelude-val">None </span>=&gt; { <span class="macro">error!</span>(<span class="string">&quot;no stderr for this task&quot;</span>); }
-    };
-}
-
-<span class="doccomment">/// Applications call this function to set the flag which requests the parent shell to
-/// flush stdin immediately upon character input, rather than waiting for enter key strike.
-/// 
-/// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
-/// or it finds no IoControlFlags structure for that task.
-</span><span class="kw">pub fn </span>request_stdin_instant_flush() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id();
-    <span class="kw">let </span><span class="kw-2">mut </span>locked_flags = shared_maps::lock_flag_map();
-    <span class="kw">match </span>locked_flags.get_mut(<span class="kw-2">&amp;</span>task_id) {
-        <span class="prelude-val">Some</span>(flags) =&gt; {
-            flags.stdin_instant_flush = <span class="bool-val">true</span>;
-            <span class="prelude-val">Ok</span>(())
-        },
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no io control flags for this task&quot;</span>)
-    }
-}
-
-<span class="doccomment">/// Applications call this function to reset the flag which requests the parent shell to
-/// flush stdin immediately upon character input, but to wait for enter key strike.
-/// 
-/// Errors can occur in two cases, when it fails to get the `task_id` of the calling task,
-/// or it finds no IoControlFlags structure for that task.
-</span><span class="kw">pub fn </span>cancel_stdin_instant_flush() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>task_id = task::get_my_current_task_id();
-    <span class="kw">let </span><span class="kw-2">mut </span>locked_flags = shared_maps::lock_flag_map();
-    <span class="kw">match </span>locked_flags.get_mut(<span class="kw-2">&amp;</span>task_id) {
-        <span class="prelude-val">Some</span>(flags) =&gt; {
-            flags.stdin_instant_flush = <span class="bool-val">false</span>;
-            <span class="prelude-val">Ok</span>(())
-        },
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no io control flags for this task&quot;</span>)
-    }
-}
-
-<span class="doccomment">/// Shell call this function to check whether a task is requesting instant stdin flush.
-/// 
-/// Error can occur when there is no IoControlFlags structure for that task.
-</span><span class="kw">pub fn </span>is_requesting_instant_flush(task_id: <span class="kw-2">&amp;</span>usize) -&gt; <span class="prelude-ty">Result</span>&lt;bool, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>locked_flags = shared_maps::lock_flag_map();
-    <span class="kw">match </span>locked_flags.get(task_id) {
-        <span class="prelude-val">Some</span>(flags) =&gt; {
-            <span class="prelude-val">Ok</span>(flags.stdin_instant_flush)
-        },
-        <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;no io control flags for this task&quot;</span>)
-    }
-}
-
-<span class="doccomment">/// Calls `print!()` with an extra newline (&#39;\n&#39;) appended to the end. 
+<span class="doccomment">/// Calls `print!()` with an extra newline (&#39;\n&#39;) appended to the end.
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>println {
     (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
@@ -624,7 +417,8 @@
 
 }
 
-<span class="doccomment">/// The main printing macro, which simply writes to the current task&#39;s stdout stream.
+<span class="doccomment">/// The main printing macro, which simply writes to the current task&#39;s stdout
+/// stream.
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>print {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
@@ -632,23 +426,25 @@
     });
 }
 
-<span class="kw">use </span>core::fmt;
-<span class="kw">use </span>core2::io::Write;
-<span class="doccomment">/// Converts the given `core::fmt::Arguments` to a `String` and enqueues the string into the correct
-/// terminal print-producer
-</span><span class="kw">pub fn </span>print_to_stdout_args(fmt_args: fmt::Arguments) {
+<span class="doccomment">/// Converts the given `core::fmt::Arguments` to a `String` and enqueues the
+/// string into the correct terminal print-producer
+</span><span class="kw">pub fn </span>print_to_stdout_args(fmt_args: core::fmt::Arguments) {
     <span class="kw">let </span>task_id = task::get_my_current_task_id();
-    <span class="comment">// Obtain the correct stdout stream and push the output bytes.
+
+    <span class="comment">// Obtains the correct stdout stream and push the output bytes.
     </span><span class="kw">let </span>locked_streams = shared_maps::lock_stream_map();
     <span class="kw">match </span>locked_streams.get(<span class="kw-2">&amp;</span>task_id) {
         <span class="prelude-val">Some</span>(queues) =&gt; {
-            <span class="kw">if let </span><span class="prelude-val">Err</span>(<span class="kw">_</span>) = queues.stdout.lock().write_all(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, fmt_args).as_bytes()) {
+            <span class="kw">if </span>queues
+                .stdout
+                .write_all(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, fmt_args).as_bytes())
+                .is_err()
+            {
                 <span class="kw">let _ </span>= logger::write_str(<span class="string">&quot;\x1b[31m [E] failed to write to stdout \x1b[0m\n&quot;</span>);
             }
-        },
+        }
         <span class="prelude-val">None </span>=&gt; {
             <span class="kw">let _ </span>= logger::write_str(<span class="string">&quot;\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n&quot;</span>);
-            <span class="kw">return</span>;
         }
     };
 }

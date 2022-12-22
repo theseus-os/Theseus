@@ -494,7 +494,6 @@
 <span id="494">494</span>
 <span id="495">495</span>
 <span id="496">496</span>
-<span id="497">497</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.
 //!
 //! This module provides APIs to:
@@ -507,7 +506,6 @@
 </span><span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::{cmp, convert::TryFrom <span class="kw">as _</span>};
-<span class="kw">use </span>core2::io::{Read, Write};
 <span class="kw">use </span>fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 <span class="kw">use </span>hashbrown::HashMap;
 <span class="kw">use </span>memfs::MemFile;
@@ -541,11 +539,11 @@
     </span><span class="kw">pub fn </span>write(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             PosixNodeOrStdio::Stdin =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_NOTSUP),
-            PosixNodeOrStdio::Stdout =&gt; <span class="kw">match </span>app_io::stdout().unwrap().lock().write_all(buffer) {
+            PosixNodeOrStdio::Stdout =&gt; <span class="kw">match </span>app_io::stdout().unwrap().write_all(buffer) {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(buffer.len()),
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_IO),
             },
-            PosixNodeOrStdio::Stderr =&gt; <span class="kw">match </span>app_io::stderr().unwrap().lock().write_all(buffer) {
+            PosixNodeOrStdio::Stderr =&gt; <span class="kw">match </span>app_io::stderr().unwrap().write_all(buffer) {
                 <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(buffer.len()),
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_IO),
             },
@@ -565,7 +563,7 @@
     /// Otherwise, returns a wasi::Errno.
     </span><span class="kw">pub fn </span>read(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;usize, wasi::Errno&gt; {
         <span class="kw">match </span><span class="self">self </span>{
-            PosixNodeOrStdio::Stdin =&gt; <span class="kw">match </span>app_io::stdin().unwrap().lock().read(buffer) {
+            PosixNodeOrStdio::Stdin =&gt; <span class="kw">match </span>app_io::stdin().unwrap().read(buffer) {
                 <span class="prelude-val">Ok</span>(bytes_read) =&gt; <span class="prelude-val">Ok</span>(bytes_read),
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(wasi::ERRNO_IO),
             },

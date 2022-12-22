@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Event",""]],"struct":[["LineDiscipline","A TTY line discipline."],["Master","The master (i.e. terminal) end of a [`Tty`]."],["Slave","The slave (i.e. application) end of a [`Tty`]."],["Tty","A terminal device driver."]]};

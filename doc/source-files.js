@@ -113,7 +113,6 @@ var sourcesIndex = JSON.parse('{\
 "pmu_x86":["",[],["lib.rs","stat.rs"]],\
 "port_io":["",[],["lib.rs","x86.rs"]],\
 "preemption":["",[],["lib.rs"]],\
-"print":["",[],["lib.rs"]],\
 "ps2":["",[],["lib.rs"]],\
 "ps2_controller":["",[],["lib.rs"]],\
 "pte_flags":["",[],["lib.rs","pte_flags_aarch64.rs","pte_flags_x86_64.rs"]],\
@@ -157,7 +156,6 @@ var sourcesIndex = JSON.parse('{\
 "str_ref":["",[],["lib.rs"]],\
 "task":["",[],["lib.rs"]],\
 "task_fs":["",[],["lib.rs"]],\
-"terminal_print":["",[],["lib.rs"]],\
 "text_display":["",[],["lib.rs"]],\
 "text_terminal":["",[],["ansi_colors.rs","ansi_style.rs","lib.rs"]],\
 "theseus_features":["",[],["lib.rs"]],\
@@ -166,6 +164,7 @@ var sourcesIndex = JSON.parse('{\
 "tlb_shootdown":["",[],["lib.rs"]],\
 "tsc":["",[],["lib.rs"]],\
 "tss":["",[],["lib.rs"]],\
+"tty":["",[],["channel.rs","discipline.rs","lib.rs"]],\
 "unwind":["",[],["lib.rs","lsda.rs","registers.rs"]],\
 "util":["",[],["lib.rs"]],\
 "vfs_node":["",[],["lib.rs"]],\
