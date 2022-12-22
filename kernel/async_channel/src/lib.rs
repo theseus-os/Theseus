@@ -151,7 +151,7 @@ impl <T: Send> Sender<T> {
     /// Send a message, blocking until space in the channel's buffer is available. 
     /// 
     /// Returns `Ok(())` if the message was sent successfully,
-    /// otherwise returns an error of `Error` type. 
+    /// otherwise returns an [`Error`]. 
     pub fn send(&self, msg: T) -> Result<(), Error> {
         #[cfg(trace_channel)]
         trace!("async_channel: sending msg: {:?}", debugit!(msg));
@@ -353,7 +353,7 @@ impl<T: Send> Clone for Receiver<T> {
 impl <T: Send> Receiver<T> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
-    /// Returns the message if it was received properly, otherwise returns an error of `Error` type.
+    /// Returns the message if it was received properly, otherwise returns an [`Error`].
     pub fn receive(&self) -> Result<T, Error> {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
