@@ -140,10 +140,17 @@ pub fn register_early_sleeper<T>(period: Period) -> bool
 where
     T: EarlySleeper,
 {
-    let old_period = EARLY_SLEEPER_PERIOD.load();
-    if period < old_period {
+    if EARLY_SLEEPER_PERIOD
+        .fetch_update(|old_period| {
+            if period < old_period {
+                Some(period)
+            } else {
+                None
+            }
+        })
+        .is_ok()
+    {
         EARLY_SLEEP_FUNCTION.store(T::sleep);
-        EARLY_SLEEPER_PERIOD.store(period.into());
         true
     } else {
         false
@@ -173,11 +180,19 @@ pub fn register_clock_source<T>(period: Period) -> bool
 where
     T: ClockSource,
 {
-    let old_period = T::ClockType::period_atomic().load();
-    if period < old_period {
+    let period_atomic = T::ClockType::period_atomic();
+    if period_atomic
+        .fetch_update(|old_period| {
+            if period < old_period {
+                Some(period)
+            } else {
+                None
+            }
+        })
+        .is_ok()
+    {
         let now_fn = T::ClockType::now_fn();
         now_fn.store(T::now);
-        T::ClockType::period_atomic().store(period);
 
         true
     } else {
