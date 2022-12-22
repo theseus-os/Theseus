@@ -31,7 +31,6 @@ pub fn main(_: Vec<String>) -> isize {
 
 async fn foo() -> u8 {
     println!("called foo");
-    // Dividing by two prevents overflows.
     time::sleep(1000).await;
     println!("foo sleep done");
     0
