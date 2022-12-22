@@ -18,7 +18,6 @@
 //! [dreadnought]: https://starwars.fandom.com/wiki/Executor-class_Star_Dreadnought
 
 #![no_std]
-#![feature(box_into_inner, downcast_unchecked)]
 
 extern crate alloc;
 

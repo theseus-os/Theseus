@@ -4,7 +4,7 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 use app_io::println;
-use dreadnought::{block_on, select_biased, task::spawn, time, FutureExt};
+use dreadnought::{block_on, select_biased, task::spawn_async, time, FutureExt};
 
 pub fn main(_: Vec<String>) -> isize {
     block_on(async {
@@ -16,7 +16,7 @@ pub fn main(_: Vec<String>) -> isize {
         };
         assert_eq!(result, 1);
 
-        let handle_1 = spawn(async { 1855 }).unwrap();
+        let handle_1 = spawn_async(async { 1855 }).unwrap();
         // TODO: Fix task abortion. Aborting the spawned task won't properly clean it up
         // and so test_async won't be dropped.
         // let handle_2 = spawn(async { loop {} }).unwrap();
