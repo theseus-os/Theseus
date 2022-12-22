@@ -15,16 +15,41 @@ extern crate alloc;
 #[macro_use] extern crate lazy_static;
 extern crate scheduler;
 
-use core::sync::atomic::{Ordering, AtomicUsize};
+use core::{sync::atomic::{Ordering, AtomicUsize}, task::Waker};
 use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
 use task::{get_my_current_task, TaskRef, RunState};
 
 /// Contains the `TaskRef` and the associated wakeup time for an entry in DELAYED_TASKLIST.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 struct SleepingTaskNode {
     resume_time: usize,
-    taskref: TaskRef,
+    action: Action,
+}
+
+#[derive(Clone)]
+enum Action {
+    Sync(TaskRef),
+    Async(Waker),
+}
+
+impl Action {
+    fn act(self) {
+        match self {
+            Action::Sync(task) => {
+                task.unblock().expect("failed to unblock sleeping task");
+            },
+            Action::Async(waker) => waker.wake(),
+        }
+    }
+}
+
+impl Eq for SleepingTaskNode {}
+
+impl PartialEq for SleepingTaskNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.resume_time == other.resume_time
+    }
 }
 
 // The priority queue depends on `Ord`.
@@ -33,10 +58,7 @@ struct SleepingTaskNode {
 impl Ord for SleepingTaskNode {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // Notice that the we flip the ordering on resume_time.
-        // In case of a tie we compare taskids - this step is necessary
-        // to make implementations of `PartialEq` and `Ord` consistent.
         other.resume_time.cmp(&self.resume_time)
-            .then_with(|| self.taskref.id.cmp(&other.taskref.id))
     }
 }
 
@@ -87,8 +109,8 @@ fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
 /// Remove the next task from the delayed task list and unblock that task
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
-    if let Some(SleepingTaskNode { taskref, .. }) = delayed_tasklist.pop() {
-        taskref.unblock().expect("failed to unblock sleeping task");
+    if let Some(SleepingTaskNode { action, .. }) = delayed_tasklist.pop() {
+        action.act();
 
         match delayed_tasklist.peek() {
             Some(SleepingTaskNode { resume_time, .. }) => 
@@ -116,7 +138,7 @@ pub fn sleep(duration: usize) -> Result<(), RunState> {
 
     let current_task = get_my_current_task().unwrap();
     // Add the current task to the delayed tasklist and then block it.
-    add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
+    add_to_delayed_tasklist(SleepingTaskNode{action: Action::Sync(current_task.clone()), resume_time});
     current_task.block()?;
     scheduler::schedule();
     Ok(())
@@ -142,4 +164,35 @@ pub fn sleep_until(resume_time: usize) -> Result<(), RunState> {
 pub fn sleep_periodic(last_resume_time: &AtomicUsize, period: usize) -> Result<(), RunState> {
     let new_resume_time = last_resume_time.fetch_add(period, Ordering::SeqCst) + period;
     sleep_until(new_resume_time)
+}
+
+/// Asynchronous sleep methods that operate on wakers.
+pub mod future {
+    use core::task::Poll;
+    use super::*;
+
+    /// Wakes up the waker after the specified duration.
+    pub fn sleep(duration: usize, waker: Waker) {
+        let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
+        let resume_time = current_tick_count + duration;
+
+        add_to_delayed_tasklist(
+            SleepingTaskNode {
+                action: Action::Async(waker),
+                resume_time,
+            }
+        );
+    }
+
+    /// Wakes up the waker at the specified time.
+    pub fn sleep_until(resume_time: usize, waker: &Waker) -> Poll<()> {
+        let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
+
+        if let Some(duration) = resume_time.checked_sub(current_tick_count) {
+            sleep(duration, waker.clone());
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    }
 }

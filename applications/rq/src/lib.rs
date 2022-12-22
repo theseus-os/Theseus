@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate app_io;
 
 extern crate apic;
@@ -31,8 +31,8 @@ pub fn main(args: Vec<String>) -> isize {
         let lapic = lapic.1;
         let apic_id = lapic.read().apic_id();
         let processor = lapic.read().processor_id();
-        let is_bsp = lapic.read().is_bsp();
-        let core_type = if is_bsp {"BSP Core"}
+        let is_bootstrap_cpu = lapic.read().is_bootstrap_cpu();
+        let core_type = if is_bootstrap_cpu {"BSP Core"}
                         else {"AP Core"};
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
@@ -59,9 +59,9 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn print_usage(opts: Options) -> isize {
-    let mut brief = format!("Usage: cpu \n \n");
+    let mut brief = format!("Usage: rq \n \n");
 
-    brief.push_str("For each core, prints apic id, processor id, whether it is the bootstrap processor (the first processor to boot up), which tasks that is currently running on that core and which tasks are present in that core's runqueue");
+    brief.push_str("Prints each CPU's ID, the tasks on its runqueue ('*' identifies the currently running task), and whether it is the boot CPU or not");
 
     println!("{} \n", opts.usage(&brief));
 

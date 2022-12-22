@@ -17,7 +17,6 @@ use alloc::{
 use getopts::Options;
 use path::Path;
 use fs_node::FileOrDir;
-use core2::io::{Read, Write};
 
 
 pub fn main(args: Vec<String>) -> isize {

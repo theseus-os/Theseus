@@ -15,7 +15,7 @@ use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
 use locked_idt::LockedIdt;
 use log::{error, warn, info, debug};
-use vga_buffer::{print_raw, println_raw};
+use vga_buffer::println_raw;
 
 
 /// The single system-wide Interrupt Descriptor Table (IDT).
@@ -75,7 +75,7 @@ pub fn init(
     double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) -> Result<&'static LockedIdt, &'static str> {
-    let bsp_id = apic::get_bsp_id().ok_or("couldn't get BSP's id")?;
+    let bsp_id = apic::bootstrap_cpu().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
@@ -299,7 +299,7 @@ pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::get_my_apic_id(), _ticks);
+    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::current_cpu(), _ticks);
 
     // Callback to the sleep API to unblock tasks whose waiting time is over
     // and alert to update the number of ticks elapsed

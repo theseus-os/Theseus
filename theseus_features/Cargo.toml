@@ -14,7 +14,6 @@ theseus_std = { path = "../ports/theseus_std", optional = true }
 ## Regular applications.
 cat = { path = "../applications/cat", optional = true }
 cd = { path = "../applications/cd", optional = true }
-cpu = { path = "../applications/cpu", optional = true }
 date = { path = "../applications/date", optional = true }
 deps = { path = "../applications/deps", optional = true }
 hull = { path = "../applications/hull", optional = true }
@@ -30,6 +29,7 @@ pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
 ps = { path = "../applications/ps", optional = true }
 pwd = { path = "../applications/pwd", optional = true }
 rm = { path = "../applications/rm", optional = true }
+rq = { path = "../applications/rq", optional = true }
 shell = { path = "../applications/shell", optional = true }
 swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
@@ -47,6 +47,7 @@ example = { path = "../applications/example", optional = true }
 hello = { path = "../applications/hello", optional = true }
 raw_mode = { path = "../applications/raw_mode", optional = true }
 print_fault_log = { path = "../applications/print_fault_log", optional = true }
+test_async = { path = "../applications/test_async", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
 test_block_io = { path = "../applications/test_block_io", optional = true }
 test_channel = { path = "../applications/test_channel", optional = true }
@@ -93,7 +94,6 @@ wasmtime = [ "test_wasmtime" ]
 theseus_apps = [
     "cat",
     "cd",
-    "cpu",
     "date",
     "deps",
     "hull",
@@ -109,6 +109,7 @@ theseus_apps = [
     "ps",
     "pwd",
     "rm",
+    "rq",
     "shell",
     "swap",
     "upd",
@@ -129,6 +130,7 @@ theseus_tests = [
     "example",
     "hello",
     "raw_mode",
+    "test_async",
     "test_backtrace",
     "test_block_io",
     "test_channel",

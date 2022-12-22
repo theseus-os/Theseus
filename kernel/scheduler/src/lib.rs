@@ -27,23 +27,23 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", current_cpu());
         return false;
     }
 
-    let apic_id = preemption_guard.apic_id();
+    let cpu_id = preemption_guard.cpu_id();
 
-    let Some(next_task) = scheduler::select_next_task(apic_id) else {
+    let Some(next_task) = scheduler::select_next_task(cpu_id) else {
         return false; // keep running the same current task
     };
 
     let (did_switch, recovered_preemption_guard) = task::task_switch(
         next_task,
-        apic_id,
+        cpu_id,
         preemption_guard,
     ); 
 
-    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
+    // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
 
     drop(recovered_preemption_guard);
     did_switch

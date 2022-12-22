@@ -3,7 +3,7 @@
 
 // FIXME
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 // extern crate task;
 // extern crate getopts;
 // extern crate path;
@@ -20,8 +20,7 @@
 // use core::str;
 use alloc::{
     vec::Vec,
-    string::{String, ToString},
-    sync::Arc,
+    string::String,
 };
 // use getopts::Options;
 // use path::Path;
@@ -201,7 +200,7 @@ use alloc::{
 // }
 
 
-pub fn main(args: Vec<String>) -> isize {
+pub fn main(_args: Vec<String>) -> isize {
 
     // // Get stdout.
     // let stdout = match app_io::stdout() {

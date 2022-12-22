@@ -320,6 +320,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "boot_info"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "bootloader_api",
+ "kernel_config",
+ "memory_structs",
+ "multiboot2",
+]
+
+[[package]]
+name = "bootloader_api"
+version = "0.11.0"
+source = "git+https://github.com/theseus-os/bootloader?branch=theseus#6cc130e2f9dc633445846a1e2c4d961b1daddd78"
+
+[[package]]
 name = "bootloader_modules"
 version = "0.1.0"
 dependencies = [
@@ -343,9 +359,9 @@ name = "captain"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "app_io",
  "console",
+ "cpu",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -433,8 +449,8 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "channel_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
+ "cpu",
  "getopts",
  "log",
  "spawn",
@@ -586,10 +602,6 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
- "app_io",
- "getopts",
- "runqueue",
- "task",
 ]
 
 [[package]]
@@ -898,6 +910,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
+name = "dreadnought"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "mutex_sleep",
+ "scheduler",
+ "sleep",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "e1000"
 version = "0.1.0"
 dependencies = [
@@ -997,8 +1021,8 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
+ "cpu",
  "debug_info",
  "fault_log",
  "locked_idt",
@@ -1069,8 +1093,8 @@ dependencies = [
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
@@ -1158,6 +1182,79 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "futures"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38390104763dc37a5145a53c29c63c1290b5d316d6086ec32c293f6736051bb0"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-io",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+]
+
+[[package]]
+name = "futures-channel"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52ba265a92256105f45b719605a571ffe2d1f0fea3807304b522c1d778f79eed"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+]
+
+[[package]]
+name = "futures-core"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04909a7a7e4633ae6c4a9ab280aeb86da1236243a77b694a49eacd659a4bd3ac"
+
+[[package]]
+name = "futures-io"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00f5fb52a06bdcadeb54e8d3671f8888a39697dcb0b81b23b55174030427f4eb"
+
+[[package]]
+name = "futures-macro"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdfb8ce053d86b91919aad980c220b1fb8401a9394410e1c289ed7e66b61835d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "futures-sink"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39c15cf1a4aa79df40f1bb462fb39676d0ad9e366c2a33b590d7c66f4f81fcf9"
+
+[[package]]
+name = "futures-task"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ffb393ac5d9a6eaa9d3fdf37ae2776656b706e200c8e16b1bdb227f5198e6ea"
+
+[[package]]
+name = "futures-util"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "197676987abd2f9cadff84926f410af1c183608d36641465df73ae8211dc65d6"
+dependencies = [
+ "futures-core",
+ "futures-macro",
+ "futures-sink",
+ "futures-task",
+ "pin-project-lite",
+ "pin-utils",
 ]
 
 [[package]]
@@ -1464,7 +1561,6 @@ name = "ixgbe"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "bit_field 0.7.0",
  "hashbrown",
  "hpet",
@@ -1476,6 +1572,7 @@ dependencies = [
  "log",
  "memory",
  "mpmc",
+ "net",
  "network_interface_card",
  "nic_buffers",
  "nic_initialization",
@@ -1778,6 +1875,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "boot_info",
  "frame_allocator",
  "irq_safety",
  "kernel_config",
@@ -1785,7 +1883,6 @@ dependencies = [
  "log",
  "memory_structs",
  "memory_x86_64",
- "multiboot2",
  "no_drop",
  "owned_borrowed_trait",
  "page_allocator",
@@ -1801,13 +1898,13 @@ dependencies = [
 name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "bootloader_modules",
  "heap",
  "irq_safety",
  "kernel_config",
  "log",
  "memory",
- "multiboot2",
  "no_drop",
  "stack",
 ]
@@ -1833,10 +1930,10 @@ checksum = "71d96e3f3c0b6325d8ccd83c33b28acb183edcb6c67938ba104ec546854b0882"
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "kernel_config",
  "log",
  "memory_structs",
- "multiboot2",
  "pte_flags",
  "x86_64",
 ]
@@ -2064,6 +2161,7 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "captain",
  "exceptions_early",
  "irq_safety",
@@ -2078,7 +2176,6 @@ dependencies = [
  "no_drop",
  "panic_entry",
  "serial_port_basic",
- "spin 0.9.4",
  "stack",
  "state_store",
  "vga_buffer",
@@ -2263,9 +2360,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "ota_update_client"
@@ -2422,6 +2519,18 @@ dependencies = [
  "log",
  "port_io",
 ]
+
+[[package]]
+name = "pin-project-lite"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
+
+[[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
 
 [[package]]
 name = "ping"
@@ -2805,11 +2914,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "rq_eval"
+name = "rq"
 version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
+ "getopts",
+ "runqueue",
+ "task",
+]
+
+[[package]]
+name = "rq_eval"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "cpu",
  "getopts",
  "hpet",
  "libtest",
@@ -3133,8 +3253,8 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 0.1.10",
+ "cpu",
  "fs_node",
  "log",
  "memory",
@@ -3241,9 +3361,9 @@ dependencies = [
 name = "spawn"
 version = "0.1.0"
 dependencies = [
- "apic",
  "catch_unwind",
  "context_switch",
+ "cpu",
  "debugit",
  "fault_crate_swap",
  "fault_log",
@@ -3440,8 +3560,8 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic",
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3474,6 +3594,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_async"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "dreadnought",
+]
+
+[[package]]
 name = "test_backtrace"
 version = "0.1.0"
 dependencies = [
@@ -3500,9 +3628,9 @@ dependencies = [
 name = "test_channel"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
  "async_channel",
+ "cpu",
  "getopts",
  "log",
  "rendezvous",
@@ -3516,10 +3644,10 @@ dependencies = [
 name = "test_downtime"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
  "async_channel",
  "color",
+ "cpu",
  "framebuffer",
  "framebuffer_drawer",
  "getopts",
@@ -3581,7 +3709,7 @@ dependencies = [
 name = "test_mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "log",
  "mutex_sleep",
  "scheduler",
@@ -3656,8 +3784,8 @@ dependencies = [
 name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
+ "cpu",
  "log",
  "scheduler",
  "spawn",
@@ -3714,7 +3842,6 @@ dependencies = [
  "cat",
  "cd",
  "channel_eval",
- "cpu",
  "date",
  "deps",
  "example",
@@ -3736,10 +3863,12 @@ dependencies = [
  "pwd",
  "raw_mode",
  "rm",
+ "rq",
  "rq_eval",
  "scheduler_eval",
  "shell",
  "swap",
+ "test_async",
  "test_backtrace",
  "test_block_io",
  "test_channel",
@@ -3850,8 +3979,8 @@ dependencies = [
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",

@@ -19,10 +19,10 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate app_io;
 extern crate task;
-extern crate apic;
+extern crate cpu;
 extern crate spawn;
 extern crate runqueue;
 extern crate getopts;
@@ -163,7 +163,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _i in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
+        runqueue::add_task_to_specific_runqueue(cpu::current_cpu(), taskref.clone())?;
 
         #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {

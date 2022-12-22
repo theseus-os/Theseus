@@ -10,7 +10,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::{cmp, convert::TryFrom as _};
-use core2::io::{Read, Write};
 use fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 use hashbrown::HashMap;
 use memfs::MemFile;

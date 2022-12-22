@@ -1,0 +1,11 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
+name = "memory_aarch64"
+description = "The memory subsystem interfaces on aarch64."
+version = "0.1.0"
+
+[dependencies]
+cortex-a = "7.5.0"
+tock-registers = "0.7.0"
+
+memory_structs = { path = "../../../kernel/memory_structs" }

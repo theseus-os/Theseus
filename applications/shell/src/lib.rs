@@ -162,6 +162,7 @@ struct Shell {
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<Event>,
     /// The producer to the terminal's print dfqueue
+    #[allow(dead_code)]
     print_producer: DFQueueProducer<Event>,
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
@@ -614,7 +615,7 @@ impl Shell {
                 Some(c) => {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
-                    if let Some(fg_job_num) = self.fg_job_num {
+                    if let Some(_fg_job_num) = self.fg_job_num {
                         self.insert_char_to_input_buff(c, true)?;
                         return Ok(());
                     }
