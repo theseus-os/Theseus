@@ -54,6 +54,7 @@ use core::{
     ops::Deref,
     panic::PanicInfo,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    task::Waker,
 };
 use alloc::{
     boxed::Box,
@@ -314,6 +315,8 @@ pub struct TaskInner {
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
+    /// The waker that is awoken when this task completes.
+    waker: Option<Waker>,
 }
 
 
@@ -441,7 +444,7 @@ impl Task {
     pub fn new(
         kstack: Option<Stack>,
         parent_task: Option<&TaskRef>,
-        failure_cleanup_function: FailureCleanupFunction
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Result<Task, &'static str> {
         let clone_inherited_items = |taskref: &TaskRef| {
             (
@@ -496,6 +499,7 @@ impl Task {
                 kill_handler: None,
                 env,
                 restart_info: None,
+                waker: None,
             }),
             id: task_id,
             name: format!("task_{}", task_id),
@@ -759,6 +763,11 @@ impl Task {
         } else {
             Err(self.runstate.load())
         }
+    }
+
+    /// Sets the waker to be awoken when this task exits.
+    pub fn set_waker(&self, waker: Waker) {
+        self.inner.lock().waker = Some(waker);
     }
 
     /// Sets this `Task` as this CPU's current task.
@@ -1310,6 +1319,9 @@ impl TaskRef {
                 //
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
+            }
+            if let Some(waker) = inner.waker.take() {
+                waker.wake();
             }
         }
 
