@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["Error","An error returned from polling a [`JoinableAsyncTaskRef`]."]],"fn":[["spawn_async","Spawns a new asynchronous task, returning a [`JoinableAsyncTaskRef`] for it."]],"struct":[["JoinableAsyncTaskRef","An owned permission to join an async task."]],"type":[["Result",""]]};

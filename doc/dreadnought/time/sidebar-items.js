@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["sleep","Waits until the specified number of ticks has elapsed."]],"struct":[["Sleep","Future returned by [`sleep`]."]]};

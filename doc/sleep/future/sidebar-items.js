@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["sleep","Wakes up the waker after the specified duration."],["sleep_until","Wakes up the waker at the specified time."]]};

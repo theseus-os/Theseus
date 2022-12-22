@@ -1551,6 +1551,18 @@
 <span id="1551">1551</span>
 <span id="1552">1552</span>
 <span id="1553">1553</span>
+<span id="1554">1554</span>
+<span id="1555">1555</span>
+<span id="1556">1556</span>
+<span id="1557">1557</span>
+<span id="1558">1558</span>
+<span id="1559">1559</span>
+<span id="1560">1560</span>
+<span id="1561">1561</span>
+<span id="1562">1562</span>
+<span id="1563">1563</span>
+<span id="1564">1564</span>
+<span id="1565">1565</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -1607,6 +1619,7 @@
     ops::Deref,
     panic::PanicInfo,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    task::Waker,
 };
 <span class="kw">use </span>alloc::{
     boxed::Box,
@@ -1867,6 +1880,8 @@
     <span class="doccomment">/// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     </span><span class="kw">pub </span>restart_info: <span class="prelude-ty">Option</span>&lt;RestartInfo&gt;,
+    <span class="doccomment">/// The waker that is awoken when this task completes.
+    </span>waker: <span class="prelude-ty">Option</span>&lt;Waker&gt;,
 }
 
 
@@ -1994,7 +2009,7 @@
     </span><span class="kw">pub fn </span>new(
         kstack: <span class="prelude-ty">Option</span>&lt;Stack&gt;,
         parent_task: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>TaskRef&gt;,
-        failure_cleanup_function: FailureCleanupFunction
+        failure_cleanup_function: FailureCleanupFunction,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Task, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>clone_inherited_items = |taskref: <span class="kw-2">&amp;</span>TaskRef| {
             (
@@ -2049,6 +2064,7 @@
                 kill_handler: <span class="prelude-val">None</span>,
                 env,
                 restart_info: <span class="prelude-val">None</span>,
+                waker: <span class="prelude-val">None</span>,
             }),
             id: task_id,
             name: <span class="macro">format!</span>(<span class="string">&quot;task_{}&quot;</span>, task_id),
@@ -2312,6 +2328,11 @@
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(<span class="self">self</span>.runstate.load())
         }
+    }
+
+    <span class="doccomment">/// Sets the waker to be awoken when this task exits.
+    </span><span class="kw">pub fn </span>set_waker(<span class="kw-2">&amp;</span><span class="self">self</span>, waker: Waker) {
+        <span class="self">self</span>.inner.lock().waker = <span class="prelude-val">Some</span>(waker);
     }
 
     <span class="doccomment">/// Sets this `Task` as this CPU&#39;s current task.
@@ -2864,6 +2885,9 @@
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             </span>}
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(waker) = inner.waker.take() {
+                waker.wake();
+            }
         }
 
         <span class="attr">#[cfg(runqueue_spillful)] </span>{   
