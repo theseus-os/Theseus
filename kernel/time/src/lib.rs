@@ -38,14 +38,7 @@ impl Instant {
     /// Returns the amount of time elapsed from another instant to this one, or
     /// zero duration if that instant is later than this one.
     pub fn duration_since(&self, earlier: Self) -> Duration {
-        let instant = Instant {
-            counter: match self.counter.checked_sub(earlier.counter) {
-                Some(value) => value,
-                None => return Duration::ZERO,
-            },
-        };
-        let femtos = u128::from(instant.counter) * u128::from(MONOTONIC_PERIOD.load());
-        Duration::from_nanos((femtos / FEMTOS_TO_NANOS) as u64)
+        self.checked_duration_since(earlier).unwrap_or_default()
     }
 
     pub fn checked_duration_since(&self, earlier: Self) -> Option<Duration> {
