@@ -9,7 +9,7 @@ use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-use ps2::{mouse_id, set_mouse_id, read_mouse_packet, MouseId, MousePacket, status_register};
+use ps2::{PS2Mouse, MouseId, MousePacket};
 
 /// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -23,16 +23,16 @@ static MOUSE_ID: Once<MouseId> = Once::new();
 /// ## Arguments
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
-pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
+pub fn init(mouse: PS2Mouse, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
     //the current code beneath just tries to set id = 4, so is not final
     // Set Mouse ID to 4.
-    if let Err(e) = set_mouse_id(MouseId::Four) {
+    if let Err(e) = mouse.set_mouse_id(MouseId::Four) {
         error!("Failed to set the mouse id to four: {e}");
         return Err("Failed to set the mouse id to four");
     }
     // Read it back to check that it worked.
-    match mouse_id() {
+    match mouse.mouse_id() {
         Ok(id) =>  {
             debug!("The PS/2 mouse ID is: {id:?}");
             if !matches!(id, MouseId::Four) {
@@ -68,11 +68,11 @@ pub fn init(mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
 /// In some cases (e.g. on device init), [the PS/2 controller can also send an interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts).
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
     if let Some(id) = MOUSE_ID.get() {
-        if status_register().mouse_output_buffer_full() {
+        if mouse.controller.status_register().mouse_output_buffer_full() {
             // NOTE: having read some more forum comments now, if this ever breaks on real hardware,
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
             // currently get in read_mouse_packet and merge them afterwards
-            let mouse_packet = read_mouse_packet(id);
+            let mouse_packet = mouse.read_mouse_packet(id);
             // warn!("read_mouse_packet: {mouse_packet:?}");
             
             if mouse_packet.always_one() != 1 {

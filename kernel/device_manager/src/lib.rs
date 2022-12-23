@@ -97,9 +97,9 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    ps2_controller::init()?;
-    keyboard::init(key_producer)?;
-    mouse::init(mouse_producer)?;
+    let controller = ps2_controller::init()?;
+    keyboard::init(controller.keyboard_handle(), key_producer)?;
+    mouse::init(controller.mouse_handle(), mouse_producer)?;
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
