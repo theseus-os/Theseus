@@ -1166,15 +1166,16 @@ impl Drop for JoinableTaskRef {
 /// (before it proceeds to running its actual entry function).
 ///
 /// ## Not `Clone`-able
-/// Due to the above drop-based behavior, this type does not implement `Clone`
-/// because it assumes there is only ever one `ExitableTaskRef` per task.
+/// This type does not implement `Clone` because it assumes there is
+/// only ever one `ExitableTaskRef` per task.
 ///
 /// However, this type auto-derefs into an inner [`TaskRef`],
 /// which *can* be cloned, so you can easily call `.clone()` on it.
 pub struct ExitableTaskRef {
     task: TaskRef,
 }
-// Ensure that another thread cannot mark the task as exited.
+// Ensure that `ExitableTaskRef` cannot be moved to (Send) or shared with (Sync)
+// another task, as a task is the only one who should be able to mark itself as exited.
 impl !Send for ExitableTaskRef { }
 impl !Sync for ExitableTaskRef { }
 impl fmt::Debug for ExitableTaskRef {
