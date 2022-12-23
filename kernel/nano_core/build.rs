@@ -109,7 +109,11 @@ fn compile_asm() {
 
     let asm_path = include_path.join(BOOT_SPECIFICATION);
 
-    let cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
+    let mut cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
+    if BOOT_SPECIFICATION == "bios" {
+        cflags.push_str(" -DBIOS");
+    }
+
 
     for file in include_path
         .read_dir()
@@ -131,14 +135,17 @@ fn compile_asm() {
             let mut output_path = out_dir.join(file.path().file_name().unwrap());
             assert!(output_path.set_extension("o"));
 
-            assert!(Command::new("nasm")
+            let mut command = Command::new("nasm");
+            command
                 .args(["-f", "elf64"])
                 .arg("-i")
                 .arg(&include_path)
                 .arg("-o")
                 .arg(&output_path)
                 .arg(file.path())
-                .args(cflags.split(' '))
+                .args(cflags.split(' '));
+
+            assert!(command
                 .status()
                 .expect("failed to acquire nasm output status")
                 .success());
