@@ -1174,8 +1174,9 @@ impl Drop for JoinableTaskRef {
 pub struct ExitableTaskRef {
     task: TaskRef,
 }
-// Ensure this cannot be moved (sent) to a different task.
+// Ensure that another thread cannot mark the task as exited.
 impl !Send for ExitableTaskRef { }
+impl !Sync for ExitableTaskRef { }
 impl fmt::Debug for ExitableTaskRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("ExitableTaskRef")
