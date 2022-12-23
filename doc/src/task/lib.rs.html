@@ -1585,6 +1585,16 @@
 <span id="1585">1585</span>
 <span id="1586">1586</span>
 <span id="1587">1587</span>
+<span id="1588">1588</span>
+<span id="1589">1589</span>
+<span id="1590">1590</span>
+<span id="1591">1591</span>
+<span id="1592">1592</span>
+<span id="1593">1593</span>
+<span id="1594">1594</span>
+<span id="1595">1595</span>
+<span id="1596">1596</span>
+<span id="1597">1597</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -2169,12 +2179,20 @@
         <span class="self">self</span>.runstate.load()
     }
 
-    <span class="doccomment">/// Returns `true` if this `Task` is Runnable, i.e., able to be scheduled in.
+    <span class="doccomment">/// Returns whether this `Task` is runnable, i.e., able to be scheduled in.
+    ///
+    /// For this to return `true`, this `Task`&#39;s runstate must be [`Runnable`]
+    /// and it must not be [suspended].
     ///
     /// # Note
-    /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
+    /// This does *NOT* mean that this `Task` is actually currently [running],
+    /// just that it is *able* to be run.
+    ///
+    /// [`Runnable`]: RunState::Runnable
+    /// [suspended]: Task::is_suspended
+    /// [running]: Task::is_running
     </span><span class="kw">pub fn </span>is_runnable(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.runstate() == RunState::Runnable
+        <span class="self">self</span>.runstate() == RunState::Runnable &amp;&amp; !<span class="self">self</span>.is_suspended()
     }
 
     <span class="doccomment">/// Returns the namespace in which this `Task` is loaded/linked into and runs within.
@@ -2369,7 +2387,9 @@
         <span class="self">self</span>.suspended.store(<span class="bool-val">false</span>, Ordering::Release);
     }
 
-    <span class="doccomment">/// Returns whether this `Task` is suspended.
+    <span class="doccomment">/// Returns `true` if this `Task` is suspended.
+    ///
+    /// Note that a task being suspended is independent from its [`RunState`].
     </span><span class="kw">pub fn </span>is_suspended(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.suspended.load(Ordering::Acquire)
     }
