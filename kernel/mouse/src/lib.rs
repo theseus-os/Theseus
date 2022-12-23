@@ -15,15 +15,15 @@ use ps2::{PS2Mouse, MouseId, MousePacket};
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
 const PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xC;
 
+static MOUSE: Once<PS2Mouse> = Once::new();
 static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
-static MOUSE_ID: Once<MouseId> = Once::new();
 
 /// Initialize the PS/2 mouse driver and register its interrupt handler.
 /// 
 /// ## Arguments
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
-pub fn init(mouse: PS2Mouse, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
+pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
     //the current code beneath just tries to set id = 4, so is not final
     // Set Mouse ID to 4.
@@ -45,7 +45,6 @@ pub fn init(mouse: PS2Mouse, mouse_queue_producer: Queue<Event>) -> Result<(), &
             return Err("Failed to read the PS/2 mouse ID");
         }
     }
-    MOUSE_ID.call_once(|| MouseId::Four);
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_MOUSE_IRQ, ps2_mouse_handler).map_err(|e| {
@@ -53,6 +52,7 @@ pub fn init(mouse: PS2Mouse, mouse_queue_producer: Queue<Event>) -> Result<(), &
         "PS/2 mouse IRQ was already in use! Sharing IRQs is currently unsupported."
     })?;
 
+    MOUSE.call_once(|| mouse);
     // Final step: set the producer end of the mouse event queue.
     MOUSE_PRODUCER.call_once(|| mouse_queue_producer);
     Ok(())
@@ -67,12 +67,12 @@ pub fn init(mouse: PS2Mouse, mouse_queue_producer: Queue<Event>) -> Result<(), &
 /// 
 /// In some cases (e.g. on device init), [the PS/2 controller can also send an interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts).
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-    if let Some(id) = MOUSE_ID.get() {
-        if mouse.controller.status_register().mouse_output_buffer_full() {
+    if let Some(mouse) = MOUSE.get() {
+        if mouse.is_output_buffer_full() {
             // NOTE: having read some more forum comments now, if this ever breaks on real hardware,
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
             // currently get in read_mouse_packet and merge them afterwards
-            let mouse_packet = mouse.read_mouse_packet(id);
+            let mouse_packet = mouse.read_mouse_packet();
             // warn!("read_mouse_packet: {mouse_packet:?}");
             
             if mouse_packet.always_one() != 1 {
@@ -83,7 +83,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
             }
         }
     } else {
-        warn!("MOUSE_ID wasn't yet initialized, dropping the mouse packet.");
+        warn!("MOUSE wasn't yet initialized, dropping the mouse packet.");
     }
 
     interrupts::eoi(Some(PS2_MOUSE_IRQ));

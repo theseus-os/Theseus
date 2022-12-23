@@ -28,7 +28,7 @@ static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
 /// ## Arguments
 /// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler
 ///    will push new keyboard events when a key action occurs.
-pub fn init(keyboard: PS2Keyboard, keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
+pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     // Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
     match keyboard.keyboard_detect() {

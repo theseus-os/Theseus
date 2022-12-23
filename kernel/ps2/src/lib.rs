@@ -272,10 +272,13 @@ impl PS2Controller {
 
 pub struct PS2Mouse<'c> {
     controller: &'c PS2Controller,
+    id: MouseId
 }
 impl<'c> PS2Mouse<'c> {
+    /// Give a controller reference to the mouse.
+    /// The default mouse id of PS/2 is zero.
     pub fn new(controller: &'c PS2Controller) -> Self {
-        Self { controller }
+        Self { controller, id: MouseId::Zero }
     }
 
     /// reset the mouse
@@ -311,7 +314,7 @@ impl<'c> PS2Mouse<'c> {
     }
 
     /// set the [MouseId] by magic sequence
-    pub fn set_mouse_id(&self, id: MouseId) -> Result<(), &'static str> {
+    pub fn set_mouse_id(&mut self, id: MouseId) -> Result<(), &'static str> {
         self.disable_mouse_packet_streaming()?;
 
         use crate::SampleRate::*;
@@ -329,6 +332,7 @@ impl<'c> PS2Mouse<'c> {
                 }
             }
         }
+        self.id = id;
 
         self.enable_mouse_packet_streaming()?;
         Ok(())
@@ -375,9 +379,9 @@ impl<'c> PS2Mouse<'c> {
     }
 
     /// read the correct [MousePacket] according to [MouseId]
-    pub fn read_mouse_packet(&self, id: &MouseId) -> MousePacket {
+    pub fn read_mouse_packet(&self) -> MousePacket {
         let read_data = || self.controller.read_data();
-        match id {
+        match self.id {
             MouseId::Zero => MousePacket::Zero(
                 MousePacketGeneric::from_bytes([
                     read_data(), read_data(), read_data()
@@ -394,6 +398,11 @@ impl<'c> PS2Mouse<'c> {
                 ])
             ),
         }
+    }
+
+    /// read the PS2Controller's status register to find out if the mouse output buffer is full, i.e. can be read
+    pub fn is_output_buffer_full(&self) -> bool {
+        self.controller.status_register().mouse_output_buffer_full()
     }
 }
 pub struct PS2Keyboard<'c> {

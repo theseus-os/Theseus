@@ -1,12 +1,13 @@
 #![no_std]
 
 use log::{debug, warn};
-use ps2::{HostToControllerCommand::*, PS2Controller};
+use spin::Once;
 use fadt::Fadt;
+use ps2::{PS2Controller, HostToControllerCommand::*};
 
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 /// initialize the first and second (if it exists) PS/2 port
-pub fn init() -> Result<PS2Controller, &'static str> {
+pub fn init() -> Result<&'static PS2Controller, &'static str> {
     // Step 1: Initialise USB Controllers
     // no USB support yet
 
@@ -81,5 +82,7 @@ pub fn init() -> Result<PS2Controller, &'static str> {
     controller.mouse_handle().reset()?;
 
     debug!("Final PS/2 {:?}", controller.read_config());
-    Ok(controller)
+    
+    static CONTROLLER: Once<PS2Controller> = Once::new();
+    Ok(CONTROLLER.call_once(|| controller))
 }
