@@ -16,7 +16,7 @@
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
 
-use core::{marker::PhantomData, mem, ops::Deref};
+use core::{marker::PhantomData, mem, ops::Deref, sync::atomic::{fence, Ordering}};
 use alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -347,6 +347,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
     /// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
     ///
+    /// Synchronizes memory with respect to the spawned task.
+    ///
     /// This merely creates the new task and makes it `Runnable`.
     /// It does not switch to it immediately; that will happen on the next scheduler invocation.
     #[inline(never)]
@@ -405,6 +407,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
             error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
+
+        fence(Ordering::SeqCst);
         
         if let Some(core) = self.pin_on_core {
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
@@ -684,6 +688,7 @@ where
     drop(recovered_preemption_guard);
     enable_interrupts();
 
+    fence(Ordering::SeqCst);
     // Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
     catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
@@ -852,6 +857,9 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
         let _exit_value = current_task.retrieve_exit_value();
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
+
+    // Fourth, synchronise memory.
+    fence(Ordering::SeqCst)
 }
 
 
