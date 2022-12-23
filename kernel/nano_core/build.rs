@@ -167,7 +167,8 @@ fn compile_asm() {
                 .args(cflags.split(' '))
                 .status()
                 .expect("failed to acquire nasm output status")
-                .success());
+                .success()
+            );
         }
     }
 }
