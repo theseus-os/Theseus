@@ -3782,6 +3782,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_task_cancel"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spawn",
+ "spin 0.9.4",
+ "task",
+]
+
+[[package]]
 name = "test_thread_local"
 version = "0.1.0"
 dependencies = [
@@ -3894,6 +3904,7 @@ dependencies = [
  "test_restartable",
  "test_serial_echo",
  "test_std_fs",
+ "test_task_cancel",
  "test_thread_local",
  "test_wait_queue",
  "test_wasmtime",

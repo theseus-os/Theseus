@@ -63,6 +63,7 @@ test_realtime = { path = "../applications/test_realtime", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
+test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
 test_wait_queue = { path = "../applications/test_wait_queue", optional = true }
 test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
 tls_test = { path = "../applications/tls_test", optional = true }
@@ -147,6 +148,7 @@ theseus_tests = [
     "test_restartable",
     "test_serial_echo",
     "test_std_fs",
+    "test_task_cancel",
     "test_wait_queue",
     "test_wasmtime",
     "tls_test",
