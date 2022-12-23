@@ -587,7 +587,7 @@ impl Task {
     /// # Note
     /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
     pub fn is_runnable(&self) -> bool {
-        self.runstate() == RunState::Runnable
+        self.runstate() == RunState::Runnable && !self.is_suspended()
     }
 
     /// Returns the namespace in which this `Task` is loaded/linked into and runs within.
