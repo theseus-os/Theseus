@@ -559,7 +559,7 @@ pub struct MsixVectorTable {
 #[repr(C)]
 pub struct MsixVectorEntry {
     /// The lower portion of the address for the memory write transaction.
-    /// This part contains the apic id which the interrupt will be redirected to.
+    /// This part contains the CPU ID which the interrupt will be redirected to.
     pub msg_lower_addr:         Volatile<u32>,
     /// The upper portion of the address for the memory write transaction.
     pub msg_upper_addr:         Volatile<u32>,

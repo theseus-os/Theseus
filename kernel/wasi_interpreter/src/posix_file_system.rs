@@ -10,7 +10,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::{cmp, convert::TryFrom as _};
-use core2::io::{Read, Write};
 use fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 use hashbrown::HashMap;
 use memfs::MemFile;
@@ -44,11 +43,11 @@ impl PosixNodeOrStdio {
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, wasi::Errno> {
         match self {
             PosixNodeOrStdio::Stdin => Err(wasi::ERRNO_NOTSUP),
-            PosixNodeOrStdio::Stdout => match app_io::stdout().unwrap().lock().write_all(buffer) {
+            PosixNodeOrStdio::Stdout => match app_io::stdout().unwrap().write_all(buffer) {
                 Ok(_) => Ok(buffer.len()),
                 Err(_) => Err(wasi::ERRNO_IO),
             },
-            PosixNodeOrStdio::Stderr => match app_io::stderr().unwrap().lock().write_all(buffer) {
+            PosixNodeOrStdio::Stderr => match app_io::stderr().unwrap().write_all(buffer) {
                 Ok(_) => Ok(buffer.len()),
                 Err(_) => Err(wasi::ERRNO_IO),
             },
@@ -68,7 +67,7 @@ impl PosixNodeOrStdio {
     /// Otherwise, returns a wasi::Errno.
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, wasi::Errno> {
         match self {
-            PosixNodeOrStdio::Stdin => match app_io::stdin().unwrap().lock().read(buffer) {
+            PosixNodeOrStdio::Stdin => match app_io::stdin().unwrap().read(buffer) {
                 Ok(bytes_read) => Ok(bytes_read),
                 Err(_) => Err(wasi::ERRNO_IO),
             },

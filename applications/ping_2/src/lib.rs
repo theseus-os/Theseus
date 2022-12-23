@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::{string::String, vec, vec::Vec};
-use app_io::{print, println};
+use app_io::println;
 use core::str::FromStr;
 use getopts::{Matches, Options};
 use net::{

@@ -38,5 +38,8 @@ path = "dmar"
 [dependencies.iommu]
 path = "../iommu"
 
+[dependencies.time]
+path = "../time"
+
 [lib]
 crate-type = ["rlib"]

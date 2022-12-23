@@ -1,0 +1,11 @@
+[package]
+name = "seconds_counter"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A secounds counter"
+edition = "2021"
+
+[dependencies]
+app_io = { path = "../../kernel/app_io" }
+time = { path = "../../kernel/time" }
+

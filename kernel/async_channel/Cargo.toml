@@ -25,5 +25,10 @@ path = "../task"
 [dependencies.hpet]
 path = "../acpi/hpet"
 
+[dependencies.core2]
+version = "0.4.0"
+default-features = false
+features = ["alloc", "nightly"]
+
 [lib]
 crate-type = ["rlib"]
