@@ -23,7 +23,7 @@
 <span class="kw">use </span>memory::VirtualAddress;
 
 <span class="attr">#[no_mangle]
-</span><span class="kw">pub extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>nano_core_start(boot_info: usize, double_fault_stack: usize) {
+</span><span class="kw">pub extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_entry(boot_info: usize, double_fault_stack: usize) {
     <span class="macro">try_exit!</span>(early_setup(double_fault_stack));
     <span class="kw">if </span>VirtualAddress::new(boot_info).is_none() {
         shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;multiboot2 info address invalid&quot;</span>));
