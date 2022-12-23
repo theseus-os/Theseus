@@ -582,10 +582,18 @@ impl Task {
         self.runstate.load()
     }
 
-    /// Returns `true` if this `Task` is Runnable, i.e., able to be scheduled in.
+    /// Returns whether this `Task` is runnable, i.e., able to be scheduled in.
+    ///
+    /// For this to return `true`, this `Task`'s runstate must be [`Runnable`]
+    /// and it must not be [suspended].
     ///
     /// # Note
-    /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
+    /// This does *NOT* mean that this `Task` is actually currently [running],
+    /// just that it is *able* to be run.
+    ///
+    /// [`Runnable`]: RunState::Runnable
+    /// [suspended]: Task::is_suspended
+    /// [running]: Task::is_running
     pub fn is_runnable(&self) -> bool {
         self.runstate() == RunState::Runnable && !self.is_suspended()
     }
@@ -782,7 +790,9 @@ impl Task {
         self.suspended.store(false, Ordering::Release);
     }
 
-    /// Returns whether this `Task` is suspended.
+    /// Returns `true` if this `Task` is suspended.
+    ///
+    /// Note that a task being suspended is independent from its [`RunState`].
     pub fn is_suspended(&self) -> bool {
         self.suspended.load(Ordering::Acquire)
     }
