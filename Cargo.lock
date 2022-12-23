@@ -18,6 +18,7 @@ dependencies = [
  "rsdp",
  "rsdt",
  "spin 0.9.4",
+ "time",
 ]
 
 [[package]]
@@ -1408,6 +1409,7 @@ dependencies = [
  "sdt",
  "spin 0.9.4",
  "static_assertions",
+ "time",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -3132,6 +3134,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "seconds_counter"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "time",
+]
+
+[[package]]
 name = "semver"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3866,6 +3876,7 @@ dependencies = [
  "rq",
  "rq_eval",
  "scheduler_eval",
+ "seconds_counter",
  "shell",
  "swap",
  "test_async",

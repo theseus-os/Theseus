@@ -82,7 +82,9 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
     {
         let acpi_tables = ACPI_TABLES.lock();
         if let Some(hpet_table) = hpet::HpetAcpiTable::get(&acpi_tables) {
-            hpet_table.init_hpet(page_table)?;
+            let hpet = hpet_table.init_hpet(page_table)?;
+            let period = time::Period::new(hpet.read().counter_period_femtoseconds().into());
+            time::register_clock_source::<hpet::Hpet>(period);
         } else {
             warn!("This machine has no HPET.");
         }
