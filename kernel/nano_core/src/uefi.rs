@@ -20,8 +20,8 @@ pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
 #[link_section = ".init.text"]
 pub unsafe extern "C" fn _start(boot_info: &'static mut bootloader_api::BootInfo) {
     asm!(
-        // First argument: a reference to the boot info (passed through).
-        // Second argument: the top of the double fault handler stack.
+        // First argument  (rdi): a reference to the boot info (passed through).
+        // Second argument (rsi): the top of the double fault handler stack.
         "mov rsi, rsp",
         // Set the kernel stack pointer to the page before the double fault stack.
         //
