@@ -19,7 +19,7 @@ extern set_up_SSE
 
 %ifdef ENABLE_AVX
 extern set_up_AVX
-%endif
+%endif ; ENABLE_AVX
 
 _start:
 	; The bootloader has loaded us into 32-bit protected mode. 
@@ -46,7 +46,7 @@ _start:
 	call set_up_SSE
 %ifdef ENABLE_AVX
 	call set_up_AVX
-%endif
+%endif ; ENABLE_AVX
 
 	call set_up_page_tables
 	call unmap_guard_page

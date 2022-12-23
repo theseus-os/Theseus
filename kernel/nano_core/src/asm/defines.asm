@@ -27,7 +27,7 @@ KERNEL_OFFSET equ 0xFFFFFFFF80000000
 	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
 %else
 	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
-%endif
-%endif
+%endif ; DEBUG
+%endif ; INITIAL_STACK_SIZE
 
-%endif
+%endif ; __DEFINES_ASM

@@ -360,7 +360,7 @@ prot_mode:
     mov dword [0xb800c], 0x4f454f54 ; "TE"
     mov dword [0xb8010], 0x4f544f43 ; "CT"
     mov dword [0xb8014], 0x4f444f45 ; "ED"
-%endif
+%endif ; BIOS
     
  
     jmp 0x08:ap_start_protected_mode

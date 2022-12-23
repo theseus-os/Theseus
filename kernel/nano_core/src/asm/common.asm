@@ -64,7 +64,7 @@ set_up_AVX:
 .no_AVX:
 	mov al, "b"
 	jmp _error
-%endif
+%endif ; ENABLE_AVX
 
 section .text
 bits 64
