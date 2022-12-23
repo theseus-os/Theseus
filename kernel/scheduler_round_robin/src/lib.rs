@@ -37,7 +37,7 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
         }
 
         // must be runnable
-        if !t.is_runnable() {
+        if !t.is_runnable() || t.is_suspended() {
             continue;
         }
             

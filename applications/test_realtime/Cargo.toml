@@ -16,5 +16,5 @@ path = "../../kernel/spawn"
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"

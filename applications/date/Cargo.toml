@@ -6,8 +6,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 [dependencies]
 
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.rtc]
 path = "../../kernel/rtc"

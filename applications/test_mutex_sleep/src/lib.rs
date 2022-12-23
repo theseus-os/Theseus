@@ -6,7 +6,7 @@ extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate mutex_sleep;
-extern crate apic;
+extern crate cpu;
 
 use core::ops::Deref;
 
@@ -35,7 +35,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// A simple test that spawns 3 tasks that all contend to increment a shared usize
 fn test_contention() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
@@ -93,7 +93,7 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
 
 /// A test for running multiple tasks that are synchronized in lockstep
 fn test_lockstep() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
