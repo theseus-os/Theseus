@@ -1392,7 +1392,8 @@ impl TaskRef {
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             }
-            if let Some(waker) = inner.waker.take() {
+            
+            if let Some(waker) = self.inner.lock().waker.take() {
                 waker.wake();
             }
         }

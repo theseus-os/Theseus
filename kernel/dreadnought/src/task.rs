@@ -67,8 +67,8 @@ where
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
         self.task.set_waker(context.waker().clone());
         if self.is_finished() {
-            Poll::Ready(match self.task.retrieve_exit_value() {
-                Some(exit_value) => match exit_value {
+            Poll::Ready(match self.task.join() {
+                Ok(exit_value) => match exit_value {
                     ExitValue::Completed(value) => Ok(*value.downcast().unwrap()),
                     ExitValue::Killed(reason) => match reason {
                         KillReason::Requested => Err(Error::Cancelled),
@@ -76,7 +76,7 @@ where
                         KillReason::Exception(num) => Err(Error::Exception(num)),
                     },
                 },
-                None => Err(Error::Reaped),
+                Err(s) => Err(Error::JoinError(s)),
             })
         } else {
             Poll::Pending
@@ -91,6 +91,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 pub enum Error {
     Cancelled,
     Panic(PanicInfoOwned),
-    Reaped,
+    /// A `JoinError` should not occur; this indicates a BUG in Theseus's task mgmt.
+    JoinError(&'static str),
     Exception(u8),
 }
