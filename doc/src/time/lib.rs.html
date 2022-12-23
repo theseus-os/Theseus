@@ -295,62 +295,26 @@
 <span id="295">295</span>
 <span id="296">296</span>
 <span id="297">297</span>
-<span id="298">298</span>
-<span id="299">299</span>
-<span id="300">300</span>
-<span id="301">301</span>
-<span id="302">302</span>
-<span id="303">303</span>
-<span id="304">304</span>
-<span id="305">305</span>
-<span id="306">306</span>
-<span id="307">307</span>
-<span id="308">308</span>
-<span id="309">309</span>
-<span id="310">310</span>
-<span id="311">311</span>
-<span id="312">312</span>
-<span id="313">313</span>
-<span id="314">314</span>
-<span id="315">315</span>
-<span id="316">316</span>
-<span id="317">317</span>
-<span id="318">318</span>
-<span id="319">319</span>
-<span id="320">320</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains abstractions to interact with hardware clocks.
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">mod </span>dummy;
+</span><span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
+
+<span class="kw">mod </span>dummy;
 
 <span class="kw">pub use </span>core::time::Duration;
 
-<span class="kw">use </span>core::sync::atomic::{AtomicU64, Ordering};
-<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
+<span class="kw">const </span>FEMTOS_TO_NANOS: u128 = <span class="number">1_000_000</span>;
 
 <span class="kw">static </span>EARLY_SLEEP_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>(Duration)&gt; = AtomicCell::new(dummy::early_sleep);
-<span class="kw">static </span>EARLY_SLEEPER_FREQUENCY: AtomicU64 = AtomicU64::new(<span class="number">0</span>);
+<span class="kw">static </span>EARLY_SLEEPER_PERIOD: AtomicCell&lt;Period&gt; = AtomicCell::new(Period::MAX);
 
 <span class="kw">static </span>MONOTONIC_NOW_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>() -&gt; Instant&gt; = AtomicCell::new(dummy::monotonic_now);
-<span class="kw">static </span>INSTANT_TO_DURATION_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>(Instant) -&gt; Duration&gt; =
-    AtomicCell::new(dummy::instant_to_duration);
-<span class="kw">static </span>DURATION_TO_INSTANT_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>(Duration) -&gt; Instant&gt; =
-    AtomicCell::new(dummy::duration_to_instant);
-<span class="kw">static </span>MONOTONIC_FREQUENCY: AtomicU64 = AtomicU64::new(<span class="number">0</span>);
+<span class="kw">static </span>MONOTONIC_PERIOD: AtomicCell&lt;Period&gt; = AtomicCell::new(Period::MAX);
 
 <span class="kw">static </span>WALL_TIME_NOW_FUNCTION: AtomicCell&lt;<span class="kw">fn</span>() -&gt; Duration&gt; = AtomicCell::new(dummy::wall_time_now);
-<span class="kw">static </span>WALL_TIME_FREQUENCY: AtomicU64 = AtomicU64::new(<span class="number">0</span>);
-
-<span class="kw">fn </span>duration_to_instant(duration: Duration) -&gt; Instant {
-    <span class="kw">let </span>f = DURATION_TO_INSTANT_FUNCTION.load();
-    f(duration)
-}
-
-<span class="kw">fn </span>instant_to_duration(instant: Instant) -&gt; Duration {
-    <span class="kw">let </span>f = INSTANT_TO_DURATION_FUNCTION.load();
-    f(instant)
-}
+<span class="kw">static </span>WALL_TIME_PERIOD: AtomicCell&lt;Period&gt; = AtomicCell::new(Period::MAX);
 
 <span class="doccomment">/// A measurement of a monotonically nondecreasing clock.
 ///
@@ -364,23 +328,22 @@
 <span class="kw">impl </span>Instant {
     <span class="kw">const </span>ZERO: <span class="self">Self </span>= <span class="self">Self </span>{ counter: <span class="number">0 </span>};
 
-    <span class="doccomment">/// Returns the amout of time elapsed from another instant to this one, or
-    /// zero duration if that instant is later than this one.
-    </span><span class="kw">pub fn </span>duration_since(<span class="kw-2">&amp;</span><span class="self">self</span>, earlier: <span class="self">Self</span>) -&gt; Duration {
-        <span class="kw">let </span>instant = Instant {
-            counter: <span class="kw">match </span><span class="self">self</span>.counter.checked_sub(earlier.counter) {
-                <span class="prelude-val">Some</span>(value) =&gt; value,
-                <span class="prelude-val">None </span>=&gt; <span class="kw">return </span>Duration::ZERO,
-            },
-        };
-        instant_to_duration(instant)
+    <span class="kw">pub fn </span>new(counter: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ counter }
     }
 
-    <span class="kw">pub fn </span>checked_duraction_since(<span class="kw-2">&amp;</span><span class="self">self</span>, earlier: <span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Duration&gt; {
+    <span class="doccomment">/// Returns the amount of time elapsed from another instant to this one, or
+    /// zero duration if that instant is later than this one.
+    </span><span class="kw">pub fn </span>duration_since(<span class="kw-2">&amp;</span><span class="self">self</span>, earlier: <span class="self">Self</span>) -&gt; Duration {
+        <span class="self">self</span>.checked_duration_since(earlier).unwrap_or_default()
+    }
+
+    <span class="kw">pub fn </span>checked_duration_since(<span class="kw-2">&amp;</span><span class="self">self</span>, earlier: <span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Duration&gt; {
         <span class="kw">let </span>instant = Instant {
             counter: <span class="self">self</span>.counter.checked_sub(earlier.counter)<span class="question-mark">?</span>,
         };
-        <span class="prelude-val">Some</span>(instant_to_duration(instant))
+        <span class="kw">let </span>femtos = u128::from(instant.counter) * u128::from(MONOTONIC_PERIOD.load());
+        <span class="prelude-val">Some</span>(Duration::from_nanos((femtos / FEMTOS_TO_NANOS) <span class="kw">as </span>u64))
     }
 }
 
@@ -388,11 +351,12 @@
     <span class="kw">type </span>Output = <span class="self">Self</span>;
 
     <span class="kw">fn </span>add(<span class="self">self</span>, rhs: Duration) -&gt; <span class="self">Self</span>::Output {
-        <span class="kw">let </span>instant = duration_to_instant(rhs);
+        <span class="kw">let </span>femtos = rhs.as_nanos() * FEMTOS_TO_NANOS;
+        <span class="kw">let </span>ticks = (femtos / u128::from(MONOTONIC_PERIOD.load())) <span class="kw">as </span>u64;
         <span class="self">Self </span>{
             counter: <span class="self">self
                 </span>.counter
-                .checked_add(instant.counter)
+                .checked_add(ticks)
                 .expect(<span class="string">&quot;overflow when adding duration to instant&quot;</span>),
         }
     }
@@ -402,11 +366,12 @@
     <span class="kw">type </span>Output = <span class="self">Self</span>;
 
     <span class="kw">fn </span>sub(<span class="self">self</span>, rhs: Duration) -&gt; <span class="self">Self</span>::Output {
-        <span class="kw">let </span>instant = duration_to_instant(rhs);
+        <span class="kw">let </span>femtos = rhs.as_nanos() * FEMTOS_TO_NANOS;
+        <span class="kw">let </span>ticks = (femtos / u128::from(MONOTONIC_PERIOD.load())) <span class="kw">as </span>u64;
         <span class="self">Self </span>{
             counter: <span class="self">self
                 </span>.counter
-                .checked_sub(instant.counter)
+                .checked_sub(ticks)
                 .expect(<span class="string">&quot;overflow when subtracting duration from instant&quot;</span>),
         }
     }
@@ -420,46 +385,62 @@
     }
 }
 
-<span class="doccomment">/// A clock frequency.
+<span class="doccomment">/// A clock period, measured in femtoseconds.
 </span><span class="attr">#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-</span><span class="kw">pub struct </span>Frequency(u64);
+</span><span class="kw">pub struct </span>Period(u64);
 
-<span class="kw">impl </span>Frequency {
-    <span class="doccomment">/// Creates a new frequency with the specified hertz.
-    </span><span class="kw">pub fn </span>new(frequency: u64) -&gt; <span class="self">Self </span>{
-        <span class="self">Self</span>(frequency)
+<span class="kw">impl </span>Period {
+    <span class="kw">const </span>MAX: <span class="self">Self </span>= <span class="self">Self</span>(u64::MAX);
+
+    <span class="doccomment">/// Creates a new period with the specified femtoseconds.
+    </span><span class="kw">pub fn </span>new(period: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(period)
     }
 }
 
-<span class="kw">impl </span>From&lt;Frequency&gt; <span class="kw">for </span>u64 {
-    <span class="doccomment">/// Returns the frequency in hertz.
-    </span><span class="kw">fn </span>from(f: Frequency) -&gt; <span class="self">Self </span>{
+<span class="kw">impl </span>From&lt;Period&gt; <span class="kw">for </span>u64 {
+    <span class="doccomment">/// Returns the period in femtoseconds.
+    </span><span class="kw">fn </span>from(f: Period) -&gt; <span class="self">Self </span>{
         f.<span class="number">0
     </span>}
 }
 
-<span class="kw">impl </span>From&lt;u64&gt; <span class="kw">for </span>Frequency {
-    <span class="doccomment">/// Creates a new frequency with the specified hertz.
-    </span><span class="kw">fn </span>from(f: u64) -&gt; <span class="self">Self </span>{
-        <span class="self">Self</span>(f)
+<span class="kw">impl </span>From&lt;Period&gt; <span class="kw">for </span>u128 {
+    <span class="doccomment">/// Returns the period in femtoseconds.
+    </span><span class="kw">fn </span>from(f: Period) -&gt; <span class="self">Self </span>{
+        f.<span class="number">0</span>.into()
+    }
+}
+
+<span class="kw">impl </span>From&lt;u64&gt; <span class="kw">for </span>Period {
+    <span class="doccomment">/// Creates a new period with the specified femtoseconds.
+    </span><span class="kw">fn </span>from(period: u64) -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>(period)
     }
 }
 
 <span class="doccomment">/// Register the clock source that can be used to sleep when interrupts are
 /// disabled.
 ///
-/// The current early sleeper will only be overwritten by `T` if `frequency` is
-/// larger than the frequency of the current early sleeper.
+/// The provided early sleeper will overwrite the current early sleeper only if
+/// `period` is smaller than that of the current early sleeper.
 ///
 /// Returns whether the early sleeper was overwritten.
-</span><span class="kw">pub fn </span>register_early_sleeper&lt;T&gt;(frequency: Frequency) -&gt; bool
+</span><span class="kw">pub fn </span>register_early_sleeper&lt;T&gt;(period: Period) -&gt; bool
 <span class="kw">where
     </span>T: EarlySleeper,
 {
-    <span class="kw">let </span>old_frequency = EARLY_SLEEPER_FREQUENCY.load(Ordering::SeqCst);
-    <span class="kw">if </span>frequency &gt; Frequency::new(old_frequency) {
+    <span class="kw">if </span>EARLY_SLEEPER_PERIOD
+        .fetch_update(|old_period| {
+            <span class="kw">if </span>period &lt; old_period {
+                <span class="prelude-val">Some</span>(period)
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
+        })
+        .is_ok()
+    {
         EARLY_SLEEP_FUNCTION.store(T::sleep);
-        EARLY_SLEEPER_FREQUENCY.store(frequency.into(), Ordering::SeqCst);
         <span class="bool-val">true
     </span>} <span class="kw">else </span>{
         <span class="bool-val">false
@@ -481,23 +462,27 @@
 
 <span class="doccomment">/// Register a clock source.
 ///
-/// The provided source will overwrite the previous source only if `frequency`
-/// is larger than that of the previous source.
+/// The provided clock source will overwrite the current clock source only if
+/// `period` is smaller than that of the current clock source.
 ///
-/// Returns whether the previous source was overwritten.
-</span><span class="kw">pub fn </span>register_clock_source&lt;T&gt;(frequency: Frequency) -&gt; bool
+/// Returns whether the clock source was overwritten.
+</span><span class="kw">pub fn </span>register_clock_source&lt;T&gt;(period: Period) -&gt; bool
 <span class="kw">where
     </span>T: ClockSource,
 {
-    <span class="kw">let </span>old_frequency = Frequency::new(T::ClockType::frequency_atomic().load(Ordering::SeqCst));
-    <span class="kw">if </span>frequency &gt; old_frequency {
+    <span class="kw">let </span>period_atomic = T::ClockType::period_atomic();
+    <span class="kw">if </span>period_atomic
+        .fetch_update(|old_period| {
+            <span class="kw">if </span>period &lt; old_period {
+                <span class="prelude-val">Some</span>(period)
+            } <span class="kw">else </span>{
+                <span class="prelude-val">None
+            </span>}
+        })
+        .is_ok()
+    {
         <span class="kw">let </span>now_fn = T::ClockType::now_fn();
         now_fn.store(T::now);
-
-        T::ClockType::store_unit_to_duration_func(T::unit_to_duration);
-        T::ClockType::store_duration_to_unit_func(T::duration_to_unit);
-
-        T::ClockType::frequency_atomic().store(frequency.into(), Ordering::SeqCst);
 
         <span class="bool-val">true
     </span>} <span class="kw">else </span>{
@@ -532,16 +517,6 @@
     /// [`Duration`] signifying the time since 12:00am January 1st 1970 (i.e.
     /// Unix time).
     </span><span class="kw">fn </span>now() -&gt; &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit;
-
-    <span class="doccomment">/// Converts a [`ClockType::Unit`] into a [`Duration`].
-    ///
-    /// Wall time clocks should just return the [`ClockType::Unit`].
-    </span><span class="kw">fn </span>unit_to_duration(unit: &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit) -&gt; Duration;
-
-    <span class="doccomment">/// Converts a [`Duration`] into a [`ClockType::Unit`].
-    ///
-    /// Wall time clocks should just return the [`Duration`].
-    </span><span class="kw">fn </span>duration_to_unit(duration: Duration) -&gt; &lt;<span class="self">Self</span>::ClockType <span class="kw">as </span>ClockType&gt;::Unit;
 }
 
 <span class="doccomment">/// A hardware clock that can sleep without relying on interrupts.
@@ -575,12 +550,7 @@
     <span class="attr">#[doc(hidden)]
     </span><span class="kw">fn </span>now_fn() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;<span class="kw">fn</span>() -&gt; <span class="self">Self</span>::Unit&gt;;
     <span class="attr">#[doc(hidden)]
-    </span><span class="kw">fn </span>frequency_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicU64;
-
-    <span class="attr">#[doc(hidden)]
-    </span><span class="kw">fn </span>store_unit_to_duration_func(f: <span class="kw">fn</span>(<span class="self">Self</span>::Unit) -&gt; Duration);
-    <span class="attr">#[doc(hidden)]
-    </span><span class="kw">fn </span>store_duration_to_unit_func(f: <span class="kw">fn</span>(Duration) -&gt; <span class="self">Self</span>::Unit);
+    </span><span class="kw">fn </span>period_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;Period&gt;;
 }
 
 <span class="kw">pub struct </span>Monotonic;
@@ -594,16 +564,8 @@
         <span class="kw-2">&amp;</span>MONOTONIC_NOW_FUNCTION
     }
 
-    <span class="kw">fn </span>frequency_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicU64 {
-        <span class="kw-2">&amp;</span>MONOTONIC_FREQUENCY
-    }
-
-    <span class="kw">fn </span>store_unit_to_duration_func(f: <span class="kw">fn</span>(<span class="self">Self</span>::Unit) -&gt; Duration) {
-        INSTANT_TO_DURATION_FUNCTION.store(f);
-    }
-
-    <span class="kw">fn </span>store_duration_to_unit_func(f: <span class="kw">fn</span>(Duration) -&gt; <span class="self">Self</span>::Unit) {
-        DURATION_TO_INSTANT_FUNCTION.store(f);
+    <span class="kw">fn </span>period_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;Period&gt; {
+        <span class="kw-2">&amp;</span>MONOTONIC_PERIOD
     }
 }
 
@@ -618,17 +580,9 @@
         <span class="kw-2">&amp;</span>WALL_TIME_NOW_FUNCTION
     }
 
-    <span class="kw">fn </span>frequency_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicU64 {
-        <span class="kw-2">&amp;</span>WALL_TIME_FREQUENCY
+    <span class="kw">fn </span>period_atomic() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicCell&lt;Period&gt; {
+        <span class="kw-2">&amp;</span>WALL_TIME_PERIOD
     }
-
-    <span class="kw">fn </span>store_unit_to_duration_func(<span class="kw">_</span>: <span class="kw">fn</span>(<span class="self">Self</span>::Unit) -&gt; Duration) {
-        <span class="comment">// We intentionally don&#39;t store the function for wall time clocks.
-    </span>}
-
-    <span class="kw">fn </span>store_duration_to_unit_func(<span class="kw">_</span>: <span class="kw">fn</span>(Duration) -&gt; <span class="self">Self</span>::Unit) {
-        <span class="comment">// We intentionally don&#39;t store the function for wall time clocks.
-    </span>}
 }
 
 <span class="kw">mod </span>private {

@@ -192,6 +192,14 @@
 <span id="192">192</span>
 <span id="193">193</span>
 <span id="194">194</span>
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the HPET: High Precision Event Timer.
 
 </span><span class="attr">#![no_std]
@@ -204,6 +212,7 @@
 <span class="kw">use </span>sdt::{Sdt, GenericAddressStructure};
 <span class="kw">use </span>acpi_table::{AcpiTables, AcpiSignature};
 <span class="kw">use </span>static_assertions::const_assert_eq;
+<span class="kw">use </span>time::Instant;
 
 <span class="doccomment">/// The static instance of the HPET&#39;s ACPI memory region, which derefs to an Hpet instance.
 </span><span class="kw">static </span>HPET: Once&lt;RwLock&lt;BorrowedMappedPages&lt;Hpet, Mutable&gt;&gt;&gt; = Once::new();
@@ -300,6 +309,13 @@
     }
 }
 
+<span class="kw">impl </span>time::ClockSource <span class="kw">for </span>Hpet {
+    <span class="kw">type </span>ClockType = time::Monotonic;
+
+    <span class="kw">fn </span>now() -&gt; Instant {
+        Instant::new(get_hpet().expect(<span class="string">&quot;couldn&#39;t get HPET&quot;</span>).get_counter())
+    }
+}
 
 <span class="doccomment">/// A structure that wraps HPET I/O register for each timer comparator, 
 /// specified by the format here: &lt;https://wiki.osdev.org/HPET#HPET_registers&gt;.

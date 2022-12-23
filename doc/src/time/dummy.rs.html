@@ -19,16 +19,6 @@
 <span id="19">19</span>
 <span id="20">20</span>
 <span id="21">21</span>
-<span id="22">22</span>
-<span id="23">23</span>
-<span id="24">24</span>
-<span id="25">25</span>
-<span id="26">26</span>
-<span id="27">27</span>
-<span id="28">28</span>
-<span id="29">29</span>
-<span id="30">30</span>
-<span id="31">31</span>
 </pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::Instant;
 <span class="kw">use </span>core::time::Duration;
 <span class="kw">use </span>log::error;
@@ -43,16 +33,6 @@
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>monotonic_now() -&gt; Instant {
     <span class="macro">error!</span>(<span class="string">&quot;called monotonic_now dummy function&quot;</span>);
-    Instant::ZERO
-}
-
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>instant_to_duration(<span class="kw">_</span>: Instant) -&gt; Duration {
-    <span class="macro">error!</span>(<span class="string">&quot;called instant_to_duration dummy function&quot;</span>);
-    Duration::ZERO
-}
-
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>duration_to_instant(<span class="kw">_</span>: Duration) -&gt; Instant {
-    <span class="macro">error!</span>(<span class="string">&quot;called duration_to_instant dummy function&quot;</span>);
     Instant::ZERO
 }
 
