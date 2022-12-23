@@ -7,6 +7,7 @@ edition = "2021"
 
 
 [dependencies]
+cfg-if = "1.0.0"
 multiboot2 = { version = "0.14.0", optional = true }
 libm = "0.2.1"
 
@@ -59,9 +60,17 @@ path = "../memory_initialization"
 path = "../boot_info"
 features = ["multiboot2"]
 
+[dependencies.bootloader_api]
+git = "https://github.com/theseus-os/bootloader"
+branch = "theseus"
+optional = true
+
+[build-dependencies]
+cfg-if = "1.0.0"
+
 [features]
-default = [ "bios" ]
 bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
+uefi = ["boot_info/uefi", "captain/uefi", "dep:bootloader_api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
