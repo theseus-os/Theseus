@@ -325,13 +325,19 @@ impl <T: Send> Sender<T> {
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
-    
+
+    /// Returns a receiver of the given channel    
     pub fn receiver(&self) -> Receiver<T> {
         Receiver {
             channel: self.channel.clone(),
         }
-    }
 }
+
+        //if self.channel.sender_count.fetch_add(1, Ordering::SeqCst) == 0 {
+        //    self.channel.channel_status.store(ChannelStatus::Connected);
+        //}
+        //Sender { channel: self.channel.clone() }
+
 
 /// The receiver side of a channel.
 pub struct Receiver<T: Send> {
@@ -485,7 +491,8 @@ impl <T: Send> Receiver<T> {
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
-    
+
+    /// Returns a sender of the given channel
     pub fn sender(&self) -> Sender<T> {
         Sender {
             channel: self.channel.clone(),
@@ -493,9 +500,7 @@ impl <T: Send> Receiver<T> {
     }
 }
 
-
-/// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
-/// and notify all of the `Senders`
+/// Drop implementation marks the channel state and notifies the `Sender`
 impl<T: Send> Drop for Receiver<T> {
     fn drop(&mut self) {
         // trace!("Dropping a receiver");
@@ -506,8 +511,7 @@ impl<T: Send> Drop for Receiver<T> {
     }
 }
 
-/// When the only remaining `Sender` is dropped, we mark the channel as disconnected
-/// and notify all of the `Receivers`
+/// Drop implementation marks the channel state and notifies the `Receiver`
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
         // trace!("Dropping a sender");
