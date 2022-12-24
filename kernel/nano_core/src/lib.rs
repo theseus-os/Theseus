@@ -18,6 +18,7 @@
 #![no_std]
 #![no_main]
 #![feature(naked_functions)]
+#![deny(unsafe_op_in_unsafe_fn)]
 
 extern crate panic_entry;
 
@@ -71,7 +72,11 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// 1. Setting up logging
 /// 2. Dumping basic information about the Theseus build
 /// 3. Initialising early exceptions
-fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
+///
+/// # Safety
+///
+/// `early_double_fault_stack_top` must point to the end of a mapped page.
+unsafe fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
     println_raw!("Entered early_setup(). Interrupts disabled.");
 

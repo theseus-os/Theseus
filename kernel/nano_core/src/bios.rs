@@ -3,8 +3,8 @@ use boot_info::BootInformation;
 use memory::VirtualAddress;
 
 #[no_mangle]
-pub extern "C" fn rust_entry(boot_info: usize, double_fault_stack: usize) {
-    try_exit!(early_setup(double_fault_stack));
+pub unsafe extern "C" fn rust_entry(boot_info: usize, double_fault_stack: usize) {
+    try_exit!(unsafe { early_setup(double_fault_stack) });
     if VirtualAddress::new(boot_info).is_none() {
         shutdown(format_args!("multiboot2 info address invalid"));
     }
