@@ -31,7 +31,6 @@ use stack::Stack;
 use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
-use apic::get_my_apic_id;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
@@ -49,8 +48,9 @@ pub fn init(
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
-    let task_ref = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
-    BOOTSTRAP_TASKS.lock().push(task_ref.clone());
+    let joinable_bootstrap_task = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+    let task_ref = joinable_bootstrap_task.clone();
+    BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
     Ok(BootstrapTaskRef {
         apic_id, 
@@ -60,7 +60,7 @@ pub fn init(
 
 /// The set of bootstrap tasks that are created using `task::bootstrap_task()`.
 /// These require special cleanup; see [`cleanup_bootstrap_tasks()`].
-static BOOTSTRAP_TASKS: Mutex<Vec<TaskRef>> = Mutex::new(Vec::new());
+static BOOTSTRAP_TASKS: Mutex<Vec<JoinableTaskRef>> = Mutex::new(Vec::new());
 
 /// Spawns a dedicated task to cleanup all bootstrap tasks
 /// by reaping them, i.e., taking their exit value.
@@ -77,12 +77,12 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
             let mut num_tasks_cleaned = 0;
             while num_tasks_cleaned < total_tasks {
                 if let Some(task) = BOOTSTRAP_TASKS.lock().pop() {
-                    task.join().unwrap();
-                    if let Some(_) = task.take_exit_value() {
-                        // trace!("Cleaned up bootstrap task {:?}", task);
-                        num_tasks_cleaned += 1;
-                    } else {
-                        panic!("BUG: bootstrap task didn't exit before cleanup: {:?}", task);
+                    match task.join() {
+                        Ok(_exit_val) => num_tasks_cleaned += 1,
+                        Err(_e) => panic!(
+                            "BUG: failed to join bootstrap task {:?}, error: {:?}",
+                            task, _e,
+                        ),
                     }
                 }
             }
@@ -109,7 +109,7 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
-    task_ref: JoinableTaskRef,
+    task_ref: TaskRef,
 }
 impl Deref for BootstrapTaskRef {
     type Target = TaskRef;
@@ -123,9 +123,7 @@ impl BootstrapTaskRef {
     /// This function does the following:
     /// 1. Consumes this bootstrap task such that it can no longer be accessed.
     /// 2. Marks this bootstrap task as exited.
-    /// 3. Removes this bootstrap task from all this CPU's runqueue.
-    /// 
-    /// This function consumes this bootstrap task, marks it as exited
+    /// 3. Removes this bootstrap task from this CPU's runqueue.
     pub fn finish(self) {
         drop(self);
     }
@@ -851,7 +849,7 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
     // Third, reap the task if it has been orphaned (if it's non-joinable).
     if !current_task.is_joinable() {
         // trace!("Reaping orphaned task... {:?}", current_task);
-        let _exit_value = current_task.take_exit_value();
+        let _exit_value = current_task.retrieve_exit_value();
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
 }
@@ -975,7 +973,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(apic::get_my_apic_id())
+        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu())
             .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
@@ -986,7 +984,7 @@ fn remove_current_task_from_runqueue(current_task: &TaskRef) {
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
 pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let apic_id = get_my_apic_id();
+    let apic_id = cpu::current_cpu();
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
@@ -1001,7 +999,7 @@ pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
 /// so we use `()` here instead. 
 #[inline(never)]
 fn idle_task_entry(_apic_id: u8) {
-    info!("Entered idle task loop on core {}: {:?}", apic::get_my_apic_id(), task::get_my_current_task());
+    info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state
         pause::spin_loop_hint();

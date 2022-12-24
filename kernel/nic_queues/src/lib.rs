@@ -18,17 +18,10 @@ use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{create_contiguous_mapping, EntryFlags, BorrowedSliceMappedPages, Mutable};
+use memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
-
-/// The mapping flags used for pages that the NIC will map.
-pub const NIC_MAPPING_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(
-    EntryFlags::PRESENT.bits() |
-    EntryFlags::WRITABLE.bits() |
-    EntryFlags::NO_CACHE.bits() |
-    EntryFlags::NO_EXECUTE.bits()
-);
+pub use nic_buffers::NIC_MAPPING_FLAGS;
 
 /// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
@@ -70,7 +63,7 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     /// The queue of received Ethernet frames, ready for consumption by a higher layer.
     /// Just like a regular FIFO queue, newly-received frames are pushed onto the back
     /// and frames are popped off of the front.
-    /// Each frame is represented by a Vec<ReceiveBuffer>, because a single frame can span multiple receive buffers.
+    /// Each frame is represented by a `Vec<ReceiveBuffer>`, because a single frame can span multiple receive buffers.
     /// TODO: improve this? probably not the best cleanest way to expose received frames to higher layers   
     pub received_frames: VecDeque<ReceivedFrame>,
     /// The cpu which this queue is mapped to. 
@@ -107,18 +100,18 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = self.rx_buffer_size_bytes;
                     let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
-                    ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)
+                    ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)?
                 }
             };
 
             // actually tell the NIC about the new receive buffer, and that it's ready for use now
-            self.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr);
+            self.rx_descs[cur].set_packet_address(new_receive_buf.phys_addr());
 
             // Swap in the new receive buffer at the index corresponding to this current rx_desc's receive buffer,
             // getting back the receive buffer that is part of the received ethernet frame
             self.rx_bufs_in_use.push(new_receive_buf);
             let mut current_rx_buf = self.rx_bufs_in_use.swap_remove(cur); 
-            current_rx_buf.length = length as u16; // set the ReceiveBuffer's length to the size of the actual packet received
+            current_rx_buf.set_length(length as u16)?; // set the ReceiveBuffer's length to the size of the actual packet received
             receive_buffers_in_frame.push(current_rx_buf);
 
             // move on to the next receive buffer to see if it's ready for us to take
@@ -168,7 +161,7 @@ impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {
     /// # Arguments:
     /// * `transmit_buffer`: buffer containing the packet to be sent
     pub fn send_on_queue(&mut self, transmit_buffer: TransmitBuffer) {
-        self.tx_descs[self.tx_cur as usize].send(transmit_buffer.phys_addr, transmit_buffer.length);  
+        self.tx_descs[self.tx_cur as usize].send(transmit_buffer.phys_addr(), transmit_buffer.length());
         // update the tx_cur value to hold the next free descriptor
         let old_cur = self.tx_cur;
         self.tx_cur = (self.tx_cur + 1) % self.num_tx_descs;

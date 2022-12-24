@@ -3,14 +3,14 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate unified_channel;
 extern crate task;
 extern crate spawn;
-extern crate apic;
+extern crate cpu;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 use alloc::vec::Vec;
@@ -65,7 +65,7 @@ fn rmain(_matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let (sender, receiver) = unified_channel::new_string_channel(2);
 
@@ -102,8 +102,6 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     t1.join()?;
     t2.join()?;
     info!("test_multiple(): Joined the sender and receiver tasks.");
-    let _t1_exit = t1.take_exit_value();
-    let _t2_exit = t2.take_exit_value();
     
     Ok(())
 }

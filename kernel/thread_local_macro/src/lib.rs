@@ -119,7 +119,7 @@ use alloc::vec::Vec;
 /// # Initialization and Destruction
 ///
 /// Initialization is lazily performed dynamically on the first call to [`with`]
-/// within a thread ([`task::Task`]), and values that implement [`Drop`] get destructed
+/// within a thread (`Task` in Theseus), and values that implement [`Drop`] get destructed
 /// when a thread exits.
 ///
 /// A `LocalKey`'s initializer cannot recursively depend on itself, and using

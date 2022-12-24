@@ -4,7 +4,7 @@ name = "logger"
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 log = "0.4.8"
 
 [dependencies.irq_safety]

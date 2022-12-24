@@ -1,0 +1,8 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "owned_borrowed_trait"
+description = """
+An abstraction over an owned value or borrowed reference
+based on traits and marker types instead of enums.
+"""
+version = "0.1.0"

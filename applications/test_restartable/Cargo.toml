@@ -5,7 +5,7 @@ authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 
 [dependencies]
 getopts = "0.2.21"
-spin = "0.9.0"
+spin = "0.9.4"
 
 [dependencies.log]
 default-features = false
@@ -14,5 +14,5 @@ version = "0.4.8"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"

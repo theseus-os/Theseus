@@ -12,6 +12,9 @@ jobs:
       with:
         submodules: recursive
 
+    - name: "Install nasm"
+      run: sudo apt install nasm
+
     - name: Cache build artifacts
       uses: actions/cache@v2
       with:

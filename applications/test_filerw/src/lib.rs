@@ -5,7 +5,7 @@
 
 #[macro_use] extern crate alloc;
 // #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate memfs;
 extern crate root;
 extern crate memory;
@@ -69,8 +69,7 @@ fn test_filerw() -> Result<(), &'static str> {
     // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
     // need (because it entered this conditional statement)
     let pages = memory::allocate_pages_by_bytes(1).ok_or("could not allocate pages")?;
-    // the default flag is that the MappedPages are not writable
-    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, Default::default())?;
+    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, memory::PteFlags::new())?;
 
     let non_writable_file = MemFile::from_mapped_pages(mapped_pages, "non-writable testfile".to_string(), 1, &parent)?;
     match non_writable_file.lock().write_at(&mut string_slice_as_bytes, 0) {
