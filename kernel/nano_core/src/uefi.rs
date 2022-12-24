@@ -18,7 +18,7 @@ pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
 #[naked]
 #[no_mangle]
 #[link_section = ".init.text"]
-pub unsafe extern "C" fn _start(boot_info: &'static mut bootloader_api::BootInfo) {
+pub unsafe extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
     asm!(
         // First argument  (rdi): a reference to the boot info (passed through).
         // Second argument (rsi): the top of the double fault handler stack.
@@ -47,14 +47,14 @@ pub unsafe extern "C" fn _start(boot_info: &'static mut bootloader_api::BootInfo
 
 #[no_mangle]
 unsafe extern "C" fn rust_entry(
-    boot_info: &'static mut bootloader_api::BootInfo,
+    boot_info: &'static bootloader_api::BootInfo,
     double_fault_stack: usize,
 ) {
     try_exit!(early_setup(double_fault_stack));
     // See diagram above.
     let kernel_stack_start = VirtualAddress::new_canonical(double_fault_stack - STACK_SIZE);
     try_exit!(nano_core(
-        boot_info as &'static bootloader_api::BootInfo,
+        boot_info,
         kernel_stack_start,
     ));
 }
