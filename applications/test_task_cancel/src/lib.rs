@@ -5,12 +5,12 @@
 extern crate alloc;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use spin::Mutex;
 
 pub fn main(_: Vec<String>) -> isize {
     let lock = Arc::new(Mutex::new(()));
-    let task = spawn::new_task_builder(other, lock.clone())
+    let task = spawn::new_task_builder(guard_hog, lock.clone())
         .spawn()
         .expect("failed to spawn task");
 
@@ -29,21 +29,28 @@ pub fn main(_: Vec<String>) -> isize {
 }
 
 #[inline(never)]
-fn other(lock: Arc<Mutex<()>>) {
+fn guard_hog(lock: Arc<Mutex<()>>) {
     let _guard = lock.lock();
     loop {
-        // In order to properly unwind the task we need to reach an instruction that is
-        // covered by the unwind tables. Rust generates an unwind row for all call
-        // sites so by placing a call site in the loop we ensure that the task will
-        // reach an instruction from which it can unwind when it is told to cancel.
-        unwind_row_generator();
+        // We cannot inline the load of FALSE into this function as then LLVM will
+        // generate an unwind row that covers the entire function, but a call site table
+        // that only covers the instructions associated with the panic, which we would
+        // never reach.
+        lsda_generator();
     }
 }
 
 #[inline(never)]
-fn unwind_row_generator() {
+fn lsda_generator() {
+    static FALSE: AtomicBool = AtomicBool::new(false);
     static __COUNTER: AtomicUsize = AtomicUsize::new(0);
 
+    // We need to give LLVM false hope that unwind_row_generator may unwind.
+    // Otherwise, LLVM will generate an unwind row, but no LSDA for guard_holder.
+    if FALSE.load(Relaxed) {
+        panic!();
+    }
+
     // Prevents unwind_row_generator from being optimised away.
-    __COUNTER.fetch_add(1, Ordering::Relaxed);
+    __COUNTER.fetch_add(1, Relaxed);
 }
