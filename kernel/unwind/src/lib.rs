@@ -718,7 +718,6 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
     Some((eh_frame_sec.clone(), base_addrs))
 }
 
-
 /// Starts the unwinding procedure for the current task 
 /// by working backwards up the call stack starting from the current stack frame.
 /// 
@@ -731,9 +730,19 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 /// ## Note: Skipping frames
 /// If you are unsure how many frames you could possibly skip, then it's always safe to pass `0`
 /// such that all function frames on the stack are unwound.
-/// 
-#[doc(hidden)]
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
+    start_unwinding_inner(reason, stack_frames_to_skip, None, None)
+}
+
+/// Starts the unwinding procedure for a specific instruction pointer, and stack pointer.
+///
+/// See [`start_unwinding`] for more information.
+// TODO: Rename. This isn't technically remote unwinding.
+pub fn start_remote_unwinding(reason: KillReason, stack_frames_to_skip: usize, rsp: u64, ip: u64) -> Result<(), &'static str> {
+    start_unwinding_inner(reason, stack_frames_to_skip, Some(rsp), Some(ip))
+}
+
+fn start_unwinding_inner(reason: KillReason, stack_frames_to_skip: usize, rsp: Option<u64>, ip: Option<u64>) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
         let current_task = task::get_my_current_task().ok_or("couldn't get current task")?;
@@ -757,11 +766,18 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 
 
     // We pass a pointer to the unwinding context to this closure. 
-    let res = invoke_with_current_registers(&mut |registers| {
+    let res = invoke_with_current_registers(&mut |mut registers: Registers| {
         // set the proper register values before start the actual unwinding procedure.
         {  
             // SAFE: we just created this pointer above
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
+            if let Some(rsp) = rsp {
+                registers[X86_64::RSP] = Some(rsp);
+            }
+            if let Some(ip) = ip {
+                // Accounts for the -1 later
+                registers[X86_64::RA] = Some(ip + 1);
+            }
             unwinding_context.stack_frame_iter.registers = registers;
             
             // Skip the first several frames, e.g., to skip unwinding the panic entry point functions themselves.
@@ -788,7 +804,6 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
     }
     cleanup_unwinding_context(unwinding_context_ptr);
 }
-
 
 /// Continues the unwinding process from the point it left off at, 
 /// which is defined by the given unwinding context.

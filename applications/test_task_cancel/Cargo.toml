@@ -9,4 +9,4 @@ edition = "2021"
 log = "0.4"
 spawn = { path = "../../kernel/spawn" }
 spin = "0.9"
-task = { path = "../../kernel/task" }
+task_cancel = { path = "../../kernel/task_cancel" }

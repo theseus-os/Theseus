@@ -38,5 +38,8 @@ path = "../sleep"
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
+[dependencies.task]
+path = "../task"
+
 [lib]
 crate-type = ["rlib"]

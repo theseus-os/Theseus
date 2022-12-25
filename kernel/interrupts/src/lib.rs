@@ -297,7 +297,7 @@ pub fn eoi(irq: Option<u8>) {
 
 pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
 /// 0x22
-extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
+extern "x86-interrupt" fn lapic_timer_handler(mut stack_frame: InterruptStackFrame) {
     let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
     // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::current_cpu(), _ticks);
 
@@ -310,6 +310,12 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame)
     eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
     
     scheduler::schedule();
+
+    if let Some(current_task) = task::get_my_current_task()  {
+        if current_task.is_cancelled() {
+            unsafe { stack_frame.as_mut() }.update(|stack_frame| stack_frame.cpu_flags |= 0x100);
+        }
+    }
 }
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {

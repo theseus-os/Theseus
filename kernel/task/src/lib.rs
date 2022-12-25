@@ -365,6 +365,7 @@ pub struct Task {
     /// 
     /// This is not public because it permits interior mutability.
     joinable: AtomicBool,
+    pub cancel_requested: AtomicBool,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -514,6 +515,7 @@ impl Task {
             suspended: AtomicBool::new(false),
             // Tasks are not considered "joinable" until passed to `TaskRef::new()`
             joinable: AtomicBool::new(false),
+            cancel_requested: AtomicBool::new(false),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -796,6 +798,15 @@ impl Task {
     pub fn is_suspended(&self) -> bool {
         self.suspended.load(Ordering::Acquire)
     }
+
+    /// Returns `true` if this task is cancelled.
+    ///
+    /// # Latency
+    ///
+    /// The cancellation of a task will take some time to propagate to other cores.
+    pub fn is_cancelled(&self) -> bool {
+        self.cancel_requested.load(Ordering::Relaxed)
+    }
     
     /// Sets the waker to be awoken when this task exits.
     pub fn set_waker(&self, waker: Waker) {
@@ -892,7 +903,6 @@ pub fn task_switch(
     apic_id: u8,
     preemption_guard: PreemptionGuard,
 ) -> (bool, PreemptionGuard) {
-
     // We use the `with_current_task_and_value()` closure here in order to ensure that
     // the borrowed reference to the current task is guaranteed to be dropped
     // *before* the actual context switch operation occurs.

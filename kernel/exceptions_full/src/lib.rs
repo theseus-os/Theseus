@@ -29,7 +29,7 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_error.set_handler_fn(divide_error_handler);
-        idt.debug.set_handler_fn(debug_handler);
+        idt.debug.set_handler_fn(task_cancel::interrupt_handler);
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.overflow.set_handler_fn(overflow_handler);
@@ -259,12 +259,6 @@ fn exception_to_signal(exception_number: u8) -> Option<Signal> {
 extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
     println_both!("\nEXCEPTION: DIVIDE ERROR\n{:#X?}\n", stack_frame);
     kill_and_halt(0x0, &stack_frame, None, true)
-}
-
-/// exception 0x01
-extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
-    println_both!("\nEXCEPTION: DEBUG EXCEPTION\n{:#X?}", stack_frame);
-    // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
 }
 
 /// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts.

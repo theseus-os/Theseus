@@ -55,7 +55,7 @@ pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
 /// The size in pages of each kernel stack. 
 /// If it's too small, complex kernel functions will overflow, causing a page fault / double fault.
 #[cfg(not(debug_assertions))]
-pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
+pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 32;
 #[cfg(debug_assertions)]
 pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 32; // debug builds require more stack space.
 
