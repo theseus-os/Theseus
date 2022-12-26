@@ -465,9 +465,9 @@ type FuncWithRegistersRefMut<'a> = &'a mut dyn FuncWithRegisters;
 /// either because it has nothing to drop or Rust has determined that the
 /// function will never be unwound.
 ///
-/// 2. The pointer is covered by the unwind tables, and the LSDA's call site
-/// table. This occurs when the function has associated drop handlers and the
-/// instruction pointer is at an instruction that could cause an unwinding
+/// 2. The pointer is covered by the unwind tables, and has an associated
+/// landing pad. This occurs when the function has associated drop handlers and
+/// the instruction pointer is at an instruction that could cause an unwinding
 /// (usually a call site to a function that can cause an unwinding).
 pub fn can_unwind(instruction_pointer: u64) -> bool {
     can_unwind_inner(instruction_pointer).is_some()
@@ -531,11 +531,12 @@ fn can_unwind_inner(instruction_pointer: u64) -> Option<()> {
     let lsda_slice = lsda_pages.as_slice::<u8>(start, length).ok()?;
     let table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, initial_address);
 
-    // Criteria 2: Covered by unwind tables, and LSDA's call site table.
-    table
+    let entry = table
         .call_site_table_entry_for_address(call_site_address)
-        .ok()
-        .map(|_| ())
+        .ok()?;
+
+    // Criteria 2: Covered by unwind tables, and has an associated landing pad.
+    entry.landing_pad_address().map(|_| ())
 }
 
 /// This function saves the current CPU register values onto the stack (to preserve them)
@@ -856,7 +857,9 @@ fn start_unwinding_inner(reason: KillReason, stack_frames_to_skip: usize, rsp: O
                 registers[X86_64::RSP] = Some(rsp);
             }
             if let Some(ip) = ip {
-                // Accounts for the -1 later
+                // StackFrameIter::next subtracts 1 from the return address to get the call site.
+                // Since we're already providing the call site instruction pointer, we add 1 here
+                // to negate the subtraction later.
                 registers[X86_64::RA] = Some(ip + 1);
             }
             unwinding_context.stack_frame_iter.registers = registers;

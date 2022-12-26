@@ -1,4 +1,7 @@
-// TODO: Properly implement Task::kill so the test passes.
+// TODO: Test that guard_hog is succesfully cancelled when at the call
+// instruction, in which case it should unwind immediately, and at the jmp
+// (loop) instruction, in which case it should continue to the next instruction,
+// which is the call instruction, and then unwind.
 
 #![no_std]
 

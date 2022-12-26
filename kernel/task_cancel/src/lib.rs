@@ -20,8 +20,6 @@ pub extern "x86-interrupt" fn interrupt_handler(mut stack_frame: InterruptStackF
     let instruction_pointer = stack_frame.instruction_pointer.as_u64();
     let stack_pointer = stack_frame.stack_pointer.as_u64();
 
-    log::info!("instruction pointer: {instruction_pointer:0x?}");
-
     if unwind::can_unwind(instruction_pointer) {
         log::info!("unwinding a cancelled task");
         unwind::start_remote_unwinding(
@@ -32,6 +30,7 @@ pub extern "x86-interrupt" fn interrupt_handler(mut stack_frame: InterruptStackF
         )
         .expect("failed to unwind");
     } else {
+        log::debug!("couldn't unwind at {instruction_pointer:0x?}; resetting trap flag");
         // The trap flag is reset after every debug interrupt. Since we can't unwind at
         // this instruction, we reset the flag to check again at the next instruction.
         set_trap_flag(&mut stack_frame);
