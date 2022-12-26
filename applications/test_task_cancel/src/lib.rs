@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
+use core::sync::atomic::{AtomicBool, Ordering::Relaxed};
 use spin::Mutex;
 
 pub fn main(_: Vec<String>) -> isize {
@@ -42,14 +42,12 @@ fn guard_hog(lock: Arc<Mutex<()>>) {
 #[inline(never)]
 fn lsda_generator() {
     static FALSE: AtomicBool = AtomicBool::new(false);
-    static __COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-    // We need to give LLVM false hope that unwind_row_generator may unwind.
-    // Otherwise, LLVM will generate an unwind row, but no LSDA for guard_holder.
+    // We need to give LLVM false hope that lsda_generator may unwind. Otherwise,
+    // LLVM will generate an unwind row, but no LSDA for guard_holder.
+    //
+    // The potential panic also prevents lsda_generator from being optimised away.
     if FALSE.load(Relaxed) {
         panic!();
     }
-
-    // Prevents unwind_row_generator from being optimised away.
-    __COUNTER.fetch_add(1, Relaxed);
 }
