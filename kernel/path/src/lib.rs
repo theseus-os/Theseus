@@ -68,14 +68,14 @@ impl Path {
     
     /// Returns an iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
-    pub fn components<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn components(&self) -> impl Iterator<Item = &str> {
         self.path.split(PATH_DELIMITER)
             .filter(|&x| !x.is_empty())
     }
 
     /// Returns a reverse iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
-    pub fn rcomponents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn rcomponents(&self) -> impl Iterator<Item = &str> {
         self.path.rsplit(PATH_DELIMITER)
             .filter(|&x| !x.is_empty())
     }
@@ -85,14 +85,14 @@ impl Path {
     /// `"/path/to/my/file.a"` -> "file.a"
     /// `"my/file.a"` -> "file.a"
     /// `"file.a"` -> "file.a"
-    pub fn basename<'a>(&'a self) -> &'a str {
+    pub fn basename(&self) -> &str {
         self.rcomponents()
             .next()
             .unwrap_or(&self.path)
     }
 
     /// Like [`basename()`](#method.basename), but excludes the file extension, if present.
-    pub fn file_stem<'a>(&'a self) -> &'a str {
+    pub fn file_stem(&self) -> &str {
         self.basename()
             .split(EXTENSION_DELIMITER)
             .find(|&x| !x.is_empty())
@@ -102,7 +102,7 @@ impl Path {
     /// Returns the file extension, if present. 
     /// If there are multiple extensions as defined by the extension delimiter, `'.'`,
     /// then the last one will be treated as the extension. 
-    pub fn extension<'a>(&'a self) -> Option<&'a str> {
+    pub fn extension(&self) -> Option<&str> {
         self.basename()
             .rsplit(EXTENSION_DELIMITER)
             .find(|&x| !x.is_empty())

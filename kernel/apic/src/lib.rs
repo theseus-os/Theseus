@@ -241,7 +241,7 @@ pub struct ApicRegisters {
     pub timer_current_count:          ReadOnly<u32>,         // 0x390
     _padding22:                       [u32; 3 + 4*4],
     pub timer_divide:                 Volatile<u32>,         // 0x3E0
-    _padding23:                       [u32; 3 + 1*4],
+    _padding23:                       [u32; 3 + 4],
     // ends at 0x400
 }
 const_assert_eq!(core::mem::size_of::<ApicRegisters>(), 0x400);
