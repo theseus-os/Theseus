@@ -2,51 +2,59 @@ use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use smoltcp::socket::AnySocket;
+use mutex_sleep::{MutexSleep, MutexSleepGuard};
+use smoltcp::{
+    iface::{SocketHandle, SocketSet},
+    socket::AnySocket,
+};
 
-#[repr(transparent)]
-pub struct Socket<T>
+pub struct Socket<'a, T>
 where
     T: AnySocket<'static> + ?Sized,
 {
-    pub(crate) inner: Option<smoltcp::socket::Socket<'static>>,
+    pub(crate) handle: SocketHandle,
+    pub(crate) sockets: &'a MutexSleep<SocketSet<'static>>,
+    pub(crate) phantom_data: PhantomData<T>,
+}
+
+struct LockedSocket<'a, T>
+where
+    T: AnySocket<'static> + ?Sized,
+{
+    handle: SocketHandle,
+    sockets: MutexSleepGuard<'a, SocketSet<'static>>,
     phantom_data: PhantomData<T>,
 }
 
-impl<T> From<T> for Socket<T>
-where
-    T: AnySocket<'static>,
-{
-    fn from(value: T) -> Self {
-        Self {
-            inner: Some(value.upcast()),
-            phantom_data: PhantomData,
-        }
-    }
-}
-
-impl<T> Deref for Socket<T>
+impl<'a, T> Deref for LockedSocket<'a, T>
 where
     T: AnySocket<'static>,
 {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        let inner = self.inner.as_ref().unwrap();
-        // The only way to create a socket is to upcast a T, so downcasting it cannot
-        // fail.
-        T::downcast(inner).unwrap()
+        self.sockets.get(self.handle)
     }
 }
 
-impl<T> DerefMut for Socket<T>
+impl<'a, T> DerefMut for LockedSocket<'a, T>
 where
     T: AnySocket<'static>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        let inner = self.inner.as_mut().unwrap();
-        // The only way to create a socket is to upcast a T, so downcasting it cannot
-        // fail.
-        T::downcast_mut(inner).unwrap()
+        self.sockets.get_mut(self.handle)
+    }
+}
+
+impl<'a, T> Socket<'a, T>
+where
+    T: AnySocket<'static> + 'a,
+{
+    pub fn lock(&self) -> impl DerefMut<Target = T> + 'a {
+        LockedSocket {
+            handle: self.handle,
+            sockets: self.sockets.lock().expect("failed to lock sockets"),
+            phantom_data: PhantomData,
+        }
     }
 }

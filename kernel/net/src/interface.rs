@@ -1,5 +1,6 @@
 use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
-use alloc::{collections::BTreeMap, sync::Arc, vec::Vec};
+use alloc::{collections::BTreeMap, vec::Vec};
+use core::marker::PhantomData;
 use irq_safety::MutexIrqSafe;
 use mutex_sleep::MutexSleep;
 use smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
@@ -14,7 +15,7 @@ pub use wire::{IpAddress, IpCidr};
 pub struct NetworkInterface {
     inner: MutexSleep<iface::Interface<'static>>,
     device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
-    sockets: MutexIrqSafe<Vec<Arc<MutexIrqSafe<Socket<dyn AnySocket<'static> + Send>>>>>,
+    sockets: MutexSleep<SocketSet<'static>>,
 }
 
 impl NetworkInterface {
@@ -45,7 +46,7 @@ impl NetworkInterface {
                 .finalize(&mut wrapper),
         );
 
-        let sockets = MutexIrqSafe::new(Vec::new());
+        let sockets = MutexSleep::new(SocketSet::new(Vec::new()));
 
         Self {
             inner,
@@ -55,21 +56,20 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(&self, socket: T) -> Arc<MutexIrqSafe<T>>
+    pub fn add_socket<'a, T>(&self, socket: T) -> Socket<T>
     where
-        T: AnySocket<'static> + Send,
+        T: AnySocket<'static>,
     {
-        let socket_arc = Arc::new(MutexIrqSafe::new(socket));
-        self.sockets
+        let handle = self
+            .sockets
             .lock()
-            // SAFETY: Socket has a transparent representation, so the memory layout is identical
-            // regardless of T. The Send bound on T ensures that transmuting to a type that
-            // implements Send is sound.
-            // NOTE: We are transmuting an arc, not the underlying type. That doesn't change the
-            // safety requirements though.
-            .push(unsafe { core::mem::transmute(socket_arc.clone()) });
-
-        socket_arc
+            .expect("failed to lock sockets")
+            .add(socket);
+        Socket {
+            handle,
+            sockets: &self.sockets,
+            phantom_data: PhantomData,
+        }
     }
 
     /// Polls the sockets associated with the interface.
@@ -80,31 +80,12 @@ impl NetworkInterface {
         let mut wrapper = DeviceWrapper {
             inner: &mut *self.device.lock(),
         };
-
-        let sockets = self.sockets.lock();
-        let mut socket_guards = Vec::with_capacity(sockets.len());
-        let mut socket_set = SocketSet::new(Vec::with_capacity(sockets.len()));
-
-        for socket in sockets.iter() {
-            let mut guard = socket.lock();
-            let socket = guard.inner.take().unwrap();
-            let handle = match socket {
-                smoltcp::socket::Socket::Raw(socket) => socket_set.add(socket),
-                smoltcp::socket::Socket::Icmp(socket) => socket_set.add(socket),
-                smoltcp::socket::Socket::Udp(socket) => socket_set.add(socket),
-                smoltcp::socket::Socket::Tcp(socket) => socket_set.add(socket),
-            };
-            socket_guards.push((guard, handle));
-        }
+        let mut sockets = self.sockets.lock().expect("failed to lock sockets");
 
         // NOTE: If some application decides to lock a socket for an extended period of
         // time, this will prevent all other sockets from being polled. Not sure if
         // there's a great way around this.
-        inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut socket_set)?;
-
-        for (mut guard, handle) in socket_guards {
-            guard.inner = Some(socket_set.remove(handle));
-        }
+        inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut sockets)?;
 
         Ok(())
     }
