@@ -83,8 +83,8 @@ impl phy::RxToken for RxToken {
                 self.inner.0.len()
             );
         }
-        let mut slice = self.inner.0.first_mut().ok_or(Error::Exhausted)?;
-        f(&mut slice)
+        let slice = self.inner.0.first_mut().ok_or(Error::Exhausted)?;
+        f(slice)
     }
 }
 

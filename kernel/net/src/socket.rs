@@ -2,24 +2,24 @@ use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use smoltcp::{iface::SocketSet, socket::AnySocket};
+use smoltcp::socket::AnySocket;
 
 #[repr(transparent)]
 pub struct Socket<T>
 where
     T: AnySocket<'static> + ?Sized,
 {
-    pub(crate) inner: SocketSet<'static>,
+    pub(crate) inner: Option<smoltcp::socket::Socket<'static>>,
     phantom_data: PhantomData<T>,
 }
 
-impl<T> Socket<T>
+impl<T> From<T> for Socket<T>
 where
-    T: AnySocket<'static> + ?Sized,
+    T: AnySocket<'static>,
 {
-    pub(crate) fn new(inner: SocketSet<'static>) -> Self {
+    fn from(value: T) -> Self {
         Self {
-            inner,
+            inner: Some(value.upcast()),
             phantom_data: PhantomData,
         }
     }
@@ -32,8 +32,10 @@ where
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        AnySocket::downcast(self.inner.iter().next().expect("no socket in socket set").1)
-            .expect("incorrect socket type")
+        let inner = self.inner.as_ref().unwrap();
+        // The only way to create a socket is to upcast a T, so downcasting it cannot
+        // fail.
+        T::downcast(inner).unwrap()
     }
 }
 
@@ -42,13 +44,9 @@ where
     T: AnySocket<'static>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        AnySocket::downcast_mut(
-            self.inner
-                .iter_mut()
-                .next()
-                .expect("no socket in socket set")
-                .1,
-        )
-        .expect("incorrect socket type")
+        let inner = self.inner.as_mut().unwrap();
+        // The only way to create a socket is to upcast a T, so downcasting it cannot
+        // fail.
+        T::downcast_mut(inner).unwrap()
     }
 }

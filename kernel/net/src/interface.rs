@@ -14,7 +14,7 @@ pub use wire::{IpAddress, IpCidr};
 pub struct NetworkInterface {
     inner: MutexSleep<iface::Interface<'static>>,
     device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
-    sockets: MutexSleep<Vec<Arc<MutexSleep<Socket<dyn AnySocket<'static> + Send>>>>>,
+    sockets: MutexIrqSafe<Vec<Arc<MutexIrqSafe<Socket<dyn AnySocket<'static> + Send>>>>>,
 }
 
 impl NetworkInterface {
@@ -45,7 +45,7 @@ impl NetworkInterface {
                 .finalize(&mut wrapper),
         );
 
-        let sockets = MutexSleep::new(Vec::new());
+        let sockets = MutexIrqSafe::new(Vec::new());
 
         Self {
             inner,
@@ -55,22 +55,20 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(&self, socket: T) -> Arc<MutexSleep<Socket<T>>>
+    pub fn add_socket<T>(&self, socket: T) -> Arc<MutexIrqSafe<T>>
     where
         T: AnySocket<'static> + Send,
     {
-        let mut socket_set = SocketSet::new([iface::SocketStorage::default(); 1]);
-        socket_set.add(socket);
-        let socket_arc = Arc::new(MutexSleep::new(Socket::<T>::new(socket_set)));
+        let socket_arc = Arc::new(MutexIrqSafe::new(socket));
         self.sockets
             .lock()
-            .expect("failed to lock interface sockets")
             // SAFETY: Socket has a transparent representation, so the memory layout is identical
             // regardless of T. The Send bound on T ensures that transmuting to a type that
             // implements Send is sound.
             // NOTE: We are transmuting an arc, not the underlying type. That doesn't change the
             // safety requirements though.
             .push(unsafe { core::mem::transmute(socket_arc.clone()) });
+
         socket_arc
     }
 
@@ -83,45 +81,32 @@ impl NetworkInterface {
             inner: &mut *self.device.lock(),
         };
 
+        let sockets = self.sockets.lock();
+        let mut socket_guards = Vec::with_capacity(sockets.len());
+        let mut socket_set = SocketSet::new(Vec::with_capacity(sockets.len()));
+
+        for socket in sockets.iter() {
+            let mut guard = socket.lock();
+            let socket = guard.inner.take().unwrap();
+            let handle = match socket {
+                smoltcp::socket::Socket::Raw(socket) => socket_set.add(socket),
+                smoltcp::socket::Socket::Icmp(socket) => socket_set.add(socket),
+                smoltcp::socket::Socket::Udp(socket) => socket_set.add(socket),
+                smoltcp::socket::Socket::Tcp(socket) => socket_set.add(socket),
+            };
+            socket_guards.push((guard, handle));
+        }
+
         // NOTE: If some application decides to lock a socket for an extended period of
         // time, this will prevent all other sockets from being polled. Not sure if
         // there's a great way around this.
-        for socket in self
-            .sockets
-            .lock()
-            .expect("failed to lock interface sockets")
-            .iter()
-        {
-            let mut socket = socket.lock().expect("failed to lock socket");
-            inner.poll(
-                smoltcp::time::Instant::ZERO,
-                &mut wrapper,
-                &mut socket.inner,
-            )?;
+        inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut socket_set)?;
+
+        for (mut guard, handle) in socket_guards {
+            guard.inner = Some(socket_set.remove(handle));
         }
 
         Ok(())
-    }
-
-    // TODO: This is a temporary workaround while crate::Socket dereferences to a
-    // smoltcp socket. In the future, the send method on crate::Socket will poll the
-    // socket automatically.
-    pub fn poll_socket<T>(&self, socket: &mut Socket<T>) -> Result<()>
-    where
-        T: AnySocket<'static>,
-    {
-        let mut inner = self.inner.lock().expect("failed to lock inner interface");
-        let mut wrapper = DeviceWrapper {
-            inner: &mut *self.device.lock(),
-        };
-        match inner.poll(
-            smoltcp::time::Instant::ZERO,
-            &mut wrapper,
-            &mut socket.inner,
-        ) {
-            Ok(_) => Ok(()),
-            Err(error) => Err(error.into()),
-        }
     }
 
     pub fn capabilities(&self) -> DeviceCapabilities {

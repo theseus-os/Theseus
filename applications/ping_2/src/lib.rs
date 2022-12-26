@@ -84,36 +84,36 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
     let mut received = 0;
 
     loop {
-        if !socket.lock()?.is_open() {
+        if !socket.lock().is_open() {
             socket
-                .lock()?
+                .lock()
                 .bind(Endpoint::Ident(0x22b))
                 .map_err(|_| "failed to bind to endpoint")?;
         }
 
-        if socket.lock()?.can_send() && sent == received && sent < count {
+        if socket.lock().can_send() && sent == received && sent < count {
             let repr = Icmpv4Repr::EchoRequest {
                 ident: 0x22b,
                 seq_no: sent,
                 data: &data,
             };
 
-            let mut locked = socket.lock()?;
+            let mut locked = socket.lock();
             let payload = locked
                 .send(repr.buffer_len(), remote)
                 .map_err(|_| "failed to send packet")?;
             let mut packet = Icmpv4Packet::new_unchecked(payload);
-
             repr.emit(&mut packet, &ChecksumCapabilities::ignored());
-            interface
-                .poll_socket(&mut *locked)
-                .map_err(|_| "failed to poll socket after sending")?;
             drop(locked);
+
+            interface
+                .poll()
+                .map_err(|_| "failed to poll interface after sending")?;
             sent += 1;
         }
 
-        if socket.lock()?.can_recv() {
-            let mut locked = socket.lock()?;
+        if socket.lock().can_recv() {
+            let mut locked = socket.lock();
             let (payload, _) = locked.recv().map_err(|_| "failed to receive packet")?;
             let packet = Icmpv4Packet::new_checked(&payload)
                 .map_err(|_| "incoming packet had incorrect length")?;
