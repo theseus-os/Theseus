@@ -3595,11 +3595,7 @@ dependencies = [
 name = "task_cancel"
 version = "0.1.0"
 dependencies = [
- "gimli",
  "log",
- "memory_structs",
- "mod_mgmt",
- "spawn",
  "task",
  "unwind",
  "x86_64",
