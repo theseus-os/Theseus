@@ -106,6 +106,8 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
             repr.emit(&mut packet, &ChecksumCapabilities::ignored());
             drop(locked);
 
+            // Poll the socket to send the packet. Once we have a custom socket type this
+            // won't be necessary.
             interface
                 .poll()
                 .map_err(|_| "failed to poll interface after sending")?;

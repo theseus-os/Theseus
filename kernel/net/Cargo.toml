@@ -5,6 +5,7 @@ description = "Network device abstractions"
 edition = "2021"
 
 [dependencies]
+heapless = "0.7.8"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 log = "0.4.8"
 mutex_sleep = { path = "../mutex_sleep" }
@@ -14,8 +15,7 @@ spin = "0.9"
 
 [dependencies.smoltcp]
 # TODO: move to patch in root Cargo.toml after removing legacy net interface
-git = "https://github.com/tsoutsman/smoltcp"
-branch = "object-safe-any-socket"
+git = "https://github.com/smoltcp-rs/smoltcp"
 default-features = false
 features = [
     "alloc",

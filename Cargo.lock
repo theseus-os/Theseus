@@ -2204,6 +2204,7 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 name = "net"
 version = "0.1.0"
 dependencies = [
+ "heapless",
  "irq_safety",
  "log",
  "mutex_sleep",
@@ -3348,7 +3349,7 @@ dependencies = [
 [[package]]
 name = "smoltcp"
 version = "0.8.1"
-source = "git+https://github.com/tsoutsman/smoltcp?branch=object-safe-any-socket#24af392a25ede49b74f4760d7daf55fdd8551e79"
+source = "git+https://github.com/smoltcp-rs/smoltcp#19c7cba8d39dc0cea0fbd9a7ec7d7cb2ec8301c6"
 dependencies = [
  "bitflags",
  "byteorder",

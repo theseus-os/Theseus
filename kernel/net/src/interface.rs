@@ -1,5 +1,5 @@
 use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
-use alloc::{collections::BTreeMap, vec::Vec};
+use alloc::vec::Vec;
 use core::marker::PhantomData;
 use irq_safety::MutexIrqSafe;
 use mutex_sleep::MutexSleep;
@@ -25,7 +25,7 @@ impl NetworkInterface {
     {
         let hardware_addr = wire::EthernetAddress(device.lock().mac_address()).into();
 
-        let mut routes = iface::Routes::new(BTreeMap::new());
+        let mut routes = iface::Routes::new();
 
         match gateway {
             IpAddress::Ipv4(addr) => routes.add_default_ipv4_route(addr),
@@ -40,9 +40,9 @@ impl NetworkInterface {
             iface::InterfaceBuilder::new()
                 .random_seed(random::next_u64())
                 .hardware_addr(hardware_addr)
-                .ip_addrs([ip])
+                .ip_addrs(heapless::Vec::<_, 5>::from_slice(&[ip]).unwrap())
                 .routes(routes)
-                .neighbor_cache(iface::NeighborCache::new(BTreeMap::new()))
+                .neighbor_cache(iface::NeighborCache::new())
                 .finalize(&mut wrapper),
         );
 
@@ -73,8 +73,6 @@ impl NetworkInterface {
     }
 
     /// Polls the sockets associated with the interface.
-    ///
-    /// This should only be called by NIC drivers when new data is received.
     pub fn poll(&self) -> Result<()> {
         let mut inner = self.inner.lock().expect("failed to lock inner interface");
         let mut wrapper = DeviceWrapper {
@@ -82,9 +80,6 @@ impl NetworkInterface {
         };
         let mut sockets = self.sockets.lock().expect("failed to lock sockets");
 
-        // NOTE: If some application decides to lock a socket for an extended period of
-        // time, this will prevent all other sockets from being polled. Not sure if
-        // there's a great way around this.
         inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut sockets)?;
 
         Ok(())
