@@ -16,5 +16,8 @@ path = "../logger"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
+[features]
+bios = []
+
 [lib]
 crate-type = ["rlib"]

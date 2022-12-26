@@ -26,8 +26,8 @@ path = "../memory"
 [dependencies.stack]
 path = "../stack"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.task]
 path = "../task"

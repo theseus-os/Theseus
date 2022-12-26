@@ -1,0 +1,62 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "memory"
+description = "The memory management subsystem"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spin = "0.9.4"
+bitflags = "1.1.0"
+multiboot2 = "0.14.0"
+xmas-elf = { version = "0.6.2", git = "https://github.com/theseus-os/xmas-elf.git" }
+bit_field = "0.7.0"
+zerocopy = "0.5.0"
+
+# [target.'cfg(target_arch = "x86_64")'.dependencies]
+# x86_64 = "0.14.8"
+# memory_x86_64 = { path = "../memory_x86_64" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+memory_aarch64 = { path = "../memory_aarch64" }
+
+[dependencies.log]
+version = "0.4.8"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+# [dependencies.atomic_linked_list]
+# path = "../../libs/atomic_linked_list"
+
+[dependencies.kernel_config]
+path = "../../../kernel/kernel_config"
+
+[dependencies.memory_structs]
+path = "../../../kernel/memory_structs"
+
+[dependencies.page_table_entry]
+path = "../../../kernel/page_table_entry"
+
+[dependencies.pte_flags]
+path = "../../../kernel/pte_flags"
+
+[dependencies.page_allocator]
+path = "../../../kernel/page_allocator"
+
+[dependencies.frame_allocator]
+path = "../../../kernel/frame_allocator"
+
+[dependencies.no_drop]
+path = "../../../kernel/no_drop"
+
+[dependencies.owned_borrowed_trait]
+path = "../../../libs/owned_borrowed_trait"
+
+
+[lib]
+crate-type = ["rlib"]

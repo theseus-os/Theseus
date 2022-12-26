@@ -18,6 +18,7 @@ dependencies = [
  "rsdp",
  "rsdt",
  "spin 0.9.4",
+ "time",
 ]
 
 [[package]]
@@ -128,16 +129,13 @@ name = "app_io"
 version = "0.1.0"
 dependencies = [
  "core2",
- "event_types",
- "keycodes_ascii",
- "libterm",
- "log",
+ "hashbrown",
+ "lazy_static",
  "logger",
- "print",
- "spin 0.9.4",
+ "mutex_sleep",
  "stdio",
  "task",
- "window_manager",
+ "tty",
 ]
 
 [[package]]
@@ -150,6 +148,7 @@ checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 name = "async_channel"
 version = "0.1.0"
 dependencies = [
+ "core2",
  "crossbeam-utils",
  "debugit",
  "hpet",
@@ -301,6 +300,7 @@ name = "bm"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "async_channel",
  "fs_node",
  "getopts",
@@ -318,7 +318,6 @@ dependencies = [
  "simple_ipc",
  "spawn",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -326,10 +325,16 @@ name = "boot_info"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "bootloader_api",
  "kernel_config",
  "memory_structs",
  "multiboot2",
 ]
+
+[[package]]
+name = "bootloader_api"
+version = "0.11.0"
+source = "git+https://github.com/theseus-os/bootloader?branch=theseus#6cc130e2f9dc633445846a1e2c4d961b1daddd78"
 
 [[package]]
 name = "bootloader_modules"
@@ -355,8 +360,9 @@ name = "captain"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
+ "app_io",
  "console",
+ "cpu",
  "device_manager",
  "dfqueue",
  "e1000",
@@ -375,7 +381,6 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
- "print",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -419,6 +424,7 @@ checksum = "79c2681d6594606957bbb8631c4b90a7fcaaa72cdb714743a437b156d6a7eedd"
 name = "cd"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "environment",
  "fs_node",
  "getopts",
@@ -426,7 +432,6 @@ dependencies = [
  "path",
  "root",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -445,12 +450,12 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 name = "channel_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
+ "cpu",
  "getopts",
  "log",
  "spawn",
  "task",
- "terminal_print",
  "unified_channel",
 ]
 
@@ -470,17 +475,18 @@ dependencies = [
 name = "console"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "async_channel",
  "core2",
  "io",
  "irq_safety",
  "log",
- "mpmc",
+ "mod_mgmt",
+ "path",
  "serial_port",
  "spawn",
- "spin 0.9.4",
  "task",
- "text_terminal",
+ "tty",
 ]
 
 [[package]]
@@ -597,10 +603,6 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
- "getopts",
- "runqueue",
- "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -723,8 +725,8 @@ checksum = "7313c0d620d0cb4dbd9d019e461a4beb501071ff46ec0ab933efb4daa76d73e3"
 name = "date"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "rtc",
- "terminal_print",
 ]
 
 [[package]]
@@ -807,6 +809,7 @@ dependencies = [
 name = "deps"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "crate_name_utils",
  "getopts",
  "itertools",
@@ -815,7 +818,6 @@ dependencies = [
  "mod_mgmt",
  "spin 0.9.4",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -909,6 +911,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ea835d29036a4087793836fa931b08837ad5e957da9e23886b29586fb9b6650"
 
 [[package]]
+name = "dreadnought"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "mutex_sleep",
+ "scheduler",
+ "sleep",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "e1000"
 version = "0.1.0"
 dependencies = [
@@ -988,8 +1002,8 @@ dependencies = [
 name = "example"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
- "terminal_print",
 ]
 
 [[package]]
@@ -1010,14 +1024,14 @@ dependencies = [
 name = "exceptions_full"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
+ "cpu",
  "debug_info",
  "fault_log",
  "locked_idt",
  "log",
  "memory",
  "pmu_x86",
- "print",
  "runqueue",
  "signal_handler",
  "stack_trace",
@@ -1082,11 +1096,11 @@ dependencies = [
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
- "print",
  "task",
  "vga_buffer",
 ]
@@ -1171,6 +1185,79 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "futures"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38390104763dc37a5145a53c29c63c1290b5d316d6086ec32c293f6736051bb0"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-io",
+ "futures-sink",
+ "futures-task",
+ "futures-util",
+]
+
+[[package]]
+name = "futures-channel"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52ba265a92256105f45b719605a571ffe2d1f0fea3807304b522c1d778f79eed"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+]
+
+[[package]]
+name = "futures-core"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04909a7a7e4633ae6c4a9ab280aeb86da1236243a77b694a49eacd659a4bd3ac"
+
+[[package]]
+name = "futures-io"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00f5fb52a06bdcadeb54e8d3671f8888a39697dcb0b81b23b55174030427f4eb"
+
+[[package]]
+name = "futures-macro"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdfb8ce053d86b91919aad980c220b1fb8401a9394410e1c289ed7e66b61835d"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "futures-sink"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39c15cf1a4aa79df40f1bb462fb39676d0ad9e366c2a33b590d7c66f4f81fcf9"
+
+[[package]]
+name = "futures-task"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ffb393ac5d9a6eaa9d3fdf37ae2776656b706e200c8e16b1bdb227f5198e6ea"
+
+[[package]]
+name = "futures-util"
+version = "0.3.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "197676987abd2f9cadff84926f410af1c183608d36641465df73ae8211dc65d6"
+dependencies = [
+ "futures-core",
+ "futures-macro",
+ "futures-sink",
+ "futures-task",
+ "pin-project-lite",
+ "pin-utils",
 ]
 
 [[package]]
@@ -1268,6 +1355,7 @@ name = "heap_eval"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
  "getopts",
  "hashbrown",
  "heap",
@@ -1277,7 +1365,6 @@ dependencies = [
  "qp-trie",
  "runqueue",
  "spawn",
- "terminal_print",
 ]
 
 [[package]]
@@ -1309,8 +1396,8 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
- "terminal_print",
 ]
 
 [[package]]
@@ -1324,6 +1411,7 @@ dependencies = [
  "sdt",
  "spin 0.9.4",
  "static_assertions",
+ "time",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1348,13 +1436,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8734b0cfd3bc3e101ec59100e101c2eecd19282202e87808b3037b442777a83"
 
 [[package]]
-name = "immediate_input_echo"
+name = "hull"
 version = "0.1.0"
 dependencies = [
  "app_io",
  "core2",
- "log",
- "stdio",
+ "embedded-hal",
+ "hashbrown",
+ "mod_mgmt",
+ "nb 1.0.0",
+ "noline",
+ "path",
+ "root",
+ "spawn",
+ "task",
+ "tty",
 ]
 
 [[package]]
@@ -1366,15 +1462,6 @@ dependencies = [
  "autocfg",
  "hashbrown",
  "serde",
-]
-
-[[package]]
-name = "input_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "log",
 ]
 
 [[package]]
@@ -1478,7 +1565,6 @@ name = "ixgbe"
 version = "0.1.0"
 dependencies = [
  "acpi",
- "apic",
  "bit_field 0.7.0",
  "hashbrown",
  "hpet",
@@ -1535,17 +1621,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "keyboard_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "keycodes_ascii",
- "log",
- "scheduler",
-]
-
-[[package]]
 name = "keycodes_ascii"
 version = "0.1.0"
 dependencies = [
@@ -1557,11 +1632,11 @@ dependencies = [
 name = "kill"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "debugit",
  "getopts",
  "runqueue",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -1615,7 +1690,6 @@ dependencies = [
  "framebuffer_drawer",
  "framebuffer_printer",
  "log",
- "print",
  "root",
  "shapes",
  "text_display",
@@ -1712,12 +1786,12 @@ dependencies = [
 name = "ls"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "log",
  "path",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -1882,10 +1956,10 @@ dependencies = [
 name = "mkdir"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "task",
- "terminal_print",
  "vfs_node",
 ]
 
@@ -2106,7 +2180,6 @@ dependencies = [
  "no_drop",
  "panic_entry",
  "serial_port_basic",
- "spin 0.9.4",
  "stack",
  "state_store",
  "vga_buffer",
@@ -2205,16 +2278,26 @@ name = "no_drop"
 version = "0.1.0"
 
 [[package]]
+name = "noline"
+version = "0.2.0"
+source = "git+https://github.com/theseus-os/noline?branch=history-dedup#f5b6e4e1be89d1c13f5443b1bdc1fb6e1d17ccc7"
+dependencies = [
+ "embedded-hal",
+ "nb 1.0.0",
+ "num_enum",
+]
+
+[[package]]
 name = "ns"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "memory",
  "mod_mgmt",
  "path",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2281,9 +2364,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.9.0"
+version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
+checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "ota_update_client"
@@ -2442,9 +2525,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pin-project-lite"
+version = "0.2.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e0a7ae3ac2f1173085d398531c705756c94a4c56843785df85a60c1a0afac116"
+
+[[package]]
+name = "pin-utils"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b870d8c151b6f2fb93e84a13146138f05d02ed11c7e7c54f8826aaaf7c9f184"
+
+[[package]]
 name = "ping"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "byteorder",
  "getopts",
  "hashbrown",
@@ -2454,7 +2550,6 @@ dependencies = [
  "ota_update_client",
  "smoltcp 0.5.0",
  "smoltcp_helper",
- "terminal_print",
  "upd",
 ]
 
@@ -2497,9 +2592,9 @@ checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 name = "pmu_sample_start"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "pmu_x86",
- "print",
  "spawn",
 ]
 
@@ -2507,9 +2602,9 @@ dependencies = [
 name = "pmu_sample_stop"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "pmu_x86",
- "print",
 ]
 
 [[package]]
@@ -2548,16 +2643,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "log",
-]
-
-[[package]]
-name = "print"
-version = "0.1.0"
-dependencies = [
- "dfqueue",
- "event_types",
- "log",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -2604,10 +2689,10 @@ dependencies = [
 name = "ps"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "scheduler",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2653,9 +2738,9 @@ dependencies = [
 name = "pwd"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2726,6 +2811,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6823ea29436221176fe662da99998ad3b4db2c7f31e7b6f5fe43adccd6320bb"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "raw_mode"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
 ]
 
 [[package]]
@@ -2805,13 +2898,13 @@ dependencies = [
 name = "rm"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "fs_node",
  "getopts",
  "log",
  "path",
  "root",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -2825,10 +2918,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "rq_eval"
+name = "rq"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "app_io",
+ "getopts",
+ "runqueue",
+ "task",
+]
+
+[[package]]
+name = "rq_eval"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "cpu",
  "getopts",
  "hpet",
  "libtest",
@@ -2836,7 +2941,6 @@ dependencies = [
  "runqueue",
  "spawn",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -3032,6 +3136,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "seconds_counter"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "time",
+]
+
+[[package]]
 name = "semver"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3126,7 +3238,6 @@ dependencies = [
  "libterm",
  "log",
  "path",
- "print",
  "root",
  "runqueue",
  "scheduler",
@@ -3134,7 +3245,6 @@ dependencies = [
  "spin 0.9.4",
  "stdio",
  "task",
- "terminal_print",
  "window_manager",
 ]
 
@@ -3155,8 +3265,8 @@ dependencies = [
 name = "simd_personality"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 0.1.10",
+ "cpu",
  "fs_node",
  "log",
  "memory",
@@ -3263,9 +3373,9 @@ dependencies = [
 name = "spawn"
 version = "0.1.0"
 dependencies = [
- "apic",
  "catch_unwind",
  "context_switch",
+ "cpu",
  "debugit",
  "fault_crate_swap",
  "fault_log",
@@ -3418,6 +3528,7 @@ version = "0.1.0"
 name = "swap"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "crate_swap",
  "fs_node",
  "getopts",
@@ -3427,7 +3538,6 @@ dependencies = [
  "mod_mgmt",
  "path",
  "task",
- "terminal_print",
 ]
 
 [[package]]
@@ -3462,8 +3572,8 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic",
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3496,45 +3606,43 @@ dependencies = [
 ]
 
 [[package]]
-name = "terminal_print"
+name = "test_async"
 version = "0.1.0"
 dependencies = [
- "dfqueue",
- "event_types",
- "logger",
- "spin 0.9.4",
- "task",
+ "app_io",
+ "dreadnought",
 ]
 
 [[package]]
 name = "test_backtrace"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "backtrace",
  "log",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_block_io"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "ata",
  "core2",
  "io",
  "log",
  "storage_manager",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_channel"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
  "async_channel",
+ "cpu",
  "getopts",
  "log",
  "rendezvous",
@@ -3542,16 +3650,16 @@ dependencies = [
  "spawn",
  "spin 0.9.4",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_downtime"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
  "async_channel",
  "color",
+ "cpu",
  "framebuffer",
  "framebuffer_drawer",
  "getopts",
@@ -3564,7 +3672,6 @@ dependencies = [
  "spawn",
  "spin 0.9.4",
  "task",
- "terminal_print",
  "unified_channel",
  "window",
 ]
@@ -3573,23 +3680,23 @@ dependencies = [
 name = "test_filerw"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
  "memfs",
  "memory",
  "root",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_ixgbe"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "ixgbe",
  "log",
  "network_interface_card",
  "spawn",
- "terminal_print",
 ]
 
 [[package]]
@@ -3604,17 +3711,17 @@ dependencies = [
 name = "test_mlx5"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "ixgbe",
  "log",
  "mlx5",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_mutex_sleep"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "cpu",
  "log",
  "mutex_sleep",
  "scheduler",
@@ -3626,53 +3733,53 @@ dependencies = [
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_realtime"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
  "scheduler",
  "sleep",
  "spawn",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_restartable"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "getopts",
  "log",
  "spawn",
  "spin 0.9.4",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "core2",
  "io",
  "irq_safety",
  "log",
  "serial_port",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "core2",
  "log",
- "terminal_print",
  "theseus_std",
 ]
 
@@ -3689,13 +3796,13 @@ dependencies = [
 name = "test_wait_queue"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
+ "cpu",
  "log",
  "scheduler",
  "spawn",
  "spin 0.9.4",
  "task",
- "terminal_print",
  "wait_condition",
 ]
 
@@ -3704,11 +3811,11 @@ name = "test_wasmtime"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "app_io",
  "getopts",
  "log",
  "path",
  "task",
- "terminal_print",
  "wasmtime",
 ]
 
@@ -3747,17 +3854,13 @@ dependencies = [
  "cat",
  "cd",
  "channel_eval",
- "cpu",
  "date",
  "deps",
  "example",
  "heap_eval",
  "hello",
- "immediate_input_echo",
- "input_echo",
- "keyboard_echo",
+ "hull",
  "kill",
- "less",
  "libtest",
  "loadc",
  "ls",
@@ -3770,11 +3873,15 @@ dependencies = [
  "print_fault_log",
  "ps",
  "pwd",
+ "raw_mode",
  "rm",
+ "rq",
  "rq_eval",
  "scheduler_eval",
+ "seconds_counter",
  "shell",
  "swap",
+ "test_async",
  "test_backtrace",
  "test_block_io",
  "test_channel",
@@ -3867,8 +3974,8 @@ dependencies = [
 name = "tls_test"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "log",
- "terminal_print",
  "test_thread_local",
  "thread_local_macro",
 ]
@@ -3885,12 +3992,21 @@ dependencies = [
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",
  "x86_64",
+]
+
+[[package]]
+name = "tty"
+version = "0.1.0"
+dependencies = [
+ "async_channel",
+ "core2",
+ "mutex_sleep",
 ]
 
 [[package]]
@@ -3953,16 +4069,17 @@ dependencies = [
 name = "unwind_test"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "catch_unwind",
  "log",
  "task",
- "terminal_print",
 ]
 
 [[package]]
 name = "upd"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "crate_swap",
  "fs_node",
  "getopts",
@@ -3976,7 +4093,6 @@ dependencies = [
  "smoltcp 0.5.0",
  "spin 0.9.4",
  "task",
- "terminal_print",
  "vfs_node",
 ]
 

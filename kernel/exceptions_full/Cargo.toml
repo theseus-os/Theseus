@@ -13,11 +13,11 @@ locked_idt = { path = "../../libs/locked_idt" }
 [dependencies.vga_buffer]
 path = "../vga_buffer"
 
-[dependencies.print]
-path = "../print"
+[dependencies.app_io]
+path = "../app_io"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"

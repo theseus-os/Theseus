@@ -9,23 +9,19 @@
 
 %include "defines.asm"
 
-; Debug builds require a larger initial boot stack,
-; because their code is larger and less optimized.
-%ifndef INITIAL_STACK_SIZE
-%ifdef DEBUG
-	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
-%else 
-	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
-%endif 
-%endif
-
-
-global start
+global _start
 
 ; Section must have the permissions of .text
 section .init.text32 progbits alloc exec nowrite
 bits 32 ;We are still in protected mode
-start:
+
+extern set_up_SSE
+
+%ifdef ENABLE_AVX
+extern set_up_AVX
+%endif ; ENABLE_AVX
+
+_start:
 	; The bootloader has loaded us into 32-bit protected mode. 
 	; Interrupts are disabled. Paging is disabled.
 
@@ -50,7 +46,7 @@ start:
 	call set_up_SSE
 %ifdef ENABLE_AVX
 	call set_up_AVX
-%endif
+%endif ; ENABLE_AVX
 
 	call set_up_page_tables
 	call unmap_guard_page
@@ -216,60 +212,6 @@ check_long_mode:
 	jmp _error
 
 
-; Check for SSE and enable it. Prints error 'a' if unsupported
-global set_up_SSE
-set_up_SSE:
-	mov eax, 0x1
-	cpuid
-	test edx, 1 << 25
-	jz .no_SSE
-
-	; enable SSE
-	mov eax, cr0
-	and ax, 0xFFFB         ; clear coprocessor emulation CRO.EM
-	or ax, 0x2             ; set coprocessor monitoring CR0.MP
-	mov cr0, eax
-
-	mov eax, cr4
-	or ax, 3 << 9          ; set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
-	mov cr4, eax
-
-	ret
-.no_SSE:
-	mov al, "a"
-	jmp _error
-
-
-; Check for AVX and enable it. Prints error 'b' if unsupported
-%ifdef ENABLE_AVX
-global set_up_AVX
-set_up_AVX:
-	; check architectural support
-	mov eax, 0x1
-	cpuid
-	test ecx, 1 << 26	; is XSAVE supported?
-	jz .no_AVX
-	test ecx, 1 << 28	; is AVX supported?
-	jz .no_AVX
-
-	; enable OSXSAVE
-	mov eax, cr4
-	or eax, 1 << 18		; enable OSXSAVE
-	mov cr4, eax
-
-	; enable AVX
-	mov ecx, 0
-	xgetbv
-	or eax, 110b		; enable SSE and AVX
-	mov ecx, 0
-	xsetbv
-
-	ret
-.no_AVX:
-	mov al, "b"
-	jmp _error
-%endif
-
 ; Prints `ERR: ` and the given error code to screen and hangs.
 ; parameter: error code (in ascii) in al
 global _error
@@ -296,9 +238,10 @@ long_mode_start:
 	jmp rax
 
 section .text
-extern nano_core_start
+extern rust_entry
 extern eputs
 extern puts
+extern KEXIT
 
 global start_high
 start_high:
@@ -352,33 +295,10 @@ start_high:
 
 	; First argument: the higher half address to the multiboot2 information structure
 	add rdi, KERNEL_OFFSET
-	; Second argument: the higher half address to the multiboot2 information structure
+	; Second argument: the top of the initial double fault stack
 	mov rsi, initial_double_fault_stack_top
-	call nano_core_start
-
-	; rust main returned, print `OS returned!`
-	mov rdi, strings.os_return
-	call eputs
-
-	; If the system has nothing more to do, put the computer into an
-	; infinite loop. To do that:
-	; 1) Disable interrupts with cli (clear interrupt enable in eflags).
-	;    They are already disabled by the bootloader, so this is not needed.
-	;    Mind that you might later enable interrupts and return from
-	;    kernel_main (which is sort of nonsensical to do).
-	; 2) Wait for the next interrupt to arrive with hlt (halt instruction).
-	;    Since they are disabled, this will lock up the computer.
-	; 3) Jump to the hlt instruction if it ever wakes up due to a
-	;    non-maskable interrupt occurring or due to system management mode.
-global KEXIT
-KEXIT:
-	cli
-.loop:
-	hlt
-	jmp .loop
-
-
-
+	call rust_entry
+	jmp KEXIT
 
 
 section .rodata
@@ -397,8 +317,6 @@ GDT:
 	dq GDT
 
 strings:
-.os_return:
-	db 'OS returned',0
 .long_start:
 	db 'Hello long mode!',0
 

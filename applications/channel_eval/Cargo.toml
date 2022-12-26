@@ -10,8 +10,8 @@ getopts = "0.2.21"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.unified_channel]
 path = "../../kernel/unified_channel"
@@ -22,5 +22,5 @@ path = "../../kernel/task"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[dependencies.cpu]
+path = "../../kernel/cpu"

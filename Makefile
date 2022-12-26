@@ -141,7 +141,6 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
-		$(assembly_source_files) \
 		gdb \
 		doc docs view-doc view-docs book view-book
 
@@ -283,6 +282,7 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
+cargo : export override FEATURES+=--features nano_core/bios
 cargo: check-rustc 
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
@@ -298,7 +298,7 @@ endif
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)'	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)' RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -589,7 +589,7 @@ doc: check-rustc
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
 	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
 ## Now, build the docs for all of Theseus's main kernel crates.
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)

@@ -7,7 +7,10 @@
 #![feature(type_alias_impl_trait)]
 #![no_std]
 
+#[cfg(feature = "multiboot2")]
 pub mod multiboot2;
+#[cfg(feature = "uefi")]
+pub mod uefi;
 
 use core::{iter::Iterator, ops::Range};
 use memory_structs::{PhysicalAddress, VirtualAddress};
