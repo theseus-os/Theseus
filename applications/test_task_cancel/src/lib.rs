@@ -1,14 +1,21 @@
-// TODO: Test that guard_hog is succesfully cancelled when at the call
-// instruction, in which case it should unwind immediately, and at the jmp
-// (loop) instruction, in which case it should continue to the next instruction,
-// which is the call instruction, and then unwind.
+// TODO: Test that the other thread is succesfully cancelled in the following
+// scenarios:
+//
+// 1. In lsda_generator, in which case it should trigger the first criteria of
+// unwind::can_unwind.
+//
+// 2. At the call lsda_generator instruction, in which case it should trigger
+// the second criteria of unwind::can_unwind.
+//
+// 3. At the jmp (loop) instruction, in which case it should continue to the
+// next (call) instruction and then unwind.
 
 #![no_std]
 
 extern crate alloc;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use spin::Mutex;
 
 pub fn main(_: Vec<String>) -> isize {
@@ -53,4 +60,8 @@ fn lsda_generator() {
     if FALSE.load(Relaxed) {
         panic!();
     }
+
+    // Spend more time in lsda_generator to increase likelihood of scenario 1.
+    static __COUNTER: AtomicUsize = AtomicUsize::new(0);
+    __COUNTER.fetch_add(1, Relaxed);
 }
