@@ -313,9 +313,14 @@ extern "x86-interrupt" fn lapic_timer_handler(mut stack_frame: InterruptStackFra
 
     if let Some(current_task) = task::get_my_current_task()  {
         if current_task.is_cancelled() {
-            unsafe { stack_frame.as_mut() }.update(|stack_frame| stack_frame.cpu_flags |= 0x100);
+            // Trigger a debug interrupt on the next instruction which will invoke task_cancel::interrupt_handler.
+            set_trap_flag(&mut stack_frame);
         }
     }
+}
+
+fn set_trap_flag(stack_frame: &mut InterruptStackFrame) {
+    unsafe { stack_frame.as_mut() }.update(|stack_frame| stack_frame.cpu_flags |= 0x100);
 }
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
