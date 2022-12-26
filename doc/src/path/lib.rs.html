@@ -344,14 +344,14 @@
     
     <span class="doccomment">/// Returns an iterator over the components of this `Path`,
     /// split by the path delimiter `&quot;/&quot;`.
-    </span><span class="kw">pub fn </span>components&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+    </span><span class="kw">pub fn </span>components(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>str&gt; {
         <span class="self">self</span>.path.split(PATH_DELIMITER)
             .filter(|<span class="kw-2">&amp;</span>x| !x.is_empty())
     }
 
     <span class="doccomment">/// Returns a reverse iterator over the components of this `Path`,
     /// split by the path delimiter `&quot;/&quot;`.
-    </span><span class="kw">pub fn </span>rcomponents&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+    </span><span class="kw">pub fn </span>rcomponents(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = <span class="kw-2">&amp;</span>str&gt; {
         <span class="self">self</span>.path.rsplit(PATH_DELIMITER)
             .filter(|<span class="kw-2">&amp;</span>x| !x.is_empty())
     }
@@ -361,14 +361,14 @@
     /// `&quot;/path/to/my/file.a&quot;` -&gt; &quot;file.a&quot;
     /// `&quot;my/file.a&quot;` -&gt; &quot;file.a&quot;
     /// `&quot;file.a&quot;` -&gt; &quot;file.a&quot;
-    </span><span class="kw">pub fn </span>basename&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str {
+    </span><span class="kw">pub fn </span>basename(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
         <span class="self">self</span>.rcomponents()
             .next()
             .unwrap_or(<span class="kw-2">&amp;</span><span class="self">self</span>.path)
     }
 
     <span class="doccomment">/// Like [`basename()`](#method.basename), but excludes the file extension, if present.
-    </span><span class="kw">pub fn </span>file_stem&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str {
+    </span><span class="kw">pub fn </span>file_stem(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
         <span class="self">self</span>.basename()
             .split(EXTENSION_DELIMITER)
             .find(|<span class="kw-2">&amp;</span>x| !x.is_empty())
@@ -378,7 +378,7 @@
     <span class="doccomment">/// Returns the file extension, if present. 
     /// If there are multiple extensions as defined by the extension delimiter, `&#39;.&#39;`,
     /// then the last one will be treated as the extension. 
-    </span><span class="kw">pub fn </span>extension&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+    </span><span class="kw">pub fn </span>extension(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt; {
         <span class="self">self</span>.basename()
             .rsplit(EXTENSION_DELIMITER)
             .find(|<span class="kw-2">&amp;</span>x| !x.is_empty())

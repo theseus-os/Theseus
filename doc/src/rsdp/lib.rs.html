@@ -162,7 +162,7 @@
         {
             <span class="kw">let </span>region_slice: <span class="kw-2">&amp;</span>[u8] = region.as_slice(<span class="number">0</span>, size)<span class="question-mark">?</span>;
             <span class="kw">for </span>offset <span class="kw">in </span>(<span class="number">0</span>..size).step_by(RSDP_SIGNATURE_ALIGNMENT) {
-                <span class="kw">if </span><span class="kw-2">&amp;</span>region_slice[offset..(offset + signature_length)] == <span class="kw-2">&amp;*</span>RSDP_SIGNATURE {
+                <span class="kw">if </span><span class="kw-2">&amp;</span>region_slice[offset..(offset + signature_length)] == RSDP_SIGNATURE {
                     found_offset = <span class="prelude-val">Some</span>(offset);
                 }
             }

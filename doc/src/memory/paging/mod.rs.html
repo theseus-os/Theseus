@@ -388,26 +388,6 @@
 <span id="388">388</span>
 <span id="389">389</span>
 <span id="390">390</span>
-<span id="391">391</span>
-<span id="392">392</span>
-<span id="393">393</span>
-<span id="394">394</span>
-<span id="395">395</span>
-<span id="396">396</span>
-<span id="397">397</span>
-<span id="398">398</span>
-<span id="399">399</span>
-<span id="400">400</span>
-<span id="401">401</span>
-<span id="402">402</span>
-<span id="403">403</span>
-<span id="404">404</span>
-<span id="405">405</span>
-<span id="406">406</span>
-<span id="407">407</span>
-<span id="408">408</span>
-<span id="409">409</span>
-<span id="410">410</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -422,6 +402,7 @@
 <span class="kw">mod </span>table;
 
 <span class="kw">pub use </span>page_table_entry::PageTableEntry;
+
 <span class="kw">pub use </span><span class="self">self</span>::{
     temporary_page::TemporaryPage,
     mapper::{
@@ -438,7 +419,7 @@
 <span class="kw">use super</span>::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET,
+    get_vga_mem_addr, KERNEL_OFFSET, InitialMemoryMappings
 };
 <span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>no_drop::NoDrop;
@@ -610,33 +591,11 @@
 
 
 <span class="doccomment">/// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
-/// Returns the following tuple, if successful:
-/// 
-///  1. The kernel&#39;s new PageTable, which is now currently active,
-///  2. the kernel&#39;s text section MappedPages,
-///  3. the kernel&#39;s rodata section MappedPages,
-///  4. the kernel&#39;s data section MappedPages,
-///  5. a tuple of the stack&#39;s underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  6. the `MappedPages` holding the bootloader info,
-///  7. the kernel&#39;s list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  8. the kernel&#39;s list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
-///
-/// Otherwise, it returns a str error message. 
 </span><span class="kw">pub fn </span>init(
     boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation,
     stack_start_virt: VirtualAddress,
     into_alloc_frames_fn: <span class="kw">fn</span>(FrameRange) -&gt; AllocatedFrames,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(
-        PageTable,
-        NoDrop&lt;MappedPages&gt;,
-        NoDrop&lt;MappedPages&gt;,
-        NoDrop&lt;MappedPages&gt;,
-        (AllocatedPages, NoDrop&lt;MappedPages&gt;),
-        MappedPages,
-        [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
-        [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
-    ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
-{
+) -&gt; <span class="prelude-ty">Result</span>&lt;InitialMemoryMappings, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     </span>mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
@@ -807,16 +766,17 @@
     <span class="comment">// The old page_table set up during bootstrap will be dropped here. It&#39;s no longer being used.
 
     // Return the new page table because that&#39;s the one that should be used by the kernel in future mappings. 
-    </span><span class="prelude-val">Ok</span>((
-        new_table,
-        text_mapped_pages,
-        rodata_mapped_pages,
-        data_mapped_pages,
-        stack_page_group,
-        boot_info_mapped_pages,
-        higher_half_mapped_pages,
-        identity_mapped_pages
-    ))
+    </span><span class="prelude-val">Ok</span>(InitialMemoryMappings {
+        page_table: new_table,
+        text: text_mapped_pages,
+        rodata: rodata_mapped_pages,
+        data: data_mapped_pages,
+        stack_guard: stack_page_group.<span class="number">0</span>,
+        stack: stack_page_group.<span class="number">1</span>,
+        boot_info: boot_info_mapped_pages,
+        higher_half: higher_half_mapped_pages,
+        identity: identity_mapped_pages
+    })
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../../" data-current-crate="memory" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

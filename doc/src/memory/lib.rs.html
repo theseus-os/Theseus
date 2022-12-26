@@ -258,6 +258,7 @@
 <span id="258">258</span>
 <span id="259">259</span>
 <span id="260">260</span>
+<span id="261">261</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -384,34 +385,35 @@
     BROADCAST_TLB_SHOOTDOWN_FUNC.call_once(|| func);
 }
 
-
+<span class="doccomment">/// Information returned after initialising the memory subsystem.
+</span><span class="kw">pub struct </span>InitialMemoryMappings {
+    <span class="doccomment">/// The currently active page table.
+    </span><span class="kw">pub </span>page_table: PageTable,
+    <span class="doccomment">/// The kernel&#39;s text section mappings.
+    </span><span class="kw">pub </span>text: NoDrop&lt;MappedPages&gt;,
+    <span class="doccomment">/// The kernel&#39;s rodata section mappings.
+    </span><span class="kw">pub </span>rodata: NoDrop&lt;MappedPages&gt;,
+    <span class="doccomment">/// The kernel&#39;s data section mappings.
+    </span><span class="kw">pub </span>data: NoDrop&lt;MappedPages&gt;,
+    <span class="doccomment">/// The kernel stack&#39;s guard page.
+    </span><span class="kw">pub </span>stack_guard: AllocatedPages,
+    <span class="doccomment">/// The kernel&#39;s stack mappings.
+    </span><span class="kw">pub </span>stack: NoDrop&lt;MappedPages&gt;,
+    <span class="doccomment">/// The boot information mappings.
+    </span><span class="kw">pub </span>boot_info: MappedPages,
+    <span class="doccomment">/// The list of other higher-half mapping that must be converted to a vec after heap initialization, and kept forever e.g. VGA buffer.
+    </span><span class="kw">pub </span>higher_half: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    <span class="doccomment">/// The list of identity mappings that must be converted to a vec after heap initialization, and dropped before starting the first userspace program.
+    </span><span class="kw">pub </span>identity: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+}
 
 <span class="doccomment">/// Initializes the virtual memory management system.
 /// Consumes the given BootInformation, because after the memory system is initialized,
 /// the original BootInformation will be unmapped and inaccessible.
-/// 
-/// Returns the following tuple, if successful:
-///  1. the kernel&#39;s new `PageTable`, which is now currently active,
-///  2. the `MappedPages` of the kernel&#39;s text section,
-///  3. the `MappedPages` of the kernel&#39;s rodata section,
-///  4. the `MappedPages` of the kernel&#39;s data section,
-///  5. a tuple of the stack&#39;s underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  6. the `MappedPages` holding the bootloader info,
-///  7. the kernel&#39;s list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  8. the kernel&#39;s list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
 </span><span class="kw">pub fn </span>init(
     boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation,
     kernel_stack_start: VirtualAddress,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(
-    PageTable,
-    NoDrop&lt;MappedPages&gt;,
-    NoDrop&lt;MappedPages&gt;,
-    NoDrop&lt;MappedPages&gt;,
-    (AllocatedPages, NoDrop&lt;MappedPages&gt;),
-    MappedPages,
-    [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
-    [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
-), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;InitialMemoryMappings, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// Get the start and end addresses of the kernel, boot info, boot modules, etc.
     // These are all physical addresses.
     </span><span class="kw">let </span>kernel_memory = boot_info.kernel_memory_range()<span class="question-mark">?</span>;
@@ -472,8 +474,8 @@
 
     <span class="comment">// Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     </span>paging::init(boot_info, kernel_stack_start, into_alloc_frames_fn)
-        .inspect(|(new_page_table, ..)| {
-            <span class="macro">debug!</span>(<span class="string">&quot;Done with paging::init(). new page table: {:?}&quot;</span>, new_page_table);
+        .inspect(|InitialMemoryMappings { page_table, .. } | {
+            <span class="macro">debug!</span>(<span class="string">&quot;Done with paging::init(). new page table: {:?}&quot;</span>, page_table);
         })
 }
 

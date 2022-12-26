@@ -1437,7 +1437,7 @@
 
         <span class="prelude-val">Ok</span>((
             MappedPages {
-                page_table_p4: <span class="self">self</span>.target_p4.clone(),
+                page_table_p4: <span class="self">self</span>.target_p4,
                 pages,
                 flags: actual_flags,
             },
@@ -1503,7 +1503,7 @@
         </span>}
 
         <span class="prelude-val">Ok</span>(MappedPages {
-            page_table_p4: <span class="self">self</span>.target_p4.clone(),
+            page_table_p4: <span class="self">self</span>.target_p4,
             pages,
             flags: actual_flags,
         })

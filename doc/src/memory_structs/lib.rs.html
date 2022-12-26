@@ -826,7 +826,7 @@
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped [`Frame`]  using `PageTableEntry::pointed_frame()`.
     </span><span class="kw">pub const fn </span>p1_index(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        (<span class="self">self</span>.number &gt;&gt; <span class="number">0</span>) &amp; <span class="number">0x1FF
+        <span class="self">self</span>.number &amp; <span class="number">0x1FF
     </span>}
 }
 

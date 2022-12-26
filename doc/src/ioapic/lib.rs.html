@@ -163,8 +163,6 @@
 <span id="163">163</span>
 <span id="164">164</span>
 <span id="165">165</span>
-<span id="166">166</span>
-<span id="167">167</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 #[macro_use] </span><span class="kw">extern crate </span>log;
@@ -313,8 +311,6 @@
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
     </span><span class="kw">pub fn </span>set_irq(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
-        <span class="kw">let </span>vector = irq_vector <span class="kw">as </span>u8;
-
         <span class="kw">let </span>low_index: u32 = <span class="number">0x10 </span>+ (ioapic_irq <span class="kw">as </span>u32) * <span class="number">2</span>;
         <span class="kw">let </span>high_index: u32 = <span class="number">0x10 </span>+ (ioapic_irq <span class="kw">as </span>u32) * <span class="number">2 </span>+ <span class="number">1</span>;
 
@@ -328,7 +324,7 @@
         low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">11</span>);
         low &amp;= !<span class="number">0x700</span>;
         low &amp;= !<span class="number">0xff</span>;
-        low |= vector <span class="kw">as </span>u32;
+        low |= irq_vector <span class="kw">as </span>u32;
         <span class="self">self</span>.write_reg(low_index, low);
     }
 }</code></pre></div>

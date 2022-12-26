@@ -1024,7 +1024,6 @@
 <span id="1024">1024</span>
 <span id="1025">1025</span>
 <span id="1026">1026</span>
-<span id="1027">1027</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.
 //! 
 //! The important items are summarized below:
@@ -1351,9 +1350,8 @@
 <span class="kw">impl</span>&lt;R&gt; ByteReader <span class="kw">for </span>ByteReaderWrapper&lt;R&gt; <span class="kw">where </span>R: BlockReader {
     <span class="kw">fn </span>read_at(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>[u8], offset: usize) -&gt; <span class="prelude-ty">Result</span>&lt;usize, IoError&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>tmp_block_bytes: Vec&lt;u8&gt; = Vec::new(); <span class="comment">// avoid unnecessary allocation
-        </span><span class="kw">let </span>offset = offset <span class="kw">as </span>usize;
 
-        <span class="kw">let </span>transfers = blocks_from_bytes(offset .. offset + buffer.len(), <span class="self">self</span>.block_size());
+        </span><span class="kw">let </span>transfers = blocks_from_bytes(offset .. offset + buffer.len(), <span class="self">self</span>.block_size());
         <span class="kw">for </span>transfer <span class="kw">in </span>transfers.iter().flatten() {
             <span class="kw">let </span>BlockByteTransfer { byte_range_absolute, block_range, bytes_in_block_range } = transfer;
             <span class="kw">let </span>buffer_range = byte_range_absolute.start - offset .. byte_range_absolute.end - offset;

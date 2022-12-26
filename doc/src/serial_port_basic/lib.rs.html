@@ -568,7 +568,7 @@
     /// try enabling the loopback test part of this function to see if that passes.
     </span><span class="kw">pub fn </span>new(base_port: u16) -&gt; SerialPort {
         <span class="kw">let </span>serial = SerialPort {
-            data:                       Port::new(base_port + <span class="number">0</span>),
+            data:                       Port::new(base_port    ),
             interrupt_enable:           Port::new(base_port + <span class="number">1</span>),
             interrupt_id_fifo_control:  Port::new(base_port + <span class="number">2</span>),
             line_control:               Port::new(base_port + <span class="number">3</span>),

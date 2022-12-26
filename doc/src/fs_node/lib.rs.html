@@ -241,7 +241,7 @@
             <span class="kw">let </span>parent_path = <span class="kw-2">&amp;</span>cur_dir.lock().get_absolute_path();
             <span class="comment">// Check if the parent path is root 
             </span><span class="kw">if </span>parent_path == <span class="string">&quot;/&quot; </span>{
-                path.insert_str(<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, parent_path));
+                path.insert_str(<span class="number">0</span>,  <span class="kw-2">&amp;</span>parent_path);
                 <span class="kw">return </span>path;
             }
             path.insert_str(<span class="number">0</span>, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>, parent_path));

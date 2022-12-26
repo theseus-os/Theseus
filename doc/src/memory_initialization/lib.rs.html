@@ -128,6 +128,7 @@
 <span id="128">128</span>
 <span id="129">129</span>
 <span id="130">130</span>
+<span id="131">131</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -140,7 +141,7 @@
 <span class="kw">extern crate </span>bootloader_modules;
 <span class="kw">extern crate </span>boot_info;
 
-<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress};
+<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings};
 <span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 <span class="kw">use </span>boot_info::{BootInformation, Module};
 <span class="kw">use </span>alloc::{
@@ -183,16 +184,17 @@
     ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
 {
     <span class="comment">// Initialize memory management: paging (create a new page table), essential kernel mappings
-    </span><span class="kw">let </span>(
-        <span class="kw-2">mut </span>page_table, 
-        text_mapped_pages, 
-        rodata_mapped_pages, 
-        data_mapped_pages, 
-        (stack_guard_page, stack_pages), 
-        boot_info_mapped_pages,
-        higher_half_mapped_pages, 
-        identity_mapped_pages
-    ) = memory::init(<span class="kw-2">&amp;</span>boot_info, kernel_stack_start)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>InitialMemoryMappings {
+        <span class="kw-2">mut </span>page_table,
+        text: text_mapped_pages,
+        rodata: rodata_mapped_pages,
+        data: data_mapped_pages,
+        stack_guard: stack_guard_page,
+        stack: stack_pages,
+        boot_info: boot_info_mapped_pages,
+        higher_half: higher_half_mapped_pages,
+        identity: identity_mapped_pages
+    } = memory::init(<span class="kw-2">&amp;</span>boot_info, kernel_stack_start)<span class="question-mark">?</span>;
     <span class="comment">// After this point, at which `memory::init()` has returned new objects that represent
     // the currently-executing code/data/stack, we must ensure they aren&#39;t dropped if an error occurs,
     // because that will cause them to be auto-unmapped.

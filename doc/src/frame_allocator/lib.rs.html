@@ -1053,10 +1053,6 @@
 <span id="1053">1053</span>
 <span id="1054">1054</span>
 <span id="1055">1055</span>
-<span id="1056">1056</span>
-<span id="1057">1057</span>
-<span id="1058">1058</span>
-<span id="1059">1059</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.
 //! The minimum unit of allocation is a single frame. 
 //!
@@ -1882,11 +1878,9 @@
 ) -&gt; bool {
     <span class="kw">match </span><span class="kw-2">&amp;</span>list.<span class="number">0 </span>{
         Inner::Array(<span class="kw-2">ref </span>arr) =&gt; {
-            <span class="kw">for </span>elem <span class="kw">in </span>arr.iter() {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
-                    <span class="kw">if </span>chunk.contains(frame) { 
-                        <span class="kw">return </span><span class="bool-val">true</span>;
-                    }
+            <span class="kw">for </span>chunk <span class="kw">in </span>arr.iter().flatten() {
+                <span class="kw">if </span>chunk.contains(frame) {
+                    <span class="kw">return </span><span class="bool-val">true</span>;
                 }
             }
         }
@@ -1920,14 +1914,12 @@
     <span class="comment">// Check whether the reserved region overlaps any existing regions.
     </span><span class="kw">match </span><span class="kw-2">&amp;mut </span>list.<span class="number">0 </span>{
         Inner::Array(<span class="kw-2">ref mut </span>arr) =&gt; {
-            <span class="kw">for </span>elem <span class="kw">in </span>arr.iter() {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(_overlap) = chunk.overlap(<span class="kw-2">&amp;</span>frames) {
-                        <span class="comment">// trace!(&quot;Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}&quot;,
-                        //     frames, _overlap, chunk
-                        // );
-                        </span><span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to add reserved region that overlapped with existing reserved regions (array).&quot;</span>);
-                    }
+            <span class="kw">for </span>chunk <span class="kw">in </span>arr.iter().flatten() {
+                <span class="kw">if let </span><span class="prelude-val">Some</span>(_overlap) = chunk.overlap(<span class="kw-2">&amp;</span>frames) {
+                    <span class="comment">// trace!(&quot;Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}&quot;,
+                    //     frames, _overlap, chunk
+                    // );
+                    </span><span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to add reserved region that overlapped with existing reserved regions (array).&quot;</span>);
                 }
             }
         }
