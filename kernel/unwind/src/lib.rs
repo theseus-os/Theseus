@@ -465,11 +465,10 @@ type FuncWithRegistersRefMut<'a> = &'a mut dyn FuncWithRegisters;
 /// either because it has nothing to drop or Rust has determined that the
 /// function will never be unwound.
 ///
-/// 2. The pointer is covered by the unwind tables, has an LSDA, and is covered
-/// by the LSDA's call site table. This occurs when the function has associated
-/// drop handlers and the instruction pointer is at an instruction that could
-/// cause an unwinding (usually a call site to a function that can cause an
-/// unwinding).
+/// 2. The pointer is covered by the unwind tables, and the LSDA's call site
+/// table. This occurs when the function has associated drop handlers and the
+/// instruction pointer is at an instruction that could cause an unwinding
+/// (usually a call site to a function that can cause an unwinding).
 pub fn can_unwind(instruction_pointer: u64) -> bool {
     can_unwind_inner(instruction_pointer).is_some()
 }
@@ -517,6 +516,7 @@ fn can_unwind_inner(instruction_pointer: u64) -> Option<()> {
 
     let lsda_address = match lsda_address {
         Some(address) => VirtualAddress::new_canonical(address as usize),
+        // Criteria 1: Covered by unwind tables, but no LSDA.
         None => return Some(()),
     };
 
@@ -531,6 +531,7 @@ fn can_unwind_inner(instruction_pointer: u64) -> Option<()> {
     let lsda_slice = lsda_pages.as_slice::<u8>(start, length).ok()?;
     let table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, initial_address);
 
+    // Criteria 2: Covered by unwind tables, and LSDA's call site table.
     table
         .call_site_table_entry_for_address(call_site_address)
         .ok()
