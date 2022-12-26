@@ -8,6 +8,11 @@ use smoltcp::{
     socket::AnySocket,
 };
 
+/// A network socket.
+///
+/// In order to use the socket, it must be locked using the [`lock`] method.
+/// This will lock the interface's list of sockets, and so the guard returned by
+/// [`lock`] must be dropped before calling [`Interface::poll`].
 pub struct Socket<'a, T>
 where
     T: AnySocket<'static> + ?Sized,

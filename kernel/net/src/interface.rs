@@ -56,7 +56,7 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<'a, T>(&self, socket: T) -> Socket<T>
+    pub fn add_socket<T>(&self, socket: T) -> Socket<T>
     where
         T: AnySocket<'static>,
     {
