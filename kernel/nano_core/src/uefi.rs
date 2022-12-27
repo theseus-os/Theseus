@@ -68,7 +68,7 @@ pub extern "C" fn _error() {
             // See <https://doc.rust-lang.org/nightly/rust-by-example/unsafe/asm.html#labels>
             "2:",
             "hlt",
-            "jmp 2b",
+            "jmp 2b", // jump backwards ("b") to label "2:".
             options(noreturn)
         )
     }
