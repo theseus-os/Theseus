@@ -24,9 +24,11 @@ use io::{ByteReader, ByteReaderWrapper, ByteReaderWriterWrapper, ByteWriter, Byt
 
 
 pub fn main(_args: Vec<String>) -> isize {
-
-    let dev = storage_manager::storage_devices().next()
-        .expect("no storage devices exist");
+    let dev = match storage_manager::storage_devices().next() {
+        // TODO: Test all devices.
+        Some(dev) => dev,
+        None => return 0,
+    };
 
     {
         // Call `StorageDevice` trait methods directly

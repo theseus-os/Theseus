@@ -1112,6 +1112,7 @@ dependencies = [
  "path",
  "shell",
  "spawn",
+ "test_runner",
 ]
 
 [[package]]
@@ -3756,6 +3757,18 @@ dependencies = [
  "log",
  "spawn",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "test_runner"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "path",
+ "serial_port",
+ "spawn",
+ "task",
+ "x86_64",
 ]
 
 [[package]]

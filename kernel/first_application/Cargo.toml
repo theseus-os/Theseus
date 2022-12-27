@@ -31,5 +31,8 @@ path = "../path"
 [dependencies.shell]
 path = "../../applications/shell"
 
+[dependencies.test_runner]
+path = "../../applications/test_runner"
+
 [lib]
 crate-type = ["rlib"]

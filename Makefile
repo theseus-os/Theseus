@@ -243,7 +243,7 @@ endif
 	@rm -rf $(THESEUS_BUILD_TOML)
 	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
-	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
+	@cp -rf ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'sysroot = "./sysroot"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
@@ -282,7 +282,7 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo : export override FEATURES+=--features nano_core/bios
+cargo : export override FEATURES += --features nano_core/bios
 cargo: check-rustc 
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
@@ -770,6 +770,8 @@ ifdef IOMMU
 	QEMU_FLAGS += -machine q35,kernel-irqchip=split
 	QEMU_FLAGS += -device intel-iommu,intremap=on,caching-mode=on
 endif
+
+# QEMU_FLAGS += -device isa-debug-exit,iobase=0xf4,iosize=0x04
 
 ## Boot from the cd-rom drive
 QEMU_FLAGS += -cdrom $(iso) -boot d

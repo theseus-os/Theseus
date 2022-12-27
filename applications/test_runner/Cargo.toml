@@ -1,0 +1,12 @@
+[package]
+name = "test_runner"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+path = { path = "../../kernel/path" }
+serial_port = { path = "../../kernel/serial_port" }
+spawn = { path = "../../kernel/spawn" }
+task = { path = "../../kernel/task" }
+x86_64 = "0.14"
+log = "*"
