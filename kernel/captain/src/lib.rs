@@ -143,8 +143,7 @@ pub fn init(
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
 
-    #[cfg(feature = "uefi")]
-    {
+    #[cfg(feature = "uefi")] {
         log::error!("uefi boot cannot proceed as it is not fully implemented");
         loop {}
     }

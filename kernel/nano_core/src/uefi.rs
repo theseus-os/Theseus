@@ -18,7 +18,7 @@ pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
 #[naked]
 #[no_mangle]
 #[link_section = ".init.text"]
-pub unsafe extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
+pub extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
     unsafe {
         asm!(
             // First argument  (rdi): a reference to the boot info (passed through).
@@ -31,8 +31,8 @@ pub unsafe extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
             // +------------+--------------+--------------------+
             // ^                           ^                    ^
             // |                           |                   rsi (double_fault_stack)
-            // |                          rsp
-            // kernel_stack_start
+            // kernel_stack_start         rsp
+            // 
             //
             // where the guard page and double fault stack are both one page, and the kernel stack is
             // KERNEL_STACK_SIZE_IN_PAGES pages.
@@ -40,20 +40,20 @@ pub unsafe extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
             // NOTE: Stacks grow downwards e.g. the kernel stack pointer will grow towards the guard
             // page.
             "sub rsp, 4096",
-            "call rust_entry",
+            "call {}",
             "jmp KEXIT",
+            sym rust_entry,
             options(noreturn),
         )
     };
 }
 
-#[no_mangle]
-unsafe extern "C" fn rust_entry(
+fn rust_entry(
     boot_info: &'static bootloader_api::BootInfo,
     double_fault_stack: usize,
 ) {
-    try_exit!(unsafe { early_setup(double_fault_stack) });
-    // See diagram above.
+    try_exit!(early_setup(double_fault_stack));
+    // See the above diagram in `_start`.
     let kernel_stack_start = VirtualAddress::new_canonical(double_fault_stack - STACK_SIZE);
     try_exit!(nano_core(boot_info, kernel_stack_start));
 }
@@ -62,5 +62,14 @@ unsafe extern "C" fn rust_entry(
 #[no_mangle]
 #[link_section = ".init.text"]
 pub extern "C" fn _error() {
-    unsafe { asm!("hlt", options(noreturn)) };
+    unsafe {
+        asm!(
+            // "2:" is a label.
+            // See <https://doc.rust-lang.org/nightly/rust-by-example/unsafe/asm.html#labels>
+            "2:",
+            "hlt",
+            "jmp 2b",
+            options(noreturn)
+        )
+    }
 }
