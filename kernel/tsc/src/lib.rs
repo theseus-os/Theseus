@@ -2,9 +2,21 @@
 
 #[macro_use] extern crate log;
 extern crate pit_clock_basic;
+extern crate time;
 
 use core::sync::atomic::{AtomicUsize, Ordering};
 
+pub struct Tsc;
+
+impl time::ClockSource for Tsc {
+    type ClockType = time::Monotonic;
+
+    /// The current time according to the clock.
+    /// Monotonic clocks return an [`Instant`]
+    fn now() -> <Self::ClockType as time::ClockType>::Unit {
+        time::Instant::new(1)
+    }
+}
 
 #[derive(Debug)]
 pub struct TscTicks(u128);

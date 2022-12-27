@@ -3984,6 +3984,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "pit_clock_basic",
+ "time",
 ]
 
 [[package]]

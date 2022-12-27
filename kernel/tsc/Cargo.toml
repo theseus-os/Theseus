@@ -6,6 +6,7 @@ version = "0.1.0"
 
 [dependencies]
 log = "0.4.8"
+time = { version = "0.1.0", path = "../time" }
 
 [dependencies.pit_clock_basic]
 path = "../pit_clock_basic"
