@@ -162,10 +162,10 @@ export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
 
 ### Convenience targets for building the entire Theseus workspace
-### with all optional features enabled. 
+### with all optional components included. 
 ### See `theseus_features/src/lib.rs` for more details on what this includes.
 all: full
-full : export override FEATURES += --all-features
+full : export override FEATURES += --features theseus_features/everything
 ifeq (,$(findstring --workspace,$(FEATURES)))
 full : export override FEATURES += --workspace
 endif
@@ -647,7 +647,7 @@ help:
 
 	@echo -e "   all:"
 	@echo -e "   full:"
-	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling all Cargo features ('--all-features')."
+	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling the 'theseus_features/everything' feature."
 
 	@echo -e "   run:"
 	@echo -e "\t Builds Theseus (via the 'iso' target) and runs it using QEMU."

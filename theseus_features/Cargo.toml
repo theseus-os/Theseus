@@ -88,6 +88,15 @@ default = [
     "unwind_test",  ## used for regular testing
 ]
 
+## Includes all optional components.
+everything = [
+    "theseus_apps",
+    "theseus_benchmarks",
+    "theseus_std",
+    "theseus_tests",
+    "wasmtime",
+]
+
 ## Includes `wasmtime`, the WebAssembly (WASM) runtime, in the build.
 wasmtime = [ "test_wasmtime" ]
 
