@@ -408,6 +408,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
 
+        // This synchronises with the acquire fence in the thread's exit.
         fence(Ordering::Release);
         
         if let Some(core) = self.pin_on_core {
@@ -688,7 +689,9 @@ where
     drop(recovered_preemption_guard);
     enable_interrupts();
 
-    fence(Ordering::Acquire);
+    // This synchronises with the acquire fence in join.
+    fence(Ordering::Release);
+
     // Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
     catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
@@ -859,7 +862,9 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
     }
 
     // Fourth, synchronise memory.
-    fence(Ordering::Release)
+    //
+    // This synchronises with the release fence in spawn.
+    fence(Ordering::Acquire)
 }
 
 
