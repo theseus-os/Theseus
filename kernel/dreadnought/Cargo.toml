@@ -6,11 +6,10 @@ description = "An asynchronous executor"
 edition = "2021"
 
 [dependencies]
-mutex_sleep = { path = "../mutex_sleep" }
-scheduler = { path = "../scheduler" }
 sleep = { path = "../sleep" }
 spawn = { path = "../spawn" }
 task = { path = "../task" }
+waker = { path = "../waker" }
 
 [dependencies.futures]
 version = "0.3"

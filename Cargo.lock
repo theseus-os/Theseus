@@ -915,11 +915,10 @@ name = "dreadnought"
 version = "0.1.0"
 dependencies = [
  "futures",
- "mutex_sleep",
- "scheduler",
  "sleep",
  "spawn",
  "task",
+ "waker",
 ]
 
 [[package]]
@@ -3604,6 +3603,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "task_join"
+version = "0.1.0"
+dependencies = [
+ "task",
+ "waker",
+]
+
+[[package]]
 name = "test_async"
 version = "0.1.0"
 dependencies = [
@@ -4218,6 +4225,15 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
+ "scheduler",
+ "task",
+]
+
+[[package]]
+name = "waker"
+version = "0.1.0"
+dependencies = [
+ "mutex_sleep",
  "scheduler",
  "task",
 ]

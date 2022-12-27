@@ -1,0 +1,10 @@
+[package]
+name = "task_join"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Task joining"
+edition = "2021"
+
+[dependencies]
+task = { path = "../task" }
+waker = { path = "../waker" }

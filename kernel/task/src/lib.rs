@@ -797,11 +797,6 @@ impl Task {
         self.suspended.load(Ordering::Acquire)
     }
     
-    /// Sets the waker to be awoken when this task exits.
-    pub fn set_waker(&self, waker: Waker) {
-        self.inner.lock().waker = Some(waker);
-    }
-
     /// Sets this `Task` as this CPU's current task.
     /// 
     /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
@@ -1191,6 +1186,11 @@ impl Deref for JoinableTaskRef {
     }
 }
 impl JoinableTaskRef {
+    /// Sets the waker to be awoken when this task exits.
+    pub fn set_waker(&self, waker: Waker) {
+        self.inner.lock().waker = Some(waker);
+    }
+
     /// Busy-waits (spins in a loop) until this task has exited or has been killed.
     ///
     /// # Return

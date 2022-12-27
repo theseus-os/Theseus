@@ -1,0 +1,11 @@
+[package]
+name = "waker"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Waker implementation for the task system"
+edition = "2021"
+
+[dependencies]
+mutex_sleep = { path = "../mutex_sleep" }
+scheduler = { path = "../scheduler" }
+task = { path = "../task" }
