@@ -342,7 +342,7 @@ impl Page {
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped [`Frame`]  using `PageTableEntry::pointed_frame()`.
     pub const fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0x1FF
+        self.number & 0x1FF
     }
 }
 
