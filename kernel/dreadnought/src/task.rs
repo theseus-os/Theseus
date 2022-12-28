@@ -76,7 +76,7 @@ where
                         KillReason::Exception(num) => Err(Error::Exception(num)),
                     },
                 },
-                Err(s) => Err(Error::JoinError(s)),
+                Err(s) => Err(Error::Join(s)),
             })
         } else {
             Poll::Pending
@@ -91,7 +91,7 @@ pub type Result<T> = core::result::Result<T, Error>;
 pub enum Error {
     Cancelled,
     Panic(PanicInfoOwned),
-    /// A `JoinError` should not occur; this indicates a BUG in Theseus's task mgmt.
-    JoinError(&'static str),
+    /// A `Join` error should not occur; this indicates a BUG in Theseus's task mgmt.
+    Join(&'static str),
     Exception(u8),
 }
