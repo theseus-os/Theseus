@@ -30,10 +30,12 @@ static TITLE_BAR_HEIGHT: usize = 20;
 static SCREEN_WIDTH: usize = 1024;
 static SCREEN_HEIGHT: usize = 768;
 
-// TODO: Create an abstraction for COLOR
-static DEFAULT_BORDER_COLOR: u32 = 0x141414;
-static DEFAULT_TEXT_COLOR: u32 = 0xFBF1C7;
-static DEFAULT_WINDOW_COLOR: u32 = 0x3C3836;
+// We could do some fancy stuff with this like a trait, that can convert rgb to hex
+// hex to rgb hsl etc, but for now it feels like bikeshedding
+type Color = u32;
+static DEFAULT_BORDER_COLOR: Color = 0x141414;
+static DEFAULT_TEXT_COLOR: Color = 0xFBF1C7;
+static DEFAULT_WINDOW_COLOR: Color = 0x3C3836;
 
 static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
     const T: u32 = 0xFF0000;
@@ -82,7 +84,7 @@ impl App {
     }
 }
 
-pub fn display_window_title(window: &mut MutexGuard<Window>, fg_color: u32, bg_color: u32) {
+pub fn display_window_title(window: &mut MutexGuard<Window>, fg_color: Color, bg_color: Color) {
     if let Some(title) = window.title.clone() {
         let slice = title.as_str();
         let mut border = window.return_title_border();
@@ -96,8 +98,8 @@ pub fn print_string(
     window: &mut MutexGuard<Window>,
     rect: &Rect,
     slice: &str,
-    fg_color: u32,
-    bg_color: u32,
+    fg_color: Color,
+    bg_color: Color,
     column: usize,
     line: usize,
 ) {
@@ -168,8 +170,8 @@ pub struct TextDisplay {
     next_col: usize,
     next_line: usize,
     text: String,
-    fg_color: u32,
-    bg_color: u32,
+    fg_color: Color,
+    bg_color: Color,
 }
 
 impl TextDisplay {
@@ -179,8 +181,8 @@ impl TextDisplay {
         next_col: usize,
         next_line: usize,
         text: String,
-        fg_color: u32,
-        bg_color: u32,
+        fg_color: Color,
+        bg_color: Color,
     ) -> Self {
         Self {
             width,
@@ -196,6 +198,16 @@ impl TextDisplay {
     pub fn append_char(&mut self, char: char) {
         self.text.push(char);
     }
+}
+
+pub struct RelativePos {
+    x: i32,
+    y: i32,
+}
+
+pub struct WorldPos {
+    x: i32,
+    y: i32,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -335,7 +347,7 @@ impl VirtualFrameBuffer {
         self.copy_window_from_iterators(window);
     }
 
-    fn draw_unchecked(&mut self, x: isize, y: isize, col: u32) {
+    fn draw_unchecked(&mut self, x: isize, y: isize, col: Color) {
         unsafe {
             let index = (self.width * y as usize) + x as usize;
             let pixel = self.buffer.get_unchecked_mut(index);
@@ -753,7 +765,7 @@ impl Window {
     // I'm not exactly sure if using `unsafe` is right bet here
     // but since we are dealing with arrays/slices most of the time
     // we need to only prove they are within bounds once and this let's us safely call `unsafe`
-    fn draw_unchecked(&mut self, x: isize, y: isize, col: u32) {
+    fn draw_unchecked(&mut self, x: isize, y: isize, col: Color) {
         let x = x;
         let y = y;
         unsafe {
@@ -765,7 +777,7 @@ impl Window {
 
     // TODO: add better(line,box..etc) drawing functions
 
-    pub fn draw_rectangle(&mut self, col: u32) {
+    pub fn draw_rectangle(&mut self, col: Color) {
         // TODO: This should be somewhere else and it should be a function
         if self.resized {
             self.resize_framebuffer();
@@ -880,7 +892,7 @@ fn port_loop(
             .as_ref()
             .ok_or("couldn't get HPET timer")?
             .get_counter();
-        let diff = (end - start) * hpet_freq / 1_000_000_000_000;
+        let diff = (end - start) * hpet_freq / 1_000_000;
         let event_opt = key_consumer
             .pop()
             .or_else(|| mouse_consumer.pop())
