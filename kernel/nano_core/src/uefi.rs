@@ -15,32 +15,42 @@ pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
     config.serialize()
 };
 
+/// This is effectively a trampoline function that sets up the proper 
+/// argument values in the proper registers before calling `rust_entry`.
 #[naked]
 #[no_mangle]
 #[link_section = ".init.text"]
 pub extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
     unsafe {
         asm!(
-            // First argument  (rdi): a reference to the boot info (passed through).
-            // Second argument (rsi): the top of the double fault handler stack.
-            "mov rsi, rsp",
-            // Set the kernel stack pointer to the page before the double fault stack.
+            // Upon entering this function:
+            // * rdi contains the first argument, a reference to the boot info.
+            // * the stack pointer (rsp) points to the top of the double fault stack:
             //
-            // +------------+--------------+--------------------+
-            // | guard page | kernel stack | double fault stack |
-            // +------------+--------------+--------------------+
-            // ^                           ^                    ^
-            // |                           |                   rsi (double_fault_stack)
-            // kernel_stack_start         rsp
+            // +------------+------------------------------+--------------------+
+            // | guard page | kernel stack (several pages) | double fault stack |
+            // +------------+------------------------------+--------------------+
+            // ^                                           ^                    ^
+            // |                                           |                   rsi
+            // kernel_stack_start                  rsp (top of stack)
             // 
+            // The guard page and double fault stack are both one page in size;
+            // the kernel stack is `KERNEL_STACK_SIZE_IN_PAGES` pages.
             //
-            // where the guard page and double fault stack are both one page, and the kernel stack is
-            // KERNEL_STACK_SIZE_IN_PAGES pages.
-            //
-            // NOTE: Stacks grow downwards e.g. the kernel stack pointer will grow towards the guard
-            // page.
+            // Stacks grow downwards on x86, meaning that the stack pointer will grow
+            // towards the guard page. That's why we start it at the top (the highest vaddr).
+            
+            // Before invoking `rust_entry`, we need to set up:
+            // 1. First arg  (in rdi): a reference to the boot info (just pass it through).
+            // 2. Second arg (in rsi): the top vaddr of the double fault handler stack.
+            "mov rsi, rsp", // Handle #2 above
+            
+            // Now, adjust the stack pointer to the page before the double fault stack,
+            // which is the top of the initial kernel stack that was allocated for us.
             "sub rsp, 4096",
+            // Now invoke the `rust_entry` function.
             "call {}",
+            // Execution should never return to this point. If it does, halt the CPU and loop.
             "jmp KEXIT",
             sym rust_entry,
             options(noreturn),
