@@ -12,6 +12,7 @@ mod mapper;
 mod table;
 
 pub use page_table_entry::PageTableEntry;
+
 pub use self::{
     temporary_page::TemporaryPage,
     mapper::{
@@ -28,7 +29,7 @@ use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET,
+    get_vga_mem_addr, KERNEL_OFFSET, InitialMemoryMappings
 };
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
@@ -200,33 +201,11 @@ pub fn get_current_p4() -> Frame {
 
 
 /// Initializes a new page table and sets up all necessary mappings for the kernel to continue running. 
-/// Returns the following tuple, if successful:
-/// 
-///  1. The kernel's new PageTable, which is now currently active,
-///  2. the kernel's text section MappedPages,
-///  3. the kernel's rodata section MappedPages,
-///  4. the kernel's data section MappedPages,
-///  5. a tuple of the stack's underlying guard page (an `AllocatedPages` instance) and the actual `MappedPages` backing it,
-///  6. the `MappedPages` holding the bootloader info,
-///  7. the kernel's list of *other* higher-half MappedPages that needs to be converted to a vector after heap initialization, and which should be kept forever,
-///  8. the kernel's list of identity-mapped MappedPages that needs to be converted to a vector after heap initialization, and which should be dropped before starting the first userspace program. 
-///
-/// Otherwise, it returns a str error message. 
 pub fn init(
     boot_info: &impl BootInformation,
     stack_start_virt: VirtualAddress,
     into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
-) -> Result<(
-        PageTable,
-        NoDrop<MappedPages>,
-        NoDrop<MappedPages>,
-        NoDrop<MappedPages>,
-        (AllocatedPages, NoDrop<MappedPages>),
-        MappedPages,
-        [Option<NoDrop<MappedPages>>; 32],
-        [Option<NoDrop<MappedPages>>; 32],
-    ), &'static str>
-{
+) -> Result<InitialMemoryMappings, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
@@ -397,14 +376,15 @@ pub fn init(
     // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
 
     // Return the new page table because that's the one that should be used by the kernel in future mappings. 
-    Ok((
-        new_table,
-        text_mapped_pages,
-        rodata_mapped_pages,
-        data_mapped_pages,
-        stack_page_group,
-        boot_info_mapped_pages,
-        higher_half_mapped_pages,
-        identity_mapped_pages
-    ))
+    Ok(InitialMemoryMappings {
+        page_table: new_table,
+        text: text_mapped_pages,
+        rodata: rodata_mapped_pages,
+        data: data_mapped_pages,
+        stack_guard: stack_page_group.0,
+        stack: stack_page_group.1,
+        boot_info: boot_info_mapped_pages,
+        higher_half: higher_half_mapped_pages,
+        identity: identity_mapped_pages
+    })
 }

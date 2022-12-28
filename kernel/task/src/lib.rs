@@ -54,7 +54,7 @@ use core::{
     hash::{Hash, Hasher},
     ops::Deref,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering, fence},
     task::Waker,
 };
 use alloc::{
@@ -1172,6 +1172,8 @@ impl Deref for JoinableTaskRef {
 impl JoinableTaskRef {
     /// Busy-waits (spins in a loop) until this task has exited or has been killed.
     ///
+    /// Synchronizes memory with respect to the joined task.
+    ///
     /// # Return
     /// * `Ok` containing this `Task`'s [`ExitValue`] once this task has exited.
     ///   * This includes cases where this `Task` failed or was killed.
@@ -1185,6 +1187,10 @@ impl JoinableTaskRef {
 
         // Then, wait for it to actually stop running on any CPU core.
         while self.is_running() { }
+
+        // This synchronizes with the release fence from when this task first ran
+        // (in `spawn::task_wrapper()`).
+        fence(Ordering::Acquire);
 
         self.reap_exit_value()
             .ok_or("BUG: `join()` could not retrieve `ExitValue` after task had exited.")

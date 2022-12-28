@@ -56,7 +56,7 @@ macro_rules! print_raw {
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
         // to silence warnings about unused variables
-        drop(format_args!($($arg)*));
+        let _ = format_args!($($arg)*);
     });
 }
 
