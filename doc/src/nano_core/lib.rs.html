@@ -223,6 +223,14 @@
 <span id="223">223</span>
 <span id="224">224</span>
 <span id="225">225</span>
+<span id="226">226</span>
+<span id="227">227</span>
+<span id="228">228</span>
+<span id="229">229</span>
+<span id="230">230</span>
+<span id="231">231</span>
+<span id="232">232</span>
+<span id="233">233</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -251,7 +259,15 @@
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>vga_buffer::println_raw;
 
-<span class="kw">mod </span>bios;
+<span class="macro">cfg_if::cfg_if! </span>{
+    <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)] </span>{
+        <span class="kw">mod </span>bios;
+    } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)] </span>{
+        <span class="kw">mod </span>uefi;
+    } <span class="kw">else </span>{
+        <span class="macro">compile_error!</span>(<span class="string">&quot;either the &#39;bios&#39; or &#39;uefi&#39; feature must be enabled&quot;</span>);
+    }
+}
 
 <span class="doccomment">/// Used to obtain information about this build of Theseus.
 </span><span class="kw">mod </span>build_info {

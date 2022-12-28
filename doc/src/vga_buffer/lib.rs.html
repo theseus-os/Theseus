@@ -253,7 +253,7 @@
 </span><span class="macro">macro_rules! </span>print_raw {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
         <span class="comment">// to silence warnings about unused variables
-        </span>drop(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+        </span><span class="kw">let _ </span>= <span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
     });
 }
 

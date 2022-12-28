@@ -32,10 +32,10 @@
         <span class="prelude-val">Ok</span>(i) =&gt; i,
         <span class="prelude-val">Err</span>(e) =&gt; shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;failed to load multiboot 2 info: {e:?}&quot;</span>)),
     };
-    <span class="kw">let </span>kernel_stack_start = <span class="macro">try_exit!</span>(VirtualAddress::new(
-        double_fault_stack - <span class="macro">try_exit!</span>(boot_info.stack_size())
-    )
-    .ok_or(<span class="string">&quot;invalid kernel stack start&quot;</span>));
+    <span class="kw">let </span>kernel_stack_start = <span class="macro">try_exit!</span>(
+        VirtualAddress::new(double_fault_stack - <span class="macro">try_exit!</span>(boot_info.stack_size()))
+            .ok_or(<span class="string">&quot;invalid kernel stack start&quot;</span>)
+    );
     <span class="macro">try_exit!</span>(nano_core(boot_info, kernel_stack_start));
 }
 </code></pre></div>
