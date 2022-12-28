@@ -408,7 +408,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
             return Err("BUG: TASKLIST a contained a task with the new task's ID");
         }
 
-        // This synchronises with the acquire fence in the thread's exit.
+        // This synchronizes with the acquire fence in this task's exit cleanup routine
+        // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
         if let Some(core) = self.pin_on_core {
@@ -689,7 +690,7 @@ where
     drop(recovered_preemption_guard);
     enable_interrupts();
 
-    // This synchronises with the acquire fence in join.
+    // This synchronizes with the acquire fence in `JoinableTaskRef::join()`.
     fence(Ordering::Release);
 
     // Now we actually invoke the entry point function that this Task was spawned for,
@@ -861,9 +862,8 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
         // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
     }
 
-    // Fourth, synchronise memory.
-    //
-    // This synchronises with the release fence in spawn.
+    // Fourth, synchronize memory with the release fence of the "parent" task
+    // in `TaskBuilder::spawn()`.
     fence(Ordering::Acquire)
 }
 

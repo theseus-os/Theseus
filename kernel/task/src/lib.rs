@@ -1209,7 +1209,8 @@ impl JoinableTaskRef {
         // Then, wait for it to actually stop running on any CPU core.
         while self.0.is_running() { }
 
-        // This synchronises with the release fence in the thread's entry.
+        // This synchronizes with the release fence from when this task first ran
+        // (in `spawn::task_wrapper()`).
         fence(Ordering::Acquire);
 
         self.task
