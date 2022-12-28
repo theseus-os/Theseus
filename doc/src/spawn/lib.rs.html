@@ -1006,6 +1006,19 @@
 <span id="1006">1006</span>
 <span id="1007">1007</span>
 <span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
+<span id="1011">1011</span>
+<span id="1012">1012</span>
+<span id="1013">1013</span>
+<span id="1014">1014</span>
+<span id="1015">1015</span>
+<span id="1016">1016</span>
+<span id="1017">1017</span>
+<span id="1018">1018</span>
+<span id="1019">1019</span>
+<span id="1020">1020</span>
+<span id="1021">1021</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1024,7 +1037,7 @@
 #[macro_use] </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 
-<span class="kw">use </span>core::{marker::PhantomData, mem, ops::Deref};
+<span class="kw">use </span>core::{marker::PhantomData, mem, ops::Deref, sync::atomic::{fence, Ordering}};
 <span class="kw">use </span>alloc::{
     boxed::Box,
     string::{String, ToString},
@@ -1355,6 +1368,8 @@
 
     <span class="doccomment">/// Finishes this `TaskBuilder` and spawns the new task as described by its builder functions.
     ///
+    /// Synchronizes memory with respect to the spawned task.
+    ///
     /// This merely creates the new task and makes it `Runnable`.
     /// It does not switch to it immediately; that will happen on the next scheduler invocation.
     </span><span class="attr">#[inline(never)]
@@ -1413,6 +1428,10 @@
             <span class="macro">error!</span>(<span class="string">&quot;BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task&#39;s ID! {:?}&quot;</span>, _existing_task);
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: TASKLIST a contained a task with the new task&#39;s ID&quot;</span>);
         }
+
+        <span class="comment">// This synchronizes with the acquire fence in this task&#39;s exit cleanup routine
+        // (in `spawn::task_cleanup_final_internal()`).
+        </span>fence(Ordering::Release);
         
         <span class="kw">if let </span><span class="prelude-val">Some</span>(core) = <span class="self">self</span>.pin_on_core {
             runqueue::add_task_to_specific_runqueue(core, task_ref.clone())<span class="question-mark">?</span>;
@@ -1692,6 +1711,9 @@
     </span>drop(recovered_preemption_guard);
     enable_interrupts();
 
+    <span class="comment">// This synchronizes with the acquire fence in `JoinableTaskRef::join()`.
+    </span>fence(Ordering::Release);
+
     <span class="comment">// Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
     </span>catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
@@ -1860,6 +1882,10 @@
         </span><span class="kw">let </span>_exit_value = current_task.retrieve_exit_value();
         <span class="comment">// trace!(&quot;Reaped orphaned task {:?}, {:?}&quot;, current_task, _exit_value);
     </span>}
+
+    <span class="comment">// Fourth, synchronize memory with the release fence of the &quot;parent&quot; task
+    // in `TaskBuilder::spawn()`.
+    </span>fence(Ordering::Acquire)
 }
 
 

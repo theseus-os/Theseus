@@ -1595,6 +1595,12 @@
 <span id="1595">1595</span>
 <span id="1596">1596</span>
 <span id="1597">1597</span>
+<span id="1598">1598</span>
+<span id="1599">1599</span>
+<span id="1600">1600</span>
+<span id="1601">1601</span>
+<span id="1602">1602</span>
+<span id="1603">1603</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -1650,7 +1656,7 @@
     hash::{Hash, Hasher},
     ops::Deref,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering, fence},
     task::Waker,
 };
 <span class="kw">use </span>alloc::{
@@ -2790,6 +2796,8 @@
 <span class="kw">impl </span>JoinableTaskRef {
     <span class="doccomment">/// Busy-waits (spins in a loop) until this task has exited or has been killed.
     ///
+    /// Synchronizes memory with respect to the joined task.
+    ///
     /// # Return
     /// * `Ok` containing this `Task`&#39;s [`ExitValue`] once this task has exited.
     ///   * This includes cases where this `Task` failed or was killed.
@@ -2803,6 +2811,10 @@
 
         <span class="comment">// Then, wait for it to actually stop running on any CPU core.
         </span><span class="kw">while </span><span class="self">self</span>.<span class="number">0</span>.is_running() { }
+
+        <span class="comment">// This synchronizes with the release fence from when this task first ran
+        // (in `spawn::task_wrapper()`).
+        </span>fence(Ordering::Acquire);
 
         <span class="self">self</span>.task
             .retrieve_exit_value()
