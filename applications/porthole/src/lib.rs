@@ -266,111 +266,39 @@ impl Rect {
     }
 }
 
-pub struct FrameBuffer {
+/// FrameBuffer with no actual physical memory mapped,
+/// used for Window and WindowManager's backbuffer.
+pub struct VirtualFrameBuffer {
     width: usize,
     height: usize,
     buffer: BorrowedSliceMappedPages<u32, Mutable>,
 }
-impl FrameBuffer {
-    fn init_front_buffer() -> Result<FrameBuffer, &'static str> {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        if graphic_info.physical_address() == 0 {
-            return Err("wrong physical address for porthole");
-        }
-        let vesa_display_phys_start =
-            PhysicalAddress::new(graphic_info.physical_address() as usize).ok_or("Invalid address");
-        let buffer_width = graphic_info.width() as usize;
-        let buffer_height = graphic_info.height() as usize;
 
-        let framebuffer = FrameBuffer::new(
-            buffer_width,
-            buffer_height,
-            Some(vesa_display_phys_start.unwrap()),
-        )?;
-        Ok(framebuffer)
-    }
-
-    pub fn new(
-        width: usize,
-        height: usize,
-        physical_address: Option<PhysicalAddress>,
-    ) -> Result<FrameBuffer, &'static str> {
+impl VirtualFrameBuffer {
+    pub fn new(width: usize, height: usize) -> Result<VirtualFrameBuffer, &'static str> {
         let kernel_mmi_ref =
             memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
         let size = width * height * core::mem::size_of::<u32>();
         let pages = memory::allocate_pages_by_bytes(size)
             .ok_or("could not allocate pages for a new framebuffer")?;
-
-        let mapped_framebuffer = if let Some(address) = physical_address {
-            // For best performance, we map the real physical framebuffer memory
-            // as write-combining using the PAT (on x86 only).
-            // If PAT isn't available, fall back to disabling caching altogether.
-            let mut flags: PteFlagsArch = PteFlags::new().valid(true).writable(true).into();
-
-            #[cfg(target_arch = "x86_64")]
-            {
-                let use_pat = page_attribute_table::init().is_ok();
-                if use_pat {
-                    flags = flags.pat_index(
-                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index(),
-                    );
-                    info!("Using PAT write-combining mapping for real physical framebuffer memory");
-                } else {
-                    flags = flags.device_memory(true);
-                    info!("Falling back to cache-disable mapping for real physical framebuffer memory");
-                }
-            }
-            #[cfg(not(target_arch = "x86_64"))]
-            {
-                flags = flags.device_memory(true);
-            }
-
-            let frames = memory::allocate_frames_by_bytes_at(address, size)
-                .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
-            let fb_mp = kernel_mmi_ref
-                .lock()
-                .page_table
-                .map_allocated_pages_to(pages, frames, flags)?;
-            debug!("Mapped real physical framebuffer: {fb_mp:?}");
-            fb_mp
-        } else {
-            kernel_mmi_ref
-                .lock()
-                .page_table
-                .map_allocated_pages(pages, PteFlags::new().valid(true).writable(true))?
-        };
-
-        Ok(FrameBuffer {
+        let mapped_buffer = kernel_mmi_ref
+            .lock()
+            .page_table
+            .map_allocated_pages(pages, PteFlags::new().valid(true).writable(true))?;
+        Ok(VirtualFrameBuffer {
             width,
             height,
-            buffer: mapped_framebuffer
+            buffer: mapped_buffer
                 .into_borrowed_slice_mut(0, width * height)
                 .map_err(|(_mp, s)| s)?,
         })
-    }
-
-    pub fn draw_something(&mut self, x: isize, y: isize, col: u32) {
-        if x > 0 && x < self.width as isize && y > 0 && y < self.height as isize {
-            self.buffer[(self.width * y as usize) + x as usize] = col;
-        }
-    }
-
-    pub fn blank(&mut self) {
-        for pixel in self.buffer.iter_mut() {
-            *pixel = 0x000000;
-        }
-    }
-
-    fn index(&self, x: isize, y: isize) -> usize {
-        let index = (self.width as isize * y) + x;
-        index as usize
     }
 
     fn copy_window_from_iterators(&mut self, window: &mut MutexGuard<Window>) {
         let window_screen = window.on_screen_window(self.width as isize, self.height as isize);
 
         let w_it = window.return_framebuffer_iterator();
-        let f = self.indexer(window_screen);
+        let f = buffer_indexer(&mut self.buffer, self.width, window_screen);
 
         for (w_color, pixel) in w_it.zip(f) {
             *pixel = *w_color;
@@ -407,35 +335,6 @@ impl FrameBuffer {
         self.copy_window_from_iterators(window);
     }
 
-    fn indexer(&mut self, rect: Rect) -> impl Iterator<Item = &mut u32> {
-        let width = self.width;
-        let x = rect.x;
-        let mut y = rect.y;
-        let starter = ((width as isize * y) + x) as usize;
-        let mut keeper = starter;
-        let buffer = self
-            .buffer
-            .iter_mut()
-            .enumerate()
-            .filter(move |(size, _)| {
-                if y >= rect.height as isize + rect.y as isize {
-                    return false;
-                }
-                if *size > starter && size % (keeper + rect.width) == 0 {
-                    y += 1;
-                    keeper = ((width as isize * y) + x) as usize;
-                }
-                if size >= &keeper {
-                    true
-                } else {
-                    false
-                }
-            })
-            .map(|(_, b)| b);
-        buffer
-    }
-    // TODO: clear api conflict between window and framebuffer, either name them better or
-    // make it clear which function belongs to which.
     fn draw_unchecked(&mut self, x: isize, y: isize, col: u32) {
         unsafe {
             let index = (self.width * y as usize) + x as usize;
@@ -443,6 +342,121 @@ impl FrameBuffer {
             *pixel = col;
         }
     }
+    pub fn blank(&mut self) {
+        for pixel in self.buffer.iter_mut() {
+            *pixel = 0x000000;
+        }
+    }
+}
+
+/// Physical framebuffer we use for final rendering to the screen.
+pub struct PhysicalFrameBuffer {
+    width: usize,
+    height: usize,
+    buffer: BorrowedSliceMappedPages<u32, Mutable>,
+}
+impl PhysicalFrameBuffer {
+    fn init_front_buffer() -> Result<PhysicalFrameBuffer, &'static str> {
+        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
+        if graphic_info.physical_address() == 0 {
+            return Err("wrong physical address for porthole");
+        }
+        let vesa_display_phys_start =
+            PhysicalAddress::new(graphic_info.physical_address() as usize).ok_or("Invalid address");
+        let buffer_width = graphic_info.width() as usize;
+        let buffer_height = graphic_info.height() as usize;
+
+        let framebuffer = PhysicalFrameBuffer::new(
+            buffer_width,
+            buffer_height,
+            vesa_display_phys_start.unwrap(),
+        )?;
+        Ok(framebuffer)
+    }
+
+    pub fn new(
+        width: usize,
+        height: usize,
+        physical_address: PhysicalAddress,
+    ) -> Result<PhysicalFrameBuffer, &'static str> {
+        let kernel_mmi_ref =
+            memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
+        let size = width * height * core::mem::size_of::<u32>();
+        let pages = memory::allocate_pages_by_bytes(size)
+            .ok_or("could not allocate pages for a new framebuffer")?;
+
+        let mapped_framebuffer = {
+            // For best performance, we map the real physical framebuffer memory
+            // as write-combining using the PAT (on x86 only).
+            // If PAT isn't available, fall back to disabling caching altogether.
+            let mut flags: PteFlagsArch = PteFlags::new().valid(true).writable(true).into();
+
+            #[cfg(target_arch = "x86_64")]
+            {
+                let use_pat = page_attribute_table::init().is_ok();
+                if use_pat {
+                    flags = flags.pat_index(
+                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index(),
+                    );
+                    info!("Using PAT write-combining mapping for real physical framebuffer memory");
+                } else {
+                    flags = flags.device_memory(true);
+                    info!("Falling back to cache-disable mapping for real physical framebuffer memory");
+                }
+            }
+            #[cfg(not(target_arch = "x86_64"))]
+            {
+                flags = flags.device_memory(true);
+            }
+
+            let frames = memory::allocate_frames_by_bytes_at(physical_address, size)
+                .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
+            let fb_mp = kernel_mmi_ref
+                .lock()
+                .page_table
+                .map_allocated_pages_to(pages, frames, flags)?;
+            debug!("Mapped real physical framebuffer: {fb_mp:?}");
+            fb_mp
+        };
+        Ok(PhysicalFrameBuffer {
+            width,
+            height,
+            buffer: mapped_framebuffer
+                .into_borrowed_slice_mut(0, width * height)
+                .map_err(|(_mp, s)| s)?,
+        })
+    }
+}
+
+pub fn buffer_indexer(
+    buffer: &mut BorrowedSliceMappedPages<u32, Mutable>,
+    buffer_width: usize,
+    rect: Rect,
+) -> impl Iterator<Item = &mut u32> {
+    let width = buffer_width;
+    let x = rect.x;
+    let mut y = rect.y;
+    let starter = ((width as isize * y) + x) as usize;
+    let mut keeper = starter;
+    let buffer = buffer
+        .iter_mut()
+        .enumerate()
+        .filter(move |(size, _)| {
+            if y >= rect.height as isize + rect.y as isize {
+                return false;
+            }
+            if *size > starter && size % (keeper + rect.width) == 0 {
+                y += 1;
+                keeper = ((width as isize * y) + x) as usize;
+            }
+            if size >= &keeper {
+                true
+            } else {
+                false
+            }
+        })
+        .map(|(_, b)| b);
+    buffer
 }
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -483,17 +497,17 @@ pub enum Holding {
 pub struct WindowManager {
     windows: Vec<Weak<Mutex<Window>>>,
     window_rendering_order: Vec<usize>,
-    v_framebuffer: FrameBuffer,
-    p_framebuffer: FrameBuffer,
+    v_framebuffer: VirtualFrameBuffer,
+    p_framebuffer: PhysicalFrameBuffer,
     pub mouse: Rect,
     mouse_holding: Holding,
 }
 
 impl WindowManager {
     fn init() {
-        let p_framebuffer = FrameBuffer::init_front_buffer().unwrap();
+        let p_framebuffer = PhysicalFrameBuffer::init_front_buffer().unwrap();
         let v_framebuffer =
-            FrameBuffer::new(p_framebuffer.width, p_framebuffer.height, None).unwrap();
+            VirtualFrameBuffer::new(p_framebuffer.width, p_framebuffer.height).unwrap();
         let mouse = Rect::new(11, 18, 200, 200);
 
         let window_manager = WindowManager {
@@ -514,7 +528,7 @@ impl WindowManager {
         manager.window_rendering_order.push(len);
         let window = Window::new(
             *dimensions,
-            FrameBuffer::new(dimensions.width, dimensions.height, None).unwrap(),
+            VirtualFrameBuffer::new(dimensions.width, dimensions.height).unwrap(),
             title,
         );
         let arc_window = Arc::new(Mutex::new(window));
@@ -684,13 +698,13 @@ impl WindowManager {
 // TODO: We need to two different coordinate systems, one for window oriented and one for screen oriented tasks
 pub struct Window {
     rect: Rect,
-    pub frame_buffer: FrameBuffer,
+    pub frame_buffer: VirtualFrameBuffer,
     resized: bool,
     title: Option<String>,
 }
 
 impl Window {
-    fn new(rect: Rect, frame_buffer: FrameBuffer, title: Option<String>) -> Window {
+    fn new(rect: Rect, frame_buffer: VirtualFrameBuffer, title: Option<String>) -> Window {
         Window {
             rect,
             frame_buffer,
@@ -729,7 +743,8 @@ impl Window {
     }
 
     pub fn draw_border(&mut self) {
-        let buffer = self.frame_buffer.indexer(self.return_title_border());
+        let border = self.return_title_border();
+        let buffer = buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, border);
         for pixel in buffer {
             *pixel = DEFAULT_BORDER_COLOR;
         }
@@ -768,7 +783,7 @@ impl Window {
     }
 
     fn resize_framebuffer(&mut self) {
-        self.frame_buffer = FrameBuffer::new(self.rect.width, self.rect.height, None).unwrap();
+        self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).unwrap();
     }
 
     fn return_framebuffer_iterator(&mut self) -> impl Iterator<Item = &mut u32> {
@@ -780,11 +795,12 @@ impl Window {
                 bounding_box.x = (self.rect.width - bounding_box.width) as isize;
             }
             bounding_box.y = 0;
-            let buffer = self.frame_buffer.indexer(bounding_box);
+            let buffer =
+                buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, bounding_box);
             buffer
         } else {
             let rect = Rect::new(self.frame_buffer.width, self.frame_buffer.height, 0, 0);
-            let buffer = self.frame_buffer.indexer(rect);
+            let buffer = buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, rect);
             buffer
         }
     }
