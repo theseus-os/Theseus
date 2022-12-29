@@ -10,6 +10,8 @@ extern crate multicore_bringup;
 extern crate scheduler;
 extern crate spin;
 extern crate task;
+use core::ops::Add;
+
 use alloc::format;
 use alloc::sync::{Arc, Weak};
 use log::{debug, info};
@@ -74,7 +76,8 @@ impl App {
         );
         print_string(
             &mut self.window.lock(),
-            &Rect::new(rect.width, rect.height, 300, 22),
+            &rect.as_dimension(),
+            &RelativePos::new(0, 0),
             &self.text.text,
             DEFAULT_TEXT_COLOR,
             DEFAULT_WINDOW_COLOR,
@@ -87,16 +90,16 @@ impl App {
 pub fn display_window_title(window: &mut MutexGuard<Window>, fg_color: Color, bg_color: Color) {
     if let Some(title) = window.title.clone() {
         let slice = title.as_str();
-        let mut border = window.return_title_border();
-        let middle = (border.width - (slice.len() * CHARACTER_WIDTH)) / 2;
-        border.x = middle as isize;
-        print_string(window, &border, slice, fg_color, bg_color, 0, 0);
+        let border = window.return_title_border().as_dimension();
+        let title_pos = window.return_title_pos(&slice.len());
+        print_string(window, &border, &title_pos, slice, fg_color, bg_color, 0, 0);
     }
 }
 
 pub fn print_string(
     window: &mut MutexGuard<Window>,
-    rect: &Rect,
+    dimensions: &Dimensions,
+    pos: &RelativePos,
     slice: &str,
     fg_color: Color,
     bg_color: Color,
@@ -104,12 +107,12 @@ pub fn print_string(
     line: usize,
 ) {
     let slice = slice.as_bytes();
-    let relative_x = rect.x;
-    let relative_y = rect.y;
+    let relative_x = pos.x;
+    let relative_y = pos.y;
     let mut curr_column = column;
     let mut curr_line = line;
-    let start_x = relative_x + (curr_column as isize * CHARACTER_WIDTH as isize);
-    let start_y = relative_y + (curr_line as isize * CHARACTER_HEIGHT as isize);
+    let start_x = relative_x + (curr_column as u32 * CHARACTER_WIDTH as u32);
+    let start_y = relative_y + (curr_line as u32 * CHARACTER_HEIGHT as u32);
     let off_set_x = 0;
     let off_set_y = 0;
 
@@ -118,8 +121,8 @@ pub fn print_string(
     let mut z = 0;
     let mut index_j = j;
     loop {
-        let x = start_x + j as isize;
-        let y = start_y + i as isize;
+        let x = start_x + j as u32;
+        let y = start_y + i as u32;
         if j % CHARACTER_WIDTH == 0 {
             index_j = 0;
         }
@@ -136,12 +139,12 @@ pub fn print_string(
             index_j += 1;
             bg_color
         };
-        window.draw_unchecked(x, y, color);
+        window.draw_unchecked(&RelativePos::new(x, y), color);
 
         j += 1;
         if j == CHARACTER_WIDTH
             || j % CHARACTER_WIDTH == 0
-            || start_x + j as isize == rect.width as isize
+            || start_x + j as u32 == dimensions.width as u32
         {
             if slice.len() >= 1 && z < slice.len() - 1 {
                 z += 1;
@@ -153,7 +156,7 @@ pub fn print_string(
                 j = off_set_x;
             }
 
-            if i == CHARACTER_HEIGHT || start_y + i as isize == rect.height as isize {
+            if i == CHARACTER_HEIGHT || start_y + i as u32 == dimensions.height as u32 {
                 break;
             }
         }
@@ -200,14 +203,37 @@ impl TextDisplay {
     }
 }
 
-pub struct RelativePos {
-    x: i32,
-    y: i32,
+pub struct Dimensions {
+    pub width: usize,
+    pub height: usize,
 }
 
-pub struct WorldPos {
-    x: i32,
-    y: i32,
+impl Dimensions {
+    pub fn new(width: usize, height: usize) -> Self {
+        Self { width, height }
+    }
+}
+
+pub struct RelativePos {
+    pub x: u32,
+    pub y: u32,
+}
+
+impl RelativePos {
+    pub fn new(x: u32, y: u32) -> Self {
+        Self { x, y }
+    }
+}
+
+pub struct ScreenPos {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl ScreenPos {
+    pub fn new(x: i32, y: i32) -> Self {
+        Self { x, y }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -225,6 +251,13 @@ impl Rect {
             height,
             x,
             y,
+        }
+    }
+
+    fn as_dimension(&self) -> Dimensions {
+        Dimensions {
+            width: self.width,
+            height: self.height,
         }
     }
 
@@ -754,6 +787,13 @@ impl Window {
         drawable_area
     }
 
+    pub fn return_title_pos(&self, slice_len: &usize) -> RelativePos {
+        let border = self.return_title_border();
+        let pos = (border.width - (slice_len * CHARACTER_WIDTH)) / 2;
+        let relative_pos = RelativePos::new(pos as u32, 0);
+        relative_pos
+    }
+
     pub fn draw_border(&mut self) {
         let border = self.return_title_border();
         let buffer = buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, border);
@@ -765,9 +805,9 @@ impl Window {
     // I'm not exactly sure if using `unsafe` is right bet here
     // but since we are dealing with arrays/slices most of the time
     // we need to only prove they are within bounds once and this let's us safely call `unsafe`
-    fn draw_unchecked(&mut self, x: isize, y: isize, col: Color) {
-        let x = x;
-        let y = y;
+    fn draw_unchecked(&mut self, relative_pos: &RelativePos, col: Color) {
+        let x = relative_pos.x;
+        let y = relative_pos.y;
         unsafe {
             let index = (self.frame_buffer.width * y as usize) + x as usize;
             let pixel = self.frame_buffer.buffer.get_unchecked_mut(index);
@@ -798,6 +838,7 @@ impl Window {
         self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).unwrap();
     }
 
+    /// Gives framebuffer iterator for the whole screen
     fn return_framebuffer_iterator(&mut self) -> impl Iterator<Item = &mut u32> {
         if self.bottom_side_out() || self.left_side_out() || self.right_side_out() {
             let mut bounding_box =
