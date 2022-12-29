@@ -82,7 +82,7 @@ impl<T> Queue<T> {
 
         for next in iterator {
             let next = box_pointer(Node::new(next));
-            // SAEFTY: The only other pointer to the tail is stored in the second-to-last
+            // SAFETY: The only other pointer to the tail is stored in the second-to-last
             // node. We own first, hence we own all the nodes, hence that reference is not
             // being used.
             unsafe { tail.as_mut() }.next = Some(next);
