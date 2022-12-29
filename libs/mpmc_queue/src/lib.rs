@@ -128,7 +128,8 @@ impl<T> Queue<T> {
         // This will return none if another thread popped the last task between us
         // checking the fast path and now.
         let current_head = pointers.head.take()?;
-        // SAFETY: current_head is a valid pointer.
+        // SAFETY: current_head is a valid pointer and it was created from a box which
+        // ensures the correct layout.
         pointers.head = unsafe { current_head.as_ref() }.next;
 
         // If we are the last node in the list:
@@ -137,15 +138,15 @@ impl<T> Queue<T> {
         }
 
         self.len.fetch_sub(1, Ordering::Release);
-        // SAFETY: current_head is a valid pointer.
+        // SAFETY: current_head is a valid pointer and it was created from a box which
+        // ensures the correct layout.
         Some(unsafe { Box::from_raw(current_head.as_ptr()) }.item)
     }
 }
 
 /// Boxes the item and returns a non-null pointer to the box.
 fn box_pointer<T>(item: T) -> NonNull<T> {
-    let item = Box::new(item);
-    let item_pointer = NonNull::from(Box::leak(item));
+    NonNull::from(Box::leak(Box::new(item)))
 }
 
 #[cfg(test)]
