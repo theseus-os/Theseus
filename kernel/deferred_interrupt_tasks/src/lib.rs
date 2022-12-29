@@ -173,7 +173,7 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
         }
 
         if curr_task.block().is_err() {
-            error!("deffered_task_entry_point: couldn't block task");
+            error!("deferred_task_entry_point: couldn't block {:?}", curr_task);
         }
 
         scheduler::schedule();
