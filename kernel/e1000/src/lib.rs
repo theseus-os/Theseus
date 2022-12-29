@@ -87,7 +87,7 @@ struct E1000RxQueueRegisters(BorrowedMappedPages<E1000RxRegisters, Mutable>);
 impl RxQueueRegisters for E1000RxQueueRegisters {
     fn set_rdbal(&mut self, value: u32) {
         self.0.rx_regs.rdbal.write(value); 
-    }    
+    }
     fn set_rdbah(&mut self, value: u32) {
         self.0.rx_regs.rdbah.write(value); 
     }
@@ -100,7 +100,7 @@ impl RxQueueRegisters for E1000RxQueueRegisters {
     fn set_rdt(&mut self, value: u32) {
         self.0.rx_regs.rdt.write(value); 
     }
-} 
+}
 
 /// A struct which contains the transmit queue registers and implements the `TxQueueRegisters` trait,
 /// which is required to store the registers in a `TxQueue` object.
@@ -109,7 +109,7 @@ struct E1000TxQueueRegisters(BorrowedMappedPages<E1000TxRegisters, Mutable>);
 impl TxQueueRegisters for E1000TxQueueRegisters {
     fn set_tdbal(&mut self, value: u32) {
         self.0.tx_regs.tdbal.write(value); 
-    }    
+    }
     fn set_tdbah(&mut self, value: u32) {
         self.0.tx_regs.tdbah.write(value); 
     }
@@ -256,17 +256,16 @@ impl E1000Nic {
         Ok(nic_ref)
     }
     
-    /// Enables interrupts.
+    /// Initializes the interrupt handler and enables interrupts for this E1000 NIC.
     ///
-    /// The provided interface must be the interface associated with the E1000
-    /// NIC, as it will be polled when an interrupt is received.
-    pub fn enable_interrupts(&mut self, interface: Arc<net::NetworkInterface>) -> Result<(), &'static str> {
-        //self.write_command(REG_IMASK ,0x1F6DC);
-        //self.write_command(REG_IMASK ,0xff & !4);
-
-        self.regs.ims.write(INT_LSC|INT_RX); //RXT and LSC
-        self.regs.icr.read(); // clear all interrupts
-
+    /// The provided `interface` must be the network interface associated with this E1000 NIC.
+    /// This interface will be polled in a deferred task upon an interrupt being triggered
+    /// for a received packet.
+    pub fn init_interrupts(
+        &mut self,
+        interface: Arc<net::NetworkInterface>,
+    ) -> Result<(), &'static str> {
+        self.enable_interrupts();
         let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
             self.interrupt_num,
             e1000_handler,
@@ -336,7 +335,7 @@ impl E1000Nic {
 
         debug!("E1000: read hardware MAC address: {:02x?}", mac_addr);
         mac_addr
-    }   
+    }
 
     /// Start up the network
     fn start_link(regs: &mut E1000Registers) {
@@ -389,7 +388,7 @@ impl E1000Nic {
         regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
         Ok((rx_descs, rx_bufs_in_use))
-    }           
+    }
     
     /// Initialize the array of tramsmit descriptors and return them.
     fn tx_init(
@@ -400,9 +399,24 @@ impl E1000Nic {
         let tx_descs = init_tx_queue(E1000_NUM_TX_DESC as usize, tx_regs)?;
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);
         Ok(tx_descs)
-    }       
-    
-    // reads status and clears interrupt
+    }
+
+    /// Enable interrupts on this E1000 NIC.
+    ///
+    /// Currently this enables interrupts for:
+    /// * Link Status Change
+    /// * Receive transfers (incoming packets)
+    fn enable_interrupts(&mut self) {
+        //self.write_command(REG_IMASK ,0x1F6DC);
+        //self.write_command(REG_IMASK ,0xff & !4);
+
+        // Trigger interrupts on a Link Status Change and on a Receive Transfer.
+        self.regs.ims.write(INT_LSC | INT_RX);
+        // Clear all pending interrupts.
+        self.regs.icr.read();
+    }
+
+    /// Clears pending interrupts by reading the Interrupt Control Register.
     fn clear_interrupt_status(&self) -> u32 {
         self.regs.icr.read()
     }

@@ -143,7 +143,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 info!("e1000 PCI device found at: {:?}", dev.location);
                 let nic = e1000::E1000Nic::init(dev)?;
                 let interface = net::register_device(nic);
-                nic.lock().enable_interrupts(interface)?;
+                nic.lock().init_interrupts(interface)?;
 
                 let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
                 add_to_network_interfaces(e1000_interface);
