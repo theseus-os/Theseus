@@ -145,9 +145,7 @@ impl<T> Queue<T> {
 /// Boxes the item and returns a non-null pointer to the box.
 fn box_pointer<T>(item: T) -> NonNull<T> {
     let item = Box::new(item);
-    let item_pointer = Box::into_raw(item);
-    // SAFETY: We just constructed the box.
-    unsafe { NonNull::new_unchecked(item_pointer) }
+    let item_pointer = NonNull::from(Box::leak(item));
 }
 
 #[cfg(test)]
