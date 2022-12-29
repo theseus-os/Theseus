@@ -236,6 +236,28 @@ impl ScreenPos {
     }
 }
 
+impl Add for ScreenPos {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            x: self.x + other.x,
+            y: self.y + other.y,
+        }
+    }
+}
+
+impl Add<Rect> for ScreenPos {
+    type Output = Self;
+
+    fn add(self, other: Rect) -> Self {
+        Self {
+            x: self.x + other.x as i32,
+            y: self.y + other.y as i32,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
     pub width: usize,
@@ -607,6 +629,11 @@ impl WindowManager {
         }
     }
 
+    pub fn set_mouse_pos(&mut self, screen_pos: &ScreenPos) {
+        self.mouse.x = screen_pos.x as isize;
+        self.mouse.y = screen_pos.y as isize;
+    }
+
     fn update(&mut self) {
         self.v_framebuffer.blank();
         self.draw_windows();
@@ -614,39 +641,36 @@ impl WindowManager {
     }
 
     // TODO: Remove magic numbers
-    fn update_mouse_position(&mut self, x: isize, y: isize) {
-        let mut new_pos_x = self.mouse.x + x;
-        let mut new_pos_y = self.mouse.y - y;
+    fn update_mouse_position(&mut self, screen_pos: ScreenPos) {
+        let mut new_pos = screen_pos + self.mouse;
 
         // handle left
-        if (new_pos_x + (self.mouse.width as isize / 2)) < 0 {
-            new_pos_x = self.mouse.x;
+        if (new_pos.x + (self.mouse.width as i32 / 2)) < 0 {
+            new_pos.x = self.mouse.x as i32;
         }
 
-        if new_pos_x < 0 {
-            new_pos_x = 0;
+        if new_pos.x < 0 {
+            new_pos.x = 0;
         }
 
         // handle right
-        if new_pos_x > (self.v_framebuffer.width) as isize - 3 {
-            new_pos_x = self.v_framebuffer.width as isize - 3;
+        if new_pos.x > (self.v_framebuffer.width) as i32 - 3 {
+            new_pos.x = self.v_framebuffer.width as i32 - 3;
         }
 
         // handle top
-        if new_pos_y < 0 {
-            new_pos_y = 0;
+        if new_pos.y < 0 {
+            new_pos.y = 0;
         }
 
         // handle bottom
-        if new_pos_y > self.v_framebuffer.height as isize - 3 {
-            new_pos_y = self.v_framebuffer.height as isize - 3;
+        if new_pos.y > self.v_framebuffer.height as i32 - 3 {
+            new_pos.y = self.v_framebuffer.height as i32 - 3;
         }
-
-        self.mouse.x = new_pos_x;
-        self.mouse.y = new_pos_y;
+        self.set_mouse_pos(&new_pos);
     }
 
-    fn drag_windows(&mut self, x: isize, y: isize, mouse_event: &MouseEvent) {
+    fn drag_windows(&mut self, screen_pos: ScreenPos, mouse_event: &MouseEvent) {
         if mouse_event.buttons.left() {
             match self.mouse_holding {
                 Holding::Background => todo!(),
@@ -681,30 +705,28 @@ impl WindowManager {
                 Holding::Window(i) => {
                     let window = &mut self.windows[i];
                     let window_rect = window.upgrade().unwrap().lock().rect;
-                    let mut new_pos_x = window_rect.x + x;
-                    let mut new_pos_y = window_rect.y - y;
+                    let mut new_pos = screen_pos + window_rect;
 
                     //handle left
-                    if (new_pos_x + (window_rect.width as isize - 20)) < 0 {
-                        new_pos_x = window_rect.x;
+                    if (new_pos.x + (window_rect.width as i32 - 20)) < 0 {
+                        new_pos.x = window_rect.x as i32;
                     }
 
                     //handle right
-                    if (new_pos_x + 20) > self.v_framebuffer.width as isize {
-                        new_pos_x = window_rect.x;
+                    if (new_pos.x + 20) > self.v_framebuffer.width as i32 {
+                        new_pos.x = window_rect.x as i32;
                     }
 
                     //handle top
-                    if new_pos_y < 0 {
-                        new_pos_y = window_rect.y;
+                    if new_pos.y < 0 {
+                        new_pos.y = window_rect.y as i32;
                     }
 
-                    if new_pos_y + 20 > self.v_framebuffer.height as isize {
-                        new_pos_y = window_rect.y;
+                    if new_pos.y + 20 > self.v_framebuffer.height as i32 {
+                        new_pos.y = window_rect.y as i32;
                     }
 
-                    window.upgrade().unwrap().lock().rect.x = new_pos_x;
-                    window.upgrade().unwrap().lock().rect.y = new_pos_y;
+                    window.upgrade().unwrap().lock().set_pos(&new_pos);
                 }
             }
         } else if mouse_event.buttons.right() {
@@ -721,8 +743,8 @@ impl WindowManager {
                         self.mouse.y,
                     ))
                 {
-                    window.upgrade().unwrap().lock().rect.width += x as usize;
-                    window.upgrade().unwrap().lock().rect.height -= y as usize;
+                    window.upgrade().unwrap().lock().rect.width += screen_pos.x as usize;
+                    window.upgrade().unwrap().lock().rect.height -= screen_pos.y as usize;
                     window.upgrade().unwrap().lock().resized = true;
                 }
             }
@@ -756,6 +778,24 @@ impl Window {
             resized: false,
             title,
         }
+    }
+
+    pub fn width(&self) -> usize {
+        self.rect.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.rect.height
+    }
+
+    pub fn screen_pos(&self) -> ScreenPos {
+        let screen_pos = ScreenPos::new(self.rect.x as i32, self.rect.y as i32);
+        screen_pos
+    }
+
+    pub fn set_pos(&mut self, screen_pos: &ScreenPos) {
+        self.rect.x = screen_pos.x as isize;
+        self.rect.y = screen_pos.y as isize;
     }
 
     pub fn blank(&mut self) {
@@ -829,16 +869,11 @@ impl Window {
         self.draw_border();
     }
 
-    pub fn set_position(&mut self, x: isize, y: isize) {
-        self.rect.x = x;
-        self.rect.y = y;
-    }
-
     fn resize_framebuffer(&mut self) {
         self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).unwrap();
     }
 
-    /// Gives framebuffer iterator for the whole screen
+    /// Gives mutable framebuffer iterator for the whole window
     fn return_framebuffer_iterator(&mut self) -> impl Iterator<Item = &mut u32> {
         if self.bottom_side_out() || self.left_side_out() || self.right_side_out() {
             let mut bounding_box =
@@ -972,8 +1007,12 @@ fn port_loop(
                         }
                     }
                     if x != 0 || y != 0 {
-                        window_manager.lock().update_mouse_position(x, y);
-                        window_manager.lock().drag_windows(x, y, &mouse_event);
+                        window_manager
+                            .lock()
+                            .update_mouse_position(ScreenPos::new(x as i32, -(y as i32)));
+                        window_manager
+                            .lock()
+                            .drag_windows(ScreenPos::new(x as i32, -(y as i32)), &mouse_event);
                     }
                 }
                 _ => (),
