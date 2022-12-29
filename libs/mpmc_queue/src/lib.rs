@@ -103,7 +103,7 @@ impl<T> Queue<T> {
         let mut pointers = self.pointers.lock();
 
         if let Some(mut tail_pointer) = pointers.tail {
-            // SAEFTY: The only other pointer to the tail is stored in the second-to-last
+            // SAFETY: The only other pointer to the tail is stored in the second-to-last
             // node. We hold the lock to pointers, hence we own all the nodes, hence that
             // reference is not being used.
             let tail = unsafe { tail_pointer.as_mut() };
