@@ -215,6 +215,7 @@ impl Dimensions {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct RelativePos {
     pub x: u32,
     pub y: u32,
@@ -730,6 +731,7 @@ impl WindowManager {
                     window.upgrade().unwrap().lock().set_pos(&new_pos);
                 }
             }
+        // FIXME: Resizing is broken if windows are on top of each other
         } else if mouse_event.buttons.right() {
             for window in self.windows.iter_mut() {
                 if window
@@ -745,7 +747,13 @@ impl WindowManager {
                     ))
                 {
                     window.upgrade().unwrap().lock().rect.width += screen_pos.x as usize;
-                    window.upgrade().unwrap().lock().rect.height -= screen_pos.y as usize;
+                    window.upgrade().unwrap().lock().rect.height += screen_pos.y as usize;
+                    window.upgrade().unwrap().lock().reset_drawable_area();
+                    window
+                        .upgrade()
+                        .unwrap()
+                        .lock()
+                        .reset_title_pos_and_border();
                     window.upgrade().unwrap().lock().resized = true;
                 }
             }
@@ -763,12 +771,14 @@ impl WindowManager {
     }
 }
 
-// TODO: We need to two different coordinate systems, one for window oriented and one for screen oriented tasks
 pub struct Window {
     rect: Rect,
     pub frame_buffer: VirtualFrameBuffer,
     resized: bool,
     title: Option<String>,
+    title_border: Option<Rect>,
+    title_pos: Option<RelativePos>,
+    drawable_area: Option<Rect>,
 }
 
 impl Window {
@@ -778,6 +788,9 @@ impl Window {
             frame_buffer,
             resized: false,
             title,
+            title_border: None,
+            title_pos: None,
+            drawable_area: None,
         }
     }
 
@@ -805,10 +818,21 @@ impl Window {
         }
     }
 
+    pub fn reset_drawable_area(&mut self) {
+        self.drawable_area = None;
+    }
+
+    pub fn reset_title_pos_and_border(&mut self) {
+        self.title_border = None;
+        self.title_pos = None;
+    }
+
     /// Returns Window's border area width height with default position
-    pub fn return_title_border(&self) -> Rect {
-        let border = Rect::new(self.rect.width, TITLE_BAR_HEIGHT, 0, 0);
-        border
+    pub fn return_title_border(&mut self) -> Rect {
+        let border =
+            self.title_border
+                .get_or_insert(Rect::new(self.rect.width, TITLE_BAR_HEIGHT, 0, 0));
+        *border
     }
 
     pub fn return_dynamic_border_pos(&self) -> Rect {
@@ -818,21 +842,27 @@ impl Window {
     }
 
     // We don't want user to draw on top a border
-    pub fn return_drawable_area(&self) -> Rect {
+    pub fn return_drawable_area(&mut self) -> Rect {
         let border = self.return_title_border();
-        let x = 0;
-        let y = border.height;
-        let width = border.width;
-        let height = self.rect.height - y;
-        let drawable_area = Rect::new(width, height, x, y as isize);
-        drawable_area
+        let drawable_area = self.drawable_area.get_or_insert({
+            let x = 0;
+            let y = border.height;
+            let width = border.width;
+            let height = self.rect.height - y;
+            let drawable_area = Rect::new(width, height, x, y as isize);
+            drawable_area
+        });
+        *drawable_area
     }
 
-    pub fn return_title_pos(&self, slice_len: &usize) -> RelativePos {
+    pub fn return_title_pos(&mut self, slice_len: &usize) -> RelativePos {
         let border = self.return_title_border();
-        let pos = (border.width - (slice_len * CHARACTER_WIDTH)) / 2;
-        let relative_pos = RelativePos::new(pos as u32, 0);
-        relative_pos
+        let relative_pos = self.title_pos.get_or_insert({
+            let pos = (border.width - (slice_len * CHARACTER_WIDTH)) / 2;
+            let relative_pos = RelativePos::new(pos as u32, 0);
+            relative_pos
+        });
+        *relative_pos
     }
 
     pub fn draw_border(&mut self) {
