@@ -746,8 +746,7 @@ impl WindowManager {
                         self.mouse.y,
                     ))
                 {
-                    window.upgrade().unwrap().lock().rect.width += screen_pos.x as usize;
-                    window.upgrade().unwrap().lock().rect.height += screen_pos.y as usize;
+                    window.upgrade().unwrap().lock().resize_window(screen_pos.x, screen_pos.y);
                     window.upgrade().unwrap().lock().reset_drawable_area();
                     window
                         .upgrade()
@@ -818,6 +817,15 @@ impl Window {
         }
     }
 
+    pub fn resize_window(&mut self,width:i32,height:i32){
+        let new_width = self.width() + width as usize;
+        let new_height = self.height() + height as usize;
+        if new_width >= 50 && new_height >= 50 {
+            self.rect.width = new_width;
+            self.rect.height = new_height;
+        }
+    }
+    
     pub fn reset_drawable_area(&mut self) {
         self.drawable_area = None;
     }
