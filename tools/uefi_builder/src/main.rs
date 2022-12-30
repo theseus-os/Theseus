@@ -1,5 +1,10 @@
+mod fs;
+
 use clap::Parser;
+use fs::UefiBoot;
 use std::path::PathBuf;
+
+const KERNEL_FILE_NAME: &str = "kernel.elf";
 
 #[derive(Parser)]
 struct Args {
@@ -25,7 +30,7 @@ fn main() {
         efi_firmware,
     } = Args::parse();
 
-    let mut bootloader = bootloader::UefiBoot::new(&kernel);
+    let mut bootloader = UefiBoot::new(&kernel);
 
     for file in modules
         .read_dir()

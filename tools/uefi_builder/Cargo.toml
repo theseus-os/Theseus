@@ -9,6 +9,14 @@ edition = "2021"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
 
 [dependencies]
-bootloader = { git = "https://github.com/theseus-os/bootloader", branch = "theseus" }
+anyhow = "1.0"
 clap = { version = "4.0", features = ["derive"] }
+fatfs = "0.3"
+gpt = "3.0"
 ovmf-prebuilt = "0.1.0-alpha.1"
+tempfile = "3.3"
+
+[dependencies.uefi-bootloader]
+artifact = "bin"
+path = "../../../uefi-bootloader"
+target = "x86_64-unknown-uefi"
