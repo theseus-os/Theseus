@@ -1601,6 +1601,83 @@
 <span id="1601">1601</span>
 <span id="1602">1602</span>
 <span id="1603">1603</span>
+<span id="1604">1604</span>
+<span id="1605">1605</span>
+<span id="1606">1606</span>
+<span id="1607">1607</span>
+<span id="1608">1608</span>
+<span id="1609">1609</span>
+<span id="1610">1610</span>
+<span id="1611">1611</span>
+<span id="1612">1612</span>
+<span id="1613">1613</span>
+<span id="1614">1614</span>
+<span id="1615">1615</span>
+<span id="1616">1616</span>
+<span id="1617">1617</span>
+<span id="1618">1618</span>
+<span id="1619">1619</span>
+<span id="1620">1620</span>
+<span id="1621">1621</span>
+<span id="1622">1622</span>
+<span id="1623">1623</span>
+<span id="1624">1624</span>
+<span id="1625">1625</span>
+<span id="1626">1626</span>
+<span id="1627">1627</span>
+<span id="1628">1628</span>
+<span id="1629">1629</span>
+<span id="1630">1630</span>
+<span id="1631">1631</span>
+<span id="1632">1632</span>
+<span id="1633">1633</span>
+<span id="1634">1634</span>
+<span id="1635">1635</span>
+<span id="1636">1636</span>
+<span id="1637">1637</span>
+<span id="1638">1638</span>
+<span id="1639">1639</span>
+<span id="1640">1640</span>
+<span id="1641">1641</span>
+<span id="1642">1642</span>
+<span id="1643">1643</span>
+<span id="1644">1644</span>
+<span id="1645">1645</span>
+<span id="1646">1646</span>
+<span id="1647">1647</span>
+<span id="1648">1648</span>
+<span id="1649">1649</span>
+<span id="1650">1650</span>
+<span id="1651">1651</span>
+<span id="1652">1652</span>
+<span id="1653">1653</span>
+<span id="1654">1654</span>
+<span id="1655">1655</span>
+<span id="1656">1656</span>
+<span id="1657">1657</span>
+<span id="1658">1658</span>
+<span id="1659">1659</span>
+<span id="1660">1660</span>
+<span id="1661">1661</span>
+<span id="1662">1662</span>
+<span id="1663">1663</span>
+<span id="1664">1664</span>
+<span id="1665">1665</span>
+<span id="1666">1666</span>
+<span id="1667">1667</span>
+<span id="1668">1668</span>
+<span id="1669">1669</span>
+<span id="1670">1670</span>
+<span id="1671">1671</span>
+<span id="1672">1672</span>
+<span id="1673">1673</span>
+<span id="1674">1674</span>
+<span id="1675">1675</span>
+<span id="1676">1676</span>
+<span id="1677">1677</span>
+<span id="1678">1678</span>
+<span id="1679">1679</span>
+<span id="1680">1680</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -1630,6 +1707,7 @@
 </span><span class="attr">#![no_std]
 #![feature(panic_info_message)]
 #![feature(thread_local)]
+#![feature(negative_impls)]
 
 #[macro_use] </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
@@ -1849,7 +1927,7 @@
 }
 
 <span class="doccomment">/// The signature of a Task&#39;s failure cleanup function.
-</span><span class="kw">pub type </span>FailureCleanupFunction = <span class="kw">fn</span>(TaskRef, KillReason) -&gt; !;
+</span><span class="kw">pub type </span>FailureCleanupFunction = <span class="kw">fn</span>(ExitableTaskRef, KillReason) -&gt; !;
 
 
 <span class="doccomment">/// A wrapper around `Option&lt;u8&gt;` with a forced type alignment of 2 bytes,
@@ -1888,8 +1966,6 @@
 /// Currently, we only publicize the fields here that need to be modified externally,
 /// primarily by the `spawn` crate for creating and running new tasks. 
 </span><span class="kw">pub struct </span>TaskInner {
-    <span class="doccomment">/// The status or value this Task exited with, if it has already exited.
-    </span>exit_value: <span class="prelude-ty">Option</span>&lt;ExitValue&gt;,
     <span class="doccomment">/// the saved stack pointer value, used for task switching.
     </span><span class="kw">pub </span>saved_sp: usize,
     <span class="doccomment">/// The preemption guard that was used for safely task switching to this task.
@@ -2099,7 +2175,6 @@
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
-                exit_value: <span class="prelude-val">None</span>,
                 saved_sp: <span class="number">0</span>,
                 preemption_guard: <span class="prelude-val">None</span>,
                 drop_after_task_switch: <span class="prelude-val">None</span>,
@@ -2279,30 +2354,6 @@
         <span class="self">self</span>.inner.lock().restart_info.is_some()
     }
 
-    <span class="doccomment">/// An internal function intended for use cleaning up exited tasks.
-    ///
-    /// Retrieves and removes the `ExitValue` from this `Task` and returns it,
-    /// if and only if this `Task` was in the `Exited` runstate.
-    ///
-    /// If this `Task` was in the `Exited` runstate, after invoking this,
-    /// this `Task`&#39;s runstate will be set to `Reaped`
-    /// and this `Task` will be removed from the system task list.
-    ///
-    /// If this `Task` was **not** in the `Exited` runstate, 
-    /// nothing is done and `None` is returned.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`&#39;s inner state in order to mutate it.    
-    </span><span class="attr">#[doc(hidden)]
-    </span><span class="kw">pub fn </span>retrieve_exit_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ExitValue&gt; {
-        <span class="kw">if </span><span class="self">self</span>.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
-            TASKLIST.lock().remove(<span class="kw-2">&amp;</span><span class="self">self</span>.id);
-            <span class="self">self</span>.inner.lock().exit_value.take()
-        } <span class="kw">else </span>{
-            <span class="prelude-val">None
-        </span>}
-    }
-
     <span class="attr">#[cfg(runqueue_spillful)]
     </span><span class="doccomment">/// Returns the runqueue on which this `Task` is currently enqueued.
     </span><span class="kw">pub fn </span>on_runqueue(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
@@ -2419,8 +2470,7 @@
     ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
     /// 2. Obtains the preemption guard such that preemption can be re-enabled
     ///    when it is appropriate to do so.
-    </span><span class="attr">#[doc(hidden)]
-    </span><span class="kw">pub fn </span>post_context_switch_action(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PreemptionGuard {
+    </span><span class="kw">fn </span>post_context_switch_action(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PreemptionGuard {
         <span class="comment">// Step 1: drop data from previously running task
         </span>{
             <span class="kw">let </span>prev_task_data_to_drop = <span class="self">self</span>.inner.lock().drop_after_task_switch.take();
@@ -2782,11 +2832,17 @@
 // /// Note: this type is considered an internal implementation detail.
 // /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
 // /// which is intended to be the public-facing interface for joining a task.
-</span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>JoinableTaskRef {
     task: TaskRef,
 }
 <span class="macro">assert_not_impl_any!</span>(JoinableTaskRef: Clone);
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>JoinableTaskRef {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;JoinableTaskRef&quot;</span>)
+            .field(<span class="string">&quot;task&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.task)
+            .finish_non_exhaustive()
+    }
+}
 <span class="kw">impl </span>Deref <span class="kw">for </span>JoinableTaskRef {
     <span class="kw">type </span>Target = TaskRef;
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
@@ -2807,17 +2863,16 @@
     </span><span class="attr">#[doc(alias(<span class="string">&quot;reap&quot;</span>, <span class="string">&quot;exit&quot;</span>))]
     </span><span class="kw">pub fn </span>join(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ExitValue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="comment">// First, wait for this Task to be marked as Exited (no longer runnable).
-        </span><span class="kw">while </span>!<span class="self">self</span>.<span class="number">0</span>.has_exited() { }
+        </span><span class="kw">while </span>!<span class="self">self</span>.has_exited() { }
 
         <span class="comment">// Then, wait for it to actually stop running on any CPU core.
-        </span><span class="kw">while </span><span class="self">self</span>.<span class="number">0</span>.is_running() { }
+        </span><span class="kw">while </span><span class="self">self</span>.is_running() { }
 
         <span class="comment">// This synchronizes with the release fence from when this task first ran
         // (in `spawn::task_wrapper()`).
         </span>fence(Ordering::Acquire);
 
-        <span class="self">self</span>.task
-            .retrieve_exit_value()
+        <span class="self">self</span>.reap_exit_value()
             .ok_or(<span class="string">&quot;BUG: `join()` could not retrieve `ExitValue` after task had exited.&quot;</span>)
     }
 }
@@ -2830,6 +2885,112 @@
 }
 
 
+<span class="doccomment">/// A wrapper around `TaskRef` that allows this task to mark itself as exited.
+///
+/// This is only obtainable when a task is first switched to, specifically while
+/// it is executing the `spawn::task_wrapper()` function
+/// (before it proceeds to running its actual entry function).
+///
+/// ## Not `Clone`-able
+/// This type does not implement `Clone` because it assumes there is
+/// only ever one `ExitableTaskRef` per task.
+///
+/// However, this type auto-derefs into an inner [`TaskRef`],
+/// which *can* be cloned, so you can easily call `.clone()` on it.
+</span><span class="kw">pub struct </span>ExitableTaskRef {
+    task: TaskRef,
+}
+<span class="comment">// Ensure that `ExitableTaskRef` cannot be moved to (Send) or shared with (Sync)
+// another task, as a task is the only one who should be able to mark itself as exited.
+</span><span class="kw">impl </span>!Send <span class="kw">for </span>ExitableTaskRef { }
+<span class="kw">impl </span>!Sync <span class="kw">for </span>ExitableTaskRef { }
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ExitableTaskRef {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;ExitableTaskRef&quot;</span>)
+            .field(<span class="string">&quot;task&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.task)
+            .finish_non_exhaustive()
+    }
+}
+<span class="kw">impl </span>Deref <span class="kw">for </span>ExitableTaskRef {
+    <span class="kw">type </span>Target = TaskRef;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.task
+    }
+}
+<span class="kw">impl </span>ExitableTaskRef {
+    <span class="doccomment">/// Call this function to indicate that this task has successfully ran to completion,
+    /// and that it has returned the given `exit_value`.
+    /// 
+    /// This is only usable within task cleanup functions to indicate
+    /// that the current task has cleanly exited.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited;
+    ///   the existing exit status will not be overwritten.
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    </span><span class="kw">pub fn </span>mark_as_exited(<span class="kw-2">&amp;</span><span class="self">self</span>, exit_value: Box&lt;<span class="kw">dyn </span>Any + Send&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.internal_exit(ExitValue::Completed(exit_value))
+    }
+
+    <span class="doccomment">/// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
+    /// and it is ready to be marked as killed, i.e., it will never run again.
+    /// 
+    /// If you want to kill another task, use [`TaskRef::kill()`] instead.
+    /// 
+    /// This is only usable within task cleanup functions (e.g., after unwinding) to indicate
+    /// that the current task has crashed or failed and has been killed by the system.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    </span><span class="kw">pub fn </span>mark_as_killed(<span class="kw-2">&amp;</span><span class="self">self</span>, reason: KillReason) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.internal_exit(ExitValue::Killed(reason))
+    }
+
+    <span class="doccomment">/// Reaps this task (if orphaned) by taking and dropping its exit value and removing it
+    /// from the system task list.
+    ///
+    /// If this task has *not* been orphaned, meaning it is still joinable,
+    /// then this function does nothing.
+    </span><span class="kw">pub fn </span>reap_if_orphaned(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="kw">if </span>!<span class="self">self</span>.is_joinable() {
+            <span class="comment">// trace!(&quot;Reaping orphaned task... {:?}&quot;, self);
+            </span><span class="kw">let </span>_exit_value = <span class="self">self</span>.task.reap_exit_value();
+            <span class="comment">// trace!(&quot;Reaped orphaned task {:?}, {:?}&quot;, self, _exit_value);
+        </span>}
+    }
+
+    <span class="doccomment">/// Perform any actions needed after a context switch.
+    /// 
+    /// Currently this only does two things:
+    /// 1. Drops any data that the original previous task (before the context switch)
+    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
+    /// 2. Obtains the preemption guard such that preemption can be re-enabled
+    ///    when it is appropriate to do so.
+    ///
+    /// Note: this publicly re-exports the private `TaskRef::post_context_switch_action()`
+    ///       function for use in the early `spawn::task_wrapper` functions,
+    ///       which is the only place where an `ExitableTaskRef` can be obtained. 
+    </span><span class="kw">pub fn </span>post_context_switch_action(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PreemptionGuard {
+        <span class="self">self</span>.task.post_context_switch_action()
+    }
+
+    <span class="doccomment">/// Allows the unwinder to obtain an `ExitableTaskRef` in order for it to
+    /// be able to invoke this task&#39;s [`FailureCleanupFunction`].
+    </span><span class="attr">#[doc(hidden)]
+    </span><span class="kw">pub fn </span>obtain_for_unwinder(current_task: TaskRef) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ task: current_task }
+    }
+}
+
 <span class="doccomment">/// A shareable, cloneable reference to a `Task` that exposes more methods
 /// for task management and auto-derefs into an immutable `&amp;Task` reference.
 /// 
@@ -2840,8 +3001,19 @@
 /// ## Equality comparisons
 /// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits to ensure that
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
-</span><span class="attr">#[derive(Debug, Clone)]
-</span><span class="kw">pub struct </span>TaskRef(Arc&lt;Task&gt;);
+</span><span class="attr">#[derive(Clone)]
+</span><span class="kw">pub struct </span>TaskRef(Arc&lt;TaskRefInner&gt;);
+<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>TaskRef {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        f.debug_struct(<span class="string">&quot;TaskRef&quot;</span>)
+            .field(<span class="string">&quot;task&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.task)
+            .finish_non_exhaustive()
+    }
+}
+<span class="kw">struct </span>TaskRefInner {
+    task: Task,
+    exit_value_mailbox: Mutex&lt;<span class="prelude-ty">Option</span>&lt;ExitValue&gt;&gt;,
+}
 
 <span class="kw">impl </span>TaskRef {
     <span class="doccomment">/// Creates a new `TaskRef`, a shareable wrapper around the given `Task`.
@@ -2853,63 +3025,12 @@
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to &quot;join&quot; this task (wait for it to exit) and obtain its exit value.
     </span><span class="kw">pub fn </span>new(task: Task) -&gt; JoinableTaskRef {
-        <span class="kw">let </span>taskref = TaskRef(Arc::new(task));
+        <span class="kw">let </span>exit_value_mailbox = Mutex::new(<span class="prelude-val">None</span>);
+        <span class="kw">let </span>taskref = TaskRef(Arc::new(TaskRefInner { task, exit_value_mailbox }));
 
         <span class="comment">// Mark this task as joinable, now that it has been wrapped in the proper type.
         </span>taskref.joinable.store(<span class="bool-val">true</span>, Ordering::Relaxed);
         JoinableTaskRef { task: taskref }
-    }
-
-    <span class="doccomment">/// Call this function to indicate that this task has successfully ran to completion,
-    /// and that it has returned the given `exit_value`.
-    /// 
-    /// This should only be used within task cleanup functions to indicate
-    /// that the current task has cleanly exited.
-    /// 
-    /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task&#39;s inner state.
-    /// 
-    /// # Return
-    /// * Returns `Ok` if the exit status was successfully set.     
-    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
-    ///  
-    /// # Note 
-    /// The `Task` will not be halted immediately -- 
-    /// it will finish running its current timeslice, and then never be run again.
-    </span><span class="attr">#[doc(hidden)]
-    </span><span class="kw">pub fn </span>mark_as_exited(<span class="kw-2">&amp;</span><span class="self">self</span>, exit_value: Box&lt;<span class="kw">dyn </span>Any + Send&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="self">self</span>.internal_exit(ExitValue::Completed(exit_value))
-    }
-
-    <span class="doccomment">/// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
-    /// and it is ready to be marked as killed, i.e., it will never run again.
-    /// This task (`self`) must be the currently executing task, 
-    /// you cannot invoke `mark_as_killed()` on a different task.
-    /// 
-    /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
-    /// 
-    /// This should only be used within task cleanup functions (e.g., after unwinding) to indicate
-    /// that the current task has crashed or failed and has been killed by the system.
-    /// 
-    /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task&#39;s inner state.
-    /// 
-    /// # Return
-    /// * Returns `Ok` if the exit status was successfully set.     
-    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
-    ///  
-    /// # Note 
-    /// The `Task` will not be halted immediately -- 
-    /// it will finish running its current timeslice, and then never be run again.
-    </span><span class="attr">#[doc(hidden)]
-    </span><span class="kw">pub fn </span>mark_as_killed(<span class="kw-2">&amp;</span><span class="self">self</span>, reason: KillReason) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">if </span>with_current_task(|t| t == <span class="self">self</span>)
-            .unwrap_or(<span class="bool-val">false</span>)
-        {
-            <span class="self">self</span>.internal_exit(ExitValue::Killed(reason))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(<span class="string">&quot;`mark_as_exited()` can only be invoked on the current task, not on another task.&quot;</span>)
-        }
     }
 
     <span class="doccomment">/// Kills this `Task` (not a clean exit) without allowing it to run to completion.
@@ -2938,30 +3059,27 @@
     }
 
     <span class="doccomment">/// The internal routine that actually exits or kills a Task.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`&#39;s inner state in order to mutate it. 
     </span><span class="kw">fn </span>internal_exit(<span class="kw-2">&amp;</span><span class="self">self</span>, val: ExitValue) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.has_exited() {
+        <span class="kw">if </span><span class="self">self</span>.has_exited() {
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: task was already exited! (did not overwrite its existing exit value)&quot;</span>);
         }
         {
-            <span class="kw">let </span><span class="kw-2">mut </span>inner = <span class="self">self</span>.<span class="number">0</span>.inner.lock();
-            inner.exit_value = <span class="prelude-val">Some</span>(val);
-            <span class="self">self</span>.<span class="number">0</span>.runstate.store(RunState::Exited);
+            <span class="kw-2">*</span><span class="self">self</span>.<span class="number">0</span>.exit_value_mailbox.lock() = <span class="prelude-val">Some</span>(val);
+            <span class="self">self</span>.runstate.store(RunState::Exited);
 
             <span class="comment">// Corner case: if the task isn&#39;t currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
-            </span><span class="kw">if </span>!<span class="self">self</span>.<span class="number">0</span>.is_running() {
+            </span><span class="kw">if </span>!<span class="self">self</span>.is_running() {
                 <span class="macro">todo!</span>(<span class="string">&quot;Unhandled scenario: internal_exit(): task {:?} wasn&#39;t running \
-                    but its current task TLS variable needs to be cleaned up!&quot;</span>, <span class="self">self</span>.<span class="number">0</span>);
+                    but its current task TLS variable needs to be cleaned up!&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.task);
                 <span class="comment">// Note: we cannot call `deinit_current_task()` here because if this task
                 //       isn&#39;t running, then it&#39;s definitely not the current task.
                 //
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             </span>}
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(waker) = inner.waker.take() {
+            
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(waker) = <span class="self">self</span>.inner.lock().waker.take() {
                 waker.wake();
             }
         }
@@ -2975,6 +3093,27 @@
         }
 
         <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// Takes the `ExitValue` from this `Task` and returns it
+    /// if and only if this `Task` was in the `Exited` runstate.
+    ///
+    /// If this `Task` was in the `Exited` runstate, after invoking this,
+    /// this `Task`&#39;s runstate will be set to `Reaped`
+    /// and this `Task` will be removed from the system task list.
+    ///
+    /// If this `Task` was **not** in the `Exited` runstate, 
+    /// nothing is done and `None` is returned.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on the system task list.
+    </span><span class="kw">fn </span>reap_exit_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ExitValue&gt; {
+        <span class="kw">if </span><span class="self">self</span>.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
+            TASKLIST.lock().remove(<span class="kw-2">&amp;</span><span class="self">self</span>.id);
+            <span class="self">self</span>.<span class="number">0</span>.exit_value_mailbox.lock().take()
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
     }
 }
 
@@ -2994,7 +3133,7 @@
 <span class="kw">impl </span>Deref <span class="kw">for </span>TaskRef {
     <span class="kw">type </span>Target = Task;
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
-        <span class="self">self</span>.<span class="number">0</span>.deref()
+        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.task
     }
 }
 
@@ -3011,14 +3150,19 @@
 
 
 </span><span class="doccomment">/// Bootstrap a new task from the current thread of execution.
-/// 
-/// # Note
+///
+/// Returns a tuple of:
+/// 1. a [`JoinableTaskRef`], which allows another task to join this bootstrapped task,
+/// 2. an [`ExitableTaskRef`], which allows this bootstrapped task to mark itself
+///    as exited once it has completed running.
+///
+/// ## Note
 /// This function does not add the new task to any runqueue.
 </span><span class="kw">pub fn </span>bootstrap_task(
     apic_id: u8, 
     stack: NoDrop&lt;Stack&gt;,
     kernel_mmi_ref: MmiRef,
-) -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(JoinableTaskRef, ExitableTaskRef), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// Here, we cannot call `Task::new()` because tasking hasn&#39;t yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
     </span><span class="kw">let </span>default_namespace = mod_mgmt::get_initial_kernel_namespace()
@@ -3038,21 +3182,23 @@
     bootstrap_task.running_on_cpu.store(<span class="prelude-val">Some</span>(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = <span class="prelude-val">Some</span>(apic_id); <span class="comment">// can only run on this CPU core
     </span><span class="kw">let </span>bootstrap_task_id = bootstrap_task.id;
-    <span class="kw">let </span>task_ref = TaskRef::new(bootstrap_task);
+    <span class="kw">let </span>joinable_taskref = TaskRef::new(bootstrap_task);
 
     <span class="comment">// Set this task as this CPU&#39;s current task, as it&#39;s already running.
-    </span>task_ref.set_as_current_task();
-    <span class="comment">// Set this task as this CPU&#39;s current task, as it&#39;s already running.
-    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(<span class="kw">_</span>) = init_current_task(bootstrap_task_id, <span class="prelude-val">Some</span>(task_ref.clone())) {
+    </span>joinable_taskref.set_as_current_task();
+    <span class="kw">let </span><span class="prelude-val">Ok</span>(exitable_taskref) = init_current_task(
+        bootstrap_task_id, 
+        <span class="prelude-val">Some</span>(joinable_taskref.clone()),
+    ) <span class="kw">else </span>{
         <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set boostrapped task as current task on AP {}&quot;</span>, apic_id);
         <span class="comment">// Don&#39;t drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
-        </span><span class="kw">let </span>_task_ref = NoDrop::new(task_ref);
+        </span><span class="kw">let </span>_task_ref = NoDrop::new(joinable_taskref);
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to set bootstrapped task as current task&quot;</span>);
-    }
+    };
 
     <span class="comment">// insert the new task into the task list
-    </span><span class="kw">let </span>old_task = TASKLIST.lock().insert(bootstrap_task_id, task_ref.clone());
+    </span><span class="kw">let </span>old_task = TASKLIST.lock().insert(bootstrap_task_id, joinable_taskref.clone());
     <span class="kw">if let </span><span class="prelude-val">Some</span>(ot) = old_task {
         <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task(): TASKLIST already contained a task {:?} with the same id {} as bootstrap_task_core_{}!&quot;</span>, 
             ot, bootstrap_task_id, apic_id
@@ -3060,7 +3206,7 @@
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): TASKLIST already contained a task with the new bootstrap_task&#39;s ID&quot;</span>);
     }
     
-    <span class="prelude-val">Ok</span>(task_ref)
+    <span class="prelude-val">Ok</span>((joinable_taskref, exitable_taskref))
 }
 
 
@@ -3071,8 +3217,12 @@
 /// because it was invoked from assembly and may not even have one. 
 /// 
 /// Therefore there&#39;s not much we can actually do.
-</span><span class="kw">fn </span>bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -&gt; ! {
-    <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There&#39;s nothing we can do here; looping indefinitely!&quot;</span>, current_task, kill_reason);
+</span><span class="kw">fn </span>bootstrap_task_cleanup_failure(current_task: ExitableTaskRef, kill_reason: KillReason) -&gt; ! {
+    <span class="macro">error!</span>(<span class="string">&quot;BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. \
+        There&#39;s nothing we can do here; looping indefinitely!&quot;</span>,
+        current_task,
+        kill_reason,
+    );
     <span class="kw">loop </span>{ }
 }
 
@@ -3082,7 +3232,7 @@
 <span class="doccomment">/// A private module to ensure the below TLS variables aren&#39;t modified directly.
 </span><span class="kw">mod </span>tls_current_task {
     <span class="kw">use </span>core::cell::{Cell, RefCell};
-    <span class="kw">use super</span>::{TASKLIST, TaskRef};
+    <span class="kw">use super</span>::{TASKLIST, TaskRef, ExitableTaskRef};
 
     <span class="doccomment">/// The TLS area that holds the current task&#39;s ID.
     </span><span class="attr">#[thread_local]
@@ -3148,7 +3298,7 @@
         CURRENT_TASK_ID.get()
     }
 
-    <span class="doccomment">/// Set the given task as the current task.
+    <span class="doccomment">/// Initializes the TLS variable(s) used for tracking the &quot;current&quot; task.
     ///
     /// This function being public is completely safe, as it will only ever execute
     /// once per task, typically at the beginning of a task&#39;s first execution.
@@ -3157,12 +3307,16 @@
     /// If `current_task` is `None`, the task must have already been added to 
     /// the system-wide task list such that a reference to it can be retrieved.
     ///
-    /// Returns an `Err` if the current task has already been set.
+    /// # Return
+    /// * On success, an [`ExitableTaskRef`] for the current task,
+    ///   which can only be obtained once at the very start of the task&#39;s execution,
+    ///   and only from this one function. 
+    /// * Returns an `Err` if the current task has already been set.
     </span><span class="attr">#[doc(hidden)]
     </span><span class="kw">pub fn </span>init_current_task(
         current_task_id: usize,
         current_task: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskRef, ()&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ExitableTaskRef, ()&gt; {
         <span class="kw">let </span>taskref = <span class="kw">if let </span><span class="prelude-val">Some</span>(t) = current_task {
             <span class="kw">if </span>t.id != current_task_id {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(());
@@ -3179,7 +3333,7 @@
             <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>t_opt) <span class="kw">if </span>t_opt.is_none() =&gt; {
                 <span class="kw-2">*</span>t_opt = <span class="prelude-val">Some</span>(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
-                <span class="prelude-val">Ok</span>(taskref)
+                <span class="prelude-val">Ok</span>(ExitableTaskRef { task: taskref })
             }
             <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(()),
         }

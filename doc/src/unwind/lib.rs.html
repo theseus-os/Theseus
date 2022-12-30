@@ -954,6 +954,9 @@
 <span id="954">954</span>
 <span id="955">955</span>
 <span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.
 //! 
 //! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
@@ -1908,7 +1911,10 @@
     <span class="attr">#[cfg(not(downtime_eval))]
     </span><span class="macro">warn!</span>(<span class="string">&quot;cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}&quot;</span>, current_task);
     
-    (current_task.failure_cleanup_function)(current_task, cause)
+    (current_task.failure_cleanup_function)(
+        task::ExitableTaskRef::obtain_for_unwinder(current_task),
+        cause,
+    )
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="unwind" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

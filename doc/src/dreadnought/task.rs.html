@@ -94,6 +94,7 @@
 <span id="94">94</span>
 <span id="95">95</span>
 <span id="96">96</span>
+<span id="97">97</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Asynchronous tasks based on Theseus&#39;s native OS [task] subsystem.
 
 </span><span class="kw">use </span>alloc::boxed::Box;
@@ -163,8 +164,8 @@
     <span class="kw">fn </span>poll(<span class="self">self</span>: Pin&lt;<span class="kw-2">&amp;mut </span><span class="self">Self</span>&gt;, context: <span class="kw-2">&amp;mut </span>Context&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; Poll&lt;<span class="self">Self</span>::Output&gt; {
         <span class="self">self</span>.task.set_waker(context.waker().clone());
         <span class="kw">if </span><span class="self">self</span>.is_finished() {
-            Poll::Ready(<span class="kw">match </span><span class="self">self</span>.task.retrieve_exit_value() {
-                <span class="prelude-val">Some</span>(exit_value) =&gt; <span class="kw">match </span>exit_value {
+            Poll::Ready(<span class="kw">match </span><span class="self">self</span>.task.join() {
+                <span class="prelude-val">Ok</span>(exit_value) =&gt; <span class="kw">match </span>exit_value {
                     ExitValue::Completed(value) =&gt; <span class="prelude-val">Ok</span>(<span class="kw-2">*</span>value.downcast().unwrap()),
                     ExitValue::Killed(reason) =&gt; <span class="kw">match </span>reason {
                         KillReason::Requested =&gt; <span class="prelude-val">Err</span>(Error::Cancelled),
@@ -172,7 +173,7 @@
                         KillReason::Exception(num) =&gt; <span class="prelude-val">Err</span>(Error::Exception(num)),
                     },
                 },
-                <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(Error::Reaped),
+                <span class="prelude-val">Err</span>(s) =&gt; <span class="prelude-val">Err</span>(Error::Join(s)),
             })
         } <span class="kw">else </span>{
             Poll::Pending
@@ -187,7 +188,8 @@
 </span><span class="kw">pub enum </span>Error {
     Cancelled,
     Panic(PanicInfoOwned),
-    Reaped,
+    <span class="doccomment">/// A `Join` error should not occur; this indicates a BUG in Theseus&#39;s task mgmt.
+    </span>Join(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str),
     Exception(u8),
 }
 </code></pre></div>
