@@ -87,7 +87,7 @@ impl App {
     }
 }
 
-pub fn display_window_title(window: &mut MutexGuard<Window>, fg_color: Color, bg_color: Color) {
+pub fn display_window_title(window: &mut Window, fg_color: Color, bg_color: Color) {
     if window.title.is_some() {
         let title = window.title.as_mut().unwrap().clone();
         let slice = title.as_str();
@@ -98,7 +98,7 @@ pub fn display_window_title(window: &mut MutexGuard<Window>, fg_color: Color, bg
 }
 
 pub fn print_string(
-    window: &mut MutexGuard<Window>,
+    window: &mut Window,
     dimensions: &Dimensions,
     pos: &RelativePos,
     slice: &str,
