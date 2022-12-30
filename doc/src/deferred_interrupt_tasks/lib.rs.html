@@ -178,6 +178,7 @@
 <span id="178">178</span>
 <span id="179">179</span>
 <span id="180">180</span>
+<span id="181">181</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Abstractions for deferred interrupt tasks, a companion to regular interrupt handlers.
 //!
 //! Deferred interrupt tasks are similar to the concept of &quot;top half&quot; and &quot;bottom half&quot;
@@ -242,6 +243,7 @@
 
 
 <span class="doccomment">/// The errors that may occur in [`register_interrupt_handler()`].
+</span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub enum </span>InterruptRegistrationError {
     <span class="doccomment">/// The given `irq` number was already in use and is registered to 
     /// the interrupt handler at the given `existing_handler_address`.
@@ -352,7 +354,7 @@
         }
 
         <span class="kw">if </span>curr_task.block().is_err() {
-            <span class="macro">error!</span>(<span class="string">&quot;deffered_task_entry_point: couldn&#39;t block task&quot;</span>);
+            <span class="macro">error!</span>(<span class="string">&quot;deferred_task_entry_point: couldn&#39;t block {:?}&quot;</span>, curr_task);
         }
 
         scheduler::schedule();

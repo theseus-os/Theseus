@@ -32,16 +32,16 @@ Ethernet controller could look as follows:</p>
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; phy::Device&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">for </span>StmPhy {
-    <span class="kw">type </span>RxToken = StmPhyRxToken&lt;<span class="lifetime">&#39;a</span>&gt;;
-    <span class="kw">type </span>TxToken = StmPhyTxToken&lt;<span class="lifetime">&#39;a</span>&gt;;
+<span class="kw">impl </span>phy::Device <span class="kw">for </span>StmPhy {
+    <span class="kw">type </span>RxToken&lt;<span class="lifetime">&#39;a</span>&gt; = StmPhyRxToken&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">where </span><span class="self">Self</span>: <span class="lifetime">&#39;a</span>;
+    <span class="kw">type </span>TxToken&lt;<span class="lifetime">&#39;a</span>&gt; = StmPhyTxToken&lt;<span class="lifetime">&#39;a</span>&gt; <span class="kw">where </span><span class="self">Self</span>: <span class="lifetime">&#39;a</span>;
 
-    <span class="kw">fn </span>receive(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="self">Self</span>::RxToken, <span class="self">Self</span>::TxToken)&gt; {
+    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="self">Self</span>::RxToken&lt;<span class="lifetime">&#39;_</span>&gt;, <span class="self">Self</span>::TxToken&lt;<span class="lifetime">&#39;_</span>&gt;)&gt; {
         <span class="prelude-val">Some</span>((StmPhyRxToken(<span class="kw-2">&amp;mut </span><span class="self">self</span>.rx_buffer[..]),
               StmPhyTxToken(<span class="kw-2">&amp;mut </span><span class="self">self</span>.tx_buffer[..])))
     }
 
-    <span class="kw">fn </span>transmit(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="kw-2">mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::TxToken&gt; {
+    <span class="kw">fn </span>transmit(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::TxToken&lt;<span class="lifetime">&#39;_</span>&gt;&gt; {
         <span class="prelude-val">Some</span>(StmPhyTxToken(<span class="kw-2">&amp;mut </span><span class="self">self</span>.tx_buffer[..]))
     }
 

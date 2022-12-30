@@ -309,6 +309,7 @@
 <span id="309">309</span>
 <span id="310">310</span>
 <span id="311">311</span>
+<span id="312">312</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(trait_alias)]
 
@@ -453,7 +454,8 @@
             <span class="kw">if </span>dev.vendor_id == e1000::INTEL_VEND &amp;&amp; dev.device_id == e1000::E1000_DEV {
                 <span class="macro">info!</span>(<span class="string">&quot;e1000 PCI device found at: {:?}&quot;</span>, dev.location);
                 <span class="kw">let </span>nic = e1000::E1000Nic::init(dev)<span class="question-mark">?</span>;
-                net::register_device(nic);
+                <span class="kw">let </span>interface = net::register_device(nic);
+                nic.lock().init_interrupts(interface)<span class="question-mark">?</span>;
 
                 <span class="kw">let </span>e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP)<span class="question-mark">?</span>;
                 add_to_network_interfaces(e1000_interface);

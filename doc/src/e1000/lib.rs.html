@@ -452,6 +452,50 @@
 <span id="452">452</span>
 <span id="453">453</span>
 <span id="454">454</span>
+<span id="455">455</span>
+<span id="456">456</span>
+<span id="457">457</span>
+<span id="458">458</span>
+<span id="459">459</span>
+<span id="460">460</span>
+<span id="461">461</span>
+<span id="462">462</span>
+<span id="463">463</span>
+<span id="464">464</span>
+<span id="465">465</span>
+<span id="466">466</span>
+<span id="467">467</span>
+<span id="468">468</span>
+<span id="469">469</span>
+<span id="470">470</span>
+<span id="471">471</span>
+<span id="472">472</span>
+<span id="473">473</span>
+<span id="474">474</span>
+<span id="475">475</span>
+<span id="476">476</span>
+<span id="477">477</span>
+<span id="478">478</span>
+<span id="479">479</span>
+<span id="480">480</span>
+<span id="481">481</span>
+<span id="482">482</span>
+<span id="483">483</span>
+<span id="484">484</span>
+<span id="485">485</span>
+<span id="486">486</span>
+<span id="487">487</span>
+<span id="488">488</span>
+<span id="489">489</span>
+<span id="490">490</span>
+<span id="491">491</span>
+<span id="492">492</span>
+<span id="493">493</span>
+<span id="494">494</span>
+<span id="495">495</span>
+<span id="496">496</span>
+<span id="497">497</span>
+<span id="498">498</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 #![allow(dead_code)] </span><span class="comment">//  to suppress warnings for unused functions/methods
@@ -478,19 +522,20 @@
 <span class="kw">extern crate </span>nic_queues;
 <span class="kw">extern crate </span>nic_initialization;
 <span class="kw">extern crate </span>net;
+<span class="kw">extern crate </span>deferred_interrupt_tasks;
+<span class="kw">extern crate </span>task;
 
 <span class="kw">pub mod </span>test_e1000_driver;
 <span class="kw">mod </span>regs;
 <span class="kw">use </span>regs::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>spin::Once; 
-<span class="kw">use </span>alloc::vec::Vec;
-<span class="kw">use </span>alloc::collections::VecDeque;
+<span class="kw">use </span>alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable};
 <span class="kw">use </span>pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 <span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
-<span class="kw">use </span>interrupts::{eoi, register_interrupt};
+<span class="kw">use </span>interrupts::eoi;
 <span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 <span class="kw">use </span>network_interface_card:: NetworkInterfaceCard;
 <span class="kw">use </span>nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
@@ -540,7 +585,7 @@
 <span class="kw">impl </span>RxQueueRegisters <span class="kw">for </span>E1000RxQueueRegisters {
     <span class="kw">fn </span>set_rdbal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: u32) {
         <span class="self">self</span>.<span class="number">0</span>.rx_regs.rdbal.write(value); 
-    }    
+    }
     <span class="kw">fn </span>set_rdbah(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: u32) {
         <span class="self">self</span>.<span class="number">0</span>.rx_regs.rdbah.write(value); 
     }
@@ -553,7 +598,7 @@
     <span class="kw">fn </span>set_rdt(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: u32) {
         <span class="self">self</span>.<span class="number">0</span>.rx_regs.rdt.write(value); 
     }
-} 
+}
 
 <span class="doccomment">/// A struct which contains the transmit queue registers and implements the `TxQueueRegisters` trait,
 /// which is required to store the registers in a `TxQueue` object.
@@ -562,7 +607,7 @@
 <span class="kw">impl </span>TxQueueRegisters <span class="kw">for </span>E1000TxQueueRegisters {
     <span class="kw">fn </span>set_tdbal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: u32) {
         <span class="self">self</span>.<span class="number">0</span>.tx_regs.tdbal.write(value); 
-    }    
+    }
     <span class="kw">fn </span>set_tdbah(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: u32) {
         <span class="self">self</span>.<span class="number">0</span>.tx_regs.tdbah.write(value); 
     }
@@ -596,7 +641,8 @@
     <span class="doccomment">/// memory-mapped control registers
     </span>regs: BorrowedMappedPages&lt;E1000Registers, Mutable&gt;,
     <span class="doccomment">/// memory-mapped registers holding the MAC address
-    </span>mac_regs: BorrowedMappedPages&lt;E1000MacRegisters, Mutable&gt;
+    </span>mac_regs: BorrowedMappedPages&lt;E1000MacRegisters, Mutable&gt;,
+    deferred_task: <span class="prelude-ty">Option</span>&lt;task::JoinableTaskRef&gt;,
 }
 
 
@@ -625,6 +671,8 @@
 <span class="doccomment">/// Functions that setup the NIC struct and handle the sending and receiving of packets.
 </span><span class="kw">impl </span>E1000Nic {
     <span class="doccomment">/// Initializes the new E1000 network interface card that is connected as the given PciDevice.
+    ///
+    /// `enable_interrupts` must be called after the NIC has been registered with the `net` subsystem.
     </span><span class="kw">pub fn </span>init(e1000_pci_dev: <span class="kw-2">&amp;</span>PciDevice) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;E1000Nic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">use </span>interrupts::IRQ_BASE_OFFSET;
 
@@ -660,13 +708,7 @@
         <span class="comment">//e1000_nc.clear_multicast();
         //e1000_nc.clear_statistics();
         
-        </span><span class="self">Self</span>::enable_interrupts(<span class="kw-2">&amp;mut </span>mapped_registers);
-        register_interrupt(interrupt_num, e1000_handler).map_err(|_handler_addr| {
-            <span class="macro">error!</span>(<span class="string">&quot;e1000 IRQ {:#X} was already in use by handler {:#X}! Sharing IRQs is currently unsupported.&quot;</span>, interrupt_num, _handler_addr);
-            <span class="string">&quot;e1000 interrupt number was already in use! Sharing IRQs is currently unsupported.&quot;
-        </span>})<span class="question-mark">?</span>;
-
-        <span class="comment">// initialize the buffer pool
+        // initialize the buffer pool
         </span>init_rx_buf_pool(RX_BUFFER_POOL_SIZE, E1000_RX_BUFFER_SIZE_IN_BYTES, <span class="kw-2">&amp;</span>RX_BUFFER_POOL)<span class="question-mark">?</span>;
 
         <span class="kw">let </span>(rx_descs, rx_buffers) = <span class="self">Self</span>::rx_init(<span class="kw-2">&amp;mut </span>mapped_registers, <span class="kw-2">&amp;mut </span>rx_registers)<span class="question-mark">?</span>;
@@ -704,13 +746,40 @@
             rx_queue: rxq,
             tx_queue: txq,
             regs: mapped_registers,
-            mac_regs: mac_registers
+            mac_regs: mac_registers,
+            deferred_task: <span class="prelude-val">None</span>,
         };
         
         <span class="kw">let </span>nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
         <span class="prelude-val">Ok</span>(nic_ref)
     }
     
+    <span class="doccomment">/// Initializes the interrupt handler and enables interrupts for this E1000 NIC.
+    ///
+    /// The provided `interface` must be the network interface associated with this E1000 NIC.
+    /// This interface will be polled in a deferred task upon an interrupt being triggered
+    /// for a received packet.
+    </span><span class="kw">pub fn </span>init_interrupts(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        interface: Arc&lt;net::NetworkInterface&gt;,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.enable_interrupts();
+        <span class="kw">let </span>deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
+            <span class="self">self</span>.interrupt_num,
+            e1000_handler,
+            poll_interface,
+            interface,
+            <span class="prelude-val">Some</span>(<span class="macro">format!</span>(<span class="string">&quot;e1000_deferred_task_irq_{:#X}&quot;</span>, <span class="self">self</span>.interrupt_num)),
+        )
+        .map_err(|error| {
+            <span class="macro">error!</span>(<span class="string">&quot;error registering e1000 handler: {:?}&quot;</span>, error);
+            <span class="string">&quot;e1000 interrupt number was already in use! Sharing IRQs is currently unsupported.&quot;
+        </span>})<span class="question-mark">?</span>;
+        <span class="self">self</span>.deferred_task = <span class="prelude-val">Some</span>(deferred_task);
+
+        <span class="prelude-val">Ok</span>(())
+    }
+
     <span class="doccomment">/// Allocates memory for the NIC and maps the E1000 Register struct to that memory area.
     /// Returns a reference to the E1000 Registers, tied to their backing `MappedPages`.
     /// 
@@ -764,7 +833,7 @@
 
         <span class="macro">debug!</span>(<span class="string">&quot;E1000: read hardware MAC address: {:02x?}&quot;</span>, mac_addr);
         mac_addr
-    }   
+    }
 
     <span class="doccomment">/// Start up the network
     </span><span class="kw">fn </span>start_link(regs: <span class="kw-2">&amp;mut </span>E1000Registers) {
@@ -817,7 +886,7 @@
         </span>regs.rctl.write(regs::RCTL_EN| regs::RCTL_SBP | regs::RCTL_LBM_NONE | regs::RTCL_RDMTS_HALF | regs::RCTL_BAM | regs::RCTL_SECRC  | regs::RCTL_BSIZE_2048);
 
         <span class="prelude-val">Ok</span>((rx_descs, rx_bufs_in_use))
-    }           
+    }
     
     <span class="doccomment">/// Initialize the array of tramsmit descriptors and return them.
     </span><span class="kw">fn </span>tx_init(
@@ -828,18 +897,24 @@
         </span><span class="kw">let </span>tx_descs = init_tx_queue(E1000_NUM_TX_DESC <span class="kw">as </span>usize, tx_regs)<span class="question-mark">?</span>;
         regs.tctl.write(regs::TCTL_EN | regs::TCTL_PSP);
         <span class="prelude-val">Ok</span>(tx_descs)
-    }       
-    
-    <span class="doccomment">/// Enable Interrupts 
-    </span><span class="kw">fn </span>enable_interrupts(regs: <span class="kw-2">&amp;mut </span>E1000Registers) {
+    }
+
+    <span class="doccomment">/// Enable interrupts on this E1000 NIC.
+    ///
+    /// Currently this enables interrupts for:
+    /// * Link Status Change
+    /// * Receive transfers (incoming packets)
+    </span><span class="kw">fn </span>enable_interrupts(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="comment">//self.write_command(REG_IMASK ,0x1F6DC);
         //self.write_command(REG_IMASK ,0xff &amp; !4);
-    
-        </span>regs.ims.write(INT_LSC|INT_RX); <span class="comment">//RXT and LSC
-        </span>regs.icr.read(); <span class="comment">// clear all interrupts
-    </span>}      
 
-    <span class="comment">// reads status and clears interrupt
+        // Trigger interrupts on a Link Status Change and on a Receive Transfer.
+        </span><span class="self">self</span>.regs.ims.write(INT_LSC | INT_RX);
+        <span class="comment">// Clear all pending interrupts.
+        </span><span class="self">self</span>.regs.icr.read();
+    }
+
+    <span class="doccomment">/// Clears pending interrupts by reading the Interrupt Control Register.
     </span><span class="kw">fn </span>clear_interrupt_status(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
         <span class="self">self</span>.regs.icr.read()
     }
@@ -867,6 +942,12 @@
 
         <span class="kw">if </span>!handled {
             <span class="macro">error!</span>(<span class="string">&quot;e1000::handle_interrupt(): unhandled interrupt!  status: {:#X}&quot;</span>, status);
+        } <span class="kw">else if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>deferred_task) = <span class="self">self</span>.deferred_task {
+            <span class="kw">let _ </span>= deferred_task
+                .unblock()
+                .expect(<span class="string">&quot;BUG: e1000::handle_interrupt(): couldn&#39;t unblock deferred task&quot;</span>);
+        } <span class="kw">else </span>{
+            <span class="macro">error!</span>(<span class="string">&quot;e1000::handle_interrupt(): no deferred task&quot;</span>);
         }
         <span class="comment">//regs.icr.read(); //clear interrupt
         </span><span class="prelude-val">Ok</span>(())
@@ -905,6 +986,13 @@
         <span class="macro">error!</span>(<span class="string">&quot;BUG: e1000_handler(): E1000 NIC hasn&#39;t yet been initialized!&quot;</span>);
     }
 
+}
+
+<span class="doccomment">/// This function is used as a deferred interrupt task.
+///
+/// After processing the interrupt, the network interface associated with the `e1000` NIC will be polled to process the received data.
+</span><span class="kw">fn </span>poll_interface(interface: <span class="kw-2">&amp;</span>Arc&lt;net::NetworkInterface&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), net::Error&gt; {
+    interface.poll()
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="e1000" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>
