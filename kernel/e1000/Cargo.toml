@@ -53,5 +53,11 @@ path = "../nic_initialization"
 [dependencies.net]
 path = "../net"
 
+[dependencies.deferred_interrupt_tasks]
+path = "../deferred_interrupt_tasks"
+
+[dependencies.task]
+path = "../task"
+
 [lib]
 crate-type = ["rlib"]
