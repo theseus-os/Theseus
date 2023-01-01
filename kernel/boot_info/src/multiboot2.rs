@@ -11,6 +11,10 @@ impl<'a> crate::MemoryRegion for &'a multiboot2::MemoryArea {
     fn len(&self) -> usize {
         multiboot2::MemoryArea::size(self) as usize
     }
+    
+    fn is_empty(&self) -> bool {
+        multiboot2::MemoryArea::size(self) as usize == 0
+    }
 
     fn is_usable(&self) -> bool {
         matches!(self.typ(), multiboot2::MemoryAreaType::Available)
@@ -42,6 +46,10 @@ impl crate::ElfSection for multiboot2::ElfSection {
 
     fn len(&self) -> usize {
         multiboot2::ElfSection::size(self) as usize
+    }
+    
+    fn is_empty(&self) -> bool {
+        multiboot2::ElfSection::size(self) as usize == 0
     }
 
     fn flags(&self) -> ElfSectionFlags {
@@ -77,6 +85,10 @@ impl<'a> crate::Module for &'a multiboot2::ModuleTag {
     fn len(&self) -> usize {
         (self.end_address() - self.start_address()) as usize
     }
+    
+    fn is_empty(&self) -> bool {
+        (self.end_address() - self.start_address()) as usize == 0
+    }
 }
 
 impl crate::BootInformation for multiboot2::BootInformation {
@@ -95,6 +107,10 @@ impl crate::BootInformation for multiboot2::BootInformation {
 
     fn len(&self) -> usize {
         self.total_size()
+    }
+    
+    fn is_empty(&self) -> bool {
+        self.total_size() == 0
     }
 
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
@@ -175,7 +191,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
             .or_else(|| self.rsdp_v1_tag().map(|tag| tag.signature()))
             .and_then(|utf8_result| utf8_result.ok())
             .map(|signature| signature as *const _ as *const () as usize)
-            .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address))
+            .and_then(PhysicalAddress::new)
     }
 
     fn stack_size(&self) -> Result<usize, &'static str> {

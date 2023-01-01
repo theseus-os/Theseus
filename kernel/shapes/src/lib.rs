@@ -17,7 +17,7 @@ pub struct Coord {
 impl Coord {
     /// Creates a new coordinate.
     pub fn new(x: isize, y: isize) -> Coord {
-        Coord { x: x, y: y }
+        Coord { x, y }
     }
 }
 
@@ -62,11 +62,11 @@ impl Sub<Coord> for Coord {
 impl Ord for Coord {
     fn cmp(&self, other: &Self) -> Ordering {
         if self.y > other.y {
-            return Ordering::Greater;
+            Ordering::Greater
         } else if self.y < other.y {
-            return Ordering::Less;
+            Ordering::Less
         } else {
-            return self.x.cmp(&other.x);
+            self.x.cmp(&other.x)
         }
 
     }

@@ -102,7 +102,7 @@ pub fn init<F, R, P>(
         let area = area.borrow();
         // debug!("Frame Allocator: looking to add free physical memory area: {:?}", area);
         check_and_add_free_region(
-            &area,
+            area,
             &mut free_list,
             &mut free_list_idx,
             reserved_physical_memory_areas.clone(),
@@ -464,7 +464,7 @@ impl Drop for AllocatedFrames {
             frames: self.frames.clone(),
         });
         match res {
-            Ok(_inserted_free_chunk) => return,
+            Ok(_inserted_free_chunk) => (),
             Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free frame list", c),
         }
         
@@ -692,8 +692,8 @@ fn find_specific_chunk(
 
 
 /// Searches the given `list` for any chunk large enough to hold at least `num_frames`.
-fn find_any_chunk<'list>(
-    list: &'list mut StaticArrayRBTree<Chunk>,
+fn find_any_chunk(
+    list: &mut StaticArrayRBTree<Chunk>,
     num_frames: usize
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // During the first pass, we ignore designated regions.
@@ -944,10 +944,9 @@ pub fn allocate_frames_deferred(
             // If we failed to allocate the requested frames from the general list,
             // we can add a new reserved region containing them,
             // but ONLY if those frames are *NOT* in the general-purpose region.
-            else if {
-                let g = GENERAL_REGIONS.lock();  
-                !frame_is_in_list(&g, &start_frame) && !frame_is_in_list(&g, &end_frame)
-            } {
+            else if !frame_is_in_list(&GENERAL_REGIONS.lock(), &start_frame) 
+                    && !frame_is_in_list(&GENERAL_REGIONS.lock(), &end_frame) 
+            {
                 let frames = FrameRange::new(start_frame, end_frame);
                 let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames)?;
                 // If we successfully added a new reserved region,
