@@ -84,6 +84,9 @@ impl KnownLength for HeapFile {
     fn len(&self) -> usize {
         self.vec.len()
     }
+    fn is_empty(&self) -> bool {
+        self.vec.len() == 0
+    }
 }
 
 impl File for HeapFile {

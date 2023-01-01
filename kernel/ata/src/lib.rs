@@ -685,6 +685,7 @@ impl BlockIo for AtaDrive {
 }
 impl KnownLength for AtaDrive {
 	fn len(&self) -> usize { self.block_size() * self.size_in_blocks() }
+	fn is_empty(&self) -> bool { self.block_size() * self.size_in_blocks() == 0 }
 }
 impl BlockReader for AtaDrive {
 	fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError> {

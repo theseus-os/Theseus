@@ -303,6 +303,9 @@ impl KnownLength for TaskFile {
     fn len(&self) -> usize {
         self.generate().len() 
     }
+    fn is_empty(&self) -> bool {
+        self.generate().len() == 0
+    }
 }
 
 impl File for TaskFile {
@@ -454,6 +457,9 @@ impl ByteWriter for MmiFile {
 impl KnownLength for MmiFile {
     fn len(&self) -> usize {
         self.generate().len() 
+    }
+    fn is_empty(&self) -> bool {
+        self.generate().len() == 0
     }
 }
 
