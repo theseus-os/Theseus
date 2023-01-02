@@ -60,20 +60,18 @@ path = "../memory_initialization"
 path = "../boot_info"
 features = ["multiboot2"]
 
-[dependencies.bootloader_api]
-git = "https://github.com/theseus-os/bootloader"
-branch = "theseus"
+[dependencies.uefi-bootloader-api]
+path = "../../../uefi-bootloader/uefi-bootloader-api"
 optional = true
 
 [build-dependencies]
 cfg-if = "1.0.0"
 
 [features]
-default = [ "bios" ]
 ## Build for a system that boots via legacy BIOS (multiboot2).
 bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
 ## Build for a system that boots via UEFI.
-uefi = ["boot_info/uefi", "captain/uefi", "dep:bootloader_api"]
+uefi = ["boot_info/uefi", "captain/uefi", "dep:uefi-bootloader-api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

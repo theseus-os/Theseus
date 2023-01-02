@@ -661,9 +661,14 @@ dependencies = [
  "paste",
  "spin",
  "uefi",
+ "uefi-bootloader-api",
  "x86_64",
  "zerocopy",
 ]
+
+[[package]]
+name = "uefi-bootloader-api"
+version = "0.1.0"
 
 [[package]]
 name = "uefi-macros"

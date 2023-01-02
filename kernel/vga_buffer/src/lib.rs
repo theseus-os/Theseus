@@ -9,6 +9,8 @@ extern crate kernel_config;
 extern crate logger;
 extern crate spin;
 extern crate volatile;
+#[doc(hidden)]
+pub extern crate log as __log;
 
 
 use core::fmt;
@@ -55,8 +57,7 @@ macro_rules! print_raw {
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
-        // to silence warnings about unused variables
-        let _ = format_args!($($arg)*);
+        ::vga_buffer::__log::info!($($arg)*);
     });
 }
 

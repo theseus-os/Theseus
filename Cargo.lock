@@ -325,16 +325,12 @@ name = "boot_info"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "bootloader_api",
  "kernel_config",
+ "log",
  "memory_structs",
  "multiboot2",
+ "uefi-bootloader-api",
 ]
-
-[[package]]
-name = "bootloader_api"
-version = "0.11.0"
-source = "git+https://github.com/theseus-os/bootloader?branch=theseus#6cc130e2f9dc633445846a1e2c4d961b1daddd78"
 
 [[package]]
 name = "bootloader_modules"
@@ -2164,7 +2160,6 @@ name = "nano_core"
 version = "0.1.0"
 dependencies = [
  "boot_info",
- "bootloader_api",
  "captain",
  "cfg-if 1.0.0",
  "exceptions_early",
@@ -2182,6 +2177,7 @@ dependencies = [
  "serial_port_basic",
  "stack",
  "state_store",
+ "uefi-bootloader-api",
  "vga_buffer",
 ]
 
@@ -4027,6 +4023,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 
 [[package]]
+name = "uefi-bootloader-api"
+version = "0.1.0"
+
+[[package]]
 name = "unicode-ident"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4144,6 +4144,7 @@ name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
  "kernel_config",
+ "log",
  "logger",
  "spin 0.9.4",
  "volatile 0.2.7",
