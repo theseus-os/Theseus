@@ -32,7 +32,7 @@ pub struct VFSDirectory {
 
 impl VFSDirectory {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new(name: String, parent: &DirRef)  -> Result<DirRef, &'static str> {
+    pub fn new_dirref(name: String, parent: &DirRef)  -> Result<DirRef, &'static str> {
         // creates a copy of the parent pointer so that we can add the newly created folder to the parent's children later
         let directory = VFSDirectory {
             name,
@@ -89,3 +89,6 @@ impl FsNode for VFSDirectory {
         self.parent = new_parent;
     }
 }
+
+unsafe impl Send for VFSDirectory {}
+unsafe impl Sync for VFSDirectory {}

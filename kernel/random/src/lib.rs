@@ -46,8 +46,15 @@ lazy_static::lazy_static! {
     };
 }
 
+/// Error kinds in the Random crate.
+pub enum RandError {
+    InvalidData,
+    InvalidInput,
+    Other,
+}
+
 /// Tries to generate a 32 byte seed using the RDSEED x86 instruction.
-fn rdseed_seed() -> Result<[u8; 32], ()> {
+fn rdseed_seed() -> Result<[u8; 32], RandError> {
     match rdrand::RdSeed::new() {
         Ok(mut generator) => {
             let mut seed = [0; 32];
@@ -58,19 +65,19 @@ fn rdseed_seed() -> Result<[u8; 32], ()> {
                 }
                 Err(_) => {
                     log::warn!("failed to generate seed from RDSEED");
-                    Err(())
+                    Err(RandError::InvalidData)
                 }
             }
         }
         Err(_) => {
             log::warn!("failed to initialise RDSEED");
-            Err(())
+            Err(RandError::InvalidInput)
         }
     }
 }
 
 /// Tries to generate a 32 byte seed using the RDRAND x86 instruction.
-fn rdrand_seed() -> Result<[u8; 32], ()> {
+fn rdrand_seed() -> Result<[u8; 32], RandError> {
     match rdrand::RdRand::new() {
         Ok(mut generator) => {
             let mut seed = [0; 32];
@@ -81,13 +88,13 @@ fn rdrand_seed() -> Result<[u8; 32], ()> {
                 }
                 Err(_) => {
                     log::warn!("failed to generate seed from RDRAND");
-                    Err(())
+                    Err(RandError::InvalidData)
                 }
             }
         }
         Err(_) => {
             log::warn!("failed to initialise RDRAND");
-            Err(())
+            Err(RandError::InvalidInput)
         }
     }
 }
@@ -99,9 +106,9 @@ fn rdrand_seed() -> Result<[u8; 32], ()> {
 fn tsc_seed() -> [u8; 32] {
     let mut seed = [0; 32];
 
-    for i in 0..seed.len() {
+    for s in &mut seed {
         // The last byte is the _most_ random.
-        seed[i] = u128::from(tsc::tsc_ticks()).to_be_bytes()[15];
+        *s = u128::from(tsc::tsc_ticks()).to_be_bytes()[15];
     }
 
     // The TSC isn't a high quality source of randomness.
@@ -141,10 +148,10 @@ pub fn fill_bytes(dest: &mut [u8]) {
 /// Directly accessing the global CSPRNG can be expensive and so it is often
 /// better to seed a local PRNG from the global CSPRNG. Using a local PRNG
 /// also allows for much faster cryptographically insecure PRNGs to be used.
-pub fn init_rng<T>() -> Result<T, ()>
+pub fn init_rng<T>() -> Result<T, RandError>
 where
     T: SeedableRng,
 {
     let mut csprng = CSPRNG.lock();
-    T::from_rng(&mut *csprng).map_err(|_| ())
+    T::from_rng(&mut *csprng).map_err(|_| RandError::InvalidInput)
 }

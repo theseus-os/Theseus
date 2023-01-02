@@ -61,14 +61,11 @@ impl Sub<Coord> for Coord {
 
 impl Ord for Coord {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.y > other.y {
-            Ordering::Greater
-        } else if self.y < other.y {
-            Ordering::Less
-        } else {
-            self.x.cmp(&other.x)
+        match (self.y, other.y) {
+            (s, o) if s > o => Ordering::Greater,
+            (s, o) if s < o => Ordering::Less,
+            _ => self.x.cmp(&other.x),
         }
-
     }
 }
 
