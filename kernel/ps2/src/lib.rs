@@ -54,7 +54,7 @@ pub enum HostToControllerCommand {
     /// 
     /// Note: only if 2 PS/2 ports supported
     TestPort2 = 0xA9,
-    /// returns [ControllerTestResult]
+    /// see [PS2Controller::test]
     TestController = 0xAA,
     /// returns [PortTestResult]
     TestPort1 = 0xAB,
@@ -125,14 +125,14 @@ impl PS2Controller {
 
     /// Get a handle to the keyboard.
     /// 
-    /// The keyboard uses only [PS2_DATA_PORT].
+    /// The keyboard only uses the data port.
     pub fn keyboard_handle(&self) -> PS2Keyboard {
         PS2Keyboard::new(self)
     }
 
     /// Get a handle to the keyboard.
     /// 
-    /// The mouse uses both [PS2_DATA_PORT] and [PS2_COMMAND_AND_STATUS_PORT].
+    /// The mouse uses both the data port and the command/status port.
     pub fn mouse_handle(&self) -> PS2Mouse {
         PS2Mouse::new(self)
     }
@@ -166,7 +166,7 @@ impl PS2Controller {
         ControllerToHostStatus::from_bytes([self.command_and_status_port.lock().read()])
     }
 
-    /// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
+    /// Clean the data port output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
     pub fn flush_output_buffer(&self) {
         self.read_data();
     }
@@ -452,8 +452,8 @@ impl<'c> PS2Keyboard<'c> {
     /// detect the [KeyboardType]
     /// 
     /// Note:
-    /// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but [read_data] always returns a byte.
-    /// This means [read_data] would return 0x00 here, even though the value is already reserved for the device type "Standard PS/2 mouse".
+    /// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but `PS2Controller::read_data` always returns a byte.
+    /// This means `PS2Controller::read_data` would return 0x00 here, even though the value is already reserved for the device type "Standard PS/2 mouse".
     /// As we only care about detecting keyboard types here, it should work.
     pub fn keyboard_detect(&self) -> Result<KeyboardType, &'static str> {
         self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))?;
@@ -717,7 +717,7 @@ pub struct MousePacketGeneric {
 impl MousePacketGeneric {
     /// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
     /// 
-    /// Note: This handles overflow as well, although it might not happen on newer systems (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
+    /// Note: This handles overflow as well, although it might not happen on newer systems <https://forum.osdev.org/viewtopic.php?f=1&t=31176>
     pub fn x_movement(&self) -> i16 {
         let x_1st_to_8th_bit = if self.x_overflow() {
             u8::MAX
@@ -729,7 +729,7 @@ impl MousePacketGeneric {
 
     /// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
     /// 
-    /// Note: This handles overflow as well, although it might not happen on newer systems (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
+    /// Note: This handles overflow as well, although it might not happen on newer systems <https://forum.osdev.org/viewtopic.php?f=1&t=31176>
     pub fn y_movement(&self) -> i16 {
         let y_1st_to_8th_bit = if self.y_overflow() {
             u8::MAX
