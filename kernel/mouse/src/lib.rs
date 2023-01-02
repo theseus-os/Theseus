@@ -21,6 +21,7 @@ static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
 /// Initialize the PS/2 mouse driver and register its interrupt handler.
 /// 
 /// ## Arguments
+/// * `mouse`: a wrapper around mouse functionality and id, used by the mouse interrupt handler.
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {

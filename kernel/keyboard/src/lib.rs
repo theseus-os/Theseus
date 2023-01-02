@@ -26,6 +26,7 @@ static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
 /// Initialize the PS/2 keyboard driver and register its interrupt handler.
 /// 
 /// ## Arguments
+/// * `keyboard`: a wrapper around keyboard functionality, used by the keyboard interrupt handler.
 /// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler
 ///    will push new keyboard events when a key action occurs.
 pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
