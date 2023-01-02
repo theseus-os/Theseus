@@ -366,7 +366,7 @@ impl NamespaceDir {
     /// * The file "a#ps.o" will be placed into "./ps.o". 
     pub fn write_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
-        let cfile = MemFile::new(String::from(objfilename), &self.0)?;
+        let cfile = MemFile::new_fileref(String::from(objfilename), &self.0)?;
         cfile.lock().write_at(content, 0)?;
         Ok(cfile)
     }

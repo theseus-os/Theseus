@@ -14,14 +14,45 @@ use core::sync::atomic::{AtomicU8, Ordering};
 /// so the maximum number of cores it supports is `u8::MAX` (256).
 const MAX_CPU_CORES: usize = u8::MAX as usize;
 
-const ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(0);
 
 /// The per-core preemption count, indexed by a CPU core's APIC ID.
 /// 
 /// If a CPU's count is `0`, preemption is enabled.
 /// If a CPU's count is greater than `0`, preemption is disabled.
-static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CORES];
-
+static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+    AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0), AtomicU8::new(0),
+];
 
 /// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.
