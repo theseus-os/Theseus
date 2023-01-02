@@ -5,6 +5,8 @@ use spin::Once;
 use fadt::Fadt;
 use ps2::{PS2Controller, HostToControllerCommand::*};
 
+static CONTROLLER: Once<PS2Controller> = Once::new();
+
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
 /// initialize the first and second (if it exists) PS/2 port
 pub fn init() -> Result<&'static PS2Controller, &'static str> {
@@ -83,6 +85,5 @@ pub fn init() -> Result<&'static PS2Controller, &'static str> {
 
     debug!("Final PS/2 {:?}", controller.read_config());
     
-    static CONTROLLER: Once<PS2Controller> = Once::new();
     Ok(CONTROLLER.call_once(|| controller))
 }
