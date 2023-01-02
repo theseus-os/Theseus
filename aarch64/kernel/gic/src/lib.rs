@@ -52,6 +52,7 @@ pub type IntNumber = u8;
 pub type Priority = u8;
 
 bitflags! {
+    /// Which CPU to route an interrupt to
     pub struct TargetCpu: u8 {
         const CPU_0 = 1 << 0;
         const CPU_1 = 1 << 1;
@@ -65,8 +66,13 @@ bitflags! {
     }
 }
 
+// = 4
 const U32BYTES: usize = core::mem::size_of::<u32>();
+
+// = 32
 const U32BITS: usize = U32BYTES * 8;
+
+// Offsets defined by the GIC specification:
 
 const GICC_CTLR: usize = 0x00 / U32BYTES;
 const GICC_PMR:  usize = 0x04 / U32BYTES;
@@ -143,26 +149,39 @@ impl ArmGic {
         self.distributor.0[offset] = value;
     }
 
-    fn read_gicd_array<const IRQ_PER_U32: usize>(&self, offset: usize, int: IntNumber) -> u32 {
+    // Reads one slot of an array spanning across
+    // multiple u32s.
+    //
+    // - `int` is the index
+    // - `offset` tells the beginning of the array
+    // - `INTS_PER_U32` = how many array slots per u32 in this array
+    fn read_gicd_array<const INTS_PER_U32: usize>(&self, offset: usize, int: IntNumber) -> u32 {
         let int = int as usize;
-        let bits_per_int: usize = U32BITS / IRQ_PER_U32;
+        let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
 
-        let offset = offset + (int / IRQ_PER_U32);
-        let reg_index = int & (IRQ_PER_U32 - 1);
+        let offset = offset + (int / INTS_PER_U32);
+        let reg_index = int & (INTS_PER_U32 - 1);
         let shift = reg_index * bits_per_int;
 
         let reg = self.read_gicd(offset);
         (reg >> shift) & mask
     }
 
-    fn write_gicd_array<const IRQ_PER_U32: usize>(&mut self, offset: usize, int: IntNumber, value: u32) {
+    // Writes one slot of an array spanning across
+    // multiple u32s.
+    //
+    // - `int` is the index
+    // - `offset` tells the beginning of the array
+    // - `INTS_PER_U32` = how many array slots per u32 in this array
+    // - `value` is the value to write
+    fn write_gicd_array<const INTS_PER_U32: usize>(&mut self, offset: usize, int: IntNumber, value: u32) {
         let int = int as usize;
-        let bits_per_int: usize = U32BITS / IRQ_PER_U32;
+        let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
 
-        let offset = offset + (int / IRQ_PER_U32);
-        let reg_index = int & (IRQ_PER_U32 - 1);
+        let offset = offset + (int / INTS_PER_U32);
+        let reg_index = int & (INTS_PER_U32 - 1);
         let shift = reg_index * bits_per_int;
 
         let mut reg = self.read_gicd(offset);
@@ -246,18 +265,18 @@ impl ArmGic {
         self.write_gicc(GICC_EOIR, int as u32);
     }
 
-    /// Acknowledge the currently serviced IRQ
-    /// and fetches its IRQ number
+    /// Acknowledge the currently serviced interrupt
+    /// and fetches its number
     /// 
     /// Note: this constructor accesses the
     /// interfaces; their addresses have to be
     /// readable and writable.
-    pub fn acknowledge_irq(&mut self) -> (IntNumber, Priority) {
-        // Reading the IRQ number has the side effect
+    pub fn acknowledge_int(&mut self) -> (IntNumber, Priority) {
+        // Reading the interrupt number has the side effect
         // of acknowledging the interrupt.
-        let irq_num = self.read_gicc(GICC_IAR) as u8;
+        let int_num = self.read_gicc(GICC_IAR) as u8;
         let priority = self.read_gicc(GICC_RPR) as u8;
 
-        (irq_num, priority)
+        (int_num, priority)
     }
 }

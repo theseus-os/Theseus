@@ -60,11 +60,13 @@ pub struct ExceptionContext {
 
 type HandlerFunc = extern "C" fn(&ExceptionContext) -> bool;
 
+// called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
-    log::error!("Kernel Panic: Unhandled Exception: {}\r\n{}", origin, exc);
+    log::error!("Kernel Panic: Unhandled Exception ({})\r\n{}", origin, exc);
     loop {}
 }
 
+// called for all unhandled interrupt requests
 extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
     log::error!("Kernel Panic: Unhandled IRQ:\r\n{}", exc);
     loop {}
@@ -103,12 +105,13 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
         // see table.s for more info.
         unsafe { VBAR_EL1.set(__exception_vector_start.get() as u64) };
 
-        // this gets called everytime the timer ticks.
+        // called everytime the timer ticks.
         extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
             info!("timer int!");
             loop {}
 
             // return false if you haven't sent an EOI
+            // so that the caller does it for you
         }
 
         // register the handler for the timer IRQ.
@@ -120,7 +123,12 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
         {
             let mut gic = GIC.lock();
             let gic = gic.get_mut().ok_or("GIC is uninitialized")?;
+
+            // this has no effect (IRQ# < 32), just including it
+            // to show how the function should be used
             gic.set_int_target(AARCH64_TIMER_IRQ, TargetCpu::ALL_CPUS);
+
+            // enable routing of this interrupt
             gic.set_int_state(AARCH64_TIMER_IRQ, true);
         }
 
@@ -135,10 +143,14 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
             + CNTP_CTL_EL0::ENABLE.val(1)
         );
 
+        /* DEBUGGING CODE
+
         log::info!("timer: {:?}", CNTPCT_EL0.get());
         log::info!("ENABLE: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
         log::info!("IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
         log::info!("ISTATUS: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
+
+        */
 
         log::info!("Unmasking all exceptions types");
         // unmask every kind of exception
@@ -149,7 +161,7 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
             // regular IRQs
             + DAIF::I::Unmasked
 
-            // fast IRQs
+            // fast IRQs (unimplemented atm)
             + DAIF::F::Unmasked,
         );
 
@@ -208,7 +220,7 @@ pub fn deregister_interrupt(irq_num: IntNumber, func: HandlerFunc) -> Result<(),
     }
 }
 
-/// Send an end of interrupt signal, notifying the interrupt chip that
+/// Send an "end of interrupt" signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: IntNumber) {
     let mut gic = GIC.lock();
@@ -318,7 +330,7 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
         let mut gic = GIC.lock();
         let gic = gic.get_mut().expect("GIC is uninitialized!");
-        gic.acknowledge_irq()
+        gic.acknowledge_int()
     };
     // important: GIC mutex is now implicitly unlocked
 
