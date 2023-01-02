@@ -199,7 +199,7 @@ impl Path {
                 Arc::clone(root::get_root())
             }
             else {
-                Arc::clone(&starting_dir)
+                Arc::clone(starting_dir)
             }
         };
 

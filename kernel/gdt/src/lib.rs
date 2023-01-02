@@ -206,7 +206,7 @@ impl fmt::Display for Gdt {
     fn fmt(&self, fmtr: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         fmtr.write_fmt(format_args!("\nGdt: [\n"))?;
         for (index, entry) in self.table.iter().enumerate() {
-             fmtr.write_fmt(format_args!("  {}:  {:#016x}\n", index, entry))?;
+             fmtr.write_fmt(format_args!("  {index}:  {entry:#016x}\n"))?;
         }
         fmtr.write_fmt(format_args!("]"))?;
         Ok(())
