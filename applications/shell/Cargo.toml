@@ -34,12 +34,6 @@ path = "../../kernel/runqueue"
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
-
-[dependencies.print]
-path = "../../kernel/print"
-
 [dependencies.environment]
 path = "../../kernel/environment"
 

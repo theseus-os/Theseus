@@ -13,8 +13,8 @@ version = "0.4.8"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[dependencies.cpu]
+path = "../../kernel/cpu"
 
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
@@ -25,5 +25,5 @@ path = "../../kernel/spawn"
 [dependencies.wait_condition]
 path = "../../kernel/wait_condition"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"

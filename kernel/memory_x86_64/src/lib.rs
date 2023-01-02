@@ -45,15 +45,11 @@ pub struct SectionMemoryBounds {
 ///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
 ///     because they can be mapped using the same page table flags.
 /// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
-/// It also contains:
-/// * The `stack` section bounds cover the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
    pub text:        SectionMemoryBounds,
    pub rodata:      SectionMemoryBounds,
    pub data:        SectionMemoryBounds,
-   pub stack:       SectionMemoryBounds,
 }
 
 
@@ -72,8 +68,6 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     let mut rodata_end:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_end:         Option<(VirtualAddress, PhysicalAddress)> = None;
 
     let mut text_flags:        Option<PteFlags> = None;
     let mut rodata_flags:      Option<PteFlags> = None;
@@ -183,14 +177,17 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
                 data_flags = Some(flags);
                 "nano_core .bss"
             }
-            ".page_table" => {
-                // We bootstrap the page table from the CR3 register.
+            // This appears when compiling for BIOS.
+            ".page_table" | ".stack" => {
+                debug!("     no need to map this section, it is mapped separately later");
                 continue;
             }
-            ".stack" => {
-                stack_start = Some((start_virt_addr, start_phys_addr));
-                stack_end   = Some((end_virt_addr, end_phys_addr));
-                "initial stack"
+            // This appears when compiling for UEFI.
+            ".bootloader-config" => {
+                // TODO: Ideally we'd mark .bootloader-config as not allocated
+                // so the bootloader doesn't load it.
+                debug!("     no need to map this section, it is only used by the bootloader for config.");
+                continue;
             }
             _ =>  {
                 error!("Section {} at {:#X}, size {:#X} was not an expected section", 
@@ -215,8 +212,6 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
     let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
     let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
-    let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
-    let stack_end          = stack_end        .ok_or("Couldn't find start of .stack section")?;
      
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
@@ -237,17 +232,11 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         end: data_end,
         flags: data_flags,
     };
-    let stack = SectionMemoryBounds {
-        start: stack_start,
-        end: stack_end,
-        flags: data_flags, // same flags as data sections
-    };
 
     let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
         text,
         rodata,
         data,
-        stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
 }

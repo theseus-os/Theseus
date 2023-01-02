@@ -48,17 +48,17 @@ pub(crate) struct DeviceWrapper<'a> {
     pub(crate) inner: &'a mut dyn NetworkDevice,
 }
 
-impl<'a, 'b> phy::Device<'a> for DeviceWrapper<'b> {
-    type RxToken = RxToken;
+impl<'a> phy::Device for DeviceWrapper<'a> {
+    type RxToken<'b> = RxToken where Self: 'b;
 
-    type TxToken = TxToken<'a>;
+    type TxToken<'c> = TxToken<'c> where Self: 'c;
 
-    fn receive(&'a mut self) -> Option<(Self::RxToken, Self::TxToken)> {
+    fn receive(&mut self) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
         let frame = self.inner.receive()?;
         Some((RxToken { inner: frame }, TxToken { device: self.inner }))
     }
 
-    fn transmit(&'a mut self) -> Option<Self::TxToken> {
+    fn transmit(&mut self) -> Option<Self::TxToken<'_>> {
         Some(TxToken { device: self.inner })
     }
 
@@ -83,12 +83,8 @@ impl phy::RxToken for RxToken {
                 self.inner.0.len()
             );
         }
-        let mut slice = self
-            .inner
-            .0
-            .first_mut()
-            .ok_or(Error::Exhausted)?;
-        f(&mut slice)
+        let slice = self.inner.0.first_mut().ok_or(Error::Exhausted)?;
+        f(slice)
     }
 }
 

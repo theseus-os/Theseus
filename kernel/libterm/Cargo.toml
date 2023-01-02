@@ -18,9 +18,6 @@ path = "../environment"
 [dependencies.root]
 path = "../root"
 
-[dependencies.print]
-path = "../print"
-
 [dependencies.color]
 path = "../color"
 

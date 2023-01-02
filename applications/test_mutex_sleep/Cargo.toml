@@ -13,8 +13,8 @@ path = "../../kernel/scheduler"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[dependencies.cpu]
+path = "../../kernel/cpu"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"

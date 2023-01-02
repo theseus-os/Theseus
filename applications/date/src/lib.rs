@@ -4,7 +4,7 @@
 
 
 extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate rtc;
 
 use alloc::vec::Vec;

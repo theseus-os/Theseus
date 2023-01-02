@@ -10,8 +10,8 @@ log = "0.4.8"
 anyhow = { version = "1.0", default-features = false }
 getopts = "0.2.21"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.path]
 path = "../../kernel/path"

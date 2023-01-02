@@ -195,7 +195,7 @@ impl SerialPort {
     /// try enabling the loopback test part of this function to see if that passes.
     pub fn new(base_port: u16) -> SerialPort {
         let serial = SerialPort {
-            data:                       Port::new(base_port + 0),
+            data:                       Port::new(base_port    ),
             interrupt_enable:           Port::new(base_port + 1),
             interrupt_id_fifo_control:  Port::new(base_port + 2),
             line_control:               Port::new(base_port + 3),

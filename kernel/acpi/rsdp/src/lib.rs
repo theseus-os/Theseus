@@ -63,7 +63,7 @@ impl Rsdp {
         {
             let region_slice: &[u8] = region.as_slice(0, size)?;
             for offset in (0..size).step_by(RSDP_SIGNATURE_ALIGNMENT) {
-                if &region_slice[offset..(offset + signature_length)] == &*RSDP_SIGNATURE {
+                if &region_slice[offset..(offset + signature_length)] == RSDP_SIGNATURE {
                     found_offset = Some(offset);
                 }
             }

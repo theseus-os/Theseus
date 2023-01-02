@@ -13,7 +13,6 @@
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
-extern crate print;
 extern crate event_types;
 extern crate displayable;
 extern crate font;

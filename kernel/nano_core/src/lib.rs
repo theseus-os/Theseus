@@ -26,7 +26,15 @@ use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use vga_buffer::println_raw;
 
-mod bios;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "bios")] {
+        mod bios;
+    } else if #[cfg(feature = "uefi")] {
+        mod uefi;
+    } else {
+        compile_error!("either the 'bios' or 'uefi' feature must be enabled");
+    }
+}
 
 /// Used to obtain information about this build of Theseus.
 mod build_info {
@@ -90,7 +98,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
 }
 
 /// The nano core routine. See crate-level documentation for more information.
-fn nano_core<T>(boot_info: T) -> Result<(), &'static str>
+fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation
 {
@@ -106,7 +114,7 @@ where
         stack,
         bootloader_modules,
         identity_mapped_pages
-    ) = memory_initialization::init_memory_management(boot_info)?;
+    ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
     println_raw!("nano_core(): initialized memory subsystem.");
 
     state_store::init();

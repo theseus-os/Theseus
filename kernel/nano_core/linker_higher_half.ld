@@ -1,4 +1,4 @@
-ENTRY(start)
+ENTRY(_start)
 OUTPUT_FORMAT(elf64-x86-64)
 
 /*  this offset CANNOT be any smaller than 2GiB below the end of the 64-bit address space
