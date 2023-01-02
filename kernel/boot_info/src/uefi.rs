@@ -143,22 +143,9 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
     }
 
     fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        let mut iter = self
-            .memory_regions
-            .iter()
-            .filter(|region| region.kind == uefi_bootloader_api::MemoryRegionKind::Bootloader)
-            .filter(|region| region.start == 0x1000);
-
-        let bootloader_info_memory_region =
-            iter.next().ok_or("no bootloader info memory region")?;
-        if iter.next().is_some() {
-            Err("multiple potential bootloader memory info memory regions")
-        } else {
-            let start = PhysicalAddress::new(bootloader_info_memory_region.start as usize)
-                .ok_or("invalid bootloader info start address")?;
-            let end = start + bootloader_info_memory_region.len;
-            Ok(start..end)
-        }
+        // The bootloader already marked the info memory regions as reserved.
+        // TODO: Improve function name.
+        Ok(PhysicalAddress::zero()..PhysicalAddress::zero())
     }
 
     fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {

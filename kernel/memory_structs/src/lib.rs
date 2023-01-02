@@ -372,11 +372,14 @@ macro_rules! implement_page_frame_range {
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
                     all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
                 pub fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
-                    assert!(size_in_bytes > 0);
-                    let start = $chunk::containing_address(starting_addr);
-                    // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
-                    let end = $chunk::containing_address(starting_addr + (size_in_bytes - 1));
-                    $TypeName::new(start, end)
+                    if size_in_bytes == 0 {
+                        $TypeName::empty()
+                    } else {
+                        let start = $chunk::containing_address(starting_addr);
+                        // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
+                        let end = $chunk::containing_address(starting_addr + (size_in_bytes - 1));
+                        $TypeName::new(start, end)
+                    }
                 }
 
                 #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]
