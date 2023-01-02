@@ -112,8 +112,9 @@ pub fn create_stack(
 ) -> Result<(MappedPages, usize), &'static str> {
     // x30 stores the return address
     // it's used by the `ret` instruction
-    let artificial_ctx = [
+    let artificial_ctx_src = [
         // [lower address]
+        // [returned stack pointer]
 
                     0, 0, //  x2,  x3,
                     0, 0, //  x4,  x5,
@@ -129,7 +130,7 @@ pub fn create_stack(
                     0, 0, // x24, x25,
                     0, 0, // x26, x27,
                     0, 0, // x28, x29,
-        start_address, 0, // x30, <nothing>
+        start_address, 0, // x30, <nothing; kept for alignment>
 
         // [higher address]
         // [top of stack]
@@ -144,10 +145,10 @@ pub fn create_stack(
 
         // inserting an artificial SavedContext
         // at the top of the stack
-        let offset = stack.len() - artificial_ctx.len();
-        let stack_top = &mut stack[offset..];
-        stack_ptr = stack_top.as_ptr() as usize;
-        stack_top.copy_from_slice(artificial_ctx.as_slice());
+        let offset = stack.len() - artificial_ctx_src.len();
+        let artificial_ctx_dst = &mut stack[offset..];
+        stack_ptr = artificial_ctx_dst.as_ptr() as usize;
+        artificial_ctx_dst.copy_from_slice(artificial_ctx_src.as_slice());
     }
 
     Ok((stack, stack_ptr))
