@@ -176,7 +176,14 @@ impl PageTable {
     pub fn switch(&mut self, new_table: &PageTable) {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
-        set_as_active_page_table_root(new_table.physical_address());
+        // perform the actual page table switch
+        unsafe { 
+            use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
+            Cr3::write(
+                PhysFrame::containing_address(PhysAddr::new_truncate(new_table.p4_table.start_address().value() as u64)),
+                Cr3Flags::empty(),
+            )
+        };
     }
 
 
