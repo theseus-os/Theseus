@@ -15,8 +15,12 @@ use ps2::{PS2Mouse, MouseId, MousePacket};
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
 const PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xC;
 
-static MOUSE: Once<PS2Mouse> = Once::new();
-static MOUSE_PRODUCER: Once<Queue<Event>> = Once::new();
+static MOUSE: Once<MouseInterruptParams> = Once::new();
+
+struct MouseInterruptParams {
+    mouse: PS2Mouse<'static>,
+    queue: Queue<Event>,
+}
 
 /// Initialize the PS/2 mouse driver and register its interrupt handler.
 /// 
@@ -53,9 +57,9 @@ pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) ->
         "PS/2 mouse IRQ was already in use! Sharing IRQs is currently unsupported."
     })?;
 
-    MOUSE.call_once(|| mouse);
     // Final step: set the producer end of the mouse event queue.
-    MOUSE_PRODUCER.call_once(|| mouse_queue_producer);
+    // Also add the mouse struct for access during interrupts.
+    MOUSE.call_once(|| MouseInterruptParams { mouse, queue: mouse_queue_producer });
     Ok(())
 }
 
@@ -68,7 +72,7 @@ pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) ->
 /// 
 /// In some cases (e.g. on device init), [the PS/2 controller can also send an interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts).
 extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-    if let Some(mouse) = MOUSE.get() {
+    if let Some(MouseInterruptParams { mouse, queue }) = MOUSE.get() {
         if mouse.is_output_buffer_full() {
             // NOTE: having read some more forum comments now, if this ever breaks on real hardware,
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
@@ -79,12 +83,12 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
             if mouse_packet.always_one() != 1 {
                 // this could signal a hardware error or a mouse which doesn't conform to the rule
                 warn!("Discarding mouse data packet since its third bit should always be 1.");
-            } else if let Err(e) = handle_mouse_input(mouse_packet) {
+            } else if let Err(e) = handle_mouse_input(mouse_packet, queue) {
                 error!("ps2_mouse_handler: {e:?}");
             }
         }
     } else {
-        warn!("MOUSE wasn't yet initialized, dropping the mouse packet.");
+        warn!("ps2_mouse_handler(): MOUSE isn't initialized yet, skipping interrupt.");
     }
 
     interrupts::eoi(Some(PS2_MOUSE_IRQ));
@@ -92,19 +96,14 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
 
 /// enqueue a Mouse Event according to the data
-fn handle_mouse_input(mouse_packet: MousePacket) -> Result<(), &'static str> {
+fn handle_mouse_input(mouse_packet: MousePacket, queue: &Queue<Event>) -> Result<(), &'static str> {
     let buttons = Buttons::from(&mouse_packet).0;
     let movement = Movement::from(&mouse_packet).0;
 
     let mouse_event = MouseEvent::new(buttons, movement);
     let event = Event::MouseMovementEvent(mouse_event);
 
-    if let Some(producer) = MOUSE_PRODUCER.get() {
-        producer.push(event).map_err(|_| "failed to enqueue the mouse event")
-    } else {
-        warn!("MOUSE_PRODUCER wasn't yet initialized, dropping mouse event {event:?}.");
-        Err("MOUSE_PRODUCER wasn't yet initialized")
-    }
+    queue.push(event).map_err(|_| "failed to enqueue the mouse event")
 }
 
 // both MouseMovementRelative and MousePacketBits4 are in different crates, so we need a newtype wrapper:
