@@ -108,56 +108,54 @@ pub fn print_string(
     line: usize,
 ) {
     let slice = slice.as_bytes();
-    let relative_x = pos.x;
-    let relative_y = pos.y;
-    let mut curr_column = column;
-    let mut curr_line = line;
-    let start_x = relative_x + (curr_column as u32 * CHARACTER_WIDTH as u32);
-    let start_y = relative_y + (curr_line as u32 * CHARACTER_HEIGHT as u32);
-    let off_set_x = 0;
-    let off_set_y = 0;
+    let start_x = pos.x + (column as u32 * CHARACTER_WIDTH as u32);
+    let start_y = pos.y + (line as u32 * CHARACTER_HEIGHT as u32);
 
-    let mut j = off_set_x;
-    let mut i = off_set_y;
-    let mut z = 0;
-    let mut index_j = j;
+    let mut x_pixel = 0;
+    let mut row_controller = 0;
+    let mut char_index = 0;
+    let mut char_color_on_x_axis = x_pixel;
     loop {
-        let x = start_x + j as u32;
-        let y = start_y + i as u32;
-        if j % CHARACTER_WIDTH == 0 {
-            index_j = 0;
+        let x = start_x + x_pixel as u32;
+        let y = start_y + row_controller as u32;
+        if x_pixel % CHARACTER_WIDTH == 0 {
+            char_color_on_x_axis = 0;
         }
-        let color = if index_j >= 1 {
-            let index = index_j - 1;
-            let char_font = FONT_BASIC[slice[z] as usize][i];
-            index_j += 1;
+        let color = if char_color_on_x_axis >= 1 {
+            let index = char_color_on_x_axis - 1;
+            let char_font = FONT_BASIC[slice[char_index] as usize][row_controller];
+            char_color_on_x_axis += 1;
             if get_bit(char_font, index) != 0 {
                 fg_color
             } else {
                 bg_color
             }
         } else {
-            index_j += 1;
+            char_color_on_x_axis += 1;
             bg_color
         };
         window.draw_unchecked(&RelativePos::new(x, y), color);
 
-        j += 1;
-        if j == CHARACTER_WIDTH
-            || j % CHARACTER_WIDTH == 0
-            || start_x + j as u32 == dimensions.width as u32
+        x_pixel += 1;
+        if x_pixel == CHARACTER_WIDTH
+            || x_pixel % CHARACTER_WIDTH == 0
+            || start_x + x_pixel as u32 == dimensions.width as u32
         {
-            if slice.len() >= 1 && z < slice.len() - 1 {
-                z += 1;
+            if slice.len() >= 1 && char_index < slice.len() - 1 {
+                char_index += 1;
             }
 
-            if j >= CHARACTER_WIDTH * slice.len() && j % (CHARACTER_WIDTH * slice.len()) == 0 {
-                i += 1;
-                z = 0;
-                j = off_set_x;
+            if x_pixel >= CHARACTER_WIDTH * slice.len()
+                && x_pixel % (CHARACTER_WIDTH * slice.len()) == 0
+            {
+                row_controller += 1;
+                char_index = 0;
+                x_pixel = 0;
             }
 
-            if i == CHARACTER_HEIGHT || start_y + i as u32 == dimensions.height as u32 {
+            if row_controller == CHARACTER_HEIGHT
+                || start_y + row_controller as u32 == dimensions.height as u32
+            {
                 break;
             }
         }
@@ -313,30 +311,29 @@ impl Rect {
         }
     }
 
-    pub fn on_screen_window(&self, screen_width: isize, screen_height: isize) -> Rect {
+    /// Creates a new `Rect` from visible parts of itself.
+    pub fn return_visible_rect(&self) -> Rect {
         let mut start_x = self.x;
         let start_y = self.y;
         let mut end_x = self.width as isize;
         let mut end_y = self.height as isize;
         if self.x < 0 {
             start_x = 0;
-            end_x = self.x + self.width as isize;
-        } else if self.x + self.width as isize > screen_width as isize {
+            end_x = self.end_x();
+        } else if self.end_x() > SCREEN_WIDTH as isize {
             start_x = self.x;
-            let gap = (self.x + self.width as isize) - screen_width as isize;
+            let gap = (self.x + self.width as isize) - SCREEN_HEIGHT as isize;
             end_x = self.width as isize - gap;
         }
-        if self.y + self.height as isize > screen_height {
-            let gap = (self.y + self.height as isize) - screen_height;
+        if self.end_y() > SCREEN_HEIGHT as isize {
+            let gap = (self.y + self.height as isize) - SCREEN_HEIGHT as isize;
             end_y = self.height as isize - gap;
         }
-        let f = Rect::new(end_x as usize, end_y as usize, start_x, start_y);
-        f
+        let visible_rect = Rect::new(end_x as usize, end_y as usize, start_x, start_y);
+        visible_rect
     }
 }
 
-/// FrameBuffer with no actual physical memory mapped,
-/// used for Window and WindowManager's backbuffer.
 pub struct VirtualFrameBuffer {
     width: usize,
     height: usize,
@@ -364,43 +361,18 @@ impl VirtualFrameBuffer {
     }
 
     fn copy_window_from_iterators(&mut self, window: &mut MutexGuard<Window>) {
-        let window_screen = window.on_screen_window(self.width as isize, self.height as isize);
+        let window_screen = window.rect.return_visible_rect();
 
-        let w_it = window.return_framebuffer_iterator();
-        let f = buffer_indexer(&mut self.buffer, self.width, window_screen);
+        let window_iterator = window.return_framebuffer_iterator();
+        let framebuffer_iterator =
+            ret_fbiter_for_given_rect(&mut self.buffer, self.width, window_screen);
 
-        for (w_color, pixel) in w_it.zip(f) {
+        for (w_color, pixel) in window_iterator.zip(framebuffer_iterator) {
             *pixel = *w_color;
         }
     }
 
     fn copy_window_only(&mut self, window: &mut MutexGuard<Window>) {
-        /*
-        (ouz-a):I feel like(because at this point it's very hard to benchmark performance as our resolution is small)
-                this version is faster than iterator version below, could be improved with a lot of work, but still would
-                require `unsafe`.
-
-        let bounding_box = window.on_screen_window(self.width as isize, self.height as isize);
-        for y in 0..bounding_box.height {
-                let x = 0;
-                let y = y as isize;
-                let real_x = x + bounding_box.x;
-                let real_y = y + bounding_box.y;
-                let index = self.index(real_x, real_y);
-                let index_end = index + bounding_box.width;
-                let color_index = window.frame_buffer.index(x, y);
-                let color_index_end = color_index + bounding_box.width;
-                unsafe {
-                    let color = window.frame_buffer.buffer.get_unchecked(color_index..color_index_end);
-                    let buffer = self.buffer.get_unchecked_mut(index..index_end);
-                    buffer.copy_from_slice(&color);
-            }
-        }
-        */
-
-        // (ouz-a):I like this version better, it's easy to read very flexible and could be simplfied with little more work
-        //         not really sure about how to improve it's performance maybe we could use chunks and then copy slices but
-        //         or we could
         self.copy_window_from_iterators(window);
     }
 
@@ -497,7 +469,7 @@ impl PhysicalFrameBuffer {
     }
 }
 
-pub fn buffer_indexer(
+pub fn ret_fbiter_for_given_rect(
     buffer: &mut BorrowedSliceMappedPages<u32, Mutable>,
     buffer_width: usize,
     rect: Rect,
@@ -577,6 +549,7 @@ impl WindowManager {
         let p_framebuffer = PhysicalFrameBuffer::init_front_buffer().unwrap();
         let v_framebuffer =
             VirtualFrameBuffer::new(p_framebuffer.width, p_framebuffer.height).unwrap();
+        // FIXME: Don't use magic numbers
         let mouse = Rect::new(11, 18, 200, 200);
 
         let window_manager = WindowManager {
@@ -615,11 +588,9 @@ impl WindowManager {
         }
     }
 
+    // TODO: Do stop indexing mouse image create iterator for it, also draw the thing with iterators
     fn draw_mouse(&mut self) {
-        let bounding_box = self.mouse.on_screen_window(
-            self.v_framebuffer.width as isize,
-            self.v_framebuffer.height as isize,
-        );
+        let bounding_box = self.mouse.return_visible_rect();
         for y in bounding_box.y..bounding_box.y + bounding_box.height as isize {
             for x in bounding_box.x..bounding_box.x + bounding_box.width as isize {
                 let color = MOUSE_POINTER_IMAGE[(x - bounding_box.x) as usize]
@@ -647,28 +618,15 @@ impl WindowManager {
         let mut new_pos = screen_pos + self.mouse;
 
         // handle left
-        if (new_pos.x + (self.mouse.width as i32 / 2)) < 0 {
-            new_pos.x = self.mouse.x as i32;
-        }
-
-        if new_pos.x < 0 {
-            new_pos.x = 0;
-        }
-
+        new_pos.x = core::cmp::max(new_pos.x, 0);
         // handle right
-        if new_pos.x > (self.v_framebuffer.width) as i32 - 3 {
-            new_pos.x = self.v_framebuffer.width as i32 - 3;
-        }
+        new_pos.x = core::cmp::min(new_pos.x, self.v_framebuffer.width as i32 - 3);
 
         // handle top
-        if new_pos.y < 0 {
-            new_pos.y = 0;
-        }
-
+        new_pos.y = core::cmp::max(new_pos.y, 0);
         // handle bottom
-        if new_pos.y > self.v_framebuffer.height as i32 - 3 {
-            new_pos.y = self.v_framebuffer.height as i32 - 3;
-        }
+        new_pos.y = core::cmp::min(new_pos.y, self.v_framebuffer.height as i32 - 3);
+
         self.set_mouse_pos(&new_pos);
     }
 
@@ -746,7 +704,11 @@ impl WindowManager {
                         self.mouse.y,
                     ))
                 {
-                    window.upgrade().unwrap().lock().resize_window(screen_pos.x, screen_pos.y);
+                    window
+                        .upgrade()
+                        .unwrap()
+                        .lock()
+                        .resize_window(screen_pos.x, screen_pos.y);
                     window.upgrade().unwrap().lock().reset_drawable_area();
                     window
                         .upgrade()
@@ -817,15 +779,15 @@ impl Window {
         }
     }
 
-    pub fn resize_window(&mut self,width:i32,height:i32){
+    pub fn resize_window(&mut self, width: i32, height: i32) {
         let new_width = self.width() + width as usize;
         let new_height = self.height() + height as usize;
-        if new_width >= 50 && new_height >= 50 {
+        if new_width > 50 && new_height > 50 {
             self.rect.width = new_width;
             self.rect.height = new_height;
         }
     }
-    
+
     pub fn reset_drawable_area(&mut self) {
         self.drawable_area = None;
     }
@@ -875,7 +837,8 @@ impl Window {
 
     pub fn draw_border(&mut self) {
         let border = self.return_title_border();
-        let buffer = buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, border);
+        let buffer =
+            ret_fbiter_for_given_rect(&mut self.frame_buffer.buffer, self.rect.width, border);
         for pixel in buffer {
             *pixel = DEFAULT_BORDER_COLOR;
         }
@@ -894,14 +857,17 @@ impl Window {
         }
     }
 
-    // TODO: add better(line,box..etc) drawing functions
-
-    pub fn draw_rectangle(&mut self, col: Color) {
-        // TODO: This should be somewhere else and it should be a function
+    fn should_resize_framebuffer(&mut self) {
         if self.resized {
             self.resize_framebuffer();
             self.resized = false;
         }
+    }
+
+    // TODO: add better(line,box..etc) drawing functions
+    pub fn draw_rectangle(&mut self, col: Color) {
+        self.should_resize_framebuffer();
+
         for pixel in self.frame_buffer.buffer.iter_mut() {
             *pixel = col;
         }
@@ -915,67 +881,36 @@ impl Window {
     /// Gives mutable framebuffer iterator for the whole window
     fn return_framebuffer_iterator(&mut self) -> impl Iterator<Item = &mut u32> {
         if self.bottom_side_out() || self.left_side_out() || self.right_side_out() {
-            let mut bounding_box =
-                self.on_screen_window(SCREEN_WIDTH as isize, SCREEN_HEIGHT as isize);
+            let mut bounding_box = self.rect.return_visible_rect();
             bounding_box.x = 0;
             if self.left_side_out() {
                 bounding_box.x = (self.rect.width - bounding_box.width) as isize;
             }
             bounding_box.y = 0;
-            let buffer =
-                buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, bounding_box);
+            let buffer = ret_fbiter_for_given_rect(
+                &mut self.frame_buffer.buffer,
+                self.rect.width,
+                bounding_box,
+            );
             buffer
         } else {
             let rect = Rect::new(self.frame_buffer.width, self.frame_buffer.height, 0, 0);
-            let buffer = buffer_indexer(&mut self.frame_buffer.buffer, self.rect.width, rect);
+            let buffer =
+                ret_fbiter_for_given_rect(&mut self.frame_buffer.buffer, self.rect.width, rect);
             buffer
         }
     }
 
     pub fn left_side_out(&self) -> bool {
-        if self.rect.x < 0 {
-            true
-        } else {
-            false
-        }
+        self.rect.x < 0
     }
+
     pub fn right_side_out(&self) -> bool {
-        if (self.rect.x + self.rect.width as isize) > SCREEN_WIDTH as isize {
-            true
-        } else {
-            false
-        }
+        self.rect.x + self.rect.width as isize > SCREEN_WIDTH as isize
     }
 
     pub fn bottom_side_out(&self) -> bool {
-        if (self.rect.y + self.rect.height as isize) > SCREEN_HEIGHT as isize {
-            true
-        } else {
-            false
-        }
-    }
-
-    // TODO: This should be moved to somewhere else
-    // and renamed
-    pub fn on_screen_window(&self, screen_width: isize, screen_height: isize) -> Rect {
-        let mut start_x = self.rect.x;
-        let start_y = self.rect.y;
-        let mut end_x = self.rect.width as isize;
-        let mut end_y = self.rect.height as isize;
-        if self.rect.x < 0 {
-            start_x = 0;
-            end_x = self.rect.x + self.rect.width as isize;
-        } else if self.rect.x + self.rect.width as isize > screen_width as isize {
-            start_x = self.rect.x;
-            let gap = (self.rect.x + self.rect.width as isize) - screen_width as isize;
-            end_x = self.rect.width as isize - gap;
-        }
-        if self.rect.y + self.rect.height as isize > screen_height {
-            let gap = (self.rect.y + self.rect.height as isize) - screen_height;
-            end_y = self.rect.height as isize - gap;
-        }
-        let f = Rect::new(end_x as usize, end_y as usize, start_x, start_y);
-        f
+        self.rect.y + self.rect.height as isize > SCREEN_HEIGHT as isize
     }
 }
 
@@ -990,7 +925,7 @@ fn port_loop(
         height: 400,
         next_col: 1,
         next_line: 1,
-        text: "asdasd".to_string(),
+        text: "Hello World".to_string(),
         fg_color: 0xFFFFFF,
         bg_color: 0x0F0FFF,
     };
