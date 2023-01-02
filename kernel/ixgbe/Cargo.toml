@@ -34,9 +34,6 @@ path = "../kernel_config"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.pic]
 path = "../pic"
 
@@ -83,6 +80,9 @@ path = "../physical_nic"
 
 [dependencies.virtual_nic]
 path = "../virtual_nic"
+
+[dependencies.net]
+path = "../net"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

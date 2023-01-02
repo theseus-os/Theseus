@@ -10,5 +10,5 @@ getopts = "0.2.21"
 [dependencies.pmu_x86]
 path = "../../kernel/pmu_x86"
 
-[dependencies.print]
-path = "../../kernel/print"
+[dependencies.app_io]
+path = "../../kernel/app_io"

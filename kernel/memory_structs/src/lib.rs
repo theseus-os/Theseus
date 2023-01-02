@@ -164,20 +164,31 @@ mod canonical_address {
 mod canonical_address {
     use bit_field::BitField;
 
-    // aarch64 doesn't have a concept of canonical VA
-    // so this always returns true
+    /// On aarch64, VAs are composed of an ASID
+    /// which is 8 or 16 bits long depending
+    /// on MMU config. In Theseus, we use 8-bits
+    /// and the next 8 bits are unused.
+    /// Our ASID is zero, so a "canonical" VA has
+    /// the 16 most significant bits cleared.
     #[inline]
-    pub fn is_canonical_virtual_address(_virt_addr: usize) -> bool {
-        true
+    pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+        match virt_addr.get_bits(48..64) {
+            0 => true,
+            _ => false,
+        }
     }
-    
-    // aarch64 doesn't have a concept of canonical VA
-    // so this returns the address as-is
+
+    /// On aarch64, VAs are composed of an ASID
+    /// which is 8 or 16 bits long depending
+    /// on MMU config. In Theseus, we use 8-bits
+    /// and the next 8 bits are unused.
+    /// Our ASID is zero, so a "canonical" VA has
+    /// the 16 most significant bits cleared.
     #[inline]
     pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
-        virt_addr
+        virt_addr & 0x0000_FFFF_FFFF_FFFF
     }
-    
+
     /// On aarch64, we configure the MMU to use 48-bit
     /// physical addresses; "canonical" physical addresses
     /// have the 16 most significant bits cleared.
@@ -188,7 +199,7 @@ mod canonical_address {
             _ => false,
         }
     }
-    
+
     /// On aarch64, we configure the MMU to use 48-bit
     /// physical addresses; "canonical" physical addresses
     /// have the 16 most significant bits cleared.
@@ -331,7 +342,7 @@ impl Page {
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped [`Frame`]  using `PageTableEntry::pointed_frame()`.
     pub const fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0x1FF
+        self.number & 0x1FF
     }
 }
 

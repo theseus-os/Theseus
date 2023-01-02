@@ -368,7 +368,7 @@ impl PteFlagsAarch64 {
     /// for use in a higher-level page table entry, e.g., P4, P3, P2.
     ///
     /// Currently, on aarch64, this does the following:
-    /// * Clears the `NOT_EXECUTABLE` bit.  
+    /// * Clears the `NOT_EXECUTABLE` bit, making it executable. 
     ///   * P4, P3, and P2 entries should never set `NOT_EXECUTABLE`,
     ///     only the lowest-level P1 entry should.
     /// * Clears the `EXCLUSIVE` bit.
@@ -376,11 +376,17 @@ impl PteFlagsAarch64 {
     ///     because another page table frame may re-use it (create another alias to it)
     ///     without our page table implementation knowing about it.
     ///   * Only P1-level PTEs can map a frame exclusively.
+    /// * Sets the `ACCESSED` bit, since Theseus currently does not use it
+    ///   and aarch64 will throw an Access Flag Fault if it is not set.
+    /// * Sets the `PAGE_DESCRIPTOR` bit, since Theseus currently does not
+    ///   use block descriptors on aarch64.
     /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
     #[must_use]
     pub fn adjust_for_higher_level_pte(self) -> Self {
         self.executable(true)
             .exclusive(false)
+            .accessed(true)
+            .page_descriptor(true)
             .valid(true)
     }
 

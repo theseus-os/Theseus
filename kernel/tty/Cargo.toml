@@ -1,0 +1,15 @@
+[package]
+name = "tty"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "TTY abstractions"
+edition = "2021"
+
+[dependencies]
+async_channel = { path = "../async_channel" }
+mutex_sleep = { path = "../mutex_sleep" }
+
+[dependencies.core2]
+version = "0.4.0"
+default-features = false
+features = ["alloc", "nightly"]

@@ -256,7 +256,7 @@ if #[cfg(unsafe_heap)] {
 /// other value e.g. task id
 #[inline(always)] 
 fn get_key() -> usize {
-    apic::get_my_apic_id() as usize
+    apic::current_cpu() as usize
 }
 
 // The LockedHeap struct definition changes depending on the slabmalloc version used.

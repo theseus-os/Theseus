@@ -29,7 +29,7 @@ extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate no_drop;
 extern crate stack;
-extern crate apic; 
+extern crate cpu; 
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate tsc;
@@ -39,7 +39,7 @@ extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
-#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate app_io;
 extern crate first_application;
 extern crate exceptions_full;
 extern crate network_manager;
@@ -57,6 +57,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
 use no_drop::NoDrop;
+use memory::PhysicalAddress;
 
 
 #[cfg(mirror_log_to_vga)]
@@ -86,6 +87,7 @@ pub fn init(
     bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
     {
@@ -99,7 +101,7 @@ pub fn init(
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
+    device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
@@ -114,7 +116,7 @@ pub fn init(
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // get BSP's apic id
-    let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
+    let bsp_apic_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
@@ -137,11 +139,22 @@ pub fn init(
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
     tlb_shootdown::init();
     
-    // //initialize the per core heaps
+    // Initialize the per-core heaps.
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
 
-    // initialize window manager.
+    #[cfg(feature = "uefi")] {
+        log::error!("uefi boot cannot proceed as it is not fully implemented");
+        loop {}
+    }
+
+    // Initialize the window manager, and also the PAT, if available.
+    // The PAT supports write-combining caching of graphics video memory for better performance
+    // and must be initialized explicitly on every CPU, 
+    // but it is not a fatal error if it doesn't exist.
+    if page_attribute_table::init().is_err() {
+        error!("This CPU does not support the Page Attribute Table");
+    }
     let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the rest of our drivers

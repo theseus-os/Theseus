@@ -3,36 +3,31 @@ name = "app_io"
 version = "0.1.0"
 authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
 description = "Offers applications the ability to read from or print to the terminal."
+edition = "2021"
 
 
 [dependencies]
-spin = "0.9.4"
+hashbrown = "0.11"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
-log = "0.4.8"
-
-[dependencies.keycodes_ascii]
-path = "../../libs/keycodes_ascii"
-
-[dependencies.event_types]
-path = "../../kernel/event_types"
 
 [dependencies.task]
 path = "../../kernel/task"
-
-[dependencies.print]
-path = "../../kernel/print"
-
-[dependencies.window_manager]
-path = "../../kernel/window_manager"
-
-[dependencies.libterm]
-path = "../../kernel/libterm"
 
 [dependencies.stdio]
 path = "../../libs/stdio"
 
 [dependencies.logger]
 path = "../../kernel/logger"
+
+[dependencies.mutex_sleep]
+path = "../../kernel/mutex_sleep"
+
+[dependencies.tty]
+path = "../../kernel/tty"
+
+[dependencies.lazy_static]
+features = ["spin_no_std"]
+version = "1.4.0"
 
 [lib]
 crate-type = ["rlib"]

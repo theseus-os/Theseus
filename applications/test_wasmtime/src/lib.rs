@@ -6,7 +6,7 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 
 use alloc::{
     string::{String, ToString},

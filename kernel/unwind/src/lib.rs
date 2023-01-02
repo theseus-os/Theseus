@@ -952,5 +952,8 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     #[cfg(not(downtime_eval))]
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     
-    (current_task.failure_cleanup_function)(current_task, cause)
+    (current_task.failure_cleanup_function)(
+        task::ExitableTaskRef::obtain_for_unwinder(current_task),
+        cause,
+    )
 }

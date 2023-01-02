@@ -20,8 +20,6 @@ extern crate stdio;
 extern crate core2;
 extern crate app_io;
 extern crate fs_node;
-extern crate terminal_print;
-extern crate print;
 extern crate environment;
 extern crate libterm;
 
@@ -123,7 +121,6 @@ pub fn main(_args: Vec<String>) -> isize {
     //     Err(err) => {error!("{}", err)}
     // }
     // warn!("shell::main(): the `shell_loop` task exited unexpectedly.");
-    // warn!("SHELL_LOOP exit value: {:?}", _task_ref.take_exit_value());
     // return 0;
 }
 
@@ -165,6 +162,7 @@ struct Shell {
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<Event>,
     /// The producer to the terminal's print dfqueue
+    #[allow(dead_code)]
     print_producer: DFQueueProducer<Event>,
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
@@ -186,11 +184,6 @@ impl Shell {
         let key_event_queue: KeyEventQueue = KeyEventQueue::new();
         let key_event_producer = key_event_queue.get_writer();
         let key_event_consumer = key_event_queue.get_reader();
-
-        // Sets up the kernel to print to this terminal instance.
-        // Note that if this has already been previously set by an existing shell,
-        // this function call will do nothing. 
-        print::set_default_print_output(print_producer.obtain_producer());
 
         let env = Environment::default();
 
@@ -411,32 +404,30 @@ impl Shell {
 
             if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
                 // Lock the shared structure in `app_io` and then kill the running application
-                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
-                    // Kill all tasks in the job.
-                    for task_ref in task_refs {
-                        if task_ref.has_exited() { continue; }
-                        match task_ref.kill(KillReason::Requested) {
-                            Ok(_) => {
-                                if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
-                                    error!("Killed task but could not remove it from runqueue: {}", e);
-                                }
+                // Kill all tasks in the job.
+                for task_ref in task_refs {
+                    if task_ref.has_exited() { continue; }
+                    match task_ref.kill(KillReason::Requested) {
+                        Ok(_) => {
+                            if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
+                                error!("Killed task but could not remove it from runqueue: {}", e);
                             }
-                            Err(e) => error!("Could not kill task, error: {}", e),
                         }
+                        Err(e) => error!("Could not kill task, error: {}", e),
+                    }
 
-                        // Here we must wait for the running application to quit before releasing the lock,
-                        // because the previous `kill` method will NOT stop the application immediately.
-                        // We must circumvent the situation where the application is killed while holding the
-                        // lock. We wait for the application to finish its last time slice. It will then be
-                        // removed from the run queue. We can thereafter release the lock.
-                        loop {
-                            scheduler::schedule(); // yield the CPU
-                            if !task_ref.is_running() {
-                                break;
-                            }
+                    // Here we must wait for the running application to quit before releasing the lock,
+                    // because the previous `kill` method will NOT stop the application immediately.
+                    // We must circumvent the situation where the application is killed while holding the
+                    // lock. We wait for the application to finish its last time slice. It will then be
+                    // removed from the run queue. We can thereafter release the lock.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref.is_running() {
+                            break;
                         }
                     }
-                });
+                }
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
             } else {
                 self.clear_cmdline(true)?;
@@ -459,27 +450,23 @@ impl Shell {
             };
 
             if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
-                // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
-                    // Stop all tasks in the job.
-                    for task_ref in task_refs {
-                        if task_ref.block().is_err() {
-                            continue;
-                        }
+                // Stop all tasks in the job.
+                for task_ref in task_refs {
+                    if task_ref.has_exited() { continue; }
+                    if task_ref.block().is_err() { continue; }
 
-                        // Here we must wait for the running application to stop before releasing the lock,
-                        // because the previous `block` method will NOT stop the application immediately.
-                        // We must circumvent the situation where the application is stopped while holding the
-                        // lock. We wait for the application to finish its last time slice. It will then be
-                        // truly blocked. We can thereafter release the lock.
-                        loop {
-                            scheduler::schedule(); // yield the CPU
-                            if !task_ref.is_running() {
-                                break;
-                            }
+                    // Here we must wait for the running application to stop before releasing the lock,
+                    // because the previous `block` method will NOT stop the application immediately.
+                    // We must circumvent the situation where the application is stopped while holding the
+                    // lock. We wait for the application to finish its last time slice. It will then be
+                    // truly blocked. We can thereafter release the lock.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref.is_running() {
+                            break;
                         }
                     }
-                });
+                }
             }
             return Ok(());
         }
@@ -628,15 +615,8 @@ impl Shell {
                 Some(c) => {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
-                    if let Some(fg_job_num) = self.fg_job_num {
+                    if let Some(_fg_job_num) = self.fg_job_num {
                         self.insert_char_to_input_buff(c, true)?;
-                        if let Some(job) = self.jobs.get(&fg_job_num) {
-                            if app_io::is_requesting_instant_flush(&job.task_ids[0])? {
-                                job.stdin_writer.lock().write_all(self.input_buffer.as_bytes())
-                                    .or(Err("shell failed to write to stdin"))?;
-                                self.input_buffer.clear();
-                            }
-                        }
                         return Ok(());
                     }
                     else {
@@ -742,24 +722,17 @@ impl Shell {
                 for task_id in &task_ids {
                     let stdio_queue_for_stdin_and_stdout = Stdio::new();
                     let stdio_queue_for_stderr = Stdio::new();
-                    let streams = IoStreams::new(
-                        previous_queue_reader,
-                        stdio_queue_for_stdin_and_stdout.get_writer(),
-                        stdio_queue_for_stderr.get_writer(),
-                        self.key_event_consumer.clone(),
-                        self.terminal.clone(),
-                    );
+                    let streams = IoStreams {
+                        stdin: Arc::new(previous_queue_reader),
+                        stdout: Arc::new(stdio_queue_for_stdin_and_stdout.get_writer()),
+                        stderr: Arc::new(stdio_queue_for_stderr.get_writer()),
+                        discipline: None,
+                    };
                     app_io::insert_child_streams(*task_id, streams);
 
                     previous_queue_reader = stdio_queue_for_stdin_and_stdout.get_reader();
                     stderr_queues.push(stdio_queue_for_stderr);
                     pipe_queues.push(stdio_queue_for_stdin_and_stdout);
-
-                    // Insert print event producer to `terminal_print` to support legacy output.
-                    if let Err(msg) = terminal_print::add_child(*task_id, self.print_producer.obtain_producer()) {
-                        self.terminal.lock().print_to_terminal(format!("{}\n", msg));
-                        return Err(msg);
-                    }
                 }
 
                 let job_stdout_reader = previous_queue_reader;
@@ -1057,64 +1030,67 @@ impl Shell {
             for task_ref in task_refs {
                 if task_ref.has_exited() { // a task has exited
                     let exited_task_id = task_ref.id;
-                    if let Some(exit_val) = task_ref.take_exit_value() {
-                        match exit_val {
-                            ExitValue::Completed(exit_status) => {
-                                // here: the task ran to completion successfully, so it has an exit value.
-                                // we know the return type of this task is `isize`,
-                                // so we need to downcast it from Any to isize.
-                                let val: Option<&isize> = exit_status.downcast_ref::<isize>();
-                                info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
-                                if let Some(val) = val {
-                                    self.terminal.lock().print_to_terminal(
-                                        format!("task [{}] exited with code {} ({:#X})\n", exited_task_id, val, val)
-                                    );
-                                }
-                            },
-
-                            ExitValue::Killed(KillReason::Requested) => {
-                                // Nothing to do. We have already print "^C" while handling keyboard event.
-                            },
-                            // If the user manually aborts the task
-                            ExitValue::Killed(kill_reason) => {
-                                warn!("task [{}] was killed because {:?}", exited_task_id, kill_reason);
+                    match task_ref.join() {
+                        Ok(ExitValue::Completed(exit_status)) => {
+                            // here: the task ran to completion successfully, so it has an exit value.
+                            // we know the return type of this task is `isize`,
+                            // so we need to downcast it from Any to isize.
+                            let val: Option<&isize> = exit_status.downcast_ref::<isize>();
+                            info!("terminal: task [{}] returned exit value: {:?}", exited_task_id, val);
+                            if let Some(val) = val {
                                 self.terminal.lock().print_to_terminal(
-                                    format!("task [{}] was killed because {:?}\n", exited_task_id, kill_reason)
+                                    format!("task [{}] exited with code {} ({:#X})\n", exited_task_id, val, val)
                                 );
                             }
+                        },
+
+                        Ok(ExitValue::Killed(KillReason::Requested)) => {
+                            // Nothing to do. We have already print "^C" while handling keyboard event.
+                        },
+
+                        // If the user manually aborts the task
+                        Ok(ExitValue::Killed(kill_reason)) => {
+                            warn!("task [{}] was killed because {:?}", exited_task_id, kill_reason);
+                            self.terminal.lock().print_to_terminal(
+                                format!("task [{}] was killed because {:?}\n", exited_task_id, kill_reason)
+                            );
                         }
+                        Err(_e) => {
+                            let err_msg = format!("Failed to `join` task [{}] {:?}, error: {:?}",
+                                exited_task_id, task_ref, _e,
+                            );
+                            error!("{}", err_msg);
+                            self.terminal.lock().print_to_terminal(err_msg);
+                        }
+                    }
 
-                        // Remove the queue for legacy terminal print
-                        terminal_print::remove_child(exited_task_id)?;
+                    need_refresh = true;
 
-                        need_refresh = true;
+                    // Set EOF flag for the stdin, stdout of the exited task.
+                    let mut pipe_queue_iter = job.pipe_queues.iter();
+                    let mut stderr_queue_iter = job.stderr_queues.iter();
+                    let mut task_id_iter = job.task_ids.iter();
+                    while let (Some(pipe_queue), Some(stderr_queue), Some(task_id))
+                        = (pipe_queue_iter.next(), stderr_queue_iter.next(), task_id_iter.next()) {
 
-                        // Set EOF flag for the stdin, stdout of the exited task.
-                        let mut pipe_queue_iter = job.pipe_queues.iter();
-                        let mut stderr_queue_iter = job.stderr_queues.iter();
-                        let mut task_id_iter = job.task_ids.iter();
-                        while let (Some(pipe_queue), Some(stderr_queue), Some(task_id))
-                            = (pipe_queue_iter.next(), stderr_queue_iter.next(), task_id_iter.next()) {
+                        // Find the exited task by matching task id.
+                        if *task_id == exited_task_id {
 
-                            // Find the exited task by matching task id.
-                            if *task_id == exited_task_id {
+                            // Set the EOF flag of its `stdin`, which effectively prevents it's
+                            // producer from writing more. (It returns an error upon writing to
+                            // the queue which has the EOF flag set.)
+                            pipe_queue.get_writer().lock().set_eof();
 
-                                // Set the EOF flag of its `stdin`, which effectively prevents it's
-                                // producer from writing more. (It returns an error upon writing to
-                                // the queue which has the EOF flag set.)
+                            // Also set the EOF of `stderr`.
+                            stderr_queue.get_writer().lock().set_eof();
+
+                            // Set the EOF flag of its `stdout`, which effectively notifies the reader
+                            // of the queue that the stream has ended. The `if let` clause should not
+                            // fail.
+                            if let Some(pipe_queue) = pipe_queue_iter.next() {
                                 pipe_queue.get_writer().lock().set_eof();
-
-                                // Also set the EOF of `stderr`.
-                                stderr_queue.get_writer().lock().set_eof();
-
-                                // Set the EOF flag of its `stdout`, which effectively notifies the reader
-                                // of the queue that the stream has ended. The `if let` clause should not
-                                // fail.
-                                if let Some(pipe_queue) = pipe_queue_iter.next() {
-                                    pipe_queue.get_writer().lock().set_eof();
-                                }
-                                break;
                             }
+                            break;
                         }
                     }
 
@@ -1185,7 +1161,7 @@ impl Shell {
             if let Some(job) = self.jobs.remove(&finished_job_num) {
                 for task_id in job.task_ids {
                     self.task_to_job.remove(&task_id);
-                    app_io::remove_child_streams(&task_id);
+                    app_io::remove_child_streams(task_id);
                 }
             }
         }

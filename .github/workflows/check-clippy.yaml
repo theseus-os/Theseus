@@ -10,6 +10,8 @@ jobs:
       - name: "Initialize git submodules"
         run: |
           git submodule update --init --recursive
+      - name: "Install nasm"
+        run: sudo apt install nasm
       - name: "Install Rust toolchain"
         run: |
           (echo "rustup toolchain install "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;"; echo "rustup component add clippy rust-src --toolchain "; cat rust-toolchain; printf -- "-x86_64-unknown-linux-gnu;") | tr -d "\r" | tr -d "\n" > cmd.txt
@@ -19,6 +21,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: .
         run: |
-          printf "cargo clippy -q -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-unknown-theseus.json --workspace --all-features -- -A clippy::all " > cmd.txt;
+          printf "cargo clippy -q -Z build-std=core,alloc -Z build-std-features=compiler-builtins-mem --target cfg/x86_64-unknown-theseus.json --workspace --features theseus_features/everything -- -A clippy::all " > cmd.txt;
           grep -v "#" lints.txt | sed 's/^/-D clippy::/g' | tr -d '\r' | tr '\n' ' ' >> cmd.txt
           bash cmd.txt;

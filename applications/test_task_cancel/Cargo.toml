@@ -1,0 +1,12 @@
+[package]
+name = "test_task_cancel"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Task cancellation test"
+edition = "2021"
+
+[dependencies]
+log = "0.4"
+spawn = { path = "../../kernel/spawn" }
+spin = "0.9"
+task = { path = "../../kernel/task" }

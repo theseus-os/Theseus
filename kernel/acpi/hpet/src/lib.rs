@@ -10,6 +10,7 @@ use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAdd
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
 use static_assertions::const_assert_eq;
+use time::Instant;
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
 static HPET: Once<RwLock<BorrowedMappedPages<Hpet, Mutable>>> = Once::new();
@@ -106,6 +107,13 @@ impl Hpet {
     }
 }
 
+impl time::ClockSource for Hpet {
+    type ClockType = time::Monotonic;
+
+    fn now() -> Instant {
+        Instant::new(get_hpet().expect("couldn't get HPET").get_counter())
+    }
+}
 
 /// A structure that wraps HPET I/O register for each timer comparator, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.

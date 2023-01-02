@@ -62,6 +62,7 @@ pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
 
 /// The errors that may occur in [`register_interrupt_handler()`].
+#[derive(Debug)]
 pub enum InterruptRegistrationError {
     /// The given `irq` number was already in use and is registered to 
     /// the interrupt handler at the given `existing_handler_address`.
@@ -99,7 +100,7 @@ pub enum InterruptRegistrationError {
 /// It is the caller's responsibility to notify or otherwise wake up the deferred interrupt task
 /// in the given `interrupt_handler` (or elsewhere, arbitrarily). 
 /// WIthout doing this, the `deferred_interrupt_action` will never be invoked.
-/// The returned [`TaskRef`] is useful for doing this, as you can `unblock` it when it needs to run,
+/// The returned [`JoinableTaskRef`] is useful for doing this, as you can `unblock` it when it needs to run,
 /// e.g., when an interrupt has occurred.
 ///
 /// # Return
@@ -172,7 +173,7 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
         }
 
         if curr_task.block().is_err() {
-            error!("deffered_task_entry_point: couldn't block task");
+            error!("deferred_task_entry_point: couldn't block {:?}", curr_task);
         }
 
         scheduler::schedule();

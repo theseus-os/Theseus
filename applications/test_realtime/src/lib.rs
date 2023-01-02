@@ -18,7 +18,7 @@ extern crate alloc;
 extern crate spawn;
 extern crate sleep;
 extern crate scheduler;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 
 use core::sync::atomic::AtomicUsize;
 use alloc::{

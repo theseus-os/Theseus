@@ -19,10 +19,10 @@
 #![no_std]
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 extern crate task;
-extern crate apic;
+extern crate cpu;
 extern crate spawn;
 extern crate runqueue;
 extern crate getopts;
@@ -30,7 +30,6 @@ extern crate hpet;
 extern crate libtest;
 
 use alloc::{
-    boxed::Box,
     string::String,
     vec::Vec,
 };
@@ -132,7 +131,6 @@ fn run_whole(num_tasks: usize) -> Result<(), &'static str> {
 
     for t in &tasks {
         t.join()?;
-        let _ = t.take_exit_value();
     }
 
     let end = hpet.get_counter();
@@ -164,7 +162,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _i in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(apic::get_my_apic_id(), taskref.clone())?;
+        runqueue::add_task_to_specific_runqueue(cpu::current_cpu(), taskref.clone())?;
 
         #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {
@@ -189,10 +187,6 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         elapsed_ticks, hpet_period);
     println!("Elapsed time:{} us", elapsed_time);
 
-    // cleanup the dummy task we created earlier
-    taskref.mark_as_exited(Box::new(0usize))?;
-    taskref.take_exit_value();
-    
     Ok(())
 }
 
