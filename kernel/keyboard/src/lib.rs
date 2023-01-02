@@ -20,8 +20,12 @@ const PS2_KEYBOARD_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0x1;
 // TODO: avoid unsafe static mut
 static mut KBD_MODIFIERS: Lazy<KeyboardModifiers> = Lazy::new(KeyboardModifiers::new);
 
-static KEYBOARD: Once<PS2Keyboard> = Once::new();
-static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
+static KEYBOARD: Once<KeyboardInterruptParams> = Once::new();
+
+struct KeyboardInterruptParams {
+    keyboard: PS2Keyboard<'static>,
+    queue: Queue<Event>,
+}
 
 /// Initialize the PS/2 keyboard driver and register its interrupt handler.
 /// 
@@ -51,9 +55,9 @@ pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event
         "PS/2 keyboard IRQ was already in use! Sharing IRQs is currently unsupported."
     })?;
 
-    KEYBOARD.call_once(|| keyboard);
     // Final step: set the producer end of the keyboard event queue.
-    KEYBOARD_PRODUCER.call_once(|| keyboard_queue_producer);
+    // Also add the keyboard struct for access during interrupts.
+    KEYBOARD.call_once(|| KeyboardInterruptParams { keyboard, queue: keyboard_queue_producer });
     Ok(())
 }
 
@@ -63,7 +67,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
     // the first handling the E0 byte, the second handling their second byte.
     static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
-    if let Some(keyboard) = KEYBOARD.get() {
+    if let Some(KeyboardInterruptParams { keyboard, queue }) = KEYBOARD.get() {
         let scan_code = keyboard.read_scancode();
         let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
 
@@ -86,13 +90,13 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
             // a scan code of zero is a PS2_PORT error that we can ignore,
             // a scan code of 0xFA is a command ACK response, already handled in polling (when sending a command, see ps2 crate)
             if scan_code != 0 && scan_code != 0xFA {
-                if let Err(e) = handle_keyboard_input(keyboard, scan_code, extended) {
+                if let Err(e) = handle_keyboard_input(keyboard, queue, scan_code, extended) {
                     error!("ps2_keyboard_handler: error handling PS2_PORT input: {e:?}");
                 }
             }
         }
     } else {
-        warn!("ps2_keyboard_handler(): KEYBOARD wasn't yet initialized.");
+        warn!("ps2_keyboard_handler(): KEYBOARD isn't initialized yet, skipping interrupt.");
     }
     
     interrupts::eoi(Some(PS2_KEYBOARD_IRQ));
@@ -104,7 +108,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
 /// 
 /// Returns Ok(()) if everything was handled properly.
 /// Otherwise, returns an error string.
-fn handle_keyboard_input(keyboard: &PS2Keyboard, scan_code: u8, extended: bool) -> Result<(), &'static str> {
+fn handle_keyboard_input(keyboard: &PS2Keyboard, queue: &Queue<Event>, scan_code: u8, extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
     // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
@@ -185,12 +189,7 @@ fn handle_keyboard_input(keyboard: &PS2Keyboard, scan_code: u8, extended: bool) 
 
     if let Ok(keycode) = Keycode::try_from(adjusted_scan_code) {
         let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, **modifiers));
-        if let Some(producer) = KEYBOARD_PRODUCER.get() {
-            producer.push(event).map_err(|_| "keyboard input queue is full")
-        } else {
-            warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {event:?}.");
-            Err("keyboard event queue not ready")
-        }
+        queue.push(event).map_err(|_| "keyboard input queue is full")
     } else {
         error!("handle_keyboard_input(): Unknown scancode: {scan_code:?}, adjusted scancode: {adjusted_scan_code:?}");
         Err("unknown keyboard scancode")
