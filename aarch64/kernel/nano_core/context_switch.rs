@@ -1,10 +1,11 @@
 use core::mem::size_of;
-use core::arch::asm;
 
 use log::{info, error};
 
 use memory::{MappedPages, PageTable};
 use pte_flags::PteFlags;
+
+use context_switch_regular::context_switch_regular;
 
 static mut PREV_STACK: usize = 0xdeadbeef;
 
@@ -21,73 +22,6 @@ pub extern "C" fn landing_pad() {
 
     error!("This should never be printed");
     loop {}
-}
-
-// This:
-// - saves general pupose regs,
-// - saves the current SP to an arbitrary address expected to be in x0 (= parameter `_prev_stack_pointer`),
-// - installs the new one expected to be in x1 (= parameter `_next_stack_pointer_value`),
-// - restores GP regs from the just-installed stack
-// - jumps to address in x30
-#[naked]
-unsafe extern "C" fn context_switch_regular(_prev_stack_pointer: *mut usize, _next_stack_pointer_value: usize) {
-    asm!(
-        // Make room on the stack for the exception context.
-        // This is 8 bytes too much, but has better alignment.
-        "sub sp,  sp,  #8 * 29",
-
-        // Push general-purpose registers on the stack.
-        "stp x2,  x3,  [sp, #8 *  0 * 2]",
-        "stp x4,  x5,  [sp, #8 *  1 * 2]",
-        "stp x6,  x7,  [sp, #8 *  2 * 2]",
-        "stp x8,  x9,  [sp, #8 *  3 * 2]",
-        "stp x10, x11, [sp, #8 *  4 * 2]",
-        "stp x12, x13, [sp, #8 *  5 * 2]",
-        "stp x14, x15, [sp, #8 *  6 * 2]",
-        "stp x16, x17, [sp, #8 *  7 * 2]",
-        "stp x18, x19, [sp, #8 *  8 * 2]",
-        "stp x20, x21, [sp, #8 *  9 * 2]",
-        "stp x22, x23, [sp, #8 * 10 * 2]",
-        "stp x24, x25, [sp, #8 * 11 * 2]",
-        "stp x26, x27, [sp, #8 * 12 * 2]",
-        "stp x28, x29, [sp, #8 * 13 * 2]",
-
-        // x30 stores the return address.
-        "str x30,      [sp, #8 * 14 * 2]",
-
-        // Save current stack pointer to address in 1st argument.
-        "mov x2, sp",
-        "str x2, [x0, 0]",
-
-        // Set the stack pointer to value in 2nd argument.
-        "mov sp, x1",
-
-        // Pop general-purpose registers from the stack.
-        "ldp x2,  x3,  [sp, #8 *  0 * 2]",
-        "ldp x4,  x5,  [sp, #8 *  1 * 2]",
-        "ldp x6,  x7,  [sp, #8 *  2 * 2]",
-        "ldp x8,  x9,  [sp, #8 *  3 * 2]",
-        "ldp x10, x11, [sp, #8 *  4 * 2]",
-        "ldp x12, x13, [sp, #8 *  5 * 2]",
-        "ldp x14, x15, [sp, #8 *  6 * 2]",
-        "ldp x16, x17, [sp, #8 *  7 * 2]",
-        "ldp x18, x19, [sp, #8 *  8 * 2]",
-        "ldp x20, x21, [sp, #8 *  9 * 2]",
-        "ldp x22, x23, [sp, #8 * 10 * 2]",
-        "ldp x24, x25, [sp, #8 * 11 * 2]",
-        "ldp x26, x27, [sp, #8 * 12 * 2]",
-        "ldp x28, x29, [sp, #8 * 13 * 2]",
-
-        // x30 stores the return address.
-        "ldr x30,      [sp, #8 * 14 * 2]",
-
-        // Move the stack pointer back up.
-        "add sp,  sp,  #8 * 30",
-
-        // return (to address in x30 by default).
-        "ret",
-        options(noreturn)
-    );
 }
 
 /// Utility function to switch to another task

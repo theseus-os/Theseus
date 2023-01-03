@@ -247,6 +247,7 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "context_switch_regular",
  "frame_allocator",
  "kernel_config",
  "log",
