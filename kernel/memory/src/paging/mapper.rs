@@ -10,7 +10,6 @@
 use core::{
     borrow::{Borrow, BorrowMut},
     cmp::Ordering,
-    fmt::{self, Write},
     hash::{Hash, Hasher},
     marker::PhantomData,
     mem,
@@ -23,12 +22,12 @@ use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page,
 use crate::paging::{
     get_current_p4,
     PageRange,
-    table::{P4, Table, Level4},
+    table::{P4, TEMP_P4, Table, Level4},
 };
 use pte_flags::PteFlagsArch;
 use spin::Once;
 use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
-use super::{tlb_flush_virt_addr, table::TEMP_P4};
+use super::tlb_flush_virt_addr;
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
 use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
@@ -70,6 +69,7 @@ impl Mapper {
         }
     }
 
+    /// Creates a new mapper that uses the temporary recursive P4 address.
     pub(crate) fn temp(p4: Frame) -> Mapper {
         Mapper {
             p4: Unique::new(TEMP_P4).unwrap(),

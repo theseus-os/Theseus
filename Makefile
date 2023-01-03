@@ -803,7 +803,6 @@ endif
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 
 QEMU_FLAGS += -s
-QEMU_FLAGS += -monitor telnet:localhost:1235,server,nowait
 
 ## Enable the first serial port (the default log) to be redirected to the host terminal's stdio.
 ## Optionally, use the below `mon:` prefix to have the host terminal forward escape/control sequences to this serial port.
