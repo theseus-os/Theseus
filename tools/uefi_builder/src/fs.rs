@@ -51,7 +51,9 @@ impl UefiBoot {
         let bootloader_path = Path::new(env!("CARGO_BIN_FILE_UEFI_BOOTLOADER"));
 
         let mut files = BTreeMap::new();
-        files.insert("efi/boot/bootx64.efi", bootloader_path);
+        // files.insert("efi/boot/bootx64.efi", bootloader_path);
+        // TODO
+        files.insert("efi/boot/bootaa64.efi", bootloader_path);
         files.insert(KERNEL_FILE_NAME, self.kernel.as_path());
 
         for (image_path, host_path) in &self.extra_files {

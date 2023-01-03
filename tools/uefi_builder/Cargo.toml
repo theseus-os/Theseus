@@ -19,4 +19,4 @@ tempfile = "3.3"
 [dependencies.uefi-bootloader]
 artifact = "bin"
 path = "../../../uefi-bootloader/uefi-bootloader"
-target = "x86_64-unknown-uefi"
+target = "aarch64-unknown-uefi"
