@@ -110,12 +110,15 @@ pub struct PS2Controller {
     /// at 0x60
     data_port: Mutex<Port<u8>>,
     /// at 0x64
-    command_and_status_port: Mutex<Port<u8>>, //TODO: doesn't x86 have a port struct?
+    command_and_status_port: Mutex<Port<u8>>,
 }
+
 impl PS2Controller {
+    /// Constructs a new PS2 Controller.
+    ///
     /// # Safety
     /// 
-    /// Should only be called exactly once.
+    /// Must only be called once.
     pub const unsafe fn new() -> Self {
         Self {
             data_port: Mutex::new(Port::new(PS2_DATA_PORT)),
@@ -146,8 +149,6 @@ impl PS2Controller {
             self.command_and_status_port.lock().write(value as u8);
         }
     }
-
-    //NOTE TO MYSELF: so, we still have all the things being pub kinda, but you need to also pass an object in, which should only be creatable once on init, so others can't call it. This would also work without struct-impl blocks, but I would just pass around the same object anyways (instead of self I would pass PS2Controller as a kind of ticket/capa)
 
     /// read the config of the PS/2 port
     pub fn read_config(&self) -> ControllerConfigurationByte {
@@ -274,6 +275,7 @@ pub struct PS2Mouse<'c> {
     controller: &'c PS2Controller,
     id: MouseId
 }
+
 impl<'c> PS2Mouse<'c> {
     /// Give a controller reference to the mouse.
     /// The default mouse id of PS/2 is zero.
@@ -405,9 +407,11 @@ impl<'c> PS2Mouse<'c> {
         self.controller.status_register().mouse_output_buffer_full()
     }
 }
+
 pub struct PS2Keyboard<'c> {
     controller: &'c PS2Controller,
 }
+
 impl<'c> PS2Keyboard<'c> {
     pub fn new(controller: &'c PS2Controller) -> Self {
         Self { controller }
@@ -480,6 +484,7 @@ impl<'c> PS2Keyboard<'c> {
         self.controller.read_data()
     }
 }
+
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
 // and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
 #[bitfield(bits = 8)]
@@ -898,7 +903,7 @@ pub enum MouseResolution {
     Count8PerMm = 3
 }
 
-//NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
+// NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
 pub enum KeyboardType {
     MF2Keyboard,
     MF2KeyboardWithPSControllerTranslator,
