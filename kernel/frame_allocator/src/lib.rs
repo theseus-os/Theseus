@@ -944,9 +944,10 @@ pub fn allocate_frames_deferred(
             // If we failed to allocate the requested frames from the general list,
             // we can add a new reserved region containing them,
             // but ONLY if those frames are *NOT* in the general-purpose region.
-            else if !frame_is_in_list(&GENERAL_REGIONS.lock(), &start_frame) 
-                    && !frame_is_in_list(&GENERAL_REGIONS.lock(), &end_frame) 
-            {
+            else if {
+                let g = GENERAL_REGIONS.lock();  
+                !frame_is_in_list(&g, &start_frame) && !frame_is_in_list(&g, &end_frame)
+            } {
                 let frames = FrameRange::new(start_frame, end_frame);
                 let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames)?;
                 // If we successfully added a new reserved region,

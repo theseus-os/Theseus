@@ -113,6 +113,12 @@ macro_rules! implement_address {
                     *self = $TypeName::new_canonical(self.0.saturating_sub(rhs));
                 }
             }
+
+            impl From<$TypeName> for usize {
+                fn from(w: $TypeName) -> usize {
+                    w.0
+                }
+            }
         }
     };
 }

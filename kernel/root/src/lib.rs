@@ -62,6 +62,7 @@ impl Directory for RootDirectory {
     }
 
     fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
+        // Prevents removal of root
         if let FileOrDir::Dir(dir) = node {
             if Arc::ptr_eq(dir, get_root()) {
                 error!("Ignoring attempt to remove the root directory");

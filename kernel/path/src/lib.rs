@@ -134,7 +134,7 @@ impl Path {
                 first_cmpnt = false;
             } 
             else {
-                new_path.push_str(component);
+                new_path.push_str(&format!("/{component}"));
             }
         }
         Path::new(new_path)
