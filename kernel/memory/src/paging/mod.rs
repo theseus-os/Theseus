@@ -226,7 +226,6 @@ pub fn init(
     let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
     // Stack frames are not guaranteed to be contiguous.
-    let mut stack_mappings = [None; 34];
     let stack_size = boot_info.stack_size()?;
     let stack_page_range = PageRange::from_virt_addr(
         // `PAGE_SIZE` accounts for the guard page, which does not have a corresponding frame.
@@ -234,22 +233,13 @@ pub fn init(
         stack_size - PAGE_SIZE,
     );
     debug!("Initial stack start {stack_start_virt:#X}, size: {stack_size:#X} bytes, {stack_page_range:X?}");
-    for (i, page) in stack_page_range.into_iter().enumerate() {
-        let frame = page_table.translate_page(page).ok_or("couldn't translate stack page")?;
-        stack_mappings[i] = Some((page, frame));
-    }
 
     // Boot info frames are not guaranteed to be contiguous.
-    let mut boot_info_mappings = [None; 10];
     let boot_info_page_range = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
     debug!("Boot info start: {boot_info_start_vaddr:#X}, size: {boot_info_size:#X}, {boot_info_page_range:#X?}");
-    for (i, page) in boot_info_page_range.into_iter().enumerate() {
-        let frame = page_table.translate_page(page).ok_or("couldn't translate boot info page")?;
-        boot_info_mappings[i] = Some((page, frame));
-    }
 
     // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
-    page_table.with(&mut new_table, |new_mapper, _current_mapper| {
+    page_table.with(&mut new_table, |new_mapper, current_mapper| {
         // Map every section found in the kernel image (given by the boot information above) into our new page table. 
         // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
         // map the same physical frames to both lower-half and higher-half virtual addresses. 
@@ -306,7 +296,9 @@ pub fn init(
         // It does not need to be identity mapped because each AP core will have its own stack.
         let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1)?;
         let mut stack_mapped_pages: Option<MappedPages> = None;
-        for (page, frame) in stack_mappings.into_iter().flatten() {
+        for page in stack_page_range.into_iter() {
+            let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
+
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
@@ -334,8 +326,9 @@ pub fn init(
         higher_half_mapped_pages[index] = Some(NoDrop::new(new_mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
-        let mut iter = boot_info_mappings.iter();
-        while let Some(Some((page, frame))) = iter.next() {
+        for page in boot_info_page_range.into_iter() {
+            let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
+
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
