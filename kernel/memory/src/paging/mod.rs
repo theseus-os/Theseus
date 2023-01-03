@@ -34,7 +34,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
-use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE};
+use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, TEMPORARY_RECURSIVE_P4_INDEX};
 
 
 /// A top-level root (P4) page table.
@@ -104,6 +104,10 @@ impl PageTable {
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
+            table[TEMPORARY_RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -132,40 +136,27 @@ impl PageTable {
             return Err("PageTable::with(): this PageTable ('self') must be the currently active page table.");
         }
 
-        // Temporarily take ownership of this page table's p4 allocated frame and
-        // create a new temporary page that maps to that frame.
-        let this_p4 = core::mem::replace(&mut self.p4_table, AllocatedFrames::empty());
-        let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
+        // // Temporarily take ownership of this page table's p4 allocated frame and
+        // // create a new temporary page that maps to that frame.
+        // let this_p4 = core::mem::replace(&mut self.p4_table, AllocatedFrames::empty());
+        // let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // overwrite recursive mapping
-        self.p4_mut()[RECURSIVE_P4_INDEX].set_entry(
+        self.p4_mut()[TEMPORARY_RECURSIVE_P4_INDEX].set_entry(
             other_table.p4_table.as_allocated_frame(),
             PteFlagsArch::new().valid(true).writable(true),
         );
         tlb_flush_all();
 
-        // set mapper's target frame to reflect that future mappings will be mapped into the other_table
-        self.mapper.target_p4 = *other_table.p4_table.start();
+        let mut mapper = Mapper::temp(*other_table.p4_table.start());
 
         // execute `f` in the new context, in which the new page table is considered "active"
-        let ret = f(self);
-
-        // restore mapper's target frame to reflect that future mappings will be mapped using the currently-active (original) PageTable
-        self.mapper.target_p4 = active_p4_frame;
-
-        // restore recursive mapping to original p4 table
-        temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[RECURSIVE_P4_INDEX].set_entry(
-                frame.as_allocated_frame(),
-                PteFlagsArch::new().valid(true).writable(true),
-            );
-        })?;
-        tlb_flush_all();
+        let ret = f(&mut mapper);
 
         // Here, recover the current page table's p4 frame and restore it into this current page table,
         // since we removed it earlier at the top of this function and gave it to the temporary page. 
-        let (_temp_page, p4_frame) = temporary_page.unmap_into_parts(self)?;
-        self.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
+        // let (_temp_page, p4_frame) = temporary_page.unmap_into_parts(self)?;
+        // self.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
 
         ret
     }
@@ -359,10 +350,8 @@ pub fn init(
         debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
         debug!("higher_half_mapped_pages: {:?}", &higher_half_mapped_pages[..index]);
 
-        Ok(()) // mapping closure completed successfully
-
-    })?; // TemporaryPage is dropped here
-
+        Ok(())
+    })?;
 
     let text_mapped_pages       = text_mapped_pages     .ok_or("Couldn't map .text section")?;
     let rodata_mapped_pages     = rodata_mapped_pages   .ok_or("Couldn't map .rodata section")?;

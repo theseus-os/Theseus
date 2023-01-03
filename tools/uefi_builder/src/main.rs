@@ -48,7 +48,7 @@ fn main() {
 
     bootloader
         .create_disk_image(&efi_image)
-        .expect("failed to create uefi disk image");
+        .expect("failed to create UEFI disk image");
 
     std::fs::copy(ovmf_prebuilt::ovmf_pure_efi(), efi_firmware)
         .expect("couldn't copy efi firmware");

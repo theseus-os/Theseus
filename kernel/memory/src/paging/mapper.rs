@@ -28,7 +28,7 @@ use crate::paging::{
 use pte_flags::PteFlagsArch;
 use spin::Once;
 use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
-use super::tlb_flush_virt_addr;
+use super::{tlb_flush_virt_addr, table::TEMP_P4};
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
 use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
@@ -70,6 +70,13 @@ impl Mapper {
         }
     }
 
+    pub(crate) fn temp(p4: Frame) -> Mapper {
+        Mapper {
+            p4: Unique::new(TEMP_P4).unwrap(),
+            target_p4: p4,
+        }
+    }
+
     pub(crate) fn p4(&self) -> &Table<Level4> {
         unsafe { self.p4.as_ref() }
     }
@@ -82,14 +89,13 @@ impl Mapper {
     /// and also shows their `PteFlags`.
     /// 
     /// The page table details are written to the the given `writer`.
-    pub fn dump_pte<W: Write>(&self, writer: &mut W, virtual_address: VirtualAddress) -> fmt::Result {
+    pub fn dump_pte(&self,virtual_address: VirtualAddress) {
         let page = Page::containing_address(virtual_address);
         let p4  = self.p4();
         let p3  = p4.next_table(page.p4_index());
         let p2  = p3.and_then(|p3| p3.next_table(page.p3_index()));
         let p1  = p2.and_then(|p2| p2.next_table(page.p2_index()));
-        write!(
-            writer,
+        log::info!(
             "VirtualAddress: {:#X}:
                 P4 entry:        {:#X}   ({:?})
                 P3 entry:        {:#X}   ({:?})
@@ -104,7 +110,7 @@ impl Mapper {
             p2.map(|p2| &p2[page.p2_index()]).map(|p2_entry| p2_entry.flags()),
             p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.value()).unwrap_or(0x0),
             p1.map(|p1| &p1[page.p1_index()]).map(|p1_entry| p1_entry.flags()),
-        )
+        );
     }
 
     /// Translates a `VirtualAddress` to a `PhysicalAddress` by walking the page tables.

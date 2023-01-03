@@ -36,7 +36,7 @@ pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
-/// Value: 512. 
+/// Value: 512.
 pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
 /// Value: 511. The 511th entry is used for kernel text sections
 pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
@@ -48,6 +48,8 @@ pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
 pub const KERNEL_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
 /// Value: 507. The 507th entry is used for all userspace stacks
 pub const USER_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 5;
+// Value: 506. The 506th entry is used as a temporary recursive entry when mapping a new page table.
+pub const TEMPORARY_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 6;
 
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
