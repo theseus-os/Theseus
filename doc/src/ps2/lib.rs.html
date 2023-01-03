@@ -810,9 +810,109 @@
 <span id="810">810</span>
 <span id="811">811</span>
 <span id="812">812</span>
+<span id="813">813</span>
+<span id="814">814</span>
+<span id="815">815</span>
+<span id="816">816</span>
+<span id="817">817</span>
+<span id="818">818</span>
+<span id="819">819</span>
+<span id="820">820</span>
+<span id="821">821</span>
+<span id="822">822</span>
+<span id="823">823</span>
+<span id="824">824</span>
+<span id="825">825</span>
+<span id="826">826</span>
+<span id="827">827</span>
+<span id="828">828</span>
+<span id="829">829</span>
+<span id="830">830</span>
+<span id="831">831</span>
+<span id="832">832</span>
+<span id="833">833</span>
+<span id="834">834</span>
+<span id="835">835</span>
+<span id="836">836</span>
+<span id="837">837</span>
+<span id="838">838</span>
+<span id="839">839</span>
+<span id="840">840</span>
+<span id="841">841</span>
+<span id="842">842</span>
+<span id="843">843</span>
+<span id="844">844</span>
+<span id="845">845</span>
+<span id="846">846</span>
+<span id="847">847</span>
+<span id="848">848</span>
+<span id="849">849</span>
+<span id="850">850</span>
+<span id="851">851</span>
+<span id="852">852</span>
+<span id="853">853</span>
+<span id="854">854</span>
+<span id="855">855</span>
+<span id="856">856</span>
+<span id="857">857</span>
+<span id="858">858</span>
+<span id="859">859</span>
+<span id="860">860</span>
+<span id="861">861</span>
+<span id="862">862</span>
+<span id="863">863</span>
+<span id="864">864</span>
+<span id="865">865</span>
+<span id="866">866</span>
+<span id="867">867</span>
+<span id="868">868</span>
+<span id="869">869</span>
+<span id="870">870</span>
+<span id="871">871</span>
+<span id="872">872</span>
+<span id="873">873</span>
+<span id="874">874</span>
+<span id="875">875</span>
+<span id="876">876</span>
+<span id="877">877</span>
+<span id="878">878</span>
+<span id="879">879</span>
+<span id="880">880</span>
+<span id="881">881</span>
+<span id="882">882</span>
+<span id="883">883</span>
+<span id="884">884</span>
+<span id="885">885</span>
+<span id="886">886</span>
+<span id="887">887</span>
+<span id="888">888</span>
+<span id="889">889</span>
+<span id="890">890</span>
+<span id="891">891</span>
+<span id="892">892</span>
+<span id="893">893</span>
+<span id="894">894</span>
+<span id="895">895</span>
+<span id="896">896</span>
+<span id="897">897</span>
+<span id="898">898</span>
+<span id="899">899</span>
+<span id="900">900</span>
+<span id="901">901</span>
+<span id="902">902</span>
+<span id="903">903</span>
+<span id="904">904</span>
+<span id="905">905</span>
+<span id="906">906</span>
+<span id="907">907</span>
+<span id="908">908</span>
+<span id="909">909</span>
+<span id="910">910</span>
+<span id="911">911</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>num_enum::TryFromPrimitive;
+</span><span class="kw">use </span>log::warn;
+<span class="kw">use </span>num_enum::TryFromPrimitive;
 <span class="kw">use </span>port_io::Port;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>modular_bitfield::{specifiers::{B1, B4, B8}, bitfield, BitfieldSpecifier};
@@ -823,9 +923,9 @@
 <span class="kw">use </span>DeviceToHostResponse::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// Port used by PS/2 Controller and devices
-</span><span class="kw">static </span>PS2_DATA_PORT: Mutex&lt;Port&lt;u8&gt;&gt; = Mutex::new(Port::new(<span class="number">0x60</span>));
+</span><span class="kw">const </span>PS2_DATA_PORT: u16 = <span class="number">0x60</span>;
 <span class="doccomment">/// Port used to send commands to and receive status from the PS/2 Controller
-</span><span class="kw">static </span>PS2_COMMAND_AND_STATUS_PORT: Mutex&lt;Port&lt;u8&gt;&gt; = Mutex::new(Port::new(<span class="number">0x64</span>));
+</span><span class="kw">const </span>PS2_COMMAND_AND_STATUS_PORT: u16 = <span class="number">0x64</span>;
 
 <span class="comment">// https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
 // quite a few of these are commented out because they&#39;re either unused, deprecated or non-standard.
@@ -865,7 +965,7 @@
     /// 
     /// Note: only if 2 PS/2 ports supported
     </span>TestPort2 = <span class="number">0xA9</span>,
-    <span class="doccomment">/// returns `ControllerTestResult`
+    <span class="doccomment">/// see [PS2Controller::test]
     </span>TestController = <span class="number">0xAA</span>,
     <span class="doccomment">/// returns [PortTestResult]
     </span>TestPort1 = <span class="number">0xAB</span>,
@@ -917,18 +1017,385 @@
     // PulseOutputLineLowFor6ms = 0xF0,
 </span>}
 
-<span class="doccomment">/// Write a command to the PS/2 command port/register
-/// 
-/// Note: Devices attached to the controller should be disabled
-/// before sending commands that return data, otherwise the output buffer could get overwritten
-</span><span class="kw">pub fn </span>write_command(value: HostToControllerCommand) {
-    <span class="kw">unsafe </span>{
-        PS2_COMMAND_AND_STATUS_PORT.lock().write(value <span class="kw">as </span>u8);
+<span class="kw">pub struct </span>PS2Controller {
+    <span class="doccomment">/// at 0x60
+    </span>data_port: Mutex&lt;Port&lt;u8&gt;&gt;,
+    <span class="doccomment">/// at 0x64
+    </span>command_and_status_port: Mutex&lt;Port&lt;u8&gt;&gt;,
+}
+
+<span class="kw">impl </span>PS2Controller {
+    <span class="doccomment">/// Constructs a new PS2 Controller.
+    ///
+    /// # Safety
+    /// 
+    /// Must only be called once.
+    </span><span class="kw">pub const unsafe fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            data_port: Mutex::new(Port::new(PS2_DATA_PORT)),
+            command_and_status_port: Mutex::new(Port::new(PS2_COMMAND_AND_STATUS_PORT))
+        }
+    }
+
+    <span class="doccomment">/// Get a handle to the keyboard.
+    /// 
+    /// The keyboard only uses the data port.
+    </span><span class="kw">pub fn </span>keyboard_handle(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Keyboard {
+        PS2Keyboard::new(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Get a handle to the keyboard.
+    /// 
+    /// The mouse uses both the data port and the command/status port.
+    </span><span class="kw">pub fn </span>mouse_handle(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Mouse {
+        PS2Mouse::new(<span class="self">self</span>)
+    }
+
+    <span class="doccomment">/// Write a command to the PS/2 command port/register
+    /// 
+    /// Note: Devices attached to the controller should be disabled
+    /// before sending commands that return data, otherwise the output buffer could get overwritten
+    </span><span class="kw">pub fn </span>write_command(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToControllerCommand) {
+        <span class="kw">unsafe </span>{
+            <span class="self">self</span>.command_and_status_port.lock().write(value <span class="kw">as </span>u8);
+        }
+    }
+
+    <span class="doccomment">/// read the config of the PS/2 port
+    </span><span class="kw">pub fn </span>read_config(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ControllerConfigurationByte {
+        <span class="self">self</span>.write_command(ReadFromInternalRAMByte0);
+        ControllerConfigurationByte::from_bytes([<span class="self">self</span>.read_data()])
+    }
+    
+    <span class="doccomment">/// write the new config to the PS/2 command port (0x64)
+    </span><span class="kw">pub fn </span>write_config(<span class="kw-2">&amp;</span><span class="self">self</span>, value: ControllerConfigurationByte) {
+        <span class="self">self</span>.write_command(WriteToInternalRAMByte0);
+        <span class="self">self</span>.write_data(WritableData::Configuration(value));
+    }
+
+    <span class="doccomment">/// Read the PS/2 status port/register
+    </span><span class="kw">pub fn </span>status_register(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ControllerToHostStatus {
+        ControllerToHostStatus::from_bytes([<span class="self">self</span>.command_and_status_port.lock().read()])
+    }
+
+    <span class="doccomment">/// Clean the data port output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
+    </span><span class="kw">pub fn </span>flush_output_buffer(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="self">self</span>.read_data();
+    }
+
+    <span class="kw">pub fn </span>test(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.write_command(TestController);
+        <span class="self">self</span>.read_controller_test_result() <span class="comment">//TODO: bad naming
+    </span>}
+
+    <span class="kw">pub fn </span>test_port1(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.write_command(TestPort1);
+        <span class="self">self</span>.match_port_test_result().map_err(|e| {
+            <span class="macro">warn!</span>(<span class="string">&quot;failed PS/2 port 1 test: {e}&quot;</span>);
+            e
+        })
+    }
+
+    <span class="kw">pub fn </span>test_port2(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.write_command(TestPort2);
+        <span class="self">self</span>.match_port_test_result().map_err(|e| {
+            <span class="macro">warn!</span>(<span class="string">&quot;failed PS/2 port 2 test: {e}&quot;</span>);
+            e
+        })
+    }
+
+    <span class="kw">fn </span>match_port_test_result(<span class="kw-2">&amp;</span><span class="self">self</span>)-&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">use </span>PortTestResult::<span class="kw-2">*</span>;
+        <span class="kw">match </span><span class="self">self</span>.read_port_test_result()<span class="question-mark">? </span>{
+            Passed =&gt; <span class="prelude-val">Ok</span>(()),
+            ClockLineStuckLow =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;clock line stuck low&quot;</span>),
+            ClockLineStuckHigh =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;clock line stuck high&quot;</span>),
+            DataLineStuckLow =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;data line stuck low&quot;</span>),
+            DataLineStuckHigh =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;data line stuck high&quot;</span>),
+        }
+    }
+
+    <span class="doccomment">/// must only be called after writing the [TestController] command
+    /// otherwise would read bogus data
+    </span><span class="kw">pub fn </span>read_controller_test_result(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">const </span>CONTROLLER_TEST_PASSED: u8 = <span class="number">0x55</span>;
+        <span class="kw">if </span><span class="self">self</span>.read_data() != CONTROLLER_TEST_PASSED {
+            <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 controller test&quot;</span>)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(())
+        }
+    }
+
+    <span class="doccomment">/// must only be called after writing the [TestPort1] or [TestPort2] command
+    /// otherwise would read bogus data
+    </span><span class="kw">pub fn </span>read_port_test_result(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;PortTestResult, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to read port test result&quot;</span>)
+    }
+
+    <span class="doccomment">/// e.g. https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
+    </span><span class="kw">fn </span>polling_send_receive(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToDevice) -&gt; <span class="prelude-ty">Result</span>&lt;DeviceToHostResponse, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.polling_send(value)<span class="question-mark">?</span>;
+        <span class="self">self</span>.polling_receive()
+    }
+
+    <span class="doccomment">/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
+    </span><span class="kw">fn </span>polling_send(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToDevice) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">const </span>VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
+        <span class="kw">for _ in </span><span class="number">0</span>..VERY_ARBITRARY_TIMEOUT_VALUE {
+            <span class="comment">// so that we don&#39;t overwrite the previously sent value
+            </span><span class="kw">if </span>!<span class="self">self</span>.status_register().input_buffer_full() {
+                <span class="self">self</span>.write_data(WritableData::HostToDevice(value));
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+            }
+        }
+        <span class="prelude-val">Err</span>(<span class="string">&quot;polling_send timeout value exceeded&quot;</span>)
+    }
+
+    <span class="doccomment">/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
+    /// We might still need to disable one of the devices every time we send so we can read_data reliably.
+    /// As it currently works, it might only be a problem for older devices, so I won&#39;t overoptimize.
+    </span><span class="kw">fn </span>polling_receive(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;DeviceToHostResponse, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">const </span>VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
+        <span class="kw">for _ in </span><span class="number">0</span>..VERY_ARBITRARY_TIMEOUT_VALUE {
+            <span class="comment">// so that we only read when data is available
+            </span><span class="kw">if </span><span class="self">self</span>.status_register().output_buffer_full() {
+                <span class="kw">return </span><span class="self">self</span>.read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to read device response&quot;</span>);
+            }
+        }
+        <span class="prelude-val">Err</span>(<span class="string">&quot;polling_receive timeout value exceeded&quot;</span>)
+    }
+
+    <span class="doccomment">/// Read data from the PS/2 data port.
+    /// 
+    /// Note: this can be called directly when within a PS/2 device&#39;s interrupt handler.
+    /// If polling is used (e.g. in a device&#39;s init function), [ControllerToHostStatus] `output_buffer_full` needs to be checked first.
+    </span><span class="kw">fn </span>read_data(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.data_port.lock().read()
+    }
+
+    <span class="doccomment">/// Write data to the PS/2 data port.
+    /// 
+    /// Note: when writing to the PS/2 controller, it might be necessary to check for
+    /// [ControllerToHostStatus] `!input_buffer_full` first.
+    </span><span class="kw">fn </span>write_data(<span class="kw-2">&amp;</span><span class="self">self</span>, value: WritableData) {
+        <span class="kw">unsafe </span>{ <span class="self">self</span>.data_port.lock().write(value.into()) };
     }
 }
 
-<span class="comment">// workaround for `dead_code` warnings, https://github.com/Robbepop/modular-bitfield/issues/56
-</span><span class="attr">#[allow(dead_code)] </span><span class="kw">fn </span>hi() {ControllerToHostStatus::new().into_bytes();}
+<span class="kw">pub struct </span>PS2Mouse&lt;<span class="lifetime">&#39;c</span>&gt; {
+    controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller,
+    id: MouseId
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;c</span>&gt; PS2Mouse&lt;<span class="lifetime">&#39;c</span>&gt; {
+    <span class="doccomment">/// Give a controller reference to the mouse.
+    /// The default mouse id of PS/2 is zero.
+    </span><span class="kw">pub fn </span>new(controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ controller, id: MouseId::Zero }
+    }
+
+    <span class="doccomment">/// reset the mouse
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))<span class="question-mark">?</span>; 
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = <span class="self">self</span>.controller.read_data().try_into() {
+            <span class="comment">//returns mouse id 0
+            </span><span class="self">self</span>.controller.read_data();
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+        }
+        <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset mouse&quot;</span>)
+    }
+
+    <span class="doccomment">/// write command to the mouse and handle the result
+    </span><span class="kw">fn </span>command_to_mouse(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToMouseCommandOrData) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.controller.write_command(WriteByteToPort2InputBuffer);
+        <span class="kw">const </span>RETRIES: u8 = <span class="number">3</span>;
+        <span class="kw">for _ in </span><span class="number">0</span>..=RETRIES {
+            <span class="kw">return match </span><span class="self">self</span>.controller.polling_send_receive(HostToDevice::Mouse(value.clone()))<span class="question-mark">? </span>{
+                Acknowledge =&gt; <span class="prelude-val">Ok</span>(()),
+                ResendCommand =&gt; <span class="kw">continue</span>,
+                <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;wrong response type&quot;</span>)
+            };
+        }
+        <span class="prelude-val">Err</span>(<span class="string">&quot;mouse doesn&#39;t support the command or there has been a hardware failure&quot;</span>)
+    }
+
+    <span class="doccomment">/// set PS/2 mouse&#39;s sampling rate
+    </span><span class="kw">fn </span>set_mouse_sampling_rate(<span class="kw-2">&amp;</span><span class="self">self</span>, value: SampleRate) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
+            .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the mouse sampling rate&quot;</span>)
+    }
+
+    <span class="doccomment">/// set the [MouseId] by magic sequence
+    </span><span class="kw">pub fn </span>set_mouse_id(<span class="kw-2">&amp;mut </span><span class="self">self</span>, id: MouseId) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.disable_mouse_packet_streaming()<span class="question-mark">?</span>;
+
+        <span class="kw">use </span><span class="kw">crate</span>::SampleRate::<span class="kw-2">*</span>;
+        <span class="kw">match </span>id {
+            MouseId::Zero =&gt; { <span class="comment">/* do nothing */ </span>}
+            MouseId::Three =&gt; {
+                <span class="kw">for </span>rate <span class="kw">in </span>[_200, _100, _80] {
+                    <span class="self">self</span>.set_mouse_sampling_rate(rate)<span class="question-mark">?</span>;
+                }
+            }
+            <span class="comment">//(maybe) TODO: apparently this needs to check after the first 80 if mouse_id is 3
+            </span>MouseId::Four =&gt; {
+                <span class="kw">for </span>rate <span class="kw">in </span>[_200, _100, _80, _200, _200, _80] {
+                    <span class="self">self</span>.set_mouse_sampling_rate(rate)<span class="question-mark">?</span>;
+                }
+            }
+        }
+        <span class="self">self</span>.id = id;
+
+        <span class="self">self</span>.enable_mouse_packet_streaming()<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="doccomment">/// get the [MouseId]
+    </span><span class="kw">pub fn </span>mouse_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;MouseId, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.disable_mouse_packet_streaming()<span class="question-mark">?</span>;
+
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))<span class="question-mark">?</span>;
+        <span class="kw">let </span>id = <span class="self">self</span>.controller.read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to get mouse id: bad response&quot;</span>)<span class="question-mark">?</span>;
+
+        <span class="self">self</span>.enable_mouse_packet_streaming()<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(id)
+    }
+
+    <span class="doccomment">/// resend the most recent packet again
+    </span><span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>mouse_resend(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to resend mouse request&quot;</span>)
+    }
+
+    <span class="doccomment">/// enable the packet streaming
+    </span><span class="kw">fn </span>enable_mouse_packet_streaming(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)).map_err(|<span class="kw">_</span>| {
+            <span class="string">&quot;failed to enable mouse streaming&quot;
+        </span>})
+    }
+
+    <span class="doccomment">/// disable the packet streaming
+    </span><span class="kw">fn </span>disable_mouse_packet_streaming(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(DisableDataReporting)).map_err(|<span class="kw">_</span>| {
+            <span class="string">&quot;failed to disable mouse streaming&quot;
+        </span>})
+    }
+
+    <span class="doccomment">/// set the resolution of the mouse
+    </span><span class="attr">#[allow(dead_code)]
+    </span><span class="kw">fn </span>mouse_resolution(<span class="kw-2">&amp;</span><span class="self">self</span>, value: MouseResolution) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
+            .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the mouse resolution&quot;</span>)
+    }
+
+    <span class="doccomment">/// read the correct [MousePacket] according to [MouseId]
+    </span><span class="kw">pub fn </span>read_mouse_packet(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MousePacket {
+        <span class="kw">let </span>read_data = || <span class="self">self</span>.controller.read_data();
+        <span class="kw">match </span><span class="self">self</span>.id {
+            MouseId::Zero =&gt; MousePacket::Zero(
+                MousePacketGeneric::from_bytes([
+                    read_data(), read_data(), read_data()
+                ])
+            ),
+            MouseId::Three =&gt; MousePacket::Three(
+                MousePacket3::from_bytes([
+                    read_data(), read_data(), read_data(), read_data()
+                ])
+            ),
+            MouseId::Four =&gt; MousePacket::Four(
+                MousePacket4::from_bytes([
+                    read_data(), read_data(), read_data(), read_data()
+                ])
+            ),
+        }
+    }
+
+    <span class="doccomment">/// read the PS2Controller&#39;s status register to find out if the mouse output buffer is full, i.e. can be read
+    </span><span class="kw">pub fn </span>is_output_buffer_full(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="self">self</span>.controller.status_register().mouse_output_buffer_full()
+    }
+}
+
+<span class="kw">pub struct </span>PS2Keyboard&lt;<span class="lifetime">&#39;c</span>&gt; {
+    controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller,
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;c</span>&gt; PS2Keyboard&lt;<span class="lifetime">&#39;c</span>&gt; {
+    <span class="kw">pub fn </span>new(controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{ controller }
+    }
+    
+    <span class="doccomment">/// reset the keyboard
+    </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))<span class="question-mark">?</span>; 
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = <span class="self">self</span>.controller.read_data().try_into() {
+            <span class="kw">return </span><span class="prelude-val">Ok</span>(())
+        }
+        <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset keyboard&quot;</span>)
+    }
+
+    <span class="doccomment">/// write command to the keyboard and handle the result
+    </span><span class="kw">fn </span>command_to_keyboard(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToKeyboardCommandOrData) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">const </span>RETRIES: u8 = <span class="number">3</span>;
+        <span class="kw">for _ in </span><span class="number">0</span>..=RETRIES {
+            <span class="kw">return match </span><span class="self">self</span>.controller.polling_send_receive(HostToDevice::Keyboard(value.clone()))<span class="question-mark">? </span>{
+                Acknowledge =&gt; <span class="prelude-val">Ok</span>(()),
+                ResendCommand =&gt; <span class="kw">continue</span>,
+                <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;wrong response type&quot;</span>)
+            };
+        }
+        <span class="prelude-val">Err</span>(<span class="string">&quot;keyboard doesn&#39;t support the command or there has been a hardware failure&quot;</span>)
+    }
+
+    <span class="doccomment">/// set LED status of the keyboard
+    </span><span class="kw">pub fn </span>set_keyboard_led(<span class="kw-2">&amp;</span><span class="self">self</span>, value: LEDState) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
+            .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the keyboard led&quot;</span>)
+    }
+
+    <span class="doccomment">/// set the scancode set of the keyboard
+    </span><span class="kw">pub fn </span>keyboard_scancode_set(<span class="kw-2">&amp;</span><span class="self">self</span>, value: ScancodeSet) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
+            .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the keyboard scancode set&quot;</span>)
+    }
+
+    <span class="doccomment">/// detect the [KeyboardType]
+    /// 
+    /// Note:
+    /// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but `PS2Controller::read_data` always returns a byte.
+    /// This means `PS2Controller::read_data` would return 0x00 here, even though the value is already reserved for the device type &quot;Standard PS/2 mouse&quot;.
+    /// As we only care about detecting keyboard types here, it should work.
+    </span><span class="kw">pub fn </span>keyboard_detect(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;KeyboardType, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))<span class="question-mark">?</span>;
+
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))<span class="question-mark">?</span>; 
+
+        <span class="kw">let </span>keyboard_type = <span class="kw">match </span><span class="self">self</span>.controller.read_data() {
+            <span class="number">0x00 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::AncientATKeyboard),
+            <span class="number">0xAB </span>=&gt; {
+                <span class="kw">match </span><span class="self">self</span>.controller.read_data() {
+                    <span class="number">0x41 </span>| <span class="number">0xC1 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+                    <span class="number">0x83 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2Keyboard),
+                    <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;unrecognized keyboard type&quot;</span>)
+                }
+            }
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;unrecognized keyboard type&quot;</span>)
+        };
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(EnableScanning))<span class="question-mark">?</span>;
+        keyboard_type
+    }
+
+    <span class="doccomment">/// reads a Scancode (for now an untyped u8)
+    </span><span class="kw">pub fn </span>read_scancode(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+        <span class="self">self</span>.controller.read_data()
+    }
+}
+
 <span class="comment">// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
 // and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
 </span><span class="attr">#[bitfield(bits = <span class="number">8</span>)]
@@ -966,19 +1433,6 @@
     </span>parity_error: bool,
 }
 
-<span class="doccomment">/// Read the PS/2 status port/register
-</span><span class="kw">pub fn </span>status_register() -&gt; ControllerToHostStatus {
-    ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
-}
-
-<span class="doccomment">/// Read data from the PS/2 data port.
-/// 
-/// Note: this can be called directly when within a PS/2 device&#39;s interrupt handler.
-/// If polling is used (e.g. in a device&#39;s init function), [ControllerToHostStatus] `output_buffer_full` needs to be checked first.
-</span><span class="kw">fn </span>read_data() -&gt; u8 {
-    PS2_DATA_PORT.lock().read()
-}
-
 <span class="doccomment">/// All types of data writable to the [PS2_DATA_PORT].
 </span><span class="kw">enum </span>WritableData {
     Configuration(ControllerConfigurationByte),
@@ -1007,14 +1461,6 @@
     }
 }
 
-<span class="doccomment">/// Write data to the PS/2 data port.
-/// 
-/// Note: when writing to the PS/2 controller, it might be necessary to check for
-/// [ControllerToHostStatus] `!input_buffer_full` first.
-</span><span class="kw">fn </span>write_data(value: WritableData) {
-    <span class="kw">unsafe </span>{ PS2_DATA_PORT.lock().write(value.into()) };
-}
-
 <span class="comment">// wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
 </span><span class="doccomment">/// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
 </span><span class="attr">#[bitfield(bits = <span class="number">8</span>)]
@@ -1039,37 +1485,9 @@
     /// Note: only if 2 PS/2 ports supported
     </span><span class="kw">pub </span>port2_clock_disabled: bool,
     <span class="doccomment">/// whether IBM scancode translation is enabled (0=AT, 1=PC)
-    </span><span class="kw">pub </span>port1_translation_enabled: bool,
+    </span><span class="kw">pub </span>port1_scancode_translation_enabled: bool,
     <span class="attr">#[allow(dead_code)]
     </span>must_be_zero: B1,
-}
-
-<span class="doccomment">/// read the config of the PS/2 port
-</span><span class="kw">pub fn </span>read_config() -&gt; ControllerConfigurationByte {
-    write_command(ReadFromInternalRAMByte0);
-    ControllerConfigurationByte::from_bytes([read_data()])
-}
-
-<span class="doccomment">/// write the new config to the PS/2 command port (0x64)
-</span><span class="kw">pub fn </span>write_config(value: ControllerConfigurationByte) {
-    write_command(WriteToInternalRAMByte0);
-    write_data(WritableData::Configuration(value));
-}
-
-<span class="doccomment">/// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
-</span><span class="kw">pub fn </span>flush_output_buffer() {
-    read_data();
-}
-
-<span class="doccomment">/// must only be called after writing the [TestController] command
-/// otherwise would read bogus data
-</span><span class="kw">pub fn </span>read_controller_test_result() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">const </span>CONTROLLER_TEST_PASSED: u8 = <span class="number">0x55</span>;
-    <span class="kw">if </span>read_data() != CONTROLLER_TEST_PASSED {
-        <span class="prelude-val">Err</span>(<span class="string">&quot;failed PS/2 controller test&quot;</span>)
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Ok</span>(())
-    }
 }
 
 <span class="attr">#[derive(TryFromPrimitive)]
@@ -1080,12 +1498,6 @@
     ClockLineStuckHigh = <span class="number">0x02</span>,
     DataLineStuckLow = <span class="number">0x03</span>,
     DataLineStuckHigh = <span class="number">0x04</span>,
-}
-
-<span class="doccomment">/// must only be called after writing the [TestPort1] or [TestPort2] command
-/// otherwise would read bogus data
-</span><span class="kw">pub fn </span>read_port_test_result() -&gt; <span class="prelude-ty">Result</span>&lt;PortTestResult, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to read port test result&quot;</span>)
 }
 
 <span class="comment">// https://wiki.osdev.org/PS/2_Keyboard#Special_Bytes all other bytes sent by the keyboard are scan codes
@@ -1104,39 +1516,6 @@
     </span>SelfTestFailed2 = <span class="number">0xFD</span>,
     ResendCommand = <span class="number">0xFE</span>,
     KeyDetectionErrorOrInternalBufferOverrun2 = <span class="number">0xFF</span>,
-}
-
-<span class="doccomment">/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
-</span><span class="kw">fn </span>polling_send(value: HostToDevice) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">const </span>VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
-    <span class="kw">for _ in </span><span class="number">0</span>..VERY_ARBITRARY_TIMEOUT_VALUE {
-        <span class="comment">// so that we don&#39;t overwrite the previously sent value
-        </span><span class="kw">if </span>!status_register().input_buffer_full() {
-            write_data(WritableData::HostToDevice(value));
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(());
-        }
-    }
-    <span class="prelude-val">Err</span>(<span class="string">&quot;polling_send timeout value exceeded&quot;</span>)
-}
-
-<span class="doccomment">/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
-/// We might still need to disable one of the devices every time we send so we can read_data reliably.
-/// As it currently works, it might only be a problem for older devices, so I won&#39;t overoptimize.
-</span><span class="kw">fn </span>polling_receive() -&gt; <span class="prelude-ty">Result</span>&lt;DeviceToHostResponse, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">const </span>VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
-    <span class="kw">for _ in </span><span class="number">0</span>..VERY_ARBITRARY_TIMEOUT_VALUE {
-        <span class="comment">// so that we only read when data is available
-        </span><span class="kw">if </span>status_register().output_buffer_full() {
-            <span class="kw">return </span>read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to read device response&quot;</span>);
-        }
-    }
-    <span class="prelude-val">Err</span>(<span class="string">&quot;polling_receive timeout value exceeded&quot;</span>)
-}
-
-<span class="doccomment">/// e.g. https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
-</span><span class="kw">fn </span>polling_send_receive(value: HostToDevice) -&gt; <span class="prelude-ty">Result</span>&lt;DeviceToHostResponse, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    polling_send(value)<span class="question-mark">?</span>;
-    polling_receive()
 }
 
 <span class="attr">#[derive(Clone)]
@@ -1229,33 +1608,6 @@
     </span>Reset = <span class="number">0xFF</span>,       <span class="comment">//same
 </span>}
 
-<span class="doccomment">/// write command to the keyboard and handle the result
-</span><span class="kw">fn </span>command_to_keyboard(value: HostToKeyboardCommandOrData) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">const </span>RETRIES: u8 = <span class="number">3</span>;
-    <span class="kw">for _ in </span><span class="number">0</span>..=RETRIES {
-        <span class="kw">return match </span>polling_send_receive(HostToDevice::Keyboard(value.clone()))<span class="question-mark">? </span>{
-            Acknowledge =&gt; <span class="prelude-val">Ok</span>(()),
-            ResendCommand =&gt; <span class="kw">continue</span>,
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;wrong response type&quot;</span>)
-        };
-    }
-    <span class="prelude-val">Err</span>(<span class="string">&quot;keyboard doesn&#39;t support the command or there has been a hardware failure&quot;</span>)
-}
-
-<span class="doccomment">/// write command to the mouse and handle the result
-</span><span class="kw">fn </span>command_to_mouse(value: HostToMouseCommandOrData) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    write_command(WriteByteToPort2InputBuffer);
-    <span class="kw">const </span>RETRIES: u8 = <span class="number">3</span>;
-    <span class="kw">for _ in </span><span class="number">0</span>..=RETRIES {
-        <span class="kw">return match </span>polling_send_receive(HostToDevice::Mouse(value.clone()))<span class="question-mark">? </span>{
-            Acknowledge =&gt; <span class="prelude-val">Ok</span>(()),
-            ResendCommand =&gt; <span class="kw">continue</span>,
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;wrong response type&quot;</span>)
-        };
-    }
-    <span class="prelude-val">Err</span>(<span class="string">&quot;mouse doesn&#39;t support the command or there has been a hardware failure&quot;</span>)
-}
-
 <span class="attr">#[bitfield(bits = <span class="number">24</span>)]
 #[derive(Debug, BitfieldSpecifier)]
 </span><span class="kw">pub struct </span>MousePacketGeneric {
@@ -1268,8 +1620,8 @@
     </span>x_9th_bit: bool,
     <span class="doccomment">/// see [y_1st_to_8th_bit]
     </span>y_9th_bit: bool,
-    <span class="kw">pub </span>x_overflow: bool,
-    <span class="kw">pub </span>y_overflow: bool,
+    x_overflow: bool,
+    y_overflow: bool,
     <span class="comment">//2. byte
     </span><span class="doccomment">/// only a part of x_movement, needs to be combined with [x_9th_bit]
     </span>x_1st_to_8th_bit: B8,
@@ -1280,9 +1632,10 @@
 
 <span class="kw">impl </span>MousePacketGeneric {
     <span class="doccomment">/// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they&#39;re part of one signed 9-bit number
+    /// 
+    /// Note: This handles overflow as well, although it might not happen on newer systems &lt;https://forum.osdev.org/viewtopic.php?f=1&amp;t=31176&gt;
     </span><span class="kw">pub fn </span>x_movement(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i16 {
-        <span class="comment">// NOTE: not sure if this ever happens (https://forum.osdev.org/viewtopic.php?f=1&amp;t=31176)
-        </span><span class="kw">let </span>x_1st_to_8th_bit = <span class="kw">if </span><span class="self">self</span>.x_overflow() {
+        <span class="kw">let </span>x_1st_to_8th_bit = <span class="kw">if </span><span class="self">self</span>.x_overflow() {
             u8::MAX
         } <span class="kw">else </span>{
             <span class="self">self</span>.x_1st_to_8th_bit()
@@ -1291,9 +1644,10 @@
     }
 
     <span class="doccomment">/// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they&#39;re part of one signed 9-bit number
+    /// 
+    /// Note: This handles overflow as well, although it might not happen on newer systems &lt;https://forum.osdev.org/viewtopic.php?f=1&amp;t=31176&gt;
     </span><span class="kw">pub fn </span>y_movement(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i16 {
-        <span class="comment">// NOTE: not sure if this ever happens (https://forum.osdev.org/viewtopic.php?f=1&amp;t=31176)
-        </span><span class="kw">let </span>y_1st_to_8th_bit = <span class="kw">if </span><span class="self">self</span>.y_overflow() {
+        <span class="kw">let </span>y_1st_to_8th_bit = <span class="kw">if </span><span class="self">self</span>.y_overflow() {
             u8::MAX
         } <span class="kw">else </span>{
             <span class="self">self</span>.y_1st_to_8th_bit()
@@ -1429,27 +1783,6 @@
     }
 }
 
-<span class="doccomment">/// read the correct [MousePacket] according to [MouseId]
-</span><span class="kw">pub fn </span>read_mouse_packet(id: <span class="kw-2">&amp;</span>MouseId) -&gt; MousePacket {
-    <span class="kw">match </span>id {
-        MouseId::Zero =&gt; MousePacket::Zero(
-            MousePacketGeneric::from_bytes([
-                read_data(), read_data(), read_data()
-            ])
-        ),
-        MouseId::Three =&gt; MousePacket::Three(
-            MousePacket3::from_bytes([
-                read_data(), read_data(), read_data(), read_data()
-            ])
-        ),
-        MouseId::Four =&gt; MousePacket::Four(
-            MousePacket4::from_bytes([
-                read_data(), read_data(), read_data(), read_data()
-            ])
-        ),
-    }
-}
-
 <span class="attr">#[derive(Clone)]
 </span><span class="kw">pub enum </span>SampleRate {
     _10 = <span class="number">10</span>,
@@ -1460,13 +1793,6 @@
     _100 = <span class="number">100</span>,
     _200 = <span class="number">200
 </span>}
-
-<span class="doccomment">/// set PS/2 mouse&#39;s sampling rate
-</span><span class="kw">fn </span>set_mouse_sampling_rate(value: SampleRate) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
-        .and_then(|<span class="kw">_</span>| command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the mouse sampling rate&quot;</span>)
-}
 
 <span class="doccomment">/// See [MousePacket] and its enum variants for further information.
 </span><span class="attr">#[derive(Debug, TryFromPrimitive)]
@@ -1480,81 +1806,6 @@
     </span>Four = <span class="number">4</span>,
 }
 
-<span class="doccomment">/// set the [MouseId] by magic sequence
-</span><span class="kw">pub fn </span>set_mouse_id(id: MouseId) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    disable_mouse_packet_streaming()<span class="question-mark">?</span>;
-
-    <span class="kw">use </span><span class="kw">crate</span>::SampleRate::<span class="kw-2">*</span>;
-    <span class="kw">match </span>id {
-        MouseId::Zero =&gt; { <span class="comment">/* do nothing */ </span>}
-        MouseId::Three =&gt; {
-            <span class="kw">for </span>rate <span class="kw">in </span>[_200, _100, _80] {
-                set_mouse_sampling_rate(rate)<span class="question-mark">?</span>;
-            }
-        }
-        <span class="comment">//(maybe) TODO: apparently this needs to check after the first 80 if mouse_id is 3
-        </span>MouseId::Four =&gt; {
-            <span class="kw">for </span>rate <span class="kw">in </span>[_200, _100, _80, _200, _200, _80] {
-                set_mouse_sampling_rate(rate)<span class="question-mark">?</span>;
-            }
-        }
-    }
-
-    enable_mouse_packet_streaming()<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(())
-}
-
-<span class="doccomment">/// get the [MouseId]
-</span><span class="kw">pub fn </span>mouse_id() -&gt; <span class="prelude-ty">Result</span>&lt;MouseId, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    disable_mouse_packet_streaming()<span class="question-mark">?</span>;
-
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))<span class="question-mark">?</span>;
-    <span class="kw">let </span>id = read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to get mouse id: bad response&quot;</span>)<span class="question-mark">?</span>;
-
-    enable_mouse_packet_streaming()<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(id)
-}
-
-<span class="doccomment">/// reset the mouse
-</span><span class="kw">pub fn </span>reset_mouse() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))<span class="question-mark">?</span>; 
-    <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = read_data().try_into() {
-        <span class="comment">//returns mouse id 0
-        </span>read_data();
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
-    }
-    <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset mouse&quot;</span>)
-}
-<span class="doccomment">/// reset the keyboard
-</span><span class="kw">pub fn </span>reset_keyboard() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))<span class="question-mark">?</span>; 
-    <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = read_data().try_into() {
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(())
-    }
-    <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset keyboard&quot;</span>)
-}
-
-<span class="doccomment">/// resend the most recent packet again
-</span><span class="attr">#[allow(dead_code)]
-</span><span class="kw">fn </span>mouse_resend() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to resend mouse request&quot;</span>)
-}
-
-<span class="doccomment">/// enable the packet streaming
-</span><span class="kw">fn </span>enable_mouse_packet_streaming() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)).map_err(|<span class="kw">_</span>| {
-        <span class="string">&quot;failed to enable mouse streaming&quot;
-    </span>})
-}
-
-<span class="doccomment">/// disable the packet streaming
-</span><span class="kw">fn </span>disable_mouse_packet_streaming() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(DisableDataReporting)).map_err(|<span class="kw">_</span>| {
-        <span class="string">&quot;failed to disable mouse streaming&quot;
-    </span>})
-}
-
 <span class="attr">#[derive(Clone)]
 </span><span class="kw">pub enum </span>MouseResolution {
     Count1PerMm = <span class="number">0</span>,
@@ -1563,64 +1814,11 @@
     Count8PerMm = <span class="number">3
 </span>}
 
-<span class="doccomment">/// set the resolution of the mouse
-</span><span class="attr">#[allow(dead_code)]
-</span><span class="kw">fn </span>mouse_resolution(value: MouseResolution) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
-        .and_then(|<span class="kw">_</span>| command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the mouse resolution&quot;</span>)
-}
-
-<span class="doccomment">/// set LED status of the keyboard
-</span><span class="kw">pub fn </span>set_keyboard_led(value: LEDState) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
-        .and_then(|<span class="kw">_</span>| command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the keyboard led&quot;</span>)
-}
-
-<span class="doccomment">/// set the scancode set of the keyboard
-</span><span class="kw">pub fn </span>keyboard_scancode_set(value: ScancodeSet) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
-        .and_then(|<span class="kw">_</span>| command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the keyboard scancode set&quot;</span>)
-}
-
-<span class="comment">//NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
+<span class="comment">// NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
 </span><span class="kw">pub enum </span>KeyboardType {
     MF2Keyboard,
     MF2KeyboardWithPSControllerTranslator,
     AncientATKeyboard,
-}
-
-<span class="doccomment">/// detect the [KeyboardType]
-/// 
-/// Note:
-/// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but [read_data] always returns a byte.
-/// This means [read_data] would return 0x00 here, even though the value is already reserved for the device type &quot;Standard PS/2 mouse&quot;.
-/// As we only care about detecting keyboard types here, it should work.
-</span><span class="kw">pub fn </span>keyboard_detect() -&gt; <span class="prelude-ty">Result</span>&lt;KeyboardType, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))<span class="question-mark">?</span>;
-
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))<span class="question-mark">?</span>; 
-
-    <span class="kw">let </span>keyboard_type = <span class="kw">match </span>read_data() {
-        <span class="number">0x00 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::AncientATKeyboard),
-        <span class="number">0xAB </span>=&gt; {
-            <span class="kw">match </span>read_data() {
-                <span class="number">0x41 </span>| <span class="number">0xC1 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-                <span class="number">0x83 </span>=&gt; <span class="prelude-val">Ok</span>(KeyboardType::MF2Keyboard),
-                <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;unrecognized keyboard type&quot;</span>)
-            }
-        }
-        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;unrecognized keyboard type&quot;</span>)
-    };
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(EnableScanning))<span class="question-mark">?</span>;
-    keyboard_type
-}
-
-<span class="doccomment">/// reads a Scancode (for now an untyped u8)
-</span><span class="kw">pub fn </span>read_scancode() -&gt; u8 {
-    read_data()
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="ps2" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

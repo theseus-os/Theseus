@@ -142,30 +142,35 @@
 <span class="kw">use </span>event_types::Event;
 <span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 <span class="kw">use </span>mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-<span class="kw">use </span>ps2::{mouse_id, set_mouse_id, read_mouse_packet, MouseId, MousePacket, status_register};
+<span class="kw">use </span>ps2::{PS2Mouse, MouseId, MousePacket};
 
 <span class="doccomment">/// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
 </span><span class="kw">const </span>PS2_MOUSE_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + <span class="number">0xC</span>;
 
-<span class="kw">static </span>MOUSE_PRODUCER: Once&lt;Queue&lt;Event&gt;&gt; = Once::new();
-<span class="kw">static </span>MOUSE_ID: Once&lt;MouseId&gt; = Once::new();
+<span class="kw">static </span>MOUSE: Once&lt;MouseInterruptParams&gt; = Once::new();
+
+<span class="kw">struct </span>MouseInterruptParams {
+    mouse: PS2Mouse&lt;<span class="lifetime">&#39;static</span>&gt;,
+    queue: Queue&lt;Event&gt;,
+}
 
 <span class="doccomment">/// Initialize the PS/2 mouse driver and register its interrupt handler.
 /// 
 /// ## Arguments
+/// * `mouse`: a wrapper around mouse functionality and id, used by the mouse interrupt handler.
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
-</span><span class="kw">pub fn </span>init(mouse_queue_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>init(<span class="kw-2">mut </span>mouse: PS2Mouse&lt;<span class="lifetime">&#39;static</span>&gt;, mouse_queue_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">//TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
     //the current code beneath just tries to set id = 4, so is not final
     // Set Mouse ID to 4.
-    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = set_mouse_id(MouseId::Four) {
+    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mouse.set_mouse_id(MouseId::Four) {
         <span class="macro">error!</span>(<span class="string">&quot;Failed to set the mouse id to four: {e}&quot;</span>);
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to set the mouse id to four&quot;</span>);
     }
     <span class="comment">// Read it back to check that it worked.
-    </span><span class="kw">match </span>mouse_id() {
+    </span><span class="kw">match </span>mouse.mouse_id() {
         <span class="prelude-val">Ok</span>(id) =&gt;  {
             <span class="macro">debug!</span>(<span class="string">&quot;The PS/2 mouse ID is: {id:?}&quot;</span>);
             <span class="kw">if </span>!<span class="macro">matches!</span>(id, MouseId::Four) {
@@ -178,7 +183,6 @@
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to read the PS/2 mouse ID&quot;</span>);
         }
     }
-    MOUSE_ID.call_once(|| MouseId::Four);
 
     <span class="comment">// Register the interrupt handler
     </span>interrupts::register_interrupt(PS2_MOUSE_IRQ, ps2_mouse_handler).map_err(|e| {
@@ -187,7 +191,8 @@
     </span>})<span class="question-mark">?</span>;
 
     <span class="comment">// Final step: set the producer end of the mouse event queue.
-    </span>MOUSE_PRODUCER.call_once(|| mouse_queue_producer);
+    // Also add the mouse struct for access during interrupts.
+    </span>MOUSE.call_once(|| MouseInterruptParams { mouse, queue: mouse_queue_producer });
     <span class="prelude-val">Ok</span>(())
 }
 
@@ -200,23 +205,23 @@
 /// 
 /// In some cases (e.g. on device init), [the PS/2 controller can also send an interrupt](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts).
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(id) = MOUSE_ID.get() {
-        <span class="kw">if </span>status_register().mouse_output_buffer_full() {
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(MouseInterruptParams { mouse, queue }) = MOUSE.get() {
+        <span class="kw">if </span>mouse.is_output_buffer_full() {
             <span class="comment">// NOTE: having read some more forum comments now, if this ever breaks on real hardware,
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
             // currently get in read_mouse_packet and merge them afterwards
-            </span><span class="kw">let </span>mouse_packet = read_mouse_packet(id);
+            </span><span class="kw">let </span>mouse_packet = mouse.read_mouse_packet();
             <span class="comment">// warn!(&quot;read_mouse_packet: {mouse_packet:?}&quot;);
             
             </span><span class="kw">if </span>mouse_packet.always_one() != <span class="number">1 </span>{
                 <span class="comment">// this could signal a hardware error or a mouse which doesn&#39;t conform to the rule
                 </span><span class="macro">warn!</span>(<span class="string">&quot;Discarding mouse data packet since its third bit should always be 1.&quot;</span>);
-            } <span class="kw">else if let </span><span class="prelude-val">Err</span>(e) = handle_mouse_input(mouse_packet) {
+            } <span class="kw">else if let </span><span class="prelude-val">Err</span>(e) = handle_mouse_input(mouse_packet, queue) {
                 <span class="macro">error!</span>(<span class="string">&quot;ps2_mouse_handler: {e:?}&quot;</span>);
             }
         }
     } <span class="kw">else </span>{
-        <span class="macro">warn!</span>(<span class="string">&quot;MOUSE_ID wasn&#39;t yet initialized, dropping the mouse packet.&quot;</span>);
+        <span class="macro">warn!</span>(<span class="string">&quot;ps2_mouse_handler(): MOUSE isn&#39;t initialized yet, skipping interrupt.&quot;</span>);
     }
 
     interrupts::eoi(<span class="prelude-val">Some</span>(PS2_MOUSE_IRQ));
@@ -224,19 +229,14 @@
 
 
 <span class="doccomment">/// enqueue a Mouse Event according to the data
-</span><span class="kw">fn </span>handle_mouse_input(mouse_packet: MousePacket) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">fn </span>handle_mouse_input(mouse_packet: MousePacket, queue: <span class="kw-2">&amp;</span>Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>buttons = Buttons::from(<span class="kw-2">&amp;</span>mouse_packet).<span class="number">0</span>;
     <span class="kw">let </span>movement = Movement::from(<span class="kw-2">&amp;</span>mouse_packet).<span class="number">0</span>;
 
     <span class="kw">let </span>mouse_event = MouseEvent::new(buttons, movement);
     <span class="kw">let </span>event = Event::MouseMovementEvent(mouse_event);
 
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(producer) = MOUSE_PRODUCER.get() {
-        producer.push(event).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to enqueue the mouse event&quot;</span>)
-    } <span class="kw">else </span>{
-        <span class="macro">warn!</span>(<span class="string">&quot;MOUSE_PRODUCER wasn&#39;t yet initialized, dropping mouse event {event:?}.&quot;</span>);
-        <span class="prelude-val">Err</span>(<span class="string">&quot;MOUSE_PRODUCER wasn&#39;t yet initialized&quot;</span>)
-    }
+    queue.push(event).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to enqueue the mouse event&quot;</span>)
 }
 
 <span class="comment">// both MouseMovementRelative and MousePacketBits4 are in different crates, so we need a newtype wrapper:

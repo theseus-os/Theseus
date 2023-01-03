@@ -413,9 +413,9 @@
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    ps2_controller::init()<span class="question-mark">?</span>;
-    keyboard::init(key_producer)<span class="question-mark">?</span>;
-    mouse::init(mouse_producer)<span class="question-mark">?</span>;
+    <span class="kw">let </span>controller = ps2_controller::init()<span class="question-mark">?</span>;
+    keyboard::init(controller.keyboard_handle(), key_producer)<span class="question-mark">?</span>;
+    mouse::init(controller.mouse_handle(), mouse_producer)<span class="question-mark">?</span>;
 
     <span class="comment">// Initialize/scan the PCI bus to discover PCI devices
     </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {
