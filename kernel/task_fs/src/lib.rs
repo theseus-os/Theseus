@@ -304,7 +304,7 @@ impl KnownLength for TaskFile {
         self.generate().len() 
     }
     fn is_empty(&self) -> bool {
-        self.generate().len() == 0
+        self.len() == 0
     }
 }
 
@@ -459,7 +459,7 @@ impl KnownLength for MmiFile {
         self.generate().len() 
     }
     fn is_empty(&self) -> bool {
-        self.generate().len() == 0
+        self.len() == 0
     }
 }
 

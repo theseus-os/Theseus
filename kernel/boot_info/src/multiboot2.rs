@@ -13,7 +13,7 @@ impl<'a> crate::MemoryRegion for &'a multiboot2::MemoryArea {
     }
     
     fn is_empty(&self) -> bool {
-        multiboot2::MemoryArea::size(self) as usize == 0
+        self.len() == 0
     }
 
     fn is_usable(&self) -> bool {
@@ -49,7 +49,7 @@ impl crate::ElfSection for multiboot2::ElfSection {
     }
     
     fn is_empty(&self) -> bool {
-        multiboot2::ElfSection::size(self) as usize == 0
+        self.len() == 0
     }
 
     fn flags(&self) -> ElfSectionFlags {
@@ -87,7 +87,7 @@ impl<'a> crate::Module for &'a multiboot2::ModuleTag {
     }
     
     fn is_empty(&self) -> bool {
-        (self.end_address() - self.start_address()) as usize == 0
+        self.len() == 0
     }
 }
 
@@ -110,7 +110,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
     }
     
     fn is_empty(&self) -> bool {
-        self.total_size() == 0
+        self.len() == 0
     }
 
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {

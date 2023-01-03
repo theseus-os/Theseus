@@ -42,7 +42,7 @@ impl crate::MemoryRegion for MemoryRegion {
     }
     
     fn is_empty(&self) -> bool {
-        self.len == 0
+        self.len() == 0
     }
 
     fn is_usable(&self) -> bool {
@@ -89,7 +89,7 @@ impl<'a> crate::ElfSection for &'a info::ElfSection {
     }
     
     fn is_empty(&self) -> bool {
-        self.size == 0
+        self.len() == 0
     }
 
     fn flags(&self) -> ElfSectionFlags {
@@ -123,7 +123,7 @@ impl crate::Module for Module {
     }
     
     fn is_empty(&self) -> bool {
-        self.inner.len == 0
+        self.len() == 0
     }
 }
 
@@ -166,7 +166,7 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
     }
     
     fn is_empty(&self) -> bool {
-        self.size == 0
+        self.len() == 0
     }
 
     // The bootloader creates two memory regions with the bootloader type. The first

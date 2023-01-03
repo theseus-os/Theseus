@@ -716,7 +716,7 @@ impl OsStr {
     #[must_use]
     #[inline]
     pub fn is_empty(&self) -> bool {
-        self.inner.inner.is_empty()
+        self.len() == 0
     }
 
     /// Returns the length of this `OsStr`.
