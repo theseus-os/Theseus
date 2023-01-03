@@ -129,7 +129,7 @@ impl PageTable {
         other_table: &mut PageTable,
         f: F,
     ) -> Result<(), &'static str>
-        where F: FnOnce(&mut Mapper) -> Result<(), &'static str>
+        where F: FnOnce(&mut Mapper, &Mapper) -> Result<(), &'static str>
     {
         let active_p4_frame = get_current_p4();
         if self.p4_table.start() != &active_p4_frame || self.p4_table.end() != &active_p4_frame {
@@ -151,7 +151,7 @@ impl PageTable {
         let mut mapper = Mapper::temp(*other_table.p4_table.start());
 
         // execute `f` in the new context, in which the new page table is considered "active"
-        let ret = f(&mut mapper);
+        let ret = f(&mut mapper, self);
 
         // Here, recover the current page table's p4 frame and restore it into this current page table,
         // since we removed it earlier at the top of this function and gave it to the temporary page. 
@@ -249,8 +249,7 @@ pub fn init(
     }
 
     // Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
-    page_table.with(&mut new_table, |mapper| {
-        
+    page_table.with(&mut new_table, |new_mapper, _current_mapper| {
         // Map every section found in the kernel image (given by the boot information above) into our new page table. 
         // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
         // map the same physical frames to both lower-half and higher-half virtual addresses. 
@@ -280,27 +279,27 @@ pub fn init(
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
         let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, text_pages_identity, &text_frames, text_flags)?
+            Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         }));
-        text_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?));
+        text_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?));
         index += 1;
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
         let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
+            Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
         }));
-        rodata_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?));
+        rodata_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?));
         index += 1;
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
         let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, data_pages_identity, &data_frames, data_flags)?
+            Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, &data_frames, data_flags)?
         }));
-        data_mapped_pages = Some(NoDrop::new(mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
+        data_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
         index += 1;
 
         // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
@@ -310,7 +309,7 @@ pub fn init(
         for (page, frame) in stack_mappings.into_iter().flatten() {
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
-            let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
+            let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
             if let Some(ref mut stack_mapped_pages) = stack_mapped_pages {
                 stack_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge stack mapped pages")?;
             } else {
@@ -330,16 +329,16 @@ pub fn init(
         let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
         let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
+            Mapper::map_to_non_exclusive(new_mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
         }));
-        higher_half_mapped_pages[index] = Some(NoDrop::new(mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
+        higher_half_mapped_pages[index] = Some(NoDrop::new(new_mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
         let mut iter = boot_info_mappings.iter();
         while let Some(Some((page, frame))) = iter.next() {
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
-            let mapped_pages = mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
+            let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
             if let Some(ref mut boot_info_mapped_pages) = boot_info_mapped_pages {
                 boot_info_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge boot info pages")?;
             } else {
