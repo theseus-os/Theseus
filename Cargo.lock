@@ -948,6 +948,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "early_printer"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "kernel_config",
+ "logger",
+ "spin 0.9.4",
+ "volatile 0.2.7",
+]
+
+[[package]]
 name = "either"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

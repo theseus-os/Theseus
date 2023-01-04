@@ -63,7 +63,7 @@ fn rust_entry(
     double_fault_stack: usize,
 ) {
     try_exit!(early_setup(double_fault_stack));
-    // See the above diagram in `_start`.
+    // See the above memory layout diagram in `_start`.
     let kernel_stack_start = VirtualAddress::new_canonical(double_fault_stack - STACK_SIZE);
     try_exit!(nano_core(boot_info, kernel_stack_start));
 }

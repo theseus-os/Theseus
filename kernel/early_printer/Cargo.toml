@@ -1,0 +1,27 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "early_printer"
+description = "Basic support for displaying ASCII text on screen during early boot/init"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spin = "0.9.4"
+
+[dependencies.volatile]
+version = "0.2.7"
+
+[dependencies.logger]
+path = "../logger"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.boot_info]
+path = "../boot_info"
+
+[features]
+bios = []
+
+[lib]
+crate-type = ["rlib"]

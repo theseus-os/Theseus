@@ -1,19 +1,17 @@
 //! The aptly-named tiny crate containing the first OS code to run.
-//! 
+//!
 //! The `nano_core` is very simple, and only does the following things:
-//! 
 //! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
-//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
+//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`] as a final step.
 //! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
 //! In general, you shouldn't ever need to change `nano_core`. 
 //! That's because `nano_core` doesn't contain any specific program logic, 
 //! it just sets up an initial environment so that other subsystems can run.
-//! 
+//!
 //! If you want to change how the OS starts up and which systems it initializes, 
-//! you should change the code in the [`captain`](../captain/index.html) crate instead.
-//! 
+//! you should change the code in the [`captain`] crate instead.
 
 #![no_std]
 #![no_main]
@@ -65,12 +63,12 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
     panic!("{}", msg);
 }
 
-/// Early setup that must be done prior to loading the boot information.
+/// Early setup that should be done before bootloader information is available.
 ///
 /// This involves:
-/// 1. Setting up logging
-/// 2. Dumping basic information about the Theseus build
-/// 3. Initialising early exceptions
+/// 1. Setting up an early logger.
+/// 2. Dumping basic information about the Theseus build.
+/// 3. Initializing early exception handlers.
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
     println_raw!("Entered early_setup(). Interrupts disabled.");
@@ -79,9 +77,9 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
         serial_port_basic::SerialPortAddress::COM1,
     )];
     logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|_| "failed to initialise early logging")?;
-    log::info!("initialised early logging");
-    println_raw!("early_setup(): initialized logger.");
+        .map_err(|_| "failed to initialize early logging")?;
+    log::info!("initialized early logger");
+    println_raw!("early_setup(): initialized early logger.");
 
     // Dump basic information about this build of Theseus.
     log::info!("\n    \
@@ -104,6 +102,22 @@ where
 {
     let rsdp_address = boot_info.rsdp();
     println_raw!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
+
+    // Temp test: dump out framebuffer info from bootloader
+    log::warn!("Framebuffer info: {:#X?}", boot_info.framebuffer_info());
+    unsafe {
+        let fb_info = boot_info.framebuffer_info().unwrap();
+        let addr = match fb_info.address {
+            boot_info::Address::Virtual(vaddr)   => vaddr.value(),
+            boot_info::Address::Physical(_paddr) => todo!("support framebuffer physical address via early Mapper"),
+        };
+        let total_pixel_count = fb_info.total_size_in_bytes / (fb_info.bits_per_pixel / 8) as u64;
+        let addr = addr as *mut u32;
+        let first_half = (total_pixel_count*2/4) as isize;
+        for offset in 0 .. first_half {
+            core::ptr::write(addr.offset(offset), 0xa742f5);
+        }
+    }
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (

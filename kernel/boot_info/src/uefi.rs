@@ -1,4 +1,4 @@
-use crate::ElfSectionFlags;
+use crate::{ElfSectionFlags, FramebufferFormat, Address};
 use bootloader_api::info;
 use core::{
     iter::{Iterator, Peekable},
@@ -241,5 +241,37 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
 
     fn stack_size(&self) -> Result<usize, &'static str> {
         Ok(STACK_SIZE)
+    }
+
+    fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
+        let uefi_fb = self.framebuffer.as_ref()?;
+        let uefi_fb_info = uefi_fb.info();
+        let format = match uefi_fb_info.pixel_format {
+            info::PixelFormat::Rgb => FramebufferFormat::RgbPixel,
+            info::PixelFormat::Bgr => FramebufferFormat::BgrPixel,
+            info::PixelFormat::U8  => FramebufferFormat::Grayscale,
+            info::PixelFormat::Unknown {
+                red_position,
+                green_position,
+                blue_position,
+            } => FramebufferFormat::CustomPixel {
+                // each pixel is 8 bits
+                red_bitmask:   0xFF << red_position,
+                green_bitmask: 0xFF << green_position,
+                blue_bitmask:  0xFF << blue_position,
+            },
+            _ => return None,
+        };
+        Some(crate::FramebufferInfo {
+            address: Address::Virtual(
+                VirtualAddress::new_canonical(uefi_fb.buffer().as_ptr() as usize)
+            ),
+            total_size_in_bytes: uefi_fb_info.byte_len as u64,
+            width: uefi_fb_info.width as u32,
+            height: uefi_fb_info.height as u32,
+            bits_per_pixel: (uefi_fb_info.bytes_per_pixel * 8) as u8,
+            stride: uefi_fb_info.stride as u32,
+            format,
+        })
     }
 }
