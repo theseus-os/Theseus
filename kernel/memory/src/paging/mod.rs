@@ -148,6 +148,7 @@ impl PageTable {
         );
         tlb_flush_all();
 
+        // This mapper will modify the other table using the temporary recursive p4 index set in the current page table.
         let mut mapper = Mapper::temp(*other_table.p4_table.start());
 
         // Execute `f` in the new context, in which the new page table is considered "active"

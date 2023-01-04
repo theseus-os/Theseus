@@ -86,5 +86,5 @@ pub const KERNEL_HEAP_INITIAL_SIZE: usize = 256 * 1024 * 1024; // 256 MiB, debug
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
-/// The page allocator doesn't allocate addresses above this address.
+/// The page allocator doesn't allocate pages above this address.
 pub const TEMPORARY_RECURSIVE_MEMORY_START: usize = 0xFFFF_0000_0000_0000 | (TEMPORARY_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
