@@ -11,6 +11,7 @@ path = "main.rs"
 
 [dependencies]
 log = "0.4.17"
+zerocopy = "0.5.0"
 
 logger = { path = "../logger" }
 frame_allocator = { path = "../../../kernel/frame_allocator" }

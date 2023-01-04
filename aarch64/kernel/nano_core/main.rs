@@ -97,7 +97,7 @@ fn main(
     info!("page table: {:?}", page_table);
 
     info!("Creating new stack");
-    let (_new_stack, stack_ptr) = create_stack(&mut page_table, landing_pad as *const () as _, 16)?;
+    let (_new_stack, stack_ptr) = create_stack(&mut page_table, landing_pad, 16)?;
 
     info!("Switching to new task");
     switch_to_task(stack_ptr);

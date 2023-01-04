@@ -258,6 +258,7 @@ dependencies = [
  "pte_flags",
  "uefi",
  "uefi-services",
+ "zerocopy",
 ]
 
 [[package]]
