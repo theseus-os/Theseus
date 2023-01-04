@@ -194,7 +194,15 @@ pub fn init(
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
-    page_allocator::init(VirtualAddress::new_canonical(boot_info.kernel_end()?.value()))?;
+    page_allocator::init(
+        VirtualAddress::new(
+            Mapper::from_current()
+                .translate(boot_info.kernel_end()?)
+                .ok_or("couldn't translate kernel end virtual address")?
+                .value(),
+        )
+        .ok_or("couldn't convert kernel end physical address into virtual address")?,
+    )?;
     debug!("Initialized new page allocator!");
     page_allocator::dump_page_allocator_state();
 

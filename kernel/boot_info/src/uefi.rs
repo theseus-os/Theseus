@@ -1,7 +1,7 @@
 use crate::ElfSectionFlags;
 use bootloader_api::info;
 use core::iter::{Iterator, Peekable};
-use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
+use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
 // TODO: Ideally this would be defined in nano_core. However, that would
@@ -176,18 +176,18 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         Ok(core::iter::empty())
     }
 
-    fn kernel_end(&self) -> Result<PhysicalAddress, &'static str> {
+    fn kernel_end(&self) -> Result<VirtualAddress, &'static str> {
         use crate::ElfSection;
 
-        PhysicalAddress::new(
+        VirtualAddress::new(
             self.elf_sections()?
                 .filter(|section| section.flags().contains(ElfSectionFlags::ALLOCATED))
+                .filter(|section| section.size > 0)
                 .map(|section| section.start + section.size)
                 .max()
-                .ok_or("couldn't find kernel end address")? as usize
-                - KERNEL_OFFSET,
+                .ok_or("couldn't find kernel end address")? as usize,
         )
-        .ok_or("kernel physical end address was invalid")
+        .ok_or("kernel virtual end address was invalid")
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {

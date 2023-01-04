@@ -102,7 +102,7 @@ pub trait BootInformation: 'static {
     ) -> Result<Self::AdditionalReservedMemoryRegions, &'static str>;
 
     /// Returns the end of the kernel's image in physical memory.
-    fn kernel_end(&self) -> Result<PhysicalAddress, &'static str>;
+    fn kernel_end(&self) -> Result<VirtualAddress, &'static str>;
 
     /// Returns the RSDP if it was provided by the bootloader.
     fn rsdp(&self) -> Option<PhysicalAddress>;
