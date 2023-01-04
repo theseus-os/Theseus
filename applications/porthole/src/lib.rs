@@ -1,5 +1,5 @@
 #![no_std]
-
+#![feature(slice_ptr_get)]
 extern crate alloc;
 extern crate device_manager;
 extern crate hpet;
@@ -10,7 +10,9 @@ extern crate multicore_bringup;
 extern crate scheduler;
 extern crate spin;
 extern crate task;
+use core::marker::PhantomData;
 use core::ops::Add;
+use core::slice::IterMut;
 
 use alloc::format;
 use alloc::sync::{Arc, Weak};
@@ -322,7 +324,7 @@ impl Rect {
             end_x = self.end_x();
         } else if self.end_x() > SCREEN_WIDTH as isize {
             start_x = self.x;
-            let gap = (self.x + self.width as isize) - SCREEN_HEIGHT as isize;
+            let gap = (self.x + self.width as isize) - SCREEN_WIDTH as isize;
             end_x = self.width as isize - gap;
         }
         if self.end_y() > SCREEN_HEIGHT as isize {
@@ -362,14 +364,22 @@ impl VirtualFrameBuffer {
 
     fn copy_window_from_iterators(&mut self, window: &mut MutexGuard<Window>) {
         let window_screen = window.rect.return_visible_rect();
+        let window_stride = window.frame_buffer.width as usize;
 
-        let window_iterator = window.return_framebuffer_iterator();
-        let framebuffer_iterator =
-            ret_fbiter_for_given_rect(&mut self.buffer, self.width, window_screen);
+        // FIXME: Handle errors with error types
+        let chunker = FramebufferChunker::new(&mut self.buffer, window_screen, self.width).unwrap();
+        let relative_visible_rect = window.return_relative_visible_rect();
 
-        for (w_color, pixel) in window_iterator.zip(framebuffer_iterator) {
-            *pixel = *w_color;
+        let w_chunker = FramebufferChunker::new(
+            &mut window.frame_buffer.buffer,
+            relative_visible_rect,
+            window_stride,
+        )
+        .unwrap();
+        for (screen, window) in chunker.zip(w_chunker) {
+            screen.copy_from_slice(window);
         }
+
     }
 
     fn copy_window_only(&mut self, window: &mut MutexGuard<Window>) {
@@ -466,6 +476,62 @@ impl PhysicalFrameBuffer {
                 .into_borrowed_slice_mut(0, width * height)
                 .map_err(|(_mp, s)| s)?,
         })
+    }
+}
+
+struct FramebufferChunker<'a, T: 'a> {
+    fb: *mut [T],
+    rect: Rect,
+    stride: usize,
+    row_index_beg: usize,
+    row_index_end: usize,
+    current_column: usize,
+    _marker: PhantomData<&'a mut T>,
+}
+
+impl<'a, T: 'a> FramebufferChunker<'a, T> {
+    #[inline]
+    pub fn new(slice: &'a mut [T], rect: Rect, stride: usize) -> Option<Self> {
+        if rect.width <= stride {
+            let current_column = rect.y as usize;
+            let row_index_beg = (stride * current_column) + rect.x as usize;
+            let row_index_end = (stride * current_column) + rect.end_x() as usize;
+            Some(Self {
+                fb: slice,
+                rect,
+                stride,
+                row_index_beg,
+                row_index_end,
+                current_column,
+                _marker: PhantomData,
+            })
+        } else {
+            None
+        }
+    }
+
+    fn calculate_next_row(&mut self) {
+        self.row_index_beg = (self.stride * self.current_column) + self.rect.x as usize;
+        self.row_index_end = (self.stride * self.current_column) + self.rect.end_x() as usize;
+    }
+}
+
+impl<'a, T> Iterator for FramebufferChunker<'a, T> {
+    type Item = &'a mut [T];
+
+    fn next(&mut self) -> Option<&'a mut [T]> {
+        if self.current_column < self.rect.end_y() as usize {
+            let chunk = unsafe {
+                self.fb
+                    .get_unchecked_mut(self.row_index_beg..self.row_index_end)
+            };
+            self.current_column += 1;
+            self.calculate_next_row();
+            let chunk = { unsafe { &mut *chunk } };
+            Some(chunk)
+        } else {
+            None
+        }
     }
 }
 
@@ -655,6 +721,7 @@ impl WindowManager {
                                 self.window_rendering_order.remove(wind_index);
                                 self.window_rendering_order.push(i);
                             }
+                            // FIXME: Don't hold a window if its behind another window
                             self.mouse_holding = Holding::Window(i);
                             break;
                         }
@@ -837,10 +904,16 @@ impl Window {
 
     pub fn draw_border(&mut self) {
         let border = self.return_title_border();
-        let buffer =
-            ret_fbiter_for_given_rect(&mut self.frame_buffer.buffer, self.rect.width, border);
-        for pixel in buffer {
-            *pixel = DEFAULT_BORDER_COLOR;
+        if let Some(chunker) = FramebufferChunker::new(
+            &mut self.frame_buffer.buffer,
+            border,
+            self.frame_buffer.width,
+        ) {
+            for row in chunker {
+                for pixel in row {
+                    *pixel = DEFAULT_BORDER_COLOR;
+                }
+            }
         }
     }
 
@@ -878,27 +951,17 @@ impl Window {
         self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).unwrap();
     }
 
-    /// Gives mutable framebuffer iterator for the whole window
-    fn return_framebuffer_iterator(&mut self) -> impl Iterator<Item = &mut u32> {
-        if self.bottom_side_out() || self.left_side_out() || self.right_side_out() {
-            let mut bounding_box = self.rect.return_visible_rect();
-            bounding_box.x = 0;
-            if self.left_side_out() {
-                bounding_box.x = (self.rect.width - bounding_box.width) as isize;
-            }
-            bounding_box.y = 0;
-            let buffer = ret_fbiter_for_given_rect(
-                &mut self.frame_buffer.buffer,
-                self.rect.width,
-                bounding_box,
-            );
-            buffer
-        } else {
-            let rect = Rect::new(self.frame_buffer.width, self.frame_buffer.height, 0, 0);
-            let buffer =
-                ret_fbiter_for_given_rect(&mut self.frame_buffer.buffer, self.rect.width, rect);
-            buffer
+    /// Returns visible part of self's `rect` with relative bounds applied
+    /// e.g if visible rect is `Rect{width: 358, height: 400, x: 0, y: 0}`
+    /// this will return `Rect{width: 358, height: 400, x: 42, y: 0}`
+    pub fn return_relative_visible_rect(&self) -> Rect {
+        let mut bounding_box = self.rect.return_visible_rect();
+        bounding_box.x = 0;
+        if self.left_side_out() {
+            bounding_box.x = (self.rect.width - bounding_box.width) as isize;
         }
+        bounding_box.y = 0;
+        bounding_box
     }
 
     pub fn left_side_out(&self) -> bool {
@@ -936,6 +999,8 @@ fn port_loop(
         .ok_or("couldn't get HPET timer")?
         .get_counter();
     let hpet_freq = hpet.as_ref().ok_or("ss")?.counter_period_femtoseconds() as u64;
+    let mut counter = 0;
+    let mut total_time = 0;
 
     loop {
         let end = hpet
