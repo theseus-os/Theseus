@@ -69,7 +69,6 @@ optional = true
 cfg-if = "1.0.0"
 
 [features]
-default = [ "bios" ]
 ## Build for a system that boots via legacy BIOS (multiboot2).
 bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
 ## Build for a system that boots via UEFI.
