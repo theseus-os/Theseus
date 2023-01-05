@@ -12,7 +12,6 @@ extern crate spin;
 extern crate task;
 use core::marker::PhantomData;
 use core::ops::Add;
-use core::slice::IterMut;
 
 use alloc::format;
 use alloc::sync::{Arc, Weak};
@@ -20,7 +19,6 @@ use log::{debug, info};
 use spin::{Mutex, MutexGuard, Once};
 
 use event_types::Event;
-use keycodes_ascii::{KeyAction, KeyEvent, Keycode};
 use mpmc::Queue;
 
 use alloc::string::{String, ToString};
@@ -61,16 +59,15 @@ static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
 };
 pub struct App {
     window: Arc<Mutex<Window>>,
-    text: TextDisplay,
+    text: TextDisplayInfo,
 }
 
 impl App {
-    pub fn new(window: Arc<Mutex<Window>>, text: TextDisplay) -> Self {
+    pub fn new(window: Arc<Mutex<Window>>, text: TextDisplayInfo) -> Self {
         Self { window, text }
     }
     pub fn draw(&mut self) {
         self.window.lock().draw_rectangle(DEFAULT_WINDOW_COLOR);
-        let rect = self.window.lock().rect;
         display_window_title(
             &mut self.window.lock(),
             DEFAULT_TEXT_COLOR,
@@ -78,14 +75,14 @@ impl App {
         );
         print_string(
             &mut self.window.lock(),
-            rect.width,
-            rect.height,
-            &RelativePos::new(0, 0),
+            self.text.width,
+            self.text.height,
+            &self.text.pos,
             &self.text.text,
-            DEFAULT_TEXT_COLOR,
-            DEFAULT_WINDOW_COLOR,
-            0,
-            1,
+            self.text.fg_color,
+            self.text.bg_color,
+            self.text.next_col,
+            self.text.next_line,
         )
     }
 }
@@ -179,10 +176,10 @@ fn get_bit(char_font: u8, i: usize) -> u8 {
     char_font & (0x80 >> i)
 }
 
-// TODO: Implement proper `types` for width height etc
-pub struct TextDisplay {
+pub struct TextDisplayInfo {
     width: usize,
     height: usize,
+    pos: RelativePos,
     next_col: usize,
     next_line: usize,
     text: String,
@@ -190,10 +187,11 @@ pub struct TextDisplay {
     bg_color: Color,
 }
 
-impl TextDisplay {
+impl TextDisplayInfo {
     pub fn new(
         width: usize,
         height: usize,
+        pos: RelativePos,
         next_col: usize,
         next_line: usize,
         text: String,
@@ -203,6 +201,7 @@ impl TextDisplay {
         Self {
             width,
             height,
+            pos,
             next_col,
             next_line,
             text,
@@ -961,14 +960,15 @@ fn port_loop(
     let window_manager = WINDOW_MANAGER.get().unwrap();
     let window_3 = WindowManager::new_window(&Rect::new(400, 200, 30, 100), None);
     let window_2 = WindowManager::new_window(&Rect::new(400, 400, 500, 20), Some(format!("Basic")));
-    let text = TextDisplay {
+    let text = TextDisplayInfo {
         width: 400,
         height: 400,
+        pos: RelativePos::new(0, 0),
         next_col: 1,
         next_line: 1,
         text: "Hello World".to_string(),
-        fg_color: 0xFFFFFF,
-        bg_color: 0x0F0FFF,
+        fg_color: DEFAULT_TEXT_COLOR,
+        bg_color: DEFAULT_BORDER_COLOR,
     };
     let mut app = App::new(window_2, text);
     let hpet = get_hpet();
@@ -977,8 +977,6 @@ fn port_loop(
         .ok_or("couldn't get HPET timer")?
         .get_counter();
     let hpet_freq = hpet.as_ref().ok_or("ss")?.counter_period_femtoseconds() as u64;
-    let mut counter = 0;
-    let mut total_time = 0;
 
     loop {
         let end = hpet
@@ -1036,18 +1034,11 @@ fn port_loop(
             }
         }
 
-        if diff >= 0 {
+        if diff > 0 {
             app.draw();
             window_3.lock().draw_rectangle(DEFAULT_WINDOW_COLOR);
             window_manager.lock().update();
             window_manager.lock().render();
-            if counter == 1000 {
-                log::info!("time {}", total_time / counter);
-                counter = 0;
-                total_time = 0;
-            }
-            counter += 1;
-            total_time += diff;
 
             start = hpet.as_ref().unwrap().get_counter();
         }
