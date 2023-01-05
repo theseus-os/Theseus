@@ -308,15 +308,10 @@ impl Rect {
     }
 
     fn detect_collision(&self, other: &Rect) -> bool {
-        if self.x < other.x_plus_width()
+        self.x < other.x_plus_width()
             && self.x_plus_width() > other.x
             && self.y < other.y_plus_height()
             && self.y_plus_height() > other.y
-        {
-            true
-        } else {
-            false
-        }
     }
 
     /// Creates a new `Rect` from visible parts of itself.
@@ -616,7 +611,7 @@ impl WindowManager {
             title,
         );
         let arc_window = Arc::new(Mutex::new(window));
-        manager.windows.push(Arc::downgrade(&arc_window.clone()));
+        manager.windows.push(Arc::downgrade(&arc_window));
         arc_window
     }
 
