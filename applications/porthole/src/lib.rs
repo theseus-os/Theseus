@@ -78,7 +78,8 @@ impl App {
         );
         print_string(
             &mut self.window.lock(),
-            &rect.as_dimension(),
+            rect.width,
+            rect.height,
             &RelativePos::new(0, 0),
             &self.text.text,
             DEFAULT_TEXT_COLOR,
@@ -93,15 +94,16 @@ pub fn display_window_title(window: &mut Window, fg_color: Color, bg_color: Colo
     if window.title.is_some() {
         let title = window.title.as_mut().unwrap().clone();
         let slice = title.as_str();
-        let border = window.return_title_border().as_dimension();
-        let title_pos = window.return_title_pos(&slice.len());
-        print_string(window, &border, &title_pos, slice, fg_color, bg_color, 0, 0);
+        let border = window.title_border();
+        let title_pos = window.title_pos(&slice.len());
+        print_string(window, border.width,border.height, &title_pos, slice, fg_color, bg_color, 0, 0);
     }
 }
 
 pub fn print_string(
     window: &mut Window,
-    dimensions: &Dimensions,
+    width: usize,
+    height: usize,
     pos: &RelativePos,
     slice: &str,
     fg_color: Color,
@@ -113,14 +115,14 @@ pub fn print_string(
     let start_x = pos.x + (column as u32 * CHARACTER_WIDTH as u32);
     let start_y = pos.y + (line as u32 * CHARACTER_HEIGHT as u32);
 
-    let mut x_pixel = 0;
+    let mut x_index = 0;
     let mut row_controller = 0;
     let mut char_index = 0;
-    let mut char_color_on_x_axis = x_pixel;
+    let mut char_color_on_x_axis = x_index;
     loop {
-        let x = start_x + x_pixel as u32;
+        let x = start_x + x_index as u32;
         let y = start_y + row_controller as u32;
-        if x_pixel % CHARACTER_WIDTH == 0 {
+        if x_index % CHARACTER_WIDTH == 0 {
             char_color_on_x_axis = 0;
         }
         let color = if char_color_on_x_axis >= 1 {
@@ -138,25 +140,25 @@ pub fn print_string(
         };
         window.draw_unchecked(&RelativePos::new(x, y), color);
 
-        x_pixel += 1;
-        if x_pixel == CHARACTER_WIDTH
-            || x_pixel % CHARACTER_WIDTH == 0
-            || start_x + x_pixel as u32 == dimensions.width as u32
+        x_index += 1;
+        if x_index == CHARACTER_WIDTH
+            || x_index % CHARACTER_WIDTH == 0
+            || start_x + x_index as u32 == width as u32
         {
             if slice.len() >= 1 && char_index < slice.len() - 1 {
                 char_index += 1;
             }
 
-            if x_pixel >= CHARACTER_WIDTH * slice.len()
-                && x_pixel % (CHARACTER_WIDTH * slice.len()) == 0
+            if x_index >= CHARACTER_WIDTH * slice.len()
+                && x_index % (CHARACTER_WIDTH * slice.len()) == 0
             {
                 row_controller += 1;
                 char_index = 0;
-                x_pixel = 0;
+                x_index = 0;
             }
 
             if row_controller == CHARACTER_HEIGHT
-                || start_y + row_controller as u32 == dimensions.height as u32
+                || start_y + row_controller as u32 == height as u32
             {
                 break;
             }
@@ -215,6 +217,7 @@ impl Dimensions {
     }
 }
 
+/// Position that is relative to a `Window`
 #[derive(Clone, Copy)]
 pub struct RelativePos {
     pub x: u32,
@@ -225,8 +228,13 @@ impl RelativePos {
     pub fn new(x: u32, y: u32) -> Self {
         Self { x, y }
     }
+
+    pub fn to_1d_pos(&self,target_stride: u32) -> usize{
+        ((target_stride * self.y) + self.x) as usize
+    }
 }
 
+/// Position that is relative to the screen 
 pub struct ScreenPos {
     pub x: i32,
     pub y: i32,
@@ -235,6 +243,10 @@ pub struct ScreenPos {
 impl ScreenPos {
     pub fn new(x: i32, y: i32) -> Self {
         Self { x, y }
+    }
+
+    pub fn to_1d_pos(&self) -> usize{
+        ((SCREEN_WIDTH as i32 * self.y) + self.x) as usize
     }
 }
 
@@ -278,34 +290,19 @@ impl Rect {
         }
     }
 
-    fn as_dimension(&self) -> Dimensions {
-        Dimensions {
-            width: self.width,
-            height: self.height,
-        }
-    }
-
-    fn start_x(&self) -> isize {
-        self.x
-    }
-
-    fn end_x(&self) -> isize {
+    fn x_plus_width(&self) -> isize {
         self.x + self.width as isize
     }
 
-    fn start_y(&self) -> isize {
-        self.y
-    }
-
-    fn end_y(&self) -> isize {
+    fn y_plus_height(&self) -> isize {
         self.y + self.height as isize
     }
 
     fn detect_collision(&self, other: &Rect) -> bool {
-        if self.x < other.end_x()
-            && self.end_x() > other.x
-            && self.y < other.end_y()
-            && self.end_y() > other.y
+        if self.x < other.x_plus_width()
+            && self.x_plus_width() > other.x
+            && self.y < other.y_plus_height()
+            && self.y_plus_height() > other.y
         {
             true
         } else {
@@ -314,24 +311,24 @@ impl Rect {
     }
 
     /// Creates a new `Rect` from visible parts of itself.
-    pub fn return_visible_rect(&self) -> Rect {
-        let mut start_x = self.x;
-        let start_y = self.y;
-        let mut end_x = self.width as isize;
-        let mut end_y = self.height as isize;
+    pub fn visible_rect(&self) -> Rect {
+        let mut x = self.x;
+        let y = self.y;
+        let mut width = self.width as isize;
+        let mut height = self.height as isize;
         if self.x < 0 {
-            start_x = 0;
-            end_x = self.end_x();
-        } else if self.end_x() > SCREEN_WIDTH as isize {
-            start_x = self.x;
+            x = 0;
+            width = self.x_plus_width();
+        } else if self.x_plus_width() > SCREEN_WIDTH as isize {
+            x = self.x;
             let gap = (self.x + self.width as isize) - SCREEN_WIDTH as isize;
-            end_x = self.width as isize - gap;
+            width = self.width as isize - gap;
         }
-        if self.end_y() > SCREEN_HEIGHT as isize {
+        if self.y_plus_height() > SCREEN_HEIGHT as isize {
             let gap = (self.y + self.height as isize) - SCREEN_HEIGHT as isize;
-            end_y = self.height as isize - gap;
+            height = self.height as isize - gap;
         }
-        let visible_rect = Rect::new(end_x as usize, end_y as usize, start_x, start_y);
+        let visible_rect = Rect::new(width as usize, height as usize, x, y);
         visible_rect
     }
 }
@@ -362,28 +359,25 @@ impl VirtualFrameBuffer {
         })
     }
 
-    fn copy_window_from_iterators(&mut self, window: &mut MutexGuard<Window>) {
-        let window_screen = window.rect.return_visible_rect();
+    fn copy_windows_into_main_vbuffer(&mut self, window: &mut MutexGuard<Window>) {
+        let window_screen = window.rect.visible_rect();
         let window_stride = window.frame_buffer.width as usize;
 
         // FIXME: Handle errors with error types
-        let chunker = FramebufferChunker::new(&mut self.buffer, window_screen, self.width).unwrap();
-        let relative_visible_rect = window.return_relative_visible_rect();
+        let screen_rows = FramebufferRowChunks::new(&mut self.buffer, window_screen, self.width).unwrap();
+        // To handle rendering when the window is partially outside the screen we use relative version of visible rect
+        let relative_visible_rect = window.relative_visible_rect();
 
-        let w_chunker = FramebufferChunker::new(
+        let window_rows = FramebufferRowChunks::new(
             &mut window.frame_buffer.buffer,
             relative_visible_rect,
             window_stride,
         )
         .unwrap();
-        for (screen, window) in chunker.zip(w_chunker) {
-            screen.copy_from_slice(window);
+        for (screen_row, window_row) in screen_rows.zip(window_rows) {
+            screen_row.copy_from_slice(window_row);
         }
 
-    }
-
-    fn copy_window_only(&mut self, window: &mut MutexGuard<Window>) {
-        self.copy_window_from_iterators(window);
     }
 
     fn draw_unchecked(&mut self, x: isize, y: isize, col: Color) {
@@ -437,9 +431,6 @@ impl PhysicalFrameBuffer {
             .ok_or("could not allocate pages for a new framebuffer")?;
 
         let mapped_framebuffer = {
-            // For best performance, we map the real physical framebuffer memory
-            // as write-combining using the PAT (on x86 only).
-            // If PAT isn't available, fall back to disabling caching altogether.
             let mut flags: PteFlagsArch = PteFlags::new().valid(true).writable(true).into();
 
             #[cfg(target_arch = "x86_64")]
@@ -479,7 +470,7 @@ impl PhysicalFrameBuffer {
     }
 }
 
-struct FramebufferChunker<'a, T: 'a> {
+struct FramebufferRowChunks<'a, T: 'a> {
     fb: *mut [T],
     rect: Rect,
     stride: usize,
@@ -489,13 +480,13 @@ struct FramebufferChunker<'a, T: 'a> {
     _marker: PhantomData<&'a mut T>,
 }
 
-impl<'a, T: 'a> FramebufferChunker<'a, T> {
+impl<'a, T: 'a> FramebufferRowChunks<'a, T> {
     #[inline]
     pub fn new(slice: &'a mut [T], rect: Rect, stride: usize) -> Option<Self> {
         if rect.width <= stride {
             let current_column = rect.y as usize;
             let row_index_beg = (stride * current_column) + rect.x as usize;
-            let row_index_end = (stride * current_column) + rect.end_x() as usize;
+            let row_index_end = (stride * current_column) + rect.x_plus_width() as usize;
             Some(Self {
                 fb: slice,
                 rect,
@@ -512,15 +503,15 @@ impl<'a, T: 'a> FramebufferChunker<'a, T> {
 
     fn calculate_next_row(&mut self) {
         self.row_index_beg = (self.stride * self.current_column) + self.rect.x as usize;
-        self.row_index_end = (self.stride * self.current_column) + self.rect.end_x() as usize;
+        self.row_index_end = (self.stride * self.current_column) + self.rect.x_plus_width() as usize;
     }
 }
 
-impl<'a, T> Iterator for FramebufferChunker<'a, T> {
+impl<'a, T> Iterator for FramebufferRowChunks<'a, T> {
     type Item = &'a mut [T];
 
     fn next(&mut self) -> Option<&'a mut [T]> {
-        if self.current_column < self.rect.end_y() as usize {
+        if self.current_column < self.rect.y_plus_height() as usize {
             let chunk = unsafe {
                 self.fb
                     .get_unchecked_mut(self.row_index_beg..self.row_index_end)
@@ -533,37 +524,6 @@ impl<'a, T> Iterator for FramebufferChunker<'a, T> {
             None
         }
     }
-}
-
-pub fn ret_fbiter_for_given_rect(
-    buffer: &mut BorrowedSliceMappedPages<u32, Mutable>,
-    buffer_width: usize,
-    rect: Rect,
-) -> impl Iterator<Item = &mut u32> {
-    let width = buffer_width;
-    let x = rect.x;
-    let mut y = rect.y;
-    let starter = ((width as isize * y) + x) as usize;
-    let mut keeper = starter;
-    let buffer = buffer
-        .iter_mut()
-        .enumerate()
-        .filter(move |(size, _)| {
-            if y >= rect.height as isize + rect.y as isize {
-                return false;
-            }
-            if *size > starter && size % (keeper + rect.width) == 0 {
-                y += 1;
-                keeper = ((width as isize * y) + x) as usize;
-            }
-            if size >= &keeper {
-                true
-            } else {
-                false
-            }
-        })
-        .map(|(_, b)| b);
-    buffer
 }
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -629,14 +589,14 @@ impl WindowManager {
         WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
     }
 
-    fn new_window(dimensions: &Rect, title: Option<String>) -> Arc<Mutex<Window>> {
+    fn new_window(rect: &Rect, title: Option<String>) -> Arc<Mutex<Window>> {
         let mut manager = WINDOW_MANAGER.get().unwrap().lock();
         let len = manager.windows.len();
 
         manager.window_rendering_order.push(len);
         let window = Window::new(
-            *dimensions,
-            VirtualFrameBuffer::new(dimensions.width, dimensions.height).unwrap(),
+            *rect,
+            VirtualFrameBuffer::new(rect.width, rect.height).unwrap(),
             title,
         );
         let arc_window = Arc::new(Mutex::new(window));
@@ -647,16 +607,16 @@ impl WindowManager {
     fn draw_windows(&mut self) {
         for order in self.window_rendering_order.iter() {
             self.v_framebuffer
-                .copy_window_only(&mut self.windows[*order].upgrade().unwrap().lock());
+                .copy_windows_into_main_vbuffer(&mut self.windows[*order].upgrade().unwrap().lock());
         }
         for window in self.windows.iter() {
             window.upgrade().unwrap().lock().blank();
         }
     }
 
-    // TODO: Do stop indexing mouse image create iterator for it, also draw the thing with iterators
+    // TODO: Stop indexing mouse image create iterator for it, also draw the thing with iterators
     fn draw_mouse(&mut self) {
-        let bounding_box = self.mouse.return_visible_rect();
+        let bounding_box = self.mouse.visible_rect();
         for y in bounding_box.y..bounding_box.y + bounding_box.height as isize {
             for x in bounding_box.x..bounding_box.x + bounding_box.width as isize {
                 let color = MOUSE_POINTER_IMAGE[(x - bounding_box.x) as usize]
@@ -701,7 +661,6 @@ impl WindowManager {
             match self.mouse_holding {
                 Holding::Background => todo!(),
                 Holding::Nothing => {
-                    // This costs nothing
                     let rendering_o = self.window_rendering_order.clone();
                     for &i in rendering_o.iter().rev() {
                         let window = &mut self.windows[i];
@@ -709,7 +668,7 @@ impl WindowManager {
                             .upgrade()
                             .unwrap()
                             .lock()
-                            .return_dynamic_border_pos()
+                            .dynamic_title_border_pos()
                             .detect_collision(&self.mouse)
                         {
                             if i != *self.window_rendering_order.last().unwrap() {
@@ -749,11 +708,12 @@ impl WindowManager {
                         new_pos.y = window_rect.y as i32;
                     }
 
+                    // handle bottom
                     if new_pos.y + 20 > self.v_framebuffer.height as i32 {
                         new_pos.y = window_rect.y as i32;
                     }
 
-                    window.upgrade().unwrap().lock().set_pos(&new_pos);
+                    window.upgrade().unwrap().lock().set_screen_pos(&new_pos);
                 }
             }
         // FIXME: Resizing is broken if windows are on top of each other
@@ -835,7 +795,7 @@ impl Window {
         screen_pos
     }
 
-    pub fn set_pos(&mut self, screen_pos: &ScreenPos) {
+    pub fn set_screen_pos(&mut self, screen_pos: &ScreenPos) {
         self.rect.x = screen_pos.x as isize;
         self.rect.y = screen_pos.y as isize;
     }
@@ -864,23 +824,24 @@ impl Window {
         self.title_pos = None;
     }
 
-    /// Returns Window's border area width height with default position
-    pub fn return_title_border(&mut self) -> Rect {
+    /// Returns Window's border area width and height with 0 as position
+    pub fn title_border(&mut self) -> Rect {
         let border =
             self.title_border
                 .get_or_insert(Rect::new(self.rect.width, TITLE_BAR_HEIGHT, 0, 0));
         *border
     }
 
-    pub fn return_dynamic_border_pos(&self) -> Rect {
+    /// Return's title border's position in screen coordinates
+    pub fn dynamic_title_border_pos(&self) -> Rect {
         let mut rect = self.rect;
         rect.height = TITLE_BAR_HEIGHT;
         rect
     }
 
-    // We don't want user to draw on top a border
-    pub fn return_drawable_area(&mut self) -> Rect {
-        let border = self.return_title_border();
+    /// Return's drawable area
+    pub fn drawable_area(&mut self) -> Rect {
+        let border = self.title_border();
         let drawable_area = self.drawable_area.get_or_insert({
             let x = 0;
             let y = border.height;
@@ -892,8 +853,8 @@ impl Window {
         *drawable_area
     }
 
-    pub fn return_title_pos(&mut self, slice_len: &usize) -> RelativePos {
-        let border = self.return_title_border();
+    pub fn title_pos(&mut self, slice_len: &usize) -> RelativePos {
+        let border = self.title_border();
         let relative_pos = self.title_pos.get_or_insert({
             let pos = (border.width - (slice_len * CHARACTER_WIDTH)) / 2;
             let relative_pos = RelativePos::new(pos as u32, 0);
@@ -902,14 +863,14 @@ impl Window {
         *relative_pos
     }
 
-    pub fn draw_border(&mut self) {
-        let border = self.return_title_border();
-        if let Some(chunker) = FramebufferChunker::new(
+    pub fn draw_title_border(&mut self) {
+        let border = self.title_border();
+        if let Some(rows) = FramebufferRowChunks::new(
             &mut self.frame_buffer.buffer,
             border,
             self.frame_buffer.width,
         ) {
-            for row in chunker {
+            for row in rows {
                 for pixel in row {
                     *pixel = DEFAULT_BORDER_COLOR;
                 }
@@ -917,9 +878,7 @@ impl Window {
         }
     }
 
-    // I'm not exactly sure if using `unsafe` is right bet here
-    // but since we are dealing with arrays/slices most of the time
-    // we need to only prove they are within bounds once and this let's us safely call `unsafe`
+    // TODO: look into this
     fn draw_unchecked(&mut self, relative_pos: &RelativePos, col: Color) {
         let x = relative_pos.x;
         let y = relative_pos.y;
@@ -937,16 +896,17 @@ impl Window {
         }
     }
 
-    // TODO: add better(line,box..etc) drawing functions
+    /// Draws the rectangular shape representing the `Window`
     pub fn draw_rectangle(&mut self, col: Color) {
         self.should_resize_framebuffer();
 
         for pixel in self.frame_buffer.buffer.iter_mut() {
             *pixel = col;
         }
-        self.draw_border();
+        self.draw_title_border();
     }
 
+    /// Resizes framebuffer after to Window's width and height
     fn resize_framebuffer(&mut self) {
         self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).unwrap();
     }
@@ -954,8 +914,8 @@ impl Window {
     /// Returns visible part of self's `rect` with relative bounds applied
     /// e.g if visible rect is `Rect{width: 358, height: 400, x: 0, y: 0}`
     /// this will return `Rect{width: 358, height: 400, x: 42, y: 0}`
-    pub fn return_relative_visible_rect(&self) -> Rect {
-        let mut bounding_box = self.rect.return_visible_rect();
+    pub fn relative_visible_rect(&self) -> Rect {
+        let mut bounding_box = self.rect.visible_rect();
         bounding_box.x = 0;
         if self.left_side_out() {
             bounding_box.x = (self.rect.width - bounding_box.width) as isize;
@@ -999,8 +959,6 @@ fn port_loop(
         .ok_or("couldn't get HPET timer")?
         .get_counter();
     let hpet_freq = hpet.as_ref().ok_or("ss")?.counter_period_femtoseconds() as u64;
-    let mut counter = 0;
-    let mut total_time = 0;
 
     loop {
         let end = hpet
