@@ -203,9 +203,6 @@
 <span id="203">203</span>
 <span id="204">204</span>
 <span id="205">205</span>
-<span id="206">206</span>
-<span id="207">207</span>
-<span id="208">208</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
@@ -224,28 +221,25 @@
 /// because its memory is directly mapped to the VESA display device&#39;s underlying physical memory.
 </span><span class="kw">pub fn </span>init&lt;P: Pixel&gt;() -&gt; <span class="prelude-ty">Result</span>&lt;Framebuffer&lt;P&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// get the graphic mode information
-    </span><span class="kw">let </span>vesa_display_phys_start: PhysicalAddress;
-    <span class="kw">let </span>buffer_width: usize;
-    <span class="kw">let </span>buffer_height: usize;
-    {
-        <span class="kw">let </span>graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        <span class="macro">info!</span>(<span class="string">&quot;Graphical framebuffer info: {} x {}, at paddr {:#X}&quot;</span>,
-            graphic_info.width(),
-            graphic_info.height(),
-            graphic_info.physical_address(),
-        );
-        <span class="kw">if </span>graphic_info.physical_address() == <span class="number">0 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to get graphic mode information!&quot;</span>);
-        }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() <span class="kw">as </span>usize)
-            .ok_or(<span class="string">&quot;Graphic mode physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
-        buffer_width = graphic_info.width() <span class="kw">as </span>usize;
-        buffer_height = graphic_info.height() <span class="kw">as </span>usize;
-    };
+    </span><span class="kw">let </span>graphic_info = multicore_bringup::get_graphic_info()
+        .ok_or(<span class="string">&quot;Failed to get graphic mode information!&quot;</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span>vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() <span class="kw">as </span>usize)
+        .ok_or(<span class="string">&quot;Graphic mode physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>buffer_width = graphic_info.width() <span class="kw">as </span>usize;
+    <span class="kw">let </span>buffer_height = graphic_info.height() <span class="kw">as </span>usize;
+    <span class="macro">info!</span>(<span class="string">&quot;Graphical framebuffer info: {} x {}, at paddr {:#X}&quot;</span>,
+        graphic_info.width(),
+        graphic_info.height(),
+        graphic_info.physical_address(),
+    );
 
     <span class="comment">// create and return the final framebuffer
-    </span><span class="kw">let </span>framebuffer = Framebuffer::new(buffer_width, buffer_height, <span class="prelude-val">Some</span>(vesa_display_phys_start))<span class="question-mark">?</span>;
-    <span class="prelude-val">Ok</span>(framebuffer)
+    </span>Framebuffer::new(
+        buffer_width,
+        buffer_height,
+        <span class="prelude-val">Some</span>(vesa_display_phys_start),
+    )
 }
 
 <span class="doccomment">/// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
