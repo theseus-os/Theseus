@@ -62,6 +62,7 @@ pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 
 
 /// The errors that may occur in [`register_interrupt_handler()`].
+#[derive(Debug)]
 pub enum InterruptRegistrationError {
     /// The given `irq` number was already in use and is registered to 
     /// the interrupt handler at the given `existing_handler_address`.
@@ -172,7 +173,7 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
         }
 
         if curr_task.block().is_err() {
-            error!("deffered_task_entry_point: couldn't block task");
+            error!("deferred_task_entry_point: couldn't block {:?}", curr_task);
         }
 
         scheduler::schedule();

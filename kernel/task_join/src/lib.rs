@@ -6,6 +6,5 @@ pub fn join(task: task::JoinableTaskRef) -> Result<task::ExitValue, &'static str
     if !task.has_exited() {
         blocker.block();
     }
-    task.retrieve_exit_value()
-        .ok_or("BUG: `join()` could not retrieve `ExitValue` after task had exited.")
+    task.join()
 }
