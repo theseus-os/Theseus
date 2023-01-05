@@ -33,7 +33,7 @@ pub trait ElfSection {
     /// Returns the section's starting virtual address.
     fn start(&self) -> VirtualAddress;
 
-    /// Returns the section's length.
+    /// Returns the section's length in memory.
     fn len(&self) -> usize;
 
     /// Returns the section's flags.

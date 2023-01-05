@@ -278,7 +278,10 @@ pub fn init(
 
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
-        let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
+        let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(text_start_phys.value()),
+            text_end_phys.value() - text_start_phys.value(),
+        )?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         }));
@@ -287,7 +290,10 @@ pub fn init(
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
-        let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
+        let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(rodata_start_phys.value()),
+            rodata_end_phys.value() - rodata_start_phys.value(),
+        )?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
         }));
@@ -296,7 +302,10 @@ pub fn init(
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
-        let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
+        let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(data_start_phys.value()),
+            data_end_phys.value() - data_start_phys.value(),
+        )?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, &data_frames, data_flags)?
         }));
