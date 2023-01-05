@@ -131,9 +131,10 @@ ap_start_realmode:
 
 ; This is the start of the graphics mode code. 
 ; First, zero-out the key fields of our "best" mode info and the Rust-visible GraphicInfo.
-    mov word  [best_mode.mode],    0
-    mov word  [best_mode.width],   0
-    mov word  [best_mode.height],  0
+    mov word  [best_mode.mode],     0
+    mov word  [best_mode.width],    0
+    mov word  [best_mode.height],   0
+    mov dword [best_mode.physaddr], 0
     
     ; WARNING: the below code must be kept in sync with the `GraphicInfo` struct 
     ;          in the `multicore_bringup` crate. 
