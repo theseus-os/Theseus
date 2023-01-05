@@ -95,8 +95,8 @@ pub trait BootInformation: 'static {
     /// Returns the modules found in the kernel image.
     fn modules(&self) -> Self::Modules<'_>;
 
-    /// Returns reserved memory regions that aren't marked as reserved in the
-    /// memory map returned by [`memory_regions`].
+    /// Returns additional reserved memory regions that aren't included in
+    /// the list of regions returned by [`memory_regions`].
     fn additional_reserved_memory_regions(
         &self,
     ) -> Result<Self::AdditionalReservedMemoryRegions, &'static str>;
