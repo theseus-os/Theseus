@@ -63,9 +63,10 @@ impl Blocker {
 struct Waker {
     /// Whether the waker has been activated.
     ///
-    /// This field ensures `execute` detects if the waker was activated prior to
-    /// `execute` blocking the task. The field cannot be an atomic as the lock
-    /// must be held while blocking or unblocking the task.
+    /// This field ensures [`Blocker::block`] detects if the waker was activated
+    /// prior to [`Blocker::block`] blocking the task. The field cannot be
+    /// an atomic as the lock must be held while blocking or unblocking the
+    /// task.
     activated: Arc<Mutex<bool>>,
     task: TaskRef,
 }
