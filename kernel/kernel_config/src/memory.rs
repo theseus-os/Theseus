@@ -36,7 +36,7 @@ pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
-/// Value: 512. 
+/// Value: 512.
 pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
 /// Value: 511. The 511th entry is used for kernel text sections
 pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
@@ -44,10 +44,8 @@ pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
 pub const RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
 /// Value: 509. The 509th entry is used for the kernel heap
 pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
-/// Value: 508. The 508th entry is used for all kernel stacks
-pub const KERNEL_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
-/// Value: 507. The 507th entry is used for all userspace stacks
-pub const USER_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 5;
+// Value: 508. The 508th entry is used as a temporary recursive entry when mapping a new page table.
+pub const TEMPORARY_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 6;
 
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
@@ -88,17 +86,5 @@ pub const KERNEL_HEAP_INITIAL_SIZE: usize = 256 * 1024 * 1024; // 256 MiB, debug
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
-
-/// the kernel stack allocator gets the 508th P4 entry of addressability.
-/// actual value: 0o177777_774_000_000_000_0000, or 0xFFFF_FE00_0000_0000 
-pub const KERNEL_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | (KERNEL_STACK_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// the highest actually usuable address in the kernel stack allocator
-pub const KERNEL_STACK_ALLOCATOR_TOP_ADDR: usize = KERNEL_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
-
-
-/// the userspace stack allocators (one per userspace task) each get the 507th P4 entry of addressability.
-/// actual value: 0o177777_773_000_000_000_0000, or 0xFFFF_FD80_0000_0000  
-pub const USER_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | (USER_STACK_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// the highest actually usuable address in each userspace stack allocator
-pub const USER_STACK_ALLOCATOR_TOP_ADDR: usize = USER_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
-
+/// The page allocator doesn't allocate pages above this address.
+pub const TEMPORARY_RECURSIVE_MEMORY_START: usize = 0xFFFF_0000_0000_0000 | (TEMPORARY_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));

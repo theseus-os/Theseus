@@ -922,6 +922,7 @@ dependencies = [
 name = "e1000"
 version = "0.1.0"
 dependencies = [
+ "deferred_interrupt_tasks",
  "intel_ethernet",
  "interrupts",
  "irq_safety",
@@ -938,6 +939,7 @@ dependencies = [
  "pci",
  "spin 0.9.4",
  "static_assertions",
+ "task",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -2200,12 +2202,13 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 name = "net"
 version = "0.1.0"
 dependencies = [
+ "heapless",
  "irq_safety",
  "log",
  "mutex_sleep",
  "nic_buffers",
  "random",
- "smoltcp 0.8.0",
+ "smoltcp 0.8.1",
  "spin 0.9.4",
 ]
 
@@ -2710,6 +2713,7 @@ dependencies = [
  "fadt",
  "log",
  "ps2",
+ "spin 0.9.4",
 ]
 
 [[package]]
@@ -3343,8 +3347,8 @@ dependencies = [
 
 [[package]]
 name = "smoltcp"
-version = "0.8.0"
-source = "git+https://github.com/smoltcp-rs/smoltcp#6b8b667be5878fbf288365df9260996116b81fa6"
+version = "0.8.1"
+source = "git+https://github.com/smoltcp-rs/smoltcp#19c7cba8d39dc0cea0fbd9a7ec7d7cb2ec8301c6"
 dependencies = [
  "bitflags",
  "byteorder",

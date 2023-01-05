@@ -1,5 +1,6 @@
 #![no_std]
 
+use log::warn;
 use num_enum::TryFromPrimitive;
 use port_io::Port;
 use spin::Mutex;
@@ -11,9 +12,9 @@ use HostToMouseCommand::*;
 use DeviceToHostResponse::*;
 
 /// Port used by PS/2 Controller and devices
-static PS2_DATA_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x60));
+const PS2_DATA_PORT: u16 = 0x60;
 /// Port used to send commands to and receive status from the PS/2 Controller
-static PS2_COMMAND_AND_STATUS_PORT: Mutex<Port<u8>> = Mutex::new(Port::new(0x64));
+const PS2_COMMAND_AND_STATUS_PORT: u16 = 0x64;
 
 // https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
 // quite a few of these are commented out because they're either unused, deprecated or non-standard.
@@ -53,7 +54,7 @@ pub enum HostToControllerCommand {
     /// 
     /// Note: only if 2 PS/2 ports supported
     TestPort2 = 0xA9,
-    /// returns `ControllerTestResult`
+    /// see [PS2Controller::test]
     TestController = 0xAA,
     /// returns [PortTestResult]
     TestPort1 = 0xAB,
@@ -105,18 +106,385 @@ pub enum HostToControllerCommand {
     // PulseOutputLineLowFor6ms = 0xF0,
 }
 
-/// Write a command to the PS/2 command port/register
-/// 
-/// Note: Devices attached to the controller should be disabled
-/// before sending commands that return data, otherwise the output buffer could get overwritten
-pub fn write_command(value: HostToControllerCommand) {
-    unsafe {
-        PS2_COMMAND_AND_STATUS_PORT.lock().write(value as u8);
+pub struct PS2Controller {
+    /// at 0x60
+    data_port: Mutex<Port<u8>>,
+    /// at 0x64
+    command_and_status_port: Mutex<Port<u8>>,
+}
+
+impl PS2Controller {
+    /// Constructs a new PS2 Controller.
+    ///
+    /// # Safety
+    /// 
+    /// Must only be called once.
+    pub const unsafe fn new() -> Self {
+        Self {
+            data_port: Mutex::new(Port::new(PS2_DATA_PORT)),
+            command_and_status_port: Mutex::new(Port::new(PS2_COMMAND_AND_STATUS_PORT))
+        }
+    }
+
+    /// Get a handle to the keyboard.
+    /// 
+    /// The keyboard only uses the data port.
+    pub fn keyboard_handle(&self) -> PS2Keyboard {
+        PS2Keyboard::new(self)
+    }
+
+    /// Get a handle to the keyboard.
+    /// 
+    /// The mouse uses both the data port and the command/status port.
+    pub fn mouse_handle(&self) -> PS2Mouse {
+        PS2Mouse::new(self)
+    }
+
+    /// Write a command to the PS/2 command port/register
+    /// 
+    /// Note: Devices attached to the controller should be disabled
+    /// before sending commands that return data, otherwise the output buffer could get overwritten
+    pub fn write_command(&self, value: HostToControllerCommand) {
+        unsafe {
+            self.command_and_status_port.lock().write(value as u8);
+        }
+    }
+
+    /// read the config of the PS/2 port
+    pub fn read_config(&self) -> ControllerConfigurationByte {
+        self.write_command(ReadFromInternalRAMByte0);
+        ControllerConfigurationByte::from_bytes([self.read_data()])
+    }
+    
+    /// write the new config to the PS/2 command port (0x64)
+    pub fn write_config(&self, value: ControllerConfigurationByte) {
+        self.write_command(WriteToInternalRAMByte0);
+        self.write_data(WritableData::Configuration(value));
+    }
+
+    /// Read the PS/2 status port/register
+    pub fn status_register(&self) -> ControllerToHostStatus {
+        ControllerToHostStatus::from_bytes([self.command_and_status_port.lock().read()])
+    }
+
+    /// Clean the data port output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
+    pub fn flush_output_buffer(&self) {
+        self.read_data();
+    }
+
+    pub fn test(&self) -> Result<(), &'static str> {
+        self.write_command(TestController);
+        self.read_controller_test_result() //TODO: bad naming
+    }
+
+    pub fn test_port1(&self) -> Result<(), &'static str> {
+        self.write_command(TestPort1);
+        self.match_port_test_result().map_err(|e| {
+            warn!("failed PS/2 port 1 test: {e}");
+            e
+        })
+    }
+
+    pub fn test_port2(&self) -> Result<(), &'static str> {
+        self.write_command(TestPort2);
+        self.match_port_test_result().map_err(|e| {
+            warn!("failed PS/2 port 2 test: {e}");
+            e
+        })
+    }
+
+    fn match_port_test_result(&self)-> Result<(), &'static str> {
+        use PortTestResult::*;
+        match self.read_port_test_result()? {
+            Passed => Ok(()),
+            ClockLineStuckLow => Err("clock line stuck low"),
+            ClockLineStuckHigh => Err("clock line stuck high"),
+            DataLineStuckLow => Err("data line stuck low"),
+            DataLineStuckHigh => Err("data line stuck high"),
+        }
+    }
+
+    /// must only be called after writing the [TestController] command
+    /// otherwise would read bogus data
+    pub fn read_controller_test_result(&self) -> Result<(), &'static str> {
+        const CONTROLLER_TEST_PASSED: u8 = 0x55;
+        if self.read_data() != CONTROLLER_TEST_PASSED {
+            Err("failed PS/2 controller test")
+        } else {
+            Ok(())
+        }
+    }
+
+    /// must only be called after writing the [TestPort1] or [TestPort2] command
+    /// otherwise would read bogus data
+    pub fn read_port_test_result(&self) -> Result<PortTestResult, &'static str> {
+        self.read_data().try_into().map_err(|_| "failed to read port test result")
+    }
+
+    /// e.g. https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
+    fn polling_send_receive(&self, value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
+        self.polling_send(value)?;
+        self.polling_receive()
+    }
+
+    /// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
+    fn polling_send(&self, value: HostToDevice) -> Result<(), &'static str> {
+        const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
+        for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
+            // so that we don't overwrite the previously sent value
+            if !self.status_register().input_buffer_full() {
+                self.write_data(WritableData::HostToDevice(value));
+                return Ok(());
+            }
+        }
+        Err("polling_send timeout value exceeded")
+    }
+
+    /// https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
+    /// We might still need to disable one of the devices every time we send so we can read_data reliably.
+    /// As it currently works, it might only be a problem for older devices, so I won't overoptimize.
+    fn polling_receive(&self) -> Result<DeviceToHostResponse, &'static str> {
+        const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
+        for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
+            // so that we only read when data is available
+            if self.status_register().output_buffer_full() {
+                return self.read_data().try_into().map_err(|_| "failed to read device response");
+            }
+        }
+        Err("polling_receive timeout value exceeded")
+    }
+
+    /// Read data from the PS/2 data port.
+    /// 
+    /// Note: this can be called directly when within a PS/2 device's interrupt handler.
+    /// If polling is used (e.g. in a device's init function), [ControllerToHostStatus] `output_buffer_full` needs to be checked first.
+    fn read_data(&self) -> u8 {
+        self.data_port.lock().read()
+    }
+
+    /// Write data to the PS/2 data port.
+    /// 
+    /// Note: when writing to the PS/2 controller, it might be necessary to check for
+    /// [ControllerToHostStatus] `!input_buffer_full` first.
+    fn write_data(&self, value: WritableData) {
+        unsafe { self.data_port.lock().write(value.into()) };
     }
 }
 
-// workaround for `dead_code` warnings, https://github.com/Robbepop/modular-bitfield/issues/56
-#[allow(dead_code)] fn hi() {ControllerToHostStatus::new().into_bytes();}
+pub struct PS2Mouse<'c> {
+    controller: &'c PS2Controller,
+    id: MouseId
+}
+
+impl<'c> PS2Mouse<'c> {
+    /// Give a controller reference to the mouse.
+    /// The default mouse id of PS/2 is zero.
+    pub fn new(controller: &'c PS2Controller) -> Self {
+        Self { controller, id: MouseId::Zero }
+    }
+
+    /// reset the mouse
+    pub fn reset(&self) -> Result<(), &'static str> {
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))?; 
+        if let Ok(SelfTestPassed) = self.controller.read_data().try_into() {
+            //returns mouse id 0
+            self.controller.read_data();
+            return Ok(());
+        }
+        Err("failed to reset mouse")
+    }
+
+    /// write command to the mouse and handle the result
+    fn command_to_mouse(&self, value: HostToMouseCommandOrData) -> Result<(), &'static str> {
+        self.controller.write_command(WriteByteToPort2InputBuffer);
+        const RETRIES: u8 = 3;
+        for _ in 0..=RETRIES {
+            return match self.controller.polling_send_receive(HostToDevice::Mouse(value.clone()))? {
+                Acknowledge => Ok(()),
+                ResendCommand => continue,
+                _ => Err("wrong response type")
+            };
+        }
+        Err("mouse doesn't support the command or there has been a hardware failure")
+    }
+
+    /// set PS/2 mouse's sampling rate
+    fn set_mouse_sampling_rate(&self, value: SampleRate) -> Result<(), &'static str> {
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
+            .and_then(|_| self.command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
+            .map_err(|_| "failed to set the mouse sampling rate")
+    }
+
+    /// set the [MouseId] by magic sequence
+    pub fn set_mouse_id(&mut self, id: MouseId) -> Result<(), &'static str> {
+        self.disable_mouse_packet_streaming()?;
+
+        use crate::SampleRate::*;
+        match id {
+            MouseId::Zero => { /* do nothing */ }
+            MouseId::Three => {
+                for rate in [_200, _100, _80] {
+                    self.set_mouse_sampling_rate(rate)?;
+                }
+            }
+            //(maybe) TODO: apparently this needs to check after the first 80 if mouse_id is 3
+            MouseId::Four => {
+                for rate in [_200, _100, _80, _200, _200, _80] {
+                    self.set_mouse_sampling_rate(rate)?;
+                }
+            }
+        }
+        self.id = id;
+
+        self.enable_mouse_packet_streaming()?;
+        Ok(())
+    }
+
+    /// get the [MouseId]
+    pub fn mouse_id(&self) -> Result<MouseId, &'static str> {
+        self.disable_mouse_packet_streaming()?;
+
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))?;
+        let id = self.controller.read_data().try_into().map_err(|_| "failed to get mouse id: bad response")?;
+
+        self.enable_mouse_packet_streaming()?;
+        Ok(id)
+    }
+
+    /// resend the most recent packet again
+    #[allow(dead_code)]
+    fn mouse_resend(&self) -> Result<(), &'static str> {
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
+            .map_err(|_| "failed to resend mouse request")
+    }
+
+    /// enable the packet streaming
+    fn enable_mouse_packet_streaming(&self) -> Result<(), &'static str> {
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)).map_err(|_| {
+            "failed to enable mouse streaming"
+        })
+    }
+
+    /// disable the packet streaming
+    fn disable_mouse_packet_streaming(&self) -> Result<(), &'static str> {
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(DisableDataReporting)).map_err(|_| {
+            "failed to disable mouse streaming"
+        })
+    }
+
+    /// set the resolution of the mouse
+    #[allow(dead_code)]
+    fn mouse_resolution(&self, value: MouseResolution) -> Result<(), &'static str> {
+        self.command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
+            .and_then(|_| self.command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
+            .map_err(|_| "failed to set the mouse resolution")
+    }
+
+    /// read the correct [MousePacket] according to [MouseId]
+    pub fn read_mouse_packet(&self) -> MousePacket {
+        let read_data = || self.controller.read_data();
+        match self.id {
+            MouseId::Zero => MousePacket::Zero(
+                MousePacketGeneric::from_bytes([
+                    read_data(), read_data(), read_data()
+                ])
+            ),
+            MouseId::Three => MousePacket::Three(
+                MousePacket3::from_bytes([
+                    read_data(), read_data(), read_data(), read_data()
+                ])
+            ),
+            MouseId::Four => MousePacket::Four(
+                MousePacket4::from_bytes([
+                    read_data(), read_data(), read_data(), read_data()
+                ])
+            ),
+        }
+    }
+
+    /// read the PS2Controller's status register to find out if the mouse output buffer is full, i.e. can be read
+    pub fn is_output_buffer_full(&self) -> bool {
+        self.controller.status_register().mouse_output_buffer_full()
+    }
+}
+
+pub struct PS2Keyboard<'c> {
+    controller: &'c PS2Controller,
+}
+
+impl<'c> PS2Keyboard<'c> {
+    pub fn new(controller: &'c PS2Controller) -> Self {
+        Self { controller }
+    }
+    
+    /// reset the keyboard
+    pub fn reset(&self) -> Result<(), &'static str> {
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))?; 
+        if let Ok(SelfTestPassed) = self.controller.read_data().try_into() {
+            return Ok(())
+        }
+        Err("failed to reset keyboard")
+    }
+
+    /// write command to the keyboard and handle the result
+    fn command_to_keyboard(&self, value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
+        const RETRIES: u8 = 3;
+        for _ in 0..=RETRIES {
+            return match self.controller.polling_send_receive(HostToDevice::Keyboard(value.clone()))? {
+                Acknowledge => Ok(()),
+                ResendCommand => continue,
+                _ => Err("wrong response type")
+            };
+        }
+        Err("keyboard doesn't support the command or there has been a hardware failure")
+    }
+
+    /// set LED status of the keyboard
+    pub fn set_keyboard_led(&self, value: LEDState) -> Result<(), &'static str> {
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
+            .and_then(|_| self.command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
+            .map_err(|_| "failed to set the keyboard led")
+    }
+
+    /// set the scancode set of the keyboard
+    pub fn keyboard_scancode_set(&self, value: ScancodeSet) -> Result<(), &'static str> {
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
+            .and_then(|_| self.command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
+            .map_err(|_| "failed to set the keyboard scancode set")
+    }
+
+    /// detect the [KeyboardType]
+    /// 
+    /// Note:
+    /// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but `PS2Controller::read_data` always returns a byte.
+    /// This means `PS2Controller::read_data` would return 0x00 here, even though the value is already reserved for the device type "Standard PS/2 mouse".
+    /// As we only care about detecting keyboard types here, it should work.
+    pub fn keyboard_detect(&self) -> Result<KeyboardType, &'static str> {
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))?;
+
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))?; 
+
+        let keyboard_type = match self.controller.read_data() {
+            0x00 => Ok(KeyboardType::AncientATKeyboard),
+            0xAB => {
+                match self.controller.read_data() {
+                    0x41 | 0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
+                    0x83 => Ok(KeyboardType::MF2Keyboard),
+                    _ => Err("unrecognized keyboard type")
+                }
+            }
+            _ => Err("unrecognized keyboard type")
+        };
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(EnableScanning))?;
+        keyboard_type
+    }
+
+    /// reads a Scancode (for now an untyped u8)
+    pub fn read_scancode(&self) -> u8 {
+        self.controller.read_data()
+    }
+}
+
 // see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
 // and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
 #[bitfield(bits = 8)]
@@ -154,19 +522,6 @@ pub struct ControllerToHostStatus {
     parity_error: bool,
 }
 
-/// Read the PS/2 status port/register
-pub fn status_register() -> ControllerToHostStatus {
-    ControllerToHostStatus::from_bytes([PS2_COMMAND_AND_STATUS_PORT.lock().read()])
-}
-
-/// Read data from the PS/2 data port.
-/// 
-/// Note: this can be called directly when within a PS/2 device's interrupt handler.
-/// If polling is used (e.g. in a device's init function), [ControllerToHostStatus] `output_buffer_full` needs to be checked first.
-fn read_data() -> u8 {
-    PS2_DATA_PORT.lock().read()
-}
-
 /// All types of data writable to the [PS2_DATA_PORT].
 enum WritableData {
     Configuration(ControllerConfigurationByte),
@@ -195,14 +550,6 @@ impl From<WritableData> for u8 {
     }
 }
 
-/// Write data to the PS/2 data port.
-/// 
-/// Note: when writing to the PS/2 controller, it might be necessary to check for
-/// [ControllerToHostStatus] `!input_buffer_full` first.
-fn write_data(value: WritableData) {
-    unsafe { PS2_DATA_PORT.lock().write(value.into()) };
-}
-
 // wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
 /// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
 #[bitfield(bits = 8)]
@@ -227,37 +574,9 @@ pub struct ControllerConfigurationByte {
     /// Note: only if 2 PS/2 ports supported
     pub port2_clock_disabled: bool,
     /// whether IBM scancode translation is enabled (0=AT, 1=PC)
-    pub port1_translation_enabled: bool,
+    pub port1_scancode_translation_enabled: bool,
     #[allow(dead_code)]
     must_be_zero: B1,
-}
-
-/// read the config of the PS/2 port
-pub fn read_config() -> ControllerConfigurationByte {
-    write_command(ReadFromInternalRAMByte0);
-    ControllerConfigurationByte::from_bytes([read_data()])
-}
-
-/// write the new config to the PS/2 command port (0x64)
-pub fn write_config(value: ControllerConfigurationByte) {
-    write_command(WriteToInternalRAMByte0);
-    write_data(WritableData::Configuration(value));
-}
-
-/// Clean the [PS2_DATA_PORT] output buffer, skipping the [ControllerToHostStatus] `output_buffer_full` check
-pub fn flush_output_buffer() {
-    read_data();
-}
-
-/// must only be called after writing the [TestController] command
-/// otherwise would read bogus data
-pub fn read_controller_test_result() -> Result<(), &'static str> {
-    const CONTROLLER_TEST_PASSED: u8 = 0x55;
-    if read_data() != CONTROLLER_TEST_PASSED {
-        Err("failed PS/2 controller test")
-    } else {
-        Ok(())
-    }
 }
 
 #[derive(TryFromPrimitive)]
@@ -268,12 +587,6 @@ pub enum PortTestResult {
     ClockLineStuckHigh = 0x02,
     DataLineStuckLow = 0x03,
     DataLineStuckHigh = 0x04,
-}
-
-/// must only be called after writing the [TestPort1] or [TestPort2] command
-/// otherwise would read bogus data
-pub fn read_port_test_result() -> Result<PortTestResult, &'static str> {
-    read_data().try_into().map_err(|_| "failed to read port test result")
 }
 
 // https://wiki.osdev.org/PS/2_Keyboard#Special_Bytes all other bytes sent by the keyboard are scan codes
@@ -292,39 +605,6 @@ pub enum DeviceToHostResponse {
     SelfTestFailed2 = 0xFD,
     ResendCommand = 0xFE,
     KeyDetectionErrorOrInternalBufferOverrun2 = 0xFF,
-}
-
-/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Sending_Bytes_To_Device.2Fs
-fn polling_send(value: HostToDevice) -> Result<(), &'static str> {
-    const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
-    for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
-        // so that we don't overwrite the previously sent value
-        if !status_register().input_buffer_full() {
-            write_data(WritableData::HostToDevice(value));
-            return Ok(());
-        }
-    }
-    Err("polling_send timeout value exceeded")
-}
-
-/// https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling, which still has some _maybe relevant information_:
-/// We might still need to disable one of the devices every time we send so we can read_data reliably.
-/// As it currently works, it might only be a problem for older devices, so I won't overoptimize.
-fn polling_receive() -> Result<DeviceToHostResponse, &'static str> {
-    const VERY_ARBITRARY_TIMEOUT_VALUE: u8 = u8::MAX;
-    for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
-        // so that we only read when data is available
-        if status_register().output_buffer_full() {
-            return read_data().try_into().map_err(|_| "failed to read device response");
-        }
-    }
-    Err("polling_receive timeout value exceeded")
-}
-
-/// e.g. https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
-fn polling_send_receive(value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
-    polling_send(value)?;
-    polling_receive()
 }
 
 #[derive(Clone)]
@@ -417,33 +697,6 @@ pub enum HostToMouseCommand {
     Reset = 0xFF,       //same
 }
 
-/// write command to the keyboard and handle the result
-fn command_to_keyboard(value: HostToKeyboardCommandOrData) -> Result<(), &'static str> {
-    const RETRIES: u8 = 3;
-    for _ in 0..=RETRIES {
-        return match polling_send_receive(HostToDevice::Keyboard(value.clone()))? {
-            Acknowledge => Ok(()),
-            ResendCommand => continue,
-            _ => Err("wrong response type")
-        };
-    }
-    Err("keyboard doesn't support the command or there has been a hardware failure")
-}
-
-/// write command to the mouse and handle the result
-fn command_to_mouse(value: HostToMouseCommandOrData) -> Result<(), &'static str> {
-    write_command(WriteByteToPort2InputBuffer);
-    const RETRIES: u8 = 3;
-    for _ in 0..=RETRIES {
-        return match polling_send_receive(HostToDevice::Mouse(value.clone()))? {
-            Acknowledge => Ok(()),
-            ResendCommand => continue,
-            _ => Err("wrong response type")
-        };
-    }
-    Err("mouse doesn't support the command or there has been a hardware failure")
-}
-
 #[bitfield(bits = 24)]
 #[derive(Debug, BitfieldSpecifier)]
 pub struct MousePacketGeneric {
@@ -456,8 +709,8 @@ pub struct MousePacketGeneric {
     x_9th_bit: bool,
     /// see [y_1st_to_8th_bit]
     y_9th_bit: bool,
-    pub x_overflow: bool,
-    pub y_overflow: bool,
+    x_overflow: bool,
+    y_overflow: bool,
     //2. byte
     /// only a part of x_movement, needs to be combined with [x_9th_bit]
     x_1st_to_8th_bit: B8,
@@ -468,8 +721,9 @@ pub struct MousePacketGeneric {
 
 impl MousePacketGeneric {
     /// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
+    /// 
+    /// Note: This handles overflow as well, although it might not happen on newer systems <https://forum.osdev.org/viewtopic.php?f=1&t=31176>
     pub fn x_movement(&self) -> i16 {
-        // NOTE: not sure if this ever happens (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
         let x_1st_to_8th_bit = if self.x_overflow() {
             u8::MAX
         } else {
@@ -479,8 +733,9 @@ impl MousePacketGeneric {
     }
 
     /// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they're part of one signed 9-bit number
+    /// 
+    /// Note: This handles overflow as well, although it might not happen on newer systems <https://forum.osdev.org/viewtopic.php?f=1&t=31176>
     pub fn y_movement(&self) -> i16 {
-        // NOTE: not sure if this ever happens (https://forum.osdev.org/viewtopic.php?f=1&t=31176)
         let y_1st_to_8th_bit = if self.y_overflow() {
             u8::MAX
         } else {
@@ -617,27 +872,6 @@ impl MousePacket {
     }
 }
 
-/// read the correct [MousePacket] according to [MouseId]
-pub fn read_mouse_packet(id: &MouseId) -> MousePacket {
-    match id {
-        MouseId::Zero => MousePacket::Zero(
-            MousePacketGeneric::from_bytes([
-                read_data(), read_data(), read_data()
-            ])
-        ),
-        MouseId::Three => MousePacket::Three(
-            MousePacket3::from_bytes([
-                read_data(), read_data(), read_data(), read_data()
-            ])
-        ),
-        MouseId::Four => MousePacket::Four(
-            MousePacket4::from_bytes([
-                read_data(), read_data(), read_data(), read_data()
-            ])
-        ),
-    }
-}
-
 #[derive(Clone)]
 pub enum SampleRate {
     _10 = 10,
@@ -647,13 +881,6 @@ pub enum SampleRate {
     _80 = 80,
     _100 = 100,
     _200 = 200
-}
-
-/// set PS/2 mouse's sampling rate
-fn set_mouse_sampling_rate(value: SampleRate) -> Result<(), &'static str> {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
-        .and_then(|_| command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
-        .map_err(|_| "failed to set the mouse sampling rate")
 }
 
 /// See [MousePacket] and its enum variants for further information.
@@ -668,81 +895,6 @@ pub enum MouseId {
     Four = 4,
 }
 
-/// set the [MouseId] by magic sequence
-pub fn set_mouse_id(id: MouseId) -> Result<(), &'static str> {
-    disable_mouse_packet_streaming()?;
-
-    use crate::SampleRate::*;
-    match id {
-        MouseId::Zero => { /* do nothing */ }
-        MouseId::Three => {
-            for rate in [_200, _100, _80] {
-                set_mouse_sampling_rate(rate)?;
-            }
-        }
-        //(maybe) TODO: apparently this needs to check after the first 80 if mouse_id is 3
-        MouseId::Four => {
-            for rate in [_200, _100, _80, _200, _200, _80] {
-                set_mouse_sampling_rate(rate)?;
-            }
-        }
-    }
-
-    enable_mouse_packet_streaming()?;
-    Ok(())
-}
-
-/// get the [MouseId]
-pub fn mouse_id() -> Result<MouseId, &'static str> {
-    disable_mouse_packet_streaming()?;
-
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))?;
-    let id = read_data().try_into().map_err(|_| "failed to get mouse id: bad response")?;
-
-    enable_mouse_packet_streaming()?;
-    Ok(id)
-}
-
-/// reset the mouse
-pub fn reset_mouse() -> Result<(), &'static str> {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))?; 
-    if let Ok(SelfTestPassed) = read_data().try_into() {
-        //returns mouse id 0
-        read_data();
-        return Ok(());
-    }
-    Err("failed to reset mouse")
-}
-/// reset the keyboard
-pub fn reset_keyboard() -> Result<(), &'static str> {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))?; 
-    if let Ok(SelfTestPassed) = read_data().try_into() {
-        return Ok(())
-    }
-    Err("failed to reset keyboard")
-}
-
-/// resend the most recent packet again
-#[allow(dead_code)]
-fn mouse_resend() -> Result<(), &'static str> {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(HostToMouseCommand::ResendByte))
-        .map_err(|_| "failed to resend mouse request")
-}
-
-/// enable the packet streaming
-fn enable_mouse_packet_streaming() -> Result<(), &'static str> {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(EnableDataReporting)).map_err(|_| {
-        "failed to enable mouse streaming"
-    })
-}
-
-/// disable the packet streaming
-fn disable_mouse_packet_streaming() -> Result<(), &'static str> {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(DisableDataReporting)).map_err(|_| {
-        "failed to disable mouse streaming"
-    })
-}
-
 #[derive(Clone)]
 pub enum MouseResolution {
     Count1PerMm = 0,
@@ -751,62 +903,9 @@ pub enum MouseResolution {
     Count8PerMm = 3
 }
 
-/// set the resolution of the mouse
-#[allow(dead_code)]
-fn mouse_resolution(value: MouseResolution) -> Result<(), &'static str> {
-    command_to_mouse(HostToMouseCommandOrData::MouseCommand(SetResolution))
-        .and_then(|_| command_to_mouse(HostToMouseCommandOrData::MouseResolution(value)))
-        .map_err(|_| "failed to set the mouse resolution")
-}
-
-/// set LED status of the keyboard
-pub fn set_keyboard_led(value: LEDState) -> Result<(), &'static str> {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
-        .and_then(|_| command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
-        .map_err(|_| "failed to set the keyboard led")
-}
-
-/// set the scancode set of the keyboard
-pub fn keyboard_scancode_set(value: ScancodeSet) -> Result<(), &'static str> {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
-        .and_then(|_| command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
-        .map_err(|_| "failed to set the keyboard scancode set")
-}
-
-//NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
+// NOTE: could be combined into a PS2DeviceType enum, see https://wiki.osdev.org/%228042%22_PS/2_Controller#Detecting_PS.2F2_Device_Types
 pub enum KeyboardType {
     MF2Keyboard,
     MF2KeyboardWithPSControllerTranslator,
     AncientATKeyboard,
-}
-
-/// detect the [KeyboardType]
-/// 
-/// Note:
-/// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but [read_data] always returns a byte.
-/// This means [read_data] would return 0x00 here, even though the value is already reserved for the device type "Standard PS/2 mouse".
-/// As we only care about detecting keyboard types here, it should work.
-pub fn keyboard_detect() -> Result<KeyboardType, &'static str> {
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))?;
-
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))?; 
-
-    let keyboard_type = match read_data() {
-        0x00 => Ok(KeyboardType::AncientATKeyboard),
-        0xAB => {
-            match read_data() {
-                0x41 | 0xC1 => Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
-                0x83 => Ok(KeyboardType::MF2Keyboard),
-                _ => Err("unrecognized keyboard type")
-            }
-        }
-        _ => Err("unrecognized keyboard type")
-    };
-    command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(EnableScanning))?;
-    keyboard_type
-}
-
-/// reads a Scancode (for now an untyped u8)
-pub fn read_scancode() -> u8 {
-    read_data()
 }
