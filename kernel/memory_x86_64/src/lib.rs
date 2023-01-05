@@ -59,7 +59,10 @@ pub struct AggregatedSectionMemoryBounds {
 ///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections 
 ///    that share the same page table mapping flags and can thus be logically combined.
 ///  * The list of all individual sections found. 
-pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
+pub fn find_section_memory_bounds<F>(boot_info: &impl BootInformation, translate: F) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str>
+where
+    F: Fn(VirtualAddress) -> Option<PhysicalAddress>,
+{
     let mut index = 0;
     let mut text_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut text_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
@@ -87,24 +90,16 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.len());
         let flags = convert_to_pte_flags(&section);
 
-        // even though the linker stipulates that the kernel sections have a higher-half virtual address,
-        // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
-        // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
-        // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-        let mut start_phys_addr = section.start().value();
-        if start_phys_addr >= KERNEL_OFFSET {
-            // true for all sections but the first section (inittext)
-            start_phys_addr -= KERNEL_OFFSET;
-        }
+        let mut start_virt_addr = VirtualAddress::new(section.start().value())
+            .ok_or("section had invalid starting virtual address")?;
+        let start_phys_addr = translate(start_virt_addr)
+            .ok_or("couldn't translate section's starting virtual address")?;
 
-        let mut start_virt_addr = section.start().value();
-        if start_virt_addr < KERNEL_OFFSET {
+        if start_virt_addr.value() < KERNEL_OFFSET {
             // special case to handle the first section only
             start_virt_addr += KERNEL_OFFSET;
         }
 
-        let start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or("section had invalid starting physical address")?;
-        let start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or("section had invalid ending physical address")?;
         let end_virt_addr = start_virt_addr + section.len();
         let end_phys_addr = start_phys_addr + section.len();
 

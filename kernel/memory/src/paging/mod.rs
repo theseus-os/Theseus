@@ -212,13 +212,13 @@ pub fn init(
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
 
-    let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)?;
-    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
-    
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current()
         .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;
     debug!("Bootstrapped initial {:?}", page_table);
+
+    let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info, |virtual_address| page_table.translate(virtual_address))?;
+    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
 
     let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
