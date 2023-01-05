@@ -34,6 +34,8 @@ static TITLE_BAR_HEIGHT: usize = 20;
 static SCREEN_WIDTH: usize = 1024;
 static SCREEN_HEIGHT: usize = 768;
 
+// We could do some fancy stuff with this like a trait, that can convert rgb to hex
+// hex to rgb hsl etc, but for now it feels like bikeshedding
 type Color = u32;
 static DEFAULT_BORDER_COLOR: Color = 0x141414;
 static DEFAULT_TEXT_COLOR: Color = 0xFBF1C7;
@@ -94,7 +96,17 @@ pub fn display_window_title(window: &mut Window, fg_color: Color, bg_color: Colo
         let slice = title.as_str();
         let border = window.title_border();
         let title_pos = window.title_pos(&slice.len());
-        print_string(window, border.width,border.height, &title_pos, slice, fg_color, bg_color, 0, 0);
+        print_string(
+            window,
+            border.width,
+            border.height,
+            &title_pos,
+            slice,
+            fg_color,
+            bg_color,
+            0,
+            0,
+        );
     }
 }
 
@@ -227,12 +239,12 @@ impl RelativePos {
         Self { x, y }
     }
 
-    pub fn to_1d_pos(&self,target_stride: u32) -> usize{
+    pub fn to_1d_pos(&self, target_stride: u32) -> usize {
         ((target_stride * self.y) + self.x) as usize
     }
 }
 
-/// Position that is relative to the screen 
+/// Position that is relative to the screen
 pub struct ScreenPos {
     pub x: i32,
     pub y: i32,
@@ -243,7 +255,7 @@ impl ScreenPos {
         Self { x, y }
     }
 
-    pub fn to_1d_pos(&self) -> usize{
+    pub fn to_1d_pos(&self) -> usize {
         ((SCREEN_WIDTH as i32 * self.y) + self.x) as usize
     }
 }
@@ -362,7 +374,8 @@ impl VirtualFrameBuffer {
         let window_stride = window.frame_buffer.width as usize;
 
         // FIXME: Handle errors with error types
-        let screen_rows = FramebufferRowChunks::new(&mut self.buffer, window_screen, self.width).unwrap();
+        let screen_rows =
+            FramebufferRowChunks::new(&mut self.buffer, window_screen, self.width).unwrap();
         // To handle rendering when the window is partially outside the screen we use relative version of visible rect
         let relative_visible_rect = window.relative_visible_rect();
 
@@ -375,7 +388,6 @@ impl VirtualFrameBuffer {
         for (screen_row, window_row) in screen_rows.zip(window_rows) {
             screen_row.copy_from_slice(window_row);
         }
-
     }
 
     fn draw_unchecked(&mut self, x: isize, y: isize, col: Color) {
@@ -396,6 +408,7 @@ impl VirtualFrameBuffer {
 pub struct PhysicalFrameBuffer {
     width: usize,
     height: usize,
+    stride: usize,
     buffer: BorrowedSliceMappedPages<u32, Mutable>,
 }
 impl PhysicalFrameBuffer {
@@ -408,10 +421,13 @@ impl PhysicalFrameBuffer {
             PhysicalAddress::new(graphic_info.physical_address() as usize).ok_or("Invalid address");
         let buffer_width = graphic_info.width() as usize;
         let buffer_height = graphic_info.height() as usize;
+        // We are assuming a pixel is 4 bytes big
+        let stride = graphic_info.bytes_per_scanline() / 4;
 
         let framebuffer = PhysicalFrameBuffer::new(
             buffer_width,
             buffer_height,
+            stride as usize,
             vesa_display_phys_start.unwrap(),
         )?;
         Ok(framebuffer)
@@ -420,6 +436,7 @@ impl PhysicalFrameBuffer {
     pub fn new(
         width: usize,
         height: usize,
+        stride: usize,
         physical_address: PhysicalAddress,
     ) -> Result<PhysicalFrameBuffer, &'static str> {
         let kernel_mmi_ref =
@@ -461,6 +478,7 @@ impl PhysicalFrameBuffer {
         Ok(PhysicalFrameBuffer {
             width,
             height,
+            stride,
             buffer: mapped_framebuffer
                 .into_borrowed_slice_mut(0, width * height)
                 .map_err(|(_mp, s)| s)?,
@@ -501,7 +519,8 @@ impl<'a, T: 'a> FramebufferRowChunks<'a, T> {
 
     fn calculate_next_row(&mut self) {
         self.row_index_beg = (self.stride * self.current_column) + self.rect.x as usize;
-        self.row_index_end = (self.stride * self.current_column) + self.rect.x_plus_width() as usize;
+        self.row_index_end =
+            (self.stride * self.current_column) + self.rect.x_plus_width() as usize;
     }
 }
 
@@ -604,8 +623,9 @@ impl WindowManager {
 
     fn draw_windows(&mut self) {
         for order in self.window_rendering_order.iter() {
-            self.v_framebuffer
-                .copy_windows_into_main_vbuffer(&mut self.windows[*order].upgrade().unwrap().lock());
+            self.v_framebuffer.copy_windows_into_main_vbuffer(
+                &mut self.windows[*order].upgrade().unwrap().lock(),
+            );
         }
         for window in self.windows.iter() {
             window.upgrade().unwrap().lock().blank();
@@ -693,22 +713,22 @@ impl WindowManager {
 
                     //handle left
                     if (new_pos.x + (window_rect.width as i32 - 20)) < 0 {
-                        new_pos.x = window_rect.x as i32;
+                        new_pos.x = -(window_rect.width as i32 - 20);
                     }
 
                     //handle right
                     if (new_pos.x + 20) > self.v_framebuffer.width as i32 {
-                        new_pos.x = window_rect.x as i32;
+                        new_pos.x = SCREEN_WIDTH as i32 - 20
                     }
 
                     //handle top
                     if new_pos.y < 0 {
-                        new_pos.y = window_rect.y as i32;
+                        new_pos.y = 0
                     }
 
                     // handle bottom
                     if new_pos.y + 20 > self.v_framebuffer.height as i32 {
-                        new_pos.y = window_rect.y as i32;
+                        new_pos.y = (SCREEN_HEIGHT - 20) as i32;
                     }
 
                     window.upgrade().unwrap().lock().set_screen_pos(&new_pos);
@@ -957,6 +977,8 @@ fn port_loop(
         .ok_or("couldn't get HPET timer")?
         .get_counter();
     let hpet_freq = hpet.as_ref().ok_or("ss")?.counter_period_femtoseconds() as u64;
+    let mut counter = 0;
+    let mut total_time = 0;
 
     loop {
         let end = hpet
@@ -1019,6 +1041,13 @@ fn port_loop(
             window_3.lock().draw_rectangle(DEFAULT_WINDOW_COLOR);
             window_manager.lock().update();
             window_manager.lock().render();
+            if counter == 1000 {
+                log::info!("time {}", total_time / counter);
+                counter = 0;
+                total_time = 0;
+            }
+            counter += 1;
+            total_time += diff;
 
             start = hpet.as_ref().unwrap().get_counter();
         }
