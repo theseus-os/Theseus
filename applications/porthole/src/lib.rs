@@ -34,8 +34,6 @@ static TITLE_BAR_HEIGHT: usize = 20;
 static SCREEN_WIDTH: usize = 1024;
 static SCREEN_HEIGHT: usize = 768;
 
-// We could do some fancy stuff with this like a trait, that can convert rgb to hex
-// hex to rgb hsl etc, but for now it feels like bikeshedding
 type Color = u32;
 static DEFAULT_BORDER_COLOR: Color = 0x141414;
 static DEFAULT_TEXT_COLOR: Color = 0xFBF1C7;
@@ -402,7 +400,7 @@ pub struct PhysicalFrameBuffer {
 }
 impl PhysicalFrameBuffer {
     fn init_front_buffer() -> Result<PhysicalFrameBuffer, &'static str> {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
+        let graphic_info = multicore_bringup::get_graphic_info().unwrap();
         if graphic_info.physical_address() == 0 {
             return Err("wrong physical address for porthole");
         }
