@@ -118,10 +118,13 @@ impl PageTable {
         })
     }
 
-    /// Temporarily maps the given other `PageTable` to the recursive entry (510th entry) 
-    /// so that the given closure `f` can set up new mappings on the new `other_table` without actually switching to it yet.
-    /// Accepts a closure `f` that is passed  a `Mapper`, such that it can set up new mappings on the other table.
-    /// Consumes the given `temporary_page` and automatically unmaps it afterwards. 
+    /// Temporarily maps the given other `PageTable` to the temporary recursive
+    /// index (508th entry)
+    ///
+    /// Accepts a closure `f` that is passed a mutable reference to the other
+    /// table's mapper, and an immutable reference to the current table's
+    /// mapper.
+    ///
     /// # Note
     /// This does not perform any task switching or changing of the current page table register (e.g., cr3).
     pub fn with<F>(
