@@ -1,5 +1,5 @@
 use crate::ElfSectionFlags;
-use core::{iter::Iterator, ops::Range};
+use core::iter::{Iterator, Peekable};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
 use uefi_bootloader_api;
@@ -14,7 +14,7 @@ pub const STACK_SIZE: usize = (KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE;
 const MODULES_MEMORY_KIND: uefi_bootloader_api::MemoryRegionKind =
     uefi_bootloader_api::MemoryRegionKind::UnknownUefi(0x80000000);
 
-impl<'a> crate::MemoryRegion for &'a uefi_bootloader_api::MemoryRegion {
+impl crate::MemoryRegion for uefi_bootloader_api::MemoryRegion {
     fn start(&self) -> PhysicalAddress {
         PhysicalAddress::new_canonical(self.start)
     }
@@ -25,6 +25,30 @@ impl<'a> crate::MemoryRegion for &'a uefi_bootloader_api::MemoryRegion {
 
     fn is_usable(&self) -> bool {
         matches!(self.kind, uefi_bootloader_api::MemoryRegionKind::Usable)
+    }
+}
+
+pub struct MemoryRegions<'a> {
+    inner: Peekable<core::slice::Iter<'a, uefi_bootloader_api::MemoryRegion>>,
+}
+
+impl<'a> Iterator for MemoryRegions<'a> {
+    type Item = uefi_bootloader_api::MemoryRegion;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut region = *self.inner.next()?;
+
+        // UEFI often separates contiguous memory into separate memory regions. We
+        // consolidate them to minimise the number of entries in the frame allocator's
+        // reserved and available lists.
+        while let Some(next) = self
+            .inner
+            .next_if(|next| region.kind == next.kind && (region.start + region.len) == next.start)
+        {
+            region.len += next.len;
+        }
+
+        Some(region)
     }
 }
 
@@ -94,8 +118,8 @@ impl Iterator for Modules {
 }
 
 impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
-    type MemoryRegion<'a> = &'a uefi_bootloader_api::MemoryRegion;
-    type MemoryRegions<'a> = core::slice::Iter<'a, uefi_bootloader_api::MemoryRegion>;
+    type MemoryRegion<'a> = uefi_bootloader_api::MemoryRegion;
+    type MemoryRegions<'a> = MemoryRegions<'a>;
 
     type ElfSection<'a> = &'a uefi_bootloader_api::ElfSection;
     type ElfSections<'a> = core::slice::Iter<'a, uefi_bootloader_api::ElfSection>;
@@ -114,7 +138,9 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
     }
 
     fn memory_regions(&self) -> Result<Self::MemoryRegions<'_>, &'static str> {
-        Ok(self.memory_regions.iter())
+        Ok(MemoryRegions {
+            inner: self.memory_regions.iter().peekable(),
+        })
     }
 
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str> {
