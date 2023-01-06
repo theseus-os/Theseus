@@ -750,9 +750,6 @@ impl WindowManager {
                     }
 
                     window.upgrade().unwrap().lock().set_screen_pos(&new_pos);
-                    log::info!("mouse pos is {:?}", self.mouse);
-                    let window_rect = window.upgrade().unwrap().lock().rect;
-                    log::info!("window rect is {:?}", &window_rect);
                 }
             }
         // FIXME: Resizing is broken if windows are on top of each other
