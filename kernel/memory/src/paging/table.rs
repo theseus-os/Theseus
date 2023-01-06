@@ -34,7 +34,7 @@ pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _;
 /// NOTE: this must be kept in sync with the recursive index in `kernel_config/memory.rs`.
 ///
 /// All four table indexes need to be set to 0o772 so that `Table::next_table_address` works properly.
-pub const TEMP_P4: *mut Table<Level4> = 0o177777_772_772_772_772_0000 as *mut _; 
+pub const TEMP_P4: *mut Table<Level4> = 0o177777_774_774_774_774_0000 as *mut _; 
 
 #[derive(FromBytes)]
 pub struct Table<L: TableLevel> {
