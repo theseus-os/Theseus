@@ -45,7 +45,7 @@ pub const RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
 /// Value: 509. The 509th entry is used for the kernel heap
 pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
 // Value: 508. The 508th entry is used as a temporary recursive entry when mapping a new page table.
-pub const TEMPORARY_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 6;
+pub const TEMPORARY_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
 
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
