@@ -572,6 +572,19 @@ pub enum Holding {
     Window(usize),
 }
 
+impl Holding {
+    fn nothing(&self) -> bool {
+        *self == Holding::Nothing
+    }
+
+    fn backgrond(&self) -> bool {
+        *self == Holding::Background
+    }
+
+    fn window(&self) -> bool {
+        !self.nothing() && !self.backgrond()
+    }
+}
 pub struct WindowManager {
     windows: Vec<Weak<Mutex<Window>>>,
     window_rendering_order: Vec<usize>,
@@ -671,7 +684,7 @@ impl WindowManager {
     fn drag_windows(&mut self, screen_pos: ScreenPos, mouse_event: &MouseEvent) {
         if mouse_event.buttons.left() {
             match self.mouse_holding {
-                Holding::Background => todo!(),
+                Holding::Background => {}
                 Holding::Nothing => {
                     let rendering_o = self.window_rendering_order.clone();
                     for &i in rendering_o.iter().rev() {
@@ -680,7 +693,7 @@ impl WindowManager {
                             .upgrade()
                             .unwrap()
                             .lock()
-                            .dynamic_title_border_pos()
+                            .rect
                             .detect_collision(&self.mouse)
                         {
                             if i != *self.window_rendering_order.last().unwrap() {
@@ -692,11 +705,22 @@ impl WindowManager {
                                 self.window_rendering_order.remove(wind_index);
                                 self.window_rendering_order.push(i);
                             }
-                            // FIXME: Don't hold a window if its behind another window
-                            self.mouse_holding = Holding::Window(i);
+                            if window
+                                .upgrade()
+                                .unwrap()
+                                .lock()
+                                .dynamic_title_border_pos()
+                                .detect_collision(&self.mouse)
+                            {
+                                self.mouse_holding = Holding::Window(i);
+                            }
                             break;
                         }
                         self.mouse_holding = Holding::Nothing;
+                    }
+                    // If couldn't hold onto anything we must have hold onto background
+                    if self.mouse_holding.nothing() {
+                        self.mouse_holding = Holding::Background;
                     }
                 }
                 // TODO: Fix the bug that allows you to move the window while mouse position is still
@@ -726,6 +750,9 @@ impl WindowManager {
                     }
 
                     window.upgrade().unwrap().lock().set_screen_pos(&new_pos);
+                    log::info!("mouse pos is {:?}", self.mouse);
+                    let window_rect = window.upgrade().unwrap().lock().rect;
+                    log::info!("window rect is {:?}", &window_rect);
                 }
             }
         // FIXME: Resizing is broken if windows are on top of each other
