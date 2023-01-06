@@ -384,7 +384,7 @@
 /// Devices include:
 /// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,
 /// * The fully-featured system [`logger`],
-/// * PS2 [`keyboard`] and [`mouse`],
+/// * The legacy PS2 controller and any connected devices: [`keyboard`] and [`mouse`],
 /// * All other devices discovered on the [`pci`] bus.
 </span><span class="kw">pub fn </span>init(key_producer: Queue&lt;Event&gt;, mouse_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;  {
 
@@ -413,9 +413,9 @@
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    <span class="kw">let </span>controller = ps2_controller::init()<span class="question-mark">?</span>;
-    keyboard::init(controller.keyboard_handle(), key_producer)<span class="question-mark">?</span>;
-    mouse::init(controller.mouse_handle(), mouse_producer)<span class="question-mark">?</span>;
+    <span class="kw">let </span>ps2_controller = ps2::init()<span class="question-mark">?</span>;
+    keyboard::init(ps2_controller.keyboard_ref(), key_producer)<span class="question-mark">?</span>;
+    mouse::init(ps2_controller.mouse_ref(), mouse_producer)<span class="question-mark">?</span>;
 
     <span class="comment">// Initialize/scan the PCI bus to discover PCI devices
     </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {

@@ -909,115 +909,236 @@
 <span id="909">909</span>
 <span id="910">910</span>
 <span id="911">911</span>
-</pre><pre class="rust"><code><span class="attr">#![no_std]
+<span id="912">912</span>
+<span id="913">913</span>
+<span id="914">914</span>
+<span id="915">915</span>
+<span id="916">916</span>
+<span id="917">917</span>
+<span id="918">918</span>
+<span id="919">919</span>
+<span id="920">920</span>
+<span id="921">921</span>
+<span id="922">922</span>
+<span id="923">923</span>
+<span id="924">924</span>
+<span id="925">925</span>
+<span id="926">926</span>
+<span id="927">927</span>
+<span id="928">928</span>
+<span id="929">929</span>
+<span id="930">930</span>
+<span id="931">931</span>
+<span id="932">932</span>
+<span id="933">933</span>
+<span id="934">934</span>
+<span id="935">935</span>
+<span id="936">936</span>
+<span id="937">937</span>
+<span id="938">938</span>
+<span id="939">939</span>
+<span id="940">940</span>
+<span id="941">941</span>
+<span id="942">942</span>
+<span id="943">943</span>
+<span id="944">944</span>
+<span id="945">945</span>
+<span id="946">946</span>
+<span id="947">947</span>
+<span id="948">948</span>
+<span id="949">949</span>
+<span id="950">950</span>
+<span id="951">951</span>
+<span id="952">952</span>
+<span id="953">953</span>
+<span id="954">954</span>
+<span id="955">955</span>
+<span id="956">956</span>
+<span id="957">957</span>
+<span id="958">958</span>
+<span id="959">959</span>
+<span id="960">960</span>
+<span id="961">961</span>
+<span id="962">962</span>
+<span id="963">963</span>
+<span id="964">964</span>
+<span id="965">965</span>
+<span id="966">966</span>
+<span id="967">967</span>
+<span id="968">968</span>
+<span id="969">969</span>
+<span id="970">970</span>
+<span id="971">971</span>
+<span id="972">972</span>
+<span id="973">973</span>
+<span id="974">974</span>
+<span id="975">975</span>
+<span id="976">976</span>
+<span id="977">977</span>
+<span id="978">978</span>
+<span id="979">979</span>
+<span id="980">980</span>
+<span id="981">981</span>
+<span id="982">982</span>
+<span id="983">983</span>
+<span id="984">984</span>
+<span id="985">985</span>
+<span id="986">986</span>
+<span id="987">987</span>
+<span id="988">988</span>
+<span id="989">989</span>
+<span id="990">990</span>
+<span id="991">991</span>
+<span id="992">992</span>
+<span id="993">993</span>
+<span id="994">994</span>
+<span id="995">995</span>
+<span id="996">996</span>
+<span id="997">997</span>
+<span id="998">998</span>
+<span id="999">999</span>
+<span id="1000">1000</span>
+<span id="1001">1001</span>
+<span id="1002">1002</span>
+<span id="1003">1003</span>
+<span id="1004">1004</span>
+<span id="1005">1005</span>
+<span id="1006">1006</span>
+<span id="1007">1007</span>
+<span id="1008">1008</span>
+<span id="1009">1009</span>
+<span id="1010">1010</span>
+<span id="1011">1011</span>
+<span id="1012">1012</span>
+<span id="1013">1013</span>
+<span id="1014">1014</span>
+<span id="1015">1015</span>
+<span id="1016">1016</span>
+<span id="1017">1017</span>
+<span id="1018">1018</span>
+<span id="1019">1019</span>
+<span id="1020">1020</span>
+<span id="1021">1021</span>
+<span id="1022">1022</span>
+</pre><pre class="rust"><code><span class="doccomment">//! Driver for the PS/2 interface, which supports legacy keyboard and mouse devices.
+//!
+//! The [`init()`] function sets up the single system-wide [`PS2Controller`],
+//! which can then be used to obtain a reference to a [`PS2Keyboard`] or [`PS2Mouse`].
 
-</span><span class="kw">use </span>log::warn;
+</span><span class="attr">#![no_std]
+
+</span><span class="kw">use </span>log::{debug, warn};
+<span class="kw">use </span>modular_bitfield::{specifiers::{B1, B4, B8}, bitfield, BitfieldSpecifier};
 <span class="kw">use </span>num_enum::TryFromPrimitive;
 <span class="kw">use </span>port_io::Port;
-<span class="kw">use </span>spin::Mutex;
-<span class="kw">use </span>modular_bitfield::{specifiers::{B1, B4, B8}, bitfield, BitfieldSpecifier};
+<span class="kw">use </span>spin::{Mutex, Once};
+<span class="kw">use </span>fadt::Fadt;
 
 <span class="kw">use </span>HostToControllerCommand::<span class="kw-2">*</span>;
 <span class="kw">use </span>HostToKeyboardCommand::<span class="kw-2">*</span>;
 <span class="kw">use </span>HostToMouseCommand::<span class="kw-2">*</span>;
 <span class="kw">use </span>DeviceToHostResponse::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// Port used by PS/2 Controller and devices
-</span><span class="kw">const </span>PS2_DATA_PORT: u16 = <span class="number">0x60</span>;
-<span class="doccomment">/// Port used to send commands to and receive status from the PS/2 Controller
-</span><span class="kw">const </span>PS2_COMMAND_AND_STATUS_PORT: u16 = <span class="number">0x64</span>;
 
-<span class="comment">// https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
-// quite a few of these are commented out because they&#39;re either unused, deprecated or non-standard.
-</span><span class="doccomment">/// Command types which can be sent to the PS/2 Controller
-/// 
-/// Naming perspective: Output means &quot;out of the device into the host&quot;.
-/// e.g. [WriteByteToPort2InputBuffer] means &quot;write byte out of the host into port 2&quot;
-</span><span class="kw">pub enum </span>HostToControllerCommand {
-    <span class="doccomment">/// returns [ControllerConfigurationByte]
-    </span>ReadFromInternalRAMByte0 = <span class="number">0x20</span>,
+<span class="doccomment">/// The system-wide singleton PS/2 Controller.
+</span><span class="kw">static </span>PS2_CONTROLLER: Once&lt;PS2Controller&gt; = Once::new();
+
+
+<span class="doccomment">/// Initializes the PS/2 controller, and the first and second PS/2 ports (if they exist).
+///
+/// We roughly follow the procedure from the [OS dev wiki].
+///
+/// [OS dev wiki]: https://wiki.osdev.org/%228042%22_PS/2_Controller#Initialising_the_PS.2F2_Controller
+</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PS2Controller, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">if </span>PS2_CONTROLLER.is_completed() {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The PS/2 Controller has already been initialized once.&quot;</span>);
+    }
+
+    <span class="comment">// Step 1: Initialise USB Controllers
+    // no USB support yet
+
+    // Step 2: Determine if the PS/2 Controller Exists.
+    // If ACPI, and therefore the FADT, is unsupported, the PS/2 controller is assumed to exist.
+    </span><span class="kw">let </span>acpi_tables = acpi::get_acpi_tables().lock();
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(fadt) = Fadt::get(<span class="kw-2">&amp;</span>acpi_tables) {
+        <span class="comment">// If earlier than ACPI v2, the PS/2 controller is assumed to exist
+        </span><span class="kw">if </span>fadt.header.revision &gt; <span class="number">1 </span>{
+            <span class="kw">let </span>has_controller = fadt.iapc_boot_architecture_flags &amp; <span class="number">0b10 </span>== <span class="number">0b10</span>;
+            <span class="kw">if </span>!has_controller {
+                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no PS/2 Controller present&quot;</span>);
+            }
+        }
+    }
+
+    <span class="comment">// Here: the PS/2 Controller exists, so create the object representing it.
+    </span><span class="kw">let </span>controller = PS2Controller {
+        data_port: Mutex::new(Port::new(PS2Controller::PS2_DATA_PORT)),
+        command_and_status_port: Mutex::new(Port::new(PS2Controller::PS2_COMMAND_AND_STATUS_PORT))
+    };
+
+    <span class="comment">// Step 3: Disable Devices
+    </span>controller.write_command(DisablePort1);
+    controller.write_command(DisablePort2);
+
+    <span class="comment">// Step 4: Flush The Output Buffer
+    </span>controller.flush_output_buffer();
+
+    <span class="comment">// Step 5: Set the Controller Configuration Byte
+    </span><span class="kw">let </span><span class="kw-2">mut </span>config = controller.read_config();
+    config.set_port1_interrupt_enabled(<span class="bool-val">false</span>);
+    config.set_port2_interrupt_enabled(<span class="bool-val">false</span>);
+    config.set_port1_scancode_translation_enabled(<span class="bool-val">false</span>);
+    <span class="kw">let </span>has_mouse = config.port2_clock_disabled();
+    controller.write_config(config);
+
+    <span class="comment">// Step 6: Perform Controller Self Test
+    </span>controller.test()<span class="question-mark">?</span>;
+    <span class="macro">debug!</span>(<span class="string">&quot;passed PS/2 controller test&quot;</span>);
+    <span class="comment">// as this can reset the controller on some hardware, we restore the config
+    </span>controller.write_config(config);
+
+    <span class="comment">// Step 7: Determine If There Are 2 Channels
+    // not needed, already done above
+
+    // Step 8: Perform Interface Tests
+    </span><span class="kw">let </span>port_1_works = controller.test_port1().is_ok();
+    <span class="kw">let </span>port_2_works = <span class="kw">if </span>has_mouse {
+        controller.test_port2().is_ok()
+    } <span class="kw">else </span>{
+        <span class="macro">warn!</span>(<span class="string">&quot;PS/2 controller is not dual channel, so no mouse available&quot;</span>);
+        <span class="bool-val">false
+    </span>};
+    <span class="kw">if </span>!port_1_works &amp;&amp; !port_2_works {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;failed both PS/2 port tests, terminating PS/2 controller driver&quot;</span>);
+    }
+
+    <span class="comment">// Step 9: Enable Devices
+    </span><span class="kw">if </span>port_1_works {
+        <span class="macro">debug!</span>(<span class="string">&quot;passed PS/2 port 1 test&quot;</span>);
+        controller.write_command(EnablePort1);
+        config.set_port1_clock_disabled(<span class="bool-val">false</span>);
+        config.set_port1_interrupt_enabled(<span class="bool-val">true</span>);
+    }
+    <span class="kw">if </span>port_2_works {
+        <span class="macro">debug!</span>(<span class="string">&quot;passed PS/2 port 2 test&quot;</span>);
+        controller.write_command(EnablePort2);
+        config.set_port2_clock_disabled(<span class="bool-val">false</span>);
+        config.set_port2_interrupt_enabled(<span class="bool-val">true</span>);
+    }
+    controller.write_config(config);
+
+    <span class="comment">// Step 10: Reset Devices
+    </span>controller.keyboard_ref().reset()<span class="question-mark">?</span>;
+    controller.mouse_ref().reset()<span class="question-mark">?</span>;
+
+    <span class="macro">debug!</span>(<span class="string">&quot;Final PS/2 {:?}&quot;</span>, controller.read_config());
     
-    <span class="comment">// return is non-standard
-    // /// 0x21-0x3F; N is the command byte &amp; 0x1F
-    // ReadFromInternalRAMByteN = 0x21,
+    <span class="prelude-val">Ok</span>(PS2_CONTROLLER.call_once(|| controller))
+}
 
-    </span><span class="doccomment">/// sets [ControllerConfigurationByte]
-    </span>WriteToInternalRAMByte0 = <span class="number">0x60</span>,
-
-    <span class="comment">// usage is non-standard
-    // /// 0x61-0x7F; N is the command byte &amp; 0x1F
-    // WriteToInternalRAMByteN = 0x61,
-
-    // these are all deprecated 
-    // PasswordInstalledTest = 0xA4,
-    // LoadSecurity = 0xA5,
-    // EnableSecurity = 0xA6,
-    
-    </span><span class="doccomment">/// sets [ControllerConfigurationByte] `port2_clock_disabled`
-    /// 
-    /// Note: only if 2 PS/2 ports supported
-    </span>DisablePort2 = <span class="number">0xA7</span>,
-    <span class="doccomment">/// clears [ControllerConfigurationByte] `port2_clock_disabled`
-    /// 
-    /// Note: only if 2 PS/2 ports supported
-    </span>EnablePort2 = <span class="number">0xA8</span>,
-    <span class="doccomment">/// returns [PortTestResult]
-    /// 
-    /// Note: only if 2 PS/2 ports supported
-    </span>TestPort2 = <span class="number">0xA9</span>,
-    <span class="doccomment">/// see [PS2Controller::test]
-    </span>TestController = <span class="number">0xAA</span>,
-    <span class="doccomment">/// returns [PortTestResult]
-    </span>TestPort1 = <span class="number">0xAB</span>,
-
-    <span class="comment">// unused
-    // /// read all bytes of internal RAM
-    // DiagnosticDump = 0xAC,
-
-    </span><span class="doccomment">/// sets [ControllerConfigurationByte] `port1_clock_disabled`
-    </span>DisablePort1 = <span class="number">0xAD</span>,
-    <span class="doccomment">/// clears [ControllerConfigurationByte] `port1_clock_disabled`
-    </span>EnablePort1 = <span class="number">0xAE</span>,
-
-    <span class="comment">// return is non-standard
-    // ReadControllerInputPort = 0xC0,
-
-    // both unused
-    // CopyBits0to3ofInputPortToStatusBits4to7 = 0xC1,
-    // CopyBits4to7ofInputPortToStatusBits4to7 = 0xC2,
-
-    // both unused and therefore not implemented, https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Output_Port
-    // /// returns [ControllerOutputPort]
-    // ReadControllerOutputPort = 0xD0,
-    // /// sets [ControllerOutputPort]
-    // ///
-    // /// Note: Check if the output buffer is empty first
-    // WriteByteToControllerOutputPort = 0xD1,
-
-    // both unused
-    // /// makes it look like the byte written was received from the first PS/2 port
-    // /// 
-    // /// Note: only if 2 PS/2 ports supported
-    // WriteByteToPort1OutputBuffer = 0xD2,
-    // /// makes it look like the byte written was received from the second PS/2 port
-    // /// 
-    // /// Note: only if 2 PS/2 ports supported
-    // WriteByteToPort2OutputBuffer = 0xD3,
-
-    </span><span class="doccomment">/// sends next byte to the second PS/2 port
-    /// 
-    /// Note: only if 2 PS/2 ports supported
-    </span>WriteByteToPort2InputBuffer = <span class="number">0xD4</span>,
-
-    <span class="comment">// both unused
-    // ReadTestInputs = 0xE0,
-    // /// 0xF0-0xFF; Bits 0 to 3 correspond to 4 different output lines and are used as a mask:
-    // /// 0 = pulse line, 1 = don&#39;t pulse line; Bit 0 corresponds to the &quot;reset&quot; line.
-    // /// The other output lines don&#39;t have a standard/defined purpose.
-    // PulseOutputLineLowFor6ms = 0xF0,
-</span>}
-
-<span class="kw">pub struct </span>PS2Controller {
+<span class="doccomment">/// An initialized PS/2 controller that can be used to communicate with
+/// legacy PS/2 keyboard and mouse devices.
+</span><span class="kw">pub struct </span>PS2Controller {
     <span class="doccomment">/// at 0x60
     </span>data_port: Mutex&lt;Port&lt;u8&gt;&gt;,
     <span class="doccomment">/// at 0x64
@@ -1025,55 +1146,49 @@
 }
 
 <span class="kw">impl </span>PS2Controller {
-    <span class="doccomment">/// Constructs a new PS2 Controller.
-    ///
-    /// # Safety
-    /// 
-    /// Must only be called once.
-    </span><span class="kw">pub const unsafe fn </span>new() -&gt; <span class="self">Self </span>{
-        <span class="self">Self </span>{
-            data_port: Mutex::new(Port::new(PS2_DATA_PORT)),
-            command_and_status_port: Mutex::new(Port::new(PS2_COMMAND_AND_STATUS_PORT))
-        }
-    }
+    <span class="doccomment">/// Port used to transmit data to and from the PS/2 Controller and its devices.
+    </span><span class="kw">const </span>PS2_DATA_PORT: u16 = <span class="number">0x60</span>;
+    <span class="doccomment">/// Port used to send commands to and receive status from the PS/2 Controller.
+    </span><span class="kw">const </span>PS2_COMMAND_AND_STATUS_PORT: u16 = <span class="number">0x64</span>;
 
-    <span class="doccomment">/// Get a handle to the keyboard.
-    /// 
+    <span class="doccomment">/// Returns a reference to the keyboard attached to this PS/2 controller.
+    ///
     /// The keyboard only uses the data port.
-    </span><span class="kw">pub fn </span>keyboard_handle(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Keyboard {
+    </span><span class="kw">pub fn </span>keyboard_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Keyboard {
         PS2Keyboard::new(<span class="self">self</span>)
     }
 
-    <span class="doccomment">/// Get a handle to the keyboard.
-    /// 
+    <span class="doccomment">/// Returns a reference to the mouse attached to this PS/2 controller.
+    ///
     /// The mouse uses both the data port and the command/status port.
-    </span><span class="kw">pub fn </span>mouse_handle(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Mouse {
+    </span><span class="kw">pub fn </span>mouse_ref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PS2Mouse {
         PS2Mouse::new(<span class="self">self</span>)
     }
 
-    <span class="doccomment">/// Write a command to the PS/2 command port/register
-    /// 
-    /// Note: Devices attached to the controller should be disabled
-    /// before sending commands that return data, otherwise the output buffer could get overwritten
+    <span class="doccomment">/// Writes a command to the PS/2 command port.
+    ///
+    /// ## Usage Note
+    /// Devices attached to the controller should be disabled *before* writing
+    /// a command that returns data, otherwise the output buffer may get overwritten.
     </span><span class="kw">pub fn </span>write_command(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToControllerCommand) {
         <span class="kw">unsafe </span>{
             <span class="self">self</span>.command_and_status_port.lock().write(value <span class="kw">as </span>u8);
         }
     }
 
-    <span class="doccomment">/// read the config of the PS/2 port
+    <span class="doccomment">/// Reads and returns the current config value from the PS/2 controller.
     </span><span class="kw">pub fn </span>read_config(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ControllerConfigurationByte {
         <span class="self">self</span>.write_command(ReadFromInternalRAMByte0);
         ControllerConfigurationByte::from_bytes([<span class="self">self</span>.read_data()])
     }
     
-    <span class="doccomment">/// write the new config to the PS/2 command port (0x64)
+    <span class="doccomment">/// Writes the given config `value` to the PS/2 controller.
     </span><span class="kw">pub fn </span>write_config(<span class="kw-2">&amp;</span><span class="self">self</span>, value: ControllerConfigurationByte) {
         <span class="self">self</span>.write_command(WriteToInternalRAMByte0);
         <span class="self">self</span>.write_data(WritableData::Configuration(value));
     }
 
-    <span class="doccomment">/// Read the PS/2 status port/register
+    <span class="doccomment">/// Reads the PS/2 status port.
     </span><span class="kw">pub fn </span>status_register(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ControllerToHostStatus {
         ControllerToHostStatus::from_bytes([<span class="self">self</span>.command_and_status_port.lock().read()])
     }
@@ -1085,8 +1200,8 @@
 
     <span class="kw">pub fn </span>test(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.write_command(TestController);
-        <span class="self">self</span>.read_controller_test_result() <span class="comment">//TODO: bad naming
-    </span>}
+        <span class="self">self</span>.read_controller_test_result()
+    }
 
     <span class="kw">pub fn </span>test_port1(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.write_command(TestPort1);
@@ -1108,10 +1223,10 @@
         <span class="kw">use </span>PortTestResult::<span class="kw-2">*</span>;
         <span class="kw">match </span><span class="self">self</span>.read_port_test_result()<span class="question-mark">? </span>{
             Passed =&gt; <span class="prelude-val">Ok</span>(()),
-            ClockLineStuckLow =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;clock line stuck low&quot;</span>),
+            ClockLineStuckLow  =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;clock line stuck low&quot;</span>),
             ClockLineStuckHigh =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;clock line stuck high&quot;</span>),
-            DataLineStuckLow =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;data line stuck low&quot;</span>),
-            DataLineStuckHigh =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;data line stuck high&quot;</span>),
+            DataLineStuckLow   =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;data line stuck low&quot;</span>),
+            DataLineStuckHigh  =&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;data line stuck high&quot;</span>),
         }
     }
 
@@ -1166,7 +1281,7 @@
     }
 
     <span class="doccomment">/// Read data from the PS/2 data port.
-    /// 
+    ///
     /// Note: this can be called directly when within a PS/2 device&#39;s interrupt handler.
     /// If polling is used (e.g. in a device&#39;s init function), [ControllerToHostStatus] `output_buffer_full` needs to be checked first.
     </span><span class="kw">fn </span>read_data(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
@@ -1174,7 +1289,7 @@
     }
 
     <span class="doccomment">/// Write data to the PS/2 data port.
-    /// 
+    ///
     /// Note: when writing to the PS/2 controller, it might be necessary to check for
     /// [ControllerToHostStatus] `!input_buffer_full` first.
     </span><span class="kw">fn </span>write_data(<span class="kw-2">&amp;</span><span class="self">self</span>, value: WritableData) {
@@ -1182,19 +1297,21 @@
     }
 }
 
-<span class="kw">pub struct </span>PS2Mouse&lt;<span class="lifetime">&#39;c</span>&gt; {
+<span class="doccomment">/// A reference to the PS/2 Mouse connected to the PS/2 Controller.
+</span><span class="kw">pub struct </span>PS2Mouse&lt;<span class="lifetime">&#39;c</span>&gt; {
     controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller,
     id: MouseId
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;c</span>&gt; PS2Mouse&lt;<span class="lifetime">&#39;c</span>&gt; {
-    <span class="doccomment">/// Give a controller reference to the mouse.
+    <span class="doccomment">/// Create a new reference to the mouse connected to the given PS2 controller.
+    ///
     /// The default mouse id of PS/2 is zero.
     </span><span class="kw">pub fn </span>new(controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ controller, id: MouseId::Zero }
     }
 
-    <span class="doccomment">/// reset the mouse
+    <span class="doccomment">/// Reset the mouse.
     </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(Reset))<span class="question-mark">?</span>; 
         <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = <span class="self">self</span>.controller.read_data().try_into() {
@@ -1209,7 +1326,7 @@
     </span><span class="kw">fn </span>command_to_mouse(<span class="kw-2">&amp;</span><span class="self">self</span>, value: HostToMouseCommandOrData) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.controller.write_command(WriteByteToPort2InputBuffer);
         <span class="kw">const </span>RETRIES: u8 = <span class="number">3</span>;
-        <span class="kw">for _ in </span><span class="number">0</span>..=RETRIES {
+        <span class="kw">for _ in </span><span class="number">0 </span>..= RETRIES {
             <span class="kw">return match </span><span class="self">self</span>.controller.polling_send_receive(HostToDevice::Mouse(value.clone()))<span class="question-mark">? </span>{
                 Acknowledge =&gt; <span class="prelude-val">Ok</span>(()),
                 ResendCommand =&gt; <span class="kw">continue</span>,
@@ -1220,7 +1337,7 @@
     }
 
     <span class="doccomment">/// set PS/2 mouse&#39;s sampling rate
-    </span><span class="kw">fn </span>set_mouse_sampling_rate(<span class="kw-2">&amp;</span><span class="self">self</span>, value: SampleRate) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">fn </span>set_mouse_sampling_rate(<span class="kw-2">&amp;</span><span class="self">self</span>, value: MouseSampleRate) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(SampleRate))
             .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::SampleRate(value)))
             .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the mouse sampling rate&quot;</span>)
@@ -1230,7 +1347,7 @@
     </span><span class="kw">pub fn </span>set_mouse_id(<span class="kw-2">&amp;mut </span><span class="self">self</span>, id: MouseId) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.disable_mouse_packet_streaming()<span class="question-mark">?</span>;
 
-        <span class="kw">use </span><span class="kw">crate</span>::SampleRate::<span class="kw-2">*</span>;
+        <span class="kw">use </span><span class="kw">crate</span>::MouseSampleRate::<span class="kw-2">*</span>;
         <span class="kw">match </span>id {
             MouseId::Zero =&gt; { <span class="comment">/* do nothing */ </span>}
             MouseId::Three =&gt; {
@@ -1256,7 +1373,10 @@
         <span class="self">self</span>.disable_mouse_packet_streaming()<span class="question-mark">?</span>;
 
         <span class="self">self</span>.command_to_mouse(HostToMouseCommandOrData::MouseCommand(GetDeviceID))<span class="question-mark">?</span>;
-        <span class="kw">let </span>id = <span class="self">self</span>.controller.read_data().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to get mouse id: bad response&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>id = <span class="self">self</span>.controller
+            .read_data()
+            .try_into()
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to get mouse id: bad response&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="self">self</span>.enable_mouse_packet_streaming()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(id)
@@ -1313,22 +1433,25 @@
         }
     }
 
-    <span class="doccomment">/// read the PS2Controller&#39;s status register to find out if the mouse output buffer is full, i.e. can be read
+    <span class="doccomment">/// Returns `true` if there is content in the PS/2 Mouse&#39;s output buffer
+    /// that can be read from.
     </span><span class="kw">pub fn </span>is_output_buffer_full(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.controller.status_register().mouse_output_buffer_full()
     }
 }
 
-<span class="kw">pub struct </span>PS2Keyboard&lt;<span class="lifetime">&#39;c</span>&gt; {
+<span class="doccomment">/// A reference to the PS/2 Keyboard connected to the PS/2 Controller.
+</span><span class="kw">pub struct </span>PS2Keyboard&lt;<span class="lifetime">&#39;c</span>&gt; {
     controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;c</span>&gt; PS2Keyboard&lt;<span class="lifetime">&#39;c</span>&gt; {
-    <span class="kw">pub fn </span>new(controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Create a new reference to the keyboard connected to the given PS2 controller.
+    </span><span class="kw">pub fn </span>new(controller: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>PS2Controller) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ controller }
     }
     
-    <span class="doccomment">/// reset the keyboard
+    <span class="doccomment">/// Reset the keyboard.
     </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))<span class="question-mark">?</span>; 
         <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = <span class="self">self</span>.controller.read_data().try_into() {
@@ -1350,22 +1473,22 @@
         <span class="prelude-val">Err</span>(<span class="string">&quot;keyboard doesn&#39;t support the command or there has been a hardware failure&quot;</span>)
     }
 
-    <span class="doccomment">/// set LED status of the keyboard
+    <span class="doccomment">/// Set the status LEDs on the keyboard.
     </span><span class="kw">pub fn </span>set_keyboard_led(<span class="kw-2">&amp;</span><span class="self">self</span>, value: LEDState) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetLEDStatus))
             .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::LEDState(value)))
             .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the keyboard led&quot;</span>)
     }
 
-    <span class="doccomment">/// set the scancode set of the keyboard
+    <span class="doccomment">/// Set the active scancode set currently used by the keyboard.
     </span><span class="kw">pub fn </span>keyboard_scancode_set(<span class="kw-2">&amp;</span><span class="self">self</span>, value: ScancodeSet) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(SetScancodeSet))
             .and_then(|<span class="kw">_</span>| <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::ScancodeSet(value)))
             .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to set the keyboard scancode set&quot;</span>)
     }
 
-    <span class="doccomment">/// detect the [KeyboardType]
-    /// 
+    <span class="doccomment">/// Detect the [KeyboardType].
+    ///
     /// Note:
     /// On the identify command, [KeyboardType::AncientATKeyboard] usually returns no bytes at all, but `PS2Controller::read_data` always returns a byte.
     /// This means `PS2Controller::read_data` would return 0x00 here, even though the value is already reserved for the device type &quot;Standard PS/2 mouse&quot;.
@@ -1390,27 +1513,122 @@
         keyboard_type
     }
 
-    <span class="doccomment">/// reads a Scancode (for now an untyped u8)
+    <span class="doccomment">/// Reads a raw scancode value from the PS/2 controller&#39;s data port.
     </span><span class="kw">pub fn </span>read_scancode(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
         <span class="self">self</span>.controller.read_data()
     }
 }
 
+
+<span class="comment">// https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Commands
+// quite a few of these are commented out because they&#39;re either unused, deprecated or non-standard.
+</span><span class="doccomment">/// Commands that can be sent to the PS/2 Controller.
+///
+/// The naming convention is device-centric:
+/// * &quot;Output&quot; means sending data &quot;out of the device to the host (CPU)&quot;.
+/// * &quot;Input&quot; means sending data &quot;out of the host (CPU) into the device&quot;.
+///   * Example: [WriteByteToPort2InputBuffer] instructs the host (CPU) to write a byte
+///     into port 2 of the device, so the device receives that byte as input.
+</span><span class="kw">pub enum </span>HostToControllerCommand {
+    <span class="doccomment">/// returns [ControllerConfigurationByte]
+    </span>ReadFromInternalRAMByte0 = <span class="number">0x20</span>,
+    
+    <span class="comment">// return is non-standard
+    // /// 0x21-0x3F; N is the command byte &amp; 0x1F
+    // ReadFromInternalRAMByteN = 0x21,
+
+    </span><span class="doccomment">/// sets [ControllerConfigurationByte]
+    </span>WriteToInternalRAMByte0 = <span class="number">0x60</span>,
+
+    <span class="comment">// usage is non-standard
+    // /// 0x61-0x7F; N is the command byte &amp; 0x1F
+    // WriteToInternalRAMByteN = 0x61,
+
+    // these are all deprecated 
+    // PasswordInstalledTest = 0xA4,
+    // LoadSecurity = 0xA5,
+    // EnableSecurity = 0xA6,
+    
+    </span><span class="doccomment">/// sets [ControllerConfigurationByte] `port2_clock_disabled`
+    ///
+    /// Note: only if 2 PS/2 ports supported
+    </span>DisablePort2 = <span class="number">0xA7</span>,
+    <span class="doccomment">/// clears [ControllerConfigurationByte] `port2_clock_disabled`
+    ///
+    /// Note: only if 2 PS/2 ports supported
+    </span>EnablePort2 = <span class="number">0xA8</span>,
+    <span class="doccomment">/// returns [PortTestResult]
+    ///
+    /// Note: only if 2 PS/2 ports supported
+    </span>TestPort2 = <span class="number">0xA9</span>,
+    <span class="doccomment">/// see [PS2Controller::test]
+    </span>TestController = <span class="number">0xAA</span>,
+    <span class="doccomment">/// returns [PortTestResult]
+    </span>TestPort1 = <span class="number">0xAB</span>,
+
+    <span class="comment">// unused
+    // /// read all bytes of internal RAM
+    // DiagnosticDump = 0xAC,
+
+    </span><span class="doccomment">/// sets [ControllerConfigurationByte] `port1_clock_disabled`
+    </span>DisablePort1 = <span class="number">0xAD</span>,
+    <span class="doccomment">/// clears [ControllerConfigurationByte] `port1_clock_disabled`
+    </span>EnablePort1 = <span class="number">0xAE</span>,
+
+    <span class="comment">// return is non-standard
+    // ReadControllerInputPort = 0xC0,
+
+    // both unused
+    // CopyBits0to3ofInputPortToStatusBits4to7 = 0xC1,
+    // CopyBits4to7ofInputPortToStatusBits4to7 = 0xC2,
+
+    // both unused and therefore not implemented, https://wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Output_Port
+    // /// returns [ControllerOutputPort]
+    // ReadControllerOutputPort = 0xD0,
+    // /// sets [ControllerOutputPort]
+    // ///
+    // /// Note: Check if the output buffer is empty first
+    // WriteByteToControllerOutputPort = 0xD1,
+
+    // both unused
+    // /// makes it look like the byte written was received from the first PS/2 port
+    // ///
+    // /// Note: only if 2 PS/2 ports supported
+    // WriteByteToPort1OutputBuffer = 0xD2,
+    // /// makes it look like the byte written was received from the second PS/2 port
+    // ///
+    // /// Note: only if 2 PS/2 ports supported
+    // WriteByteToPort2OutputBuffer = 0xD3,
+
+    </span><span class="doccomment">/// sends next byte to the second PS/2 port
+    ///
+    /// Note: only if 2 PS/2 ports supported
+    </span>WriteByteToPort2InputBuffer = <span class="number">0xD4</span>,
+
+    <span class="comment">// both unused
+    // ReadTestInputs = 0xE0,
+    // /// 0xF0-0xFF; Bits 0 to 3 correspond to 4 different output lines and are used as a mask:
+    // /// 0 = pulse line, 1 = don&#39;t pulse line; Bit 0 corresponds to the &quot;reset&quot; line.
+    // /// The other output lines don&#39;t have a standard/defined purpose.
+    // PulseOutputLineLowFor6ms = 0xF0,
+</span>}
+
 <span class="comment">// see https://wiki.osdev.org/%228042%22_PS/2_Controller#Status_Register
 // and https://users.utcluj.ro/~baruch/sie/labor/PS2/PS-2_Keyboard_Interface.htm
 </span><span class="attr">#[bitfield(bits = <span class="number">8</span>)]
 </span><span class="kw">pub struct </span>ControllerToHostStatus {
-    <span class="doccomment">/// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from [PS2_DATA_PORT].
+    <span class="doccomment">/// When using [Polling](https://wiki.osdev.org/%228042%22_PS/2_Controller#Polling), must be `true` before attempting to read data from PS/2 data port.
     /// When using [Interrupts](https://wiki.osdev.org/%228042%22_PS/2_Controller#Interrupts), guaranteed to be `true`, because an interrupt only happens if the buffer is full
     /// Alternative name: output_register_full, which might make more sense because it only ever fits 1 byte. &quot;Buffer&quot; sounds like multiple.
     </span>output_buffer_full: bool,
-    <span class="doccomment">/// Must be `false` before attempting to write data to [PS2_DATA_PORT] or [PS2_COMMAND_AND_STATUS_PORT] for 8042 keyboard controller
+    <span class="doccomment">/// Must be `false` before attempting to write data to PS/2 data port or PS/2 command/status port for 8042 keyboard controller
     /// Alternative name: input_register_full, which might make more sense because it only ever fits 1 byte. &quot;Buffer&quot; sounds like multiple.
     </span>input_buffer_full: bool,
     <span class="doccomment">/// Cleared on reset; set when the system passed Power-on self-test
     </span><span class="attr">#[allow(dead_code)]
     </span>system_passed_self_test: bool,
-    <span class="doccomment">/// Input buffer should be written to: 0 - [PS2_DATA_PORT], 1 - [PS2_COMMAND_AND_STATUS_PORT]
+    <span class="doccomment">/// If `0`, the input buffer should be written to the PS/2 data port.
+    /// If `1`, the input buffer should be written to the PS/2 command/status port.
     </span><span class="attr">#[allow(dead_code)]
     </span>input_buffer_is_command: B1,
     <span class="doccomment">/// Whether or not communication is inhibited (via switch) / Unknown (chipset specific) / (more likely unused on modern systems)
@@ -1433,7 +1651,7 @@
     </span>parity_error: bool,
 }
 
-<span class="doccomment">/// All types of data writable to the [PS2_DATA_PORT].
+<span class="doccomment">/// Kinds of data that can be written to the PS/2 data port.
 </span><span class="kw">enum </span>WritableData {
     Configuration(ControllerConfigurationByte),
     HostToDevice(HostToDevice)
@@ -1461,15 +1679,19 @@
     }
 }
 
-<span class="comment">// wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte
-</span><span class="doccomment">/// Used for [HostToControllerCommand::ReadFromInternalRAMByte0] and [HostToControllerCommand::WriteToInternalRAMByte0]
+<span class="doccomment">/// Configuration values used to enable or disable features of the PS/2 controller.
+///
+/// This type is used with [HostToControllerCommand::ReadFromInternalRAMByte0]
+/// and [HostToControllerCommand::WriteToInternalRAMByte0].
+///
+/// [More info](wiki.osdev.org/%228042%22_PS/2_Controller#PS.2F2_Controller_Configuration_Byte)
 </span><span class="attr">#[bitfield(bits = <span class="number">8</span>)]
 #[derive(Debug, Clone, Copy)]
 </span><span class="kw">pub struct </span>ControllerConfigurationByte {
     <span class="doccomment">/// interrupt on [ControllerToHostStatus] `output_buffer_full`
     </span><span class="kw">pub </span>port1_interrupt_enabled: bool,
     <span class="doccomment">/// interrupt on [ControllerToHostStatus] `mouse_output_buffer_full`
-    /// 
+    ///
     /// Note: only if 2 PS/2 ports supported
     </span><span class="kw">pub </span>port2_interrupt_enabled: bool,
     <span class="doccomment">/// Cleared on reset; set when the system passed Power-on self-test
@@ -1481,7 +1703,7 @@
     <span class="doccomment">/// disables the keyboard
     </span><span class="kw">pub </span>port1_clock_disabled: bool,
     <span class="doccomment">/// disables the auxilary device (mouse)
-    /// 
+    ///
     /// Note: only if 2 PS/2 ports supported
     </span><span class="kw">pub </span>port2_clock_disabled: bool,
     <span class="doccomment">/// whether IBM scancode translation is enabled (0=AT, 1=PC)
@@ -1581,7 +1803,7 @@
 <span class="attr">#[derive(Clone)]
 </span><span class="kw">pub enum </span>HostToMouseCommandOrData {
     MouseCommand(HostToMouseCommand),
-    SampleRate(SampleRate),
+    SampleRate(MouseSampleRate),
     MouseResolution(MouseResolution),
 }
 
@@ -1632,7 +1854,7 @@
 
 <span class="kw">impl </span>MousePacketGeneric {
     <span class="doccomment">/// `x_1st_to_8th_bit` and `x_9th_bit` should not be accessed directly, because they&#39;re part of one signed 9-bit number
-    /// 
+    ///
     /// Note: This handles overflow as well, although it might not happen on newer systems &lt;https://forum.osdev.org/viewtopic.php?f=1&amp;t=31176&gt;
     </span><span class="kw">pub fn </span>x_movement(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i16 {
         <span class="kw">let </span>x_1st_to_8th_bit = <span class="kw">if </span><span class="self">self</span>.x_overflow() {
@@ -1644,7 +1866,7 @@
     }
 
     <span class="doccomment">/// `y_1st_to_8th_bit` and `y_9th_bit` should not be accessed directly, because they&#39;re part of one signed 9-bit number
-    /// 
+    ///
     /// Note: This handles overflow as well, although it might not happen on newer systems &lt;https://forum.osdev.org/viewtopic.php?f=1&amp;t=31176&gt;
     </span><span class="kw">pub fn </span>y_movement(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; i16 {
         <span class="kw">let </span>y_1st_to_8th_bit = <span class="kw">if </span><span class="self">self</span>.y_overflow() {
@@ -1784,7 +2006,7 @@
 }
 
 <span class="attr">#[derive(Clone)]
-</span><span class="kw">pub enum </span>SampleRate {
+</span><span class="kw">pub enum </span>MouseSampleRate {
     _10 = <span class="number">10</span>,
     _20 = <span class="number">20</span>,
     _40 = <span class="number">40</span>,
