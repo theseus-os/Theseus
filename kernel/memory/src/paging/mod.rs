@@ -34,7 +34,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
-use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, TEMPORARY_RECURSIVE_P4_INDEX};
+use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX};
 
 
 /// A top-level root (P4) page table.
@@ -104,7 +104,7 @@ impl PageTable {
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
-            table[TEMPORARY_RECURSIVE_P4_INDEX].set_entry(
+            table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
@@ -118,10 +118,13 @@ impl PageTable {
         })
     }
 
-    /// Temporarily maps the given other `PageTable` to the recursive entry (510th entry) 
-    /// so that the given closure `f` can set up new mappings on the new `other_table` without actually switching to it yet.
-    /// Accepts a closure `f` that is passed  a `Mapper`, such that it can set up new mappings on the other table.
-    /// Consumes the given `temporary_page` and automatically unmaps it afterwards. 
+    /// Temporarily maps the given other `PageTable` to the temporary recursive
+    /// index (508th entry)
+    ///
+    /// Accepts a closure `f` that is passed a mutable reference to the other
+    /// table's mapper, and an immutable reference to the current table's
+    /// mapper.
+    ///
     /// # Note
     /// This does not perform any task switching or changing of the current page table register (e.g., cr3).
     pub fn with<F>(
@@ -142,22 +145,22 @@ impl PageTable {
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
 
         // Overwrite temporary recursive mapping
-        self.p4_mut()[TEMPORARY_RECURSIVE_P4_INDEX].set_entry(
+        self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
             other_table.p4_table.as_allocated_frame(),
             PteFlagsArch::new().valid(true).writable(true),
         );
         tlb_flush_all();
 
         // This mapper will modify the other table using the temporary recursive p4 index set in the current page table.
-        let mut mapper = Mapper::temp(*other_table.p4_table.start());
+        let mut mapper = Mapper::inactive(*other_table.p4_table.start());
 
         // Execute `f` in the new context, in which the new page table is considered "active"
         let ret = f(&mut mapper, self);
 
-        // Restore temporary recursive mapping to original p4 table. This isn't strictly necessary,
+        // Restore inactive page table recursive mapping to original p4 table. This isn't strictly necessary,
         // but ensures the current table is returned to its original state.
         temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[TEMPORARY_RECURSIVE_P4_INDEX].set_entry(
+            p4_table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );

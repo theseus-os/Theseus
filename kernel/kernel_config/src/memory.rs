@@ -44,8 +44,8 @@ pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
 pub const RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
 /// Value: 509. The 509th entry is used for the kernel heap
 pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
-// Value: 508. The 508th entry is used as a temporary recursive entry when mapping a new page table.
-pub const TEMPORARY_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 6;
+/// Value: 508. The 508th entry is used as a temporary recursive entry when mapping an inactive page table.
+pub const INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
 
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
@@ -87,4 +87,4 @@ pub const KERNEL_HEAP_INITIAL_SIZE: usize = 256 * 1024 * 1024; // 256 MiB, debug
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
 /// The page allocator doesn't allocate pages above this address.
-pub const TEMPORARY_RECURSIVE_MEMORY_START: usize = 0xFFFF_0000_0000_0000 | (TEMPORARY_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
+pub const INACTIVE_PAGE_TABLE_RECURSIVE_MEMORY_START: usize = 0xFFFF_0000_0000_0000 | (INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));

@@ -50,7 +50,7 @@ static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 /// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
 ///
 /// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
-static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(TEMPORARY_RECURSIVE_MEMORY_START));
+static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(INACTIVE_PAGE_TABLE_RECURSIVE_MEMORY_START));
 
 const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
 const MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
