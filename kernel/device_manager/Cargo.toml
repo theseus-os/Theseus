@@ -45,8 +45,8 @@ path = "../acpi"
 [dependencies.pci]
 path = "../pci"
 
-[dependencies.ps2_controller]
-path = "../ps2_controller"
+[dependencies.ps2]
+path = "../ps2"
 
 [dependencies.keyboard]
 path = "../keyboard"
