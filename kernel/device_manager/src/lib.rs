@@ -72,7 +72,7 @@ pub fn early_init(
 /// Devices include:
 /// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,
 /// * The fully-featured system [`logger`],
-/// * PS2 [`keyboard`] and [`mouse`],
+/// * The legacy PS2 controller and any connected devices: [`keyboard`] and [`mouse`],
 /// * All other devices discovered on the [`pci`] bus.
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
 
@@ -101,9 +101,9 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    let controller = ps2_controller::init()?;
-    keyboard::init(controller.keyboard_handle(), key_producer)?;
-    mouse::init(controller.mouse_handle(), mouse_producer)?;
+    let ps2_controller = ps2::init()?;
+    keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
+    mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
