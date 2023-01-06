@@ -90,33 +90,25 @@ fn kernel_memory_region(
     // So, the start of the kernel is its physical address, but the end of it is its
     // virtual address... confusing, I know. Thus, kernel_phys_start is the same as
     // kernel_virt_start initially, but we remap them later in paging::init.
-    let start = PhysicalAddress::new(
-        boot_info
-            .elf_sections()?
-            .into_iter()
-            .filter(|section| section.is_allocated())
-            .map(|section| section.start_address())
-            .min()
-            .ok_or("couldn't find kernel start address")? as usize,
-    )
-    .ok_or("kernel physical start address was invalid")?;
+    let mut physical_start = usize::MAX;
+    let mut virtual_end = 0;
 
-    let virtual_end = VirtualAddress::new(
-        boot_info
-            .elf_sections()?
-            .into_iter()
-            .filter(|s| s.is_allocated())
-            .map(|s| s.end_address())
-            .max()
-            .ok_or("couldn't find kernel end address")? as usize,
-    )
-    .ok_or("kernel virtual end address was invalid")?;
-    let physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
+    for section in boot_info
+        .elf_sections()?
+        .into_iter()
+        .filter(|section| section.is_allocated())
+    {
+        physical_start = cmp::min(section.start_address() as usize, physical_start);
+        virtual_end = cmp::max(section.end_address() as usize, virtual_end);
+    }
+
+    let physical_end = PhysicalAddress::new(virtual_end - KERNEL_OFFSET)
         .ok_or("kernel physical end address was invalid")?;
 
     Ok(ReservedMemoryRegion {
-        start,
-        len: (physical_end - start).value(),
+        start: PhysicalAddress::new(physical_start)
+            .ok_or("kernel physical start address was invalid")?,
+        len: (physical_end - physical_start).value(),
     })
 }
 
