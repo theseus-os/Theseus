@@ -1053,6 +1053,17 @@
 <span id="1053">1053</span>
 <span id="1054">1054</span>
 <span id="1055">1055</span>
+<span id="1056">1056</span>
+<span id="1057">1057</span>
+<span id="1058">1058</span>
+<span id="1059">1059</span>
+<span id="1060">1060</span>
+<span id="1061">1061</span>
+<span id="1062">1062</span>
+<span id="1063">1063</span>
+<span id="1064">1064</span>
+<span id="1065">1065</span>
+<span id="1066">1066</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.
 //! The minimum unit of allocation is a single frame. 
 //!
@@ -1149,8 +1160,6 @@
 
     <span class="kw">let </span><span class="kw-2">mut </span>free_list: [<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>] = Default::default();
     <span class="kw">let </span><span class="kw-2">mut </span>free_list_idx = <span class="number">0</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>reserved_list: [<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>] = Default::default();
-    <span class="kw">let </span><span class="kw-2">mut </span>reserved_list_idx = <span class="number">0</span>;
 
     <span class="comment">// Populate the list of free regions for general-purpose usage.
     </span><span class="kw">for </span>area <span class="kw">in </span>free_physical_memory_areas.into_iter() {
@@ -1164,35 +1173,48 @@
         );
     }
 
-    <span class="comment">// Insert all of the reserved memory areas into the list of free reserved regions,
-    // while de-duplicating overlapping areas by merging them.
-    </span><span class="kw">for </span>reserved <span class="kw">in </span>reserved_physical_memory_areas.into_iter() {
-        <span class="kw">let </span>reserved = reserved.borrow();
-        <span class="kw">let </span><span class="kw-2">mut </span>reserved_was_merged = <span class="bool-val">false</span>;
-        <span class="kw">for </span>existing <span class="kw">in </span>reserved_list[..reserved_list_idx].iter_mut().flatten() {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(_overlap) = existing.overlap(reserved) {
-                <span class="comment">// merge the `reserved` range into the `existing` range
-                </span>existing.frames = FrameRange::new(
-                    min(<span class="kw-2">*</span>existing.start(), <span class="kw-2">*</span>reserved.start()),
-                    max(<span class="kw-2">*</span>existing.end(),   <span class="kw-2">*</span>reserved.end()),
-                );
-                reserved_was_merged = <span class="bool-val">true</span>;
-                <span class="kw">break</span>;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>reserved_list: [<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>] = Default::default();
+    <span class="kw">for </span>(i, area) <span class="kw">in </span>reserved_physical_memory_areas.into_iter().enumerate() {
+        reserved_list[i] = <span class="prelude-val">Some</span>(Chunk {
+            typ: MemoryRegionType::Reserved,
+            frames: area.borrow().frames.clone(),
+        });
+    }
+
+    <span class="kw">let </span><span class="kw-2">mut </span>changed = <span class="bool-val">true</span>;
+    <span class="kw">while </span>changed {
+        <span class="kw">let </span><span class="kw-2">mut </span>temp_reserved_list: [<span class="prelude-ty">Option</span>&lt;Chunk&gt;; <span class="number">32</span>] = Default::default();
+        changed = <span class="bool-val">false</span>;
+
+        <span class="kw">let </span><span class="kw-2">mut </span>temp_reserved_list_idx = <span class="number">0</span>;
+        <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..temp_reserved_list.len() {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>current) = reserved_list[i].clone() {
+                <span class="kw">for </span>maybe_other <span class="kw">in </span><span class="kw-2">&amp;mut </span>reserved_list[i + <span class="number">1</span>..] {
+                    <span class="kw">if let </span><span class="prelude-val">Some</span>(other) = maybe_other {
+                        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw">_</span>) = current.overlap(other) {
+                            current.frames = FrameRange::new(
+                                min(<span class="kw-2">*</span>current.start(), <span class="kw-2">*</span>other.start()),
+                                max(<span class="kw-2">*</span>current.end(), <span class="kw-2">*</span>other.end()),
+                            );
+
+                            changed = <span class="bool-val">true</span>;
+                            <span class="kw-2">*</span>maybe_other = <span class="prelude-val">None</span>;
+                        }
+                    }
+                }
+                temp_reserved_list[temp_reserved_list_idx] = <span class="prelude-val">Some</span>(current);
+                temp_reserved_list_idx += <span class="number">1</span>;
             }
         }
-        <span class="kw">if </span>!reserved_was_merged {
-            reserved_list[reserved_list_idx] = <span class="prelude-val">Some</span>(Chunk {
-                typ:  MemoryRegionType::Reserved,
-                frames: reserved.frames.clone(),
-            });
-            reserved_list_idx += <span class="number">1</span>;
-        }
+
+        reserved_list = temp_reserved_list;
     }
 
 
     <span class="comment">// Finally, one last sanity check -- ensure no two regions overlap. 
     </span><span class="kw">let </span>all_areas = free_list[..free_list_idx].iter().flatten()
-        .chain(reserved_list[..reserved_list_idx].iter().flatten());
+        .chain(reserved_list.iter().flatten());
     <span class="kw">for </span>(i, elem) <span class="kw">in </span>all_areas.clone().enumerate() {
         <span class="kw">let </span>next_idx = i + <span class="number">1</span>;
         <span class="kw">for </span>other <span class="kw">in </span>all_areas.clone().skip(next_idx) {
