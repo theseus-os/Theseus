@@ -21,6 +21,7 @@ mod paging;
 pub use self::paging::{
     PageTable, Mapper, Mutability, Mutable, Immutable,
     MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
+    translate,
 };
 
 pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};

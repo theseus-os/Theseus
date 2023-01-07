@@ -34,8 +34,16 @@ ap_start_protected_mode:
 %endif ; BIOS
 
 	; Load the 64-bit GDT
-	lgdt [GDT_AP.ptr_low - KERNEL_OFFSET]
 
+	mov eax, [AP_GDT]
+	add eax, GDT_AP.ptr_low - GDT_AP
+
+	; eax now points to GDT_AP.ptr_low
+	mov ebx, [AP_GDT]
+	; the size ([eax]) is already correct, we just need to set the offset
+	mov dword [eax + 2], ebx
+
+	lgdt [eax]
 
 %ifdef BIOS
 	; prints GDT
@@ -205,6 +213,7 @@ start_high_ap:
 ; However, during the ap boot phase on real hardware, there is a write page fault
 ; if you put it in rodata (i.e., map it as read-only).
 section .data.ap
+global GDT_AP
 GDT_AP:
 	dq 0 ; zero entry
 .code equ $ - GDT_AP
@@ -217,7 +226,7 @@ GDT_AP:
 ; 	dw 0 ; padding to make sure GDT pointer is 4-byte aligned
 .ptr_low:
 	dw .end - GDT_AP - 1
-	dd GDT_AP - KERNEL_OFFSET
+	dd 0
 	; dq GDT_AP - KERNEL_OFFSET
 .ptr:
 	dw .end - GDT_AP - 1

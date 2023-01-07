@@ -22,6 +22,7 @@ extern crate ap_start;
 extern crate pause;
 
 use core::{
+    convert::TryInto,
     ops::DerefMut,
     sync::atomic::Ordering,
 };
@@ -194,6 +195,7 @@ pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    ap_gdt: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,
 ) -> Result<u32, &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
@@ -261,6 +263,7 @@ pub fn handle_ap_cores(
     let (max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
     ap_trampoline_data.ap_max_fb_width.write(max_width);
     ap_trampoline_data.ap_max_fb_height.write(max_height);
+    ap_trampoline_data.ap_gdt.write(ap_gdt.value().try_into().map_err(|_| "AP_GDT physical address larger than u32::MAX")?);
 
     let acpi_tables = acpi::get_acpi_tables().lock();
     let madt = Madt::get(&acpi_tables)
@@ -338,7 +341,7 @@ pub fn handle_ap_cores(
 /// # Important Layout Note
 /// The order of the members in this struct must exactly match how they are used
 /// and specified in the AP bootup code (at the top of `defines.asm`).
-#[derive(FromBytes)]
+#[derive(Debug, FromBytes)]
 #[repr(C)]
 struct ApTrampolineData {
     /// A flag that indicates whether the new AP is ready. 
@@ -372,6 +375,8 @@ struct ApTrampolineData {
     /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
     ap_max_fb_height:  Volatile<u16>,
     _padding5:         [u8; 6],
+    ap_gdt:            Volatile<u32>,
+    _padding6:         [u8; 4],
 }
 
 

@@ -144,6 +144,9 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
     }
 
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str> {
+        for region in self.memory_regions().unwrap() {
+            log::info!("{region:x?}");
+        }
         Ok(self.elf_sections.iter())
     }
 

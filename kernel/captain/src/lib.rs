@@ -87,6 +87,7 @@ pub fn init(
     bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    ap_gdt: VirtualAddress,
     rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
@@ -130,6 +131,7 @@ pub fn init(
         &kernel_mmi_ref,
         ap_start_realmode_begin,
         ap_start_realmode_end,
+        ap_gdt,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
     let cpu_count = ap_count + 1;
