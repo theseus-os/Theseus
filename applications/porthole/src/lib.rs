@@ -784,9 +784,10 @@ impl WindowManager {
                     window.upgrade().unwrap().lock().set_screen_pos(&new_pos);
                 }
             }
-        // FIXME: Resizing is broken if windows are on top of each other
         } else if mouse_event.buttons.right() {
-            for window in self.windows.iter_mut() {
+            let rendering_o = self.window_rendering_order.clone();
+            for &i in rendering_o.iter().rev() {
+                let window = &mut self.windows[i];
                 if window
                     .upgrade()
                     .unwrap()
@@ -811,6 +812,7 @@ impl WindowManager {
                         .lock()
                         .reset_title_pos_and_border();
                     window.upgrade().unwrap().lock().resized = true;
+                    break;
                 }
             }
         }
