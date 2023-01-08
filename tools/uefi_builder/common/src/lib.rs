@@ -2,9 +2,7 @@ mod fs;
 
 use clap::Parser;
 use fs::UefiBoot;
-use std::path::PathBuf;
-
-const KERNEL_FILE_NAME: &str = "kernel.elf";
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 struct Args {
@@ -22,7 +20,7 @@ struct Args {
     efi_firmware: Option<PathBuf>,
 }
 
-fn main() {
+pub fn main(bootloader_host_path: &Path, bootloader_efi_path: &Path) {
     let Args {
         kernel,
         modules,
@@ -54,7 +52,7 @@ fn main() {
     }
 
     bootloader
-        .create_disk_image(&efi_image)
+        .create_disk_image(bootloader_host_path, bootloader_efi_path, &efi_image)
         .expect("failed to create uefi disk image");
 
     if let Some(efi_firmware) = efi_firmware {

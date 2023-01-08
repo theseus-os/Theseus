@@ -1,0 +1,16 @@
+[package]
+name = "uefi_builder_x86_64"
+version = "0.1.0"
+edition = "2021"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+
+[dependencies]
+uefi_builder_common = { path = "../common" }
+
+[dependencies.uefi-bootloader]
+artifact = "bin"
+path = "../../../../uefi-bootloader/uefi-bootloader"
+target = "x86_64-unknown-uefi"
+
+[patch.crates-io]
+uefi-macros = { git = "https://github.com/rust-osdev/uefi-rs" }

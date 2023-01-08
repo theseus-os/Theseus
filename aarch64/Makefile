@@ -26,6 +26,7 @@ QEMU_FLAGS += -smp 4
 QEMU_MEMORY ?= 512M
 QEMU_FLAGS += -net none
 QEMU_FLAGS += -device ramfb
+QEMU_FLAGS += -monitor telnet:localhost:1235,server,nowait
 
 # Include that file which enables efi support in qemu
 # QEMU_FLAGS += -drive if=pflash,format=raw,file=$(efi_firmware)
@@ -59,7 +60,7 @@ $(iso): build
 		--release \
 		-Z bindeps \
 		--manifest-path \
-		$(AARCH64_DIR)/../tools/uefi_builder/Cargo.toml -- \
+		$(AARCH64_DIR)/../tools/uefi_builder/aarch64/Cargo.toml -- \
 		--kernel $(nano_core_binary) \
 		--efi-image $(iso)
 

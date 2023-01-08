@@ -1,9 +1,0 @@
-[package]
-name = "bootloader"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies.uefi-bootloader]
-artifact = "bin"
-path = "../../../../uefi-bootloader/uefi-bootloader"
-target = "aarch64-unknown-none"

@@ -1,6 +1,5 @@
 //! Taken from rust-osdev/bootloader
 
-use crate::KERNEL_FILE_NAME;
 use anyhow::Context;
 use std::{
     collections::BTreeMap,
@@ -26,9 +25,14 @@ impl UefiBoot {
     }
 
     /// Create a bootable BIOS disk image at the given path.
-    pub fn create_disk_image(&self, out_path: &Path) -> anyhow::Result<()> {
+    pub fn create_disk_image(
+        &self,
+        bootloader_host_path: &Path,
+        bootloader_efi_path: &Path,
+        out_path: &Path,
+    ) -> anyhow::Result<()> {
         let fat_partition = self
-            .create_fat_partition()
+            .create_fat_partition(bootloader_efi_path, bootloader_host_path)
             .context("failed to create FAT partition")?;
 
         create_gpt_disk(fat_partition.path(), out_path)
@@ -47,20 +51,17 @@ impl UefiBoot {
     }
 
     /// Creates an UEFI-bootable FAT partition with the kernel.
-    fn create_fat_partition(&self) -> anyhow::Result<NamedTempFile> {
-        let bootloader_path = Path::new(env!("CARGO_BIN_FILE_UEFI_BOOTLOADER"));
-
+    fn create_fat_partition(
+        &self,
+        bootloader_efi_path: &Path,
+        bootloader_host_path: &Path,
+    ) -> anyhow::Result<NamedTempFile> {
         let mut files = BTreeMap::new();
-        files.insert("efi/boot/bootx64.efi", bootloader_path);
-        // TODO
-        // files.insert("efi/boot/bootaa64.efi", bootloader_path);
-        files.insert(KERNEL_FILE_NAME, self.kernel.as_path());
+        files.insert(bootloader_efi_path, bootloader_host_path);
+        files.insert(Path::new("kernel.elf"), self.kernel.as_path());
 
         for (image_path, host_path) in &self.extra_files {
-            files.insert(
-                image_path.to_str().expect("couldn't convert path to str"),
-                host_path,
-            );
+            files.insert(image_path, host_path);
         }
 
         let out_file = NamedTempFile::new().context("failed to create temp file")?;
@@ -136,7 +137,7 @@ pub fn create_gpt_disk(fat_image: &Path, out_gpt_path: &Path) -> anyhow::Result<
 }
 
 pub fn create_fat_filesystem(
-    files: BTreeMap<&str, &Path>,
+    files: BTreeMap<&Path, &Path>,
     out_fat_path: &Path,
 ) -> anyhow::Result<()> {
     const MB: u64 = 1024 * 1024;
@@ -163,7 +164,7 @@ pub fn create_fat_filesystem(
 
     // choose a file system label
     let mut label = *b"MY_RUST_OS!";
-    if let Some(path) = files.get(KERNEL_FILE_NAME) {
+    if let Some(path) = files.get(Path::new("kernel.elf")) {
         if let Some(name) = path.file_stem() {
             let converted = name.to_string_lossy();
             let name = converted.as_bytes();
@@ -183,8 +184,7 @@ pub fn create_fat_filesystem(
 
     // copy files to file system
     let root_dir = filesystem.root_dir();
-    for (target_path_raw, file_path) in files {
-        let target_path = Path::new(target_path_raw);
+    for (target_path, file_path) in files {
         // create parent directories
         let ancestors: Vec<_> = target_path.ancestors().skip(1).collect();
         for ancestor in ancestors.into_iter().rev().skip(1) {
@@ -199,7 +199,7 @@ pub fn create_fat_filesystem(
         }
 
         let mut new_file = root_dir
-            .create_file(target_path_raw)
+            .create_file(target_path.to_str().unwrap())
             .with_context(|| format!("failed to create file at `{}`", target_path.display()))?;
         new_file.truncate().unwrap();
         io::copy(
