@@ -61,7 +61,7 @@ path = "../boot_info"
 features = ["multiboot2"]
 
 [dependencies.uefi-bootloader-api]
-path = "../../../uefi-bootloader/uefi-bootloader-api"
+git = "https://github.com/theseus-os/uefi-bootloader"
 optional = true
 
 [build-dependencies]

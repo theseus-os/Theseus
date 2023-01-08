@@ -13,7 +13,7 @@ multiboot2 = { version = "0.14", optional = true }
 log = "*"
 
 [dependencies.uefi-bootloader-api]
-path = "../../../uefi-bootloader/uefi-bootloader-api"
+git = "https://github.com/theseus-os/uefi-bootloader"
 optional = true
 
 [features]

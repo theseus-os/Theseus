@@ -9,7 +9,7 @@ uefi_builder_common = { path = "../common" }
 
 [dependencies.uefi-bootloader]
 artifact = "bin"
-path = "../../../../uefi-bootloader/uefi-bootloader"
+git = "https://github.com/theseus-os/uefi-bootloader"
 target = "x86_64-unknown-uefi"
 
 [patch.crates-io]
