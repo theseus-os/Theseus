@@ -24,6 +24,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff91a64014e1bc53bf643920f2c9ab5f0980d92a0948295f3ee550e9266849ad"
 
 [[package]]
+name = "bit_field"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dcb6dd1c2376d2e096796e234a70e17e94cc2d5d54ff8ce42b28cef1d0d359a4"
+
+[[package]]
 name = "bitfield"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -182,7 +188,7 @@ dependencies = [
 name = "memory"
 version = "0.1.0"
 dependencies = [
- "bit_field",
+ "bit_field 0.7.0",
  "bitflags",
  "frame_allocator",
  "irq_safety",
@@ -215,7 +221,7 @@ dependencies = [
 name = "memory_structs"
 version = "0.1.0"
 dependencies = [
- "bit_field",
+ "bit_field 0.7.0",
  "derive_more",
  "kernel_config",
  "paste",
@@ -234,6 +240,18 @@ dependencies = [
 [[package]]
 name = "nano_core"
 version = "0.1.0"
+dependencies = [
+ "frame_allocator",
+ "kernel_config",
+ "log",
+ "logger",
+ "memory",
+ "memory_structs",
+ "page_allocator",
+ "pte_flags",
+ "uefi",
+ "uefi-services",
+]
 
 [[package]]
 name = "nb"
@@ -424,6 +442,49 @@ name = "tock-registers"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee8fba06c1f4d0b396ef61a54530bb6b28f0dc61c38bc8bc5a5a48161e6282e"
+
+[[package]]
+name = "ucs2"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bad643914094137d475641b6bab89462505316ec2ce70907ad20102d28a79ab8"
+dependencies = [
+ "bit_field 0.10.1",
+]
+
+[[package]]
+name = "uefi"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "07b87700863d65dd4841556be3374d8d4f9f8dbb577ad93a39859e70b3b91f35"
+dependencies = [
+ "bitflags",
+ "log",
+ "ucs2",
+ "uefi-macros",
+]
+
+[[package]]
+name = "uefi-macros"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "275f054a1d9fd7e43a2ce91cc24298a87b281117dea8afc120ae95faa0e96b94"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "uefi-services"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74f6e28d165193fb5da5230faec576f0be75c71ce6d171556a2775b3673094b4"
+dependencies = [
+ "cfg-if",
+ "log",
+ "uefi",
+]
 
 [[package]]
 name = "unicode-ident"
