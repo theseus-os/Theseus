@@ -172,9 +172,6 @@ impl KnownLength for FileOrDir {
             FileOrDir::Dir(_) => 0,
         }
     }
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 impl FileOrDir {

@@ -124,23 +124,20 @@ impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
 /// A trait that represents an I/O stream that has a known length, e.g., a disk drive.
 ///
 /// This trait exists to enable seeking to an offset from the end of the stream.
+#[allow(clippy::len_without_is_empty)]
 pub trait KnownLength {
     /// Returns the length (size in bytes) of this I/O stream or device.
     fn len(&self) -> usize;
-    fn is_empty(&self) -> bool;
 }
 
 impl<KL> KnownLength for Box<KL> where KL: KnownLength + ?Sized {
     fn len(&self) -> usize { (**self).len() }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<KL> KnownLength for &KL where KL: KnownLength + ?Sized {
     fn len(&self) -> usize { (**self).len() }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<KL> KnownLength for &mut KL where KL: KnownLength + ?Sized {
     fn len(&self) -> usize { (**self).len() }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 
 
@@ -356,7 +353,6 @@ impl<R> BlockIo for ByteReaderWrapper<R> where R: BlockReader {
 }
 impl<R> KnownLength for ByteReaderWrapper<R> where R: KnownLength + BlockReader {
     delegate!{ to self.0 { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<R> BlockReader for ByteReaderWrapper<R> where R: BlockReader {
     delegate!{ to self.0 { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
@@ -430,7 +426,6 @@ impl<RW> BlockIo for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWr
 }
 impl<RW> KnownLength for ByteReaderWriterWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
     delegate!{ to self.0 { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<RW> BlockReader for ByteReaderWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     delegate!{ to self.0 { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
@@ -473,7 +468,6 @@ impl<RW> BlockIo for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
 }
 impl<RW> KnownLength for ByteWriterWrapper<RW> where RW: KnownLength + BlockReader + BlockWriter {
     delegate!{ to self.0 { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<RW> BlockWriter for ByteWriterWrapper<RW> where RW: BlockReader + BlockWriter {
     delegate!{ to self.0 { fn write_blocks(&mut self, buffer: &[u8], block_offset: usize) -> Result<usize, IoError>; } }
@@ -562,7 +556,6 @@ impl<IO> BlockIo for ReaderWriter<IO> where IO: BlockIo {
 }
 impl<IO> KnownLength for ReaderWriter<IO> where IO: KnownLength {
     delegate!{ to self.io { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<IO> BlockReader for ReaderWriter<IO> where IO: BlockReader {
     delegate!{ to self.io { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
@@ -605,7 +598,6 @@ impl<IO> BlockIo for Reader<IO> where IO: BlockIo {
 }
 impl<IO> KnownLength for Reader<IO> where IO: KnownLength {
     delegate!{ to self.0 { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<IO> BlockReader for Reader<IO> where IO: BlockReader {
     delegate!{ to self.0 { fn read_blocks(&mut self, buffer: &mut [u8], block_offset: usize) -> Result<usize, IoError>; } }
@@ -642,7 +634,6 @@ impl<IO> BlockIo for Writer<IO> where IO: BlockIo {
 }
 impl<IO> KnownLength for Writer<IO> where IO: KnownLength {
     delegate!{ to self.0 { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<IO> BlockWriter for Writer<IO> where IO: BlockWriter {
     delegate!{ to self.0 {
@@ -788,7 +779,6 @@ impl<'io, IO, L, B> KnownLength for LockableIo<'io, IO, L, B>
     where IO: KnownLength + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,
 {
     delegate!{ to self.lock() { fn len(&self) -> usize; } }
-    fn is_empty(&self) -> bool { self.len() == 0 }
 }
 impl<'io, IO, L, B> BlockReader for LockableIo<'io, IO, L, B>
     where IO: BlockReader + 'io + ?Sized, L: for <'a> Lockable<'a, IO> + ?Sized, B: Borrow<L>,

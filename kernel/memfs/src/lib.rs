@@ -138,9 +138,6 @@ impl KnownLength for MemFile {
     fn len(&self) -> usize {
         self.len
     }
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 }
 
 impl File for MemFile {

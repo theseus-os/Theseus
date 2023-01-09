@@ -114,9 +114,11 @@ macro_rules! implement_address {
                 }
             }
 
-            impl From<$TypeName> for usize {
-                fn from(w: $TypeName) -> usize {
-                    w.0
+            #[allow(clippy::from_over_into)]
+            impl Into<usize> for $TypeName {
+                #[inline]
+                fn into(self) -> usize {
+                    self.0
                 }
             }
         }

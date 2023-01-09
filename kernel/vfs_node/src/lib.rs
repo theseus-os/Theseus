@@ -89,6 +89,3 @@ impl FsNode for VFSDirectory {
         self.parent = new_parent;
     }
 }
-
-unsafe impl Send for VFSDirectory {}
-unsafe impl Sync for VFSDirectory {}

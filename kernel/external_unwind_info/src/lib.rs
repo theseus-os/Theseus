@@ -79,7 +79,7 @@ pub unsafe fn register_unwind_info(
     };
 
     uw.try_insert(text_start, uw_info).map_err(|_e| {
-        error!("External unwind info for {text_start:#X} was already registered"); 
+        error!("External unwind info for {text_start:#X} was already registered");
         ExternalUnwindInfoError::AlreadyExists
     })?;
 
