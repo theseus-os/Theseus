@@ -104,10 +104,6 @@ impl PageTable {
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
-            table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
-                frame.as_allocated_frame(),
-                PteFlagsArch::new().valid(true).writable(true),
-            );
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -139,38 +135,40 @@ impl PageTable {
             return Err("PageTable::with(): this PageTable ('self') must be the currently active page table.");
         }
 
-        // Temporarily take ownership of this page table's p4 allocated frame and
+        // Temporarily take ownership of the other page table's p4 allocated frame and
         // create a new temporary page that maps to that frame.
-        let this_p4 = core::mem::replace(&mut self.p4_table, AllocatedFrames::empty());
-        let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
+        let other_p4 = core::mem::replace(&mut other_table.p4_table, AllocatedFrames::empty());
+        let other_p4_frame = *other_p4.start();
+        let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, other_p4, self)?;
 
-        // Overwrite temporary recursive mapping
-        self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
-            other_table.p4_table.as_allocated_frame(),
-            PteFlagsArch::new().valid(true).writable(true),
-        );
-        tlb_flush_all();
-
-        // This mapper will modify the other table using the temporary recursive p4 index set in the current page table.
-        let mut mapper = Mapper::inactive(*other_table.p4_table.start());
-
-        // Execute `f` in the new context, in which the new page table is considered "active"
-        let ret = f(&mut mapper, self);
-
-        // Restore inactive page table recursive mapping to original p4 table. This isn't strictly necessary,
-        // but ensures the current table is returned to its original state.
-        temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
+        // Overwrite inactive page table recursive mapping.
+        temporary_page.with_table_and_frame(|table, frame| {
+            self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
+            table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
         })?;
         tlb_flush_all();
 
-        // Here, recover the current page table's p4 frame and restore it into this current page table,
+        // This mapper will modify the other table using the inactive page table recursive p4 index set in the current page table.
+        let mut mapper = Mapper::inactive(other_p4_frame);
+
+        // Execute `f` in the new context, in which the new page table is considered "active"
+        let ret = f(&mut mapper, self);
+
+        // Clear inactive page table recursive mapping.
+        self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
+        other_table.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
+        tlb_flush_all();
+
+        // Here, recover the other page table's p4 frame and restore it into the other page table,
         // since we removed it earlier at the top of this function and gave it to the temporary page. 
         let (_temp_page, p4_frame) = temporary_page.unmap_into_parts(self)?;
-        self.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
+        other_table.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
 
         ret
     }
