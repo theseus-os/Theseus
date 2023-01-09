@@ -13,6 +13,7 @@
 //!    * You can optionally add it to the `default` set of features,
 //!      or create a new group of features that includes it, 
 //!      or even add it to an existing set of features.
+//!    * If you do so, add that new feature or feature group to the `everything` feature.
 //!
 //! 
 //! ## How to customize what is included in a Theseus build
@@ -31,11 +32,11 @@
 //! make FEATURES=--no-default-features
 //! 
 //! # Build the bare minimum `default-members` of the Theseus workspace, plus all optional crates.
-//! make FEATURES=--all-features
+//! make FEATURES="--features everything"
 //! 
 //! # Build the standard Theseus workspace plus all optional crates. 
 //! # This is what `make full` or `make all` does.
-//! make FEATURES="--workspace --all-features"
+//! make FEATURES="--workspace --features theseus_features/everything"
 //! 
 //! # Build the bare minimum `default-members` of the Theseus workspace, plus the `ps` crate.
 //! make FEATURES="--features ps"

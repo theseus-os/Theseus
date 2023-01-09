@@ -26,7 +26,15 @@ use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use vga_buffer::println_raw;
 
-mod bios;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "bios")] {
+        mod bios;
+    } else if #[cfg(feature = "uefi")] {
+        mod uefi;
+    } else {
+        compile_error!("either the 'bios' or 'uefi' feature must be enabled");
+    }
+}
 
 /// Used to obtain information about this build of Theseus.
 mod build_info {

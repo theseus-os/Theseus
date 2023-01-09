@@ -862,7 +862,7 @@ dependencies = [
  "net",
  "network_manager",
  "pci",
- "ps2_controller",
+ "ps2",
  "serial_port",
  "spin 0.9.4",
  "storage_manager",
@@ -926,6 +926,7 @@ dependencies = [
 name = "e1000"
 version = "0.1.0"
 dependencies = [
+ "deferred_interrupt_tasks",
  "intel_ethernet",
  "interrupts",
  "irq_safety",
@@ -942,6 +943,7 @@ dependencies = [
  "pci",
  "spin 0.9.4",
  "static_assertions",
+ "task",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -2164,7 +2166,9 @@ name = "nano_core"
 version = "0.1.0"
 dependencies = [
  "boot_info",
+ "bootloader_api",
  "captain",
+ "cfg-if 1.0.0",
  "exceptions_early",
  "irq_safety",
  "kernel_config",
@@ -2202,12 +2206,13 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 name = "net"
 version = "0.1.0"
 dependencies = [
+ "heapless",
  "irq_safety",
  "log",
  "mutex_sleep",
  "nic_buffers",
  "random",
- "smoltcp 0.8.0",
+ "smoltcp 0.8.1",
  "spin 0.9.4",
 ]
 
@@ -2362,9 +2367,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
 name = "ota_update_client"
@@ -2697,21 +2702,13 @@ dependencies = [
 name = "ps2"
 version = "0.1.0"
 dependencies = [
+ "acpi",
+ "fadt",
  "log",
  "modular-bitfield",
  "num_enum",
  "port_io",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "ps2_controller"
-version = "0.1.0"
-dependencies = [
- "acpi",
- "fadt",
- "log",
- "ps2",
 ]
 
 [[package]]
@@ -3345,8 +3342,8 @@ dependencies = [
 
 [[package]]
 name = "smoltcp"
-version = "0.8.0"
-source = "git+https://github.com/smoltcp-rs/smoltcp#6b8b667be5878fbf288365df9260996116b81fa6"
+version = "0.8.1"
+source = "git+https://github.com/smoltcp-rs/smoltcp#19c7cba8d39dc0cea0fbd9a7ec7d7cb2ec8301c6"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -3782,6 +3779,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_task_cancel"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "spawn",
+ "spin 0.9.4",
+ "task",
+]
+
+[[package]]
 name = "test_thread_local"
 version = "0.1.0"
 dependencies = [
@@ -3894,6 +3901,7 @@ dependencies = [
  "test_restartable",
  "test_serial_echo",
  "test_std_fs",
+ "test_task_cancel",
  "test_thread_local",
  "test_wait_queue",
  "test_wasmtime",
