@@ -246,19 +246,6 @@
 <span id="246">246</span>
 <span id="247">247</span>
 <span id="248">248</span>
-<span id="249">249</span>
-<span id="250">250</span>
-<span id="251">251</span>
-<span id="252">252</span>
-<span id="253">253</span>
-<span id="254">254</span>
-<span id="255">255</span>
-<span id="256">256</span>
-<span id="257">257</span>
-<span id="258">258</span>
-<span id="259">259</span>
-<span id="260">260</span>
-<span id="261">261</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -414,24 +401,9 @@
     boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation,
     kernel_stack_start: VirtualAddress,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;InitialMemoryMappings, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">// Get the start and end addresses of the kernel, boot info, boot modules, etc.
-    // These are all physical addresses.
-    </span><span class="kw">let </span>kernel_memory = boot_info.kernel_memory_range()<span class="question-mark">?</span>;
-    <span class="kw">let </span>boot_info_memory = boot_info.bootloader_info_memory_range()<span class="question-mark">?</span>;
-    <span class="kw">let </span>modules_memory = boot_info.modules_memory_range()<span class="question-mark">?</span>;
-
-    <span class="macro">debug!</span>(<span class="string">&quot;kernel memory: p{:#X} to p{:#X}&quot;</span>, kernel_memory.start, kernel_memory.end);
-    <span class="macro">debug!</span>(<span class="string">&quot;boot info memory: p{:#X} to p{:#X}&quot;</span>, boot_info_memory.start, boot_info_memory.end);
-    <span class="macro">debug!</span>(<span class="string">&quot;modules memory: p{:#X} to p{:#X}&quot;</span>, modules_memory.start, modules_memory.end);
-
-    <span class="comment">// In addition to the information about the hardware&#39;s physical memory map provided by the bootloader,
-    // Theseus chooses to reserve the following regions of physical memory for specific use.
-    </span><span class="kw">let </span>low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), <span class="number">0x10_0000</span>); <span class="comment">// suggested by most OS developers
-    </span><span class="kw">let </span>kernel_frames       = FrameRange::from_phys_addr(kernel_memory.start, kernel_memory.end.value() - kernel_memory.start.value());
-    <span class="kw">let </span>boot_modules_frames = FrameRange::from_phys_addr(modules_memory.start, modules_memory.end.value() - modules_memory.start.value());
-    <span class="kw">let </span>boot_info_frames    = FrameRange::from_phys_addr(boot_info_memory.start, boot_info_memory.end.value() - boot_info_memory.start.value());
+    <span class="kw">let </span>low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), <span class="number">0x10_0000</span>); <span class="comment">// suggested by most OS developers
     
-    <span class="comment">// Add the VGA display&#39;s memory region to the list of reserved physical memory areas.
+    // Add the VGA display&#39;s memory region to the list of reserved physical memory areas.
     // Currently this is covered by the first 1MiB region, but it&#39;s okay to duplicate it here.
     </span><span class="kw">let </span>(vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()<span class="question-mark">?</span>;
     <span class="kw">let </span>vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
@@ -444,18 +416,12 @@
 
     reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
     reserved_index += <span class="number">1</span>;
-    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(kernel_frames, MemoryRegionType::Reserved));
-    reserved_index += <span class="number">1</span>;
-    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(boot_modules_frames, MemoryRegionType::Reserved));
-    reserved_index += <span class="number">1</span>;
-    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(boot_info_frames, MemoryRegionType::Reserved));
-    reserved_index += <span class="number">1</span>;
     reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
     reserved_index += <span class="number">1</span>;
 
-    <span class="kw">for </span>area <span class="kw">in </span>boot_info.memory_regions()<span class="question-mark">? </span>{
-        <span class="kw">let </span>frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start().value()), area.len());
-        <span class="kw">if </span>area.is_usable() {
+    <span class="kw">for </span>region <span class="kw">in </span>boot_info.memory_regions()<span class="question-mark">? </span>{
+        <span class="kw">let </span>frames = FrameRange::from_phys_addr(region.start(), region.len());
+        <span class="kw">if </span>region.is_usable() {
             free_regions[free_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
             free_index += <span class="number">1</span>;
         } <span class="kw">else </span>{
@@ -464,11 +430,19 @@
         }
     }
 
+    <span class="kw">for </span>region <span class="kw">in </span>boot_info.additional_reserved_memory_regions()<span class="question-mark">? </span>{
+        reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(
+            FrameRange::from_phys_addr(region.start, region.len),
+            MemoryRegionType::Reserved,
+        ));
+        reserved_index += <span class="number">1</span>;
+    }
+
     <span class="kw">let </span>into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new frame allocator!&quot;</span>);
     frame_allocator::dump_frame_allocator_state();
 
-    page_allocator::init(VirtualAddress::new_canonical(kernel_memory.end.value()))<span class="question-mark">?</span>;
+    page_allocator::init(VirtualAddress::new_canonical(boot_info.kernel_end()<span class="question-mark">?</span>.value()))<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new page allocator!&quot;</span>);
     page_allocator::dump_page_allocator_state();
 

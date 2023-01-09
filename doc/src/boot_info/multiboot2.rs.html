@@ -192,8 +192,37 @@
 <span id="192">192</span>
 <span id="193">193</span>
 <span id="194">194</span>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::ElfSectionFlags;
-<span class="kw">use </span>core::{cmp, iter::Iterator, ops::Range};
+<span id="195">195</span>
+<span id="196">196</span>
+<span id="197">197</span>
+<span id="198">198</span>
+<span id="199">199</span>
+<span id="200">200</span>
+<span id="201">201</span>
+<span id="202">202</span>
+<span id="203">203</span>
+<span id="204">204</span>
+<span id="205">205</span>
+<span id="206">206</span>
+<span id="207">207</span>
+<span id="208">208</span>
+<span id="209">209</span>
+<span id="210">210</span>
+<span id="211">211</span>
+<span id="212">212</span>
+<span id="213">213</span>
+<span id="214">214</span>
+<span id="215">215</span>
+<span id="216">216</span>
+<span id="217">217</span>
+<span id="218">218</span>
+<span id="219">219</span>
+<span id="220">220</span>
+<span id="221">221</span>
+<span id="222">222</span>
+<span id="223">223</span>
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{ElfSectionFlags, ReservedMemoryRegion};
+<span class="kw">use </span>core::{cmp, iter::Iterator};
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
 
@@ -273,6 +302,69 @@
     }
 }
 
+<span class="kw">fn </span>kernel_memory_region(
+    boot_info: <span class="kw-2">&amp;</span>multiboot2::BootInformation,
+) -&gt; <span class="prelude-ty">Result</span>&lt;ReservedMemoryRegion, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">use </span><span class="kw">crate</span>::BootInformation;
+
+    <span class="comment">// Our linker script specifies that the kernel will have the .init section
+    // starting at 1MB and ending at 1MB + .init size and all other kernel sections
+    // will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
+    // So, the start of the kernel is its physical address, but the end of it is its
+    // virtual address... confusing, I know. Thus, kernel_phys_start is the same as
+    // kernel_virt_start initially, but we remap them later in paging::init.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>physical_start = usize::MAX;
+    <span class="kw">let </span><span class="kw-2">mut </span>virtual_end = <span class="number">0</span>;
+
+    <span class="kw">for </span>section <span class="kw">in </span>boot_info
+        .elf_sections()<span class="question-mark">?
+        </span>.into_iter()
+        .filter(|section| section.is_allocated())
+    {
+        physical_start = cmp::min(section.start_address() <span class="kw">as </span>usize, physical_start);
+        virtual_end = cmp::max(section.end_address() <span class="kw">as </span>usize, virtual_end);
+    }
+
+    <span class="kw">let </span>physical_end = PhysicalAddress::new(virtual_end - KERNEL_OFFSET)
+        .ok_or(<span class="string">&quot;kernel physical end address was invalid&quot;</span>)<span class="question-mark">?</span>;
+
+    <span class="prelude-val">Ok</span>(ReservedMemoryRegion {
+        start: PhysicalAddress::new(physical_start)
+            .ok_or(<span class="string">&quot;kernel physical start address was invalid&quot;</span>)<span class="question-mark">?</span>,
+        len: (physical_end - physical_start).value(),
+    })
+}
+
+<span class="kw">fn </span>bootloader_info_memory_region(
+    boot_info: <span class="kw-2">&amp;</span>multiboot2::BootInformation,
+) -&gt; <span class="prelude-ty">Result</span>&lt;ReservedMemoryRegion, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>start = PhysicalAddress::new(boot_info.start_address() - KERNEL_OFFSET)
+        .ok_or(<span class="string">&quot;invalid bootloader info start address&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>end = PhysicalAddress::new(boot_info.end_address() - KERNEL_OFFSET)
+        .ok_or(<span class="string">&quot;invalid bootloader info end address&quot;</span>)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(ReservedMemoryRegion {
+        start,
+        len: (end - start).value(),
+    })
+}
+
+<span class="kw">fn </span>modules_memory_region(
+    boot_info: <span class="kw-2">&amp;</span>multiboot2::BootInformation,
+) -&gt; <span class="prelude-ty">Result</span>&lt;ReservedMemoryRegion, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span><span class="kw-2">mut </span>min = usize::MAX;
+    <span class="kw">let </span><span class="kw-2">mut </span>max = <span class="number">0</span>;
+
+    <span class="kw">for </span>module <span class="kw">in </span>boot_info.module_tags() {
+        min = cmp::min(min, module.start_address() <span class="kw">as </span>usize);
+        max = cmp::max(max, module.end_address() <span class="kw">as </span>usize);
+    }
+
+    <span class="prelude-val">Ok</span>(ReservedMemoryRegion {
+        start: PhysicalAddress::new(min).ok_or(<span class="string">&quot;invalid modules start address&quot;</span>)<span class="question-mark">?</span>,
+        len: max - min,
+    })
+}
+
 <span class="kw">impl </span><span class="kw">crate</span>::BootInformation <span class="kw">for </span>multiboot2::BootInformation {
     <span class="kw">type </span>MemoryRegion&lt;<span class="lifetime">&#39;a</span>&gt; = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>multiboot2::MemoryArea;
     <span class="kw">type </span>MemoryRegions&lt;<span class="lifetime">&#39;a</span>&gt; = MemoryRegions&lt;<span class="lifetime">&#39;a</span>&gt;;
@@ -283,64 +375,14 @@
     <span class="kw">type </span>Module&lt;<span class="lifetime">&#39;a</span>&gt; = <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>multiboot2::ModuleTag;
     <span class="kw">type </span>Modules&lt;<span class="lifetime">&#39;a</span>&gt; = multiboot2::ModuleIter&lt;<span class="lifetime">&#39;a</span>&gt;;
 
+    <span class="kw">type </span>AdditionalReservedMemoryRegions = core::array::IntoIter&lt;ReservedMemoryRegion, <span class="number">3</span>&gt;;
+
     <span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt; {
         VirtualAddress::new(<span class="self">self</span>.start_address())
     }
 
     <span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.total_size()
-    }
-
-    <span class="kw">fn </span>kernel_memory_range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Range&lt;PhysicalAddress&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// Our linker script specifies that the kernel will have the .init section
-        // starting at 1MB and ending at 1MB + .init size and all other kernel sections
-        // will start at (KERNEL_OFFSET + 1MB) and end at (KERNEL_OFFSET + 1MB + size).
-        // So, the start of the kernel is its physical address, but the end of it is its
-        // virtual address... confusing, I know. Thus, kernel_phys_start is the same as
-        // kernel_virt_start initially, but we remap them later in paging::init.
-        </span><span class="kw">let </span>start = PhysicalAddress::new(
-            <span class="self">self</span>.elf_sections()<span class="question-mark">?
-                </span>.into_iter()
-                .filter(|section| section.is_allocated())
-                .map(|section| section.start_address())
-                .min()
-                .ok_or(<span class="string">&quot;couldn&#39;t find kernel start address&quot;</span>)<span class="question-mark">? </span><span class="kw">as </span>usize,
-        )
-        .ok_or(<span class="string">&quot;kernel physical start address was invalid&quot;</span>)<span class="question-mark">?</span>;
-
-        <span class="kw">let </span>virtual_end = VirtualAddress::new(
-            <span class="self">self</span>.elf_sections()<span class="question-mark">?
-                </span>.into_iter()
-                .filter(|s| s.is_allocated())
-                .map(|s| s.end_address())
-                .max()
-                .ok_or(<span class="string">&quot;couldn&#39;t find kernel end address&quot;</span>)<span class="question-mark">? </span><span class="kw">as </span>usize,
-        )
-        .ok_or(<span class="string">&quot;kernel virtual end address was invalid&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
-            .ok_or(<span class="string">&quot;kernel physical end address was invalid&quot;</span>)<span class="question-mark">?</span>;
-
-        <span class="prelude-val">Ok</span>(start..physical_end)
-    }
-
-    <span class="kw">fn </span>bootloader_info_memory_range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Range&lt;PhysicalAddress&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>start = PhysicalAddress::new(<span class="self">self</span>.start_address() - KERNEL_OFFSET)
-            .ok_or(<span class="string">&quot;invalid bootloader info start address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>end = PhysicalAddress::new(<span class="self">self</span>.end_address() - KERNEL_OFFSET)
-            .ok_or(<span class="string">&quot;invalid bootloader info end address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(start..end)
-    }
-
-    <span class="kw">fn </span>modules_memory_range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Range&lt;PhysicalAddress&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>min = usize::MAX;
-        <span class="kw">let </span><span class="kw-2">mut </span>max = <span class="number">0</span>;
-
-        <span class="kw">for </span>module <span class="kw">in </span><span class="self">self</span>.module_tags() {
-            min = cmp::min(min, module.start_address() <span class="kw">as </span>usize);
-            max = cmp::max(max, module.end_address() <span class="kw">as </span>usize);
-        }
-
-        <span class="prelude-val">Ok</span>(PhysicalAddress::new_canonical(min)..PhysicalAddress::new_canonical(max))
     }
 
     <span class="kw">fn </span>memory_regions(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::MemoryRegions&lt;<span class="lifetime">&#39;_</span>&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -361,6 +403,22 @@
 
     <span class="kw">fn </span>modules(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self</span>::Modules&lt;<span class="lifetime">&#39;_</span>&gt; {
         <span class="self">self</span>.module_tags()
+    }
+
+    <span class="kw">fn </span>additional_reserved_memory_regions(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::AdditionalReservedMemoryRegions, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="prelude-val">Ok</span>([
+            kernel_memory_region(<span class="self">self</span>)<span class="question-mark">?</span>,
+            bootloader_info_memory_region(<span class="self">self</span>)<span class="question-mark">?</span>,
+            modules_memory_region(<span class="self">self</span>)<span class="question-mark">?</span>,
+        ]
+        .into_iter())
+    }
+
+    <span class="kw">fn </span>kernel_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;PhysicalAddress, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>reserved_region = kernel_memory_region(<span class="self">self</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(reserved_region.start + reserved_region.len)
     }
 
     <span class="kw">fn </span>rsdp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt; {
