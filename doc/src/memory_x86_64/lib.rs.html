@@ -285,6 +285,22 @@
 <span id="285">285</span>
 <span id="286">286</span>
 <span id="287">287</span>
+<span id="288">288</span>
+<span id="289">289</span>
+<span id="290">290</span>
+<span id="291">291</span>
+<span id="292">292</span>
+<span id="293">293</span>
+<span id="294">294</span>
+<span id="295">295</span>
+<span id="296">296</span>
+<span id="297">297</span>
+<span id="298">298</span>
+<span id="299">299</span>
+<span id="300">300</span>
+<span id="301">301</span>
+<span id="302">302</span>
+<span id="303">303</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //!
 //! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
@@ -333,6 +349,7 @@
 /// * The `data` section bounds cover those that are writable (.data, .bss).
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>AggregatedSectionMemoryBounds {
+   <span class="kw">pub </span>init:        SectionMemoryBounds,
    <span class="kw">pub </span>text:        SectionMemoryBounds,
    <span class="kw">pub </span>rodata:      SectionMemoryBounds,
    <span class="kw">pub </span>data:        SectionMemoryBounds,
@@ -348,6 +365,8 @@
 ///  * The list of all individual sections found. 
 </span><span class="kw">pub fn </span>find_section_memory_bounds(boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation) -&gt; <span class="prelude-ty">Result</span>&lt;(AggregatedSectionMemoryBounds, [<span class="prelude-ty">Option</span>&lt;SectionMemoryBounds&gt;; <span class="number">32</span>]), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>init_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>init_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>text_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>text_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_start:      <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
@@ -355,6 +374,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>data_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>data_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
 
+    <span class="kw">let </span><span class="kw-2">mut </span>init_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>text_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>rodata_flags:      <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>data_flags:        <span class="prelude-ty">Option</span>&lt;PteFlags&gt; = <span class="prelude-val">None</span>;
@@ -421,10 +441,13 @@
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         </span><span class="kw">let </span>static_str_name = <span class="kw">match </span>section.name() {
             <span class="string">&quot;.init&quot; </span>=&gt; {
-                text_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
+                init_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
+                init_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                init_flags = <span class="prelude-val">Some</span>(flags);
                 <span class="string">&quot;nano_core .init&quot;
             </span>} 
             <span class="string">&quot;.text&quot; </span>=&gt; {
+                text_start = <span class="prelude-val">Some</span>((start_virt_addr, start_phys_addr));
                 text_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
                 text_flags = <span class="prelude-val">Some</span>(flags);
                 <span class="string">&quot;nano_core .text&quot;
@@ -492,6 +515,8 @@
         index += <span class="number">1</span>;
     }
 
+    <span class="kw">let </span>init_start         = init_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .init section&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>init_end           = init_end         .ok_or(<span class="string">&quot;Couldn&#39;t find end of .init section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>text_start         = text_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .text section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>text_end           = text_end         .ok_or(<span class="string">&quot;Couldn&#39;t find end of .text section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>rodata_start       = rodata_start     .ok_or(<span class="string">&quot;Couldn&#39;t find start of .rodata section&quot;</span>)<span class="question-mark">?</span>;
@@ -499,10 +524,16 @@
     <span class="kw">let </span>data_start         = data_start       .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>data_end           = data_end         .ok_or(<span class="string">&quot;Couldn&#39;t find start of .data section&quot;</span>)<span class="question-mark">?</span>;
      
+    <span class="kw">let </span>init_flags    = init_flags  .ok_or(<span class="string">&quot;Couldn&#39;t find .init section flags&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>text_flags    = text_flags  .ok_or(<span class="string">&quot;Couldn&#39;t find .text section flags&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>rodata_flags  = rodata_flags.ok_or(<span class="string">&quot;Couldn&#39;t find .rodata section flags&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>data_flags    = data_flags  .ok_or(<span class="string">&quot;Couldn&#39;t find .data section flags&quot;</span>)<span class="question-mark">?</span>;
 
+    <span class="kw">let </span>init = SectionMemoryBounds {
+        start: init_start,
+        end: init_end,
+        flags: init_flags,
+    };
     <span class="kw">let </span>text = SectionMemoryBounds {
         start: text_start,
         end: text_end,
@@ -520,6 +551,7 @@
     };
 
     <span class="kw">let </span>aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
+        init,
         text,
         rodata,
         data,

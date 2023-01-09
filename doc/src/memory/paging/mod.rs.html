@@ -388,6 +388,22 @@
 <span id="388">388</span>
 <span id="389">389</span>
 <span id="390">390</span>
+<span id="391">391</span>
+<span id="392">392</span>
+<span id="393">393</span>
+<span id="394">394</span>
+<span id="395">395</span>
+<span id="396">396</span>
+<span id="397">397</span>
+<span id="398">398</span>
+<span id="399">399</span>
+<span id="400">400</span>
+<span id="401">401</span>
+<span id="402">402</span>
+<span id="403">403</span>
+<span id="404">404</span>
+<span id="405">405</span>
+<span id="406">406</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -664,6 +680,8 @@
         </span><span class="macro">debug!</span>(<span class="string">&quot;{:X?}&quot;</span>, aggregated_section_memory_bounds);
         <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
 
+        <span class="kw">let </span>(init_start_virt,    init_start_phys)    = aggregated_section_memory_bounds.init.start;
+        <span class="kw">let </span>(init_end_virt,      init_end_phys)      = aggregated_section_memory_bounds.init.end;
         <span class="kw">let </span>(text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
         <span class="kw">let </span>(text_end_virt,      text_end_phys)      = aggregated_section_memory_bounds.text.end;
         <span class="kw">let </span>(rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
@@ -671,9 +689,22 @@
         <span class="kw">let </span>(data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
         <span class="kw">let </span>(data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
 
+        <span class="kw">let </span>init_flags    = aggregated_section_memory_bounds.init.flags;
         <span class="kw">let </span>text_flags    = aggregated_section_memory_bounds.text.flags;
         <span class="kw">let </span>rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         <span class="kw">let </span>data_flags    = aggregated_section_memory_bounds.data.flags;
+
+        <span class="kw">let </span>init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())<span class="question-mark">?</span>;
+        <span class="kw">let </span>init_frames = frame_allocator::allocate_frames_by_bytes_at(init_start_phys, init_end_phys.value() - init_start_phys.value())<span class="question-mark">?</span>;
+        <span class="kw">let </span>init_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(init_start_phys.value()),
+            init_end_phys.value() - init_start_phys.value(),
+        )<span class="question-mark">?</span>;
+        identity_mapped_pages[index] = <span class="prelude-val">Some</span>(NoDrop::new( <span class="kw">unsafe </span>{
+            Mapper::map_to_non_exclusive(mapper, init_pages_identity, <span class="kw-2">&amp;</span>init_frames, init_flags)<span class="question-mark">?
+        </span>}));
+        <span class="kw">let </span><span class="kw-2">mut </span>init_mapped_pages = mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)<span class="question-mark">?</span>;
+        index += <span class="number">1</span>;
 
         <span class="kw">let </span>text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())<span class="question-mark">?</span>;
@@ -681,7 +712,8 @@
         identity_mapped_pages[index] = <span class="prelude-val">Some</span>(NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(mapper, text_pages_identity, <span class="kw-2">&amp;</span>text_frames, text_flags)<span class="question-mark">?
         </span>}));
-        text_mapped_pages = <span class="prelude-val">Some</span>(NoDrop::new(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)<span class="question-mark">?</span>));
+        init_mapped_pages.merge(mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)<span class="question-mark">?</span>).map_err(|(error, <span class="kw">_</span>)| error)<span class="question-mark">?</span>;
+        text_mapped_pages = <span class="prelude-val">Some</span>(NoDrop::new(init_mapped_pages));
         index += <span class="number">1</span>;
 
         <span class="kw">let </span>rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())<span class="question-mark">?</span>;
