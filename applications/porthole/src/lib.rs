@@ -14,7 +14,7 @@ use core::marker::PhantomData;
 use core::ops::{Add, Sub};
 
 use alloc::format;
-use alloc::sync::{Arc, Weak};
+use alloc::sync::Arc;
 use log::{debug, info};
 use spin::{Mutex, MutexGuard, Once};
 
@@ -58,22 +58,21 @@ static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
     ]
 };
 pub struct App {
-    window: Weak<Mutex<Window>>,
+    window: Arc<Mutex<Window>>,
     text: TextDisplayInfo,
 }
 
 impl App {
-    pub fn new(window: Weak<Mutex<Window>>, text: TextDisplayInfo) -> Self {
+    pub fn new(window: Arc<Mutex<Window>>, text: TextDisplayInfo) -> Self {
         Self { window, text }
     }
     pub fn draw(&mut self) -> Result<(), &'static str> {
-        if let Some(window) = self.window.upgrade() {
-            window.lock().draw_rectangle(DEFAULT_WINDOW_COLOR)?;
-            window
-                .lock()
-                .display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR);
+        let mut window = self.window.lock();
+        {
+            window.draw_rectangle(DEFAULT_WINDOW_COLOR)?;
+            window.display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR);
             print_string(
-                &mut window.lock(),
+                &mut window,
                 self.text.width,
                 self.text.height,
                 &self.text.pos,
@@ -616,7 +615,7 @@ impl WindowManager {
         &mut self,
         rect: &Rect,
         title: Option<String>,
-    ) -> Result<Weak<Mutex<Window>>, &'static str> {
+    ) -> Result<Arc<Mutex<Window>>, &'static str> {
         let len = self.windows.len();
 
         self.window_rendering_order.push(len);
@@ -626,9 +625,9 @@ impl WindowManager {
             title,
         );
         let arc_window = Arc::new(Mutex::new(window));
-        let weak = Arc::downgrade(&arc_window);
+        let returned_window = arc_window.clone();
         self.windows.push(arc_window);
-        Ok(weak)
+        Ok(returned_window)
     }
 
     fn draw_windows(&mut self) {
