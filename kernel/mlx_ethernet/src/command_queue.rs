@@ -1078,6 +1078,7 @@ impl CommandQueue {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_send_queue_context_to_mailbox(
         input_mailbox_buffers: &mut [MailboxBuffer],
         pages: Vec<PhysicalAddress>, 

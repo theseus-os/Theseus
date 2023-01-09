@@ -689,6 +689,7 @@ pub struct LoadedSection {
 }
 impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         typ: SectionType, 
         name: StrRef, 
@@ -716,6 +717,7 @@ impl LoadedSection {
     }
 
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_dependencies(
         typ: SectionType, 
         name: StrRef, 
