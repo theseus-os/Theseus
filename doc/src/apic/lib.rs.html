@@ -939,17 +939,17 @@
 <span class="kw">impl </span>LapicIpiDestination {
     <span class="doccomment">/// Convert the enum to a bitmask value to be used in the interrupt command register
     </span><span class="kw">pub fn </span>as_icr_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u64 {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="kw-2">&amp;</span>LapicIpiDestination::One(apic_id) =&gt; { 
+        <span class="kw">match </span><span class="kw-2">*</span><span class="self">self </span>{
+            LapicIpiDestination::One(apic_id) =&gt; { 
                 <span class="kw">if </span>has_x2apic() {
                     (apic_id <span class="kw">as </span>u64) &lt;&lt; <span class="number">32
                 </span>} <span class="kw">else </span>{
                     (apic_id <span class="kw">as </span>u64) &lt;&lt; <span class="number">56
                 </span>}
             }
-            <span class="kw-2">&amp;</span>LapicIpiDestination::Me       =&gt; <span class="number">0b01 </span>&lt;&lt; <span class="number">18</span>, <span class="comment">// 0x4_0000
-            </span><span class="kw-2">&amp;</span>LapicIpiDestination::All      =&gt; <span class="number">0b10 </span>&lt;&lt; <span class="number">18</span>, <span class="comment">// 0x8_0000
-            </span><span class="kw-2">&amp;</span>LapicIpiDestination::AllButMe =&gt; <span class="number">0b11 </span>&lt;&lt; <span class="number">18</span>, <span class="comment">// 0xC_0000
+            LapicIpiDestination::Me       =&gt; <span class="number">0b01 </span>&lt;&lt; <span class="number">18</span>, <span class="comment">// 0x4_0000
+            </span>LapicIpiDestination::All      =&gt; <span class="number">0b10 </span>&lt;&lt; <span class="number">18</span>, <span class="comment">// 0x8_0000
+            </span>LapicIpiDestination::AllButMe =&gt; <span class="number">0b11 </span>&lt;&lt; <span class="number">18</span>, <span class="comment">// 0xC_0000
         </span>}
     }
 }
@@ -1239,7 +1239,7 @@
             enable_bitmask = IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE;
         } <span class="kw">else </span>{
             <span class="kw">let </span>apic_regs = map_apic(page_table)
-                .map_err(|e| LapicInitError::MemoryMappingError(e))
+                .map_err(LapicInitError::MemoryMappingError)
                 .and_then(|apic_mp| 
                     apic_mp.into_borrowed_mut(<span class="number">0</span>)
                         .map_err(|(_mp, err)| LapicInitError::MemoryMappingError(err))

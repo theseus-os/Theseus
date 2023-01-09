@@ -335,7 +335,7 @@
 <span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;HpetTimer&gt;(), <span class="number">32</span>);
 
 
-<span class="kw">pub const </span>HPET_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;HPET&quot;</span>;
+<span class="kw">pub const </span>HPET_SIGNATURE: <span class="kw-2">&amp;</span>[u8; <span class="number">4</span>] = <span class="string">b&quot;HPET&quot;</span>;
 
 <span class="doccomment">/// The handler for parsing the HPET table and adding it to the ACPI tables list.
 </span><span class="kw">pub fn </span>handle(
@@ -365,8 +365,8 @@
 
 <span class="kw">impl </span>HpetAcpiTable {
     <span class="doccomment">/// Finds the HPET in the given `AcpiTables` and returns a reference to it.
-    </span><span class="kw">pub fn </span>get&lt;<span class="lifetime">&#39;t</span>&gt;(acpi_tables: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>HpetAcpiTable&gt; {
-        acpi_tables.table(<span class="kw-2">&amp;</span>HPET_SIGNATURE).ok()
+    </span><span class="kw">pub fn </span>get(acpi_tables: <span class="kw-2">&amp;</span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>HpetAcpiTable&gt; {
+        acpi_tables.table(HPET_SIGNATURE).ok()
     }
 
     <span class="doccomment">/// Initializes the HPET counter-based timer

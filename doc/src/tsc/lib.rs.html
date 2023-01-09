@@ -104,14 +104,14 @@
     /// returning `None` if underflow occurred.
     </span><span class="kw">pub fn </span>sub(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>TscTicks) -&gt; <span class="prelude-ty">Option</span>&lt;TscTicks&gt; {
         <span class="kw">let </span>checked_sub = <span class="self">self</span>.<span class="number">0</span>.checked_sub(other.<span class="number">0</span>);
-        checked_sub.map( |tt| TscTicks(tt) )
+        checked_sub.map(TscTicks)
     }
     
     <span class="doccomment">/// Checked addition. Computes `self + other`, 
     /// returning `None` if overflow occurred.
     </span><span class="kw">pub fn </span>add(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>TscTicks) -&gt; <span class="prelude-ty">Option</span>&lt;TscTicks&gt; {
         <span class="kw">let </span>checked_add = <span class="self">self</span>.<span class="number">0</span>.checked_add(other.<span class="number">0</span>);
-        checked_add.map( |tt| TscTicks(tt) )
+        checked_add.map(TscTicks)
     }
 }
 

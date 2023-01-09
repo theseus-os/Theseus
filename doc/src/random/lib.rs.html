@@ -148,6 +148,13 @@
 <span id="148">148</span>
 <span id="149">149</span>
 <span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
+<span id="155">155</span>
+<span id="156">156</span>
+<span id="157">157</span>
 </pre><pre class="rust"><code><span class="doccomment">//! A cryptographically secure source of randomness.
 //!
 //! The randomness is provided by a global, cryptographically secure
@@ -196,8 +203,15 @@
     };
 }
 
+<span class="doccomment">/// Error kinds in the Random crate.
+</span><span class="kw">pub enum </span>RandError {
+    InvalidData,
+    InvalidInput,
+    Other,
+}
+
 <span class="doccomment">/// Tries to generate a 32 byte seed using the RDSEED x86 instruction.
-</span><span class="kw">fn </span>rdseed_seed() -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], ()&gt; {
+</span><span class="kw">fn </span>rdseed_seed() -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], RandError&gt; {
     <span class="kw">match </span>rdrand::RdSeed::new() {
         <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>generator) =&gt; {
             <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0</span>; <span class="number">32</span>];
@@ -208,19 +222,19 @@
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                     <span class="macro">log::warn!</span>(<span class="string">&quot;failed to generate seed from RDSEED&quot;</span>);
-                    <span class="prelude-val">Err</span>(())
+                    <span class="prelude-val">Err</span>(RandError::InvalidData)
                 }
             }
         }
         <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
             <span class="macro">log::warn!</span>(<span class="string">&quot;failed to initialise RDSEED&quot;</span>);
-            <span class="prelude-val">Err</span>(())
+            <span class="prelude-val">Err</span>(RandError::InvalidInput)
         }
     }
 }
 
 <span class="doccomment">/// Tries to generate a 32 byte seed using the RDRAND x86 instruction.
-</span><span class="kw">fn </span>rdrand_seed() -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], ()&gt; {
+</span><span class="kw">fn </span>rdrand_seed() -&gt; <span class="prelude-ty">Result</span>&lt;[u8; <span class="number">32</span>], RandError&gt; {
     <span class="kw">match </span>rdrand::RdRand::new() {
         <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>generator) =&gt; {
             <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0</span>; <span class="number">32</span>];
@@ -231,13 +245,13 @@
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
                     <span class="macro">log::warn!</span>(<span class="string">&quot;failed to generate seed from RDRAND&quot;</span>);
-                    <span class="prelude-val">Err</span>(())
+                    <span class="prelude-val">Err</span>(RandError::InvalidData)
                 }
             }
         }
         <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
             <span class="macro">log::warn!</span>(<span class="string">&quot;failed to initialise RDRAND&quot;</span>);
-            <span class="prelude-val">Err</span>(())
+            <span class="prelude-val">Err</span>(RandError::InvalidInput)
         }
     }
 }
@@ -249,9 +263,9 @@
 </span><span class="kw">fn </span>tsc_seed() -&gt; [u8; <span class="number">32</span>] {
     <span class="kw">let </span><span class="kw-2">mut </span>seed = [<span class="number">0</span>; <span class="number">32</span>];
 
-    <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..seed.len() {
+    <span class="kw">for </span>s <span class="kw">in </span><span class="kw-2">&amp;mut </span>seed {
         <span class="comment">// The last byte is the _most_ random.
-        </span>seed[i] = u128::from(tsc::tsc_ticks()).to_be_bytes()[<span class="number">15</span>];
+        </span><span class="kw-2">*</span>s = u128::from(tsc::tsc_ticks()).to_be_bytes()[<span class="number">15</span>];
     }
 
     <span class="comment">// The TSC isn&#39;t a high quality source of randomness.
@@ -291,12 +305,12 @@
 /// Directly accessing the global CSPRNG can be expensive and so it is often
 /// better to seed a local PRNG from the global CSPRNG. Using a local PRNG
 /// also allows for much faster cryptographically insecure PRNGs to be used.
-</span><span class="kw">pub fn </span>init_rng&lt;T&gt;() -&gt; <span class="prelude-ty">Result</span>&lt;T, ()&gt;
+</span><span class="kw">pub fn </span>init_rng&lt;T&gt;() -&gt; <span class="prelude-ty">Result</span>&lt;T, RandError&gt;
 <span class="kw">where
     </span>T: SeedableRng,
 {
     <span class="kw">let </span><span class="kw-2">mut </span>csprng = CSPRNG.lock();
-    T::from_rng(<span class="kw-2">&amp;mut *</span>csprng).map_err(|<span class="kw">_</span>| ())
+    T::from_rng(<span class="kw-2">&amp;mut *</span>csprng).map_err(|<span class="kw">_</span>| RandError::InvalidInput)
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="random" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

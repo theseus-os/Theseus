@@ -98,9 +98,6 @@
 <span id="98">98</span>
 <span id="99">99</span>
 <span id="100">100</span>
-<span id="101">101</span>
-<span id="102">102</span>
-<span id="103">103</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 </span><span class="doccomment">//! This crate contains the implementation of the special root directory. The only way that this 
 //! directory implementation differs from VFSDirectory is that there is no parent field (becuase the 
@@ -120,7 +117,7 @@
 <span class="kw">use </span>fs_node::{DirRef, Directory, FileOrDir, FsNode, WeakDirRef};
 
 
-<span class="kw">pub const </span>ROOT_DIRECTORY_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;&quot;</span>;
+<span class="kw">pub const </span>ROOT_DIRECTORY_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;&quot;</span>;
 
 <span class="macro">lazy_static! </span>{
     <span class="doccomment">/// The root directory
@@ -166,14 +163,11 @@
 
     <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, node: <span class="kw-2">&amp;</span>FileOrDir) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
         <span class="comment">// Prevents removal of root
-        </span><span class="kw">match </span>node {
-            <span class="kw-2">&amp;</span>FileOrDir::Dir(<span class="kw-2">ref </span>dir) =&gt; {
-                <span class="kw">if </span>Arc::ptr_eq(dir, get_root()) {
-                    <span class="macro">error!</span>(<span class="string">&quot;Ignoring attempt to remove the root directory.&quot;</span>);
-                    <span class="kw">return </span><span class="prelude-val">None</span>;
-                }
-            },
-            <span class="kw">_ </span>=&gt; {}
+        </span><span class="kw">if let </span>FileOrDir::Dir(dir) = node {
+            <span class="kw">if </span>Arc::ptr_eq(dir, get_root()) {
+                <span class="macro">error!</span>(<span class="string">&quot;Ignoring attempt to remove the root directory&quot;</span>);
+                <span class="kw">return </span><span class="prelude-val">None</span>;
+            }
         }
         
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>old_node) = <span class="self">self</span>.children.remove(<span class="kw-2">&amp;</span>node.get_name()) {
@@ -188,7 +182,7 @@
 <span class="kw">impl </span>FsNode <span class="kw">for </span>RootDirectory {
     <span class="doccomment">/// Recursively gets the absolute pathname as a String
     </span><span class="kw">fn </span>get_absolute_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>, ROOT_DIRECTORY_NAME)
+        <span class="macro">format!</span>(<span class="string">&quot;{ROOT_DIRECTORY_NAME}/&quot;</span>)
     }
 
     <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {

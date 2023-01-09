@@ -423,7 +423,7 @@
 }
 <span class="kw">impl </span>SerialPortAddress {
     <span class="doccomment">/// Returns a reference to the static instance of this serial port.
-    </span><span class="kw">fn </span>to_static_port(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; {
+    </span><span class="kw">fn </span>to_static_port(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             SerialPortAddress::COM1 =&gt; <span class="kw-2">&amp;</span>COM1_SERIAL_PORT,
             SerialPortAddress::COM2 =&gt; <span class="kw-2">&amp;</span>COM2_SERIAL_PORT,

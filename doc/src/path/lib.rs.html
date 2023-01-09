@@ -406,11 +406,11 @@
         <span class="kw">let </span><span class="kw-2">mut </span>first_cmpnt = <span class="bool-val">true</span>; 
         <span class="kw">for </span>component <span class="kw">in </span>new_components {
             <span class="kw">if </span>first_cmpnt {
-                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>,  component));
+                new_path.push_str(component);
                 first_cmpnt = <span class="bool-val">false</span>;
             } 
             <span class="kw">else </span>{
-                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}&quot;</span>,  component));
+                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{component}&quot;</span>));
             }
         }
         Path::new(new_path)
@@ -435,7 +435,7 @@
                 }
                 (<span class="prelude-val">None</span>, <span class="kw">_</span>) =&gt; comps.push(<span class="string">&quot;..&quot;</span>.to_string()),
                 (<span class="prelude-val">Some</span>(<span class="kw-2">ref </span>a), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>comps.is_empty() &amp;&amp; a == b =&gt; <span class="kw">continue</span>,
-                (<span class="prelude-val">Some</span>(<span class="kw-2">ref </span>_a), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>b == <span class="kw-2">&amp;</span><span class="string">&quot;.&quot;</span>.to_string() =&gt; comps.push(<span class="string">&quot;..&quot;</span>.to_string()),
+                (<span class="prelude-val">Some</span>(_a), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>b == <span class="kw-2">&amp;</span><span class="string">&quot;.&quot;</span>.to_string() =&gt; comps.push(<span class="string">&quot;..&quot;</span>.to_string()),
                 (<span class="prelude-val">Some</span>(<span class="kw">_</span>), <span class="prelude-val">Some</span>(<span class="kw-2">ref </span>b)) <span class="kw">if </span>b == <span class="kw-2">&amp;</span><span class="string">&quot;..&quot;</span>.to_string() =&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
                 (<span class="prelude-val">Some</span>(a), <span class="prelude-val">Some</span>(<span class="kw">_</span>)) =&gt; {
                     comps.push(<span class="string">&quot;..&quot;</span>.to_string());
@@ -453,7 +453,7 @@
         <span class="comment">// Create the new path from its components 
         </span><span class="kw">let </span><span class="kw-2">mut </span>new_path = String::new();
         <span class="kw">for </span>component <span class="kw">in </span>comps.iter() {
-                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}/&quot;</span>,  component));
+                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{component}/&quot;</span>));
         }
         <span class="comment">// Remove the trailing slash after the final path component
         </span>new_path.pop();
@@ -475,7 +475,7 @@
                 Arc::clone(root::get_root())
             }
             <span class="kw">else </span>{
-                Arc::clone(<span class="kw-2">&amp;</span>starting_dir)
+                Arc::clone(starting_dir)
             }
         };
 

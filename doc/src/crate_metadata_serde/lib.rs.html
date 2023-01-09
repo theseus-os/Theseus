@@ -147,9 +147,6 @@
 <span id="147">147</span>
 <span id="148">148</span>
 <span id="149">149</span>
-<span id="150">150</span>
-<span id="151">151</span>
-<span id="152">152</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Standalone crate containing (de)serializable types for crate and section metadata.
 //! 
 //! The primary reason this exists is because `LoadedCrate` and `LoadedSection`
@@ -296,10 +293,7 @@
 
     <span class="doccomment">/// Returns `true` if `Data` or `Bss`, otherwise `false`.
     </span><span class="kw">pub fn </span>is_data_or_bss(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="self">Self</span>::Data | <span class="self">Self</span>::Bss =&gt; <span class="bool-val">true</span>,
-            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-        }
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="self">Self</span>::Data | <span class="self">Self</span>::Bss)
     }
 }
 </code></pre></div>

@@ -115,6 +115,10 @@
 <span id="115">115</span>
 <span id="116">116</span>
 <span id="117">117</span>
+<span id="118">118</span>
+<span id="119">119</span>
+<span id="120">120</span>
+<span id="121">121</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Registers and stores unwind information from external components.
 //! 
 //! Typically, Theseus maintains metadata about all crates loaded and linked into system.
@@ -173,7 +177,7 @@
     </span><span class="kw">pub </span>unwind_info: Range&lt;VirtualAddress&gt;,
 }
 
-<span class="doccomment">/// Register  a new section of external unwinding information.
+<span class="doccomment">/// Register a new section of external unwinding information.
 /// 
 /// Returns an error if unwinding information has already been registered 
 /// for the given `text_section_base_address`.
@@ -182,7 +186,7 @@
     text_section_len: usize,
     unwind_info: <span class="kw-2">*mut </span>u8,
     unwind_len: usize,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), ExternalUnwindInfoError&gt; {
 
     <span class="kw">let </span><span class="kw-2">mut </span>uw = EXTERNAL_UNWIND_INFO.lock();
     <span class="kw">let </span>text_start = VirtualAddress::new_canonical(text_section_base_address <span class="kw">as </span>usize);
@@ -197,7 +201,7 @@
 
     uw.try_insert(text_start, uw_info).map_err(|_e| {
         <span class="macro">error!</span>(<span class="string">&quot;External unwind info for {text_start:#X} was already registered&quot;</span>);
-        ()
+        ExternalUnwindInfoError::AlreadyExists
     })<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())
@@ -232,5 +236,9 @@
 
     <span class="prelude-val">None
 </span>}
+
+<span class="kw">pub enum </span>ExternalUnwindInfoError {
+    AlreadyExists,
+}
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="external_unwind_info" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

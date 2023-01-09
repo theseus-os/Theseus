@@ -1024,6 +1024,7 @@
 <span id="1024">1024</span>
 <span id="1025">1025</span>
 <span id="1026">1026</span>
+<span id="1027">1027</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.
 //! 
 //! The important items are summarized below:
@@ -1150,6 +1151,7 @@
 <span class="doccomment">/// A trait that represents an I/O stream that has a known length, e.g., a disk drive.
 ///
 /// This trait exists to enable seeking to an offset from the end of the stream.
+</span><span class="attr">#[allow(clippy::len_without_is_empty)]
 </span><span class="kw">pub trait </span>KnownLength {
     <span class="doccomment">/// Returns the length (size in bytes) of this I/O stream or device.
     </span><span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;

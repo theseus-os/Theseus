@@ -316,6 +316,7 @@
 <span id="316">316</span>
 <span id="317">317</span>
 <span id="318">318</span>
+<span id="319">319</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="comment">// #[macro_use] extern crate log;
@@ -524,7 +525,8 @@
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, fmtr: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; <span class="prelude-ty">Result</span>&lt;(), fmt::Error&gt; {
         fmtr.write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;\nGdt: [\n&quot;</span>))<span class="question-mark">?</span>;
         <span class="kw">for </span>(index, entry) <span class="kw">in </span><span class="self">self</span>.table.iter().enumerate() {
-             fmtr.write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;  {}:  {:#016x}\n&quot;</span>, index, entry))<span class="question-mark">?</span>;
+            <span class="attr">#[allow(clippy::uninlined_format_args)]
+            </span>fmtr.write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;  {}:  {:#016x}\n&quot;</span>, index, entry))<span class="question-mark">?</span>;
         }
         fmtr.write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;]&quot;</span>))<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(())

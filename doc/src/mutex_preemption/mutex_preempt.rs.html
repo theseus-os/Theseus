@@ -225,9 +225,8 @@
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexPreemptGuard&lt;T&gt; {
         <span class="kw">loop </span>{
-            <span class="kw">match </span><span class="self">self</span>.try_lock() {
-                <span class="prelude-val">Some</span>(guard) =&gt; <span class="kw">return </span>guard,
-                <span class="kw">_ </span>=&gt; {}
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(guard) = <span class="self">self</span>.try_lock() {
+                <span class="kw">return </span>guard;
             }
         }
     }
@@ -245,6 +244,7 @@
 
     <span class="doccomment">/// Force unlock the spinlock.
     ///
+    /// # Safety
     /// This is *extremely* unsafe if the lock is not held by the current
     /// thread. However, this can be useful in some instances for exposing the
     /// lock to FFI that doesn&#39;t know how to deal with RAII.

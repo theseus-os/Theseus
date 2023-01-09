@@ -1689,7 +1689,7 @@
         <span class="kw">let </span>size_in_pages = <span class="self">self</span>.size_in_pages();
 
         <span class="kw">use </span><span class="kw">crate</span>::paging::allocate_pages;
-        <span class="kw">let </span>new_pages = allocate_pages(size_in_pages).ok_or_else(|| <span class="string">&quot;Couldn&#39;t allocate_pages()&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>new_pages = allocate_pages(size_in_pages).ok_or(<span class="string">&quot;Couldn&#39;t allocate_pages()&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// we must temporarily map the new pages as Writable, since we&#39;re about to copy data into them
         </span><span class="kw">let </span>new_flags = new_flags.map_or(<span class="self">self</span>.flags, Into::into);
@@ -1774,7 +1774,7 @@
             }
             <span class="prelude-val">Err</span>(e) =&gt; {
                 <span class="macro">error!</span>(<span class="string">&quot;MappedPages::unmap_into_parts(): failed to unmap {:?}, error: {}&quot;</span>, <span class="self">self</span>, e);
-                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>);
+                <span class="prelude-val">Err</span>(<span class="self">self</span>)
             }
         }
     }

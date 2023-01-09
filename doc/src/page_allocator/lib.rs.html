@@ -1004,7 +1004,7 @@
 			pages: <span class="self">self</span>.pages.clone(),
 		});
 		<span class="kw">match </span>res {
-			<span class="prelude-val">Ok</span>(_inserted_free_chunk) =&gt; <span class="kw">return</span>,
+			<span class="prelude-val">Ok</span>(_inserted_free_chunk) =&gt; (),
 			<span class="prelude-val">Err</span>(c) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free page list&quot;</span>, c),
 		}
 		
@@ -1149,8 +1149,8 @@
 ///
 /// It first attempts to find a suitable chunk **not** in the designated regions,
 /// and only allocates from the designated regions as a backup option.
-</span><span class="kw">fn </span>find_any_chunk&lt;<span class="lifetime">&#39;list</span>&gt;(
-	list: <span class="kw-2">&amp;</span><span class="lifetime">&#39;list </span><span class="kw-2">mut </span>StaticArrayRBTree&lt;Chunk&gt;,
+</span><span class="kw">fn </span>find_any_chunk(
+	list: <span class="kw-2">&amp;mut </span>StaticArrayRBTree&lt;Chunk&gt;,
 	num_pages: usize
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), AllocationError&gt; {
 	<span class="kw">let </span>designated_low_end = DESIGNATED_PAGES_LOW_END.get().ok_or(AllocationError::NotInitialized)<span class="question-mark">?</span>;
@@ -1162,7 +1162,7 @@
 				<span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = elem {
 					<span class="comment">// Skip chunks that are too-small or in the designated regions.
 					</span><span class="kw">if  </span>chunk.size_in_pages() &lt; num_pages || 
-						chunk.start() &lt;= <span class="kw-2">&amp;</span>designated_low_end || 
+						chunk.start() &lt;= designated_low_end || 
 						chunk.end() &gt;= <span class="kw-2">&amp;</span>DESIGNATED_PAGES_HIGH_START
 					{
 						<span class="kw">continue</span>;
@@ -1190,7 +1190,7 @@
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
 			</span><span class="kw">let </span><span class="kw-2">mut </span>cursor = tree.upper_bound_mut(Bound::Excluded(<span class="kw-2">&amp;</span>DESIGNATED_PAGES_HIGH_START));
 			<span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
-				<span class="kw">if </span>chunk.start() &lt;= <span class="kw-2">&amp;</span>designated_low_end {
+				<span class="kw">if </span>chunk.start() &lt;= designated_low_end {
 					<span class="kw">break</span>; <span class="comment">// move on to searching through the designated regions
 				</span>}
 				<span class="kw">if </span>num_pages &lt; chunk.size_in_pages() {

@@ -517,7 +517,7 @@
 /// If the logger has not yet been initialized, no log messages will be emitted.
 /// and an `Error` will be returned.
 </span><span class="kw">pub fn </span>write_str(s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
-    <span class="kw">crate</span>::write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, s))
+    <span class="kw">crate</span>::write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;{s}&quot;</span>))
 }
 
 

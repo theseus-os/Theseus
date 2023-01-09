@@ -159,7 +159,6 @@
 <span id="159">159</span>
 <span id="160">160</span>
 <span id="161">161</span>
-<span id="162">162</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="doccomment">//! This crate contains an implementation of an in-memory filesystem backed by MappedPages from the memory crate
@@ -269,14 +268,13 @@
             
             <span class="comment">// first, we need to copy over the bytes from the previous mapped pages
             </span>{
-                <span class="comment">// this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
-                </span><span class="kw">let </span>copy_limit;
-                <span class="comment">// The write does not overlap with existing content, so we copy all existing content
-                </span><span class="kw">if </span>offset &gt; <span class="self">self</span>.len { 
-                    copy_limit = <span class="self">self</span>.len;
+                <span class="comment">// copy_limit copies bytes to min(the write offset, all the bytes of the existing mapped pages)
+                // The write does not overlap with existing content, so we copy all existing content
+                </span><span class="kw">let </span>copy_limit = <span class="kw">if </span>offset &gt; <span class="self">self</span>.len { 
+                    <span class="self">self</span>.len
                 } <span class="kw">else </span>{ <span class="comment">// Otherwise, we only copy up to where the overlap begins
-                    </span>copy_limit = offset;
-                }
+                    </span>offset
+                };
                 <span class="kw">let </span>existing_bytes = <span class="self">self</span>.mp.as_slice(<span class="number">0</span>, copy_limit)<span class="question-mark">?</span>;
                 <span class="kw">let </span>copy_slice = new_mapped_pages.as_slice_mut::&lt;u8&gt;(<span class="number">0</span>, copy_limit)<span class="question-mark">?</span>;
                 copy_slice.copy_from_slice(existing_bytes);

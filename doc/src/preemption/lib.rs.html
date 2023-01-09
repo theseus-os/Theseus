@@ -141,6 +141,7 @@
 <span id="141">141</span>
 <span id="142">142</span>
 <span id="143">143</span>
+<span id="144">144</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.
 //! 
 //! Supports enabling and disabling preemption for the purpose of 
@@ -157,7 +158,8 @@
 /// so the maximum number of cores it supports is `u8::MAX` (256).
 </span><span class="kw">const </span>MAX_CPU_CORES: usize = u8::MAX <span class="kw">as </span>usize;
 
-<span class="kw">const </span>ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
+<span class="attr">#[allow(clippy::declare_interior_mutable_const)]
+</span><span class="kw">const </span>ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
 
 <span class="doccomment">/// The per-core preemption count, indexed by a CPU core&#39;s APIC ID.
 /// 

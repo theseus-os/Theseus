@@ -120,9 +120,6 @@
 <span id="120">120</span>
 <span id="121">121</span>
 <span id="122">122</span>
-<span id="123">123</span>
-<span id="124">124</span>
-<span id="125">125</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines the basic shapes used for display.
 
 </span><span class="attr">#![no_std]
@@ -142,7 +139,7 @@
 <span class="kw">impl </span>Coord {
     <span class="doccomment">/// Creates a new coordinate.
     </span><span class="kw">pub fn </span>new(x: isize, y: isize) -&gt; Coord {
-        Coord { x: x, y: y }
+        Coord { x, y }
     }
 }
 
@@ -186,14 +183,11 @@
 
 <span class="kw">impl </span>Ord <span class="kw">for </span>Coord {
     <span class="kw">fn </span>cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; Ordering {
-        <span class="kw">if </span><span class="self">self</span>.y &gt; other.y {
-            <span class="kw">return </span>Ordering::Greater;
-        } <span class="kw">else if </span><span class="self">self</span>.y &lt; other.y {
-            <span class="kw">return </span>Ordering::Less;
-        } <span class="kw">else </span>{
-            <span class="kw">return </span><span class="self">self</span>.x.cmp(<span class="kw-2">&amp;</span>other.x);
+        <span class="kw">match </span>(<span class="self">self</span>.y, other.y) {
+            (s, o) <span class="kw">if </span>s &gt; o =&gt; Ordering::Greater,
+            (s, o) <span class="kw">if </span>s &lt; o =&gt; Ordering::Less,
+            <span class="kw">_ </span>=&gt; <span class="self">self</span>.x.cmp(<span class="kw-2">&amp;</span>other.x),
         }
-
     }
 }
 
