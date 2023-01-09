@@ -94,7 +94,7 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     // The lock is dropped and interrupts are restored to their prior state
     /// }
     /// ```
-    pub fn read<'a>(&'a self) -> Result<RwLockSleepReadGuard<'a, T>, &'static str> {
+    pub fn read(&self) -> Result<RwLockSleepReadGuard<T>, &'static str> {
         // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_read() {
             return Ok(guard);
@@ -194,7 +194,7 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     // The lock is dropped
     /// }
     /// ```
-    pub fn write<'a>(&'a self) -> Result<RwLockSleepWriteGuard<'a, T>, &'static str> {
+    pub fn write(&self) -> Result<RwLockSleepWriteGuard<T>, &'static str> {
         // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_write() {
             return Ok(guard);

@@ -168,7 +168,7 @@ impl CrateType {
     /// let result = CrateType::from_module_name("ksse#my_crate.o");
     /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
+    pub fn from_module_name(module_name: &str) -> Result<(CrateType, &str, &str), &'static str> {
         let mut iter = module_name.split(MODULE_PREFIX_DELIMITER);
         let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
         let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
