@@ -33,8 +33,12 @@ static TITLE_BAR_HEIGHT: usize = 20;
 static SCREEN_WIDTH: usize = 1024;
 static SCREEN_HEIGHT: usize = 768;
 
-// We could do some fancy stuff with this like a trait, that can convert rgb to hex
-// hex to rgb hsl etc, but for now it feels like bikeshedding
+/// Controls amount of visible `Window` we see when we move a `Window` out of the screen
+static WINDOW_VISIBLE_GAP: i32 = 20;
+
+/// Controls amount of visible mouse we see when we move the mouse out of the screen
+static MOUSE_VISIBLE_GAP: i32 = 3;
+
 type Color = u32;
 static DEFAULT_BORDER_COLOR: Color = 0x141414;
 static DEFAULT_TEXT_COLOR: Color = 0xFBF1C7;
@@ -72,7 +76,7 @@ impl App {
         let mut window = self.window.lock();
         {
             window.draw_rectangle(DEFAULT_WINDOW_COLOR)?;
-            //window.display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR);
+            window.display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;
             print_string(
                 &mut window,
                 &self.text.pos,
@@ -85,12 +89,10 @@ impl App {
     }
 }
 
-/// Prints a line of string from the start of the Window
+/// Prints a line of string to the `Window`
 ///  
-/// *Prints from left -> right*
-///
 /// * `window` - Window we are printing to.
-/// * `position` - This indicates where line will be.
+/// * `position` - This indicates where line of text will be.
 /// * `slice` - Text we are printing
 /// * `fg_color` - Foreground color of the text
 /// * `bg_color` - Background color of the text
@@ -102,6 +104,7 @@ pub fn print_string(
     bg_color: Color,
 ) -> Result<(), &'static str> {
     let slice = slice.as_bytes();
+    let start_x = position.x;
     let start_y = position.y;
 
     let mut x_index = 0;
@@ -109,11 +112,12 @@ pub fn print_string(
     let mut char_index = 0;
     let mut char_color_on_x_axis = x_index;
 
-    let window_width = window.width();
-    let mut row_of_pixels = FramebufferRowChunks::get_a_row(
+    let mut window_rect = window.rect;
+    window_rect.set_position(start_x, start_y);
+    let mut row_of_pixels = FramebufferRowChunks::get_exact_row(
         &mut window.frame_buffer.buffer,
-        window.rect,
-        window_width,
+        window_rect,
+        window_rect.width,
         start_y as usize,
     )?;
 
@@ -124,6 +128,7 @@ pub fn print_string(
         }
         let color = if char_color_on_x_axis >= 1 {
             let index = char_color_on_x_axis - 1;
+            // TODO: Stop indexing here
             let char_font = FONT_BASIC[slice[char_index] as usize][row_controller];
             char_color_on_x_axis += 1;
             if get_bit(char_font, index) != 0 {
@@ -150,10 +155,10 @@ pub fn print_string(
             if x_index >= CHARACTER_WIDTH * slice.len()
                 && x_index % (CHARACTER_WIDTH * slice.len()) == 0
             {
-                row_of_pixels = FramebufferRowChunks::get_a_row(
+                row_of_pixels = FramebufferRowChunks::get_exact_row(
                     &mut window.frame_buffer.buffer,
-                    window.rect,
-                    window_width,
+                    window_rect,
+                    window_rect.width,
                     y as usize,
                 )?;
                 row_controller += 1;
@@ -303,6 +308,11 @@ impl Rect {
         }
     }
 
+    pub fn set_position(&mut self, x: u32, y: u32) {
+        self.x = x as isize;
+        self.y = y as isize;
+    }
+
     fn x_plus_width(&self) -> isize {
         self.x + self.width as isize
     }
@@ -318,21 +328,33 @@ impl Rect {
             && self.y_plus_height() > other.y
     }
 
+    pub fn left_side_out(&self) -> bool {
+        self.x < 0
+    }
+
+    pub fn right_side_out(&self) -> bool {
+        self.x + self.width as isize > SCREEN_WIDTH as isize
+    }
+
+    pub fn bottom_side_out(&self) -> bool {
+        self.y + self.height as isize > SCREEN_HEIGHT as isize
+    }
+
     /// Creates a new `Rect` from visible parts of itself.
     pub fn visible_rect(&self) -> Rect {
         let mut x = self.x;
         let y = self.y;
         let mut width = self.width as isize;
         let mut height = self.height as isize;
-        if self.x < 0 {
+        if self.left_side_out() {
             x = 0;
             width = self.x_plus_width();
-        } else if self.x_plus_width() > SCREEN_WIDTH as isize {
+        } else if self.right_side_out() {
             x = self.x;
             let gap = (self.x + self.width as isize) - SCREEN_WIDTH as isize;
             width = self.width as isize - gap;
         }
-        if self.y_plus_height() > SCREEN_HEIGHT as isize {
+        if self.bottom_side_out() {
             let gap = (self.y + self.height as isize) - SCREEN_HEIGHT as isize;
             height = self.height as isize - gap;
         }
@@ -533,12 +555,23 @@ impl<'a> Iterator for MouseImageRowIterator<'a> {
     }
 }
 
+/// From given mutable `Framebuffer` slice and `Rect` returns
+/// rows of slices.
+///
+/// Think `Framebuffer` as a big cake and `Rect` as a smaller cake within the `Framebuffer`
+/// this returns row of mutable slices from that smaller cake.
 pub struct FramebufferRowChunks<'a, T: 'a> {
+    /// Framebuffer we used to get the `rows` from
     fb: *mut [T],
+    /// This let's us decide where and how big of a row we want to get
     rect: Rect,
+    /// Amount of pixels in a line of `Framebuffer`
     stride: usize,
+    /// Where we start the row
     row_index_beg: usize,
+    /// Where we end the row
     row_index_end: usize,
+    /// The index of the row we are getting
     current_column: usize,
     _marker: PhantomData<&'a mut T>,
 }
@@ -564,34 +597,22 @@ impl<'a, T: 'a> FramebufferRowChunks<'a, T> {
         }
     }
 
-    pub fn get_a_row(
+    /// Returns a single `IterMut<T>` from specified `row` of the framebuffer
+    ///  
+    /// * `row` - Specifies which row will be returned from this function
+    pub fn get_exact_row(
         slice: &'a mut [T],
         rect: Rect,
         stride: usize,
         row: usize,
     ) -> Result<IterMut<T>, &'static str> {
-        if rect.width <= stride {
-            let mut rect = rect;
-            rect.y = row as isize;
-            rect.height = 1;
-            let current_column = rect.y as usize;
-            let row_index_beg = stride * current_column;
-            let row_index_end = (stride * current_column) + rect.width as usize;
-            let mut row = Some(Self {
-                fb: slice,
-                rect,
-                stride,
-                row_index_beg,
-                row_index_end,
-                current_column,
-                _marker: PhantomData,
-            })
-            .ok_or("Unable to get a row of pixels from given row")?;
-            let row_iterator = row.next().ok_or("Error created empty row")?.iter_mut();
-            Ok(row_iterator)
-        } else {
-            Err("Unable to create row if given width is bigger than stride")
-        }
+        let mut rect = rect;
+        rect.y = row as isize;
+        rect.height = 1;
+        let mut rows = FramebufferRowChunks::new(slice, rect, stride)
+            .ok_or("Couldn't create `FramebufferRowChunks` from given rect")?;
+        let row_iterator = rows.next().ok_or("Error created empty row")?.iter_mut();
+        Ok(row_iterator)
     }
 
     fn calculate_next_row(&mut self) {
@@ -680,6 +701,7 @@ pub struct WindowManager {
     pub mouse: Rect,
     prev_mouse_pos: ScreenPos,
     mouse_holding: Holding,
+    /// Holds the index of the active window/last element in the `window_rendering_order`
     active_window_index: usize,
 }
 
@@ -687,7 +709,7 @@ impl WindowManager {
     fn init() -> Result<(), &'static str> {
         let p_framebuffer = PhysicalFrameBuffer::init_front_buffer()?;
         let v_framebuffer = VirtualFrameBuffer::new(p_framebuffer.width, p_framebuffer.height)?;
-        // FIXME: Don't use magic numbers
+        // FIXME: Don't use magic numbers,
         let mouse = Rect::new(11, 18, 200, 200);
 
         let window_manager = WindowManager {
@@ -727,6 +749,7 @@ impl WindowManager {
         for order in self.window_rendering_order.iter() {
             self.v_framebuffer
                 .copy_window_into_main_vbuffer(&mut self.windows[*order].lock());
+            // TODO: Stop indexing ^ here
         }
         for window in self.windows.iter() {
             window.lock().blank();
@@ -734,12 +757,12 @@ impl WindowManager {
     }
 
     fn draw_mouse(&mut self) {
-        let bounding_box = self.mouse.visible_rect();
+        let visible_mouse = self.mouse.visible_rect();
 
         if let Some(screen_rows) =
-            FramebufferRowChunks::new(&mut self.v_framebuffer.buffer, bounding_box, SCREEN_WIDTH)
+            FramebufferRowChunks::new(&mut self.v_framebuffer.buffer, visible_mouse, SCREEN_WIDTH)
         {
-            let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, bounding_box);
+            let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, visible_mouse);
             for (screen_row, mouse_image_row) in screen_rows.zip(mouse_image) {
                 for (screen_pixel, mouse_pixel) in screen_row.iter_mut().zip(mouse_image_row.iter())
                 {
@@ -751,9 +774,9 @@ impl WindowManager {
         }
     }
 
-    pub fn set_mouse_pos(&mut self, screen_pos: &ScreenPos) {
-        self.mouse.x = screen_pos.x as isize;
-        self.mouse.y = screen_pos.y as isize;
+    pub fn set_mouse_pos(&mut self, screen_positon: &ScreenPos) {
+        self.mouse.x = screen_positon.x as isize;
+        self.mouse.y = screen_positon.y as isize;
     }
 
     fn update(&mut self) {
@@ -762,23 +785,32 @@ impl WindowManager {
         self.draw_mouse();
     }
 
-    fn calculate_next_mouse_pos(&self, curr_pos: ScreenPos, next_pos: ScreenPos) -> ScreenPos {
-        let mut new_pos = next_pos + curr_pos;
+    fn calculate_next_mouse_pos(
+        &self,
+        current_position: ScreenPos,
+        next_position: ScreenPos,
+    ) -> ScreenPos {
+        let mut new_pos = next_position + current_position;
 
         // handle left
         new_pos.x = core::cmp::max(new_pos.x, 0);
         // handle right
-        new_pos.x = core::cmp::min(new_pos.x, self.v_framebuffer.width as i32 - 3);
+        new_pos.x = core::cmp::min(
+            new_pos.x,
+            self.v_framebuffer.width as i32 - MOUSE_VISIBLE_GAP,
+        );
 
         // handle top
         new_pos.y = core::cmp::max(new_pos.y, 0);
         // handle bottom
-        new_pos.y = core::cmp::min(new_pos.y, self.v_framebuffer.height as i32 - 3);
+        new_pos.y = core::cmp::min(
+            new_pos.y,
+            self.v_framebuffer.height as i32 - MOUSE_VISIBLE_GAP,
+        );
 
         new_pos
     }
 
-    // TODO: Remove magic numbers
     fn update_mouse_position(&mut self, screen_pos: ScreenPos) {
         self.prev_mouse_pos = self.mouse.to_screen_pos();
         let new_pos = self.calculate_next_mouse_pos(self.mouse.to_screen_pos(), screen_pos);
@@ -786,18 +818,21 @@ impl WindowManager {
         self.set_mouse_pos(&new_pos);
     }
 
-    fn drag_windows(&mut self, screen_pos: ScreenPos, mouse_event: &MouseEvent) {
+    fn drag_windows(&mut self, screen_position: ScreenPos, mouse_event: &MouseEvent) {
         if mouse_event.buttons.left() {
             match self.mouse_holding {
                 Holding::Background => {}
                 Holding::Nothing => {
-                    let rendering_o = self.window_rendering_order.clone();
-                    for (window_index, pos) in rendering_o.iter().enumerate().rev() {
+                    let rendering_order = self.window_rendering_order.clone();
+                    for (window_index, position_in_iter) in rendering_order.iter().enumerate().rev()
+                    {
                         let window = &mut self.windows[window_index];
                         if window.lock().rect.detect_collision(&self.mouse) {
                             if window_index != self.active_window_index {
+                                // FIXME: This is half-broken, doesn't handle multiple windows correctly
                                 let last_one = self.window_rendering_order.len() - 1;
-                                self.window_rendering_order.swap(last_one, *pos);
+                                self.window_rendering_order
+                                    .swap(last_one, *position_in_iter);
                             }
                             if window
                                 .lock()
@@ -820,20 +855,21 @@ impl WindowManager {
                     // These calculations are required because we do want finer control
                     // over a window's movement.
                     let prev_mouse_pos = self.prev_mouse_pos;
-                    let next_mouse_pos = self.calculate_next_mouse_pos(prev_mouse_pos, screen_pos);
+                    let next_mouse_pos =
+                        self.calculate_next_mouse_pos(prev_mouse_pos, screen_position);
                     let window = &mut self.windows[i];
                     let window_rect = window.lock().rect;
                     let diff = next_mouse_pos - prev_mouse_pos;
                     let mut new_pos = diff + window_rect.to_screen_pos();
 
                     //handle left
-                    if (new_pos.x + (window_rect.width as i32 - 20)) < 0 {
-                        new_pos.x = -(window_rect.width as i32 - 20);
+                    if (new_pos.x + (window_rect.width as i32 - WINDOW_VISIBLE_GAP as i32)) < 0 {
+                        new_pos.x = -(window_rect.width as i32 - WINDOW_VISIBLE_GAP);
                     }
 
                     //handle right
-                    if (new_pos.x + 20) > self.v_framebuffer.width as i32 {
-                        new_pos.x = SCREEN_WIDTH as i32 - 20
+                    if (new_pos.x + WINDOW_VISIBLE_GAP) > self.v_framebuffer.width as i32 {
+                        new_pos.x = SCREEN_WIDTH as i32 - WINDOW_VISIBLE_GAP
                     }
 
                     //handle top
@@ -842,8 +878,8 @@ impl WindowManager {
                     }
 
                     // handle bottom
-                    if new_pos.y + 20 > self.v_framebuffer.height as i32 {
-                        new_pos.y = (SCREEN_HEIGHT - 20) as i32;
+                    if new_pos.y + WINDOW_VISIBLE_GAP > self.v_framebuffer.height as i32 {
+                        new_pos.y = (SCREEN_HEIGHT as i32 - WINDOW_VISIBLE_GAP) as i32;
                     }
 
                     window.lock().set_screen_pos(&new_pos);
@@ -859,7 +895,9 @@ impl WindowManager {
                     self.mouse.x,
                     self.mouse.y,
                 )) {
-                    window.lock().resize_window(screen_pos.x, screen_pos.y);
+                    window
+                        .lock()
+                        .resize_window(screen_position.x, screen_position.y);
                     window.lock().reset_drawable_area();
                     window.lock().reset_title_pos_and_border();
                     window.lock().resized = true;
@@ -928,9 +966,9 @@ impl Window {
         screen_pos
     }
 
-    pub fn set_screen_pos(&mut self, screen_pos: &ScreenPos) {
-        self.rect.x = screen_pos.x as isize;
-        self.rect.y = screen_pos.y as isize;
+    pub fn set_screen_pos(&mut self, screen_position: &ScreenPos) {
+        self.rect.x = screen_position.x as isize;
+        self.rect.y = screen_position.y as isize;
     }
 
     pub fn blank(&mut self) {
@@ -986,10 +1024,11 @@ impl Window {
         *drawable_area
     }
 
-    pub fn title_pos(&mut self, slice_len: &usize) -> RelativePos {
+    /// From given title length returns center position of the title border
+    pub fn title_pos(&mut self, title_length: &usize) -> RelativePos {
         let border = self.title_border();
         let relative_pos = self.title_pos.get_or_insert({
-            let pos = (border.width - (slice_len * CHARACTER_WIDTH)) / 2;
+            let pos = (border.width - (title_length * CHARACTER_WIDTH)) / 2;
             let relative_pos = RelativePos::new(pos as u32, 0);
             relative_pos
         });
@@ -1020,11 +1059,11 @@ impl Window {
     }
 
     /// Draws the rectangular shape representing the `Window`
-    pub fn draw_rectangle(&mut self, col: Color) -> Result<(), &'static str> {
+    pub fn draw_rectangle(&mut self, color: Color) -> Result<(), &'static str> {
         self.should_resize_framebuffer()?;
 
         for pixel in self.frame_buffer.buffer.iter_mut() {
-            *pixel = col;
+            *pixel = color;
         }
         self.draw_title_border();
         Ok(())
@@ -1044,23 +1083,11 @@ impl Window {
     pub fn relative_visible_rect(&self) -> Rect {
         let mut bounding_box = self.rect.visible_rect();
         bounding_box.x = 0;
-        if self.left_side_out() {
+        if self.rect.left_side_out() {
             bounding_box.x = (self.rect.width - bounding_box.width) as isize;
         }
         bounding_box.y = 0;
         bounding_box
-    }
-
-    pub fn left_side_out(&self) -> bool {
-        self.rect.x < 0
-    }
-
-    pub fn right_side_out(&self) -> bool {
-        self.rect.x + self.rect.width as isize > SCREEN_WIDTH as isize
-    }
-
-    pub fn bottom_side_out(&self) -> bool {
-        self.rect.y + self.rect.height as isize > SCREEN_HEIGHT as isize
     }
 }
 
@@ -1072,6 +1099,7 @@ fn port_loop(
         .lock()
         .new_window(&Rect::new(400, 400, 500, 20), Some(format!("Basic")))?;
     let drawable_area = window_2.lock().drawable_area();
+
     let text = TextDisplayInfo {
         width: drawable_area.width,
         height: drawable_area.height,
