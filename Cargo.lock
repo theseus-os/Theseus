@@ -326,7 +326,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "kernel_config",
- "log",
  "memory_structs",
  "multiboot2",
  "uefi-bootloader-api",
