@@ -90,7 +90,9 @@ pub trait BootInformation: 'static {
     fn len(&self) -> usize;
     
     /// Returns whether the boot information is empty.
-    fn is_empty(&self) -> bool;
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 
     /// Returns the range of physical addresses at which the kernel code is
     /// located.
