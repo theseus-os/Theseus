@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(slice_ptr_get)]
+#![feature(slice_flatten)]
 extern crate alloc;
 extern crate device_manager;
 extern crate hpet;
@@ -10,11 +11,10 @@ extern crate multicore_bringup;
 extern crate scheduler;
 extern crate spin;
 extern crate task;
-use core::marker::PhantomData;
-use core::ops::{Add, Sub};
-
 use alloc::format;
 use alloc::sync::Arc;
+use core::marker::PhantomData;
+use core::ops::{Add, Sub};
 use log::{debug, info};
 use spin::{Mutex, MutexGuard, Once};
 
@@ -57,6 +57,7 @@ static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
         [T, T, T, T, T, T, T, T, T, T, B, T, T, T, T, T, T, T],
     ]
 };
+
 pub struct App {
     window: Arc<Mutex<Window>>,
     text: TextDisplayInfo,
@@ -372,13 +373,6 @@ impl VirtualFrameBuffer {
         }
     }
 
-    fn draw_unchecked(&mut self, x: isize, y: isize, col: Color) {
-        unsafe {
-            let index = (self.width * y as usize) + x as usize;
-            let pixel = self.buffer.get_unchecked_mut(index);
-            *pixel = col;
-        }
-    }
     pub fn blank(&mut self) {
         for pixel in self.buffer.iter_mut() {
             *pixel = 0x000000;
@@ -467,6 +461,60 @@ impl PhysicalFrameBuffer {
                 .into_borrowed_slice_mut(0, width * height)
                 .map_err(|(_mp, s)| s)?,
         })
+    }
+}
+
+/// Our mouse image is [`MOUSE_POINTER_IMAGE`] column major 2D array
+/// This type returns us row major, 1D vec of that image
+pub struct MouseImageRowIterator<'a> {
+    /// Mouse image [`MOUSE_POINTER_IMAGE`]
+    mouse_image: &'a [[u32; 18]; 11],
+    /// Rect of our mouse
+    bounding_box: Rect,
+    /// Since image is column major we will iterate will use
+    /// individual columns to create a row, think of it as y axis
+    current_column: usize,
+    /// Used to traverse image in x axis
+    current_row: usize,
+}
+
+impl<'a> MouseImageRowIterator<'a> {
+    fn new(mouse_image: &'a [[u32; 18]; 11], bounding_box: Rect) -> Self {
+        Self {
+            mouse_image,
+            bounding_box,
+            current_column: 0,
+            current_row: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for MouseImageRowIterator<'a> {
+    type Item = Vec<u32>;
+
+    fn next(&mut self) -> Option<Vec<u32>> {
+        // We start from MOUSE_POINTER_IMAGE[0][0], get the color on that index push it to our `row`
+        // then move to MOUSE_POINTER_IMAGE[1][0] do the same thing
+        // until we hit `bounding_box.width -1` then we reset our `current_column` to `0` and increase
+        // our `current_row` by `1`
+        if self.current_row < self.bounding_box.height - 1 {
+            let mut row = Vec::new();
+            while self.current_column < self.bounding_box.width {
+                let color = unsafe {
+                    self.mouse_image.get_unchecked(self.current_column)[self.current_row]
+                };
+                row.push(color);
+                self.current_column += 1;
+                if self.current_column == self.bounding_box.width - 1 {
+                    self.current_column = 0;
+                    break;
+                }
+            }
+            self.current_row += 1;
+            Some(row)
+        } else {
+            None
+        }
     }
 }
 
@@ -640,15 +688,18 @@ impl WindowManager {
         }
     }
 
-    // TODO: Stop indexing mouse image create iterator for it, also draw the thing with iterators
     fn draw_mouse(&mut self) {
         let bounding_box = self.mouse.visible_rect();
-        for y in bounding_box.y..bounding_box.y + bounding_box.height as isize {
-            for x in bounding_box.x..bounding_box.x + bounding_box.width as isize {
-                let color = MOUSE_POINTER_IMAGE[(x - bounding_box.x) as usize]
-                    [(y - bounding_box.y) as usize];
-                if color != 0xFF0000 {
-                    self.v_framebuffer.draw_unchecked(x, y, color);
+
+        let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, bounding_box);
+        let chunker =
+            FramebufferRowChunks::new(&mut self.v_framebuffer.buffer, bounding_box, SCREEN_WIDTH)
+                .unwrap();
+
+        for (screen_row, mouse_image_row) in chunker.zip(mouse_image) {
+            for (screen_pixel, mouse_pixel) in screen_row.iter_mut().zip(mouse_image_row.iter()) {
+                if mouse_pixel != &0xFF0000 {
+                    *screen_pixel = *mouse_pixel;
                 }
             }
         }
