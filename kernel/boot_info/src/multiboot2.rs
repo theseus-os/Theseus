@@ -11,10 +11,6 @@ impl<'a> crate::MemoryRegion for &'a multiboot2::MemoryArea {
     fn len(&self) -> usize {
         multiboot2::MemoryArea::size(self) as usize
     }
-    
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
 
     fn is_usable(&self) -> bool {
         matches!(self.typ(), multiboot2::MemoryAreaType::Available)
@@ -48,10 +44,6 @@ impl crate::ElfSection for multiboot2::ElfSection {
         multiboot2::ElfSection::size(self) as usize
     }
     
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn flags(&self) -> ElfSectionFlags {
         let mut boot_info_flags = ElfSectionFlags::empty();
         let flags = multiboot2::ElfSection::flags(self);

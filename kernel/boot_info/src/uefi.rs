@@ -36,15 +36,7 @@ impl crate::MemoryRegion for MemoryRegion {
     fn start(&self) -> PhysicalAddress {
         self.start
     }
-
-    fn len(&self) -> usize {
-        self.len
-    }
     
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn is_usable(&self) -> bool {
         self.is_usable
     }
@@ -88,10 +80,6 @@ impl<'a> crate::ElfSection for &'a info::ElfSection {
         self.size
     }
     
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn flags(&self) -> ElfSectionFlags {
         ElfSectionFlags::from_bits_truncate(self.flags)
     }
@@ -120,10 +108,6 @@ impl crate::Module for Module {
 
     fn len(&self) -> usize {
         self.inner.len
-    }
-    
-    fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }
 
