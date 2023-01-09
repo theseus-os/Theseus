@@ -398,8 +398,8 @@ pub enum QueryHcaCapMaxOpMod {
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::QueryHcaCap`] and we want to retrieve current values of capabilities.
 #[derive(Copy, Clone)]
 pub enum QueryHcaCapCurrentOpMod {
-    GeneralDeviceCapabilities       = (0x0 << 1) | 0x1,
-    EthernetOffloadCapabilities     = (0x1 << 1) | 0x1
+    GeneralDeviceCapabilities       =              0x1,
+    EthernetOffloadCapabilities     = (0x1 << 1) | 0x1,
 }
 
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::AccessRegister`].

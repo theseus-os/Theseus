@@ -240,7 +240,7 @@ impl AtaBus {
 		let data_bar = data_bar & PCI_BAR_PORT_MASK;
 		let control_bar = control_bar & PCI_BAR_PORT_MASK;
 		AtaBus { 
-			data: Port::new(data_bar + 0),
+			data: Port::new(data_bar),
 			error: PortReadOnly::new(data_bar + 1),
 			_features: PortWriteOnly::new(data_bar + 1),
 			sector_count: Port::new(data_bar + 2),
@@ -283,7 +283,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write( (lba_start) as u8);
 				self.command.write(AtaCommand::ReadPio as u8);
 			}
 		} else {
@@ -299,7 +299,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write( (lba_start) as u8);
 				self.command.write(AtaCommand::ReadPioExt as u8);
 			}
 		} 
@@ -351,7 +351,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write( (lba_start) as u8);
 				self.command.write(AtaCommand::WritePio as u8);
 			}
 		} else {
@@ -367,7 +367,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write( (lba_start) as u8);
 				self.command.write(AtaCommand::WritePioExt as u8);
 			}
 		}

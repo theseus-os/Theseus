@@ -146,10 +146,10 @@ pub enum EventType{
     /// This event counts the number of instructions at retirement. For instructions that consist of multiple micro-ops,
     /// this event counts the retirement of the last micro-op of the instruction.
     /// This is counted by IA32_FIXED_CTR0.
-    InstructionsRetired = (0x03 << 16) | (0x00 << 8) | 0xC0,
+    InstructionsRetired = (0x03 << 16) | 0xC0,
     /// This event counts core clock cycles when the clock signal on a specific core is running (not halted).
     /// This is counted by IA32_FIXED_CTR1. 
-    UnhaltedCoreCycles = (0x03 << 16) | (0x00 << 8) | 0x3C,
+    UnhaltedCoreCycles = (0x03 << 16) | 0x3C,
     /// This event counts reference clock cycles at a fixed frequency while the clock signal on the core is running. 
     /// The event counts at a fixed frequency, irrespective of core frequency changes due to performance state transitions. 
     /// Current implementations use the TSC clock.
@@ -164,11 +164,11 @@ pub enum EventType{
     /// line fills due to other hardware-prefetchers.
     LastLevelCacheMisses = (0x03 << 16) | (0x41 << 8) | 0x2E,
     /// This event counts branch instructions at retirement. It counts the retirement of the last micro-op of a branch instruction.
-    BranchInstructionsRetired = (0x03 << 16) | (0x00 << 8) | 0xC4,
+    BranchInstructionsRetired = (0x03 << 16) | 0xC4,
     /// This event counts mispredicted branch instructions at retirement. It counts the retirement of the last micro-op
     /// of a branch instruction in the architectural path of execution and experienced misprediction in the branch
     /// prediction hardware.
-    BranchMissesRetired = (0x03 << 16) | (0x00 << 8) | 0xC5,
+    BranchMissesRetired = (0x03 << 16) | 0xC5,
 }
 
 fn num_general_purpose_counters() -> u8 {
