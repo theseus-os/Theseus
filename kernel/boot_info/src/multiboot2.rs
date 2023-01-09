@@ -43,7 +43,7 @@ impl crate::ElfSection for multiboot2::ElfSection {
     fn len(&self) -> usize {
         multiboot2::ElfSection::size(self) as usize
     }
-    
+
     fn flags(&self) -> ElfSectionFlags {
         let mut boot_info_flags = ElfSectionFlags::empty();
         let flags = multiboot2::ElfSection::flags(self);
@@ -77,7 +77,7 @@ impl<'a> crate::Module for &'a multiboot2::ModuleTag {
     fn len(&self) -> usize {
         (self.end_address() - self.start_address()) as usize
     }
-    
+
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -100,7 +100,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
     fn len(&self) -> usize {
         self.total_size()
     }
-    
+
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
         // Our linker script specifies that the kernel will have the .init section
         // starting at 1MB and ending at 1MB + .init size and all other kernel sections

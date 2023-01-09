@@ -21,7 +21,7 @@ pub trait MemoryRegion {
 
     /// Returns the region's length.
     fn len(&self) -> usize;
-    
+
     /// Returns whether the region is empty
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -40,7 +40,7 @@ pub trait ElfSection {
 
     /// Returns the section's length.
     fn len(&self) -> usize;
-    
+
     /// Returns whether the section is empty (zero length)
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -73,7 +73,7 @@ pub trait Module {
 
     /// Returns the module's length.
     fn len(&self) -> usize;
-    
+
     /// Returns whether the module is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -94,7 +94,7 @@ pub trait BootInformation: 'static {
     fn start(&self) -> Option<VirtualAddress>;
     /// Returns the boot information's length.
     fn len(&self) -> usize;
-    
+
     /// Returns whether the boot information is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0

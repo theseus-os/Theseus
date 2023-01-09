@@ -36,11 +36,11 @@ impl crate::MemoryRegion for MemoryRegion {
     fn start(&self) -> PhysicalAddress {
         self.start
     }
-    
+
     fn len(&self) -> usize {
         self.len
     }
-    
+
     fn is_usable(&self) -> bool {
         self.is_usable
     }
@@ -83,7 +83,7 @@ impl<'a> crate::ElfSection for &'a info::ElfSection {
     fn len(&self) -> usize {
         self.size
     }
-    
+
     fn flags(&self) -> ElfSectionFlags {
         ElfSectionFlags::from_bits_truncate(self.flags)
     }
@@ -152,7 +152,7 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
     fn len(&self) -> usize {
         self.size
     }
-    
+
     // The bootloader creates two memory regions with the bootloader type. The first
     // one always starts at 0x1000 and contains the page table, boot info, etc. The
     // second one starts at some other address and contains the nano_core elf file.
