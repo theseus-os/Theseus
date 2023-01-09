@@ -28,7 +28,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     for dir_name in args.iter() {
         // add child dir to current directory
-        if let Err(err) = VFSDirectory::new_dirref(dir_name.to_string(), &curr_wd) {
+        if let Err(err) = VFSDirectory::new(dir_name.to_string(), &curr_wd) {
             println!("Error creating {:?}: {}", dir_name, err);
             ret = -1;
         }

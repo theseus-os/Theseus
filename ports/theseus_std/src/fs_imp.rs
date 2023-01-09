@@ -329,7 +329,7 @@ impl File {
                 .ok_or(io::Error::from(io::ErrorKind::NotFound))?;
 
             let file_name = path.file_name().ok_or(io::Error::from(io::ErrorKind::NotFound))?;
-            let new_file = theseus_memfs::MemFile::new_fileref(
+            let new_file = theseus_memfs::MemFile::new(
                 file_name.to_string_lossy().into(), 
                 &containing_dir,
             ).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;

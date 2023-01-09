@@ -125,16 +125,16 @@ fn parse_bootloader_modules_into_files(
 ) -> Result<(DirRef, NamespaceDir), &'static str> {
 
     // create the top-level directory to hold all default namespaces
-    let namespaces_dir = VFSDirectory::new_dirref(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())?;
+    let namespaces_dir = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())?;
     // create the top-level directory to hold all extra files
-    let extra_files_dir = VFSDirectory::new_dirref(EXTRA_FILES_DIRECTORY_NAME.to_string(), root::get_root())?;
+    let extra_files_dir = VFSDirectory::new(EXTRA_FILES_DIRECTORY_NAME.to_string(), root::get_root())?;
 
     // a map that associates a prefix string (e.g., "sse" in "ksse#crate.o") to a namespace directory of object files 
     let mut prefix_map: BTreeMap<String, NamespaceDir> = BTreeMap::new();
 
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
-        VFSDirectory::new_dirref(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
+        VFSDirectory::new(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
     };
 
     let mut process_module = |name: &str, size, pages| -> Result<_, &'static str> {
@@ -250,7 +250,7 @@ fn parse_extra_file(
         if iter.peek().is_some() {
             let existing_dir = parent_dir.lock().get_dir(path_component);
             parent_dir = existing_dir
-                .or_else(|| VFSDirectory::new_dirref(path_component.to_string(), &parent_dir).ok())
+                .or_else(|| VFSDirectory::new(path_component.to_string(), &parent_dir).ok())
                 .ok_or_else(|| {
                     error!("Failed to get or create directory {:?} for extra file {:?}", path_component, extra_file_name);
                     "Failed to get or create directory for extra file"
@@ -366,7 +366,7 @@ impl NamespaceDir {
     /// * The file "a#ps.o" will be placed into "./ps.o". 
     pub fn write_crate_object_file(&self, crate_object_file_name: &str, content: &[u8]) -> Result<FileRef, &'static str> {
         let (_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)?;
-        let cfile = MemFile::new_fileref(String::from(objfilename), &self.0)?;
+        let cfile = MemFile::new(String::from(objfilename), &self.0)?;
         cfile.lock().write_at(content, 0)?;
         Ok(cfile)
     }
