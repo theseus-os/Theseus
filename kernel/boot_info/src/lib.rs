@@ -22,7 +22,7 @@ pub trait MemoryRegion {
     /// Returns the region's length.
     fn len(&self) -> usize;
 
-    /// Returns whether the region is empty
+    /// Returns whether the region is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -41,7 +41,7 @@ pub trait ElfSection {
     /// Returns the section's length.
     fn len(&self) -> usize;
 
-    /// Returns whether the section is empty (zero length)
+    /// Returns whether the section is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
