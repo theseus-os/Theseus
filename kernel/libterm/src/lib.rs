@@ -193,7 +193,7 @@ impl Terminal {
             if new_line_indices.len() == 0 {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
-                if end_idx <= self.scrollback_buffer.len() -1 {
+                if end_idx == self.scrollback_buffer.len() {
                     return Ok(end_idx); 
                 } else {
                     return Err(ScrollError::OffEndBound);
@@ -234,7 +234,7 @@ impl Terminal {
                 end_idx += last_line_chars;
             }
 
-            if end_idx <= self.scrollback_buffer.len() -1 {
+            if end_idx == self.scrollback_buffer.len() {
                 return Ok(end_idx); 
             } else {
                 return Err(ScrollError::OffEndBound);
