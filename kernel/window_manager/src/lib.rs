@@ -351,7 +351,7 @@ impl WindowManager {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
             coordinate: Coord::new(0, 0),
-            gcoordinate: coordinate.clone(),
+            gcoordinate: *coordinate,
             scrolling_up: mouse_event.movement.scroll_movement > 0, //TODO: might be more beneficial to save scroll_movement here
             scrolling_down: mouse_event.movement.scroll_movement < 0, //FIXME: also might be the wrong way around
             left_button_hold: mouse_event.buttons.left(),
