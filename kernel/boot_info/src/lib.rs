@@ -24,8 +24,8 @@ pub trait MemoryRegion {
     
     /// Returns whether the region is empty
     fn is_empty(&self) -> bool {
-        len() == 0
-    };
+        self.len() == 0
+    }
 
     /// Returns whether the region can be used by the frame allocator.
     fn is_usable(&self) -> bool;
@@ -44,7 +44,7 @@ pub trait ElfSection {
     /// Returns whether the section is empty (zero length)
     fn is_empty(&self) -> bool {
         self.len() == 0
-    };
+    }
 
     /// Returns the section's flags.
     fn flags(&self) -> ElfSectionFlags;
@@ -77,7 +77,7 @@ pub trait Module {
     /// Returns whether the module is empty.
     fn is_empty(&self) -> bool {
         self.len() == 0
-    };
+    }
 }
 
 pub trait BootInformation: 'static {

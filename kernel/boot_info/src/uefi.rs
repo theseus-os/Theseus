@@ -37,6 +37,10 @@ impl crate::MemoryRegion for MemoryRegion {
         self.start
     }
     
+    fn len(&self) -> usize {
+        self.len
+    }
+    
     fn is_usable(&self) -> bool {
         self.is_usable
     }
