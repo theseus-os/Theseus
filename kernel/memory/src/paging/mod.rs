@@ -34,7 +34,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
-use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX};
+use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX};
 
 
 /// A top-level root (P4) page table.
@@ -141,28 +141,28 @@ impl PageTable {
         let other_p4_frame = *other_p4.start();
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, other_p4, self)?;
 
-        // Overwrite inactive page table recursive mapping.
+        // Overwrite upcoming page table recursive mapping.
         temporary_page.with_table_and_frame(|table, frame| {
-            self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
+            self.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
-            table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
+            table[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
         })?;
         tlb_flush_all();
 
-        // This mapper will modify the other table using the inactive page table recursive p4 index set in the current page table.
+        // This mapper will modify the other table using the upcoming page table recursive p4 index set in the current page table.
         let mut mapper = Mapper::inactive(other_p4_frame);
 
         // Execute `f` in the new context, in which the new page table is considered "active"
         let ret = f(&mut mapper, self);
 
         // Clear inactive page table recursive mapping.
-        self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
-        other_table.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
+        self.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
+        other_table.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
         tlb_flush_all();
 
         // Here, recover the other page table's p4 frame and restore it into the other page table,

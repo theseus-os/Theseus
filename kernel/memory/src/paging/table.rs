@@ -29,12 +29,12 @@ pub const P4: *mut Table<Level4> = 0o177777_776_776_776_776_0000 as *mut _;
                                          // ^p4 ^p3 ^p2 ^p1 ^offset  
                                          // ^ 0o776 means that we're always looking at the 510th entry recursively
 
-/// By default this is equivalent to [`P4`] unless the inactive page table recursive entry is modified.
+/// By default this is an invalid address unless the upcoming page table recursive entry is modified.
 ///
-/// NOTE: this must be kept in sync with the inactive page table recursive index in `kernel_config/memory.rs`.
+/// NOTE: this must be kept in sync with the upcoming page table recursive index in `kernel_config/memory.rs`.
 ///
-/// All four table indexes need to be set to 0o772 so that `Table::next_table_address` works properly.
-pub const INACTIVE_P4: *mut Table<Level4> = 0o177777_774_774_774_774_0000 as *mut _;
+/// All four table indexes need to be set to 0o774 so that `Table::next_table_address` works properly.
+pub const UPCOMING_P4: *mut Table<Level4> = 0o177777_774_774_774_774_0000 as *mut _;
 
 #[derive(FromBytes)]
 pub struct Table<L: TableLevel> {

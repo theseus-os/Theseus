@@ -22,7 +22,7 @@ use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page,
 use crate::paging::{
     get_current_p4,
     PageRange,
-    table::{P4, INACTIVE_P4, Table, Level4},
+    table::{P4, UPCOMING_P4, Table, Level4},
 };
 use pte_flags::PteFlagsArch;
 use spin::Once;
@@ -72,7 +72,7 @@ impl Mapper {
     /// Creates a new mapper that uses the temporary recursive P4 address.
     pub(crate) fn inactive(p4: Frame) -> Mapper {
         Mapper {
-            p4: Unique::new(INACTIVE_P4).unwrap(),
+            p4: Unique::new(UPCOMING_P4).unwrap(),
             target_p4: p4,
         }
     }
