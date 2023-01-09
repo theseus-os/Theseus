@@ -109,10 +109,6 @@ impl crate::BootInformation for multiboot2::BootInformation {
         self.total_size()
     }
     
-    fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
     fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
         // Our linker script specifies that the kernel will have the .init section
         // starting at 1MB and ending at 1MB + .init size and all other kernel sections
