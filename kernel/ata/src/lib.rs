@@ -1054,14 +1054,10 @@ impl AtaIdentifyData {
 /// 
 /// This is a wrapper around a byte string `[u8; 20]`, because Rust only supports deriving traits
 /// like `Debug` and `Default` for arrays up to 32 elements.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(packed)]
 pub struct AtaSerialNumber([u8; 20]);
-impl Default for AtaSerialNumber {
-	fn default() -> Self { 
-		AtaSerialNumber([0; 20])
-	}
-}
+
 impl fmt::Display for AtaSerialNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
@@ -1105,14 +1101,10 @@ impl fmt::Debug for AtaModelNumber {
 /// An ATA drive's firmware version is an 8-byte string.
 ///
 /// A wrapper around a byte string `[u8; 8]` to allow it to be printed.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(packed)]
 pub struct AtaFirmwareVersion([u8; 8]);
-impl Default for AtaFirmwareVersion {
-	fn default() -> Self { 
-		AtaFirmwareVersion([0; 8])
-	}
-}
+
 impl fmt::Display for AtaFirmwareVersion {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
