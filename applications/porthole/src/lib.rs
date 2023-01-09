@@ -58,52 +58,33 @@ static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
     ]
 };
 pub struct App {
-    window: Arc<Mutex<Window>>,
+    window: Weak<Mutex<Window>>,
     text: TextDisplayInfo,
 }
 
 impl App {
-    pub fn new(window: Arc<Mutex<Window>>, text: TextDisplayInfo) -> Self {
+    pub fn new(window: Weak<Mutex<Window>>, text: TextDisplayInfo) -> Self {
         Self { window, text }
     }
-    pub fn draw(&mut self) {
-        self.window.lock().draw_rectangle(DEFAULT_WINDOW_COLOR);
-        display_window_title(
-            &mut self.window.lock(),
-            DEFAULT_TEXT_COLOR,
-            DEFAULT_BORDER_COLOR,
-        );
-        print_string(
-            &mut self.window.lock(),
-            self.text.width,
-            self.text.height,
-            &self.text.pos,
-            &self.text.text,
-            self.text.fg_color,
-            self.text.bg_color,
-            self.text.next_col,
-            self.text.next_line,
-        )
-    }
-}
-
-pub fn display_window_title(window: &mut Window, fg_color: Color, bg_color: Color) {
-    if window.title.is_some() {
-        let title = window.title.as_mut().unwrap().clone();
-        let slice = title.as_str();
-        let border = window.title_border();
-        let title_pos = window.title_pos(&slice.len());
-        print_string(
-            window,
-            border.width,
-            border.height,
-            &title_pos,
-            slice,
-            fg_color,
-            bg_color,
-            0,
-            0,
-        );
+    pub fn draw(&mut self) -> Result<(), &'static str> {
+        if let Some(window) = self.window.upgrade() {
+            window.lock().draw_rectangle(DEFAULT_WINDOW_COLOR)?;
+            window
+                .lock()
+                .display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR);
+            print_string(
+                &mut window.lock(),
+                self.text.width,
+                self.text.height,
+                &self.text.pos,
+                &self.text.text,
+                self.text.fg_color,
+                self.text.bg_color,
+                self.text.next_col,
+                self.text.next_line,
+            );
+        }
+        Ok(())
     }
 }
 
@@ -212,17 +193,6 @@ impl TextDisplayInfo {
 
     pub fn append_char(&mut self, char: char) {
         self.text.push(char);
-    }
-}
-
-pub struct Dimensions {
-    pub width: usize,
-    pub height: usize,
-}
-
-impl Dimensions {
-    pub fn new(width: usize, height: usize) -> Self {
-        Self { width, height }
     }
 }
 
@@ -382,24 +352,24 @@ impl VirtualFrameBuffer {
         })
     }
 
-    fn copy_windows_into_main_vbuffer(&mut self, window: &mut MutexGuard<Window>) {
+    fn copy_window_into_main_vbuffer(&mut self, window: &mut MutexGuard<Window>) {
         let window_screen = window.rect.visible_rect();
         let window_stride = window.frame_buffer.width as usize;
 
-        // FIXME: Handle errors with error types
-        let screen_rows =
-            FramebufferRowChunks::new(&mut self.buffer, window_screen, self.width).unwrap();
-        // To handle rendering when the window is partially outside the screen we use relative version of visible rect
-        let relative_visible_rect = window.relative_visible_rect();
-
-        let window_rows = FramebufferRowChunks::new(
-            &mut window.frame_buffer.buffer,
-            relative_visible_rect,
-            window_stride,
-        )
-        .unwrap();
-        for (screen_row, window_row) in screen_rows.zip(window_rows) {
-            screen_row.copy_from_slice(window_row);
+        if let Some(screen_rows) =
+            FramebufferRowChunks::new(&mut self.buffer, window_screen, self.width)
+        {
+            // To handle rendering when the window is partially outside the screen we use relative version of visible rect
+            let relative_visible_rect = window.relative_visible_rect();
+            if let Some(window_rows) = FramebufferRowChunks::new(
+                &mut window.frame_buffer.buffer,
+                relative_visible_rect,
+                window_stride,
+            ) {
+                for (screen_row, window_row) in screen_rows.zip(window_rows) {
+                    screen_row.copy_from_slice(window_row);
+                }
+            }
         }
     }
 
@@ -426,12 +396,14 @@ pub struct PhysicalFrameBuffer {
 }
 impl PhysicalFrameBuffer {
     fn init_front_buffer() -> Result<PhysicalFrameBuffer, &'static str> {
-        let graphic_info = multicore_bringup::get_graphic_info().unwrap();
+        let graphic_info =
+            multicore_bringup::get_graphic_info().ok_or("Failed to get graphic info")?;
         if graphic_info.physical_address() == 0 {
             return Err("wrong physical address for porthole");
         }
         let vesa_display_phys_start =
-            PhysicalAddress::new(graphic_info.physical_address() as usize).ok_or("Invalid address");
+            PhysicalAddress::new(graphic_info.physical_address() as usize)
+                .ok_or("Invalid address")?;
         let buffer_width = graphic_info.width() as usize;
         let buffer_height = graphic_info.height() as usize;
         // We are assuming a pixel is 4 bytes big
@@ -441,7 +413,7 @@ impl PhysicalFrameBuffer {
             buffer_width,
             buffer_height,
             stride as usize,
-            vesa_display_phys_start.unwrap(),
+            vesa_display_phys_start,
         )?;
         Ok(framebuffer)
     }
@@ -556,13 +528,14 @@ impl<'a, T> Iterator for FramebufferRowChunks<'a, T> {
     }
 }
 
-pub fn main(_args: Vec<String>) -> isize {
+pub fn main(_args: Vec<String>) -> Result<isize, &'static str> {
     let mouse_consumer = Queue::with_capacity(100);
     let mouse_producer = mouse_consumer.clone();
     let key_consumer = Queue::with_capacity(100);
     let key_producer = mouse_consumer.clone();
-    WindowManager::init();
-    device_manager::init(key_producer, mouse_producer).unwrap();
+    WindowManager::init()?;
+    device_manager::init(key_producer, mouse_producer)
+        .or(Err("Failed to initialize device manager"))?;
 
     let _task_ref = match spawn::new_task_builder(port_loop, (mouse_consumer, key_consumer))
         .name("port_loop".to_string())
@@ -572,11 +545,14 @@ pub fn main(_args: Vec<String>) -> isize {
         Err(err) => {
             log::error!("{}", err);
             log::error!("failed to spawn shell");
-            return -1;
+            return Err("failed to spawn shell");
         }
     };
 
-    task::get_my_current_task().unwrap().block().unwrap();
+    task::get_my_current_task()
+        .ok_or("Failed to get the current task")?
+        .block()
+        .or(Err("Failed to block the current task"))?;
     scheduler::schedule();
 
     loop {
@@ -605,20 +581,20 @@ impl Holding {
     }
 }
 pub struct WindowManager {
-    windows: Vec<Weak<Mutex<Window>>>,
+    windows: Vec<Arc<Mutex<Window>>>,
     window_rendering_order: Vec<usize>,
     v_framebuffer: VirtualFrameBuffer,
     p_framebuffer: PhysicalFrameBuffer,
     pub mouse: Rect,
     prev_mouse_pos: ScreenPos,
     mouse_holding: Holding,
+    active_window_index: usize,
 }
 
 impl WindowManager {
-    fn init() {
-        let p_framebuffer = PhysicalFrameBuffer::init_front_buffer().unwrap();
-        let v_framebuffer =
-            VirtualFrameBuffer::new(p_framebuffer.width, p_framebuffer.height).unwrap();
+    fn init() -> Result<(), &'static str> {
+        let p_framebuffer = PhysicalFrameBuffer::init_front_buffer()?;
+        let v_framebuffer = VirtualFrameBuffer::new(p_framebuffer.width, p_framebuffer.height)?;
         // FIXME: Don't use magic numbers
         let mouse = Rect::new(11, 18, 200, 200);
 
@@ -630,33 +606,38 @@ impl WindowManager {
             mouse,
             prev_mouse_pos: mouse.to_screen_pos(),
             mouse_holding: Holding::Nothing,
+            active_window_index: 0,
         };
         WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
+        Ok(())
     }
 
-    fn new_window(rect: &Rect, title: Option<String>) -> Arc<Mutex<Window>> {
-        let mut manager = WINDOW_MANAGER.get().unwrap().lock();
-        let len = manager.windows.len();
+    fn new_window(
+        &mut self,
+        rect: &Rect,
+        title: Option<String>,
+    ) -> Result<Weak<Mutex<Window>>, &'static str> {
+        let len = self.windows.len();
 
-        manager.window_rendering_order.push(len);
+        self.window_rendering_order.push(len);
         let window = Window::new(
             *rect,
-            VirtualFrameBuffer::new(rect.width, rect.height).unwrap(),
+            VirtualFrameBuffer::new(rect.width, rect.height)?,
             title,
         );
         let arc_window = Arc::new(Mutex::new(window));
-        manager.windows.push(Arc::downgrade(&arc_window));
-        arc_window
+        let weak = Arc::downgrade(&arc_window);
+        self.windows.push(arc_window);
+        Ok(weak)
     }
 
     fn draw_windows(&mut self) {
         for order in self.window_rendering_order.iter() {
-            self.v_framebuffer.copy_windows_into_main_vbuffer(
-                &mut self.windows[*order].upgrade().unwrap().lock(),
-            );
+            self.v_framebuffer
+                .copy_window_into_main_vbuffer(&mut self.windows[*order].lock());
         }
         for window in self.windows.iter() {
-            window.upgrade().unwrap().lock().blank();
+            window.lock().blank();
         }
     }
 
@@ -715,32 +696,20 @@ impl WindowManager {
                 Holding::Background => {}
                 Holding::Nothing => {
                     let rendering_o = self.window_rendering_order.clone();
-                    for &i in rendering_o.iter().rev() {
-                        let window = &mut self.windows[i];
-                        if window
-                            .upgrade()
-                            .unwrap()
-                            .lock()
-                            .rect
-                            .detect_collision(&self.mouse)
-                        {
-                            if i != *self.window_rendering_order.last().unwrap() {
-                                let wind_index = self
-                                    .window_rendering_order
-                                    .iter()
-                                    .position(|ii| ii == &i)
-                                    .unwrap();
-                                self.window_rendering_order.remove(wind_index);
-                                self.window_rendering_order.push(i);
+                    for (window_index, pos) in rendering_o.iter().enumerate().rev() {
+                        let window = &mut self.windows[window_index];
+                        if window.lock().rect.detect_collision(&self.mouse) {
+                            if window_index != self.active_window_index {
+                                let last_one = self.window_rendering_order.len() - 1;
+                                self.window_rendering_order.swap(last_one, *pos);
                             }
                             if window
-                                .upgrade()
-                                .unwrap()
                                 .lock()
                                 .dynamic_title_border_pos()
                                 .detect_collision(&self.mouse)
                             {
-                                self.mouse_holding = Holding::Window(i);
+                                self.active_window_index = window_index;
+                                self.mouse_holding = Holding::Window(window_index);
                             }
                             break;
                         }
@@ -757,7 +726,7 @@ impl WindowManager {
                     let prev_mouse_pos = self.prev_mouse_pos;
                     let next_mouse_pos = self.calculate_next_mouse_pos(prev_mouse_pos, screen_pos);
                     let window = &mut self.windows[i];
-                    let window_rect = window.upgrade().unwrap().lock().rect;
+                    let window_rect = window.lock().rect;
                     let diff = next_mouse_pos - prev_mouse_pos;
                     let mut new_pos = diff + window_rect.to_screen_pos();
 
@@ -781,37 +750,23 @@ impl WindowManager {
                         new_pos.y = (SCREEN_HEIGHT - 20) as i32;
                     }
 
-                    window.upgrade().unwrap().lock().set_screen_pos(&new_pos);
+                    window.lock().set_screen_pos(&new_pos);
                 }
             }
         } else if mouse_event.buttons.right() {
             let rendering_o = self.window_rendering_order.clone();
             for &i in rendering_o.iter().rev() {
                 let window = &mut self.windows[i];
-                if window
-                    .upgrade()
-                    .unwrap()
-                    .lock()
-                    .rect
-                    .detect_collision(&Rect::new(
-                        self.mouse.width,
-                        self.mouse.height,
-                        self.mouse.x,
-                        self.mouse.y,
-                    ))
-                {
-                    window
-                        .upgrade()
-                        .unwrap()
-                        .lock()
-                        .resize_window(screen_pos.x, screen_pos.y);
-                    window.upgrade().unwrap().lock().reset_drawable_area();
-                    window
-                        .upgrade()
-                        .unwrap()
-                        .lock()
-                        .reset_title_pos_and_border();
-                    window.upgrade().unwrap().lock().resized = true;
+                if window.lock().rect.detect_collision(&Rect::new(
+                    self.mouse.width,
+                    self.mouse.height,
+                    self.mouse.x,
+                    self.mouse.y,
+                )) {
+                    window.lock().resize_window(screen_pos.x, screen_pos.y);
+                    window.lock().reset_drawable_area();
+                    window.lock().reset_title_pos_and_border();
+                    window.lock().resized = true;
                     break;
                 }
             }
@@ -852,6 +807,24 @@ impl Window {
         }
     }
 
+    pub fn display_window_title(&mut self, fg_color: Color, bg_color: Color) {
+        if let Some(title) = self.title.clone() {
+            let slice = title.as_str();
+            let border = self.title_border();
+            let title_pos = self.title_pos(&slice.len());
+            print_string(
+                self,
+                border.width,
+                border.height,
+                &title_pos,
+                slice,
+                fg_color,
+                bg_color,
+                0,
+                0,
+            );
+        }
+    }
     pub fn width(&self) -> usize {
         self.rect.width
     }
@@ -959,26 +932,31 @@ impl Window {
         }
     }
 
-    fn should_resize_framebuffer(&mut self) {
+    fn should_resize_framebuffer(&mut self) -> Result<(), &'static str> {
         if self.resized {
-            self.resize_framebuffer();
+            self.resize_framebuffer()?;
             self.resized = false;
         }
+        Ok(())
     }
 
     /// Draws the rectangular shape representing the `Window`
-    pub fn draw_rectangle(&mut self, col: Color) {
-        self.should_resize_framebuffer();
+    pub fn draw_rectangle(&mut self, col: Color) -> Result<(), &'static str> {
+        self.should_resize_framebuffer()?;
 
         for pixel in self.frame_buffer.buffer.iter_mut() {
             *pixel = col;
         }
         self.draw_title_border();
+        Ok(())
     }
 
     /// Resizes framebuffer after to Window's width and height
-    fn resize_framebuffer(&mut self) {
-        self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).unwrap();
+    fn resize_framebuffer(&mut self) -> Result<(), &'static str> {
+        self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height).or(Err(
+            "Unable to resize framebuffer to current width and height",
+        ))?;
+        Ok(())
     }
 
     /// Returns visible part of self's `rect` with relative bounds applied
@@ -1010,9 +988,10 @@ impl Window {
 fn port_loop(
     (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
-    let window_manager = WINDOW_MANAGER.get().unwrap();
-    let window_3 = WindowManager::new_window(&Rect::new(400, 200, 30, 100), None);
-    let window_2 = WindowManager::new_window(&Rect::new(400, 400, 500, 20), Some(format!("Basic")));
+    let window_manager = WINDOW_MANAGER.get().ok_or("Unable to get WindowManager")?;
+    let window_2 = window_manager
+        .lock()
+        .new_window(&Rect::new(400, 400, 500, 20), Some(format!("Basic")))?;
     let text = TextDisplayInfo {
         width: 400,
         height: 400,
@@ -1023,6 +1002,7 @@ fn port_loop(
         fg_color: DEFAULT_TEXT_COLOR,
         bg_color: DEFAULT_BORDER_COLOR,
     };
+    // let window_3 = window_manager.lock().new_window(&Rect::new(100, 100, 0, 0), Some(format!("window 3")))?;
     let mut app = App::new(window_2, text);
     let hpet = get_hpet();
     let mut start = hpet
@@ -1078,22 +1058,21 @@ fn port_loop(
                         window_manager
                             .lock()
                             .update_mouse_position(ScreenPos::new(x as i32, -(y as i32)));
-                        window_manager
-                            .lock()
-                            .drag_windows(ScreenPos::new(x as i32, -(y as i32)), &mouse_event);
                     }
+                    window_manager
+                        .lock()
+                        .drag_windows(ScreenPos::new(x as i32, -(y as i32)), &mouse_event);
                 }
                 _ => (),
             }
         }
 
         if diff > 0 {
-            app.draw();
-            window_3.lock().draw_rectangle(DEFAULT_WINDOW_COLOR);
+            app.draw()?;
             window_manager.lock().update();
             window_manager.lock().render();
 
-            start = hpet.as_ref().unwrap().get_counter();
+            start = hpet.as_ref().ok_or("Unable to get timer")?.get_counter();
         }
     }
     Ok(())
