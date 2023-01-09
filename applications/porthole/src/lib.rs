@@ -736,15 +736,16 @@ impl WindowManager {
     fn draw_mouse(&mut self) {
         let bounding_box = self.mouse.visible_rect();
 
-        let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, bounding_box);
-        let chunker =
+        if let Some(screen_rows) =
             FramebufferRowChunks::new(&mut self.v_framebuffer.buffer, bounding_box, SCREEN_WIDTH)
-                .unwrap();
-
-        for (screen_row, mouse_image_row) in chunker.zip(mouse_image) {
-            for (screen_pixel, mouse_pixel) in screen_row.iter_mut().zip(mouse_image_row.iter()) {
-                if mouse_pixel != &0xFF0000 {
-                    *screen_pixel = *mouse_pixel;
+        {
+            let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, bounding_box);
+            for (screen_row, mouse_image_row) in screen_rows.zip(mouse_image) {
+                for (screen_pixel, mouse_pixel) in screen_row.iter_mut().zip(mouse_image_row.iter())
+                {
+                    if mouse_pixel != &0xFF0000 {
+                        *screen_pixel = *mouse_pixel;
+                    }
                 }
             }
         }
