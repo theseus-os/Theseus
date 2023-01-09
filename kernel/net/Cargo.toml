@@ -5,6 +5,7 @@ description = "Network device abstractions"
 edition = "2021"
 
 [dependencies]
+heapless = "0.7.8"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 log = "0.4.8"
 mutex_sleep = { path = "../mutex_sleep" }

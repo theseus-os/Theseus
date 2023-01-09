@@ -48,7 +48,16 @@ const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 const GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = 0x100;
 
 /// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
-pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo::new());
+static GRAPHIC_INFO: Mutex<Option<GraphicInfo>> = Mutex::new(None);
+
+/// Returns information about the currently-active graphical framebuffer.
+///
+/// This will return `None` if `handle_ap_cores()` has not yet been invoked
+/// (which is the function that obtains the graphic info in the first place),
+/// or if the obtained graphic info is invalid.
+pub fn get_graphic_info() -> Option<GraphicInfo> {
+    GRAPHIC_INFO.lock().filter(GraphicInfo::is_valid)
+}
 
 /// A structure to access information about the graphical framebuffer mode
 /// that was discovered and chosen in the AP's real-mode initialization sequence.
@@ -75,18 +84,32 @@ pub struct GraphicInfo {
     _attributes: u16,
     /// The total size of the graphic VGA memory in 64 KiB chunks.
     total_memory_size_64_kib_chunks: u16,
+    /// The number of bytes in each row or line of the framebuffer's memory.
+    /// This is similar to the "stride" of a framebuffer, but is expressed
+    /// in units of bytes rather than in units of pixels.
+    bytes_per_scanline: u16,
+    /// The size of each pixel, in number of bits.
+    bits_per_pixel: u8,
+    /// The size of a pixel's red component, in number of bits.
+    red_mask_size: u8,
+    /// The bit position of the least significant byte of a pixel's red component.
+    red_field_position: u8,
+    /// The size of a pixel's green component, in number of bits.
+    green_mask_size: u8,
+    /// The bit position of the least significant byte of a pixel's green component.
+    green_field_position: u8,
+    /// The size of a pixel's blue component, in number of bits.
+    blue_mask_size: u8,
+    /// The bit position of the least significant byte of a pixel's blue component.
+    blue_field_position: u8,
 }
 
 impl GraphicInfo {
-    const fn new() -> Self {
-        Self {
-            width: 0,
-            height: 0,
-            physical_address: 0,
-            _mode: 0,
-            _attributes: 0,
-            total_memory_size_64_kib_chunks: 0,
-        }
+    /// Checks this `GraphicInfo` to ensure it is valid.
+    ///
+    /// Currently, its width, height, and physical address all must be non-zero.
+    fn is_valid(&self) -> bool {
+        self.width != 0 && self.height != 0 && self.physical_address != 0
     }
 
     /// Returns the visible width of the screen, in pixels.
@@ -94,7 +117,7 @@ impl GraphicInfo {
         self.width
     }
 
-    /// Returns the height width of the screen, in pixels.
+    /// Returns the visible height of the screen, in pixels.
     pub fn height(&self) -> u16 {
         self.height
     }
@@ -111,6 +134,49 @@ impl GraphicInfo {
     /// e.g., a backbuffer for double buffering (aka page flipping).
     pub fn total_memory_size_in_bytes(&self) -> u32 {
         (self.total_memory_size_64_kib_chunks as u32) << 16
+    }
+
+    /// The number of bytes in each row or line of the framebuffer's memory.
+    ///
+    /// This is similar to the "stride" of a framebuffer, but is expressed
+    /// in units of bytes rather than in units of pixels.
+    pub fn bytes_per_scanline(&self) -> u16 {
+        self.bytes_per_scanline
+    }
+
+    /// The size of each pixel, in number of bits, *not* bytes.
+    pub fn bits_per_pixel(&self) -> u8 {
+        self.bits_per_pixel
+    }
+
+    /// The size of a pixel's Red value, in number of bits.
+    pub fn red_size(&self) -> u8 {
+        self.red_mask_size
+    }
+
+    /// The position of the least significant bit of a pixel's Red value.
+    pub fn red_position(&self) -> u8 {
+        self.red_field_position
+    }
+
+    /// The size of a pixel's Green value, in number of bits.
+    pub fn green_size(&self) -> u8 {
+        self.green_mask_size
+    }
+
+    /// The position of the least significant bit of a pixel's Green value.
+    pub fn green_position(&self) -> u8 {
+        self.green_field_position
+    }
+    
+    /// The size of a pixel's Blue value, in number of bits.
+    pub fn blue_size(&self) -> u8 {
+        self.blue_mask_size
+    }
+
+    /// The position of the least significant bit of a pixel's Blue value.
+    pub fn blue_position(&self) -> u8 {
+        self.blue_field_position
     }
 }
 
@@ -242,9 +308,10 @@ pub fn handle_ap_cores(
 
     // Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
     {
-        let graphic_info = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
+        let graphic_info = trampoline_mapped_pages
+            .as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
         info!("Obtained graphic info from real mode: {:?}", graphic_info);
-        *GRAPHIC_INFO.lock() = graphic_info.clone();
+        *GRAPHIC_INFO.lock() = Some(*graphic_info);
     }
     
     // Wait for all CPUs to finish booting and init

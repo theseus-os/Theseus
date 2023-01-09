@@ -10,7 +10,7 @@ use once_cell::unsync::Lazy;
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
-use ps2::{keyboard_detect, KeyboardType, read_scancode, LEDState, keyboard_scancode_set, ScancodeSet};
+use ps2::{PS2Keyboard, KeyboardType, LEDState, ScancodeSet};
 use x86_64::structures::idt::InterruptStackFrame;
 
 /// The first PS/2 port for the keyboard is connected directly to IRQ 1.
@@ -20,17 +20,23 @@ const PS2_KEYBOARD_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0x1;
 // TODO: avoid unsafe static mut
 static mut KBD_MODIFIERS: Lazy<KeyboardModifiers> = Lazy::new(KeyboardModifiers::new);
 
-static KEYBOARD_PRODUCER: Once<Queue<Event>> = Once::new();
+static KEYBOARD: Once<KeyboardInterruptParams> = Once::new();
+
+struct KeyboardInterruptParams {
+    keyboard: PS2Keyboard<'static>,
+    queue: Queue<Event>,
+}
 
 /// Initialize the PS/2 keyboard driver and register its interrupt handler.
 /// 
 /// ## Arguments
+/// * `keyboard`: a wrapper around keyboard functionality, used by the keyboard interrupt handler.
 /// * `keyboard_queue_producer`: the queue onto which the keyboard interrupt handler
 ///    will push new keyboard events when a key action occurs.
-pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
+pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     // Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
-    match keyboard_detect() {
+    match keyboard.keyboard_detect() {
         Ok(KeyboardType::AncientATKeyboard) => debug!("The PS/2 keyboard type is: Ancient AT Keyboard with translator enabled in the PS/2 Controller"),
         Ok(KeyboardType::MF2Keyboard) => debug!("The PS/2 keyboard type is: MF2Keyboard"),
         Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator) => debug!("The PS/2 keyboard type is: MF2 Keyboard with translator enabled in PS/2 Controller"),
@@ -41,7 +47,7 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     }
 
     // TODO: figure out what we should do, for now using set 1
-    keyboard_scancode_set(ScancodeSet::Set1)?;
+    keyboard.keyboard_scancode_set(ScancodeSet::Set1)?;
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {
@@ -50,7 +56,8 @@ pub fn init(keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     })?;
 
     // Final step: set the producer end of the keyboard event queue.
-    KEYBOARD_PRODUCER.call_once(|| keyboard_queue_producer);
+    // Also add the keyboard struct for access during interrupts.
+    KEYBOARD.call_once(|| KeyboardInterruptParams { keyboard, queue: keyboard_queue_producer });
     Ok(())
 }
 
@@ -60,32 +67,36 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
     // the first handling the E0 byte, the second handling their second byte.
     static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
 
-    let scan_code = read_scancode();
-    let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
+    if let Some(KeyboardInterruptParams { keyboard, queue }) = KEYBOARD.get() {
+        let scan_code = keyboard.read_scancode();
+        let extended = EXTENDED_SCANCODE.load(Ordering::SeqCst);
 
-    // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
-    if scan_code == 0xE0 {
-        if extended {
-            error!("ps2_keyboard_handler: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
-        }
-        // mark it true for the next interrupt
-        EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
-    } else if scan_code == 0xE1 {
-        error!("ps2_keyboard_handler: PAUSE/BREAK key pressed ... ignoring it!");
-        // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
-        EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
-    } else { // a regular scancode, go ahead and handle it
-        // if the previous interrupt's scan_code was an extended scan_code, then this one is not
-        if extended {
-            EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
-        }
-        // a scan code of zero is a PS2_PORT error that we can ignore,
-        // a scan code of 0xFA is a command ACK response, already handled in polling (when sending a command, see ps2 crate)
-        if scan_code != 0 && scan_code != 0xFA {
-            if let Err(e) = handle_keyboard_input(scan_code, extended) {
-                error!("ps2_keyboard_handler: error handling PS2_PORT input: {e:?}");
+        // 0xE0 indicates an extended scancode, so we must wait for the next interrupt to get the actual scancode
+        if scan_code == 0xE0 {
+            if extended {
+                error!("ps2_keyboard_handler: got two extended scancodes (0xE0) in a row! Shouldn't happen.");
+            }
+            // mark it true for the next interrupt
+            EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
+        } else if scan_code == 0xE1 {
+            error!("ps2_keyboard_handler: PAUSE/BREAK key pressed ... ignoring it!");
+            // TODO: handle this, it's a 6-byte sequence (over the next 5 interrupts)
+            EXTENDED_SCANCODE.store(true, Ordering::SeqCst);
+        } else { // a regular scancode, go ahead and handle it
+            // if the previous interrupt's scan_code was an extended scan_code, then this one is not
+            if extended {
+                EXTENDED_SCANCODE.store(false, Ordering::SeqCst);
+            }
+            // a scan code of zero is a PS2_PORT error that we can ignore,
+            // a scan code of 0xFA is a command ACK response, already handled in polling (when sending a command, see ps2 crate)
+            if scan_code != 0 && scan_code != 0xFA {
+                if let Err(e) = handle_keyboard_input(keyboard, queue, scan_code, extended) {
+                    error!("ps2_keyboard_handler: error handling PS2_PORT input: {e:?}");
+                }
             }
         }
+    } else {
+        warn!("ps2_keyboard_handler(): KEYBOARD isn't initialized yet, skipping interrupt.");
     }
     
     interrupts::eoi(Some(PS2_KEYBOARD_IRQ));
@@ -97,7 +108,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
 /// 
 /// Returns Ok(()) if everything was handled properly.
 /// Otherwise, returns an error string.
-fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static str> {
+fn handle_keyboard_input(keyboard: &PS2Keyboard, queue: &Queue<Event>, scan_code: u8, extended: bool) -> Result<(), &'static str> {
     // SAFE: no real race conditions with keyboard presses
     let modifiers = unsafe { &mut KBD_MODIFIERS };
     // debug!("KBD_MODIFIERS before {}: {:?}", scan_code, modifiers);
@@ -153,15 +164,15 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
         // The "*Lock" keys are toggled only upon being pressed, not when released.
         Ok(Keycode::CapsLock) => {
             modifiers.toggle(KeyboardModifiers::CAPS_LOCK);
-            set_keyboard_led(modifiers);
+            set_keyboard_led(keyboard, modifiers);
         }
         Ok(Keycode::ScrollLock) => {
             modifiers.toggle(KeyboardModifiers::SCROLL_LOCK);
-            set_keyboard_led(modifiers);
+            set_keyboard_led(keyboard, modifiers);
         }
         Ok(Keycode::NumLock) => {
             modifiers.toggle(KeyboardModifiers::NUM_LOCK);
-            set_keyboard_led(modifiers);
+            set_keyboard_led(keyboard, modifiers);
         }
 
         _ => {} // do nothing
@@ -178,12 +189,7 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
 
     if let Ok(keycode) = Keycode::try_from(adjusted_scan_code) {
         let event = Event::new_keyboard_event(KeyEvent::new(keycode, action, **modifiers));
-        if let Some(producer) = KEYBOARD_PRODUCER.get() {
-            producer.push(event).map_err(|_| "keyboard input queue is full")
-        } else {
-            warn!("handle_keyboard_input(): KEYBOARD_PRODUCER wasn't yet initialized, dropping keyboard event {event:?}.");
-            Err("keyboard event queue not ready")
-        }
+        queue.push(event).map_err(|_| "keyboard input queue is full")
     } else {
         error!("handle_keyboard_input(): Unknown scancode: {scan_code:?}, adjusted scancode: {adjusted_scan_code:?}");
         Err("unknown keyboard scancode")
@@ -191,8 +197,8 @@ fn handle_keyboard_input(scan_code: u8, extended: bool) -> Result<(), &'static s
 }
 
 
-fn set_keyboard_led(modifiers: &KeyboardModifiers) {
-    if let Err(e) = ps2::set_keyboard_led(
+fn set_keyboard_led(keyboard: &PS2Keyboard, modifiers: &KeyboardModifiers) {
+    if let Err(e) = keyboard.set_keyboard_led(
         LEDState::new()
             .with_scroll_lock(modifiers.is_scroll_lock())
             .with_number_lock(modifiers.is_num_lock())
