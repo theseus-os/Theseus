@@ -266,6 +266,8 @@ pub fn init(
         debug!("{:X?}", aggregated_section_memory_bounds);
         let mut index = 0;
 
+        let (init_start_virt,    init_start_phys)    = aggregated_section_memory_bounds.init.start;
+        let (init_end_virt,      init_end_phys)      = aggregated_section_memory_bounds.init.end;
         let (text_start_virt,    text_start_phys)    = aggregated_section_memory_bounds.text.start;
         let (text_end_virt,      text_end_phys)      = aggregated_section_memory_bounds.text.end;
         let (rodata_start_virt,  rodata_start_phys)  = aggregated_section_memory_bounds.rodata.start;
@@ -273,9 +275,22 @@ pub fn init(
         let (data_start_virt,    data_start_phys)    = aggregated_section_memory_bounds.data.start;
         let (data_end_virt,      data_end_phys)      = aggregated_section_memory_bounds.data.end;
 
+        let init_flags    = aggregated_section_memory_bounds.init.flags;
         let text_flags    = aggregated_section_memory_bounds.text.flags;
         let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         let data_flags    = aggregated_section_memory_bounds.data.flags;
+
+        let init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())?;
+        let init_frames = frame_allocator::allocate_frames_by_bytes_at(init_start_phys, init_end_phys.value() - init_start_phys.value())?;
+        let init_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(init_start_phys.value()),
+            init_end_phys.value() - init_start_phys.value(),
+        )?;
+        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
+            Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, &init_frames, init_flags)?
+        }));
+        let mut init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)?;
+        index += 1;
 
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
@@ -283,7 +298,8 @@ pub fn init(
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         }));
-        text_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?));
+        init_mapped_pages.merge(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?).map_err(|(error, _)| error)?;
+        text_mapped_pages = Some(NoDrop::new(init_mapped_pages));
         index += 1;
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;

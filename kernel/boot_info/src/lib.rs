@@ -12,7 +12,7 @@ pub mod multiboot2;
 #[cfg(feature = "uefi")]
 pub mod uefi;
 
-use core::{iter::Iterator, ops::Range};
+use core::iter::Iterator;
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
 pub trait MemoryRegion {
@@ -65,6 +65,12 @@ pub trait Module {
     fn len(&self) -> usize;
 }
 
+#[derive(Debug)]
+pub struct ReservedMemoryRegion {
+    pub start: PhysicalAddress,
+    pub len: usize,
+}
+
 pub trait BootInformation: 'static {
     type MemoryRegion<'a>: MemoryRegion;
     type MemoryRegions<'a>: Iterator<Item = Self::MemoryRegion<'a>>;
@@ -75,20 +81,12 @@ pub trait BootInformation: 'static {
     type Module<'a>: Module;
     type Modules<'a>: Iterator<Item = Self::Module<'a>>;
 
+    type AdditionalReservedMemoryRegions: Iterator<Item = ReservedMemoryRegion>;
+
     /// Returns the boot information's starting virtual address.
     fn start(&self) -> Option<VirtualAddress>;
     /// Returns the boot information's length.
     fn len(&self) -> usize;
-
-    /// Returns the range of physical addresses at which the kernel code is
-    /// located.
-    fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
-    /// Returns the range of physical addresses at which the bootloader
-    /// information is located.
-    fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
-    /// Returns the range of physical addresses at which the modules are
-    /// located.
-    fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str>;
 
     /// Returns memory regions describing the physical memory.
     fn memory_regions(&self) -> Result<Self::MemoryRegions<'_>, &'static str>;
@@ -96,6 +94,15 @@ pub trait BootInformation: 'static {
     fn elf_sections(&self) -> Result<Self::ElfSections<'_>, &'static str>;
     /// Returns the modules found in the kernel image.
     fn modules(&self) -> Self::Modules<'_>;
+
+    /// Returns additional reserved memory regions that aren't included in
+    /// the list of regions returned by [`memory_regions`].
+    fn additional_reserved_memory_regions(
+        &self,
+    ) -> Result<Self::AdditionalReservedMemoryRegions, &'static str>;
+
+    /// Returns the end of the kernel's image in physical memory.
+    fn kernel_end(&self) -> Result<PhysicalAddress, &'static str>;
 
     /// Returns the RSDP if it was provided by the bootloader.
     fn rsdp(&self) -> Option<PhysicalAddress>;
