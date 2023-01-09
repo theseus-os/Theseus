@@ -17,7 +17,7 @@ use alloc::collections::BTreeMap;
 use fs_node::{DirRef, Directory, FileOrDir, FsNode, WeakDirRef};
 
 
-pub const ROOT_DIRECTORY_NAME: &'static str = "";
+pub const ROOT_DIRECTORY_NAME: &str = "";
 
 lazy_static! {
     /// The root directory
@@ -63,14 +63,11 @@ impl Directory for RootDirectory {
 
     fn remove(&mut self, node: &FileOrDir) -> Option<FileOrDir> {
         // Prevents removal of root
-        match node {
-            &FileOrDir::Dir(ref dir) => {
-                if Arc::ptr_eq(dir, get_root()) {
-                    error!("Ignoring attempt to remove the root directory.");
-                    return None;
-                }
-            },
-            _ => {}
+        if let FileOrDir::Dir(dir) = node {
+            if Arc::ptr_eq(dir, get_root()) {
+                error!("Ignoring attempt to remove the root directory");
+                return None;
+            }
         }
         
         if let Some(mut old_node) = self.children.remove(&node.get_name()) {
@@ -85,7 +82,7 @@ impl Directory for RootDirectory {
 impl FsNode for RootDirectory {
     /// Recursively gets the absolute pathname as a String
     fn get_absolute_path(&self) -> String {
-        format!("{}/", ROOT_DIRECTORY_NAME)
+        format!("{ROOT_DIRECTORY_NAME}/")
     }
 
     fn get_name(&self) -> String {
