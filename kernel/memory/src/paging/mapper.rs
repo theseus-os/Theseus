@@ -88,8 +88,8 @@ impl Mapper {
     /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
     /// and also shows their `PteFlags`.
     /// 
-    /// The page table details are written to the the given `writer`.
-    pub fn dump_pte(&self,virtual_address: VirtualAddress) {
+    /// The page table details are written to the log as an `info` message.
+    pub fn dump_pte(&self, virtual_address: VirtualAddress) {
         let page = Page::containing_address(virtual_address);
         let p4  = self.p4();
         let p3  = p4.next_table(page.p4_index());
