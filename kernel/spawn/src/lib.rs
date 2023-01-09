@@ -28,7 +28,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, get_my_current_task, RestartInfo, TASKLIST, JoinableTaskRef, RunState};
+use task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -48,13 +48,16 @@ pub fn init(
 ) -> Result<BootstrapTaskRef, &'static str> {
     runqueue::init(apic_id)?;
     
-    let joinable_bootstrap_task = task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
-    let task_ref = joinable_bootstrap_task.clone();
+    let (joinable_bootstrap_task, exitable_bootstrap_task) =
+        task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
-    runqueue::add_task_to_specific_runqueue(apic_id, task_ref.clone())?;
+    runqueue::add_task_to_specific_runqueue(
+        apic_id,
+        exitable_bootstrap_task.clone(),
+    )?;
     Ok(BootstrapTaskRef {
-        apic_id, 
-        task_ref,
+        apic_id,
+        exitable_taskref: exitable_bootstrap_task,
     })
 }
 
@@ -109,12 +112,12 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
     apic_id: u8,
-    task_ref: TaskRef,
+    exitable_taskref: ExitableTaskRef,
 }
 impl Deref for BootstrapTaskRef {
     type Target = TaskRef;
     fn deref(&self) -> &TaskRef {
-        &self.task_ref
+        self.exitable_taskref.deref()
     }
 }
 impl BootstrapTaskRef {
@@ -132,8 +135,8 @@ impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
         // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
-        remove_current_task_from_runqueue(&self.task_ref);
-        self.mark_as_exited(Box::new(()))
+        remove_current_task_from_runqueue(&self.exitable_taskref);
+        self.exitable_taskref.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
 
         // Note: we can mark this bootstrap task as exited here, but we cannot 
@@ -633,7 +636,9 @@ pub fn setup_context_trampoline(
 
 /// Internal routine that runs when a task is first switched to,
 /// shared by `task_wrapper` and `task_wrapper_restartable`.
-fn task_wrapper_internal<F, A, R>(current_task_id: usize) -> Result<R, task::KillReason>
+fn task_wrapper_internal<F, A, R>(
+    current_task_id: usize,
+) -> (Result<R, task::KillReason>, ExitableTaskRef)
 where
     A: Send + 'static,
     R: Send + 'static,
@@ -642,6 +647,7 @@ where
     let task_entry_func;
     let task_arg;
     let recovered_preemption_guard;
+    let exitable_taskref;
 
     // This is scoped to ensure that absolutely no resources that require dropping are held
     // when invoking the task's entry function, in order to simplify cleanup when unwinding.
@@ -650,7 +656,10 @@ where
     {
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
-        let current_task = task::init_current_task(current_task_id, None).unwrap_or_else(|_|
+        exitable_taskref = task::init_current_task(
+            current_task_id,
+            None,
+        ).unwrap_or_else(|_|
             panic!("BUG: task_wrapper: couldn't init task {} as the current task", current_task_id)
         );
 
@@ -660,10 +669,10 @@ where
         // because this is the first code to run immediately after a context switch
         // switches to this task for the first time.
         // For more details, see the comments at the end of `Task::task_switch()`.
-        recovered_preemption_guard = current_task.post_context_switch_action();
+        recovered_preemption_guard = exitable_taskref.post_context_switch_action();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
-        let task_func_arg = current_task.with_kstack(|kstack| {
+        let task_func_arg = exitable_taskref.with_kstack(|kstack| {
             kstack.as_type(0).map(|tfa_box_raw_ptr: &usize| {
                 // SAFE: we placed this Box in this task's stack in the `spawn()` function when creating the TaskFuncArg struct.
                 let tfa_boxed = unsafe { Box::from_raw((*tfa_box_raw_ptr) as *mut TaskFuncArg<F, A, R>) };
@@ -675,9 +684,9 @@ where
 
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
-            &*current_task, debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
+            &**exitable_taskref, debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
-    };
+    }
 
     // The first time that a task runs, its entry function `task_wrapper()` is jumped to
     // from the `task_switch()` function, right after the context switch occurred.
@@ -695,7 +704,8 @@ where
 
     // Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
-    catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg)
+    let result = catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg);
+    (result, exitable_taskref)
 }
 
 /// The entry point for all new `Task`s.
@@ -711,7 +721,7 @@ where
     // that no other code utilizes the "first register" before we can read it.
     // See `setup_context_trampoline()` for more info on how this works.
     let current_task_id = context_switch::read_first_register();
-    let result = task_wrapper_internal::<F, A, R>(current_task_id);
+    let (result, exitable_task_ref) = task_wrapper_internal::<F, A, R>(current_task_id);
 
     // Here: now that the task is finished running, we must clean in up by doing three things:
     // 1. Put the task into a non-runnable mode (exited or killed) and set its exit value or killed reason
@@ -724,11 +734,9 @@ where
     //
     // Operations 1 happen in `task_cleanup_success` or `task_cleanup_failure`, 
     // while operations 2 and 3 then happen in `task_cleanup_final`.
-    let curr_task = get_my_current_task()
-        .expect("BUG: task_wrapper: couldn't get current task (after task func).");
     match result {
-        Ok(exit_value)   => task_cleanup_success::<F, A, R>(curr_task, exit_value),
-        Err(kill_reason) => task_cleanup_failure::<F, A, R>(curr_task, kill_reason),
+        Ok(exit_value)   => task_cleanup_success::<F, A, R>(exitable_task_ref, exit_value),
+        Err(kill_reason) => task_cleanup_failure::<F, A, R>(exitable_task_ref, kill_reason),
     }
 }
 
@@ -745,14 +753,12 @@ where
     // that no other code utilizes the "first register" before we can read it.
     // See `setup_context_trampoline()` for more info on how this works.
     let current_task_id = context_switch::read_first_register();
-    let result = task_wrapper_internal::<F, A, R>(current_task_id);
+    let (result, exitable_task_ref) = task_wrapper_internal::<F, A, R>(current_task_id);
 
     // See `task_wrapper` for an explanation of how the below functions work.
-    let curr_task = get_my_current_task()
-        .expect("BUG: task_wrapper: couldn't get current task (after task func).");
     match result {
-        Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(curr_task, exit_value),
-        Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(curr_task, kill_reason),
+        Ok(exit_value)   => task_restartable_cleanup_success::<F, A, R>(exitable_task_ref, exit_value),
+        Err(kill_reason) => task_restartable_cleanup_failure::<F, A, R>(exitable_task_ref, kill_reason),
     }
 }
 
@@ -761,7 +767,7 @@ where
 /// Internal function cleans up a task that exited properly. 
 /// Contains the shared code between `task_cleanup_success` and `task_cleanup_success_restartable`
 #[inline(always)]
-fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (PreemptionGuard, TaskRef)
+fn task_cleanup_success_internal<R>(current_task: ExitableTaskRef, exit_value: R) -> (PreemptionGuard, ExitableTaskRef)
     where R: Send + 'static,
 { 
     // Disable preemption.
@@ -777,7 +783,7 @@ fn task_cleanup_success_internal<R>(current_task: TaskRef, exit_value: R) -> (Pr
 }
 
 /// This function cleans up a task that exited properly.
-fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+fn task_cleanup_success<F, A, R>(current_task: ExitableTaskRef, exit_value: R) -> !
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -787,7 +793,7 @@ fn task_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
 }
 
 /// Similar to `task_cleanup_success` but used on restartable_tasks
-fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: R) -> !
+fn task_restartable_cleanup_success<F, A, R>(current_task: ExitableTaskRef, exit_value: R) -> !
     where A: Send + Clone + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
@@ -800,7 +806,7 @@ fn task_restartable_cleanup_success<F, A, R>(current_task: TaskRef, exit_value: 
 
 /// Internal function that cleans up a task that did not exit properly.
 #[inline(always)]
-fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillReason) -> (PreemptionGuard, TaskRef) {
+fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: task::KillReason) -> (PreemptionGuard, ExitableTaskRef) {
     // Disable preemption.
     let preemption_guard = hold_preemption();
 
@@ -817,11 +823,12 @@ fn task_cleanup_failure_internal(current_task: TaskRef, kill_reason: task::KillR
 /// This function cleans up a task that did not exit properly,
 /// e.g., it panicked, hit an exception, etc. 
 /// 
-/// A failure that occurs while unwinding a task will also jump here.
+/// Once unwinding completes, or if there is a failure while unwinding a task,
+/// execution will jump to this function.
 /// 
 /// The generic type parameters are derived from the original `task_wrapper` invocation,
 /// and are here to provide type information needed when cleaning up a failed task.
-fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
+fn task_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: task::KillReason) -> !
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -831,7 +838,7 @@ fn task_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillR
 }
 
 /// Similar to `task_cleanup_failure` but used on restartable_tasks
-fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason: task::KillReason) -> !
+fn task_restartable_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: task::KillReason) -> !
     where A: Send + Clone + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone + 'static, 
@@ -843,7 +850,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: TaskRef, kill_reason:
 
 /// Internal function that performs final cleanup actions for an exited task.
 #[inline(always)]
-fn task_cleanup_final_internal(current_task: &TaskRef) {
+fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
     // First, remove the task from its runqueue(s).
     remove_current_task_from_runqueue(current_task);
 
@@ -856,11 +863,7 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
     }
 
     // Third, reap the task if it has been orphaned (if it's non-joinable).
-    if !current_task.is_joinable() {
-        // trace!("Reaping orphaned task... {:?}", current_task);
-        let _exit_value = current_task.retrieve_exit_value();
-        // trace!("Reaped orphaned task {:?}, {:?}", current_task, _exit_value);
-    }
+    current_task.reap_if_orphaned();
 
     // Fourth, synchronize memory with the release fence of the "parent" task
     // in `TaskBuilder::spawn()`.
@@ -870,7 +873,7 @@ fn task_cleanup_final_internal(current_task: &TaskRef) {
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
-fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: TaskRef) -> ! 
+fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: ExitableTaskRef) -> ! 
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -890,7 +893,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 /// The final piece of the task cleanup logic for restartable tasks.
 /// which removes the task from its runqueue and spawns it again with 
 /// same entry function (F) and argument (A). 
-fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: TaskRef) -> !
+fn task_restartable_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: ExitableTaskRef) -> !
 where
     A: Send + Clone + 'static,
     R: Send + 'static,
@@ -970,7 +973,7 @@ where
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
-fn remove_current_task_from_runqueue(current_task: &TaskRef) {
+fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     // Special behavior when evaluating runqueues
     #[cfg(rq_eval)] {
         // The special spillful version does nothing here, since it was already done in `internal_exit()`

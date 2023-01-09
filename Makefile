@@ -644,14 +644,14 @@ ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@mdbook build $(BOOK_SRC) -d $(BOOK_OUT)
+	@mdbook build $(MDBOOK_ARGS) $(BOOK_SRC) -d $(BOOK_OUT)
 	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
 ### Opens the Theseus book.
+export override MDBOOK_ARGS+=--open
 view-book: book
-	@echo -e "Opening the Theseus book in your browser..."
-	@mdbook build --open $(BOOK_SRC) -d $(BOOK_OUT)
+	@echo -e "Opened the Theseus book in your browser."
 
 
 ### Removes all built documentation
