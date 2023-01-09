@@ -349,7 +349,7 @@ impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
     }
 }
 impl<R> BlockIo for ByteReaderWrapper<R> where R: BlockReader {
-    delegate!{ to self.0 { fn block_size(&self) -> usize; } }    
+    delegate!{ to self.0 { fn block_size(&self) -> usize; } }
 }
 impl<R> KnownLength for ByteReaderWrapper<R> where R: KnownLength + BlockReader {
     delegate!{ to self.0 { fn len(&self) -> usize; } }
