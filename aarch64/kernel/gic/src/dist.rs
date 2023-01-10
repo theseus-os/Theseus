@@ -10,6 +10,7 @@ use super::TargetList;
 mod offset {
     use super::U32BYTES;
     pub const CTLR:      usize = 0x000 / U32BYTES;
+    pub const IGROUPR:   usize = 0x080 / U32BYTES;
     pub const ISENABLER: usize = 0x100 / U32BYTES;
     pub const ICENABLER: usize = 0x180 / U32BYTES;
     pub const ITARGETSR: usize = 0x800 / U32BYTES;
@@ -18,7 +19,10 @@ mod offset {
     pub const P6IROUTER: usize = 0x100 / U32BYTES;
 }
 
-const CTLR_ENGRP0: u32 = 0b01;
+// enable group 0
+// const CTLR_ENGRP0: u32 = 0b01;
+
+// enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
 
 // Affinity Routing Enable, Non-secure state.
@@ -28,6 +32,9 @@ const CTLR_ARE_NS: u32 = 1 << 5;
 //   1 = all other PEs
 //   0 = use target list
 const SGIR_TARGET_ALL_OTHER_PE: u32 = 1 << 24;
+
+// const GROUP_0: u32 = 0;
+const GROUP_1: u32 = 1;
 
 // bit 15: which interrupt group to target
 const SGIR_NSATT_GRP0: u32 = 0 << 15;
@@ -45,7 +52,7 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 /// states.
 pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
     let mut reg = registers[offset::CTLR];
-    reg |= CTLR_ENGRP0 | CTLR_ENGRP1;
+    reg |= CTLR_ENGRP1;
     registers[offset::CTLR] = reg;
 
     // Return value: whether or not affinity routing is
@@ -56,7 +63,11 @@ pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
 
 /// Will that interrupt be forwarded by the distributor?
 pub fn get_int_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
+    // enabled?
     read_array::<32>(registers, offset::ISENABLER, int) > 0
+    &&
+    // part of group 1?
+    read_array::<32>(registers, offset::IGROUPR, int) == GROUP_1
 }
 
 /// Enables or disables the forwarding of
@@ -67,6 +78,10 @@ pub fn set_int_state(registers: &mut MmioPageOfU32, int: IntNumber, enabled: Ena
         false => offset::ICENABLER,
     };
     write_array::<32>(registers, reg_base, int, 1);
+
+    // whether we're enabling or disabling,
+    // set as part of group 1
+    write_array::<32>(registers, reg_base, int, GROUP_1);
 }
 
 /// Sends an Inter-Processor-Interrupt

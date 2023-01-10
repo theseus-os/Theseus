@@ -17,7 +17,7 @@ pub fn init() {
 
     // Enable Group 0
     // bit 0 = group 0 enable
-    unsafe { asm!("msr ICC_IGRPEN0_EL1, {}", in(reg) IGRPEN_ENABLED) };
+    // unsafe { asm!("msr ICC_IGRPEN0_EL1, {}", in(reg) IGRPEN_ENABLED) };
 
     // Enable Groupe 1 (non-secure)
     // bit 0 = group 1 (non-secure) enable

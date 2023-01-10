@@ -256,20 +256,25 @@ impl ArmGic {
 
     /// Will that interrupt be forwarded by the distributor?
     pub fn get_int_state(&self, int: IntNumber) -> Enabled {
-        let mut enabled = dist::get_int_state(self.distributor(), int);
-        if let Self::V3(v3) = self {
-            enabled &= redist::get_int_state(&v3.redist_sgippi, int);
+        match int {
+            0..=31 => if let Self::V3(v3) = self {
+                redist::get_sgippi_state(&v3.redist_sgippi, int)
+            } else {
+                true
+            },
+            _ => dist::get_int_state(self.distributor(), int),
         }
-        enabled
     }
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
     pub fn set_int_state(&mut self, int: IntNumber, enabled: Enabled) {
-        dist::set_int_state(self.distributor_mut(), int, enabled);
-        if let Self::V3(v3) = self {
-            redist::set_int_state(&mut v3.redist_sgippi, int, enabled);
-        }
+        match int {
+            0..=31 => if let Self::V3(v3) = self {
+                redist::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);
+            },
+            _ => dist::set_int_state(self.distributor_mut(), int, enabled),
+        };
     }
 
     /// Interrupts have a priority; if their priority

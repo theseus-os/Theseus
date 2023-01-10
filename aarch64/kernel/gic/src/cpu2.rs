@@ -12,12 +12,15 @@ mod offset {
     pub const EOIR: usize = 0x10 / U32BYTES;
 }
 
-const CTLR_ENGRP0: u32 = 0b01;
+// enable group 0
+// const CTLR_ENGRP0: u32 = 0b01;
+
+// enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
 
 pub fn init(registers: &mut MmioPageOfU32) {
     let mut reg = registers[offset::CTLR];
-    reg |= CTLR_ENGRP0 | CTLR_ENGRP1;
+    reg |= CTLR_ENGRP1;
     registers[offset::CTLR] = reg;
 }
 
