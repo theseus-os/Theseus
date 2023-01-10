@@ -440,7 +440,7 @@
     <span class="kw">if let </span><span class="prelude-val">Some</span>(instruction_pointer) = instruction_pointer {
         <span class="kw">let </span>instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
         fe.instruction_pointer = <span class="prelude-val">Some</span>(instruction_pointer);
-        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), <span class="bool-val">false</span>)
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer, <span class="bool-val">false</span>)
                                         .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 

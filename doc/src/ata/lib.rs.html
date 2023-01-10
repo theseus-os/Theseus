@@ -1117,14 +1117,6 @@
 <span id="1117">1117</span>
 <span id="1118">1118</span>
 <span id="1119">1119</span>
-<span id="1120">1120</span>
-<span id="1121">1121</span>
-<span id="1122">1122</span>
-<span id="1123">1123</span>
-<span id="1124">1124</span>
-<span id="1125">1125</span>
-<span id="1126">1126</span>
-<span id="1127">1127</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic driver for accessing ATA drives (IDE) as a storage device.
 //! 
 //! The primary struct of interest is [`AtaDrive`].
@@ -1367,7 +1359,7 @@
 		<span class="kw">let </span>data_bar = data_bar &amp; PCI_BAR_PORT_MASK;
 		<span class="kw">let </span>control_bar = control_bar &amp; PCI_BAR_PORT_MASK;
 		AtaBus { 
-			data: Port::new(data_bar + <span class="number">0</span>),
+			data: Port::new(data_bar),
 			error: PortReadOnly::new(data_bar + <span class="number">1</span>),
 			_features: PortWriteOnly::new(data_bar + <span class="number">1</span>),
 			sector_count: Port::new(data_bar + <span class="number">2</span>),
@@ -1410,7 +1402,7 @@
 				<span class="self">self</span>.sector_count.write(sector_count <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_high.write((lba_start &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_mid.write( (lba_start &gt;&gt;  <span class="number">8</span>) <span class="kw">as </span>u8);
-				<span class="self">self</span>.lba_low.write( (lba_start &gt;&gt;  <span class="number">0</span>) <span class="kw">as </span>u8);
+				<span class="self">self</span>.lba_low.write(  lba_start        <span class="kw">as </span>u8);
 				<span class="self">self</span>.command.write(AtaCommand::ReadPio <span class="kw">as </span>u8);
 			}
 		} <span class="kw">else </span>{
@@ -1426,7 +1418,7 @@
 				</span><span class="self">self</span>.sector_count.write(sector_count <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_high.write((lba_start &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_mid.write( (lba_start &gt;&gt;  <span class="number">8</span>) <span class="kw">as </span>u8);
-				<span class="self">self</span>.lba_low.write( (lba_start &gt;&gt;  <span class="number">0</span>) <span class="kw">as </span>u8);
+				<span class="self">self</span>.lba_low.write(  lba_start        <span class="kw">as </span>u8);
 				<span class="self">self</span>.command.write(AtaCommand::ReadPioExt <span class="kw">as </span>u8);
 			}
 		} 
@@ -1478,7 +1470,7 @@
 				<span class="self">self</span>.sector_count.write(sector_count <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_high.write((lba_start &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_mid.write( (lba_start &gt;&gt;  <span class="number">8</span>) <span class="kw">as </span>u8);
-				<span class="self">self</span>.lba_low.write( (lba_start &gt;&gt;  <span class="number">0</span>) <span class="kw">as </span>u8);
+				<span class="self">self</span>.lba_low.write(  lba_start        <span class="kw">as </span>u8);
 				<span class="self">self</span>.command.write(AtaCommand::WritePio <span class="kw">as </span>u8);
 			}
 		} <span class="kw">else </span>{
@@ -1494,7 +1486,7 @@
 				</span><span class="self">self</span>.sector_count.write(sector_count <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_high.write((lba_start &gt;&gt; <span class="number">16</span>) <span class="kw">as </span>u8);
 				<span class="self">self</span>.lba_mid.write( (lba_start &gt;&gt;  <span class="number">8</span>) <span class="kw">as </span>u8);
-				<span class="self">self</span>.lba_low.write( (lba_start &gt;&gt;  <span class="number">0</span>) <span class="kw">as </span>u8);
+				<span class="self">self</span>.lba_low.write(  lba_start        <span class="kw">as </span>u8);
 				<span class="self">self</span>.command.write(AtaCommand::WritePioExt <span class="kw">as </span>u8);
 			}
 		}
@@ -2181,14 +2173,10 @@
 /// 
 /// This is a wrapper around a byte string `[u8; 20]`, because Rust only supports deriving traits
 /// like `Debug` and `Default` for arrays up to 32 elements.
-</span><span class="attr">#[derive(Copy, Clone)]
+</span><span class="attr">#[derive(Copy, Clone, Default)]
 #[repr(packed)]
 </span><span class="kw">pub struct </span>AtaSerialNumber([u8; <span class="number">20</span>]);
-<span class="kw">impl </span>Default <span class="kw">for </span>AtaSerialNumber {
-	<span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{ 
-		AtaSerialNumber([<span class="number">0</span>; <span class="number">20</span>])
-	}
-}
+
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>AtaSerialNumber {
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		core::str::from_utf8(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
@@ -2232,14 +2220,10 @@
 <span class="doccomment">/// An ATA drive&#39;s firmware version is an 8-byte string.
 ///
 /// A wrapper around a byte string `[u8; 8]` to allow it to be printed.
-</span><span class="attr">#[derive(Copy, Clone)]
+</span><span class="attr">#[derive(Copy, Clone, Default)]
 #[repr(packed)]
 </span><span class="kw">pub struct </span>AtaFirmwareVersion([u8; <span class="number">8</span>]);
-<span class="kw">impl </span>Default <span class="kw">for </span>AtaFirmwareVersion {
-	<span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{ 
-		AtaFirmwareVersion([<span class="number">0</span>; <span class="number">8</span>])
-	}
-}
+
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>AtaFirmwareVersion {
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		core::str::from_utf8(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)

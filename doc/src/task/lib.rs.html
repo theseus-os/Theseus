@@ -2252,7 +2252,7 @@
     <span class="doccomment">/// Returns the APIC ID of the CPU this `Task` is pinned on,
     /// or `None` if it is not pinned.
     </span><span class="kw">pub fn </span>pinned_core(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-        <span class="self">self</span>.inner.lock().pinned_core.clone()
+        <span class="self">self</span>.inner.lock().pinned_core
     }
 
     <span class="doccomment">/// Returns the current [`RunState`] of this `Task`.

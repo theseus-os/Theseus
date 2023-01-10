@@ -306,9 +306,9 @@
         dest_coord: Coord,        
         _src_fb_row_range: Range&lt;usize&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;{
-        <span class="kw">let </span>relative_coord = <span class="self">self</span>.clone() - dest_coord;
+        <span class="kw">let </span>relative_coord = <span class="kw-2">*</span><span class="self">self </span>- dest_coord;
         <span class="kw">if let </span><span class="prelude-val">Some</span>(pixel) = src_fb.get_pixel(relative_coord) {
-            dest_fb.draw_pixel(<span class="self">self</span>.clone(), pixel);
+            dest_fb.draw_pixel(<span class="kw-2">*</span><span class="self">self</span>, pixel);
         }
         <span class="prelude-val">Ok</span>(())
     }

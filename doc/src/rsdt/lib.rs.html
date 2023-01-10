@@ -199,7 +199,7 @@
 
     <span class="doccomment">/// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries
     /// included in this RSDT or XSDT.
-    </span><span class="kw">pub fn </span>addresses&lt;<span class="lifetime">&#39;r</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r </span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = PhysicalAddress&gt; + <span class="lifetime">&#39;r </span>{
+    </span><span class="kw">pub fn </span>addresses(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>Iterator&lt;Item = PhysicalAddress&gt; + <span class="lifetime">&#39;_ </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>rsdt_iter = <span class="prelude-val">None</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>xsdt_iter = <span class="prelude-val">None</span>;
         <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>{

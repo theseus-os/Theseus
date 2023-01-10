@@ -1332,6 +1332,8 @@
 <span id="1332">1332</span>
 <span id="1333">1333</span>
 <span id="1334">1334</span>
+<span id="1335">1335</span>
+<span id="1336">1336</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.
 //! 
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
@@ -1591,6 +1593,7 @@
     /// * `rx_buffer_size_kbytes`: The size of receive buffers. 
     /// * `num_rx_descriptors`: The number of descriptors in each receive queue.
     /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
+    </span><span class="attr">#[allow(clippy::too_many_arguments)]
     </span><span class="kw">pub fn </span>init(
         ixgbe_pci_dev: <span class="kw-2">&amp;</span>PciDevice,
         dev_id: PciLocation,
@@ -2373,6 +2376,7 @@
     /// * `protocol`: IP L4 protocol
     /// * `priority`: priority relative to other filters, can be from 0 (lowest) to 7 (highest)
     /// * `qid`: number of the queue to forward packet to
+    </span><span class="attr">#[allow(clippy::too_many_arguments)]
     </span><span class="kw">pub fn </span>set_5_tuple_filter(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
         source_ip: <span class="prelude-ty">Option</span>&lt;[u8;<span class="number">4</span>]&gt;, 

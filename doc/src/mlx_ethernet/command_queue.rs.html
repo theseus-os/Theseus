@@ -1919,6 +1919,8 @@
 <span id="1919">1919</span>
 <span id="1920">1920</span>
 <span id="1921">1921</span>
+<span id="1922">1922</span>
+<span id="1923">1923</span>
 </pre><pre class="rust"><code> <span class="doccomment">//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
  //! Also defines multiple enums that specify the valid input and output values for different commands.
 
@@ -2319,9 +2321,10 @@
 <span class="doccomment">/// Possible values of the opcode modifer when the opcode is [`CommandOpcode::QueryHcaCap`] and we want to retrieve current values of capabilities.
 </span><span class="attr">#[derive(Copy, Clone)]
 </span><span class="kw">pub enum </span>QueryHcaCapCurrentOpMod {
-    GeneralDeviceCapabilities       = (<span class="number">0x0 </span>&lt;&lt; <span class="number">1</span>) | <span class="number">0x1</span>,
-    EthernetOffloadCapabilities     = (<span class="number">0x1 </span>&lt;&lt; <span class="number">1</span>) | <span class="number">0x1
-</span>}
+    <span class="attr">#[allow(clippy::identity_op)]
+    </span>GeneralDeviceCapabilities       = (<span class="number">0x0 </span>&lt;&lt; <span class="number">1</span>) | <span class="number">0x1</span>,
+    EthernetOffloadCapabilities     = (<span class="number">0x1 </span>&lt;&lt; <span class="number">1</span>) | <span class="number">0x1</span>,
+}
 
 <span class="doccomment">/// Possible values of the opcode modifer when the opcode is [`CommandOpcode::AccessRegister`].
 </span><span class="attr">#[derive(Copy, Clone)]
@@ -2999,7 +3002,8 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="kw">fn </span>write_send_queue_context_to_mailbox(
+    <span class="attr">#[allow(clippy::too_many_arguments)]
+    </span><span class="kw">fn </span>write_send_queue_context_to_mailbox(
         input_mailbox_buffers: <span class="kw-2">&amp;mut </span>[MailboxBuffer],
         pages: Vec&lt;PhysicalAddress&gt;, 
         cqn: u32,

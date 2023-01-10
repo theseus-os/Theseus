@@ -1171,7 +1171,7 @@
         <span class="comment">// find the starting address of the object page this block belongs to
         </span><span class="kw">let </span>page_addr = (ptr <span class="kw">as </span>usize) &amp; !(ObjectPage8k::SIZE - <span class="number">1</span>);
         <span class="comment">// find the heap id
-        </span><span class="kw">let </span>id = <span class="kw-2">*</span>((page_addr <span class="kw">as </span><span class="kw-2">*mut </span>u8).offset(ObjectPage8k::HEAP_ID_OFFSET <span class="kw">as </span>isize) <span class="kw">as </span><span class="kw-2">*mut </span>usize);
+        </span><span class="kw">let </span>id = <span class="kw-2">*</span>((page_addr <span class="kw">as </span><span class="kw-2">*mut </span>u8).add(ObjectPage8k::HEAP_ID_OFFSET) <span class="kw">as </span><span class="kw-2">*mut </span>usize);
         <span class="kw">let </span><span class="kw-2">mut </span>heap = <span class="self">self</span>.heaps.get(<span class="kw-2">&amp;</span>id).expect(<span class="string">&quot;Multiple Heaps: Heap not initialized&quot;</span>).lock();
         heap.deallocate(NonNull::new_unchecked(ptr), layout).expect(<span class="string">&quot;Couldn&#39;t deallocate&quot;</span>);
     }

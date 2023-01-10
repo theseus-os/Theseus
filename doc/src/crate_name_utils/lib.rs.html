@@ -170,7 +170,7 @@
 /// * be absolute or relative,
 /// * optionally end with an extension, e.g., `&quot;.o&quot;`,   optionally start 
 /// * optionally start with a module file prefix, e.g., `&quot;k#my_crate-&lt;hash&gt;.o&quot;`.
-</span><span class="kw">pub fn </span>crate_name_from_path&lt;<span class="lifetime">&#39;p</span>&gt;(object_file_path: <span class="kw-2">&amp;</span><span class="lifetime">&#39;p </span>Path) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;p </span>str {
+</span><span class="kw">pub fn </span>crate_name_from_path(object_file_path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="kw-2">&amp;</span>str {
     <span class="kw">let </span>stem = object_file_path.file_stem();
     <span class="kw">if let </span><span class="prelude-val">Ok</span>((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
         name
@@ -201,7 +201,7 @@
 /// * `&lt;alloc::boxed::Box&lt;T&gt;&gt;::into_unique` -&gt; `[&quot;alloc&quot;]`
 /// * `&lt;framebuffer::VirtualFramebuffer as display::Display&gt;::fill_rectangle` -&gt; `[&quot;framebuffer&quot;, &quot;display&quot;]`
 /// * `keyboard::init` -&gt; `[&quot;keyboard&quot;]`
-</span><span class="kw">pub fn </span>get_containing_crate_name&lt;<span class="lifetime">&#39;a</span>&gt;(demangled_full_symbol: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; Vec&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str&gt; {
+</span><span class="kw">pub fn </span>get_containing_crate_name(demangled_full_symbol: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;<span class="kw-2">&amp;</span>str&gt; {
     get_containing_crate_name_ranges(demangled_full_symbol)
         .into_iter()
         .filter_map(|range| demangled_full_symbol.get(range))

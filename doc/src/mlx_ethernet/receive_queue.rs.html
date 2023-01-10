@@ -382,7 +382,7 @@
     <span class="doccomment">/// Find the state of the RQ from the RQ context 
     </span><span class="kw">pub fn </span>get_state(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ReceiveQueueState, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>state = (<span class="self">self</span>.rlky_state.read().get() &amp; STATE_MASK) &gt;&gt; STATE_SHIFT;
-        <span class="prelude-val">Ok</span>( ReceiveQueueState::try_from(state <span class="kw">as </span>u8).map_err(|_e| <span class="string">&quot;Invalid value in the RQ state&quot;</span>)<span class="question-mark">? </span>)
+        ReceiveQueueState::try_from(state <span class="kw">as </span>u8).map_err(|_e| <span class="string">&quot;Invalid value in the RQ state&quot;</span>)
     }
 
     <span class="doccomment">/// Offset that this context is written to in the mailbox buffer

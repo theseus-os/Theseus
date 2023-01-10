@@ -7,7 +7,7 @@ is disabled on the current CPU for as long as the lock guard is held.</p>
 <h5 id="safety"><a href="#safety">Safety</a></h5>
 <p>This function provides no synchronization guarantees and so its result should be considered ‘out of date’
 the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.</p>
-</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.read" class="method has-srclink"><a class="srclink rightside" href="../src/mutex_preemption/rwlock_preempt.rs.html#92-99">source</a><h4 class="code-header">pub fn <a href="#method.read" class="fnname">read</a>&lt;'a&gt;(&amp;'a self) -&gt; <a class="struct" href="struct.RwLockPreemptReadGuard.html" title="struct mutex_preemption::RwLockPreemptReadGuard">RwLockPreemptReadGuard</a>&lt;'a, T&gt;</h4></section></summary><div class="docblock"><p>Locks this <code>RwLockPreempt</code> with shared read (immutable) access, blocking the current task
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.read" class="method has-srclink"><a class="srclink rightside" href="../src/mutex_preemption/rwlock_preempt.rs.html#92-99">source</a><h4 class="code-header">pub fn <a href="#method.read" class="fnname">read</a>(&amp;self) -&gt; <a class="struct" href="struct.RwLockPreemptReadGuard.html" title="struct mutex_preemption::RwLockPreemptReadGuard">RwLockPreemptReadGuard</a>&lt;'_, T&gt;</h4></section></summary><div class="docblock"><p>Locks this <code>RwLockPreempt</code> with shared read (immutable) access, blocking the current task
 until it can be acquired.</p>
 <p>The calling task will be blocked until there are no more writers which
 hold the lock. There may be other readers currently inside the lock when
@@ -57,7 +57,7 @@ RAII.</p>
 <p>This is <em>extremely</em> unsafe if there are outstanding <code>RwLockPreemptWriteGuard</code>s
 live, or if called when there are current readers, but can be useful in
 FFI contexts where the caller doesn’t know how to deal with RAII.</p>
-</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.write" class="method has-srclink"><a class="srclink rightside" href="../src/mutex_preemption/rwlock_preempt.rs.html#187-194">source</a><h4 class="code-header">pub fn <a href="#method.write" class="fnname">write</a>&lt;'a&gt;(&amp;'a self) -&gt; <a class="struct" href="struct.RwLockPreemptWriteGuard.html" title="struct mutex_preemption::RwLockPreemptWriteGuard">RwLockPreemptWriteGuard</a>&lt;'a, T&gt;</h4></section></summary><div class="docblock"><p>Lock this <code>RwLockPreempt</code> with exclusive write access, blocking the current
+</div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.write" class="method has-srclink"><a class="srclink rightside" href="../src/mutex_preemption/rwlock_preempt.rs.html#187-194">source</a><h4 class="code-header">pub fn <a href="#method.write" class="fnname">write</a>(&amp;self) -&gt; <a class="struct" href="struct.RwLockPreemptWriteGuard.html" title="struct mutex_preemption::RwLockPreemptWriteGuard">RwLockPreemptWriteGuard</a>&lt;'_, T&gt;</h4></section></summary><div class="docblock"><p>Lock this <code>RwLockPreempt</code> with exclusive write access, blocking the current
 task until it can be acquired.</p>
 <p>This function will not return while other writers or other readers
 currently have access to the lock.</p>

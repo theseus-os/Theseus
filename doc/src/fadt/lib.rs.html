@@ -188,7 +188,7 @@
 
 <span class="kw">impl </span>Fadt {
     <span class="doccomment">/// Finds the FADT in the given `AcpiTables` and returns a reference to it.
-    </span><span class="kw">pub fn </span>get&lt;<span class="lifetime">&#39;t</span>&gt;(acpi_tables: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>Fadt&gt; {
+    </span><span class="kw">pub fn </span>get(acpi_tables: <span class="kw-2">&amp;</span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Fadt&gt; {
         acpi_tables.table(<span class="kw-2">&amp;</span>FADT_SIGNATURE).ok()
     }
 }

@@ -309,7 +309,7 @@
         <span class="kw">unsafe </span>{
             CS::set_reg(kernel_cs);          <span class="comment">// reload code segment register
             </span>load_tss(tss_segment);           <span class="comment">// load TSS
-            </span>SS::set_reg(kernel_ds.clone());  <span class="comment">// unsure if necessary, but doesn&#39;t hurt
+            </span>SS::set_reg(kernel_ds);          <span class="comment">// unsure if necessary, but doesn&#39;t hurt
             </span>DS::set_reg(kernel_ds);          <span class="comment">// unsure if necessary, but doesn&#39;t hurt
         </span>}
     }

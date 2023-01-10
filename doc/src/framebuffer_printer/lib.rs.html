@@ -232,6 +232,7 @@
 <span id="232">232</span>
 <span id="233">233</span>
 <span id="234">234</span>
+<span id="235">235</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains functions to print strings in a framebuffer.
 //! The coordinate in these functions is relative to the origin(top-left point) of the framebuffer.
 
@@ -261,6 +262,7 @@
 /// * `fg_pixel`: the value of pixels in the foreground.
 /// * `bg_pixel` the value of pixels in the background.
 /// * `column`, `line`: the location of the text in the text block in number of characters.
+</span><span class="attr">#[allow(clippy::too_many_arguments)]
 </span><span class="kw">pub fn </span>print_string&lt;P: Pixel&gt;(
     framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
     coordinate: Coord,

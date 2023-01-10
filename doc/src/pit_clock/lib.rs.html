@@ -73,6 +73,7 @@
 <span id="73">73</span>
 <span id="74">74</span>
 <span id="75">75</span>
+<span id="76">76</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Full support for the Programmable Interval Timer (PIT) system clock.
 //! 
 //! This crate allows one to enable/configure PIT interrupts.
@@ -96,6 +97,7 @@
 
 <span class="doccomment">/// The PIT Channel 0 is connected directly to IRQ 0.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x20.
+</span><span class="attr">#[allow(clippy::identity_op)]
 </span><span class="kw">const </span>PIT_CHANNEL_0_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + <span class="number">0x0</span>;
 
 
