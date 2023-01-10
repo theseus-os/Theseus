@@ -348,7 +348,7 @@ impl <T: Send> Sender<T> {
 
     /// Obtain a `Receiver` endpoint connected to the same channel as this `Sender`.
     pub fn receiver(&self) -> Receiver<T> {
-        Channel::add_receiver( &self.channel.clone() )
+        Channel::add_receiver( &self.channel )
     }
 }
 
@@ -363,7 +363,7 @@ impl<T: Send> Clone for Receiver<T> {
     /// This increments the channel's receiver count.
     /// If there were previously no receivers, the channel status is updated to `Connected`.
     fn clone(&self) -> Self {
-        Channel::add_receiver( &self.channel.clone() )
+        Channel::add_receiver( &self.channel )
     }
 }
 
@@ -505,7 +505,7 @@ impl <T: Send> Receiver<T> {
 
     /// Obtain a `Sender` endpoint connected to the same channel as this `Receiver`.
     pub fn sender(&self) -> Sender<T> {
-        Channel::add_sender( &self.channel.clone() )
+        Channel::add_sender( &self.channel )
     }
 }
 
