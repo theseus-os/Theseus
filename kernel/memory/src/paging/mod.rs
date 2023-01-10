@@ -154,13 +154,14 @@ impl PageTable {
         })?;
         tlb_flush_all();
 
-        // This mapper will modify the other table using the upcoming page table recursive p4 index set in the current page table.
-        let mut mapper = Mapper::inactive(other_p4_frame);
+        // This mapper will modify the `other_table` using the upcoming P4 recursive entry
+        // that is set for the currently active page table.
+        let mut mapper = Mapper::upcoming(other_p4_frame);
 
         // Execute `f` in the new context, in which the new page table is considered "active"
         let ret = f(&mut mapper, self);
 
-        // Clear inactive page table recursive mapping.
+        // Clear both page table's upcoming recursive mapping entries.
         self.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
         other_table.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
         tlb_flush_all();
