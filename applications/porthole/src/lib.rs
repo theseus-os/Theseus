@@ -17,7 +17,7 @@ use core::marker::PhantomData;
 use core::ops::{Add, Sub};
 use core::slice::IterMut;
 use log::{debug, info};
-use spin::{Mutex, MutexGuard, Once};
+use spin::{Mutex, MutexGuard, Once, RwLockReadGuard};
 
 use event_types::Event;
 use mpmc::Queue;
@@ -25,8 +25,10 @@ use mpmc::Queue;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH, FONT_BASIC};
-use hpet::get_hpet;
-use memory::{BorrowedSliceMappedPages, Mutable, PhysicalAddress, PteFlags, PteFlagsArch};
+use hpet::{get_hpet, Hpet};
+use memory::{
+    BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, PhysicalAddress, PteFlags, PteFlagsArch,
+};
 use mouse_data::MouseEvent;
 pub static WINDOW_MANAGER: Once<Mutex<WindowManager>> = Once::new();
 static TITLE_BAR_HEIGHT: usize = 20;
@@ -63,6 +65,118 @@ static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
     ]
 };
 
+// Useful toy application that shows the real time performance
+pub struct FpsCounter {
+    window: Arc<Mutex<Window>>,
+    hpet: RwLockReadGuard<'static, BorrowedMappedPages<Hpet, Mutable>>,
+    time_it_took_to_render: u64,
+    timer_freq: u64,
+    total_frames: u64,
+    total_time: u64,
+    avg_fps: u64,
+    avg_time: u64,
+    avg_fps_str: String,
+    avg_time_str: String,
+}
+
+impl FpsCounter {
+    pub fn new(window: Arc<Mutex<Window>>) -> Result<Self, &'static str> {
+        let hpet = get_hpet().ok_or("Unable to get hpet")?;
+        let time_it_took_to_render = hpet.get_counter();
+        let timer_freq = hpet.counter_period_femtoseconds() as u64;
+        Ok(Self {
+            window,
+            hpet,
+            time_it_took_to_render,
+            timer_freq,
+            total_frames: 0,
+            total_time: 0,
+            avg_fps: 0,
+            avg_time: 0,
+            avg_fps_str: format!("Frames per second:"),
+            avg_time_str: format!("Median frame time in micro seconds:"),
+        })
+    }
+
+    fn calculate_next_frame_time(&mut self) {
+        let time = self.hpet.get_counter();
+        let diff = (time - self.time_it_took_to_render) * self.timer_freq / 1_000_000_000;
+        self.total_time += diff;
+        self.time_it_took_to_render = time;
+        self.total_frames += 1;
+    }
+
+    fn reset_counters(&mut self) {
+        // this equals to a second
+        if self.total_time >= 1_000_000 {
+            self.avg_fps = self.total_frames;
+            self.avg_time = self.total_time / self.total_frames;
+            self.total_time = 0;
+            self.total_frames = 0;
+        }
+    }
+
+    pub fn run(&mut self) -> Result<(), &'static str> {
+        self.calculate_next_frame_time();
+        self.reset_counters();
+        self.draw()?;
+        Ok(())
+    }
+
+    fn draw(&mut self) -> Result<(), &'static str> {
+        self.window.lock().draw_rectangle(DEFAULT_WINDOW_COLOR)?;
+        self.window
+            .lock()
+            .display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;
+        self.print_avg_fps()?;
+        self.print_avg_time()?;
+        Ok(())
+    }
+
+    fn print_avg_fps(&mut self) -> Result<(), &'static str> {
+        let mut drawable_area = self.window.lock().drawable_area().to_relative_pos();
+        let avg_fps = self.avg_fps.to_string();
+        print_string(
+            &mut self.window.lock(),
+            &drawable_area,
+            &self.avg_fps_str,
+            0xF8FF0E,
+            DEFAULT_WINDOW_COLOR,
+        )?;
+        drawable_area.x = (CHARACTER_WIDTH * self.avg_fps_str.len()) as u32;
+        print_string(
+            &mut self.window.lock(),
+            &drawable_area,
+            &avg_fps,
+            0x20F065,
+            DEFAULT_WINDOW_COLOR,
+        )?;
+        Ok(())
+    }
+
+    fn print_avg_time(&mut self) -> Result<(), &'static str> {
+        let mut drawable_area = self.window.lock().drawable_area().to_relative_pos();
+        drawable_area.y += (CHARACTER_HEIGHT + 1) as u32;
+        let avg_time = self.avg_time.to_string();
+        print_string(
+            &mut self.window.lock(),
+            &drawable_area,
+            &self.avg_time_str,
+            0xF8FF0E,
+            DEFAULT_WINDOW_COLOR,
+        )?;
+        drawable_area.x = (CHARACTER_WIDTH * self.avg_time_str.len()) as u32;
+        print_string(
+            &mut self.window.lock(),
+            &drawable_area,
+            &avg_time,
+            0x20F065,
+            DEFAULT_WINDOW_COLOR,
+        )?;
+        Ok(())
+    }
+}
+
 pub struct App {
     window: Arc<Mutex<Window>>,
     text: TextDisplayInfo,
@@ -74,17 +188,16 @@ impl App {
     }
     pub fn draw(&mut self) -> Result<(), &'static str> {
         let mut window = self.window.lock();
-        {
-            window.draw_rectangle(DEFAULT_WINDOW_COLOR)?;
-            window.display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;
-            print_string(
-                &mut window,
-                &self.text.pos,
-                &self.text.text,
-                self.text.fg_color,
-                self.text.bg_color,
-            )?;
-        }
+
+        window.draw_rectangle(DEFAULT_WINDOW_COLOR)?;
+        window.display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;
+        print_string(
+            &mut window,
+            &self.text.pos,
+            &self.text.text,
+            self.text.fg_color,
+            self.text.bg_color,
+        )?;
         Ok(())
     }
 }
@@ -104,6 +217,7 @@ pub fn print_string(
     bg_color: Color,
 ) -> Result<(), &'static str> {
     let slice = slice.as_bytes();
+    // FIXME: Text starts overlapping if x + text len is bigger than window.width
     let start_x = position.x;
     let start_y = position.y;
 
@@ -217,7 +331,7 @@ impl TextDisplayInfo {
 }
 
 /// Position that is relative to a `Window`
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct RelativePos {
     pub x: u32,
     pub y: u32,
@@ -306,6 +420,12 @@ impl Rect {
             x: self.x as i32,
             y: self.y as i32,
         }
+    }
+
+    pub fn to_relative_pos(&self) -> RelativePos {
+        let x = core::cmp::max(0, self.x) as u32;
+        let y = core::cmp::min(SCREEN_HEIGHT as isize, self.y) as u32;
+        RelativePos { x, y }
     }
 
     pub fn set_position(&mut self, x: u32, y: u32) {
@@ -752,9 +872,6 @@ impl WindowManager {
                 .copy_window_into_main_vbuffer(&mut self.windows[*order].lock());
             // TODO: Stop indexing ^ here
         }
-        for window in self.windows.iter() {
-            window.lock().blank();
-        }
     }
 
     fn draw_mouse(&mut self) {
@@ -917,7 +1034,6 @@ impl WindowManager {
         }
     }
 
-    #[inline]
     fn render(&mut self) {
         self.p_framebuffer
             .buffer
@@ -978,16 +1094,10 @@ impl Window {
         self.rect.y = screen_position.y as isize;
     }
 
-    pub fn blank(&mut self) {
-        for pixel in self.frame_buffer.buffer.iter_mut() {
-            *pixel = 0x000000;
-        }
-    }
-
     pub fn resize_window(&mut self, width: i32, height: i32) {
         let new_width = self.width() + width as usize;
         let new_height = self.height() + height as usize;
-        if new_width > 50 && new_height > 50 {
+        if new_width > 200 && new_height > 200 {
             self.rect.width = new_width;
             self.rect.height = new_height;
         }
@@ -1117,19 +1227,12 @@ fn port_loop(
         bg_color: DEFAULT_WINDOW_COLOR,
     };
     let mut app = App::new(window_2, text);
-    let hpet = get_hpet();
-    let mut start = hpet
-        .as_ref()
-        .ok_or("couldn't get HPET timer")?
-        .get_counter();
-    let hpet_freq = hpet.as_ref().ok_or("ss")?.counter_period_femtoseconds() as u64;
+    let window_3 = window_manager
+        .lock()
+        .new_window(&Rect::new(400, 100, 0, 0), Some(format!("Fps Counter")))?;
+    let mut fps_counter = FpsCounter::new(window_3)?;
 
     loop {
-        let end = hpet
-            .as_ref()
-            .ok_or("couldn't get HPET timer")?
-            .get_counter();
-        let diff = (end - start) * hpet_freq / 1_000_000;
         let event_opt = key_consumer
             .pop()
             .or_else(|| mouse_consumer.pop())
@@ -1179,13 +1282,10 @@ fn port_loop(
                 _ => (),
             }
         }
-        if diff > 0 {
-            app.draw()?;
-            window_manager.lock().update();
-            window_manager.lock().render();
-
-            start = hpet.as_ref().ok_or("Unable to get timer")?.get_counter();
-        }
+        app.draw()?;
+        fps_counter.run()?;
+        window_manager.lock().update();
+        window_manager.lock().render();
     }
     Ok(())
 }
