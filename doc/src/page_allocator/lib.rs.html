@@ -719,6 +719,9 @@
 <span id="719">719</span>
 <span id="720">720</span>
 <span id="721">721</span>
+<span id="722">722</span>
+<span id="723">723</span>
+<span id="724">724</span>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
@@ -768,10 +771,13 @@
 
 <span class="doccomment">/// Defines the upper part of the address space that&#39;s designated, similar to `DESIGNATED_PAGES_LOW_END`. 
 /// Any virtual addresses **greater than or equal to** this address is considered &quot;designated&quot;.
-/// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
+/// This higher part of the address range covers from:
+/// the beginning of the recursive P4 entry used for modifying upcoming page tables
+/// to the very end of the address space.
 ///
-/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
-</span><span class="kw">static </span>DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START));
+/// TODO: once the heap is fully dynamic and not dependent on static addresses,
+/// we can exclude the heap from the designated region.
+</span><span class="kw">static </span>DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START));
 
 <span class="kw">const </span>MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
 <span class="kw">const </span>MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));

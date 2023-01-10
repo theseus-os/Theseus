@@ -145,6 +145,13 @@
 <span id="145">145</span>
 <span id="146">146</span>
 <span id="147">147</span>
+<span id="148">148</span>
+<span id="149">149</span>
+<span id="150">150</span>
+<span id="151">151</span>
+<span id="152">152</span>
+<span id="153">153</span>
+<span id="154">154</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -177,7 +184,14 @@
                                          <span class="comment">// ^p4 ^p3 ^p2 ^p1 ^offset  
                                          // ^ 0o776 means that we&#39;re always looking at the 510th entry recursively
 
-</span><span class="attr">#[derive(FromBytes)]
+</span><span class="doccomment">/// By default this is an invalid address unless the upcoming page table recursive entry is modified.
+///
+/// NOTE: this must be kept in sync with the upcoming page table recursive index in `kernel_config/memory.rs`.
+///
+/// All four table indexes need to be set to 0o774 so that `Table::next_table_address` works properly.
+</span><span class="kw">pub const </span>UPCOMING_P4: <span class="kw-2">*mut </span>Table&lt;Level4&gt; = <span class="number">0o177777_774_774_774_774_0000 </span><span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>;
+
+<span class="attr">#[derive(FromBytes)]
 </span><span class="kw">pub struct </span>Table&lt;L: TableLevel&gt; {
     entries: [PageTableEntry; ENTRIES_PER_PAGE_TABLE],
     level: PhantomData&lt;L&gt;,
