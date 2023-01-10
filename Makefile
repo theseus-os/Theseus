@@ -594,22 +594,23 @@ doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
 doc: check-rustc
 ## Build the docs for select library crates, namely those not hosted online.
-## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
-	@cargo doc --no-deps --package atomic_linked_list
-	@cargo doc --no-deps --package cow_arc
-	@cargo doc --no-deps --package debugit
-	@cargo doc --no-deps --package dereffer
-	@cargo doc --no-deps --package dfqueue
-	@cargo doc --no-deps --package keycodes_ascii
-	@cargo doc --no-deps --package lockable
-	@cargo doc --no-deps --package locked_idt
-	@cargo doc --no-deps --package mouse_data
-	@cargo doc --no-deps --package owned_borrowed_trait
-	@cargo doc --no-deps --package percent-encoding
-	@cargo doc --no-deps --package port_io
-	@cargo doc --no-deps --package stdio
-	@cargo doc --no-deps --package str_ref
-	@cargo doc --no-deps --package util
+## We do this first such that the main `cargo doc` invocation below can see and link to them.
+	@cargo doc --no-deps \
+		--package atomic_linked_list \
+		--package cow_arc \
+		--package debugit \
+		--package dereffer \
+		--package dfqueue \
+		--package keycodes_ascii \
+		--package lockable \
+		--package locked_idt \
+		--package mouse_data \
+		--package owned_borrowed_trait \
+		--package percent-encoding \
+		--package port_io \
+		--package stdio \
+		--package str_ref \
+		--package util
 ## Now, build the docs for all of Theseus's main kernel crates.
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
