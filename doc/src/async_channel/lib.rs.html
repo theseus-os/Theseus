@@ -517,6 +517,22 @@
 <span id="517">517</span>
 <span id="518">518</span>
 <span id="519">519</span>
+<span id="520">520</span>
+<span id="521">521</span>
+<span id="522">522</span>
+<span id="523">523</span>
+<span id="524">524</span>
+<span id="525">525</span>
+<span id="526">526</span>
+<span id="527">527</span>
+<span id="528">528</span>
+<span id="529">529</span>
+<span id="530">530</span>
+<span id="531">531</span>
+<span id="532">532</span>
+<span id="533">533</span>
+<span id="534">534</span>
+<span id="535">535</span>
 </pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
 //! 
 //! This crate offers an asynchronous channel that allows multiple tasks
@@ -642,10 +658,32 @@
         <span class="self">self</span>.get_channel_status() != ChannelStatus::Connected
     }
 
-    <span class="doccomment">/// Returns the channel Status
+    <span class="doccomment">/// Returns the channel&#39;s current status.
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">fn </span>get_channel_status(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ChannelStatus {
         <span class="self">self</span>.channel_status.load()
+    }
+    
+    <span class="doccomment">/// Returns another `Sender` endpoint connected to the given channel.
+    ///
+    /// This increments the channel&#39;s sender count.
+    /// If there were previously no senders, the channel status is updated to `Connected`.
+    </span><span class="kw">fn </span>add_sender(channel: <span class="kw-2">&amp;</span>Arc&lt;Channel&lt;T&gt;&gt;) -&gt; Sender&lt;T&gt; {
+        <span class="kw">if </span>channel.sender_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
+            channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Sender { channel: channel.clone() }
+    }
+    
+    <span class="doccomment">/// Returns another `Receiver` endpoint connected to the given channel.
+    ///
+    /// This increments the channel&#39;s receiver count.
+    /// If there were previously no receivers, the channel status is updated to `Connected`.
+    </span><span class="kw">fn </span>add_receiver(channel: <span class="kw-2">&amp;</span>Arc&lt;Channel&lt;T&gt;&gt;) -&gt; Receiver&lt;T&gt; {
+        <span class="kw">if </span>channel.receiver_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
+            channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Receiver { channel: channel.clone() }
     }
 }
 
@@ -655,14 +693,12 @@
 }
 
 <span class="kw">impl</span>&lt;T:Send&gt; Clone <span class="kw">for </span>Sender&lt;T&gt; {
-    <span class="doccomment">/// Increment the sender&#39;s counter.
-    /// If were are no senders initially, then set channel status to `Connected`.
-    /// Return a newly created sender.
+    <span class="doccomment">/// Clones this `Sender`, returning another `Sender` connected to the same channel.
+    ///
+    /// This increments the channel&#39;s sender count.
+    /// If there were previously no senders, the channel status is updated to `Connected`.
     </span><span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="self">self</span>.channel.sender_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
-            <span class="self">self</span>.channel.channel_status.store(ChannelStatus::Connected);
-        }
-        Sender { channel: <span class="self">self</span>.channel.clone() }
+        Channel::add_sender( <span class="kw-2">&amp;</span><span class="self">self</span>.channel )
     }
 }
 
@@ -844,11 +880,10 @@
     </span><span class="kw">pub fn </span>is_disconnected(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.channel.is_disconnected()
     }
-    
-    <span class="kw">pub fn </span>receiver(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Receiver&lt;T&gt; {
-        Receiver {
-            channel: <span class="self">self</span>.channel.clone(),
-        }
+
+    <span class="doccomment">/// Obtain a `Receiver` endpoint connected to the same channel as this `Sender`.
+    </span><span class="kw">pub fn </span>receiver(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Receiver&lt;T&gt; {
+        Channel::add_receiver( <span class="kw-2">&amp;</span><span class="self">self</span>.channel )
     }
 }
 
@@ -858,14 +893,12 @@
 }
 
 <span class="kw">impl</span>&lt;T: Send&gt; Clone <span class="kw">for </span>Receiver&lt;T&gt; {
-    <span class="doccomment">/// Increment the receiver&#39;s counter.
-    /// If were are no receivers initially, then set channel status to `Connected`.
-    /// Return a newly created receiver.
+    <span class="doccomment">/// Clones this `Receiver`, returning another `Receiver` connected to the same channel.
+    ///
+    /// This increments the channel&#39;s receiver count.
+    /// If there were previously no receivers, the channel status is updated to `Connected`.
     </span><span class="kw">fn </span>clone(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="self">Self </span>{
-        <span class="kw">if </span><span class="self">self</span>.channel.receiver_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
-            <span class="self">self</span>.channel.channel_status.store(ChannelStatus::Connected);
-        }
-        Receiver { channel: <span class="self">self</span>.channel.clone() }
+        Channel::add_receiver( <span class="kw-2">&amp;</span><span class="self">self</span>.channel )
     }
 }
 
@@ -1004,11 +1037,10 @@
     </span><span class="kw">pub fn </span>is_disconnected(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.channel.is_disconnected()
     }
-    
-    <span class="kw">pub fn </span>sender(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Sender&lt;T&gt; {
-        Sender {
-            channel: <span class="self">self</span>.channel.clone(),
-        }
+
+    <span class="doccomment">/// Obtain a `Sender` endpoint connected to the same channel as this `Receiver`.
+    </span><span class="kw">pub fn </span>sender(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Sender&lt;T&gt; {
+        Channel::add_sender( <span class="kw-2">&amp;</span><span class="self">self</span>.channel )
     }
 }
 
