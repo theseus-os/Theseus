@@ -133,7 +133,7 @@ pub struct HpetTimer {
 const_assert_eq!(core::mem::size_of::<HpetTimer>(), 32);
 
 
-pub const HPET_SIGNATURE: &'static [u8; 4] = b"HPET";
+pub const HPET_SIGNATURE: &[u8; 4] = b"HPET";
 
 /// The handler for parsing the HPET table and adding it to the ACPI tables list.
 pub fn handle(
@@ -163,8 +163,8 @@ const_assert_eq!(core::mem::size_of::<HpetAcpiTable>(), 56);
 
 impl HpetAcpiTable {
     /// Finds the HPET in the given `AcpiTables` and returns a reference to it.
-    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t HpetAcpiTable> {
-        acpi_tables.table(&HPET_SIGNATURE).ok()
+    pub fn get(acpi_tables: &AcpiTables) -> Option<&HpetAcpiTable> {
+        acpi_tables.table(HPET_SIGNATURE).ok()
     }
 
     /// Initializes the HPET counter-based timer

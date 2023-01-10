@@ -124,6 +124,7 @@ impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
 /// A trait that represents an I/O stream that has a known length, e.g., a disk drive.
 ///
 /// This trait exists to enable seeking to an offset from the end of the stream.
+#[allow(clippy::len_without_is_empty)]
 pub trait KnownLength {
     /// Returns the length (size in bytes) of this I/O stream or device.
     fn len(&self) -> usize;

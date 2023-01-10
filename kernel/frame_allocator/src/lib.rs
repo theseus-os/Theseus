@@ -100,7 +100,7 @@ pub fn init<F, R, P>(
         let area = area.borrow();
         // debug!("Frame Allocator: looking to add free physical memory area: {:?}", area);
         check_and_add_free_region(
-            &area,
+            area,
             &mut free_list,
             &mut free_list_idx,
             reserved_physical_memory_areas.clone(),
@@ -475,7 +475,7 @@ impl Drop for AllocatedFrames {
             frames: self.frames.clone(),
         });
         match res {
-            Ok(_inserted_free_chunk) => return,
+            Ok(_inserted_free_chunk) => (),
             Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free frame list", c),
         }
         
@@ -703,8 +703,8 @@ fn find_specific_chunk(
 
 
 /// Searches the given `list` for any chunk large enough to hold at least `num_frames`.
-fn find_any_chunk<'list>(
-    list: &'list mut StaticArrayRBTree<Chunk>,
+fn find_any_chunk(
+    list: &mut StaticArrayRBTree<Chunk>,
     num_frames: usize
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // During the first pass, we ignore designated regions.

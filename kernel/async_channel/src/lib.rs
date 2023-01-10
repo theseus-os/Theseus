@@ -123,10 +123,32 @@ impl <T: Send> Channel<T> {
         self.get_channel_status() != ChannelStatus::Connected
     }
 
-    /// Returns the channel Status
+    /// Returns the channel's current status.
     #[inline(always)]
     fn get_channel_status(&self) -> ChannelStatus {
         self.channel_status.load()
+    }
+    
+    /// Returns another `Sender` endpoint connected to the given channel.
+    ///
+    /// This increments the channel's sender count.
+    /// If there were previously no senders, the channel status is updated to `Connected`.
+    fn add_sender(channel: &Arc<Channel<T>>) -> Sender<T> {
+        if channel.sender_count.fetch_add(1, Ordering::SeqCst) == 0 {
+            channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Sender { channel: channel.clone() }
+    }
+    
+    /// Returns another `Receiver` endpoint connected to the given channel.
+    ///
+    /// This increments the channel's receiver count.
+    /// If there were previously no receivers, the channel status is updated to `Connected`.
+    fn add_receiver(channel: &Arc<Channel<T>>) -> Receiver<T> {
+        if channel.receiver_count.fetch_add(1, Ordering::SeqCst) == 0 {
+            channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Receiver { channel: channel.clone() }
     }
 }
 
@@ -136,14 +158,12 @@ pub struct Sender<T: Send> {
 }
 
 impl<T:Send> Clone for Sender<T> {
-    /// Increment the sender's counter.
-    /// If were are no senders initially, then set channel status to `Connected`.
-    /// Return a newly created sender.
+    /// Clones this `Sender`, returning another `Sender` connected to the same channel.
+    ///
+    /// This increments the channel's sender count.
+    /// If there were previously no senders, the channel status is updated to `Connected`.
     fn clone(&self) -> Self {
-        if self.channel.sender_count.fetch_add(1, Ordering::SeqCst) == 0 {
-            self.channel.channel_status.store(ChannelStatus::Connected);
-        }
-        Sender { channel: self.channel.clone() }
+        Channel::add_sender( &self.channel )
     }
 }
 
@@ -325,11 +345,10 @@ impl <T: Send> Sender<T> {
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
-    
+
+    /// Obtain a `Receiver` endpoint connected to the same channel as this `Sender`.
     pub fn receiver(&self) -> Receiver<T> {
-        Receiver {
-            channel: self.channel.clone(),
-        }
+        Channel::add_receiver( &self.channel )
     }
 }
 
@@ -339,14 +358,12 @@ pub struct Receiver<T: Send> {
 }
 
 impl<T: Send> Clone for Receiver<T> {
-    /// Increment the receiver's counter.
-    /// If were are no receivers initially, then set channel status to `Connected`.
-    /// Return a newly created receiver.
+    /// Clones this `Receiver`, returning another `Receiver` connected to the same channel.
+    ///
+    /// This increments the channel's receiver count.
+    /// If there were previously no receivers, the channel status is updated to `Connected`.
     fn clone(&self) -> Self {
-        if self.channel.receiver_count.fetch_add(1, Ordering::SeqCst) == 0 {
-            self.channel.channel_status.store(ChannelStatus::Connected);
-        }
-        Receiver { channel: self.channel.clone() }
+        Channel::add_receiver( &self.channel )
     }
 }
 
@@ -485,11 +502,10 @@ impl <T: Send> Receiver<T> {
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
-    
+
+    /// Obtain a `Sender` endpoint connected to the same channel as this `Receiver`.
     pub fn sender(&self) -> Sender<T> {
-        Sender {
-            channel: self.channel.clone(),
-        }
+        Channel::add_sender( &self.channel )
     }
 }
 

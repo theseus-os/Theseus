@@ -28,6 +28,8 @@ use rand_chacha::{
 };
 use spin::mutex::Mutex;
 
+pub use rand_chacha::rand_core::Error;
+
 lazy_static::lazy_static! {
     /// The global random number generator.
     ///
@@ -40,54 +42,54 @@ lazy_static::lazy_static! {
     /// device drivers and such.
     static ref CSPRNG: Mutex<ChaCha20Rng> = {
         let seed = rdseed_seed()
-            .or_else(|_| rdrand_seed())
-            .unwrap_or_else(|_| tsc_seed());
+            .or_else(rdrand_seed)
+            .unwrap_or_else(tsc_seed);
         Mutex::new(ChaCha20Rng::from_seed(seed))
     };
 }
 
 /// Tries to generate a 32 byte seed using the RDSEED x86 instruction.
-fn rdseed_seed() -> Result<[u8; 32], ()> {
+fn rdseed_seed() -> Option<[u8; 32]> {
     match rdrand::RdSeed::new() {
         Ok(mut generator) => {
             let mut seed = [0; 32];
             match generator.try_fill_bytes(&mut seed) {
                 Ok(_) => {
                     log::info!("using RDSEED for CSPRNG seed");
-                    Ok(seed)
+                    Some(seed)
                 }
                 Err(_) => {
                     log::warn!("failed to generate seed from RDSEED");
-                    Err(())
+                    None
                 }
             }
         }
         Err(_) => {
             log::warn!("failed to initialise RDSEED");
-            Err(())
+            None
         }
     }
 }
 
 /// Tries to generate a 32 byte seed using the RDRAND x86 instruction.
-fn rdrand_seed() -> Result<[u8; 32], ()> {
+fn rdrand_seed() -> Option<[u8; 32]> {
     match rdrand::RdRand::new() {
         Ok(mut generator) => {
             let mut seed = [0; 32];
             match generator.try_fill_bytes(&mut seed) {
                 Ok(_) => {
                     log::info!("using RDRAND for CSPRNG seed");
-                    Ok(seed)
+                    Some(seed)
                 }
                 Err(_) => {
                     log::warn!("failed to generate seed from RDRAND");
-                    Err(())
+                    None
                 }
             }
         }
         Err(_) => {
             log::warn!("failed to initialise RDRAND");
-            Err(())
+            None
         }
     }
 }
@@ -99,9 +101,9 @@ fn rdrand_seed() -> Result<[u8; 32], ()> {
 fn tsc_seed() -> [u8; 32] {
     let mut seed = [0; 32];
 
-    for i in 0..seed.len() {
+    for s in &mut seed {
         // The last byte is the _most_ random.
-        seed[i] = u128::from(tsc::tsc_ticks()).to_be_bytes()[15];
+        *s = u128::from(tsc::tsc_ticks()).to_be_bytes()[15];
     }
 
     // The TSC isn't a high quality source of randomness.
@@ -141,10 +143,10 @@ pub fn fill_bytes(dest: &mut [u8]) {
 /// Directly accessing the global CSPRNG can be expensive and so it is often
 /// better to seed a local PRNG from the global CSPRNG. Using a local PRNG
 /// also allows for much faster cryptographically insecure PRNGs to be used.
-pub fn init_rng<T>() -> Result<T, ()>
+pub fn init_rng<T>() -> Result<T, Error>
 where
     T: SeedableRng,
 {
     let mut csprng = CSPRNG.lock();
-    T::from_rng(&mut *csprng).map_err(|_| ())
+    T::from_rng(&mut *csprng)
 }
