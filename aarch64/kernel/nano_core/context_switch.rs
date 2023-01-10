@@ -1,9 +1,10 @@
 use log::{info, error};
+use core::mem::size_of;
 
 use memory::{MappedPages, PageTable};
+use kernel_config::memory::PAGE_SIZE;
 use pte_flags::PteFlags;
 
-use zerocopy::AsBytes;
 use context_switch_regular::{context_switch_regular, ContextRegular};
 
 static mut PREV_STACK: usize = 0xdeadbeef;
@@ -33,8 +34,8 @@ pub fn switch_to_task(new_stack: usize) {
     }
 }
 
-/// Utility function which allocates a 16-page long
-/// initial task stack; you have to give it a function
+/// Utility function which allocates an initial task
+/// stack; you have to give it a function
 /// pointer (such as the address of `landing_pad`)
 /// which will be executed if you use
 /// `context_switch_regular` with that new stack.
@@ -43,23 +44,19 @@ pub fn create_stack(
     start_address: extern "C" fn(),
     pages: usize,
 ) -> Result<(MappedPages, usize), &'static str> {
-    let artificial_ctx = ContextRegular::new(start_address as *const () as _);
-    let artificial_ctx_src = artificial_ctx.as_bytes();
+    let artificial_ctx_src = ContextRegular::new(start_address as *const () as _);
 
     let stack = page_allocator::allocate_pages(pages).ok_or("couldn't allocate new stack")?;
     let mut stack = page_table.map_allocated_pages(stack, PteFlags::WRITABLE | PteFlags::NOT_EXECUTABLE)?;
 
-    let stack_ptr;
-    {
-        let stack: &mut [u8] = stack.as_slice_mut(0, pages * 4096)?;
-
+    let stack_ptr = {
         // inserting an artificial context
         // at the top of the stack
-        let offset = stack.len() - artificial_ctx_src.len();
-        let artificial_ctx_dst = &mut stack[offset..];
-        stack_ptr = artificial_ctx_dst.as_ptr() as usize;
-        artificial_ctx_dst.copy_from_slice(artificial_ctx_src);
-    }
+        let offset = pages * PAGE_SIZE - size_of::<ContextRegular>();
+        let artificial_ctx_dst = stack.as_type_mut(offset)?;
+        *artificial_ctx_dst = artificial_ctx_src;
+        artificial_ctx_dst as *mut _ as usize
+    };
 
     Ok((stack, stack_ptr))
 }

@@ -84,7 +84,7 @@ macro_rules! save_registers_regular {
     () => (
         // Save all general purpose registers into the previous task.
         r#"
-            // Make room on the stack for the exception context.
+            // Make room on the stack for the registers.
             sub sp,  sp,  #8 * 2 + 6
 
             // Push registers on the stack, two at a time.
