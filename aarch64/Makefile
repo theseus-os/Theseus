@@ -16,11 +16,12 @@ NATIVE_OUTPUT ?= $(AARCH64_DIR)/target/aarch64-unknown-uefi/release/nano_core.ef
 nano_core_binary ?= $(BUILD_DIR)/efi
 
 # Configure the machine
-QEMU_FLAGS += -machine virt
+QEMU_FLAGS += -machine virt,gic-version=3
 QEMU_FLAGS += -cpu cortex-a72
 QEMU_FLAGS += -smp 4
 QEMU_FLAGS += -m 1000
 QEMU_FLAGS += -net none
+# QEMU_FLAGS += -d int
 # QEMU_FLAGS += -nographic
 
 # Include that file which enables efi support in qemu

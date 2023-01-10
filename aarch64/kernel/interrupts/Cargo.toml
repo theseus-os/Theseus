@@ -16,5 +16,7 @@ gic = { path = "../gic" }
 memory = { path = "../memory" }
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
+[features]
+
 [lib]
 crate-type = ["rlib"]

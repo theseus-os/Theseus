@@ -8,7 +8,7 @@ use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
-use gic::{qemu_virt_addrs, ArmGic, IntNumber, TargetCpu};
+use gic::{qemu_virt_addrs, ArmGic, IntNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::{PageTable};
 use log::{info, error};
@@ -24,6 +24,8 @@ static GIC: MutexIrqSafe<Once<ArmGic>> = MutexIrqSafe::new(Once::new());
 // Default Timer IRQ number on AArch64 as
 // defined by Arm Manuals
 pub const AARCH64_TIMER_IRQ: IntNumber = 30;
+
+const MAX_IRQ_NUM: usize = 256;
 
 // Singleton which acts like an x86-style
 // Interrupt Descriptor Table: it's an
@@ -79,16 +81,22 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
 pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
     let mut gic = GIC.lock();
 
-    let inner = ArmGic::map(page_table, qemu_virt_addrs::GICD, qemu_virt_addrs::GICC)?;
+    log::info!("Configuring the GIC");
+    let inner = ArmGic::init(
+        page_table,
+        GicVersion::InitV3 {
+            dist: qemu_virt_addrs::GICD,
+            redist: qemu_virt_addrs::GICR,
+        },
+    )?;
+
     let mut result = Err("The GIC has already been initialized!");
     gic.call_once(|| { result = Ok(()); inner });
 
     if result.is_ok() {
         let gic = gic.get_mut().unwrap();
-        log::info!("Configuring the GIC");
-        gic.set_gicc_state(true);
-        gic.set_gicd_state(true);
         gic.set_minimum_int_priority(0);
+        log::info!("Done Configuring the GIC");
     }
 
     result
@@ -108,10 +116,11 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
         // called everytime the timer ticks.
         extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
             info!("timer int!");
-            loop {}
+            // loop {}
 
             // return false if you haven't sent an EOI
             // so that the caller does it for you
+            false
         }
 
         // register the handler for the timer IRQ.
@@ -123,10 +132,6 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
         {
             let mut gic = GIC.lock();
             let gic = gic.get_mut().ok_or("GIC is uninitialized")?;
-
-            // this has no effect (IRQ# < 32), just including it
-            // to show how the function should be used
-            gic.set_int_target(AARCH64_TIMER_IRQ, TargetCpu::ALL_CPUS);
 
             // enable routing of this interrupt
             gic.set_int_state(AARCH64_TIMER_IRQ, true);
@@ -333,8 +338,12 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
         gic.acknowledge_int()
     };
     // important: GIC mutex is now implicitly unlocked
+    let irq_num_usize = irq_num as usize;
 
-    let handler = IRQ_HANDLERS.read()[irq_num as usize];
+    let handler = match irq_num_usize < MAX_IRQ_NUM {
+        true => IRQ_HANDLERS.read()[irq_num_usize],
+        false => default_irq_handler,
+    };
     if !handler(exc) {
         // handler has returned, we can lock again
         let mut gic = GIC.lock();
