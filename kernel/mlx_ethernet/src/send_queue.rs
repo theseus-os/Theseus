@@ -148,7 +148,7 @@ impl SendQueueContext {
     /// Find the state of the SQ from the SQ context 
     pub fn get_state(&self) -> Result<SendQueueState, &'static str> {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
-        Ok( SendQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the SQ state")? )
+        SendQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the SQ state")
     }
 
     /// Offset that this context is written to in the mailbox buffer

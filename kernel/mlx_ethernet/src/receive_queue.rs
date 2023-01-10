@@ -136,7 +136,7 @@ impl ReceiveQueueContext {
     /// Find the state of the RQ from the RQ context 
     pub fn get_state(&self) -> Result<ReceiveQueueState, &'static str> {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
-        Ok( ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")? )
+        ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")
     }
 
     /// Offset that this context is written to in the mailbox buffer

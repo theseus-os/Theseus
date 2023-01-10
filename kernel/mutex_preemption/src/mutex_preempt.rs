@@ -137,13 +137,13 @@ impl<T: ?Sized + Default> Default for MutexPreempt<T> {
 impl<'a, T: ?Sized> Deref for MutexPreemptGuard<'a, T> {
     type Target = T;
 
-    fn deref<'b>(&'b self) -> &'b T { 
+    fn deref(&self) -> &T { 
         & *(self.guard) 
     }
 }
 
 impl<'a, T: ?Sized> DerefMut for MutexPreemptGuard<'a, T> {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { 
+    fn deref_mut(&mut self) -> &mut T { 
         &mut *(self.guard)
     }
 }

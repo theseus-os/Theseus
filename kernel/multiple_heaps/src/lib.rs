@@ -527,7 +527,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
         // find the starting address of the object page this block belongs to
         let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
         // find the heap id
-        let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
+        let id = *((page_addr as *mut u8).add(ObjectPage8k::HEAP_ID_OFFSET) as *mut usize);
         let mut heap = self.heaps.get(&id).expect("Multiple Heaps: Heap not initialized").lock();
         heap.deallocate(NonNull::new_unchecked(ptr), layout).expect("Couldn't deallocate");
     }

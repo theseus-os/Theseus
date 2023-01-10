@@ -257,6 +257,7 @@ impl IxgbeNic {
     /// * `rx_buffer_size_kbytes`: The size of receive buffers. 
     /// * `num_rx_descriptors`: The number of descriptors in each receive queue.
     /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
+    #[allow(clippy::too_many_arguments)]
     pub fn init(
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
@@ -1039,6 +1040,7 @@ impl IxgbeNic {
     /// * `protocol`: IP L4 protocol
     /// * `priority`: priority relative to other filters, can be from 0 (lowest) to 7 (highest)
     /// * `qid`: number of the queue to forward packet to
+    #[allow(clippy::too_many_arguments)]
     pub fn set_5_tuple_filter(
         &mut self, 
         source_ip: Option<[u8;4]>, 

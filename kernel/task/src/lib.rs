@@ -572,7 +572,7 @@ impl Task {
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
     /// or `None` if it is not pinned.
     pub fn pinned_core(&self) -> Option<u8> {
-        self.inner.lock().pinned_core.clone()
+        self.inner.lock().pinned_core
     }
 
     /// Returns the current [`RunState`] of this `Task`.
