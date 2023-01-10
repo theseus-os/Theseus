@@ -225,7 +225,7 @@ pub fn init(
     let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_size = boot_info.len();
-    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
+    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, None)?;
@@ -238,7 +238,7 @@ pub fn init(
     let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
     let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
-    // Stack frames are not guaranteed to be contiguous.
+    // Stack frames are not guaranteed to be contiguous in physical memory.
     let stack_size = boot_info.stack_size()?;
     let stack_page_range = PageRange::from_virt_addr(
         // `PAGE_SIZE` accounts for the guard page, which does not have a corresponding frame.
@@ -247,7 +247,7 @@ pub fn init(
     );
     debug!("Initial stack start {stack_start_virt:#X}, size: {stack_size:#X} bytes, {stack_page_range:X?}");
 
-    // Boot info frames are not guaranteed to be contiguous.
+    // Boot info frames are not guaranteed to be contiguous in physical memory.
     let boot_info_page_range = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
     debug!("Boot info start: {boot_info_start_vaddr:#X}, size: {boot_info_size:#X}, {boot_info_page_range:#X?}");
 
@@ -321,13 +321,16 @@ pub fn init(
         data_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
         index += 1;
 
-        // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
-        // It does not need to be identity mapped because each AP core will have its own stack.
+        // Handle the stack (a separate data section), which consists of one guard page (unmapped)
+        // followed by the real (mapped) stack pages.
+        // The stack does not need to be identity mapped, because each secondary CPU will get its own stack.
         let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1)?;
         let mut stack_mapped_pages: Option<MappedPages> = None;
         for page in stack_page_range.into_iter() {
+            // The stack is not guaranteed to be contiguous in physical memory,
+            // so we use the `current_mapper` to translate each page into its backing physical frame,
+            // and then reproduce the same mapping in the `new_mapper`.
             let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
-
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
@@ -343,7 +346,7 @@ pub fn init(
         ));
 
         // Map the VGA display memory as writable. 
-        // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
+        // We do an identity mapping for the VGA display too, because secondary CPUs may access it while booting.
         let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
         let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
         let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
@@ -355,9 +358,13 @@ pub fn init(
         higher_half_mapped_pages[index] = Some(NoDrop::new(new_mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
+        // Map the bootloader info, a separate region of read-only memory, so that we can access it later.
+        // This does not need to be identity mapped.
         for page in boot_info_page_range.into_iter() {
+            // The boot info is not guaranteed to be contiguous in physical memory,
+            // so we use the `current_mapper` to translate each page into its backing physical frame,
+            // and then reproduce the same mapping in the `new_mapper`.
             let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
-
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
