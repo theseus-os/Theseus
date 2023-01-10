@@ -915,7 +915,7 @@ impl CrateNamespace {
         for (new_crate_ref, elf_file) in partially_loaded_crates {
             self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
-            self.crate_tree.lock().insert(name.into(), new_crate_ref);
+            self.crate_tree.lock().insert(name, new_crate_ref);
         }
 
         Ok(())
@@ -2661,7 +2661,7 @@ impl CrateNamespace {
 
         // We add a shared reference to that section's parent crate to this namespace as well, 
         // to prevent that crate from being dropped while this namespace still relies on it.
-        self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+        self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref);
         return Some(sec);
     }
 

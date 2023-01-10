@@ -203,7 +203,7 @@ fn parse_nano_core_symbol_file_or_binary(
     drop(new_crate_mut);
 
     // Add the newly-parsed nano_core crate to the kernel namespace.
-    real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
+    real_namespace.crate_tree.lock().insert(crate_name, nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
     Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
