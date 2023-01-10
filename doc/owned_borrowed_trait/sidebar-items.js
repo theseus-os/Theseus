@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Borrowed","A wrapper that indicates the contained value is a borrowed reference to a value of type `T`."],["Owned","A wrapper that indicates the contained value is an owned value of type `T`."]],"trait":[["OwnedOrBorrowed","A trait for abstracting over an owned value or borrowed reference to a type `T`."]]};

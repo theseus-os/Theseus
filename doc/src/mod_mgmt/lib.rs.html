@@ -3956,7 +3956,7 @@
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
-    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    /// [`CowArc::clone()`] function on the returned value.
     </span><span class="kw">pub fn </span>get_crate(<span class="kw-2">&amp;</span><span class="self">self</span>, crate_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;StrongCrateRef&gt; {
         <span class="self">self</span>.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| CowArc::clone_shallow(c))
@@ -3975,7 +3975,7 @@
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
-    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    /// [`CowArc::clone()`] function on the returned value.
     </span><span class="kw">pub fn </span>get_crate_and_namespace&lt;<span class="lifetime">&#39;n</span>&gt;(
         namespace: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;,
         crate_name: <span class="kw-2">&amp;</span>str
