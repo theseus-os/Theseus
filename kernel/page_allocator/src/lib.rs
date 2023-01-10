@@ -47,9 +47,12 @@ static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 
 /// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`. 
 /// Any virtual addresses **greater than or equal to** this address is considered "designated".
-/// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
+/// This higher part of the address range covers from:
+/// the beginning of the recursive P4 entry used for modifying upcoming page tables
+/// to the very end of the address space.
 ///
-/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
+/// TODO: once the heap is fully dynamic and not dependent on static addresses,
+/// we can exclude the heap from the designated region.
 static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START));
 
 const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
