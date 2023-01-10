@@ -14,6 +14,7 @@ use core::sync::atomic::{AtomicU8, Ordering};
 /// so the maximum number of cores it supports is `u8::MAX` (256).
 const MAX_CPU_CORES: usize = u8::MAX as usize;
 
+#[allow(clippy::declare_interior_mutable_const)]
 const ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(0);
 
 /// The per-core preemption count, indexed by a CPU core's APIC ID.

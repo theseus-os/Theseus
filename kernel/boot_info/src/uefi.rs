@@ -1,9 +1,6 @@
 use crate::{ElfSectionFlags, FramebufferFormat, Address};
 use bootloader_api::info;
-use core::{
-    iter::{Iterator, Peekable},
-    ops::Range,
-};
+use core::iter::{Iterator, Peekable};
 use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
@@ -145,74 +142,14 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
     type Module<'a> = Module;
     type Modules<'a> = Modules;
 
+    type AdditionalReservedMemoryRegions = core::iter::Empty<crate::ReservedMemoryRegion>;
+
     fn start(&self) -> Option<VirtualAddress> {
         VirtualAddress::new(*self as *const _ as usize)
     }
 
     fn len(&self) -> usize {
         self.size
-    }
-
-    // The bootloader creates two memory regions with the bootloader type. The first
-    // one always starts at 0x1000 and contains the page table, boot info, etc. The
-    // second one starts at some other address and contains the nano_core elf file.
-    // It is the same size as the nano_core elf file.
-
-    fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        use crate::ElfSection;
-
-        let start = PhysicalAddress::new(
-            self.elf_sections()?
-                .into_iter()
-                .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
-                .map(|s| s.start())
-                .min()
-                .ok_or("couldn't find kernel start address")?
-                .value(),
-        )
-        .ok_or("kernel physical start address was invalid")?;
-        let virtual_end = self
-            .elf_sections()?
-            .into_iter()
-            .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
-            .map(|s| s.start() + s.len())
-            .max()
-            .ok_or("couldn't find kernel end address")?;
-        let physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
-            .ok_or("kernel physical end address was invalid")?;
-
-        Ok(start..physical_end)
-    }
-
-    fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        let mut iter = self
-            .memory_regions
-            .iter()
-            .filter(|region| region.kind == info::MemoryRegionKind::Bootloader)
-            .filter(|region| region.start == 0x1000);
-
-        let bootloader_info_memory_region =
-            iter.next().ok_or("no bootloader info memory region")?;
-        if iter.next().is_some() {
-            Err("multiple potential bootloader memory info memory regions")
-        } else {
-            let start = PhysicalAddress::new(bootloader_info_memory_region.start as usize)
-                .ok_or("invalid bootloader info start address")?;
-            let end = PhysicalAddress::new(bootloader_info_memory_region.end as usize)
-                .ok_or("invalid bootloader info end address")?;
-            Ok(start..end)
-        }
-    }
-
-    fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        let area = self
-            .memory_regions
-            .iter()
-            .find(|region| region.kind == MODULES_MEMORY_KIND)
-            .ok_or("no modules memory region")?;
-        let start = PhysicalAddress::new_canonical(area.start as usize);
-        let end = PhysicalAddress::new_canonical(area.end as usize);
-        Ok(start..end)
     }
 
     fn memory_regions(&self) -> Result<Self::MemoryRegions<'_>, &'static str> {
@@ -231,6 +168,26 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
             regions: &self.memory_regions,
             index: 0,
         }
+    }
+
+    fn additional_reserved_memory_regions(
+        &self,
+    ) -> Result<Self::AdditionalReservedMemoryRegions, &'static str> {
+        Ok(core::iter::empty())
+    }
+
+    fn kernel_end(&self) -> Result<PhysicalAddress, &'static str> {
+        use crate::ElfSection;
+
+        PhysicalAddress::new(
+            self.elf_sections()?
+                .filter(|section| section.flags().contains(ElfSectionFlags::ALLOCATED))
+                .map(|section| section.start + section.size)
+                .max()
+                .ok_or("couldn't find kernel end address")? as usize
+                - KERNEL_OFFSET,
+        )
+        .ok_or("kernel physical end address was invalid")
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {

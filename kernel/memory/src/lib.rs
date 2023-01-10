@@ -153,22 +153,7 @@ pub fn init(
     boot_info: &impl BootInformation,
     kernel_stack_start: VirtualAddress,
 ) -> Result<InitialMemoryMappings, &'static str> {
-    // Get the start and end addresses of the kernel, boot info, boot modules, etc.
-    // These are all physical addresses.
-    let kernel_memory = boot_info.kernel_memory_range()?;
-    let boot_info_memory = boot_info.bootloader_info_memory_range()?;
-    let modules_memory = boot_info.modules_memory_range()?;
-
-    debug!("kernel memory: p{:#X} to p{:#X}", kernel_memory.start, kernel_memory.end);
-    debug!("boot info memory: p{:#X} to p{:#X}", boot_info_memory.start, boot_info_memory.end);
-    debug!("modules memory: p{:#X} to p{:#X}", modules_memory.start, modules_memory.end);
-
-    // In addition to the information about the hardware's physical memory map provided by the bootloader,
-    // Theseus chooses to reserve the following regions of physical memory for specific use.
     let low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), 0x10_0000); // suggested by most OS developers
-    let kernel_frames       = FrameRange::from_phys_addr(kernel_memory.start, kernel_memory.end.value() - kernel_memory.start.value());
-    let boot_modules_frames = FrameRange::from_phys_addr(modules_memory.start, modules_memory.end.value() - modules_memory.start.value());
-    let boot_info_frames    = FrameRange::from_phys_addr(boot_info_memory.start, boot_info_memory.end.value() - boot_info_memory.start.value());
     
     // Add the VGA display's memory region to the list of reserved physical memory areas.
     // Currently this is covered by the first 1MiB region, but it's okay to duplicate it here.
@@ -183,18 +168,12 @@ pub fn init(
 
     reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
     reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(kernel_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_modules_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(boot_info_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
     reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
     reserved_index += 1;
 
-    for area in boot_info.memory_regions()? {
-        let frames = FrameRange::from_phys_addr(PhysicalAddress::new_canonical(area.start().value()), area.len());
-        if area.is_usable() {
+    for region in boot_info.memory_regions()? {
+        let frames = FrameRange::from_phys_addr(region.start(), region.len());
+        if region.is_usable() {
             free_regions[free_index] = Some(PhysicalMemoryRegion::new(frames, MemoryRegionType::Free));
             free_index += 1;
         } else {
@@ -203,11 +182,19 @@ pub fn init(
         }
     }
 
+    for region in boot_info.additional_reserved_memory_regions()? {
+        reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(
+            FrameRange::from_phys_addr(region.start, region.len),
+            MemoryRegionType::Reserved,
+        ));
+        reserved_index += 1;
+    }
+
     let into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
-    page_allocator::init(VirtualAddress::new_canonical(kernel_memory.end.value()))?;
+    page_allocator::init(VirtualAddress::new_canonical(boot_info.kernel_end()?.value()))?;
     debug!("Initialized new page allocator!");
     page_allocator::dump_page_allocator_state();
 
