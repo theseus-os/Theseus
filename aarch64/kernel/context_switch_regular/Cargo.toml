@@ -1,7 +1,7 @@
 [package]
 authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "context_switch_regular"
-description = "Context switching routines and structs for regular (non-SSE) register sets, aarch64 version"
+description = "Context switching routines and structs for regular (non-SIMD) tasks on aarch64"
 version = "0.1.0"
 
 [dependencies]
