@@ -37,4 +37,3 @@ github_pages/doc/
 # limine bootloader files
 /limine-prebuilt/
 
-libs/**/Cargo.lock
