@@ -190,7 +190,7 @@ impl CompositableRegion for Rectangle {
                 Some(index) => index,
                 None => {continue;}
             };
-            dest_fb.composite_buffer(&(src_buffer[src_start_index..src_end_index]), dest_start_index as usize);
+            dest_fb.composite_buffer( &(src_buffer[src_start_index..src_end_index]), dest_start_index );
         }
 
         Ok(())

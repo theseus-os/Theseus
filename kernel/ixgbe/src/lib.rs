@@ -1305,8 +1305,8 @@ pub enum FilterProtocol {
 pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
-    nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
-    let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
+    nic.rx_queues[qid].poll_queue_and_store_received_packets()?;
+    let frame = nic.rx_queues[qid].return_frame().ok_or("no frame")?;
     Ok(frame)
 }
 
