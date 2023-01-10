@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["RandError","Error kinds in the Random crate."]],"fn":[["fill_bytes","Fills `dest` with random data."],["init_rng","Initialises a `T` RNG."],["next_u32","Returns a random [`u32`]."],["next_u64","Returns a random [`u64`]."]]};
+window.SIDEBAR_ITEMS = {"fn":[["fill_bytes","Fills `dest` with random data."],["init_rng","Initialises a `T` RNG."],["next_u32","Returns a random [`u32`]."],["next_u64","Returns a random [`u64`]."]],"struct":[["Error","Error type of random number generators"]]};
