@@ -85,15 +85,15 @@ macro_rules! save_registers_regular {
         // Save all general purpose registers into the previous task.
         r#"
             // Make room on the stack for the exception context.
-            sub sp,  sp,  #8 * 6 * 2
+            sub sp,  sp,  #8 * 2 + 6
 
-            // Push registers on the stack.
-            stp x19, x20, [sp, #8 * 0 * 2]
-            stp x21, x22, [sp, #8 * 1 * 2]
+            // Push registers on the stack, two at a time.
+            stp x19, x20, [sp, #8 * 2 * 0]
+            stp x21, x22, [sp, #8 * 2 * 1]
             stp x23, x24, [sp, #8 * 2 * 2]
-            stp x25, x26, [sp, #8 * 3 * 2]
-            stp x27, x28, [sp, #8 * 4 * 2]
-            stp x29, x30, [sp, #8 * 5 * 2]
+            stp x25, x26, [sp, #8 * 2 * 3]
+            stp x27, x28, [sp, #8 * 2 * 4]
+            stp x29, x30, [sp, #8 * 2 * 5]
         "#
     );
 }
@@ -125,16 +125,16 @@ macro_rules! restore_registers_regular {
     () => (
         // Restore the next task's general purpose registers.
         r#"
-            // Pop registers from the stack.
-            ldp x19, x20, [sp, #8 * 0 * 2]
-            ldp x21, x22, [sp, #8 * 1 * 2]
+            // Pop registers from the stack, two at a time.
+            ldp x19, x20, [sp, #8 * 2 * 0]
+            ldp x21, x22, [sp, #8 * 2 * 1]
             ldp x23, x24, [sp, #8 * 2 * 2]
-            ldp x25, x26, [sp, #8 * 3 * 2]
-            ldp x27, x28, [sp, #8 * 4 * 2]
-            ldp x29, x30, [sp, #8 * 5 * 2]
+            ldp x25, x26, [sp, #8 * 2 * 3]
+            ldp x27, x28, [sp, #8 * 2 * 4]
+            ldp x29, x30, [sp, #8 * 2 * 5]
 
             // Move the stack pointer back up.
-            add sp,  sp,  #8 * 6 * 2
+            add sp,  sp,  #8 * 2 * 6
         "#
     );
 }
