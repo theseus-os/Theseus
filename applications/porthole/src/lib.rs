@@ -652,6 +652,7 @@ pub fn main(_args: Vec<String>) -> Result<isize, &'static str> {
 
     let _task_ref = match spawn::new_task_builder(port_loop, (mouse_consumer, key_consumer))
         .name("port_loop".to_string())
+        .pin_on_core(0)
         .spawn()
     {
         Ok(task_ref) => task_ref,
@@ -819,27 +820,36 @@ impl WindowManager {
     }
 
     fn drag_windows(&mut self, screen_position: ScreenPos, mouse_event: &MouseEvent) {
+        if !mouse_event.buttons.left() {
+            self.mouse_holding = Holding::Nothing;
+        }
         if mouse_event.buttons.left() {
             match self.mouse_holding {
                 Holding::Background => {}
                 Holding::Nothing => {
+                    // We are cloning this value because we will use it to iterate through our windows while editing the original one
                     let rendering_order = self.window_rendering_order.clone();
-                    for (window_index, position_in_iter) in rendering_order.iter().enumerate().rev()
-                    {
+                    // `iter_index` = index of the window in `self.window_rendering_order`
+                    // `window_index` = index of the window in `self.windows`
+                    for (iter_index, &window_index) in rendering_order.iter().enumerate().rev() {
                         let window = &mut self.windows[window_index];
                         if window.lock().rect.detect_collision(&self.mouse) {
+                            // If colliding window is not active one make it active
+                            // we first remove colliding window from it's position in
+                            // window_rendering_order, then push it to the back of
+                            // window_rendering_order, this way we don't have to do any special sorting
                             if window_index != self.active_window_index {
-                                // FIXME: This is half-broken, doesn't handle multiple windows correctly
-                                let last_one = self.window_rendering_order.len() - 1;
-                                self.window_rendering_order
-                                    .swap(last_one, *position_in_iter);
+                                self.active_window_index = window_index;
+                                self.window_rendering_order.remove(iter_index);
+                                self.window_rendering_order.push(window_index);
                             }
+                            // If user is holding the window from it's title border pos
+                            // it means user wants to move the window
                             if window
                                 .lock()
                                 .dynamic_title_border_pos()
                                 .detect_collision(&self.mouse)
                             {
-                                self.active_window_index = window_index;
                                 self.mouse_holding = Holding::Window(window_index);
                             }
                             break;
@@ -904,9 +914,6 @@ impl WindowManager {
                     break;
                 }
             }
-        }
-        if !mouse_event.buttons.left() {
-            self.mouse_holding = Holding::Nothing;
         }
     }
 
@@ -1099,7 +1106,6 @@ fn port_loop(
         .lock()
         .new_window(&Rect::new(400, 400, 500, 20), Some(format!("Basic")))?;
     let drawable_area = window_2.lock().drawable_area();
-
     let text = TextDisplayInfo {
         width: drawable_area.width,
         height: drawable_area.height,
@@ -1173,7 +1179,6 @@ fn port_loop(
                 _ => (),
             }
         }
-
         if diff > 0 {
             app.draw()?;
             window_manager.lock().update();
