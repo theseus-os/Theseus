@@ -892,7 +892,7 @@ impl fmt::Debug for SwapRequest {
             .field("old_namespace", &self.old_namespace.name())
             .field("new_crate", &self.new_crate_object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string() )
             )
             .field("new_namespace", &self.new_namespace.name())
             .field("reexport_symbols", &self.reexport_new_symbols_as_old)
@@ -968,7 +968,7 @@ impl SwapRequest {
                         } else if !matching_files.is_empty() {
                             matching_files.into_iter()
                                 .map(|(file, ns)| (
-                                    file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| format!("<Locked>")),
+                                    file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| "<Locked>".to_string() ),
                                     Arc::clone(ns)
                                 ))
                                 .collect::<Vec<_>>()
@@ -1093,7 +1093,7 @@ impl fmt::Debug for InvalidSwapRequest {
                     .field("searched in new_namespace", &new_namespace.name());
                 for (file, ns) in matches {
                     let s = format!("{:?} in namespace {:?}",
-                        file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| format!("<Locked>")),
+                        file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| "<Locked>".to_string() ),
                         ns.name(),
                     );
                     dbg.field("matching file", &s);

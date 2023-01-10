@@ -5,7 +5,12 @@
 #[macro_use] extern crate log;
 
 use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
-use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
+use alloc::{
+    boxed::Box, 
+    collections::{BTreeMap, btree_map, BTreeSet}, 
+    string::{String, ToString}, 
+    sync::{Arc, Weak}, vec::Vec
+};
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
 use util::round_up_power_of_two;
@@ -392,7 +397,7 @@ impl fmt::Debug for IntoCrateObjectFile {
         match self {
             Self::File(object_file) => dbg.field("File", &object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string() )
             ),
             Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
             Self::Prefix(prefix) => dbg.field("Prefix", prefix),

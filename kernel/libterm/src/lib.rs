@@ -9,7 +9,7 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
@@ -448,7 +448,7 @@ impl Terminal {
         };
         terminal.display_text()?;
 
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
+        terminal.print_to_terminal( "Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n".to_string());
         Ok(terminal)
     }
 

@@ -11,7 +11,7 @@
 
 extern crate spin;
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -784,7 +784,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
         let path = Path::new(shell_objfile.lock().get_absolute_path());
         spawn::new_application_task_builder(path, Some(new_app_namespace))?
-            .name(format!("shell"))
+            .name("shell".to_string())
             .spawn()?;
 
         debug!("window_manager: spawned new shell app in new app namespace.");

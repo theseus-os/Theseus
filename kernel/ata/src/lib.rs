@@ -13,7 +13,12 @@ extern crate alloc;
 use core::fmt;
 use bitflags::bitflags;
 use spin::Mutex;
-use alloc::{boxed::Box, format, string::String, sync::Arc};
+use alloc::{
+	boxed::Box, 
+	format, 
+	string::{String, ToString}, 
+	sync::Arc
+};
 use port_io::{Port, PortReadOnly, PortWriteOnly};
 use pci::PciDevice;
 use storage_device::{StorageDevice, StorageDeviceRef, StorageController};
@@ -775,7 +780,7 @@ impl IdeController {
 		let drive_fmt = |drive: &Result<AtaDrive, &str>| -> String {
 			match drive {
 				Ok(d)  => format!("drive initialized, size: {} sectors", d.size_in_blocks()),
-				Err(e) => format!("{}", e),
+				Err(e) => e.to_string(),
 			}
 		};
 
