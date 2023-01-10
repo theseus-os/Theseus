@@ -283,7 +283,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::ReadPio as u8);
 			}
 		} else {
@@ -299,7 +299,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::ReadPioExt as u8);
 			}
 		} 
@@ -351,7 +351,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::WritePio as u8);
 			}
 		} else {
@@ -367,7 +367,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::WritePioExt as u8);
 			}
 		}
