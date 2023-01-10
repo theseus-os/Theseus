@@ -4,25 +4,25 @@ bool-comparison
 borrowed-box
 bytes-count-to-len
 # char-lit-as-u8
-# clone-on-copy
+clone-on-copy
 crosspointer-transmute
 deprecated-cfg-attr
 deref-addrof
-# derivable-impls
+derivable-impls
 diverging-sub-expression
 double-comparisons
 double-parens
 duration-subsec
-# explicit-counter-loop
+explicit-counter-loop
 explicit-write
 extra-unused-lifetimes
 filter-map-identity
 filter-next
 flat-map-identity
 get-last-with-len
-# identity-op
+identity-op
 inspect-for-each
-# int-plus-one
+int-plus-one
 iter-count
 manual-filter-map
 manual-find-map
@@ -38,11 +38,11 @@ match-single-binding
 needless-arbitrary-self-type
 needless-bool
 needless-borrowed-reference
-# needless-lifetimes
+needless-lifetimes
 needless-match
 needless-option-as-deref
 needless-option-take
-# needless-question-mark
+needless-question-mark
 needless-splitn
 needless-update
 neg-cmp-op-on-partial-ord
@@ -55,7 +55,7 @@ or-then-unwrap
 overflow-check-conditional
 partialeq-ne-impl
 precedence
-# ptr-offset-with-cast
+ptr-offset-with-cast
 range-zip-with-len
 redundant-closure-call
 redundant-slicing
@@ -68,7 +68,7 @@ skip-while-next
 string-from-utf8-as-bytes
 strlen-on-c-strings
 temporary-assignment
-# too-many-arguments
+too-many-arguments
 transmute-bytes-to-str
 transmute-float-to-int
 transmute-int-to-bool
