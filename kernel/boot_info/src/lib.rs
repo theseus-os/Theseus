@@ -145,21 +145,18 @@ pub enum FramebufferFormat {
     TextCharacter,
     /// Custom pixel format of up to 32-bit pixels.
     CustomPixel {
-        /// The mask of bits in a pixel that correspond to a Red value.
-        ///
-        /// For example, a value of `0x00FF0000` means that the Red channel
-        /// uses bits 16-23 inclusively.
-        red_bitmask: u32,
-        /// The mask of bits in a pixel that correspond to a Green value.
-        ///
-        /// For example, a value of `0x0000FF00` means that the Green channel
-        /// comprises bits 8-15 inclusively.
-        green_bitmask: u32,
-        /// The mask of bits in a pixel that correspond to a Blue value.
-        ///
-        /// For example, a value of `0x000000FF` means that the Blue channel
-        /// comprises bits 0-7 inclusively.
-        blue_bitmask: u32,
+        /// The bit position of the least significant bit of a pixel's red component.
+        red_bit_position: u8,
+        /// The size of a pixel's red component, in number of bits.
+        red_size_in_bits: u8,
+        /// The bit position of the least significant bit of a pixel's green component.
+        green_bit_position: u8,
+        /// The size of a pixel's green component, in number of bits.
+        green_size_in_bits: u8,
+        /// The bit position of the least significant bit of a pixel's blue component.
+        blue_bit_position: u8,
+        /// The size of a pixel's blue component, in number of bits.
+        blue_size_in_bits: u8,
     },
 }
 

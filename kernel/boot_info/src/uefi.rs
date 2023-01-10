@@ -256,9 +256,12 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
                 blue_position,
             } => FramebufferFormat::CustomPixel {
                 // each pixel is 8 bits
-                red_bitmask:   0xFF << red_position,
-                green_bitmask: 0xFF << green_position,
-                blue_bitmask:  0xFF << blue_position,
+                red_bit_position: red_position,
+                red_size_in_bits: 8,
+                green_bit_position: green_position,
+                green_size_in_bits: 8,
+                blue_bit_position: blue_position,
+                blue_size_in_bits: 8,
             },
             _ => return None,
         };
