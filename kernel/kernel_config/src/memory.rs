@@ -1,14 +1,12 @@
-//! WARNING: DO NOT USE ANY ADDRESS THAT MAPS TO THE SAME P4 ENTRY AS THE ONE
-//! USED FOR THE RECURSIVE PAGE TABLE ENTRY (CURRENTLY 510). 
-//! Currently, that would be any address that starts with 0xFFFF_FF0*_****_****,
-//! so do not use that virtual address range for anything!!
-
+//! The basic virtual memory map that Theseus assumes.
+//!
 //! Current P4 (top-level page table) mappings:
-//! * 511: kernel text sections
+//! * 511: kernel text sections.
 //! * 510: recursive mapping for accessing the current P4 root page table frame.
-//! * 509: kernel heap
-//! * 508: recursive mapping for accessing the P4 root page table frame of an upcoming new page table.
-//! * 507 down to 0: available for general usage
+//! * 509: kernel heap.
+//! * 508: recursive mapping for accessing the P4 root page table frame
+//!        of an upcoming new page table.
+//! * 507 down to 0: available for general usage.
 
 /// 64-bit architecture results in 8 bytes per address.
 pub const BYTES_PER_ADDR: usize = core::mem::size_of::<usize>();
