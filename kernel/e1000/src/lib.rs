@@ -1,5 +1,6 @@
 #![no_std]
 
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(rustc_private)]
 #![feature(abi_x86_interrupt)]

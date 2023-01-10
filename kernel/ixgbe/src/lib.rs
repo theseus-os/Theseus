@@ -6,6 +6,7 @@
 //! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 #![no_std]
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(abi_x86_interrupt)]
 

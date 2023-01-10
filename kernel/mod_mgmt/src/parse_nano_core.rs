@@ -3,6 +3,8 @@
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
+#![allow(clippy::type_complexity)]
+
 use crate::{CrateNamespace, mp_range};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 use fs_node::FileRef;
