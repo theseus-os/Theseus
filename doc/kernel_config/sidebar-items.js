@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["display",""],["memory","WARNING: DO NOT USE ANY ADDRESS THAT MAPS TO THE SAME P4 ENTRY AS THE ONE USED FOR THE RECURSIVE PAGE TABLE ENTRY (CURRENTLY 510).  Currently, that would be any address that starts with 0xFFFF_FF0*********, so do not use that virtual address range for anything!! Current P4 (top-level page table) mappings:"],["time",""]]};
+window.SIDEBAR_ITEMS = {"mod":[["display",""],["memory","The basic virtual memory map that Theseus assumes."],["time",""]]};
