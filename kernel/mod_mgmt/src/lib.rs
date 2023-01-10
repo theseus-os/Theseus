@@ -617,7 +617,7 @@ impl CrateNamespace {
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
-    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    /// [`CowArc::clone()`] function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
         self.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| CowArc::clone_shallow(c))
@@ -636,7 +636,7 @@ impl CrateNamespace {
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
-    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    /// [`CowArc::clone()`] function on the returned value.
     pub fn get_crate_and_namespace<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name: &str
