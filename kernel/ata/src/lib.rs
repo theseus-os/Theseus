@@ -240,7 +240,7 @@ impl AtaBus {
 		let data_bar = data_bar & PCI_BAR_PORT_MASK;
 		let control_bar = control_bar & PCI_BAR_PORT_MASK;
 		AtaBus { 
-			data: Port::new(data_bar + 0),
+			data: Port::new(data_bar),
 			error: PortReadOnly::new(data_bar + 1),
 			_features: PortWriteOnly::new(data_bar + 1),
 			sector_count: Port::new(data_bar + 2),
@@ -283,7 +283,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::ReadPio as u8);
 			}
 		} else {
@@ -299,7 +299,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::ReadPioExt as u8);
 			}
 		} 
@@ -351,7 +351,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::WritePio as u8);
 			}
 		} else {
@@ -367,7 +367,7 @@ impl AtaBus {
 				self.sector_count.write(sector_count as u8);
 				self.lba_high.write((lba_start >> 16) as u8);
 				self.lba_mid.write( (lba_start >>  8) as u8);
-				self.lba_low.write( (lba_start >>  0) as u8);
+				self.lba_low.write(  lba_start        as u8);
 				self.command.write(AtaCommand::WritePioExt as u8);
 			}
 		}
@@ -1054,14 +1054,10 @@ impl AtaIdentifyData {
 /// 
 /// This is a wrapper around a byte string `[u8; 20]`, because Rust only supports deriving traits
 /// like `Debug` and `Default` for arrays up to 32 elements.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(packed)]
 pub struct AtaSerialNumber([u8; 20]);
-impl Default for AtaSerialNumber {
-	fn default() -> Self { 
-		AtaSerialNumber([0; 20])
-	}
-}
+
 impl fmt::Display for AtaSerialNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
@@ -1105,14 +1101,10 @@ impl fmt::Debug for AtaModelNumber {
 /// An ATA drive's firmware version is an 8-byte string.
 ///
 /// A wrapper around a byte string `[u8; 8]` to allow it to be printed.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Default)]
 #[repr(packed)]
 pub struct AtaFirmwareVersion([u8; 8]);
-impl Default for AtaFirmwareVersion {
-	fn default() -> Self { 
-		AtaFirmwareVersion([0; 8])
-	}
-}
+
 impl fmt::Display for AtaFirmwareVersion {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)

@@ -168,7 +168,7 @@ fn update_and_insert_fault_entry_internal(
     if let Some(instruction_pointer) = instruction_pointer {
         let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
         fe.instruction_pointer = Some(instruction_pointer);
-        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer, false)
                                         .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 

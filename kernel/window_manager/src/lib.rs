@@ -155,28 +155,24 @@ impl WindowManager {
 
     /// Returns the index of a window if it is in the show list
     fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
-        let mut i = 0_usize;
-        for item in self.show_list.iter() {
+        for (i, item) in self.show_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
                 if Arc::ptr_eq(&(item_ptr), window) {
                     return Some(i);
                 }
             }
-            i += 1;
         }
         None
     }
 
     /// Returns the index of a window if it is in the hide list
     fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
-        let mut i = 0_usize;
-        for item in self.hide_list.iter() {
+        for (i, item) in self.hide_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
                 if Arc::ptr_eq(&(item_ptr), window) {
                     return Some(i);
                 }
             }
-            i += 1;
         }
         None
     }
@@ -351,7 +347,7 @@ impl WindowManager {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
             coordinate: Coord::new(0, 0),
-            gcoordinate: coordinate.clone(),
+            gcoordinate: *coordinate,
             scrolling_up: mouse_event.movement.scroll_movement > 0, //TODO: might be more beneficial to save scroll_movement here
             scrolling_down: mouse_event.movement.scroll_movement < 0, //FIXME: also might be the wrong way around
             left_button_hold: mouse_event.buttons.left(),

@@ -46,6 +46,7 @@ pub struct SectionMemoryBounds {
 /// * The `data` section bounds cover those that are writable (.data, .bss).
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
+   pub init:        SectionMemoryBounds,
    pub text:        SectionMemoryBounds,
    pub rodata:      SectionMemoryBounds,
    pub data:        SectionMemoryBounds,
@@ -61,6 +62,8 @@ pub struct AggregatedSectionMemoryBounds {
 ///  * The list of all individual sections found. 
 pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
     let mut index = 0;
+    let mut init_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut init_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut text_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut text_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_start:      Option<(VirtualAddress, PhysicalAddress)> = None;
@@ -68,6 +71,7 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
 
+    let mut init_flags:        Option<PteFlags> = None;
     let mut text_flags:        Option<PteFlags> = None;
     let mut rodata_flags:      Option<PteFlags> = None;
     let mut data_flags:        Option<PteFlags> = None;
@@ -134,10 +138,13 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
             ".init" => {
-                text_start = Some((start_virt_addr, start_phys_addr));
+                init_start = Some((start_virt_addr, start_phys_addr));
+                init_end = Some((end_virt_addr, end_phys_addr));
+                init_flags = Some(flags);
                 "nano_core .init"
             } 
             ".text" => {
+                text_start = Some((start_virt_addr, start_phys_addr));
                 text_end = Some((end_virt_addr, end_phys_addr));
                 text_flags = Some(flags);
                 "nano_core .text"
@@ -205,6 +212,8 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         index += 1;
     }
 
+    let init_start         = init_start       .ok_or("Couldn't find start of .init section")?;
+    let init_end           = init_end         .ok_or("Couldn't find end of .init section")?;
     let text_start         = text_start       .ok_or("Couldn't find start of .text section")?;
     let text_end           = text_end         .ok_or("Couldn't find end of .text section")?;
     let rodata_start       = rodata_start     .ok_or("Couldn't find start of .rodata section")?;
@@ -212,10 +221,16 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
     let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
      
+    let init_flags    = init_flags  .ok_or("Couldn't find .init section flags")?;
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
     let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
 
+    let init = SectionMemoryBounds {
+        start: init_start,
+        end: init_end,
+        flags: init_flags,
+    };
     let text = SectionMemoryBounds {
         start: text_start,
         end: text_end,
@@ -233,6 +248,7 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
     };
 
     let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
+        init,
         text,
         rodata,
         data,

@@ -56,7 +56,7 @@ pub struct ExternalUnwindInfo {
     pub unwind_info: Range<VirtualAddress>,
 }
 
-/// Register  a new section of external unwinding information.
+/// Register a new section of external unwinding information.
 /// 
 /// Returns an error if unwinding information has already been registered 
 /// for the given `text_section_base_address`.
@@ -65,7 +65,7 @@ pub unsafe fn register_unwind_info(
     text_section_len: usize,
     unwind_info: *mut u8,
     unwind_len: usize,
-) -> Result<(), ()> {
+) -> Result<(), ExternalUnwindInfoError> {
 
     let mut uw = EXTERNAL_UNWIND_INFO.lock();
     let text_start = VirtualAddress::new_canonical(text_section_base_address as usize);
@@ -80,7 +80,7 @@ pub unsafe fn register_unwind_info(
 
     uw.try_insert(text_start, uw_info).map_err(|_e| {
         error!("External unwind info for {text_start:#X} was already registered");
-        ()
+        ExternalUnwindInfoError::AlreadyExists
     })?;
 
     Ok(())
@@ -114,4 +114,8 @@ pub fn get_unwind_info(
     }
 
     None
+}
+
+pub enum ExternalUnwindInfoError {
+    AlreadyExists,
 }

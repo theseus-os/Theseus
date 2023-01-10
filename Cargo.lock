@@ -862,7 +862,7 @@ dependencies = [
  "net",
  "network_manager",
  "pci",
- "ps2_controller",
+ "ps2",
  "serial_port",
  "spin 0.9.4",
  "storage_manager",
@@ -2702,21 +2702,13 @@ dependencies = [
 name = "ps2"
 version = "0.1.0"
 dependencies = [
+ "acpi",
+ "fadt",
  "log",
  "modular-bitfield",
  "num_enum",
  "port_io",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "ps2_controller"
-version = "0.1.0"
-dependencies = [
- "acpi",
- "fadt",
- "log",
- "ps2",
 ]
 
 [[package]]

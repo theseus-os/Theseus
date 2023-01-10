@@ -54,7 +54,7 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         unsafe {
             CS::set_reg(kernel_cs);          // reload code segment register
             load_tss(tss_segment);           // load TSS
-            SS::set_reg(kernel_ds.clone());  // unsure if necessary, but doesn't hurt
+            SS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
             DS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
         }
     }

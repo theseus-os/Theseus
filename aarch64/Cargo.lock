@@ -177,6 +177,7 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "irq_safety",
  "log",
  "pl011_qemu",
 ]

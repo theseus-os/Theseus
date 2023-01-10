@@ -47,10 +47,13 @@ static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 
 /// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`. 
 /// Any virtual addresses **greater than or equal to** this address is considered "designated".
-/// This higher part of the address range covers from the beginning of the heap area to the end of the address space.
+/// This higher part of the address range covers from:
+/// the beginning of the recursive P4 entry used for modifying upcoming page tables
+/// to the very end of the address space.
 ///
-/// TODO: once the heap is fully dynamic and not dependent on constant addresses, we can move this up to KERNEL_TEXT_START (511th entry of P4).
-static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START));
+/// TODO: once the heap is fully dynamic and not dependent on static addresses,
+/// we can exclude the heap from the designated region.
+static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START));
 
 const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
 const MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
@@ -283,7 +286,7 @@ impl Drop for AllocatedPages {
 			pages: self.pages.clone(),
 		});
 		match res {
-			Ok(_inserted_free_chunk) => return,
+			Ok(_inserted_free_chunk) => (),
 			Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free page list", c),
 		}
 		
@@ -428,8 +431,8 @@ fn find_specific_chunk(
 ///
 /// It first attempts to find a suitable chunk **not** in the designated regions,
 /// and only allocates from the designated regions as a backup option.
-fn find_any_chunk<'list>(
-	list: &'list mut StaticArrayRBTree<Chunk>,
+fn find_any_chunk(
+	list: &mut StaticArrayRBTree<Chunk>,
 	num_pages: usize
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
 	let designated_low_end = DESIGNATED_PAGES_LOW_END.get().ok_or(AllocationError::NotInitialized)?;
@@ -441,7 +444,7 @@ fn find_any_chunk<'list>(
 				if let Some(chunk) = elem {
 					// Skip chunks that are too-small or in the designated regions.
 					if  chunk.size_in_pages() < num_pages || 
-						chunk.start() <= &designated_low_end || 
+						chunk.start() <= designated_low_end || 
 						chunk.end() >= &DESIGNATED_PAGES_HIGH_START
 					{
 						continue;
@@ -469,7 +472,7 @@ fn find_any_chunk<'list>(
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
 			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if chunk.start() <= &designated_low_end {
+				if chunk.start() <= designated_low_end {
 					break; // move on to searching through the designated regions
 				}
 				if num_pages < chunk.size_in_pages() {
