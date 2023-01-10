@@ -21,7 +21,8 @@ use pit_clock_basic::*;
 
 /// The PIT Channel 0 is connected directly to IRQ 0.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x20.
-const PIT_CHANNEL_0_IRQ: u8 = interrupts::IRQ_BASE_OFFSET;
+#[allow(clippy::identity_op)]
+const PIT_CHANNEL_0_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0x0;
 
 
 /// Configures the PIT to fire an interrupt at the given frequency (in Hz).
