@@ -182,7 +182,7 @@ collapsible-if
 collapsible-match
 comparison-chain
 comparison-to-empty
-# declare-interior-mutable-const
+declare-interior-mutable-const
 disallowed-methods
 disallowed-types
 double-must-use
