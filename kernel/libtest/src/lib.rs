@@ -5,7 +5,7 @@ extern crate task;
 extern crate memory;
 extern crate apic;
 extern crate hpet;
-extern crate runqueue;
+extern crate scheduler;
 extern crate pmu_x86;
 extern crate libm;
 #[macro_use] extern crate log;
@@ -40,7 +40,7 @@ macro_rules! CPU_ID {
 
 /// Helper function return the tasks in a given core's runqueue
 pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
+	match scheduler::get_run_queue(core).map(|rq| rq.read()) {
 		Some(rq) => { Some(rq.iter().count()) }
 		_ => { None }
 	}

@@ -49,9 +49,6 @@ path = "../../kernel/framebuffer"
 [dependencies.framebuffer_drawer]
 path = "../../kernel/framebuffer_drawer"
 
-[dependencies.runqueue]
-path = "../../kernel/runqueue"
-
 [dependencies.hpet]
 path = "../../kernel/acpi/hpet"
 

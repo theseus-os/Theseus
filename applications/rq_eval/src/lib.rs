@@ -24,7 +24,7 @@ extern crate alloc;
 extern crate task;
 extern crate cpu;
 extern crate spawn;
-extern crate runqueue;
+extern crate scheduler;
 extern crate getopts;
 extern crate hpet;
 extern crate libtest;
@@ -162,7 +162,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _i in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(cpu::current_cpu(), taskref.clone())?;
+        scheduler::add_task_to_specific_run_queue(cpu::current_cpu(), taskref.clone())?;
 
         #[cfg(runqueue_spillful)] {   
             if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {
@@ -173,7 +173,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         }
         #[cfg(not(runqueue_spillful))]
         {
-            runqueue::remove_task_from_all(&taskref)?;
+            scheduler::remove_task_from_all(&taskref);
         }
     }
 

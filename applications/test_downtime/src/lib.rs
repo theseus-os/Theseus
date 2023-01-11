@@ -11,7 +11,6 @@ extern crate scheduler;
 extern crate rendezvous;
 extern crate async_channel;
 extern crate cpu;
-extern crate runqueue;
 extern crate window;
 extern crate framebuffer;
 extern crate framebuffer_drawer;
@@ -372,7 +371,7 @@ pub fn pick_child_core() -> u8 {
 }
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
+	match scheduler::get_run_queue(core).map(|rq| rq.read()) {
 		Some(rq) => { Some(rq.iter().count()) }
 		_ => { None }
 	}

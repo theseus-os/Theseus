@@ -5,7 +5,7 @@ extern crate alloc;
 extern crate apic;
 extern crate getopts;
 extern crate task;
-extern crate runqueue;
+extern crate scheduler;
 
 use getopts::Options;
 use alloc::vec::Vec;
@@ -37,7 +37,7 @@ pub fn main(args: Vec<String>) -> isize {
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
         
-        if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
+        if let Some(runqueue) = scheduler::get_run_queue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
                 runqueue_contents.push_str(&format!("{} ({}) {}\n", 

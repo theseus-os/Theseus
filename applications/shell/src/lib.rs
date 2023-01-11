@@ -408,11 +408,7 @@ impl Shell {
                 for task_ref in task_refs {
                     if task_ref.has_exited() { continue; }
                     match task_ref.kill(KillReason::Requested) {
-                        Ok(_) => {
-                            if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
-                                error!("Killed task but could not remove it from runqueue: {}", e);
-                            }
-                        }
+                        Ok(_) => scheduler::remove_task_from_all(task_ref),
                         Err(e) => error!("Could not kill task, error: {}", e),
                     }
 

@@ -46,12 +46,12 @@ pub fn init(
     apic_id: u8,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    runqueue::init(apic_id)?;
+    scheduler::init(apic_id)?;
     
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
         task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
-    runqueue::add_task_to_specific_runqueue(
+    scheduler::add_task_to_specific_run_queue(
         apic_id,
         exitable_bootstrap_task.clone(),
     )?;
@@ -416,9 +416,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         fence(Ordering::Release);
         
         if let Some(core) = self.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
+            scheduler::add_task_to_specific_run_queue(core, task_ref.clone())?;
         } else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            scheduler::add_task_to_any_run_queue(task_ref.clone())?;
         }
 
         Ok(task_ref)
@@ -982,18 +982,17 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
         }
         // The regular spill-free version does brute-force removal of the task from ALL runqueues.
         #[cfg(not(runqueue_spillful))] {
-            runqueue::remove_task_from_all(current_task).unwrap();
+            scheduler::remove_task_from_all(current_task).unwrap();
         }
     }
 
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu())
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
-        {
-            error!("BUG: couldn't remove exited task from runqueue: {}", e);
+        if let Some(run_queue) = scheduler::get_run_queue(cpu::current_cpu()) {
+            run_queue.write().remove_task(current_task);
+        } else {
+            error!("BUG: couldn't get run queue to remove exited task");
         }
     }
 }

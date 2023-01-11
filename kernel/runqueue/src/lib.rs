@@ -1,60 +1,70 @@
-//! This crate contains the API of the `RunQueue` structure, Runqueue Structure should contain
-//! list of tasks with additional scheduling information depending on the scheduler.
-//! All crates except the scheduler should refer to this crate to access functions on `RunQueue`.
-//! 
-
 #![no_std]
 
 extern crate alloc;
-extern crate mutex_preemption;
-extern crate atomic_linked_list;
-extern crate task;
-#[macro_use] extern crate cfg_if;
-cfg_if! {
-    if #[cfg(priority_scheduler)] {
-        extern crate runqueue_priority as runqueue;
-    } else if #[cfg(realtime_scheduler)] {
-        extern crate runqueue_realtime as runqueue;
-    } else {
-        extern crate runqueue_round_robin as runqueue;
+
+use alloc::collections::VecDeque;
+use core::ops::{self, Deref};
+use task::TaskRef;
+
+pub struct RunQueue<T> {
+    core: u8,
+    queue: VecDeque<T>,
+}
+
+impl<T> ops::Deref for RunQueue<T> {
+    type Target = VecDeque<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.queue
     }
 }
 
-#[cfg(single_simd_task_optimization)]
-extern crate single_simd_task_optimization;
-
-use mutex_preemption::RwLockPreempt;
-use task::TaskRef;
-use runqueue::RunQueue;
-
-
-/// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-pub fn init(which_core: u8) -> Result<(), &'static str> {
-    RunQueue::init(which_core)
+impl<T> ops::DerefMut for RunQueue<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.queue
+    }
 }
 
-/// Returns the `RunQueue` of the given core, which is an `apic_id`.
-pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
-    RunQueue::get_runqueue(which_core)
+impl<T> RunQueue<T> {
+    pub fn new(core: u8) -> Self {
+        Self {
+            core,
+            queue: VecDeque::new(),
+        }
+    }
+
+    pub fn push_back(&mut self, task: T) {
+        self.queue.push_back(task);
+        // FIXME: SIMD
+    }
 }
 
-/// Returns the "least busy" core
-pub fn get_least_busy_core() -> Option<u8> {
-    RunQueue::get_least_busy_core()
+impl<T> RunQueue<T>
+where
+    T: Deref<Target = TaskRef>,
+{
+    #[cfg(runqueue_spillful)]
+    pub fn remove_task(&mut self, _: &TaskRef) {
+        // For the runqueue state spill evaluation, we disable this method
+        // because we only want to allow removing a task from a runqueue
+        // from within the TaskRef::internal_exit() method.
+    }
+
+    #[cfg(not(runqueue_spillful))]
+    pub fn remove_task(&mut self, task: &TaskRef) {
+        self.queue.retain(|x| x.deref() != task)
+        // FIXME: SIMD
+    }
 }
 
-/// Chooses the "least busy" core's runqueue
-/// and adds the given `Task` reference to that core's runqueue.
-pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
-    RunQueue::add_task_to_any_runqueue(task)
-}
-
-/// Adds the given `Task` reference to given core's runqueue.
-pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
-    RunQueue::add_task_to_specific_runqueue(which_core, task)
-}
-
-/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
-    RunQueue::remove_task_from_all(task)
+impl<T> RunQueue<T>
+where
+    T: Clone,
+{
+    pub fn move_to_end(&mut self, index: usize) -> Option<T> {
+        self.swap_remove_front(index).map(|task| {
+            self.push_back(task.clone());
+            task
+        })
+    }
 }
