@@ -22,7 +22,7 @@ use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page,
 use crate::paging::{
     get_current_p4,
     PageRange,
-    table::{P4, INACTIVE_P4, Table, Level4},
+    table::{P4, UPCOMING_P4, Table, Level4},
 };
 use pte_flags::PteFlagsArch;
 use spin::Once;
@@ -61,29 +61,41 @@ pub struct Mapper {
 }
 
 impl Mapper {
+    /// Creates (bootstraps) a `Mapper` based on the
+    /// currently-active P4 page table root.
     pub(crate) fn from_current() -> Mapper {
         Self::with_p4_frame(get_current_p4())
     }
 
+    /// Creates a new `Mapper` that uses the recursive entry in the current P4 page table
+    /// to map the given `p4` frame.
+    ///
+    /// The given `p4` frame is the root frame of that upcoming page table.
     pub(crate) fn with_p4_frame(p4: Frame) -> Mapper {
         Mapper { 
-            p4: Unique::new(P4).unwrap(), // cannot panic because we know the P4 value is valid
+            p4: Unique::new(P4).unwrap(), // cannot panic; the P4 value is valid
             target_p4: p4,
         }
     }
 
-    /// Creates a new mapper that uses the temporary recursive P4 address.
-    pub(crate) fn inactive(p4: Frame) -> Mapper {
+    /// Creates a new mapper for an upcoming (soon-to-be-initialized) page table
+    /// that uses the `UPCOMING_P4` recursive entry in the current P4 table
+    /// to map that new page table.
+    ///
+    /// The given `p4` frame is the root frame of that upcoming page table.
+    pub(crate) fn upcoming(p4: Frame) -> Mapper {
         Mapper {
-            p4: Unique::new(INACTIVE_P4).unwrap(),
+            p4: Unique::new(UPCOMING_P4).unwrap(),
             target_p4: p4,
         }
     }
 
+    /// Returns a reference to this `Mapper`'s root page table as a P4-level table.
     pub(crate) fn p4(&self) -> &Table<Level4> {
         unsafe { self.p4.as_ref() }
     }
 
+    /// Returns a mutable reference to this `Mapper`'s root page table as a P4-level table.
     pub(crate) fn p4_mut(&mut self) -> &mut Table<Level4> {
         unsafe { self.p4.as_mut() }
     }
@@ -91,8 +103,8 @@ impl Mapper {
     /// Dumps all page table entries at all four page table levels for the given `VirtualAddress`, 
     /// and also shows their `PteFlags`.
     /// 
-    /// The page table details are written to the the given `writer`.
-    pub fn dump_pte(&self,virtual_address: VirtualAddress) {
+    /// The page table details are written to the log as an `info` message.
+    pub fn dump_pte(&self, virtual_address: VirtualAddress) {
         let page = Page::containing_address(virtual_address);
         let p4  = self.p4();
         let p3  = p4.next_table(page.p4_index());

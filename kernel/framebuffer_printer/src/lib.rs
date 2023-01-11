@@ -27,6 +27,7 @@ type ASCII = u8;
 /// * `fg_pixel`: the value of pixels in the foreground.
 /// * `bg_pixel` the value of pixels in the background.
 /// * `column`, `line`: the location of the text in the text block in number of characters.
+#[allow(clippy::too_many_arguments)]
 pub fn print_string<P: Pixel>(
     framebuffer: &mut Framebuffer<P>,
     coordinate: Coord,

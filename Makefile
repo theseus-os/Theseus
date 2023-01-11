@@ -594,21 +594,23 @@ doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
 doc: check-rustc
 ## Build the docs for select library crates, namely those not hosted online.
-## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dereffer/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/locked_idt/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/util/Cargo.toml
+## We do this first such that the main `cargo doc` invocation below can see and link to them.
+	@cargo doc --no-deps \
+		--package atomic_linked_list \
+		--package cow_arc \
+		--package debugit \
+		--package dereffer \
+		--package dfqueue \
+		--package keycodes_ascii \
+		--package lockable \
+		--package locked_idt \
+		--package mouse_data \
+		--package owned_borrowed_trait \
+		--package percent-encoding \
+		--package port_io \
+		--package stdio \
+		--package str_ref \
+		--package util
 ## Now, build the docs for all of Theseus's main kernel crates.
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs

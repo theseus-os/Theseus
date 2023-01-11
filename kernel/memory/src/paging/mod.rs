@@ -34,7 +34,7 @@ use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
-use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX};
+use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX};
 
 
 /// A top-level root (P4) page table.
@@ -104,10 +104,6 @@ impl PageTable {
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
-            table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
-                frame.as_allocated_frame(),
-                PteFlagsArch::new().valid(true).writable(true),
-            );
         })?;
 
         let (_temp_page, inited_new_p4_frame) = temporary_page.unmap_into_parts(current_page_table)?;
@@ -139,38 +135,41 @@ impl PageTable {
             return Err("PageTable::with(): this PageTable ('self') must be the currently active page table.");
         }
 
-        // Temporarily take ownership of this page table's p4 allocated frame and
+        // Temporarily take ownership of the other page table's p4 allocated frame and
         // create a new temporary page that maps to that frame.
-        let this_p4 = core::mem::replace(&mut self.p4_table, AllocatedFrames::empty());
-        let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, this_p4, self)?;
+        let other_p4 = core::mem::replace(&mut other_table.p4_table, AllocatedFrames::empty());
+        let other_p4_frame = *other_p4.start();
+        let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, other_p4, self)?;
 
-        // Overwrite temporary recursive mapping
-        self.p4_mut()[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
-            other_table.p4_table.as_allocated_frame(),
-            PteFlagsArch::new().valid(true).writable(true),
-        );
-        tlb_flush_all();
-
-        // This mapper will modify the other table using the temporary recursive p4 index set in the current page table.
-        let mut mapper = Mapper::inactive(*other_table.p4_table.start());
-
-        // Execute `f` in the new context, in which the new page table is considered "active"
-        let ret = f(&mut mapper, self);
-
-        // Restore inactive page table recursive mapping to original p4 table. This isn't strictly necessary,
-        // but ensures the current table is returned to its original state.
-        temporary_page.with_table_and_frame(|p4_table, frame| {
-            p4_table[INACTIVE_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
+        // Overwrite upcoming page table recursive mapping.
+        temporary_page.with_table_and_frame(|table, frame| {
+            self.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
+                frame.as_allocated_frame(),
+                PteFlagsArch::new().valid(true).writable(true),
+            );
+            table[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
         })?;
         tlb_flush_all();
 
-        // Here, recover the current page table's p4 frame and restore it into this current page table,
+        // This mapper will modify the `other_table` using the upcoming P4 recursive entry
+        // that is set for the currently active page table.
+        let mut mapper = Mapper::upcoming(other_p4_frame);
+
+        // Execute `f` in the new context, in which the new page table is considered "active"
+        let ret = f(&mut mapper, self);
+
+        // Clear both page table's upcoming recursive mapping entries.
+        self.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
+        other_table.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].zero();
+        tlb_flush_all();
+
+        // Here, recover the other page table's p4 frame and restore it into the other page table,
         // since we removed it earlier at the top of this function and gave it to the temporary page. 
         let (_temp_page, p4_frame) = temporary_page.unmap_into_parts(self)?;
-        self.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
+        other_table.p4_table = p4_frame.ok_or("BUG: PageTable::with(): failed to take back unmapped Frame for p4_table")?;
 
         ret
     }
@@ -226,7 +225,7 @@ pub fn init(
     let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
     let boot_info_size = boot_info.len();
-    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}\n", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
+    debug!("multiboot vaddr: {:#X}, multiboot paddr: {:#X}, size: {:#X}", boot_info_start_vaddr, boot_info_start_paddr, boot_info_size);
 
     let new_p4_frame = frame_allocator::allocate_frames(1).ok_or("couldn't allocate frame for new page table")?; 
     let mut new_table = PageTable::new_table(&mut page_table, new_p4_frame, None)?;
@@ -239,7 +238,7 @@ pub fn init(
     let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
     let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
-    // Stack frames are not guaranteed to be contiguous.
+    // Stack frames are not guaranteed to be contiguous in physical memory.
     let stack_size = boot_info.stack_size()?;
     let stack_page_range = PageRange::from_virt_addr(
         // `PAGE_SIZE` accounts for the guard page, which does not have a corresponding frame.
@@ -248,7 +247,7 @@ pub fn init(
     );
     debug!("Initial stack start {stack_start_virt:#X}, size: {stack_size:#X} bytes, {stack_page_range:X?}");
 
-    // Boot info frames are not guaranteed to be contiguous.
+    // Boot info frames are not guaranteed to be contiguous in physical memory.
     let boot_info_page_range = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
     debug!("Boot info start: {boot_info_start_vaddr:#X}, size: {boot_info_size:#X}, {boot_info_page_range:#X?}");
 
@@ -289,7 +288,7 @@ pub fn init(
             init_end_phys.value() - init_start_phys.value(),
         )?;
         identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, &init_frames, init_flags | PteFlags::WRITABLE)?
+            Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, &init_frames, init_flags)?
         }));
         index += 1;
         let mut init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)?;
@@ -331,13 +330,16 @@ pub fn init(
         data_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
         index += 1;
 
-        // Handle the stack (a separate data section), which consists of one guard page followed by the real stack pages.
-        // It does not need to be identity mapped because each AP core will have its own stack.
+        // Handle the stack (a separate data section), which consists of one guard page (unmapped)
+        // followed by the real (mapped) stack pages.
+        // The stack does not need to be identity mapped, because each secondary CPU will get its own stack.
         let stack_guard_page = page_allocator::allocate_pages_at(stack_start_virt, 1)?;
         let mut stack_mapped_pages: Option<MappedPages> = None;
         for page in stack_page_range.into_iter() {
+            // The stack is not guaranteed to be contiguous in physical memory,
+            // so we use the `current_mapper` to translate each page into its backing physical frame,
+            // and then reproduce the same mapping in the `new_mapper`.
             let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
-
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
@@ -353,7 +355,7 @@ pub fn init(
         ));
 
         // Map the VGA display memory as writable. 
-        // We do an identity mapping for the VGA display too, because the AP cores may access it while booting.
+        // We do an identity mapping for the VGA display too, because secondary CPUs may access it while booting.
         let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
         let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
         let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
@@ -365,9 +367,13 @@ pub fn init(
         higher_half_mapped_pages[index] = Some(NoDrop::new(new_mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
         index += 1;
 
+        // Map the bootloader info, a separate region of read-only memory, so that we can access it later.
+        // This does not need to be identity mapped.
         for page in boot_info_page_range.into_iter() {
+            // The boot info is not guaranteed to be contiguous in physical memory,
+            // so we use the `current_mapper` to translate each page into its backing physical frame,
+            // and then reproduce the same mapping in the `new_mapper`.
             let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
-
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
             let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;

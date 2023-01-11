@@ -134,6 +134,7 @@ pub fn parse_nano_core(
     Ok(try_mp!(parse_result))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse_nano_core_symbol_file_or_binary(
     f: fn(
         &[u8],
@@ -698,6 +699,7 @@ struct MainSectionInfo {
 /// A convenience function that separates out the logic 
 /// of actually creating and adding a new LoadedSection instance
 /// after it has been parsed. 
+#[allow(clippy::too_many_arguments)]
 fn add_new_section(
     namespace:           &Arc<CrateNamespace>,
     main_section_info:   &MainSectionInfo,
