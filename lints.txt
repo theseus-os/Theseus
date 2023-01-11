@@ -128,7 +128,6 @@ invisible-characters
 iter-next-loop
 iterator-step-by-zero
 let-underscore-lock
-logic-bug
 match-str-case-mismatch
 mem-replace-with-uninit
 min-max
@@ -142,6 +141,7 @@ nonsensical-open-options
 not-unsafe-ptr-arg-deref
 option-env-unwrap
 out-of-bounds-indexing
+overly-complex-bool-expr
 panicking-unwrap
 possible-missing-comma
 recursive-format-impl
