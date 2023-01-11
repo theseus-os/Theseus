@@ -397,7 +397,7 @@ impl fmt::Debug for IntoCrateObjectFile {
         match self {
             Self::File(object_file) => dbg.field("File", &object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| "<Locked>".to_string() )
+                .unwrap_or_else(|| "<Locked>".to_string())
             ),
             Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
             Self::Prefix(prefix) => dbg.field("Prefix", prefix),

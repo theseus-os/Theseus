@@ -369,8 +369,8 @@ impl Drop for Counter {
         if self.msr_mask < num_pmc as u32 {
             // clears event counting settings and counter 
             unsafe{
-                Msr::new(IA32_PERFEVTSEL0 + self.msr_mask ).write(0);
-                Msr::new(IA32_PMC0 + self.msr_mask ).write(0);
+                Msr::new(IA32_PERFEVTSEL0 + self.msr_mask).write(0);
+                Msr::new(IA32_PMC0 + self.msr_mask).write(0);
             }
             free_counter(self.core, self.msr_mask as u8); 
         }

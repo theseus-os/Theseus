@@ -448,7 +448,7 @@ impl Terminal {
         };
         terminal.display_text()?;
 
-        terminal.print_to_terminal( "Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n".to_string());
+        terminal.print_to_terminal("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n".to_string());
         Ok(terminal)
     }
 

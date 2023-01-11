@@ -486,11 +486,8 @@ impl FileDescriptorTable {
     /// # Return
     /// Returns corresponding file system node if exists.
     pub fn get_posix_node(&mut self, fd: wasi::Fd) -> Option<&mut PosixNode> {
-        if let Some(posix_node_or_stdio) = self.get_posix_node_or_stdio(fd) {
-            match posix_node_or_stdio {
-                PosixNodeOrStdio::Inode(posix_node) => Some(posix_node),
-                _ => None,
-            }
+        if let Some(PosixNodeOrStdio::Inode(posix_node)) = self.get_posix_node_or_stdio(fd) {
+            Some(posix_node)
         } else {
             None
         }        
