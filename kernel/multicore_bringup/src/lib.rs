@@ -375,6 +375,7 @@ struct ApTrampolineData {
     /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
     ap_max_fb_height:  Volatile<u16>,
     _padding5:         [u8; 6],
+    /// The location of the GDT_AP symbol in physical memory.
     ap_gdt:            Volatile<u32>,
     _padding6:         [u8; 4],
 }

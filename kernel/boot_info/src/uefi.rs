@@ -2,7 +2,6 @@ use crate::ElfSectionFlags;
 use core::iter::{Iterator, Peekable};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
-use uefi_bootloader_api;
 
 // TODO: Ideally this would be defined in nano_core. However, that would
 // introduce a circular dependency as the boot information needs the stack size.
