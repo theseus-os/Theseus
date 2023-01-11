@@ -221,12 +221,12 @@ pub fn init(
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
-    // We subtract one when translating because `kernel_end` returns an exclusive
-    // upper bound, which can cause problems if the kernel ends on a page boundary.
     page_allocator::init(
         VirtualAddress::new(
-            Mapper::from_current()
-                .translate(boot_info.kernel_end()? - 1)
+            // We subtract 1 when translating because `kernel_end` returns an exclusive
+            // upper bound, which can cause problems if the kernel ends on a page boundary.
+            // We then add it back later to get the correct identity virtual address.
+            translate(boot_info.kernel_end()? - 1)
                 .ok_or("couldn't translate kernel end virtual address")?
                 .value()
                 + 1,
