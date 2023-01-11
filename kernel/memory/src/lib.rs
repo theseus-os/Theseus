@@ -67,6 +67,7 @@ pub fn get_kernel_mmi_ref() -> Option<&'static MmiRef> {
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
 #[derive(Debug)]
+#[doc(alias("mmi"))]
 pub struct MemoryManagementInfo {
     /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
