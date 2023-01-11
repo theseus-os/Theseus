@@ -12,10 +12,10 @@ static mut PREV_STACK: usize = 0xdeadbeef;
 /// Sample Task Function
 ///
 /// It simply re-triggers a context switch to return to the original main task.
-pub extern "C" fn landing_pad() {
+pub extern "C" fn task_entrypoint() {
     let main_task_stack = unsafe { PREV_STACK };
 
-    info!("[in landing_pad]");
+    info!("[in task_entrypoint]");
     info!("main_task_stack: 0x{:x}", main_task_stack);
     info!("switching back to the main task");
     switch_to_task(main_task_stack);
@@ -36,7 +36,7 @@ pub fn switch_to_task(new_stack: usize) {
 
 /// Utility function which allocates an initial task
 /// stack; you have to give it a function
-/// pointer (such as the address of `landing_pad`)
+/// pointer (such as the address of `task_entrypoint`)
 /// which will be executed if you use
 /// `context_switch_regular` with that new stack.
 pub fn create_stack(
