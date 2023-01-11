@@ -144,7 +144,6 @@ pub struct InitialMemoryMappings {
     /// The boot information mappings.
     pub boot_info: MappedPages,
     /// The list of identity mappings that should be dropped before starting the first application.
-    /// This should also be converted to a `Vec` after the heap is initialized.
     ///
     /// Currently there are only 4 identity mappings, used for the base kernel image:
     /// 1. the `.init` early text section,
@@ -153,7 +152,6 @@ pub struct InitialMemoryMappings {
     /// 4. the `.data` section, which includes `.bss` and all read-write data.
     pub identity: NoDrop<EarlyIdentityMappedPages>,
     /// The list of additional mappings that must be kept forever.
-    /// This should also be converted to a `Vec` after the heap is initialized.
     ///
     /// Currently, this contains only one mapping: the early VGA buffer.
     pub additional: NoDrop<MappedPages>,
