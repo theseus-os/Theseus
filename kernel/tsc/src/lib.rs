@@ -26,14 +26,14 @@ impl TscTicks {
     /// returning `None` if underflow occurred.
     pub fn sub(&self, other: &TscTicks) -> Option<TscTicks> {
         let checked_sub = self.0.checked_sub(other.0);
-        checked_sub.map( |tt| TscTicks(tt) )
+        checked_sub.map(TscTicks)
     }
     
     /// Checked addition. Computes `self + other`, 
     /// returning `None` if overflow occurred.
     pub fn add(&self, other: &TscTicks) -> Option<TscTicks> {
         let checked_add = self.0.checked_add(other.0);
-        checked_add.map( |tt| TscTicks(tt) )
+        checked_add.map(TscTicks)
     }
 }
 

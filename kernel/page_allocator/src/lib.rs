@@ -283,7 +283,7 @@ impl Drop for AllocatedPages {
 			pages: self.pages.clone(),
 		});
 		match res {
-			Ok(_inserted_free_chunk) => return,
+			Ok(_inserted_free_chunk) => (),
 			Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free page list", c),
 		}
 		
@@ -428,8 +428,8 @@ fn find_specific_chunk(
 ///
 /// It first attempts to find a suitable chunk **not** in the designated regions,
 /// and only allocates from the designated regions as a backup option.
-fn find_any_chunk<'list>(
-	list: &'list mut StaticArrayRBTree<Chunk>,
+fn find_any_chunk(
+	list: &mut StaticArrayRBTree<Chunk>,
 	num_pages: usize
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
 	let designated_low_end = DESIGNATED_PAGES_LOW_END.get().ok_or(AllocationError::NotInitialized)?;
@@ -441,7 +441,7 @@ fn find_any_chunk<'list>(
 				if let Some(chunk) = elem {
 					// Skip chunks that are too-small or in the designated regions.
 					if  chunk.size_in_pages() < num_pages || 
-						chunk.start() <= &designated_low_end || 
+						chunk.start() <= designated_low_end || 
 						chunk.end() >= &DESIGNATED_PAGES_HIGH_START
 					{
 						continue;
@@ -469,7 +469,7 @@ fn find_any_chunk<'list>(
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
 			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if chunk.start() <= &designated_low_end {
+				if chunk.start() <= designated_low_end {
 					break; // move on to searching through the designated regions
 				}
 				if num_pages < chunk.size_in_pages() {

@@ -114,17 +114,17 @@ pub enum LapicIpiDestination {
 impl LapicIpiDestination {
     /// Convert the enum to a bitmask value to be used in the interrupt command register
     pub fn as_icr_value(&self) -> u64 {
-        match self {
-            &LapicIpiDestination::One(apic_id) => { 
+        match *self {
+            LapicIpiDestination::One(apic_id) => { 
                 if has_x2apic() {
                     (apic_id as u64) << 32
                 } else {
                     (apic_id as u64) << 56
                 }
             }
-            &LapicIpiDestination::Me       => 0b01 << 18, // 0x4_0000
-            &LapicIpiDestination::All      => 0b10 << 18, // 0x8_0000
-            &LapicIpiDestination::AllButMe => 0b11 << 18, // 0xC_0000
+            LapicIpiDestination::Me       => 0b01 << 18, // 0x4_0000
+            LapicIpiDestination::All      => 0b10 << 18, // 0x8_0000
+            LapicIpiDestination::AllButMe => 0b11 << 18, // 0xC_0000
         }
     }
 }
@@ -414,7 +414,7 @@ impl LocalApic {
             enable_bitmask = IA32_APIC_XAPIC_ENABLE | IA32_APIC_X2APIC_ENABLE;
         } else {
             let apic_regs = map_apic(page_table)
-                .map_err(|e| LapicInitError::MemoryMappingError(e))
+                .map_err(LapicInitError::MemoryMappingError)
                 .and_then(|apic_mp| 
                     apic_mp.into_borrowed_mut(0)
                         .map_err(|(_mp, err)| LapicInitError::MemoryMappingError(err))

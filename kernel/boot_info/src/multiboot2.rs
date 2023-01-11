@@ -77,6 +77,10 @@ impl<'a> crate::Module for &'a multiboot2::ModuleTag {
     fn len(&self) -> usize {
         (self.end_address() - self.start_address()) as usize
     }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 fn kernel_memory_region(
@@ -209,7 +213,7 @@ impl crate::BootInformation for multiboot2::BootInformation {
             .or_else(|| self.rsdp_v1_tag().map(|tag| tag.signature()))
             .and_then(|utf8_result| utf8_result.ok())
             .map(|signature| signature as *const _ as *const () as usize)
-            .and_then(|rsdp_address| PhysicalAddress::new(rsdp_address))
+            .and_then(PhysicalAddress::new)
     }
 
     fn stack_size(&self) -> Result<usize, &'static str> {

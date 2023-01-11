@@ -235,7 +235,7 @@ pub fn write_fmt(args: fmt::Arguments) -> fmt::Result {
 /// If the logger has not yet been initialized, no log messages will be emitted.
 /// and an `Error` will be returned.
 pub fn write_str(s: &str) -> fmt::Result {
-    crate::write_fmt(format_args!("{}", s))
+    crate::write_fmt(format_args!("{s}"))
 }
 
 

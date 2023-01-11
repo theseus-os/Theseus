@@ -470,7 +470,7 @@ impl MappedPages {
         let size_in_pages = self.size_in_pages();
 
         use crate::paging::allocate_pages;
-        let new_pages = allocate_pages(size_in_pages).ok_or_else(|| "Couldn't allocate_pages()")?;
+        let new_pages = allocate_pages(size_in_pages).ok_or("Couldn't allocate_pages()")?;
 
         // we must temporarily map the new pages as Writable, since we're about to copy data into them
         let new_flags = new_flags.map_or(self.flags, Into::into);
@@ -555,7 +555,7 @@ impl MappedPages {
             }
             Err(e) => {
                 error!("MappedPages::unmap_into_parts(): failed to unmap {:?}, error: {}", self, e);
-                return Err(self);
+                Err(self)
             }
         }
     }

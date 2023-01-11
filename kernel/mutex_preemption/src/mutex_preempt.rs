@@ -59,9 +59,8 @@ impl<T: ?Sized> MutexPreempt<T> {
     #[inline(always)]
     pub fn lock(&self) -> MutexPreemptGuard<T> {
         loop {
-            match self.try_lock() {
-                Some(guard) => return guard,
-                _ => {}
+            if let Some(guard) = self.try_lock() {
+                return guard;
             }
         }
     }
@@ -79,6 +78,7 @@ impl<T: ?Sized> MutexPreempt<T> {
 
     /// Force unlock the spinlock.
     ///
+    /// # Safety
     /// This is *extremely* unsafe if the lock is not held by the current
     /// thread. However, this can be useful in some instances for exposing the
     /// lock to FFI that doesn't know how to deal with RAII.

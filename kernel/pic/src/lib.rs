@@ -235,10 +235,10 @@ impl ChainedPics {
             let slave_irr  = self.pics[1].command.read();
 
             IrqStatusRegisters {
-                master_isr: master_isr,
-                master_irr: master_irr,
-                slave_isr: slave_isr,
-                slave_irr: slave_irr,
+                master_isr,
+                master_irr,
+                slave_isr,
+                slave_irr,
             }
         }
     }

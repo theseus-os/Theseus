@@ -18,7 +18,7 @@ use core::{
     cmp::{min, max},
     fmt,
     iter::Step,
-    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
+    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign}
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
@@ -113,6 +113,8 @@ macro_rules! implement_address {
                     *self = $TypeName::new_canonical(self.0.saturating_sub(rhs));
                 }
             }
+
+            #[allow(clippy::from_over_into)]
             impl Into<usize> for $TypeName {
                 #[inline]
                 fn into(self) -> usize {
@@ -129,10 +131,7 @@ mod canonical_address {
 
     #[inline]
     pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => true,
-            _ => false,
-        }
+        matches!(virt_addr.get_bits(47..64), 0 | 0b1_1111_1111_1111_1111)
     }
 
     #[inline]
@@ -148,10 +147,7 @@ mod canonical_address {
 
     #[inline]
     pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
-        match phys_addr.get_bits(52..64) {
-            0 => true,
-            _ => false,
-        }
+        matches!(phys_addr.get_bits(52..64), 0)
     }
 
     #[inline]
