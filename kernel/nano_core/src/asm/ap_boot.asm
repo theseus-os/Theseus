@@ -226,6 +226,7 @@ GDT_AP:
 ; 	dw 0 ; padding to make sure GDT pointer is 4-byte aligned
 .ptr_low:
 	dw .end - GDT_AP - 1
+	; this is overwritten in ap_start_protected_mode to point to the virtual identity address of GDT_AP
 	dd 0
 	; dq GDT_AP - KERNEL_OFFSET
 .ptr:
