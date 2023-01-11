@@ -546,7 +546,7 @@ pub fn execute_system_call(
                 FileOrDir::File { .. } => {
                     return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                FileOrDir::Dir(dir_ref) => dir_ref.clone(),
+                FileOrDir::Dir(dir_ref) => dir_ref,
             };
 
             let lookup_flags: wasi::Lookupflags = wasmi_args.nth_checked(1).unwrap();
