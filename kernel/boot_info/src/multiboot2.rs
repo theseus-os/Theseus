@@ -199,12 +199,10 @@ impl crate::BootInformation for multiboot2::BootInformation {
 
     fn kernel_end(&self) -> Result<VirtualAddress, &'static str> {
         use crate::ElfSection;
-
-        Ok(self
-            .elf_sections()?
+        self.elf_sections()?
             .map(|section| section.start() + section.len())
             .max()
-            .ok_or("no elf sections")?)
+            .ok_or("no elf sections")
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {
