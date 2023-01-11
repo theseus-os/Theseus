@@ -127,26 +127,51 @@ pub fn set_broadcast_tlb_shootdown_cb(func: fn(PageRange)) {
 }
 
 /// Information returned after initialising the memory subsystem.
+#[derive(Debug)]
 pub struct InitialMemoryMappings {
     /// The currently active page table.
     pub page_table: PageTable,
-    /// The kernel's text section mappings.
+    /// The kernel's `.text` section mappings, which includes `.init`.
     pub text: NoDrop<MappedPages>,
-    /// The kernel's rodata section mappings.
+    /// The kernel's `.rodata` section mappings.
     pub rodata: NoDrop<MappedPages>,
-    /// The kernel's data section mappings.
+    /// The kernel's .`data` section mappings/
     pub data: NoDrop<MappedPages>,
     /// The kernel stack's guard page.
     pub stack_guard: AllocatedPages,
-    /// The kernel's stack mappings.
+    /// The kernel's stack actual data page mappings.
     pub stack: NoDrop<MappedPages>,
     /// The boot information mappings.
     pub boot_info: MappedPages,
-    /// The list of identity mappings that must be converted to a vec after heap initialization, and dropped before starting the first userspace program.
-    pub identity: [Option<NoDrop<MappedPages>>; 32],
-    /// The list of additional mappings that must be converted to a vec after heap initialization and kept forever.
-    /// Currently, this contains only the mapping of the early VGA buffer.
-    pub additional: [Option<NoDrop<MappedPages>>; 32],
+    /// The list of identity mappings that should be dropped before starting the first application.
+    /// This should also be converted to a `Vec` after the heap is initialized.
+    ///
+    /// Currently there are only 4 identity mappings, used for the base kernel image:
+    /// 1. the `.init` early text section,
+    /// 2. the full `.text` section,
+    /// 3. the `.rodata` section, which includes all read-only data,
+    /// 4. the `.data` section, which includes `.bss` and all read-write data.
+    pub identity: NoDrop<EarlyIdentityMappedPages>,
+    /// The list of additional mappings that must be kept forever.
+    /// This should also be converted to a `Vec` after the heap is initialized.
+    ///
+    /// Currently, this contains only one mapping: the early VGA buffer.
+    pub additional: NoDrop<MappedPages>,
+}
+
+/// The set of identity mappings that should be dropped before starting the first application.
+/// 
+/// Currently there are only 4 identity mappings, used for the base kernel image:
+/// 1. the `.init` early text section,
+/// 2. the full `.text` section,
+/// 3. the `.rodata` section, which includes all read-only data,
+/// 4. the `.data` section, which includes `.bss` and all read-write data.
+#[derive(Debug)]
+pub struct EarlyIdentityMappedPages {
+    _init:   MappedPages,
+    _text:   MappedPages,
+    _rodata: MappedPages,
+    _data:   MappedPages,
 }
 
 /// Initializes the virtual memory management system.
@@ -217,35 +242,25 @@ pub fn init(
 ///    but *should* be dropped before starting the first application.
 pub fn init_post_heap(
     page_table: PageTable,
-    mut additional_mapped_pages: [Option<NoDrop<MappedPages>>; 32],
-    mut identity_mapped_pages: [Option<NoDrop<MappedPages>>; 32],
+    additional_mapped_pages: MappedPages,
     heap_mapped_pages: MappedPages
-) -> (MmiRef, NoDrop<Vec<MappedPages>>) {
+) -> MmiRef {
     // HERE: heap is initialized! We can now use `alloc` types.
 
     page_allocator::convert_to_heap_allocated();
     frame_allocator::convert_to_heap_allocated();
 
-    let mut additional_mapped_pages: Vec<MappedPages> = additional_mapped_pages
-        .iter_mut()
-        .filter_map(|opt| opt.take().map(NoDrop::into_inner))
-        .collect();
-    additional_mapped_pages.push(heap_mapped_pages);
-    let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages
-        .iter_mut()
-        .filter_map(|opt| opt.take().map(NoDrop::into_inner))
-        .collect();
-    let identity_mapped_pages = NoDrop::new(identity_mapped_pages);
+    let extra_mapped_pages = alloc::vec![additional_mapped_pages, heap_mapped_pages];
    
     // Construct the kernel's memory mgmt info, i.e., its address space info
     let kernel_mmi = MemoryManagementInfo {
         page_table,
-        extra_mapped_pages: additional_mapped_pages,
+        extra_mapped_pages,
     };
 
     let kernel_mmi_ref = KERNEL_MMI.call_once( || {
         Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
-    (kernel_mmi_ref.clone(), identity_mapped_pages)
+    kernel_mmi_ref.clone()
 }
