@@ -212,11 +212,11 @@
 <span class="kw">use </span>core::ptr::Unique;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>volatile::Volatile;
-<span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 
 
-<span class="doccomment">/// defined by x86&#39;s physical memory maps
-</span><span class="kw">const </span>VGA_BUFFER_VIRTUAL_ADDR: usize = <span class="number">0xb8000 </span>+ KERNEL_OFFSET;
+<span class="doccomment">/// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
+/// We must rely on the early bootstrap code to identity map this address.
+</span><span class="kw">const </span>VGA_BUFFER_VIRTUAL_ADDR: usize = <span class="number">0xb8000</span>;
 
 <span class="doccomment">/// height of the VGA text window
 </span><span class="kw">const </span>BUFFER_HEIGHT: usize = <span class="number">25</span>;

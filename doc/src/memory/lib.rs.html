@@ -246,6 +246,9 @@
 <span id="246">246</span>
 <span id="247">247</span>
 <span id="248">248</span>
+<span id="249">249</span>
+<span id="250">250</span>
+<span id="251">251</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -315,12 +318,14 @@
 <span class="doccomment">/// This holds all the information for a `Task`&#39;s memory mappings and address space
 /// (this is basically the equivalent of Linux&#39;s mm_struct)
 </span><span class="attr">#[derive(Debug)]
+#[doc(alias(<span class="string">&quot;mmi&quot;</span>))]
 </span><span class="kw">pub struct </span>MemoryManagementInfo {
     <span class="doccomment">/// the PageTable that should be switched to when this Task is switched to.
     </span><span class="kw">pub </span>page_table: PageTable,
     
-    <span class="doccomment">/// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
-    /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
+    <span class="doccomment">/// The list of additional memory mappings that have the same lifetime as this MMI
+    /// and are thus owned by this MMI.
+    /// This currently includes only the mappings for the heap and the early VGA buffer.
     </span><span class="kw">pub </span>extra_mapped_pages: Vec&lt;MappedPages&gt;,
 }
 
@@ -388,10 +393,11 @@
     </span><span class="kw">pub </span>stack: NoDrop&lt;MappedPages&gt;,
     <span class="doccomment">/// The boot information mappings.
     </span><span class="kw">pub </span>boot_info: MappedPages,
-    <span class="doccomment">/// The list of other higher-half mapping that must be converted to a vec after heap initialization, and kept forever e.g. VGA buffer.
-    </span><span class="kw">pub </span>higher_half: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
     <span class="doccomment">/// The list of identity mappings that must be converted to a vec after heap initialization, and dropped before starting the first userspace program.
     </span><span class="kw">pub </span>identity: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    <span class="doccomment">/// The list of additional mappings that must be converted to a vec after heap initialization and kept forever.
+    /// Currently, this contains only the mapping of the early VGA buffer.
+    </span><span class="kw">pub </span>additional: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
 }
 
 <span class="doccomment">/// Initializes the virtual memory management system.
@@ -458,11 +464,11 @@
 /// Returns the following tuple:
 ///  * The kernel&#39;s new [`MemoryManagementInfo`], representing the initial virtual address space,
 ///  * The kernel&#39;s list of identity-mapped [`MappedPages`],
-///    which must not be dropped until all AP (additional CPUs) are fully booted,
-///    but *should* be dropped before starting the first user application. 
+///    which must not be dropped until all secondary CPUs are fully booted,
+///    but *should* be dropped before starting the first application.
 </span><span class="kw">pub fn </span>init_post_heap(
     page_table: PageTable,
-    <span class="kw-2">mut </span>higher_half_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    <span class="kw-2">mut </span>additional_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
     <span class="kw-2">mut </span>identity_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
     heap_mapped_pages: MappedPages
 ) -&gt; (MmiRef, NoDrop&lt;Vec&lt;MappedPages&gt;&gt;) {
@@ -471,11 +477,11 @@
     </span>page_allocator::convert_to_heap_allocated();
     frame_allocator::convert_to_heap_allocated();
 
-    <span class="kw">let </span><span class="kw-2">mut </span>higher_half_mapped_pages: Vec&lt;MappedPages&gt; = higher_half_mapped_pages
+    <span class="kw">let </span><span class="kw-2">mut </span>additional_mapped_pages: Vec&lt;MappedPages&gt; = additional_mapped_pages
         .iter_mut()
         .filter_map(|opt| opt.take().map(NoDrop::into_inner))
         .collect();
-    higher_half_mapped_pages.push(heap_mapped_pages);
+    additional_mapped_pages.push(heap_mapped_pages);
     <span class="kw">let </span>identity_mapped_pages: Vec&lt;MappedPages&gt; = identity_mapped_pages
         .iter_mut()
         .filter_map(|opt| opt.take().map(NoDrop::into_inner))
@@ -485,7 +491,7 @@
     <span class="comment">// Construct the kernel&#39;s memory mgmt info, i.e., its address space info
     </span><span class="kw">let </span>kernel_mmi = MemoryManagementInfo {
         page_table,
-        extra_mapped_pages: higher_half_mapped_pages,
+        extra_mapped_pages: additional_mapped_pages,
     };
 
     <span class="kw">let </span>kernel_mmi_ref = KERNEL_MMI.call_once( || {
