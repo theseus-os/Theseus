@@ -4139,7 +4139,6 @@ name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
  "kernel_config",
- "log",
  "logger",
  "spin 0.9.4",
  "volatile 0.2.7",
