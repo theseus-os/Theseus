@@ -11,9 +11,9 @@ extern crate memory_structs;
 extern crate memory;
 extern crate kernel_config;
 
-use alloc::vec;
 use core::arch::asm;
 use alloc::vec::Vec;
+use alloc::vec;
 
 use uefi::{prelude::entry, Status, Handle, table::{SystemTable, Boot, boot::MemoryType}};
 
@@ -25,6 +25,9 @@ use pte_flags::PteFlags;
 use log::{info, error};
 
 mod uefi_conv;
+mod context_switch;
+
+use context_switch::{create_stack, switch_to_task, task_entrypoint};
 
 #[inline(never)]
 extern "C" fn inf_loop_0xbeef() -> ! {
@@ -90,8 +93,16 @@ fn main(
     layout_vec.push(mmio_region(0x0900_0000, 1));
 
     info!("Calling memory::init();");
-    info!("page table: {:?}", memory::init(&layout_vec));
+    let mut page_table = memory::init(&layout_vec)?;
+    info!("page table: {:?}", page_table);
 
+    info!("Creating new stack");
+    let (_new_stack, stack_ptr) = create_stack(&mut page_table, task_entrypoint, 16)?;
+
+    info!("Switching to new task");
+    switch_to_task(stack_ptr);
+
+    info!("[in main]");
     info!("Going to infinite loop now.");
     inf_loop_0xbeef();
 
