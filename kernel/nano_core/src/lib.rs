@@ -204,11 +204,9 @@ where
         captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
     #[cfg(loadable)] {
-        extern crate alloc;
-
-        use alloc::vec::Vec;
-        use memory::{MmiRef, MappedPages, PhysicalAddress};
+        use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
         use no_drop::NoDrop;
+        use stack::Stack;
 
         let section = default_namespace
             .get_symbol_starting_with("captain::init::")
@@ -216,7 +214,7 @@ where
             .ok_or("no single symbol matching \"captain::init\"")?;
         log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, NoDrop<Vec<MappedPages>>, NoDrop<stack::Stack>, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<EarlyIdentityMappedPages>, NoDrop<Stack>, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
         func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;

@@ -125,9 +125,9 @@ long_mode_start_ap:
 	
 %ifdef BIOS
 	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xFFFFFFFF800b8038], 0x4f2E4f2E ; ".."
-    mov dword [0xFFFFFFFF800b803c], 0x4f4f4f4c ; "LO"
-	mov dword [0xFFFFFFFF800b8040], 0x4f474f4e ; "NG"
+	mov dword [0xb8038], 0x4f2E4f2E ; ".."
+    mov dword [0xb803c], 0x4f4f4f4c ; "LO"
+	mov dword [0xb8040], 0x4f474f4e ; "NG"
 %endif ; BIOS
 
 	; Long jump to the higher half. Because `jmp` does not take
@@ -173,10 +173,10 @@ start_high_ap:
 	
 %ifdef BIOS
 	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8048 + KERNEL_OFFSET], 0x4f2E4f2E ; ".."
-    mov dword [0xb804c + KERNEL_OFFSET], 0x4f494f48 ; "HI"
-	mov dword [0xb8050 + KERNEL_OFFSET], 0x4f484f47 ; "GH"
-	mov dword [0xb8054 + KERNEL_OFFSET], 0x4f524f45 ; "ER"
+	mov dword [0xb8048], 0x4f2E4f2E ; ".."
+    mov dword [0xb804c], 0x4f494f48 ; "HI"
+	mov dword [0xb8050], 0x4f484f47 ; "GH"
+	mov dword [0xb8054], 0x4f524f45 ; "ER"
 %endif ; BIOS
 
 	; move to the new stack that was alloc'd for this AP
