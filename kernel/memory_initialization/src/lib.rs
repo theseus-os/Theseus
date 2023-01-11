@@ -38,7 +38,7 @@ use bootloader_modules::BootloaderModule;
 ///  6. the list of bootloader modules obtained from the given `boot_info`,
 ///  7. the kernel's list of identity-mapped [`MappedPages`],
 ///     which must not be dropped until all AP (additional CPUs) are fully booted,
-///     but *should* be dropped before starting the first user application.
+///     but *should* be dropped before starting the first application.
 pub fn init_memory_management(
     boot_info: impl BootInformation,
     kernel_stack_start: VirtualAddress,
@@ -61,8 +61,8 @@ pub fn init_memory_management(
         stack_guard: stack_guard_page,
         stack: stack_pages,
         boot_info: boot_info_mapped_pages,
-        higher_half: higher_half_mapped_pages,
-        identity: identity_mapped_pages
+        identity: identity_mapped_pages,
+        additional: additional_mapped_pages,
     } = memory::init(&boot_info, kernel_stack_start)?;
     // After this point, at which `memory::init()` has returned new objects that represent
     // the currently-executing code/data/stack, we must ensure they aren't dropped if an error occurs,
@@ -100,7 +100,7 @@ pub fn init_memory_management(
     // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
     let (kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(
         page_table,
-        higher_half_mapped_pages,
+        additional_mapped_pages,
         identity_mapped_pages,
         heap_mapped_pages,
     );

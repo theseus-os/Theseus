@@ -67,12 +67,14 @@ pub fn get_kernel_mmi_ref() -> Option<&'static MmiRef> {
 /// This holds all the information for a `Task`'s memory mappings and address space
 /// (this is basically the equivalent of Linux's mm_struct)
 #[derive(Debug)]
+#[doc(alias("mmi"))]
 pub struct MemoryManagementInfo {
     /// the PageTable that should be switched to when this Task is switched to.
     pub page_table: PageTable,
     
-    /// a list of additional virtual-mapped Pages that have the same lifetime as this MMI
-    /// and are thus owned by this MMI, but is not all-inclusive (e.g., Stacks are excluded).
+    /// The list of additional memory mappings that have the same lifetime as this MMI
+    /// and are thus owned by this MMI.
+    /// This currently includes only the mappings for the heap and the early VGA buffer.
     pub extra_mapped_pages: Vec<MappedPages>,
 }
 
@@ -140,10 +142,11 @@ pub struct InitialMemoryMappings {
     pub stack: NoDrop<MappedPages>,
     /// The boot information mappings.
     pub boot_info: MappedPages,
-    /// The list of other higher-half mapping that must be converted to a vec after heap initialization, and kept forever e.g. VGA buffer.
-    pub higher_half: [Option<NoDrop<MappedPages>>; 32],
     /// The list of identity mappings that must be converted to a vec after heap initialization, and dropped before starting the first userspace program.
     pub identity: [Option<NoDrop<MappedPages>>; 32],
+    /// The list of additional mappings that must be converted to a vec after heap initialization and kept forever.
+    /// Currently, this contains only the mapping of the early VGA buffer.
+    pub additional: [Option<NoDrop<MappedPages>>; 32],
 }
 
 /// Initializes the virtual memory management system.
@@ -210,11 +213,11 @@ pub fn init(
 /// Returns the following tuple:
 ///  * The kernel's new [`MemoryManagementInfo`], representing the initial virtual address space,
 ///  * The kernel's list of identity-mapped [`MappedPages`],
-///    which must not be dropped until all AP (additional CPUs) are fully booted,
-///    but *should* be dropped before starting the first user application. 
+///    which must not be dropped until all secondary CPUs are fully booted,
+///    but *should* be dropped before starting the first application.
 pub fn init_post_heap(
     page_table: PageTable,
-    mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32],
+    mut additional_mapped_pages: [Option<NoDrop<MappedPages>>; 32],
     mut identity_mapped_pages: [Option<NoDrop<MappedPages>>; 32],
     heap_mapped_pages: MappedPages
 ) -> (MmiRef, NoDrop<Vec<MappedPages>>) {
@@ -223,11 +226,11 @@ pub fn init_post_heap(
     page_allocator::convert_to_heap_allocated();
     frame_allocator::convert_to_heap_allocated();
 
-    let mut higher_half_mapped_pages: Vec<MappedPages> = higher_half_mapped_pages
+    let mut additional_mapped_pages: Vec<MappedPages> = additional_mapped_pages
         .iter_mut()
         .filter_map(|opt| opt.take().map(NoDrop::into_inner))
         .collect();
-    higher_half_mapped_pages.push(heap_mapped_pages);
+    additional_mapped_pages.push(heap_mapped_pages);
     let identity_mapped_pages: Vec<MappedPages> = identity_mapped_pages
         .iter_mut()
         .filter_map(|opt| opt.take().map(NoDrop::into_inner))
@@ -237,7 +240,7 @@ pub fn init_post_heap(
     // Construct the kernel's memory mgmt info, i.e., its address space info
     let kernel_mmi = MemoryManagementInfo {
         page_table,
-        extra_mapped_pages: higher_half_mapped_pages,
+        extra_mapped_pages: additional_mapped_pages,
     };
 
     let kernel_mmi_ref = KERNEL_MMI.call_once( || {
