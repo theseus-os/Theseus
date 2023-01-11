@@ -10,7 +10,7 @@ extern crate no_drop;
 extern crate bootloader_modules;
 extern crate boot_info;
 
-use memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings};
+use memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings, EarlyIdentityMappedPages};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use boot_info::{BootInformation, Module};
 use alloc::{
@@ -49,7 +49,7 @@ pub fn init_memory_management(
         NoDrop<MappedPages>,
         NoDrop<Stack>,
         Vec<BootloaderModule>,
-        NoDrop<Vec<MappedPages>>,
+        NoDrop<EarlyIdentityMappedPages>,
     ), &'static str>
 {
     // Initialize memory management: paging (create a new page table), essential kernel mappings
@@ -98,10 +98,9 @@ pub fn init_memory_management(
     debug!("Mapped and initialized the initial heap");
 
     // Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
-    let (kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(
+    let kernel_mmi_ref = memory::init_post_heap(
         page_table,
-        additional_mapped_pages,
-        identity_mapped_pages,
+        additional_mapped_pages.into_inner(),
         heap_mapped_pages,
     );
 
