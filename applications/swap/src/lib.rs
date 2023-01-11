@@ -108,10 +108,10 @@ fn rmain(matches: Matches) -> Result<(), String> {
 /// `(OLD,NEW[,REEXPORT]) (OLD,NEW[,REEXPORT]) (OLD,NEW[,REEXPORT])...`
 fn parse_input_tuples(args: &str) -> Result<Vec<(&str, &str, bool)>, String> {
     let mut v: Vec<(&str, &str, bool)> = Vec::new();
-    let mut open_paren_iter = args.match_indices('(');
+    let open_paren_iter = args.match_indices('(');
 
     // looking for open parenthesis
-    for (paren_start, _) = open_paren_iter {
+    for (paren_start, _) in open_paren_iter {
         let the_rest = args.get((paren_start + 1) ..).ok_or_else(|| "unmatched open parenthesis.".to_string())?;
         // find close parenthesis
         let parsed = the_rest.find(')')
