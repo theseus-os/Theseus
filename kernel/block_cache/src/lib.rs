@@ -81,7 +81,7 @@ impl BlockCache {
     /// in order to avoid reading from the storage device.
     /// If that block exists in the cache, it is copied into the buffer. 
     /// If not, it is read from the storage device into the cache, and then copied into the buffer.
-    pub fn read_block<'c>(cache: &'c mut BlockCache, block: usize) -> Result<&'c [u8], &'static str> {
+    pub fn read_block(cache: &mut BlockCache, block: usize) -> Result<&[u8], &'static str> {
         let mut locked_device = cache.storage_device.lock();
         match cache.cache.entry(block) {
             Entry::Occupied(occ) => {
