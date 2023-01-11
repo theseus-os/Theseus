@@ -235,7 +235,7 @@ pub fn init(
     let mut data_mapped_pages:        Option<NoDrop<MappedPages>> = None;
     let mut stack_page_group:         Option<(AllocatedPages, NoDrop<MappedPages>)> = None;
     let mut boot_info_mapped_pages:   Option<MappedPages> = None;
-    let mut higher_half_mapped_pages: [Option<NoDrop<MappedPages>>; 32] = Default::default();
+    let mut additional_mapped_pages:  [Option<NoDrop<MappedPages>>; 32] = Default::default();
     let mut identity_mapped_pages:    [Option<NoDrop<MappedPages>>; 32] = Default::default();
 
     // Stack frames are not guaranteed to be contiguous in physical memory.
@@ -265,7 +265,8 @@ pub fn init(
         // but before we start running applications.
 
         debug!("{:X?}", aggregated_section_memory_bounds);
-        let mut index = 0;
+        let mut index_identity = 0;
+        let mut index_addtl    = 0;
 
         let (init_start_virt,    init_start_phys)    = aggregated_section_memory_bounds.init.start;
         let (init_end_virt,      init_end_phys)      = aggregated_section_memory_bounds.init.end;
@@ -287,39 +288,39 @@ pub fn init(
             VirtualAddress::new_canonical(init_start_phys.value()),
             init_end_phys.value() - init_start_phys.value(),
         )?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
+        identity_mapped_pages[index_identity] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, &init_frames, init_flags)?
         }));
         let mut init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)?;
-        index += 1;
+        index_identity += 1;
 
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
         let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
+        identity_mapped_pages[index_identity] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         }));
         init_mapped_pages.merge(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?).map_err(|(error, _)| error)?;
         text_mapped_pages = Some(NoDrop::new(init_mapped_pages));
-        index += 1;
+        index_identity += 1;
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
         let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
+        identity_mapped_pages[index_identity] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
         }));
         rodata_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?));
-        index += 1;
+        index_identity += 1;
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
         let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
+        identity_mapped_pages[index_identity] = Some(NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, &data_frames, data_flags)?
         }));
         data_mapped_pages = Some(NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?));
-        index += 1;
+        index_identity += 1;
 
         // Handle the stack (a separate data section), which consists of one guard page (unmapped)
         // followed by the real (mapped) stack pages.
@@ -346,17 +347,18 @@ pub fn init(
         ));
 
         // Map the VGA display memory as writable. 
-        // We do an identity mapping for the VGA display too, because secondary CPUs may access it while booting.
+        // We map this *only* using an identity mapping, as it is only used during early init
+        // by both the bootstrap CPU and secondary CPUs.
         let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
-        let vga_virt_addr_identity = VirtualAddress::new_canonical(vga_phys_addr.value());
-        let vga_display_pages = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity + KERNEL_OFFSET, vga_size_in_bytes)?;
+        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(vga_phys_addr.value()),
+            vga_size_in_bytes,
+        )?;
         let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
-        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(vga_virt_addr_identity, vga_size_in_bytes)?;
-        identity_mapped_pages[index] = Some(NoDrop::new( unsafe {
-            Mapper::map_to_non_exclusive(new_mapper, vga_display_pages_identity, &vga_display_frames, vga_flags)?
-        }));
-        higher_half_mapped_pages[index] = Some(NoDrop::new(new_mapper.map_allocated_pages_to(vga_display_pages, vga_display_frames, vga_flags)?));
-        index += 1;
+        additional_mapped_pages[index_addtl] = Some(NoDrop::new(new_mapper.map_allocated_pages_to(
+            vga_display_pages_identity, vga_display_frames, vga_flags,
+        )?));
+        index_addtl += 1;
 
         // Map the bootloader info, a separate region of read-only memory, so that we can access it later.
         // This does not need to be identity mapped.
@@ -375,8 +377,8 @@ pub fn init(
             }
         }
 
-        debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index]);
-        debug!("higher_half_mapped_pages: {:?}", &higher_half_mapped_pages[..index]);
+        debug!("identity_mapped_pages: {:?}", &identity_mapped_pages[..index_identity]);
+        debug!("additional_mapped_pages: {:?}", &additional_mapped_pages[..index_addtl]);
 
         Ok(())
     })?;
@@ -401,7 +403,7 @@ pub fn init(
         stack_guard: stack_page_group.0,
         stack: stack_page_group.1,
         boot_info: boot_info_mapped_pages,
-        higher_half: higher_half_mapped_pages,
-        identity: identity_mapped_pages
+        identity: identity_mapped_pages,
+        additional: additional_mapped_pages,
     })
 }
