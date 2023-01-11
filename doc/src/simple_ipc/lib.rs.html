@@ -178,7 +178,7 @@
                 </span>}
             }
         )
-        .map(|msg| (msg &gt;&gt; <span class="number">8</span>) <span class="kw">as </span>u8 &amp; <span class="number">0xFF</span>)
+        .map(|msg| (msg &gt;&gt; <span class="number">8</span>) <span class="kw">as </span>u8)
         .map_err(|_e| <span class="string">&quot;There was no message in the buffer.&quot;</span>)
     }
 

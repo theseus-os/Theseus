@@ -3337,6 +3337,11 @@
 <a href="#3337" id="3337">3337</a>
 <a href="#3338" id="3338">3338</a>
 <a href="#3339" id="3339">3339</a>
+<a href="#3340" id="3340">3340</a>
+<a href="#3341" id="3341">3341</a>
+<a href="#3342" id="3342">3342</a>
+<a href="#3343" id="3343">3343</a>
+<a href="#3344" id="3344">3344</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
@@ -3344,7 +3349,12 @@
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 
 <span class="kw">use </span>core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
-<span class="kw">use </span>alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
+<span class="kw">use </span>alloc::{
+    boxed::Box, 
+    collections::{BTreeMap, btree_map, BTreeSet}, 
+    string::{String, ToString}, 
+    sync::{Arc, Weak}, vec::Vec
+};
 <span class="kw">use </span>spin::{Mutex, Once};
 <span class="kw">use </span>xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
 <span class="kw">use </span>util::round_up_power_of_two;
@@ -3731,7 +3741,7 @@
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::File(object_file) =&gt; dbg.field(<span class="string">&quot;File&quot;</span>, <span class="kw-2">&amp;</span>object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;&lt;Locked&gt;&quot;</span>))
+                .unwrap_or_else(|| <span class="string">&quot;&lt;Locked&gt;&quot;</span>.to_string())
             ),
             <span class="self">Self</span>::AbsolutePath(p) =&gt; dbg.field(<span class="string">&quot;AbsolutePath&quot;</span>, p),
             <span class="self">Self</span>::Prefix(prefix) =&gt; dbg.field(<span class="string">&quot;Prefix&quot;</span>, prefix),
@@ -4254,7 +4264,7 @@
         </span><span class="kw">for </span>(new_crate_ref, elf_file) <span class="kw">in </span>partially_loaded_crates {
             <span class="self">self</span>.perform_relocations(<span class="kw-2">&amp;</span>elf_file, <span class="kw-2">&amp;</span>new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)<span class="question-mark">?</span>;
             <span class="kw">let </span>name = new_crate_ref.lock_as_ref().crate_name.clone();
-            <span class="self">self</span>.crate_tree.lock().insert(name.into(), new_crate_ref);
+            <span class="self">self</span>.crate_tree.lock().insert(name, new_crate_ref);
         }
 
         <span class="prelude-val">Ok</span>(())
@@ -6000,7 +6010,7 @@
 
         <span class="comment">// We add a shared reference to that section&#39;s parent crate to this namespace as well, 
         // to prevent that crate from being dropped while this namespace still relies on it.
-        </span><span class="self">self</span>.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+        </span><span class="self">self</span>.crate_tree.lock().insert(parent_crate_name, parent_crate_ref);
         <span class="kw">return </span><span class="prelude-val">Some</span>(sec);
     }
 

@@ -1117,6 +1117,11 @@
 <a href="#1117" id="1117">1117</a>
 <a href="#1118" id="1118">1118</a>
 <a href="#1119" id="1119">1119</a>
+<a href="#1120" id="1120">1120</a>
+<a href="#1121" id="1121">1121</a>
+<a href="#1122" id="1122">1122</a>
+<a href="#1123" id="1123">1123</a>
+<a href="#1124" id="1124">1124</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic driver for accessing ATA drives (IDE) as a storage device.
 //! 
 //! The primary struct of interest is [`AtaDrive`].
@@ -1132,7 +1137,12 @@
 <span class="kw">use </span>core::fmt;
 <span class="kw">use </span>bitflags::bitflags;
 <span class="kw">use </span>spin::Mutex;
-<span class="kw">use </span>alloc::{boxed::Box, format, string::String, sync::Arc};
+<span class="kw">use </span>alloc::{
+	boxed::Box, 
+	format, 
+	string::{String, ToString}, 
+	sync::Arc
+};
 <span class="kw">use </span>port_io::{Port, PortReadOnly, PortWriteOnly};
 <span class="kw">use </span>pci::PciDevice;
 <span class="kw">use </span>storage_device::{StorageDevice, StorageDeviceRef, StorageController};
@@ -1894,7 +1904,7 @@
 		<span class="kw">let </span>drive_fmt = |drive: <span class="kw-2">&amp;</span><span class="prelude-ty">Result</span>&lt;AtaDrive, <span class="kw-2">&amp;</span>str&gt;| -&gt; String {
 			<span class="kw">match </span>drive {
 				<span class="prelude-val">Ok</span>(d)  =&gt; <span class="macro">format!</span>(<span class="string">&quot;drive initialized, size: {} sectors&quot;</span>, d.size_in_blocks()),
-				<span class="prelude-val">Err</span>(e) =&gt; <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, e),
+				<span class="prelude-val">Err</span>(e) =&gt; e.to_string(),
 			}
 		};
 

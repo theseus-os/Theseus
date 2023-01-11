@@ -224,7 +224,6 @@
 <a href="#224" id="224">224</a>
 <a href="#225" id="225">225</a>
 <a href="#226" id="226">226</a>
-<a href="#227" id="227">227</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{ElfSectionFlags, ReservedMemoryRegion};
 <span class="kw">use </span>core::{cmp, iter::Iterator};
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
@@ -326,8 +325,7 @@
 
     <span class="kw">for </span>section <span class="kw">in </span>boot_info
         .elf_sections()<span class="question-mark">?
-        </span>.into_iter()
-        .filter(|section| section.is_allocated())
+        </span>.filter(|section| section.is_allocated())
     {
         physical_start = cmp::min(section.start_address() <span class="kw">as </span>usize, physical_start);
         virtual_end = cmp::max(section.end_address() <span class="kw">as </span>usize, virtual_end);

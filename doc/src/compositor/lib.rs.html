@@ -388,7 +388,7 @@
                 <span class="prelude-val">Some</span>(index) =&gt; index,
                 <span class="prelude-val">None </span>=&gt; {<span class="kw">continue</span>;}
             };
-            dest_fb.composite_buffer(<span class="kw-2">&amp;</span>(src_buffer[src_start_index..src_end_index]), dest_start_index <span class="kw">as </span>usize);
+            dest_fb.composite_buffer(<span class="kw-2">&amp;</span>src_buffer[src_start_index..src_end_index], dest_start_index);
         }
 
         <span class="prelude-val">Ok</span>(())

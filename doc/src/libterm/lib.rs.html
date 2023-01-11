@@ -669,7 +669,7 @@
 
 </span><span class="attr">#![no_std]
 
-#[macro_use] </span><span class="kw">extern crate </span>alloc;
+</span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="kw">extern crate </span>dfqueue;
 <span class="kw">extern crate </span>environment;
@@ -1108,7 +1108,7 @@
         };
         terminal.display_text()<span class="question-mark">?</span>;
 
-        terminal.print_to_terminal(<span class="macro">format!</span>(<span class="string">&quot;Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n&quot;</span>));
+        terminal.print_to_terminal(<span class="string">&quot;Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n&quot;</span>.to_string());
         <span class="prelude-val">Ok</span>(terminal)
     }
 

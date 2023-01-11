@@ -233,7 +233,7 @@
 <span class="kw">impl </span>Pixel <span class="kw">for </span>AlphaPixel {   
     <span class="kw">fn </span>composite_buffer(src: <span class="kw-2">&amp;</span>[<span class="self">Self</span>], dest: <span class="kw-2">&amp;mut</span>[<span class="self">Self</span>]) {
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..src.len() {
-            dest[i] = AlphaPixel::from(src[i]).blend(AlphaPixel::from(dest[i])).into();
+            dest[i] = src[i].blend(dest[i]);
         }
     }
 

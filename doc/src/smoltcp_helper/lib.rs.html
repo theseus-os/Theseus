@@ -127,6 +127,7 @@
 <a href="#127" id="127">127</a>
 <a href="#128" id="128">128</a>
 <a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
 </pre><pre class="rust"><code>
 <span class="doccomment">//! Collection of functions to set up a TCP connection using a smoltcp device
 
@@ -139,6 +140,7 @@
 <span class="kw">extern crate </span>spin;
 <span class="kw">extern crate </span>hpet;
 
+<span class="kw">use </span>alloc::string::ToString;
 <span class="kw">use </span>core::convert::TryInto;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>hpet::get_hpet;
@@ -208,7 +210,7 @@
     </span><span class="kw">let </span>start = <span class="macro">hpet_ticks!</span>();
     
     <span class="macro">debug!</span>(<span class="string">&quot;smoltcp_helper: connecting from {}:{} to {} ...&quot;</span>,
-        iface.lock().ip_addrs().get(<span class="number">0</span>).map(|ip| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, ip)).unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;ERROR&quot;</span>)), 
+        iface.lock().ip_addrs().get(<span class="number">0</span>).map(|ip| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, ip)).unwrap_or_else(|| <span class="string">&quot;ERROR&quot;</span>.to_string()),
         local_port, 
         remote_endpoint,
     );

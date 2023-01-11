@@ -1267,8 +1267,8 @@
         </span><span class="kw">if </span><span class="self">self</span>.msr_mask &lt; num_pmc <span class="kw">as </span>u32 {
             <span class="comment">// clears event counting settings and counter 
             </span><span class="kw">unsafe</span>{
-                Msr::new(IA32_PERFEVTSEL0 + <span class="self">self</span>.msr_mask <span class="kw">as </span>u32).write(<span class="number">0</span>);
-                Msr::new(IA32_PMC0 + <span class="self">self</span>.msr_mask <span class="kw">as </span>u32).write(<span class="number">0</span>);
+                Msr::new(IA32_PERFEVTSEL0 + <span class="self">self</span>.msr_mask).write(<span class="number">0</span>);
+                Msr::new(IA32_PMC0 + <span class="self">self</span>.msr_mask).write(<span class="number">0</span>);
             }
             free_counter(<span class="self">self</span>.core, <span class="self">self</span>.msr_mask <span class="kw">as </span>u8); 
         }

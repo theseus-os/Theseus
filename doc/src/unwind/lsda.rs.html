@@ -588,11 +588,11 @@
 </span><span class="kw">fn </span>read_encoded_pointer&lt;R: gimli::Reader&gt;(reader: <span class="kw-2">&amp;mut </span>R, encoding: DwEhPe) -&gt; gimli::Result&lt;u64&gt; {
     <span class="kw">match </span>encoding {
         DW_EH_PE_omit     =&gt; <span class="prelude-val">Err</span>(gimli::Error::CannotParseOmitPointerEncoding),
-        DW_EH_PE_absptr   =&gt; reader.read_u64().map(|v| v <span class="kw">as </span>u64),
-        DW_EH_PE_uleb128  =&gt; reader.read_uleb128().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_absptr   =&gt; reader.read_u64(),
+        DW_EH_PE_uleb128  =&gt; reader.read_uleb128(),
         DW_EH_PE_udata2   =&gt; reader.read_u16().map(|v| v <span class="kw">as </span>u64),
         DW_EH_PE_udata4   =&gt; reader.read_u32().map(|v| v <span class="kw">as </span>u64),
-        DW_EH_PE_udata8   =&gt; reader.read_u64().map(|v| v <span class="kw">as </span>u64),
+        DW_EH_PE_udata8   =&gt; reader.read_u64(),
         DW_EH_PE_sleb128  =&gt; reader.read_sleb128().map(|v| v <span class="kw">as </span>u64),
         DW_EH_PE_sdata2   =&gt; reader.read_i16().map(|v| v <span class="kw">as </span>u64),
         DW_EH_PE_sdata4   =&gt; reader.read_i32().map(|v| v <span class="kw">as </span>u64),

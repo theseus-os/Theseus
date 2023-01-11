@@ -850,10 +850,14 @@
 <a href="#850" id="850">850</a>
 <a href="#851" id="851">851</a>
 <a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,
 //! in other words, the code that is currently executing.
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
+
+</span><span class="attr">#![allow(clippy::type_complexity)]
 
 </span><span class="kw">use crate</span>::{CrateNamespace, mp_range};
 <span class="kw">use </span>alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
@@ -1053,7 +1057,7 @@
     </span>drop(new_crate_mut);
 
     <span class="comment">// Add the newly-parsed nano_core crate to the kernel namespace.
-    </span>real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
+    </span>real_namespace.crate_tree.lock().insert(crate_name, nano_core_crate_ref.clone_shallow());
     <span class="macro">info!</span>(<span class="string">&quot;Finished parsing nano_core crate, {} new symbols.&quot;</span>, new_syms);
     <span class="prelude-val">Ok</span>((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }

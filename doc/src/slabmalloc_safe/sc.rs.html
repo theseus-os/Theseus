@@ -622,7 +622,7 @@
         // );
 
         // let page_addr = (ptr.as_ptr() as usize) &amp; !(MappedPages8k::SIZE - 1) as usize;
-        </span><span class="kw">let </span>page_vaddr = VirtualAddress::new((ptr.as_ptr() <span class="kw">as </span>usize) &amp; !(MappedPages8k::SIZE - <span class="number">1</span>) <span class="kw">as </span>usize)
+        </span><span class="kw">let </span>page_vaddr = VirtualAddress::new((ptr.as_ptr() <span class="kw">as </span>usize) &amp; !(MappedPages8k::SIZE - <span class="number">1</span>))
             .ok_or(<span class="string">&quot;pointer to deallocate was an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Figure out which page we are on and retrieve a reference to it

@@ -816,15 +816,15 @@
     wasmi_args: RuntimeArgs,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;RuntimeValue&gt;, Trap&gt; {
     <span class="comment">// Handles to wasmi memory and Theseus I/O.
-    </span><span class="kw">let </span><span class="kw-2">ref mut </span>memory = <span class="kw">match </span>h_ext.memory {
+    </span><span class="kw">let </span>memory = <span class="kw-2">&amp;mut </span><span class="kw">match </span>h_ext.memory {
         <span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>mem) =&gt; mem,
         <span class="prelude-val">None </span>=&gt; {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_NOMEM))));
         }
     };
-    <span class="kw">let </span><span class="kw-2">ref mut </span>fd_table = h_ext.fd_table;
-    <span class="kw">let </span><span class="kw-2">ref </span>theseus_env_vars = h_ext.theseus_env_vars;
-    <span class="kw">let </span><span class="kw-2">ref </span>theseus_args = h_ext.theseus_args;
+    <span class="kw">let </span>fd_table = <span class="kw-2">&amp;mut </span>h_ext.fd_table;
+    <span class="kw">let </span>theseus_env_vars = <span class="kw-2">&amp;</span>h_ext.theseus_env_vars;
+    <span class="kw">let </span>theseus_args = <span class="kw-2">&amp;</span>h_ext.theseus_args;
 
     <span class="kw">match </span>system_call {
         <span class="comment">// Terminate process with given exit code.
@@ -1000,7 +1000,7 @@
                 <span class="kw">let </span>ptr: u32 = ptr_and_len[<span class="number">0</span>];
                 <span class="kw">let </span>len: wasi::Size = wasi::Size::try_from(ptr_and_len[<span class="number">1</span>]).unwrap();
 
-                <span class="kw">let </span><span class="kw-2">ref mut </span>read_buf = <span class="macro">vec!</span>[<span class="number">0</span>; len];
+                <span class="kw">let </span>read_buf = <span class="kw-2">&amp;mut </span><span class="macro">vec!</span>[<span class="number">0</span>; len];
 
                 <span class="comment">// retrieve data to read.
                 </span><span class="kw">let </span>bytes_read: wasi::Size = <span class="kw">match </span>posix_node_or_stdio.read(read_buf) {

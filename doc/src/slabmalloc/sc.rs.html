@@ -662,7 +662,7 @@
         //     P::SIZE
         // );
 
-        </span><span class="kw">let </span>page = (ptr.as_ptr() <span class="kw">as </span>usize) &amp; !(P::SIZE - <span class="number">1</span>) <span class="kw">as </span>usize;
+        </span><span class="kw">let </span>page: usize = (ptr.as_ptr() <span class="kw">as </span>usize) &amp; !(P::SIZE - <span class="number">1</span>);
 
         <span class="comment">// Figure out which page we are on and construct a reference to it
         // TODO: The linked list will have another &amp;mut reference

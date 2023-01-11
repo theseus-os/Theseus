@@ -1107,6 +1107,9 @@
 <a href="#1107" id="1107">1107</a>
 <a href="#1108" id="1108">1108</a>
 <a href="#1109" id="1109">1109</a>
+<a href="#1110" id="1110">1110</a>
+<a href="#1111" id="1111">1111</a>
+<a href="#1112" id="1112">1112</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1162,7 +1165,10 @@
 <span class="kw">use </span>alloc::{
     collections::BTreeSet,
     format,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -1384,7 +1390,7 @@
             .field(<span class="string">&quot;name&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.crate_name)
             .field(<span class="string">&quot;object_file&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;&lt;Locked&gt;&quot;</span>))
+                .unwrap_or_else(|| <span class="string">&quot;&lt;Locked&gt;&quot;</span>.to_string())
             )
             .finish_non_exhaustive()
     }

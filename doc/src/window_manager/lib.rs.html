@@ -825,7 +825,7 @@
 
 </span><span class="kw">extern crate </span>spin;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>mpmc;
 <span class="kw">extern crate </span>event_types;
 <span class="kw">extern crate </span>compositor;
@@ -1247,7 +1247,7 @@
         <span class="kw">for </span>i <span class="kw">in </span><span class="number">0</span>..(WINDOW_BORDER_SIZE) <span class="kw">as </span>isize {
             <span class="kw">let </span>width = (border.bottom_right.x - border.top_left.x) - <span class="number">2 </span>* i;
             <span class="kw">let </span>height = (border.bottom_right.y - border.top_left.y) - <span class="number">2 </span>* i;
-            <span class="kw">let </span>coordinate = border.top_left + (i <span class="kw">as </span>isize, i <span class="kw">as </span>isize);
+            <span class="kw">let </span>coordinate = border.top_left + (i, i);
             <span class="kw">if </span>width &lt;= <span class="number">0 </span>|| height &lt;= <span class="number">0 </span>{
                 <span class="kw">break</span>;
             }
@@ -1286,7 +1286,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>current_active_win = current_active.lock();
                 <span class="kw">let </span>(current_x, current_y) = {
                     <span class="kw">let </span>m = <span class="kw-2">&amp;</span><span class="self">self</span>.mouse;
-                    (m.x <span class="kw">as </span>isize, m.y <span class="kw">as </span>isize)
+                    (m.x, m.y)
                 };
                 <span class="kw">match </span>current_active_win.moving {
                     WindowMovingStatus::Moving(base) =&gt; {
@@ -1378,7 +1378,7 @@
     </span><span class="kw">pub fn </span>move_floating_border(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>(new_x, new_y) = {
             <span class="kw">let </span>m = <span class="kw-2">&amp;</span><span class="self">self</span>.mouse;
-            (m.x <span class="kw">as </span>isize, m.y <span class="kw">as </span>isize)
+            (m.x, m.y)
         };
         
         <span class="kw">if let </span><span class="prelude-val">Some</span>(current_active) = <span class="self">self</span>.active.upgrade() {
@@ -1526,7 +1526,7 @@
                             .ok_or(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?
                             </span>.lock();
                         wm.move_mouse(
-                            Coord::new(x <span class="kw">as </span>isize, -(y <span class="kw">as </span>isize))
+                            Coord::new(x, -y)
                         )<span class="question-mark">?</span>;
                     }
                     cursor_handle_application(mouse_event.clone())<span class="question-mark">?</span>; <span class="comment">// tell the event to application, or moving window
@@ -1598,7 +1598,7 @@
             .ok_or(<span class="string">&quot;Couldn&#39;t find shell application file to run upon Ctrl+Alt+T&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>path = Path::new(shell_objfile.lock().get_absolute_path());
         spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_namespace))<span class="question-mark">?
-            </span>.name(<span class="macro">format!</span>(<span class="string">&quot;shell&quot;</span>))
+            </span>.name(<span class="string">&quot;shell&quot;</span>.to_string())
             .spawn()<span class="question-mark">?</span>;
 
         <span class="macro">debug!</span>(<span class="string">&quot;window_manager: spawned new shell app in new app namespace.&quot;</span>);

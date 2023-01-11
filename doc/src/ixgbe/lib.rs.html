@@ -1334,6 +1334,7 @@
 <a href="#1334" id="1334">1334</a>
 <a href="#1335" id="1335">1335</a>
 <a href="#1336" id="1336">1336</a>
+<a href="#1337" id="1337">1337</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.
 //! 
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
@@ -1342,6 +1343,7 @@
 //! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 </span><span class="attr">#![no_std]
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] </span><span class="comment">//  to suppress warnings for unused functions/methods
 </span><span class="attr">#![feature(abi_x86_interrupt)]
 
@@ -2640,8 +2642,8 @@
 </span><span class="kw">pub fn </span>rx_poll_mq(qid: usize, nic_id: PciLocation) -&gt; <span class="prelude-ty">Result</span>&lt;ReceivedFrame, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>nic_ref = get_ixgbe_nic(nic_id)<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>nic = nic_ref.lock();      
-    nic.rx_queues[qid <span class="kw">as </span>usize].poll_queue_and_store_received_packets()<span class="question-mark">?</span>;
-    <span class="kw">let </span>frame = nic.rx_queues[qid <span class="kw">as </span>usize].return_frame().ok_or(<span class="string">&quot;no frame&quot;</span>)<span class="question-mark">?</span>;
+    nic.rx_queues[qid].poll_queue_and_store_received_packets()<span class="question-mark">?</span>;
+    <span class="kw">let </span>frame = nic.rx_queues[qid].return_frame().ok_or(<span class="string">&quot;no frame&quot;</span>)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(frame)
 }
 

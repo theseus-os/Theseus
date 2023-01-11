@@ -1022,6 +1022,7 @@
 <a href="#1022" id="1022">1022</a>
 <a href="#1023" id="1023">1023</a>
 <a href="#1024" id="1024">1024</a>
+<a href="#1025" id="1025">1025</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1033,7 +1034,8 @@
 //! [tb]:  fn.new_task_builder.html
 //! [atb]: fn.new_application_task_builder.html
 
-</span><span class="attr">#![no_std]
+</span><span class="attr">#![allow(clippy::type_complexity)]
+#![no_std]
 #![feature(stmt_expr_attributes)]
 #![feature(naked_functions)]
 

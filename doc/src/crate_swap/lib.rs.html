@@ -1997,7 +1997,7 @@
             .field(<span class="string">&quot;old_namespace&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.old_namespace.name())
             .field(<span class="string">&quot;new_crate&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.new_crate_object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;&lt;Locked&gt;&quot;</span>))
+                .unwrap_or_else(|| <span class="string">&quot;&lt;Locked&gt;&quot;</span>.to_string())
             )
             .field(<span class="string">&quot;new_namespace&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.new_namespace.name())
             .field(<span class="string">&quot;reexport_symbols&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.reexport_new_symbols_as_old)
@@ -2073,7 +2073,7 @@
                         } <span class="kw">else if </span>!matching_files.is_empty() {
                             matching_files.into_iter()
                                 .map(|(file, ns)| (
-                                    file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;&lt;Locked&gt;&quot;</span>)),
+                                    file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| <span class="string">&quot;&lt;Locked&gt;&quot;</span>.to_string()),
                                     Arc::clone(ns)
                                 ))
                                 .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
@@ -2198,7 +2198,7 @@
                     .field(<span class="string">&quot;searched in new_namespace&quot;</span>, <span class="kw-2">&amp;</span>new_namespace.name());
                 <span class="kw">for </span>(file, ns) <span class="kw">in </span>matches {
                     <span class="kw">let </span>s = <span class="macro">format!</span>(<span class="string">&quot;{:?} in namespace {:?}&quot;</span>,
-                        file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| <span class="macro">format!</span>(<span class="string">&quot;&lt;Locked&gt;&quot;</span>)),
+                        file.try_lock().map(|f| f.get_absolute_path()).unwrap_or_else(|| <span class="string">&quot;&lt;Locked&gt;&quot;</span>.to_string()),
                         ns.name(),
                     );
                     dbg.field(<span class="string">&quot;matching file&quot;</span>, <span class="kw-2">&amp;</span>s);

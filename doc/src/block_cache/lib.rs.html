@@ -269,7 +269,7 @@
     /// in order to avoid reading from the storage device.
     /// If that block exists in the cache, it is copied into the buffer. 
     /// If not, it is read from the storage device into the cache, and then copied into the buffer.
-    </span><span class="kw">pub fn </span>read_block&lt;<span class="lifetime">&#39;c</span>&gt;(cache: <span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span><span class="kw-2">mut </span>BlockCache, block: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;c </span>[u8], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>read_block(cache: <span class="kw-2">&amp;mut </span>BlockCache, block: usize) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span>[u8], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>locked_device = cache.storage_device.lock();
         <span class="kw">match </span>cache.cache.entry(block) {
             Entry::Occupied(occ) =&gt; {
