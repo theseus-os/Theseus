@@ -149,7 +149,7 @@ impl<P: Pixel> Framebuffer<P> {
     /// at that `coordinate` in this framebuffer.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
         if let Some(index) = self.index_of(coordinate) {
-            self.buffer[index] = pixel.blend(self.buffer[index]).into();
+            self.buffer[index] = pixel.blend(self.buffer[index]);
         }
     }
 

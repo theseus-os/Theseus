@@ -11,7 +11,7 @@
 
 extern crate spin;
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -433,7 +433,7 @@ impl WindowManager {
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (border.bottom_right.x - border.top_left.x) - 2 * i;
             let height = (border.bottom_right.y - border.top_left.y) - 2 * i;
-            let coordinate = border.top_left + (i as isize, i as isize);
+            let coordinate = border.top_left + (i, i);
             if width <= 0 || height <= 0 {
                 break;
             }
@@ -472,7 +472,7 @@ impl WindowManager {
                 let mut current_active_win = current_active.lock();
                 let (current_x, current_y) = {
                     let m = &self.mouse;
-                    (m.x as isize, m.y as isize)
+                    (m.x, m.y)
                 };
                 match current_active_win.moving {
                     WindowMovingStatus::Moving(base) => {
@@ -564,7 +564,7 @@ impl WindowManager {
     pub fn move_floating_border(&mut self) -> Result<(), &'static str> {
         let (new_x, new_y) = {
             let m = &self.mouse;
-            (m.x as isize, m.y as isize)
+            (m.x, m.y)
         };
         
         if let Some(current_active) = self.active.upgrade() {
@@ -712,7 +712,7 @@ fn window_manager_loop(
                             .ok_or("The static window manager was not yet initialized")?
                             .lock();
                         wm.move_mouse(
-                            Coord::new(x as isize, -(y as isize))
+                            Coord::new(x, -y)
                         )?;
                     }
                     cursor_handle_application(mouse_event.clone())?; // tell the event to application, or moving window
@@ -784,7 +784,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
         let path = Path::new(shell_objfile.lock().get_absolute_path());
         spawn::new_application_task_builder(path, Some(new_app_namespace))?
-            .name(format!("shell"))
+            .name("shell".to_string())
             .spawn()?;
 
         debug!("window_manager: spawned new shell app in new app namespace.");

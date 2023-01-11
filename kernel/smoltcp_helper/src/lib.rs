@@ -10,6 +10,7 @@ extern crate network_manager;
 extern crate spin;
 extern crate hpet;
 
+use alloc::string::ToString;
 use core::convert::TryInto;
 use spin::Once;
 use hpet::get_hpet;
@@ -79,7 +80,7 @@ pub fn connect(
     let start = hpet_ticks!();
     
     debug!("smoltcp_helper: connecting from {}:{} to {} ...",
-        iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| format!("ERROR")), 
+        iface.lock().ip_addrs().get(0).map(|ip| format!("{}", ip)).unwrap_or_else(|| "ERROR".to_string()),
         local_port, 
         remote_endpoint,
     );
