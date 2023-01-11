@@ -169,7 +169,7 @@ zst-offset
 assertions-on-constants
 assign-op-pattern
 disallowed-names
-# blocks-in-if-conditions
+blocks-in-if-conditions
 bool-assert-comparison
 borrow-interior-mutable-const
 builtin-type-shadow

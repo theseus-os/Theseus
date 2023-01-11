@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(let_chains)]
+#![allow(clippy::blocks_in_if_conditions)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;

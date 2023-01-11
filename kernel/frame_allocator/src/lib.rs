@@ -19,6 +19,7 @@
 //! a requested address is in a chunk that needs to be merged.
 
 #![no_std]
+#![allow(clippy::blocks_in_if_conditions)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
