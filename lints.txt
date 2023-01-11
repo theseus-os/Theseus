@@ -168,7 +168,7 @@ zst-offset
 # Style
 assertions-on-constants
 assign-op-pattern
-blacklisted-name
+disallowed-names
 # blocks-in-if-conditions
 bool-assert-comparison
 borrow-interior-mutable-const
