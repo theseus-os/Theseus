@@ -169,7 +169,7 @@ zst-offset
 assertions-on-constants
 assign-op-pattern
 disallowed-names
-# blocks-in-if-conditions
+blocks-in-if-conditions
 bool-assert-comparison
 borrow-interior-mutable-const
 builtin-type-shadow
@@ -180,7 +180,7 @@ cmp-null
 collapsible-else-if
 collapsible-if
 collapsible-match
-# comparison-chain
+comparison-chain
 comparison-to-empty
 # declare-interior-mutable-const
 disallowed-methods
