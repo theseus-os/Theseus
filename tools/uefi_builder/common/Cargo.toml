@@ -1,8 +1,9 @@
 [package]
 name = "uefi_builder_common"
 version = "0.1.0"
-edition = "2021"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+descriptions = "Architecture-agnostic functionality for creating UEFI-compatible boot images"
+edition = "2021"
 
 [dependencies]
 anyhow = "1.0"

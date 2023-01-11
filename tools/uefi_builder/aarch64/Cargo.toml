@@ -1,8 +1,9 @@
 [package]
 name = "uefi_builder_aarch64"
 version = "0.1.0"
-edition = "2021"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Creates the files necessary to boot Theseus using UEFI on aarch64"
+edition = "2021"
 
 [dependencies]
 uefi_builder_common = { path = "../common" }
