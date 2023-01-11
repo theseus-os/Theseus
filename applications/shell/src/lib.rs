@@ -1185,7 +1185,7 @@ impl Shell {
         // Support for legacy output by `terminal_print`.
         if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
-                &Event::OutputEvent(ref s) => {
+                Event::OutputEvent(ref s) => {
                     self.terminal.lock().print_to_terminal(s.clone());
                 },
                 _ => { },

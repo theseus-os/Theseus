@@ -115,7 +115,7 @@ impl<S: Any> SSCached<S> {
 		// this is the VERY common case, simply loading the cached weak pointer and upgrading it
 		// SAFE: because we're the only ones able to access this AtomicPtr
 		let val: &Option<Weak<S>> = unsafe{ &*self.0.load(Ordering::Acquire) };
-		if let &Some(ref v) = val {
+		if let Some(ref v) = val {
 			if let Some(arc) = v.upgrade() {
 				// weird structure, because we only want to return if upgrade works!
 				return Some(arc);
