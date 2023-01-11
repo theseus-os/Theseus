@@ -192,7 +192,7 @@ enum-variant-names
 err-expect
 excessive-precision
 field-reassign-with-default
-# fn-to-numeric-cast
+fn-to-numeric-cast
 fn-to-numeric-cast-with-truncation
 for-kv-map
 # from-over-into

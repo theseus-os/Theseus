@@ -197,14 +197,14 @@ fn _enable_pic() {
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
-pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), u64> {
+pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), usize> {
     let mut idt = IDT.lock();
 
     // If the existing handler stored in the IDT is either missing (has an address of `0`)
     // or is the default handler, that signifies the interrupt number is available.
     let idt_entry = &mut idt[interrupt_num as usize];
-    let existing_handler_addr = idt_entry.handler_addr().as_u64();
-    if existing_handler_addr == 0 || existing_handler_addr == unimplemented_interrupt_handler as u64 {
+    let existing_handler_addr = idt_entry.handler_addr().as_u64() as usize;
+    if existing_handler_addr == 0 || existing_handler_addr == unimplemented_interrupt_handler as usize {
         idt_entry.set_handler_fn(func);
         Ok(())
     } else {
@@ -225,7 +225,7 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     // try to find an unused interrupt number in the IDT
     let interrupt_num = idt.slice(32..=255)
         .iter()
-        .rposition(|&entry| entry.handler_addr().as_u64() == unimplemented_interrupt_handler as u64)
+        .rposition(|&entry| entry.handler_addr().as_u64() as usize== unimplemented_interrupt_handler as usize)
         .map(|entry| entry + 32)
         .ok_or("register_msi_interrupt: no available interrupt handlers (BUG: IDT is full?)")?;
 
@@ -253,7 +253,7 @@ pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), 
 
     // check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
-    if idt[interrupt_num as usize].handler_addr().as_u64() == func as u64 {
+    if idt[interrupt_num as usize].handler_addr().as_u64() as usize == func as usize {
         idt[interrupt_num as usize].set_handler_fn(unimplemented_interrupt_handler);
         Ok(())
     }
