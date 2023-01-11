@@ -1,3 +1,12 @@
-edition = "2021"
-format_code_in_doc_comments = true
-wrap_comments = true
+ignore = [
+    "/applications",
+    "/compiler_plugins",
+    "/kernel",
+    "/libs",
+    "/libtheseus",
+    "/old_crates",
+    "/ports",
+    "/theseus_features",
+    "/tlibc",
+    "/tools"
+]
