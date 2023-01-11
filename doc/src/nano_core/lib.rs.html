@@ -229,8 +229,6 @@
 <span id="229">229</span>
 <span id="230">230</span>
 <span id="231">231</span>
-<span id="232">232</span>
-<span id="233">233</span>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -417,11 +415,9 @@
         captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)<span class="question-mark">?</span>;
     }
     <span class="attr">#[cfg(loadable)] </span>{
-        <span class="kw">extern crate </span>alloc;
-
-        <span class="kw">use </span>alloc::vec::Vec;
-        <span class="kw">use </span>memory::{MmiRef, MappedPages, PhysicalAddress};
+        <span class="kw">use </span>memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
         <span class="kw">use </span>no_drop::NoDrop;
+        <span class="kw">use </span>stack::Stack;
 
         <span class="kw">let </span>section = default_namespace
             .get_symbol_starting_with(<span class="string">&quot;captain::init::&quot;</span>)
@@ -429,7 +425,7 @@
             .ok_or(<span class="string">&quot;no single symbol matching \&quot;captain::init\&quot;&quot;</span>)<span class="question-mark">?</span>;
         <span class="macro">log::info!</span>(<span class="string">&quot;The nano_core (in loadable mode) is invoking the captain init function: {:?}&quot;</span>, section.name);
 
-        <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;Vec&lt;MappedPages&gt;&gt;, NoDrop&lt;stack::Stack&gt;, VirtualAddress, VirtualAddress, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+        <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;EarlyIdentityMappedPages&gt;, NoDrop&lt;Stack&gt;, VirtualAddress, VirtualAddress, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
         <span class="kw">let </span>func: <span class="kw-2">&amp;</span>CaptainInitFunc = <span class="kw">unsafe </span>{ section.as_func() }<span class="question-mark">?</span>;
 
         func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)<span class="question-mark">?</span>;

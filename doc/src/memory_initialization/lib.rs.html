@@ -128,7 +128,6 @@
 <span id="128">128</span>
 <span id="129">129</span>
 <span id="130">130</span>
-<span id="131">131</span>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -141,7 +140,7 @@
 <span class="kw">extern crate </span>bootloader_modules;
 <span class="kw">extern crate </span>boot_info;
 
-<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings};
+<span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings, EarlyIdentityMappedPages};
 <span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 <span class="kw">use </span>boot_info::{BootInformation, Module};
 <span class="kw">use </span>alloc::{
@@ -180,7 +179,7 @@
         NoDrop&lt;MappedPages&gt;,
         NoDrop&lt;Stack&gt;,
         Vec&lt;BootloaderModule&gt;,
-        NoDrop&lt;Vec&lt;MappedPages&gt;&gt;,
+        NoDrop&lt;EarlyIdentityMappedPages&gt;,
     ), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
 {
     <span class="comment">// Initialize memory management: paging (create a new page table), essential kernel mappings
@@ -229,10 +228,9 @@
     <span class="macro">debug!</span>(<span class="string">&quot;Mapped and initialized the initial heap&quot;</span>);
 
     <span class="comment">// Initialize memory management post heap intialization: set up kernel stack allocator and kernel memory management info.
-    </span><span class="kw">let </span>(kernel_mmi_ref, identity_mapped_pages) = memory::init_post_heap(
+    </span><span class="kw">let </span>kernel_mmi_ref = memory::init_post_heap(
         page_table,
-        additional_mapped_pages,
-        identity_mapped_pages,
+        additional_mapped_pages.into_inner(),
         heap_mapped_pages,
     );
 

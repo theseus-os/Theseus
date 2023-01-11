@@ -249,6 +249,19 @@
 <span id="249">249</span>
 <span id="250">250</span>
 <span id="251">251</span>
+<span id="252">252</span>
+<span id="253">253</span>
+<span id="254">254</span>
+<span id="255">255</span>
+<span id="256">256</span>
+<span id="257">257</span>
+<span id="258">258</span>
+<span id="259">259</span>
+<span id="260">260</span>
+<span id="261">261</span>
+<span id="262">262</span>
+<span id="263">263</span>
+<span id="264">264</span>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -378,26 +391,49 @@
 }
 
 <span class="doccomment">/// Information returned after initialising the memory subsystem.
+</span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>InitialMemoryMappings {
     <span class="doccomment">/// The currently active page table.
     </span><span class="kw">pub </span>page_table: PageTable,
-    <span class="doccomment">/// The kernel&#39;s text section mappings.
+    <span class="doccomment">/// The kernel&#39;s `.text` section mappings, which includes `.init`.
     </span><span class="kw">pub </span>text: NoDrop&lt;MappedPages&gt;,
-    <span class="doccomment">/// The kernel&#39;s rodata section mappings.
+    <span class="doccomment">/// The kernel&#39;s `.rodata` section mappings.
     </span><span class="kw">pub </span>rodata: NoDrop&lt;MappedPages&gt;,
-    <span class="doccomment">/// The kernel&#39;s data section mappings.
+    <span class="doccomment">/// The kernel&#39;s .`data` section mappings/
     </span><span class="kw">pub </span>data: NoDrop&lt;MappedPages&gt;,
     <span class="doccomment">/// The kernel stack&#39;s guard page.
     </span><span class="kw">pub </span>stack_guard: AllocatedPages,
-    <span class="doccomment">/// The kernel&#39;s stack mappings.
+    <span class="doccomment">/// The kernel&#39;s stack actual data page mappings.
     </span><span class="kw">pub </span>stack: NoDrop&lt;MappedPages&gt;,
     <span class="doccomment">/// The boot information mappings.
     </span><span class="kw">pub </span>boot_info: MappedPages,
-    <span class="doccomment">/// The list of identity mappings that must be converted to a vec after heap initialization, and dropped before starting the first userspace program.
-    </span><span class="kw">pub </span>identity: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
-    <span class="doccomment">/// The list of additional mappings that must be converted to a vec after heap initialization and kept forever.
-    /// Currently, this contains only the mapping of the early VGA buffer.
-    </span><span class="kw">pub </span>additional: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    <span class="doccomment">/// The list of identity mappings that should be dropped before starting the first application.
+    ///
+    /// Currently there are only 4 identity mappings, used for the base kernel image:
+    /// 1. the `.init` early text section,
+    /// 2. the full `.text` section,
+    /// 3. the `.rodata` section, which includes all read-only data,
+    /// 4. the `.data` section, which includes `.bss` and all read-write data.
+    </span><span class="kw">pub </span>identity: NoDrop&lt;EarlyIdentityMappedPages&gt;,
+    <span class="doccomment">/// The list of additional mappings that must be kept forever.
+    ///
+    /// Currently, this contains only one mapping: the early VGA buffer.
+    </span><span class="kw">pub </span>additional: NoDrop&lt;MappedPages&gt;,
+}
+
+<span class="doccomment">/// The set of identity mappings that should be dropped before starting the first application.
+/// 
+/// Currently there are only 4 identity mappings, used for the base kernel image:
+/// 1. the `.init` early text section,
+/// 2. the full `.text` section,
+/// 3. the `.rodata` section, which includes all read-only data,
+/// 4. the `.data` section, which includes `.bss` and all read-write data.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>EarlyIdentityMappedPages {
+    _init:   MappedPages,
+    _text:   MappedPages,
+    _rodata: MappedPages,
+    _data:   MappedPages,
 }
 
 <span class="doccomment">/// Initializes the virtual memory management system.
@@ -468,37 +504,27 @@
 ///    but *should* be dropped before starting the first application.
 </span><span class="kw">pub fn </span>init_post_heap(
     page_table: PageTable,
-    <span class="kw-2">mut </span>additional_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
-    <span class="kw-2">mut </span>identity_mapped_pages: [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>],
+    additional_mapped_pages: MappedPages,
     heap_mapped_pages: MappedPages
-) -&gt; (MmiRef, NoDrop&lt;Vec&lt;MappedPages&gt;&gt;) {
+) -&gt; MmiRef {
     <span class="comment">// HERE: heap is initialized! We can now use `alloc` types.
 
     </span>page_allocator::convert_to_heap_allocated();
     frame_allocator::convert_to_heap_allocated();
 
-    <span class="kw">let </span><span class="kw-2">mut </span>additional_mapped_pages: Vec&lt;MappedPages&gt; = additional_mapped_pages
-        .iter_mut()
-        .filter_map(|opt| opt.take().map(NoDrop::into_inner))
-        .collect();
-    additional_mapped_pages.push(heap_mapped_pages);
-    <span class="kw">let </span>identity_mapped_pages: Vec&lt;MappedPages&gt; = identity_mapped_pages
-        .iter_mut()
-        .filter_map(|opt| opt.take().map(NoDrop::into_inner))
-        .collect();
-    <span class="kw">let </span>identity_mapped_pages = NoDrop::new(identity_mapped_pages);
+    <span class="kw">let </span>extra_mapped_pages = <span class="macro">alloc::vec!</span>[additional_mapped_pages, heap_mapped_pages];
    
     <span class="comment">// Construct the kernel&#39;s memory mgmt info, i.e., its address space info
     </span><span class="kw">let </span>kernel_mmi = MemoryManagementInfo {
         page_table,
-        extra_mapped_pages: additional_mapped_pages,
+        extra_mapped_pages,
     };
 
     <span class="kw">let </span>kernel_mmi_ref = KERNEL_MMI.call_once( || {
         Arc::new(MutexIrqSafe::new(kernel_mmi))
     });
 
-    (kernel_mmi_ref.clone(), identity_mapped_pages)
+    kernel_mmi_ref.clone()
 }
 </code></pre></div>
 </section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="memory" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.67.0-nightly (edf018221 2022-11-02)" ></div></body></html>

@@ -407,6 +407,18 @@
 <span id="407">407</span>
 <span id="408">408</span>
 <span id="409">409</span>
+<span id="410">410</span>
+<span id="411">411</span>
+<span id="412">412</span>
+<span id="413">413</span>
+<span id="414">414</span>
+<span id="415">415</span>
+<span id="416">416</span>
+<span id="417">417</span>
+<span id="418">418</span>
+<span id="419">419</span>
+<span id="420">420</span>
+<span id="421">421</span>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -421,6 +433,8 @@
 <span class="kw">mod </span>table;
 
 <span class="kw">pub use </span>page_table_entry::PageTableEntry;
+
+<span class="kw">use </span><span class="kw">crate</span>::EarlyIdentityMappedPages;
 
 <span class="kw">pub use </span><span class="self">self</span>::{
     temporary_page::TemporaryPage,
@@ -532,12 +546,12 @@
     ///
     /// # Note
     /// This does not perform any task switching or changing of the current page table register (e.g., cr3).
-    </span><span class="kw">pub fn </span>with&lt;F&gt;(
+    </span><span class="kw">pub fn </span>with&lt;F, R&gt;(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         other_table: <span class="kw-2">&amp;mut </span>PageTable,
         f: F,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
-        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>Mapper, <span class="kw-2">&amp;</span>Mapper) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;R, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+        <span class="kw">where </span>F: FnOnce(<span class="kw-2">&amp;mut </span>Mapper, <span class="kw-2">&amp;</span>Mapper) -&gt; <span class="prelude-ty">Result</span>&lt;R, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
     {
         <span class="kw">let </span>active_p4_frame = get_current_p4();
         <span class="kw">if </span><span class="self">self</span>.p4_table.start() != <span class="kw-2">&amp;</span>active_p4_frame || <span class="self">self</span>.p4_table.end() != <span class="kw-2">&amp;</span>active_p4_frame {
@@ -639,14 +653,6 @@
     <span class="kw">let </span>new_p4_frame = frame_allocator::allocate_frames(<span class="number">1</span>).ok_or(<span class="string">&quot;couldn&#39;t allocate frame for new page table&quot;</span>)<span class="question-mark">?</span>; 
     <span class="kw">let </span><span class="kw-2">mut </span>new_table = PageTable::new_table(<span class="kw-2">&amp;mut </span>page_table, new_p4_frame, <span class="prelude-val">None</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let </span><span class="kw-2">mut </span>text_mapped_pages:        <span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>rodata_mapped_pages:      <span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>data_mapped_pages:        <span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>stack_page_group:         <span class="prelude-ty">Option</span>&lt;(AllocatedPages, NoDrop&lt;MappedPages&gt;)&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>boot_info_mapped_pages:   <span class="prelude-ty">Option</span>&lt;MappedPages&gt; = <span class="prelude-val">None</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>additional_mapped_pages:  [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>] = Default::default();
-    <span class="kw">let </span><span class="kw-2">mut </span>identity_mapped_pages:    [<span class="prelude-ty">Option</span>&lt;NoDrop&lt;MappedPages&gt;&gt;; <span class="number">32</span>] = Default::default();
-
     <span class="comment">// Stack frames are not guaranteed to be contiguous in physical memory.
     </span><span class="kw">let </span>stack_size = boot_info.stack_size()<span class="question-mark">?</span>;
     <span class="kw">let </span>stack_page_range = PageRange::from_virt_addr(
@@ -660,8 +666,17 @@
     </span><span class="kw">let </span>boot_info_page_range = PageRange::from_virt_addr(boot_info_start_vaddr, boot_info_size);
     <span class="macro">debug!</span>(<span class="string">&quot;Boot info start: {boot_info_start_vaddr:#X}, size: {boot_info_size:#X}, {boot_info_page_range:#X?}&quot;</span>);
 
-    <span class="comment">// Create and initialize a new page table with the same contents as the currently-executing kernel code/data sections.
-    </span>page_table.with(<span class="kw-2">&amp;mut </span>new_table, |new_mapper, current_mapper| {
+    <span class="comment">// Create and initialize a new page table with the same contents as the currently-executing kernel.
+    // This closure returns those new sections&#39; mappings.
+    </span><span class="kw">let </span>(
+        text_mapped_pages,
+        rodata_mapped_pages,
+        data_mapped_pages,
+        stack_page_group,
+        boot_info_mapped_pages,
+        identity_mapped_pages,
+        additional_mapped_pages,
+    ) = page_table.with(<span class="kw-2">&amp;mut </span>new_table, |new_mapper, current_mapper| {
         <span class="comment">// Map every section found in the kernel image (given by the boot information above) into our new page table. 
         // To allow the APs to boot up, we must identity map those kernel sections too, i.e., 
         // map the same physical frames to both lower-half and higher-half virtual addresses. 
@@ -674,8 +689,6 @@
         // but before we start running applications.
 
         </span><span class="macro">debug!</span>(<span class="string">&quot;{:X?}&quot;</span>, aggregated_section_memory_bounds);
-        <span class="kw">let </span><span class="kw-2">mut </span>index_identity = <span class="number">0</span>;
-        <span class="kw">let </span><span class="kw-2">mut </span>index_addtl    = <span class="number">0</span>;
 
         <span class="kw">let </span>(init_start_virt,    init_start_phys)    = aggregated_section_memory_bounds.init.start;
         <span class="kw">let </span>(init_end_virt,      init_end_phys)      = aggregated_section_memory_bounds.init.end;
@@ -691,45 +704,48 @@
         <span class="kw">let </span>rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         <span class="kw">let </span>data_flags    = aggregated_section_memory_bounds.data.flags;
 
+        <span class="kw">let </span>init_identity_mapped_pages:    NoDrop&lt;MappedPages&gt;;
+        <span class="kw">let </span>text_identity_mapped_pages:    NoDrop&lt;MappedPages&gt;;
+        <span class="kw">let </span>rodata_identity_mapped_pages:  NoDrop&lt;MappedPages&gt;;
+        <span class="kw">let </span>data_identity_mapped_pages:    NoDrop&lt;MappedPages&gt;;
+        <span class="kw">let </span>additional_mapped_pages:       NoDrop&lt;MappedPages&gt;;
+        <span class="kw">let </span><span class="kw-2">mut </span>boot_info_mapped_pages:    <span class="prelude-ty">Option</span>&lt;MappedPages&gt; = <span class="prelude-val">None</span>;
+
         <span class="kw">let </span>init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>init_frames = frame_allocator::allocate_frames_by_bytes_at(init_start_phys, init_end_phys.value() - init_start_phys.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>init_pages_identity = page_allocator::allocate_pages_by_bytes_at(
             VirtualAddress::new_canonical(init_start_phys.value()),
             init_end_phys.value() - init_start_phys.value(),
         )<span class="question-mark">?</span>;
-        identity_mapped_pages[index_identity] = <span class="prelude-val">Some</span>(NoDrop::new( <span class="kw">unsafe </span>{
+        init_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, <span class="kw-2">&amp;</span>init_frames, init_flags)<span class="question-mark">?
-        </span>}));
+        </span>});
         <span class="kw">let </span><span class="kw-2">mut </span>init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)<span class="question-mark">?</span>;
-        index_identity += <span class="number">1</span>;
 
         <span class="kw">let </span>text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())<span class="question-mark">?</span>;
-        identity_mapped_pages[index_identity] = <span class="prelude-val">Some</span>(NoDrop::new( <span class="kw">unsafe </span>{
+        text_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, <span class="kw-2">&amp;</span>text_frames, text_flags)<span class="question-mark">?
-        </span>}));
+        </span>});
         init_mapped_pages.merge(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)<span class="question-mark">?</span>).map_err(|(error, <span class="kw">_</span>)| error)<span class="question-mark">?</span>;
-        text_mapped_pages = <span class="prelude-val">Some</span>(NoDrop::new(init_mapped_pages));
-        index_identity += <span class="number">1</span>;
+        <span class="kw">let </span>text_mapped_pages = NoDrop::new(init_mapped_pages);
 
         <span class="kw">let </span>rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())<span class="question-mark">?</span>;
-        identity_mapped_pages[index_identity] = <span class="prelude-val">Some</span>(NoDrop::new( <span class="kw">unsafe </span>{
+        rodata_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, <span class="kw-2">&amp;</span>rodata_frames, rodata_flags)<span class="question-mark">?
-        </span>}));
-        rodata_mapped_pages = <span class="prelude-val">Some</span>(NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)<span class="question-mark">?</span>));
-        index_identity += <span class="number">1</span>;
+        </span>});
+        <span class="kw">let </span>rodata_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)<span class="question-mark">?</span>);
 
         <span class="kw">let </span>data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())<span class="question-mark">?</span>;
-        identity_mapped_pages[index_identity] = <span class="prelude-val">Some</span>(NoDrop::new( <span class="kw">unsafe </span>{
+        data_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, <span class="kw-2">&amp;</span>data_frames, data_flags)<span class="question-mark">?
-        </span>}));
-        data_mapped_pages = <span class="prelude-val">Some</span>(NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)<span class="question-mark">?</span>));
-        index_identity += <span class="number">1</span>;
+        </span>});
+        <span class="kw">let </span>data_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)<span class="question-mark">?</span>);
 
         <span class="comment">// Handle the stack (a separate data section), which consists of one guard page (unmapped)
         // followed by the real (mapped) stack pages.
@@ -750,10 +766,10 @@
                 stack_mapped_pages = <span class="prelude-val">Some</span>(mapped_pages);
             }
         }
-        stack_page_group = <span class="prelude-val">Some</span>((
+        <span class="kw">let </span>stack_page_group = (
             stack_guard_page,
             NoDrop::new(stack_mapped_pages.ok_or(<span class="string">&quot;no pages were allocated for the stack&quot;</span>)<span class="question-mark">?</span>),
-        ));
+        );
 
         <span class="comment">// Map the VGA display memory as writable. 
         // We map this *only* using an identity mapping, as it is only used during early init
@@ -764,10 +780,9 @@
             vga_size_in_bytes,
         )<span class="question-mark">?</span>;
         <span class="kw">let </span>vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)<span class="question-mark">?</span>;
-        additional_mapped_pages[index_addtl] = <span class="prelude-val">Some</span>(NoDrop::new(new_mapper.map_allocated_pages_to(
+        additional_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(
             vga_display_pages_identity, vga_display_frames, vga_flags,
-        )<span class="question-mark">?</span>));
-        index_addtl += <span class="number">1</span>;
+        )<span class="question-mark">?</span>);
 
         <span class="comment">// Map the bootloader info, a separate region of read-only memory, so that we can access it later.
         // This does not need to be identity mapped.
@@ -779,24 +794,33 @@
             <span class="kw">let </span>allocated_page = page_allocator::allocate_pages_at(page.start_address(), <span class="number">1</span>)<span class="question-mark">?</span>;
             <span class="kw">let </span>allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), <span class="number">1</span>)<span class="question-mark">?</span>;
             <span class="kw">let </span>mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())<span class="question-mark">?</span>;
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>boot_info_mapped_pages) = boot_info_mapped_pages {
-                boot_info_mapped_pages.merge(mapped_pages).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to merge boot info pages&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref mut </span>boot_info_mp) = boot_info_mapped_pages {
+                boot_info_mp.merge(mapped_pages).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to merge boot info pages&quot;</span>)<span class="question-mark">?</span>;
             } <span class="kw">else </span>{
                 boot_info_mapped_pages = <span class="prelude-val">Some</span>(mapped_pages);
             }
         }
 
-        <span class="macro">debug!</span>(<span class="string">&quot;identity_mapped_pages: {:?}&quot;</span>, <span class="kw-2">&amp;</span>identity_mapped_pages[..index_identity]);
-        <span class="macro">debug!</span>(<span class="string">&quot;additional_mapped_pages: {:?}&quot;</span>, <span class="kw-2">&amp;</span>additional_mapped_pages[..index_addtl]);
-
-        <span class="prelude-val">Ok</span>(())
+        <span class="kw">let </span>identity_mapped_pages = NoDrop::new(EarlyIdentityMappedPages {
+            _init:   init_identity_mapped_pages.into_inner(),
+            _text:   text_identity_mapped_pages.into_inner(),
+            _rodata: rodata_identity_mapped_pages.into_inner(),
+            _data:   data_identity_mapped_pages.into_inner(),
+        });
+        <span class="macro">debug!</span>(<span class="string">&quot;{identity_mapped_pages:?}&quot;</span>);
+        <span class="macro">debug!</span>(<span class="string">&quot;{additional_mapped_pages:?}&quot;</span>);
+        <span class="prelude-val">Ok</span>((
+            text_mapped_pages,
+            rodata_mapped_pages,
+            data_mapped_pages,
+            stack_page_group,
+            boot_info_mapped_pages,
+            identity_mapped_pages,
+            additional_mapped_pages,
+        ))
     })<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>text_mapped_pages       = text_mapped_pages     .ok_or(<span class="string">&quot;Couldn&#39;t map .text section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>rodata_mapped_pages     = rodata_mapped_pages   .ok_or(<span class="string">&quot;Couldn&#39;t map .rodata section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>data_mapped_pages       = data_mapped_pages     .ok_or(<span class="string">&quot;Couldn&#39;t map .data section&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>boot_info_mapped_pages  = boot_info_mapped_pages.ok_or(<span class="string">&quot;Couldn&#39;t map boot_info pages section&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>stack_page_group        = stack_page_group      .ok_or(<span class="string">&quot;Couldn&#39;t map .stack section&quot;</span>)<span class="question-mark">?</span>;
 
     <span class="macro">debug!</span>(<span class="string">&quot;switching from old page table {:?} to new page table {:?}&quot;</span>, page_table, new_table);
     page_table.switch(<span class="kw-2">&amp;</span>new_table); 
