@@ -27,7 +27,7 @@ use log::{info, error};
 mod uefi_conv;
 mod context_switch;
 
-use context_switch::{create_stack, switch_to_task, landing_pad};
+use context_switch::{create_stack, switch_to_task, task_entrypoint};
 
 #[inline(never)]
 extern "C" fn inf_loop_0xbeef() -> ! {
@@ -97,7 +97,7 @@ fn main(
     info!("page table: {:?}", page_table);
 
     info!("Creating new stack");
-    let (_new_stack, stack_ptr) = create_stack(&mut page_table, landing_pad, 16)?;
+    let (_new_stack, stack_ptr) = create_stack(&mut page_table, task_entrypoint, 16)?;
 
     info!("Switching to new task");
     switch_to_task(stack_ptr);
