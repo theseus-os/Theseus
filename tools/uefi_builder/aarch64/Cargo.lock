@@ -674,7 +674,7 @@ dependencies = [
 [[package]]
 name = "uefi"
 version = "0.18.0"
-source = "git+https://github.com/rust-osdev/uefi-rs#8fe9a92185f38d30eac2688d89ee706cbbf5e4c2"
+source = "git+https://github.com/rust-osdev/uefi-rs#e8e0429f652b440a63941c4754a51be668f58ebc"
 dependencies = [
  "bitflags",
  "log",
@@ -686,9 +686,9 @@ dependencies = [
 [[package]]
 name = "uefi-bootloader"
 version = "0.1.0"
+source = "git+https://github.com/theseus-os/uefi-bootloader#1aeb6f29bf2f3cc2cd2ab2dee893bef5caa1f96c"
 dependencies = [
  "bit_field",
- "bitflags",
  "cfg-if",
  "cortex-a",
  "derive_more",
@@ -696,6 +696,7 @@ dependencies = [
  "log",
  "noto-sans-mono-bitmap",
  "paste",
+ "plain",
  "spin",
  "tock-registers",
  "uefi",
@@ -707,11 +708,12 @@ dependencies = [
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
+source = "git+https://github.com/theseus-os/uefi-bootloader#1aeb6f29bf2f3cc2cd2ab2dee893bef5caa1f96c"
 
 [[package]]
 name = "uefi-macros"
 version = "0.9.0"
-source = "git+https://github.com/rust-osdev/uefi-rs#8fe9a92185f38d30eac2688d89ee706cbbf5e4c2"
+source = "git+https://github.com/rust-osdev/uefi-rs#e8e0429f652b440a63941c4754a51be668f58ebc"
 dependencies = [
  "proc-macro2",
  "quote",
