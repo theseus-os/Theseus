@@ -994,12 +994,7 @@ impl RelocationEntry {
     /// does NOT depend on the target section's address itself in any way 
     /// (i.e., it only depends on the source section)
     pub fn is_absolute(&self) -> bool {
-        match self.typ {
-            R_X86_64_32 | 
-            R_X86_64_64 => true,
-            _ => false,
-        }
-        // matches!(self.typ, R_X86_64_32 | R_X86_64_64)
+        matches!(self.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 

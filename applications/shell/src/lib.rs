@@ -848,10 +848,7 @@ impl Shell {
         };
 
         // Check if the last character is a slash.
-        let slash_ending = match incomplete_cmd.chars().last() {
-            Some('/') => true,
-            _ => false
-        };
+        let slash_ending = matches!(incomplete_cmd.chars().last(), Some('/'));
 
         // Split the path by slash and filter out consecutive slashes.
         let mut nodes: Vec<_> = incomplete_cmd.split('/').filter(|node| { !node.is_empty() }).collect();

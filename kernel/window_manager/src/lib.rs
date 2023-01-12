@@ -364,10 +364,8 @@ impl WindowManager {
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            if current_active_win.contains(*coordinate - current_coordinate) || match current_active_win.moving {
-                WindowMovingStatus::Moving(_) => true,
-                _ => false,
-            }{
+            if current_active_win.contains(*coordinate - current_coordinate) || matches!(current_active_win.moving, WindowMovingStatus::Moving(_))
+            {
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win.send_event(Event::MousePositionEvent(event))

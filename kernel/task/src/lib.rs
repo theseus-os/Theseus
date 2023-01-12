@@ -646,10 +646,7 @@ impl Task {
     /// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        match self.runstate() {
-            RunState::Exited | RunState::Reaped => true,
-            _ => false,
-        }
+        matches!(self.runstate(), RunState::Exited | RunState::Reaped)
     }
 
     /// Returns `true` if this is an application `Task`. 
