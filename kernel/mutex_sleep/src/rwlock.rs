@@ -64,10 +64,11 @@ impl<T> RwLockSleep<T> {
 impl<T: ?Sized> RwLockSleep<T> {
     /// Returns `true` if the lock is currently held.
     ///
-    /// # Safety
-    ///
     /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     #[inline(always)]
     pub fn is_locked(&self) -> bool {
         self.rwlock.is_locked()
@@ -134,10 +135,11 @@ impl<T: ?Sized> RwLockSleep<T> {
 
     /// Return the number of readers that currently hold the lock (including upgradable readers).
     ///
-    /// # Safety
-    ///
     /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub fn reader_count(&self) -> usize {
         self.rwlock.reader_count()
     }
@@ -146,10 +148,11 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///
     /// Because [`RwLockSleep`] guarantees exclusive mutable access, this function may only return either `0` or `1`.
     ///
-    /// # Safety
-    ///
     /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub fn writer_count(&self) -> usize {
         self.rwlock.writer_count()
     }
@@ -160,6 +163,9 @@ impl<T: ?Sized> RwLockSleep<T> {
     /// live, or if called more times than `read` has been called, but can be
     /// useful in FFI contexts where the caller doesn't know how to deal with
     /// RAII.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn force_read_decrement(&self) {
         self.rwlock.force_read_decrement();
     }
@@ -169,6 +175,9 @@ impl<T: ?Sized> RwLockSleep<T> {
     /// This is *extremely* unsafe if there are outstanding `RwLockSleepWriteGuard`s
     /// live, or if called when there are current readers, but can be useful in
     /// FFI contexts where the caller doesn't know how to deal with RAII.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn force_write_unlock(&self) {
         self.rwlock.force_write_unlock();
     }

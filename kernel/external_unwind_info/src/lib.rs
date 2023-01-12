@@ -60,6 +60,9 @@ pub struct ExternalUnwindInfo {
 /// 
 /// Returns an error if unwinding information has already been registered 
 /// for the given `text_section_base_address`.
+/// 
+/// # Safety
+/// [TODO: Add safety documentation]
 pub unsafe fn register_unwind_info(
     text_section_base_address: *mut u8,
     text_section_len: usize,
@@ -91,6 +94,9 @@ pub unsafe fn register_unwind_info(
 /// 
 /// Returns an error if no unwinding information was registered
 /// for the given `text_section_base_address`.
+/// 
+/// # Safety
+/// [TODO: Add safety documentation]
 pub unsafe fn deregister_unwind_info(
     text_section_base_address: *mut u8
 ) -> Result<(), ()> {

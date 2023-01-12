@@ -227,7 +227,7 @@ match-ref-pats
 match-result-ok
 mem-replace-option-with-none
 mem-replace-with-default
-# missing-safety-doc
+missing-safety-doc
 mixed-case-hex-literals
 module-inception
 must-use-unit

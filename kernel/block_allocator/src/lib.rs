@@ -62,6 +62,9 @@ impl FixedSizeBlockAllocator {
     /// This function is unsafe because the caller must guarantee that the given
     /// heap bounds are valid and that the heap is unused. This method must be
     /// called only once.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn init(&mut self, heap_start: usize, heap_size: usize) {
         self.fallback_allocator.init(heap_start, heap_size);
     }
@@ -80,6 +83,9 @@ impl FixedSizeBlockAllocator {
     /// Allocator first tries to find the smallest block size that is greater or equal to the required size. 
     /// If a block of that size is available then it is returned, 
     /// otherwise it tries to allocate from the fallback allocator.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn allocate(&mut self, layout: Layout) -> *mut u8 {
         match list_index(&layout) {
             Some(index) => {
@@ -109,6 +115,9 @@ impl FixedSizeBlockAllocator {
     /// If the allocation returned is one of the fixed block sizes, 
     /// then it is returned to the head of the block list.
     /// Otherwise, it is deallocated using the fallback allocator.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn deallocate(&mut self, ptr: *mut u8, layout: Layout) {
          match list_index(&layout) {
             Some(index) => {

@@ -153,6 +153,9 @@ impl<T: ?Sized> RwLockPreempt<T> {
     /// live, or if called more times than `read` has been called, but can be
     /// useful in FFI contexts where the caller doesn't know how to deal with
     /// RAII.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn force_read_decrement(&self) {
         self.rwlock.force_read_decrement();
     }
@@ -162,6 +165,9 @@ impl<T: ?Sized> RwLockPreempt<T> {
     /// This is *extremely* unsafe if there are outstanding `RwLockPreemptWriteGuard`s
     /// live, or if called when there are current readers, but can be useful in
     /// FFI contexts where the caller doesn't know how to deal with RAII.
+    /// 
+    /// # Safety
+    /// [TODO: Add safety documentation]
     pub unsafe fn force_write_unlock(&self) {
         self.rwlock.force_write_unlock();
     }
