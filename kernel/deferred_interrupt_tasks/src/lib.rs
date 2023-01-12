@@ -68,7 +68,7 @@ pub enum InterruptRegistrationError {
     /// the interrupt handler at the given `existing_handler_address`.
     IrqInUse {
         irq: u8,
-        existing_handler_address: u64
+        existing_handler_address: usize
     },
     /// The given error occurred when spawning the deferred interrupt task.
     SpawnError(&'static str),
