@@ -70,7 +70,7 @@ pub fn main(args: Vec<String>) -> isize {
             scheduler::schedule();
         }
 
-        task.retrieve_exit_value().unwrap();
+        task.join().expect("failed to join task");
     }
     let end = now::<Monotonic>();
 

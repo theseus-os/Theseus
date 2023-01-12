@@ -1,0 +1,37 @@
+[package]
+name = "less"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+
+[dependencies]
+getopts = "0.2.21"
+spin = "0.9.0"
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+
+[dependencies.task]
+path = "../../kernel/task"
+
+[dependencies.path]
+path = "../../kernel/path"
+
+[dependencies.fs_node]
+path = "../../kernel/fs_node"
+
+[dependencies.keycodes_ascii]
+path = "../../libs/keycodes_ascii"
+
+[dependencies.libterm]
+path = "../../kernel/libterm"
+
+[dependencies.app_io]
+path = "../../kernel/app_io"
+
+[dependencies.stdio]
+path = "../../libs/stdio"
+
+[dependencies.log]
+version = "0.4.8"
+
+
+[lib]
+crate-type = ["rlib"]

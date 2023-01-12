@@ -10,8 +10,8 @@ getopts = "0.2.21"
 version = "0.7.9"
 default-features = false
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"

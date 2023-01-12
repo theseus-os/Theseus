@@ -16,9 +16,19 @@ AP_NMI_LINT         equ TRAMPOLINE + 56
 AP_NMI_FLAGS        equ TRAMPOLINE + 64
 AP_MAX_FB_WIDTH     equ TRAMPOLINE + 72
 AP_MAX_FB_HEIGHT    equ TRAMPOLINE + 80
+AP_GDT              equ TRAMPOLINE + 88
 
 ; Kernel is linked to run at -2Gb
 KERNEL_OFFSET equ 0xFFFFFFFF80000000
 
+; Debug builds require a larger initial boot stack,
+; because their code is larger and less optimized.
+%ifndef INITIAL_STACK_SIZE
+%ifdef DEBUG
+	INITIAL_STACK_SIZE equ 32 ; 32 pages for debug builds
+%else
+	INITIAL_STACK_SIZE equ 16 ; 16 pages for release builds
+%endif ; DEBUG
+%endif ; INITIAL_STACK_SIZE
 
-%endif
+%endif ; __DEFINES_ASM

@@ -10,7 +10,6 @@
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::{cmp, convert::TryFrom as _};
-use core2::io::{Read, Write};
 use fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 use hashbrown::HashMap;
 use memfs::MemFile;
@@ -44,11 +43,11 @@ impl PosixNodeOrStdio {
     pub fn write(&mut self, buffer: &[u8]) -> Result<usize, wasi::Errno> {
         match self {
             PosixNodeOrStdio::Stdin => Err(wasi::ERRNO_NOTSUP),
-            PosixNodeOrStdio::Stdout => match app_io::stdout().unwrap().lock().write_all(buffer) {
+            PosixNodeOrStdio::Stdout => match app_io::stdout().unwrap().write_all(buffer) {
                 Ok(_) => Ok(buffer.len()),
                 Err(_) => Err(wasi::ERRNO_IO),
             },
-            PosixNodeOrStdio::Stderr => match app_io::stderr().unwrap().lock().write_all(buffer) {
+            PosixNodeOrStdio::Stderr => match app_io::stderr().unwrap().write_all(buffer) {
                 Ok(_) => Ok(buffer.len()),
                 Err(_) => Err(wasi::ERRNO_IO),
             },
@@ -68,7 +67,7 @@ impl PosixNodeOrStdio {
     /// Otherwise, returns a wasi::Errno.
     pub fn read(&mut self, buffer: &mut [u8]) -> Result<usize, wasi::Errno> {
         match self {
-            PosixNodeOrStdio::Stdin => match app_io::stdin().unwrap().lock().read(buffer) {
+            PosixNodeOrStdio::Stdin => match app_io::stdin().unwrap().read(buffer) {
                 Ok(bytes_read) => Ok(bytes_read),
                 Err(_) => Err(wasi::ERRNO_IO),
             },
@@ -353,6 +352,7 @@ impl FileDescriptorTable {
     /// # Return
     /// If successful, returns resulting file descriptor number.
     /// Otherwise, returns a wasi::Errno.
+    #[allow(clippy::too_many_arguments)]
     pub fn open_path(
         &mut self,
         path: &str,
@@ -486,12 +486,10 @@ impl FileDescriptorTable {
     /// # Return
     /// Returns corresponding file system node if exists.
     pub fn get_posix_node(&mut self, fd: wasi::Fd) -> Option<&mut PosixNode> {
-        match self.get_posix_node_or_stdio(fd) {
-            Some(posix_node_or_stdio) => match posix_node_or_stdio {
-                PosixNodeOrStdio::Inode(posix_node) => Some(posix_node),
-                _ => None,
-            },
-            None => None,
-        }
+        if let Some(PosixNodeOrStdio::Inode(posix_node)) = self.get_posix_node_or_stdio(fd) {
+            Some(posix_node)
+        } else {
+            None
+        }        
     }
 }

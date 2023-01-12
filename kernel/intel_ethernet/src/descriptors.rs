@@ -247,7 +247,7 @@ impl RxDescriptor for AdvancedRxDescriptor {
     }
 
     fn length(&self) -> u64 {
-        self.get_pkt_len() as u64
+        self.get_pkt_len()
     }
 }
 

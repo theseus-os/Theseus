@@ -5,7 +5,7 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate app_io;
 extern crate getopts;
@@ -194,9 +194,9 @@ impl Offset {
 ///    This is the difference between where the program is *actually* loaded in memory
 ///    and where the program *expected* to be loaded into memory.
 /// 4. A reference to the parsed `ElfFile`, whose lifetime is tied to the given `file_contents` parameter.
-fn parse_and_load_elf_executable<'f>(
-    file_contents: &'f [u8],
-) -> Result<(Vec<LoadedSegment>, VirtualAddress, Offset, ElfFile<'f>), String> {
+fn parse_and_load_elf_executable(
+    file_contents: &[u8],
+) -> Result<(Vec<LoadedSegment>, VirtualAddress, Offset, ElfFile), String> {
     debug!("Parsing Elf executable of size {}", file_contents.len());
 
     let elf_file = ElfFile::new(file_contents).map_err(String::from)?;

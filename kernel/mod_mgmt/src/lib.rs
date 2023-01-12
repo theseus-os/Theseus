@@ -1,3 +1,4 @@
+#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(let_chains)]
 
@@ -5,7 +6,12 @@
 #[macro_use] extern crate log;
 
 use core::{cmp::max, fmt, mem::size_of, ops::{Deref, Range}};
-use alloc::{boxed::Box, collections::{BTreeMap, btree_map, BTreeSet}, string::{String, ToString}, sync::{Arc, Weak}, vec::Vec};
+use alloc::{
+    boxed::Box, 
+    collections::{BTreeMap, btree_map, BTreeSet}, 
+    string::{String, ToString}, 
+    sync::{Arc, Weak}, vec::Vec
+};
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
 use util::round_up_power_of_two;
@@ -392,7 +398,7 @@ impl fmt::Debug for IntoCrateObjectFile {
         match self {
             Self::File(object_file) => dbg.field("File", &object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string())
             ),
             Self::AbsolutePath(p) => dbg.field("AbsolutePath", p),
             Self::Prefix(prefix) => dbg.field("Prefix", prefix),
@@ -617,7 +623,7 @@ impl CrateNamespace {
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
-    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    /// [`CowArc::clone()`] function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
         self.crate_tree.lock().get(crate_name.as_bytes())
             .map(|c| CowArc::clone_shallow(c))
@@ -636,7 +642,7 @@ impl CrateNamespace {
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
     /// that jointly exists in another namespace, they should invoke the 
-    /// [`CowArc::share()`](cow_arc/CowArc.share.html) function on the returned value.
+    /// [`CowArc::clone()`] function on the returned value.
     pub fn get_crate_and_namespace<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name: &str
@@ -915,7 +921,7 @@ impl CrateNamespace {
         for (new_crate_ref, elf_file) in partially_loaded_crates {
             self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
             let name = new_crate_ref.lock_as_ref().crate_name.clone();
-            self.crate_tree.lock().insert(name.into(), new_crate_ref);
+            self.crate_tree.lock().insert(name, new_crate_ref);
         }
 
         Ok(())
@@ -2661,7 +2667,7 @@ impl CrateNamespace {
 
         // We add a shared reference to that section's parent crate to this namespace as well, 
         // to prevent that crate from being dropped while this namespace still relies on it.
-        self.crate_tree.lock().insert(parent_crate_name.into(), parent_crate_ref);
+        self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref);
         return Some(sec);
     }
 

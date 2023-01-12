@@ -1,6 +1,6 @@
 #![no_std]
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate debugit;
 
 extern crate task;

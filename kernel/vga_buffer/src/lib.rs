@@ -15,11 +15,11 @@ use core::fmt;
 use core::ptr::Unique;
 use spin::Mutex;
 use volatile::Volatile;
-use kernel_config::memory::KERNEL_OFFSET;
 
 
-/// defined by x86's physical memory maps
-const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
+/// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
+/// We must rely on the early bootstrap code to identity map this address.
+const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000;
 
 /// height of the VGA text window
 const BUFFER_HEIGHT: usize = 25;
@@ -56,7 +56,7 @@ macro_rules! print_raw {
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
         // to silence warnings about unused variables
-        drop(format_args!($($arg)*));
+        let _ = format_args!($($arg)*);
     });
 }
 

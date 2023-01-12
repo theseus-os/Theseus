@@ -1,0 +1,14 @@
+[package]
+name = "raw_mode"
+version = "0.1.0"
+authors = ["Zhiyao Ma <zm16@pku.edu.cn>"]
+edition = "2021"
+
+[dependencies.app_io]
+path = "../../kernel/app_io"
+
+[dependencies.log]
+version = "0.4.8"
+
+[lib]
+crate-type = ["rlib"]

@@ -1,16 +1,12 @@
-//! WARNING: DO NOT USE ANY ADDRESS THAT MAPS TO THE SAME P4 ENTRY AS THE ONE
-//! USED FOR THE RECURSIVE PAGE TABLE ENTRY (CURRENTLY 510). 
-//! Currently, that would be any address that starts with 0xFFFF_FF0*_****_****,
-//! so do not use that virtual address range for anything!!
-
+//! The basic virtual memory map that Theseus assumes.
+//!
 //! Current P4 (top-level page table) mappings:
-//! * 511: kernel text sections
-//! * 510: recursive mapping to top of P4
-//! * 509: kernel heap
-//! * 508: kernel stacks
-//! * 507: userspace stacks
-//! * 506 down to 0:  available for user processes
-
+//! * 511: kernel text sections.
+//! * 510: recursive mapping for accessing the current P4 root page table frame.
+//! * 509: kernel heap.
+//! * 508: recursive mapping for accessing the P4 root page table frame
+//!        of an upcoming new page table.
+//! * 507 down to 0: available for general usage.
 
 /// 64-bit architecture results in 8 bytes per address.
 pub const BYTES_PER_ADDR: usize = core::mem::size_of::<usize>();
@@ -36,18 +32,18 @@ pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
-/// Value: 512. 
+/// Value: 512.
 pub const ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
 /// Value: 511. The 511th entry is used for kernel text sections
 pub const KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 1;
-/// Value: 510. The 510th entry is used for the recursive P4 mapping.
+/// Value: 510. The 510th entry is used to recursively map the current P4 root page table frame
+//              such that it can be accessed and modified just like any other level of page table.
 pub const RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 2;
 /// Value: 509. The 509th entry is used for the kernel heap
 pub const KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 3;
-/// Value: 508. The 508th entry is used for all kernel stacks
-pub const KERNEL_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
-/// Value: 507. The 507th entry is used for all userspace stacks
-pub const USER_STACK_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 5;
+/// Value: 508. The 508th entry is used to temporarily recursively map the P4 root page table frame
+//              of an upcoming (new) page table such that it can be accessed and modified.
+pub const UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - 4;
 
 
 pub const MAX_PAGE_NUMBER: usize = MAX_VIRTUAL_ADDRESS / PAGE_SIZE;
@@ -88,17 +84,5 @@ pub const KERNEL_HEAP_INITIAL_SIZE: usize = 256 * 1024 * 1024; // 256 MiB, debug
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
-
-/// the kernel stack allocator gets the 508th P4 entry of addressability.
-/// actual value: 0o177777_774_000_000_000_0000, or 0xFFFF_FE00_0000_0000 
-pub const KERNEL_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | (KERNEL_STACK_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// the highest actually usuable address in the kernel stack allocator
-pub const KERNEL_STACK_ALLOCATOR_TOP_ADDR: usize = KERNEL_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
-
-
-/// the userspace stack allocators (one per userspace task) each get the 507th P4 entry of addressability.
-/// actual value: 0o177777_773_000_000_000_0000, or 0xFFFF_FD80_0000_0000  
-pub const USER_STACK_ALLOCATOR_BOTTOM: usize = 0xFFFF_0000_0000_0000 | (USER_STACK_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// the highest actually usuable address in each userspace stack allocator
-pub const USER_STACK_ALLOCATOR_TOP_ADDR: usize = USER_STACK_ALLOCATOR_BOTTOM + ADDRESSABILITY_PER_P4_ENTRY - BYTES_PER_ADDR;
-
+/// The system (page allocator) must not use addresses at or above this address.
+pub const UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START: usize = 0xFFFF_0000_0000_0000 | (UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));

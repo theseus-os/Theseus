@@ -88,7 +88,7 @@ impl<'t> RsdtXsdt<'t> {
 
     /// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries
     /// included in this RSDT or XSDT.
-    pub fn addresses<'r>(&'r self) -> impl Iterator<Item = PhysicalAddress> + 'r {
+    pub fn addresses(&self) -> impl Iterator<Item = PhysicalAddress> + '_ {
         let mut rsdt_iter = None;
         let mut xsdt_iter = None;
         match &self.0 {

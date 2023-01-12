@@ -22,6 +22,7 @@ extern crate ap_start;
 extern crate pause;
 
 use core::{
+    convert::TryInto,
     ops::DerefMut,
     sync::atomic::Ordering,
 };
@@ -30,7 +31,7 @@ use volatile::Volatile;
 use zerocopy::FromBytes;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
 use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
-use apic::{LocalApic, get_lapics, get_my_apic_id, has_x2apic, get_bsp_id, cpu_count};
+use apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
 use pause::spin_loop_hint;
@@ -48,7 +49,16 @@ const TRAMPOLINE: usize = AP_STARTUP - PAGE_SIZE;
 const GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE: usize = 0x100;
 
 /// Graphic mode information that will be updated after `handle_ap_cores()` is invoked. 
-pub static GRAPHIC_INFO: Mutex<GraphicInfo> = Mutex::new(GraphicInfo::new());
+static GRAPHIC_INFO: Mutex<Option<GraphicInfo>> = Mutex::new(None);
+
+/// Returns information about the currently-active graphical framebuffer.
+///
+/// This will return `None` if `handle_ap_cores()` has not yet been invoked
+/// (which is the function that obtains the graphic info in the first place),
+/// or if the obtained graphic info is invalid.
+pub fn get_graphic_info() -> Option<GraphicInfo> {
+    GRAPHIC_INFO.lock().filter(GraphicInfo::is_valid)
+}
 
 /// A structure to access information about the graphical framebuffer mode
 /// that was discovered and chosen in the AP's real-mode initialization sequence.
@@ -75,18 +85,32 @@ pub struct GraphicInfo {
     _attributes: u16,
     /// The total size of the graphic VGA memory in 64 KiB chunks.
     total_memory_size_64_kib_chunks: u16,
+    /// The number of bytes in each row or line of the framebuffer's memory.
+    /// This is similar to the "stride" of a framebuffer, but is expressed
+    /// in units of bytes rather than in units of pixels.
+    bytes_per_scanline: u16,
+    /// The size of each pixel, in number of bits.
+    bits_per_pixel: u8,
+    /// The size of a pixel's red component, in number of bits.
+    red_mask_size: u8,
+    /// The bit position of the least significant byte of a pixel's red component.
+    red_field_position: u8,
+    /// The size of a pixel's green component, in number of bits.
+    green_mask_size: u8,
+    /// The bit position of the least significant byte of a pixel's green component.
+    green_field_position: u8,
+    /// The size of a pixel's blue component, in number of bits.
+    blue_mask_size: u8,
+    /// The bit position of the least significant byte of a pixel's blue component.
+    blue_field_position: u8,
 }
 
 impl GraphicInfo {
-    const fn new() -> Self {
-        Self {
-            width: 0,
-            height: 0,
-            physical_address: 0,
-            _mode: 0,
-            _attributes: 0,
-            total_memory_size_64_kib_chunks: 0,
-        }
+    /// Checks this `GraphicInfo` to ensure it is valid.
+    ///
+    /// Currently, its width, height, and physical address all must be non-zero.
+    fn is_valid(&self) -> bool {
+        self.width != 0 && self.height != 0 && self.physical_address != 0
     }
 
     /// Returns the visible width of the screen, in pixels.
@@ -94,7 +118,7 @@ impl GraphicInfo {
         self.width
     }
 
-    /// Returns the height width of the screen, in pixels.
+    /// Returns the visible height of the screen, in pixels.
     pub fn height(&self) -> u16 {
         self.height
     }
@@ -112,6 +136,49 @@ impl GraphicInfo {
     pub fn total_memory_size_in_bytes(&self) -> u32 {
         (self.total_memory_size_64_kib_chunks as u32) << 16
     }
+
+    /// The number of bytes in each row or line of the framebuffer's memory.
+    ///
+    /// This is similar to the "stride" of a framebuffer, but is expressed
+    /// in units of bytes rather than in units of pixels.
+    pub fn bytes_per_scanline(&self) -> u16 {
+        self.bytes_per_scanline
+    }
+
+    /// The size of each pixel, in number of bits, *not* bytes.
+    pub fn bits_per_pixel(&self) -> u8 {
+        self.bits_per_pixel
+    }
+
+    /// The size of a pixel's Red value, in number of bits.
+    pub fn red_size(&self) -> u8 {
+        self.red_mask_size
+    }
+
+    /// The position of the least significant bit of a pixel's Red value.
+    pub fn red_position(&self) -> u8 {
+        self.red_field_position
+    }
+
+    /// The size of a pixel's Green value, in number of bits.
+    pub fn green_size(&self) -> u8 {
+        self.green_mask_size
+    }
+
+    /// The position of the least significant bit of a pixel's Green value.
+    pub fn green_position(&self) -> u8 {
+        self.green_field_position
+    }
+    
+    /// The size of a pixel's Blue value, in number of bits.
+    pub fn blue_size(&self) -> u8 {
+        self.blue_mask_size
+    }
+
+    /// The position of the least significant bit of a pixel's Blue value.
+    pub fn blue_position(&self) -> u8 {
+        self.blue_field_position
+    }
 }
 
 /// Starts up and sets up AP cores based on system information from ACPI
@@ -128,8 +195,9 @@ pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    ap_gdt: VirtualAddress,
     max_framebuffer_resolution: Option<(u16, u16)>,
-) -> Result<u8, &'static str> {
+) -> Result<u32, &'static str> {
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;
@@ -168,7 +236,7 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = get_my_apic_id();
+    let me = current_cpu();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {
@@ -195,6 +263,7 @@ pub fn handle_ap_cores(
     let (max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
     ap_trampoline_data.ap_max_fb_width.write(max_width);
     ap_trampoline_data.ap_max_fb_height.write(max_height);
+    ap_trampoline_data.ap_gdt.write(ap_gdt.value().try_into().map_err(|_| "AP_GDT physical address larger than u32::MAX")?);
 
     let acpi_tables = acpi::get_acpi_tables().lock();
     let madt = Madt::get(&acpi_tables)
@@ -215,7 +284,7 @@ pub fn handle_ap_cores(
 
                 // start up this AP, and have it create a new LocalApic for itself. 
                 // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                let bsp_lapic_ref = get_bsp_id()
+                let bsp_lapic_ref = bootstrap_cpu()
                     .and_then(|bsp_id| all_lapics.get(&bsp_id))
                     .ok_or("Couldn't get BSP's LocalApic!")?;
                 let mut bsp_lapic = bsp_lapic_ref.write();
@@ -242,9 +311,10 @@ pub fn handle_ap_cores(
 
     // Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
     {
-        let graphic_info = trampoline_mapped_pages.as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
+        let graphic_info = trampoline_mapped_pages
+            .as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
         info!("Obtained graphic info from real mode: {:?}", graphic_info);
-        *GRAPHIC_INFO.lock() = graphic_info.clone();
+        *GRAPHIC_INFO.lock() = Some(*graphic_info);
     }
     
     // Wait for all CPUs to finish booting and init
@@ -271,7 +341,7 @@ pub fn handle_ap_cores(
 /// # Important Layout Note
 /// The order of the members in this struct must exactly match how they are used
 /// and specified in the AP bootup code (at the top of `defines.asm`).
-#[derive(FromBytes)]
+#[derive(Debug, FromBytes)]
 #[repr(C)]
 struct ApTrampolineData {
     /// A flag that indicates whether the new AP is ready. 
@@ -305,6 +375,9 @@ struct ApTrampolineData {
     /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
     ap_max_fb_height:  Volatile<u16>,
     _padding5:         [u8; 6],
+    /// The location of the GDT_AP symbol in physical memory.
+    ap_gdt:            Volatile<u32>,
+    _padding6:         [u8; 4],
 }
 
 

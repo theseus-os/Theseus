@@ -11,7 +11,7 @@
 #[macro_use] extern crate alloc;
 extern crate task;
 extern crate hpet;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;

@@ -10,15 +10,15 @@ extern crate x86_64;
 extern crate pause;
 
 
-use core::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::PageRange;
 use apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
 use pause::spin_loop_hint;
 
 
-/// The number of remaining cores that still need to handle the curerent TLB shootdown IPI
-pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicU8 = AtomicU8::new(0);
+/// The number of remaining cores that still need to handle the current TLB shootdown IPI
+pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
 /// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
 pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 /// The range of pages for a TLB shootdown IPI.
@@ -48,7 +48,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 /// 
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
 pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::get_my_apic_id(), pages_to_invalidate);
+    // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::current_cpu(), pages_to_invalidate);
 
     for page in pages_to_invalidate {
         x86_64::instructions::tlb::flush(x86_64::VirtAddr::new(page.start_address().value() as u64));

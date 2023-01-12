@@ -11,6 +11,7 @@ path = "main.rs"
 
 [dependencies]
 log = "0.4.17"
+zerocopy = "0.5.0"
 
 logger = { path = "../logger" }
 frame_allocator = { path = "../../../kernel/frame_allocator" }
@@ -19,6 +20,7 @@ memory_structs = { path = "../../../kernel/memory_structs" }
 kernel_config = { path = "../../../kernel/kernel_config" }
 pte_flags = { path = "../../../kernel/pte_flags" }
 memory = { path = "../memory" }
+context_switch_regular = { path = "../context_switch_regular" }
 
 uefi = { version = "0.18", default-features = false, features = [ "alloc", "exts" ] }
 uefi-services = { version = "0.15", default-features = false, features = [ "panic_handler" ] }

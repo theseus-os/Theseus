@@ -9,11 +9,10 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
-extern crate print;
 extern crate event_types;
 extern crate displayable;
 extern crate font;
@@ -194,7 +193,7 @@ impl Terminal {
             if new_line_indices.len() == 0 {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
-                if end_idx <= self.scrollback_buffer.len() -1 {
+                if end_idx < self.scrollback_buffer.len() {
                     return Ok(end_idx); 
                 } else {
                     return Err(ScrollError::OffEndBound);
@@ -235,7 +234,7 @@ impl Terminal {
                 end_idx += last_line_chars;
             }
 
-            if end_idx <= self.scrollback_buffer.len() -1 {
+            if end_idx < self.scrollback_buffer.len() {
                 return Ok(end_idx); 
             } else {
                 return Err(ScrollError::OffEndBound);
@@ -449,7 +448,7 @@ impl Terminal {
         };
         terminal.display_text()?;
 
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
+        terminal.print_to_terminal("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n".to_string());
         Ok(terminal)
     }
 

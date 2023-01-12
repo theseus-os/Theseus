@@ -38,14 +38,7 @@ impl Instant {
     /// Returns the amount of time elapsed from another instant to this one, or
     /// zero duration if that instant is later than this one.
     pub fn duration_since(&self, earlier: Self) -> Duration {
-        let instant = Instant {
-            counter: match self.counter.checked_sub(earlier.counter) {
-                Some(value) => value,
-                None => return Duration::ZERO,
-            },
-        };
-        let femtos = u128::from(instant.counter) * u128::from(MONOTONIC_PERIOD.load());
-        Duration::from_nanos((femtos / FEMTOS_TO_NANOS) as u64)
+        self.checked_duration_since(earlier).unwrap_or_default()
     }
 
     pub fn checked_duration_since(&self, earlier: Self) -> Option<Duration> {
@@ -140,10 +133,17 @@ pub fn register_early_sleeper<T>(period: Period) -> bool
 where
     T: EarlySleeper,
 {
-    let old_period = EARLY_SLEEPER_PERIOD.load();
-    if period < old_period {
+    if EARLY_SLEEPER_PERIOD
+        .fetch_update(|old_period| {
+            if period < old_period {
+                Some(period)
+            } else {
+                None
+            }
+        })
+        .is_ok()
+    {
         EARLY_SLEEP_FUNCTION.store(T::sleep);
-        EARLY_SLEEPER_PERIOD.store(period.into());
         true
     } else {
         false
@@ -173,11 +173,19 @@ pub fn register_clock_source<T>(period: Period) -> bool
 where
     T: ClockSource,
 {
-    let old_period = T::ClockType::period_atomic().load();
-    if period < old_period {
+    let period_atomic = T::ClockType::period_atomic();
+    if period_atomic
+        .fetch_update(|old_period| {
+            if period < old_period {
+                Some(period)
+            } else {
+                None
+            }
+        })
+        .is_ok()
+    {
         let now_fn = T::ClockType::now_fn();
         now_fn.store(T::now);
-        T::ClockType::period_atomic().store(period);
 
         true
     } else {

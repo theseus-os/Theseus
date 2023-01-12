@@ -297,7 +297,7 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
         //     P::SIZE
         // );
 
-        let page = (ptr.as_ptr() as usize) & !(P::SIZE - 1) as usize;
+        let page = (ptr.as_ptr() as usize) & !(P::SIZE - 1);
 
         // Figure out which page we are on and construct a reference to it
         // TODO: The linked list will have another &mut reference
