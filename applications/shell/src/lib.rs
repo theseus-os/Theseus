@@ -1398,7 +1398,7 @@ impl Shell {
             self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
             return Ok(());
         }
-        if let Some('%') = args[0].chars().nth(0) {
+        if let Some('%') = args[0].chars().next() {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
@@ -1431,7 +1431,7 @@ impl Shell {
             self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
             return Ok(());
         }
-        if let Some('%') = args[0].chars().nth(0) {
+        if let Some('%') = args[0].chars().next() {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {

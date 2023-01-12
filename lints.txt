@@ -205,7 +205,7 @@ into-iter-on-ref
 is-digit-ascii-radix
 iter-cloned-collect
 iter-next-slice
-# iter-nth-zero
+iter-nth-zero
 # iter-skip-next
 just-underscores-and-digits
 # len-without-is-empty
