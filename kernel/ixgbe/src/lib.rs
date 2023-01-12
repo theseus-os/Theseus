@@ -1327,7 +1327,7 @@ fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
         Ok(ref ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
-            ixgbe_nic.interrupt_num.get(&qid).map(|int| *int)
+            ixgbe_nic.interrupt_num.get(&qid).cloned()
         }
         Err(e) => {
             error!("BUG: ixgbe_handler_{}(): {}", qid, e);

@@ -219,7 +219,7 @@ manual-map
 manual-non-exhaustive
 manual-range-contains
 manual-saturating-arithmetic
-# map-clone
+map-clone
 map-collect-result-unit
 # match-like-matches-macro
 match-overlapping-arm

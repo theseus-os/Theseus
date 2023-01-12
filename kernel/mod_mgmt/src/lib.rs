@@ -580,7 +580,7 @@ impl CrateNamespace {
     /// including all crates in any recursive namespaces as well if `recursive` is `true`.
     /// This is a slow method mostly for debugging, since it allocates a new vector of crate names.
     pub fn crate_names(&self, recursive: bool) -> Vec<StrRef> {
-        let mut crates: Vec<StrRef> = self.crate_tree.lock().keys().map(|n| n.clone()).collect();
+        let mut crates: Vec<StrRef> = self.crate_tree.lock().keys().cloned().collect();
 
         if recursive {
             if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
