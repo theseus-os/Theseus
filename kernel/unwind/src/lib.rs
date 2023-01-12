@@ -778,11 +778,11 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         continue_unwinding(unwinding_context_ptr)
     });
 
-    match &res {
-        &Ok(()) => {
+    match res {
+        Ok(()) => {
             debug!("unwinding procedure has reached the end of the stack.");
         }
-        &Err(e) => {
+        Err(e) => {
             error!("BUG: unwinding the first stack frame returned unexpectedly. Error: {}", e);
         }
     }

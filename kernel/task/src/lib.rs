@@ -177,10 +177,10 @@ pub enum KillReason {
 }
 impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match &self {
-            &Self::Requested         => write!(f, "Requested"),
-            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        match self {
+            Self::Requested         => write!(f, "Requested"),
+            Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
+            Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
         }
     }
 }
