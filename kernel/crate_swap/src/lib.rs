@@ -652,7 +652,7 @@ pub fn swap_crates(
             //        based on which directory its object file 
             {
                 let objfile_path = Path::new(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
-                if objfile_path.components().skip(1).next() == Some(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
+                if objfile_path.components().nth(1) == Some(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
                     let new_target_ns = this_namespace.recursive_namespace().unwrap_or(this_namespace);
                     #[cfg(not(loscd_eval))]
                     warn!("temp fix: changing target_ns from {} to {}, for crate {:?}", this_namespace.name(), new_target_ns.name(), new_crate_ref);
