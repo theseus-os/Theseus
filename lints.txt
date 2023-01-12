@@ -208,7 +208,7 @@ iter-next-slice
 iter-nth-zero
 iter-skip-next
 just-underscores-and-digits
-# len-without-is-empty
+len-without-is-empty
 # len-zero
 # let-and-return
 let-unit-value
