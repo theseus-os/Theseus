@@ -651,9 +651,11 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     let mouse_consumer: Queue<Event> = Queue::with_capacity(100);
     let mouse_producer = mouse_consumer.clone();
 
+    log::warn!("spawnining window manager");
     spawn::new_task_builder(window_manager_loop, (key_consumer, mouse_consumer))
         .name("window_manager_loop".to_string())
         .spawn()?;
+    log::warn!("spawned window manager");
 
     Ok((key_producer, mouse_producer))
 }

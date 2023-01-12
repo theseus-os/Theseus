@@ -39,13 +39,13 @@ pub fn main(args: Vec<String>) -> isize {
         
         if let Some(runqueue) = scheduler::get_run_queue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
-            for task in runqueue.iter() {
-                runqueue_contents.push_str(&format!("{} ({}) {}\n", 
-                    task.name, 
-                    task.id,
-                    if task.is_running() { "*" } else { "" },
-                ));
-            }
+            // for task in runqueue.iter() {
+            //     runqueue_contents.push_str(&format!("{} ({}) {}\n", 
+            //         task.name, 
+            //         task.id,
+            //         if task.is_running() { "*" } else { "" },
+            //     ));
+            // }
             println!("RunQueue:\n{}", runqueue_contents);
         }
         

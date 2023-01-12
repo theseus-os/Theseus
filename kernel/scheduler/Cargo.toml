@@ -22,9 +22,6 @@ path = "../task"
 [dependencies.preemption]
 path = "../preemption"
 
-[dependencies.runqueue]
-path = "../runqueue"
-
 [dependencies.mutex_preemption]
 path = "../mutex_preemption"
 

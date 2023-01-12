@@ -20,9 +20,6 @@ path = "../../kernel/acpi/hpet"
 [dependencies.apic]
 path = "../../kernel/apic"
 
-[dependencies.runqueue]
-path = "../../kernel/runqueue"
-
 [dependencies.hashbrown]
 version = "0.11.2"
 features = ["nightly"]

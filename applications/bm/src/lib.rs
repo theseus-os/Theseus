@@ -17,7 +17,6 @@ extern crate fs_node;
 extern crate apic;
 extern crate spawn;
 extern crate path;
-extern crate runqueue;
 extern crate heapfile;
 extern crate scheduler;
 extern crate libtest;

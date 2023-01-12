@@ -28,7 +28,6 @@ extern crate volatile;
 extern crate mpmc;
 extern crate rand;
 extern crate hpet;
-extern crate runqueue;
 extern crate network_interface_card;
 extern crate nic_initialization;
 extern crate intel_ethernet;

@@ -41,7 +41,7 @@ macro_rules! CPU_ID {
 /// Helper function return the tasks in a given core's runqueue
 pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
 	match scheduler::get_run_queue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
+		Some(rq) => { Some(rq.len()) }
 		_ => { None }
 	}
 }

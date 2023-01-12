@@ -10,7 +10,6 @@ extern crate spin;
 extern crate dfqueue;
 extern crate spawn;
 extern crate task;
-extern crate runqueue;
 extern crate event_types; 
 extern crate window_manager;
 extern crate path;

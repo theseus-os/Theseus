@@ -46,10 +46,11 @@ pub fn init(
     apic_id: u8,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    scheduler::init(apic_id)?;
-    
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
         task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+    let idle_task = create_idle_task(apic_id)?;
+    scheduler::init(apic_id, idle_task)?;
+    
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     scheduler::add_task_to_specific_run_queue(
         apic_id,
@@ -415,10 +416,13 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        if let Some(core) = self.pin_on_core {
-            scheduler::add_task_to_specific_run_queue(core, task_ref.clone())?;
-        } else {
-            scheduler::add_task_to_any_run_queue(task_ref.clone())?;
+        // TODO: Make nicer.
+        if !self.idle {
+            if let Some(core) = self.pin_on_core {
+                scheduler::add_task_to_specific_run_queue(core, task_ref.clone())?;
+            } else {
+                scheduler::add_task_to_any_run_queue(task_ref.clone())?;
+            }
         }
 
         Ok(task_ref)
@@ -990,22 +994,21 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
         if let Some(run_queue) = scheduler::get_run_queue(cpu::current_cpu()) {
-            run_queue.write().remove_task(current_task);
+            run_queue.write().remove(current_task);
         } else {
             error!("BUG: couldn't get run queue to remove exited task");
         }
     }
 }
 
-/// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let apic_id = cpu::current_cpu();
+pub fn create_idle_task(apic_id: u8) -> Result<TaskRef, &'static str> {
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
         .name(format!("idle_task_core_{}", apic_id))
         .idle(apic_id)
         .spawn_restartable(None)
+        .map(|task| task.clone())
 }
 
 /// A basic idle task that does nothing but loop endlessly.

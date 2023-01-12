@@ -1,21 +1,30 @@
 #![no_std]
 
-mod imp;
+extern crate alloc;
 
+mod imp;
+mod queue;
+
+use crate::queue::RunQueue;
 use atomic_linked_list::atomic_map::AtomicMap;
 use log::error;
 use mutex_preemption::RwLockPreempt;
-use runqueue::RunQueue;
+use task::TaskRef;
 
 pub use imp::{get_priority, set_periodicity, set_priority};
 
 // TODO: Is RwLockPreempt necessary? We already hold_preemption when we enter
 // the schedule function.
-static RUN_QUEUES: AtomicMap<u8, RwLockPreempt<RunQueue<imp::TaskRef>>> = AtomicMap::new();
+static RUN_QUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
 
-pub fn init(core: u8) -> Result<(), &'static str> {
+pub fn init(core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
+    #[cfg(runqueue_spillful)]
+    {
+        task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| remove_task_from_within_task);
+    }
+
     if RUN_QUEUES
-        .insert(core, RwLockPreempt::new(RunQueue::new(core)))
+        .insert(core, RwLockPreempt::new(RunQueue::new(core, idle_task)))
         .is_some()
     {
         Err("run queue already exists for this core")
@@ -24,37 +33,34 @@ pub fn init(core: u8) -> Result<(), &'static str> {
     }
 }
 
-pub fn get_run_queue(core: u8) -> Option<&'static RwLockPreempt<RunQueue<imp::TaskRef>>> {
+pub fn get_run_queue(core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
     RUN_QUEUES.get(&core)
 }
 
-pub fn add_task_to_any_run_queue(task: task::TaskRef) -> Result<(), &'static str> {
-    let task = imp::TaskRef::new(task);
-    get_least_busy_run_queue()
-        .ok_or("no run queues to add task to")?
-        .write()
-        .push_back(task);
+pub fn add_task_to_any_run_queue(task: TaskRef) -> Result<(), &'static str> {
+    let locked = get_least_busy_run_queue().ok_or("no run queues to add task to")?;
+    let mut unlocked = locked.write();
+    unlocked.add(task);
     Ok(())
 }
 
-pub fn add_task_to_specific_run_queue(core: u8, task: task::TaskRef) -> Result<(), &'static str> {
-    let task = imp::TaskRef::new(task);
+pub fn add_task_to_specific_run_queue(core: u8, task: TaskRef) -> Result<(), &'static str> {
     RUN_QUEUES
         .get(&core)
         .ok_or("run queue does not exist for core")?
         .write()
-        .push_back(task);
+        .add(task);
     Ok(())
 }
 
-pub fn remove_task_from_all(task: &task::TaskRef) {
+pub fn remove_task_from_all(task: &TaskRef) {
     for (_, run_queue) in RUN_QUEUES.iter() {
-        run_queue.write().remove_task(task);
+        run_queue.write().remove(task);
     }
 }
 
-fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue<imp::TaskRef>>> {
-    let mut min_rq: Option<(&'static RwLockPreempt<RunQueue<imp::TaskRef>>, usize)> = None;
+fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue>> {
+    let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
 
     for (_, rq) in RUN_QUEUES.iter() {
         let rq_size = rq.read().len();
@@ -68,7 +74,26 @@ fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue<imp::Tas
         }
     }
 
+    log::info!("THING: {min_rq:#?}");
     min_rq.map(|m| m.0)
+}
+
+#[cfg(runqueue_spillful)]
+/// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
+/// Note: This method is only used by the state spillful runqueue
+/// implementation.
+pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
+    task.set_on_runqueue(None);
+    RUN_QUEUES
+        .get(&core)
+        .ok_or("Couldn't get runqueue for specified core")
+        .and_then(|rq| {
+            // Instead of calling `remove_task`, we directly call `remove_internal`
+            // because we want to actually remove the task from the runqueue,
+            // as calling `remove_task` would do nothing due to it skipping the actual
+            // removal when the `runqueue_spillful` cfg is enabled.
+            rq.write().remove_internal(task)
+        })
 }
 
 /// Yields the current CPU by selecting a new `Task` to run
@@ -90,7 +115,7 @@ pub fn schedule() -> bool {
     }
 
     let apic_id = preemption_guard.cpu_id();
-    let run_queue = match RUN_QUEUES.get(&apic_id) {
+    let mut run_queue = match RUN_QUEUES.get(&apic_id) {
         Some(rq) => rq.write(),
         _ => {
             error!(
@@ -101,9 +126,8 @@ pub fn schedule() -> bool {
         }
     };
 
-    let Some(imp::TaskRef { inner: next_task, .. }) = imp::select_next_task(run_queue) else {
-        return false; // keep running the same current task
-    };
+    let next_task = run_queue.next();
+    drop(run_queue);
 
     let (did_switch, recovered_preemption_guard) =
         task::task_switch(next_task, apic_id, preemption_guard);

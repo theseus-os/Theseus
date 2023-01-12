@@ -372,7 +372,7 @@ pub fn pick_child_core() -> u8 {
 
 fn nr_tasks_in_rq(core: u8) -> Option<usize> {
 	match scheduler::get_run_queue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
+		Some(rq) => { Some(rq.len()) }
 		_ => { None }
 	}
 }

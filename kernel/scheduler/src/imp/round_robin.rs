@@ -1,64 +1,63 @@
-use core::ops::{Deref, DerefMut};
-use mutex_preemption::RwLockPreemptWriteGuard;
-use runqueue::RunQueue;
+use alloc::collections::VecDeque;
+use task::TaskRef;
 
-#[derive(Debug, Clone)]
-pub struct TaskRef {
-    pub(crate) inner: task::TaskRef,
+#[derive(Debug)]
+pub struct Queue {
+    inner: VecDeque<TaskRef>,
 }
 
-impl TaskRef {
-    pub(crate) fn new(task: task::TaskRef) -> Self {
-        Self { inner: task }
+impl Queue {
+    pub(crate) fn new() -> Self {
+        Self {
+            inner: VecDeque::new(),
+        }
     }
-}
 
-impl Deref for TaskRef {
-    type Target = task::TaskRef;
-
-    fn deref(&self) -> &Self::Target {
-        &self.inner
+    pub(crate) fn is_empty(&self) -> bool {
+        self.inner.is_empty()
     }
-}
 
-impl DerefMut for TaskRef {
-    fn deref_mut(&mut self) -> &mut task::TaskRef {
-        &mut self.inner
+    pub(crate) fn len(&self) -> usize {
+        self.inner.len()
     }
-}
 
-pub fn set_priority(_: &task::TaskRef, _: u8) {}
+    pub(crate) fn add(&mut self, task: task::TaskRef) {
+        self.inner.push_back(task)
+    }
 
-pub fn get_priority(_: &task::TaskRef) {}
+    pub(crate) fn remove(&mut self, task: &task::TaskRef) {
+        self.inner.retain(|t| t != task);
+    }
 
-pub fn set_periodicity(_: &TaskRef, _: usize) {}
+    pub(crate) fn next(&mut self) -> Option<task::TaskRef> {
+        for (i, task) in self.inner.iter().enumerate() {
+            // we skip the idle task, and only choose it if no other tasks are runnable
+            if task.is_an_idle_task {
+                panic!();
+            }
 
-pub(crate) fn select_next_task(
-    mut run_queue: RwLockPreemptWriteGuard<'_, RunQueue<TaskRef>>,
-) -> Option<TaskRef> {
-    let mut idle_task_index: Option<usize> = None;
-    let mut chosen_task_index: Option<usize> = None;
+            // must be runnable
+            if !task.is_runnable() {
+                continue;
+            }
 
-    for (i, t) in run_queue.iter().enumerate() {
-        // we skip the idle task, and only choose it if no other tasks are runnable
-        if t.inner.is_an_idle_task {
-            idle_task_index = Some(i);
-            continue;
+            let task = self.inner.swap_remove_front(i).unwrap();
+            self.inner.push_back(task.clone());
+            return Some(task);
         }
 
-        // must be runnable
-        if !t.inner.is_runnable() {
-            continue;
-        }
-
-        // found a runnable task!
-        chosen_task_index = Some(i);
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, &*t);
-        break;
+        return None;
     }
+}
 
-    // idle task is a backup iff no other task has been chosen
-    chosen_task_index
-        .or(idle_task_index)
-        .and_then(|index| run_queue.move_to_end(index))
+pub fn set_priority(_: &TaskRef, _: u8) -> Result<(), &'static str> {
+    Err("cannot set priority using round robin scheduler")
+}
+
+pub fn get_priority(_: &TaskRef) -> Option<usize> {
+    None
+}
+
+pub fn set_periodicity(_: &TaskRef, _: usize) -> Result<(), &'static str> {
+    Err("cannot set periodicity using round robin scheduler")
 }

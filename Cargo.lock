@@ -313,7 +313,6 @@ dependencies = [
  "path",
  "pmu_x86",
  "rendezvous",
- "runqueue",
  "scheduler",
  "simple_ipc",
  "spawn",
@@ -1032,7 +1031,6 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
  "signal_handler",
  "stack_trace",
  "task",
@@ -1363,7 +1361,6 @@ dependencies = [
  "libtest",
  "log",
  "qp-trie",
- "runqueue",
  "spawn",
 ]
 
@@ -1586,7 +1583,6 @@ dependencies = [
  "pic",
  "pit_clock_basic",
  "rand",
- "runqueue",
  "spin 0.9.4",
  "static_assertions",
  "virtual_nic",
@@ -1635,7 +1631,6 @@ dependencies = [
  "app_io",
  "debugit",
  "getopts",
- "runqueue",
  "task",
 ]
 
@@ -2460,7 +2455,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "runqueue",
  "stack_trace",
  "stack_trace_frame_pointers",
  "task",
@@ -2971,47 +2965,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "runqueue"
-version = "0.1.0"
-dependencies = [
- "log",
- "single_simd_task_optimization",
- "task",
-]
-
-[[package]]
-name = "runqueue_priority"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "mutex_preemption",
- "single_simd_task_optimization",
- "task",
-]
-
-[[package]]
-name = "runqueue_realtime"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "mutex_preemption",
- "task",
-]
-
-[[package]]
-name = "runqueue_round_robin"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "mutex_preemption",
- "single_simd_task_optimization",
- "task",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3052,7 +3005,6 @@ dependencies = [
  "log",
  "mutex_preemption",
  "preemption",
- "runqueue",
  "spin 0.9.4",
  "task",
 ]
@@ -3195,7 +3147,6 @@ dependencies = [
  "log",
  "path",
  "root",
- "runqueue",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -3345,7 +3296,6 @@ dependencies = [
  "path",
  "pause",
  "preemption",
- "runqueue",
  "scheduler",
  "spin 0.9.4",
  "stack",
@@ -3420,23 +3370,6 @@ dependencies = [
  "atomic_linked_list",
  "lazy_static",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "state_transfer"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "hpet",
- "irq_safety",
- "lazy_static",
- "log",
- "memory",
- "mod_mgmt",
- "runqueue_priority",
- "runqueue_round_robin",
- "spin 0.9.4",
- "task",
 ]
 
 [[package]]
