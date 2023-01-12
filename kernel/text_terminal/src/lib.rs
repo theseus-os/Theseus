@@ -624,7 +624,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
 
         // Now that we've handled modifying the scrollback buffer, we can move refresh the display.
         let _orig_screen_cursor = self.screen_cursor.position;
-        let new_screen_cursor = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+        let new_screen_cursor = self.backend.display(display_action, self.scrollback_buffer, None).unwrap();
         self.screen_cursor.position = new_screen_cursor;
 
         debug!("print({:?}): moved cursors from:\n\t {:?} -> {:?} \n\t {:?} -> {:?}",
@@ -668,7 +668,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
                     *self.scrollback_cursor,
                     self.screen_cursor.position,
                     1,
-                    &self.scrollback_buffer,
+                    self.scrollback_buffer,
                     screen_size,
                     wrap,
                 );
@@ -685,7 +685,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
                     scrollback_start: new_scrollback_position,
                     num_units: num_units_removed,
                 };
-                let screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+                let screen_cursor_after_display = self.backend.display(display_action, self.scrollback_buffer, None).unwrap();
                 debug!("After BackwardsDelete, screen cursor moved from {:?} -> {:?}", self.screen_cursor.position, screen_cursor_after_display);
                 self.screen_cursor.position = screen_cursor_after_display;
                 // warn!("Scrollback Buffer: {:?}", self.scrollback_buffer);
@@ -750,7 +750,7 @@ impl<'term, Backend: TerminalBackend> Perform for TerminalActionHandler<'term, B
                     num_units: num_units_removed,
                     scrollback_start: scrollback_cursor,
                 };
-                let _screen_cursor_after_display = self.backend.display(display_action, &self.scrollback_buffer, None).unwrap();
+                let _screen_cursor_after_display = self.backend.display(display_action, self.scrollback_buffer, None).unwrap();
                 assert_eq!(self.screen_cursor.position, _screen_cursor_after_display);
             }
             ('~', HOME_KEY_PARAM) => {
@@ -923,7 +923,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             //
             // (orig_scrollback_position, orig_screen_position),
             (self.scroll_position.start_point(), ScreenPoint::default()),
-            &self.scrollback_buffer,
+            self.scrollback_buffer,
             screen_size
         );
         *self.scrollback_cursor = new_scrollback_position;
@@ -958,7 +958,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
 
         let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
             (orig_scrollback_position, orig_screen_position),
-            &self.scrollback_buffer,
+            self.scrollback_buffer,
             screen_size
         );
         *self.scrollback_cursor = new_scrollback_position;
@@ -969,7 +969,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             *self.scrollback_cursor,
             self.screen_cursor.position,
             num_units,
-            &self.scrollback_buffer,
+            self.scrollback_buffer,
             self.backend.screen_size(),
             wrap,
         );
