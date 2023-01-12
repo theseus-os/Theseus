@@ -91,7 +91,7 @@ fn args_or_env_get(
 
         // Write content of current arg to argv_data buffer.
         memory
-            .set(argv_data.checked_add(argv_data_pos).unwrap(), &arg)
+            .set(argv_data.checked_add(argv_data_pos).unwrap(), arg)
             .unwrap();
         argv_data_pos = argv_data_pos
             .checked_add(u32::try_from(arg.len()).unwrap())
