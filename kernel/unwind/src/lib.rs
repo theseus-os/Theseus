@@ -98,9 +98,9 @@ pub struct UnwindingContext {
     /// A reference to the current task that is being unwound.
     current_task: TaskRef,
 }
-impl Into<(StackFrameIter, KillReason, TaskRef)> for UnwindingContext {
-    fn into(self) -> (StackFrameIter, KillReason, TaskRef) {
-        (self.stack_frame_iter, self.cause, self.current_task)
+impl From<UnwindingContext> for (StackFrameIter, KillReason, TaskRef){
+    fn from(val: UnwindingContext) -> Self {
+        (val.stack_frame_iter, val.cause, val.current_task)
     }
 }
 

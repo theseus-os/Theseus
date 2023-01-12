@@ -195,7 +195,7 @@ field-reassign-with-default
 fn-to-numeric-cast
 fn-to-numeric-cast-with-truncation
 for-kv-map
-# from-over-into
+from-over-into
 from-str-radix-10
 # inconsistent-digit-grouping
 infallible-destructuring-match

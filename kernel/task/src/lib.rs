@@ -261,9 +261,9 @@ impl From<Option<u8>> for OptionU8 {
         OptionU8(opt)
     }
 }
-impl Into<Option<u8>> for OptionU8 {
-    fn into(self) -> Option<u8> {
-        self.0
+impl From<OptionU8> for Option<u8> {
+    fn from(val: OptionU8) -> Self {
+        val.0
     }
 }
 impl fmt::Debug for OptionU8 {
