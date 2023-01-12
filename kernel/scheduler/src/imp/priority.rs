@@ -68,7 +68,7 @@ impl Queue {
         Some(task_ref)
     }
 
-    pub(crate) fn distribute_tokens(&mut self) {
+    fn distribute_tokens(&mut self) {
         let mut total_priorities = 1;
         for task in self.inner.iter().filter(|task| task.inner.is_runnable()) {
             total_priorities += 1 + task.priority as usize;
@@ -85,6 +85,10 @@ impl Queue {
                 .saturating_mul((task.priority as usize).saturating_add(1))
                 .wrapping_div(total_priorities);
         }
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+        self.inner.iter().map(|task| &task.inner)
     }
 
     pub(crate) fn get_priority(&self, task: &TaskRef) -> Option<u8> {

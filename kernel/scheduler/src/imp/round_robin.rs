@@ -30,14 +30,15 @@ impl Queue {
     }
 
     pub(crate) fn next(&mut self) -> Option<TaskRef> {
-        let index = self
-            .inner
-            .iter()
-            .position(|task| task.is_runnable())?;
+        let index = self.inner.iter().position(|task| task.is_runnable())?;
 
         let task = self.inner.remove(index).unwrap();
         self.inner.push_back(task.clone());
         Some(task)
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+        self.inner.iter()
     }
 
     pub(crate) fn get_priority(&self, _: &TaskRef) -> Option<u8> {

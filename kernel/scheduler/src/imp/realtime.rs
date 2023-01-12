@@ -52,6 +52,10 @@ impl Queue {
         Some(task_ref)
     }
 
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+        self.inner.iter().map(|task| &task.inner)
+    }
+
     pub(crate) fn get_priority(&self, _: &TaskRef) -> Option<u8> {
         None
     }

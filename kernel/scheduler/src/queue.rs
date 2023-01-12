@@ -3,9 +3,10 @@ use task::TaskRef;
 
 #[derive(Debug)]
 pub struct RunQueue {
-    pub(crate) core: u8,
-    pub(crate) idle_task: TaskRef,
-    pub(crate) queue: imp::Queue,
+    #[cfg_attr(not(single_simd_task_optimisation), allow(dead_code))]
+    core: u8,
+    idle_task: TaskRef,
+    queue: imp::Queue,
 }
 
 impl RunQueue {
@@ -54,6 +55,10 @@ impl RunQueue {
             Some(task) => task,
             None => self.idle_task.clone(),
         }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+        self.queue.iter()
     }
 
     pub fn get_priority(&self, task: &TaskRef) -> Option<u8> {
