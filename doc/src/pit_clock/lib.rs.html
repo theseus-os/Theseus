@@ -124,7 +124,7 @@
     <span class="comment">// Register the interrupt handler
     </span><span class="kw">match </span>interrupts::register_interrupt(PIT_CHANNEL_0_IRQ, pit_timer_handler) {
         <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; { <span class="comment">/* success, do nothing */</span>}
-        <span class="prelude-val">Err</span>(handler) <span class="kw">if </span>handler == pit_timer_handler <span class="kw">as </span>u64 =&gt; { <span class="comment">/* already registered, do nothing */ </span>}
+        <span class="prelude-val">Err</span>(handler) <span class="kw">if </span>handler == pit_timer_handler <span class="kw">as </span>usize =&gt; { <span class="comment">/* already registered, do nothing */ </span>}
         <span class="prelude-val">Err</span>(_other) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot; PIT clock IRQ was already in use; sharing IRQs is currently unsupported&quot;</span>),
     }
 

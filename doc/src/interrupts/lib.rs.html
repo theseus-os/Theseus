@@ -590,14 +590,14 @@
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
-</span><span class="kw">pub fn </span>register_interrupt(interrupt_num: u8, func: HandlerFunc) -&gt; <span class="prelude-ty">Result</span>&lt;(), u64&gt; {
+</span><span class="kw">pub fn </span>register_interrupt(interrupt_num: u8, func: HandlerFunc) -&gt; <span class="prelude-ty">Result</span>&lt;(), usize&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>idt = IDT.lock();
 
     <span class="comment">// If the existing handler stored in the IDT is either missing (has an address of `0`)
     // or is the default handler, that signifies the interrupt number is available.
     </span><span class="kw">let </span>idt_entry = <span class="kw-2">&amp;mut </span>idt[interrupt_num <span class="kw">as </span>usize];
-    <span class="kw">let </span>existing_handler_addr = idt_entry.handler_addr().as_u64();
-    <span class="kw">if </span>existing_handler_addr == <span class="number">0 </span>|| existing_handler_addr == unimplemented_interrupt_handler <span class="kw">as </span>u64 {
+    <span class="kw">let </span>existing_handler_addr = idt_entry.handler_addr().as_u64() <span class="kw">as </span>usize;
+    <span class="kw">if </span>existing_handler_addr == <span class="number">0 </span>|| existing_handler_addr == unimplemented_interrupt_handler <span class="kw">as </span>usize {
         idt_entry.set_handler_fn(func);
         <span class="prelude-val">Ok</span>(())
     } <span class="kw">else </span>{
@@ -618,7 +618,7 @@
     <span class="comment">// try to find an unused interrupt number in the IDT
     </span><span class="kw">let </span>interrupt_num = idt.slice(<span class="number">32</span>..=<span class="number">255</span>)
         .iter()
-        .rposition(|<span class="kw-2">&amp;</span>entry| entry.handler_addr().as_u64() == unimplemented_interrupt_handler <span class="kw">as </span>u64)
+        .rposition(|<span class="kw-2">&amp;</span>entry| entry.handler_addr().as_u64() <span class="kw">as </span>usize == unimplemented_interrupt_handler <span class="kw">as </span>usize)
         .map(|entry| entry + <span class="number">32</span>)
         .ok_or(<span class="string">&quot;register_msi_interrupt: no available interrupt handlers (BUG: IDT is full?)&quot;</span>)<span class="question-mark">?</span>;
 
@@ -646,7 +646,7 @@
 
     <span class="comment">// check if the handler stored is the same as the one provided
     // this is to make sure no other application can deregister your interrupt
-    </span><span class="kw">if </span>idt[interrupt_num <span class="kw">as </span>usize].handler_addr().as_u64() == func <span class="kw">as </span>u64 {
+    </span><span class="kw">if </span>idt[interrupt_num <span class="kw">as </span>usize].handler_addr().as_u64() <span class="kw">as </span>usize == func <span class="kw">as </span>usize {
         idt[interrupt_num <span class="kw">as </span>usize].set_handler_fn(unimplemented_interrupt_handler);
         <span class="prelude-val">Ok</span>(())
     }

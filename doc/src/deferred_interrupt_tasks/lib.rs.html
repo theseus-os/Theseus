@@ -249,7 +249,7 @@
     /// the interrupt handler at the given `existing_handler_address`.
     </span>IrqInUse {
         irq: u8,
-        existing_handler_address: u64
+        existing_handler_address: usize
     },
     <span class="doccomment">/// The given error occurred when spawning the deferred interrupt task.
     </span>SpawnError(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str),

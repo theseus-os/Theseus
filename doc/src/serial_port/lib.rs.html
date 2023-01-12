@@ -591,7 +591,7 @@
                 };                
             }
             <span class="prelude-val">Err</span>(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) =&gt; {
-                <span class="kw">if </span>existing_handler_address != interrupt_handler <span class="kw">as </span>u64 {
+                <span class="kw">if </span>existing_handler_address != interrupt_handler <span class="kw">as </span>usize {
                     <span class="macro">error!</span>(<span class="string">&quot;Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
                         Existing interrupt handler was a different handler, at address {:#X}.&quot;</span>,
                         irq, base_port, existing_handler_address,

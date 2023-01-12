@@ -1064,6 +1064,7 @@
 <a href="#1064" id="1064">1064</a>
 <a href="#1065" id="1065">1065</a>
 <a href="#1066" id="1066">1066</a>
+<a href="#1067" id="1067">1067</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.
 //! The minimum unit of allocation is a single frame. 
 //!
@@ -1084,7 +1085,8 @@
 //! We don&#39;t need to do so until we actually run out of address space or until 
 //! a requested address is in a chunk that needs to be merged.
 
-</span><span class="attr">#![no_std]
+</span><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
+#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
