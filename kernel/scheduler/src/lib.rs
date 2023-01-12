@@ -11,8 +11,6 @@ use log::error;
 use mutex_preemption::RwLockPreempt;
 use task::TaskRef;
 
-pub use imp::{get_priority, set_periodicity, set_priority};
-
 // TODO: Is RwLockPreempt necessary? We already hold_preemption when we enter
 // the schedule function.
 static RUN_QUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
@@ -74,7 +72,6 @@ fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue>> {
         }
     }
 
-    log::info!("THING: {min_rq:#?}");
     min_rq.map(|m| m.0)
 }
 
@@ -134,4 +131,30 @@ pub fn schedule() -> bool {
 
     drop(recovered_preemption_guard);
     did_switch
+}
+
+pub fn get_priority(task: &TaskRef) -> Option<u8> {
+    for (_, queue) in RUN_QUEUES.iter() {
+        if let Some(priority) = queue.read().get_priority(task) {
+            return Some(priority);
+        }
+    }
+
+    None
+}
+
+pub fn set_priority(task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+    for (_, queue) in RUN_QUEUES.iter() {
+        queue.write().set_priority(task, priority)?;
+    }
+
+    Ok(())
+}
+
+pub fn set_periodicity(task: &TaskRef, periodicity: usize) -> Result<(), &'static str> {
+    for (_, queue) in RUN_QUEUES.iter() {
+        queue.write().set_periodicity(task, periodicity)?;
+    }
+
+    Ok(())
 }

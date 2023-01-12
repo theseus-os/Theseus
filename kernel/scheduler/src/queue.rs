@@ -26,13 +26,10 @@ impl RunQueue {
     }
 
     pub fn add(&mut self, task: TaskRef) {
-        log::info!("I'M ADDING");
         self.queue.add(task);
         #[cfg(single_simd_task_optimization)]
-        {
-            if task.simd {
-                single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.core);
-            }
+        if task.simd {
+            single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.core);
         }
     }
 
@@ -47,10 +44,8 @@ impl RunQueue {
     pub fn remove(&mut self, task: &TaskRef) {
         self.queue.remove(task);
         #[cfg(single_simd_task_optimization)]
-        {
-            if task.simd {
-                single_simd_task_optimization::simd_tasks_removed_from_core(self.iter(), self.core);
-            }
+        if task.simd {
+            single_simd_task_optimization::simd_tasks_removed_from_core(self.iter(), self.core);
         }
     }
 
@@ -59,5 +54,21 @@ impl RunQueue {
             Some(task) => task,
             None => self.idle_task.clone(),
         }
+    }
+
+    pub fn get_priority(&self, task: &TaskRef) -> Option<u8> {
+        self.queue.get_priority(task)
+    }
+
+    pub fn set_priority(&mut self, task: &TaskRef, priority: u8) -> Result<(), &'static str> {
+        self.queue.set_priority(task, priority)
+    }
+
+    pub fn set_periodicity(
+        &mut self,
+        task: &TaskRef,
+        periodicity: usize,
+    ) -> Result<(), &'static str> {
+        self.queue.set_periodicity(task, periodicity)
     }
 }
