@@ -305,7 +305,7 @@ pub fn swap_crates(
 
                 #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
-                old_sec.copy_section_data_to(&new_dest_sec)?;
+                old_sec.copy_section_data_to(new_dest_sec)?;
             }
 
             #[cfg(loscd_eval)] {
@@ -470,8 +470,8 @@ pub fn swap_crates(
                     // and that it now depends on the new source_sec.
                     let mut found_strong_dependency = false;
                     for mut strong_dep in target_sec.inner.write().sections_i_depend_on.iter_mut() {
-                        if Arc::ptr_eq(&strong_dep.section, &old_sec) && strong_dep.relocation == relocation_entry {
-                            strong_dep.section = Arc::clone(&new_source_sec);
+                        if Arc::ptr_eq(&strong_dep.section, old_sec) && strong_dep.relocation == relocation_entry {
+                            strong_dep.section = Arc::clone(new_source_sec);
                             found_strong_dependency = true;
                             break;
                         }

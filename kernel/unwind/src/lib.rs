@@ -674,7 +674,7 @@ impl UnwindRowReference {
             //     debug!("    FDE instr: {:?}", instr);
             // }
 
-            f(&fde, &unwind_table_row)
+            f(&fde, unwind_table_row)
         };
 
         // The actual logic of this function that handles the `EhFrameReference` abstraction.
@@ -742,7 +742,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    Arc::clone(&namespace),
+                    Arc::clone(namespace),
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 

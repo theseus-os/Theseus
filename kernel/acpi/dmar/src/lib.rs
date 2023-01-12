@@ -94,10 +94,10 @@ pub struct Dmar<'t> {
 impl<'t> Dmar<'t> {
     /// Finds the DMAR in the given `AcpiTables` and returns a reference to it.
     pub fn get(acpi_tables: &'t AcpiTables) -> Option<Dmar<'t>> {
-        let table: &DmarReporting = acpi_tables.table(&DMAR_SIGNATURE).ok()?;
+        let table: &DmarReporting = acpi_tables.table(DMAR_SIGNATURE).ok()?;
         let total_length = table.header.length as usize;
         let dynamic_part_length = total_length - size_of::<DmarReporting>();
-        let loc = acpi_tables.table_location(&DMAR_SIGNATURE)?;
+        let loc = acpi_tables.table_location(DMAR_SIGNATURE)?;
         Some(Dmar {
             table,
             mapped_pages: acpi_tables.mapping(),

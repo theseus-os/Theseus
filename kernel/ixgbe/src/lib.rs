@@ -1324,7 +1324,7 @@ pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer
 /// It returns the interrupt number for the rx queue 'qid'.
 fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
     match get_ixgbe_nic(nic_id) {
-        Ok(ref ixgbe_nic_ref) => {
+        Ok(ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
             ixgbe_nic.interrupt_num.get(&qid).cloned()

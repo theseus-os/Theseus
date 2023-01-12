@@ -123,14 +123,14 @@ impl WindowManager {
             None => true,
         };
         
-        match self.is_window_in_show_list(&inner_ref) {
+        match self.is_window_in_show_list(inner_ref) {
             // remove item in current list
             Some(i) => {
                 self.show_list.remove(i);
             }
             None => {}
         }
-        match self.is_window_in_hide_list(&inner_ref) {
+        match self.is_window_in_hide_list(inner_ref) {
             // remove item in current list
             Some(i) => {
                 self.hide_list.remove(i);

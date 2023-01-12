@@ -770,7 +770,7 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or(&sec_name)
+            .unwrap_or(sec_name)
     }
 
     /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list

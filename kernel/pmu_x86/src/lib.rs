@@ -755,11 +755,11 @@ pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
     let my_core_id = apic::current_cpu();
 
     let mut sampling_info = SAMPLING_INFO.lock();
-    let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
+    let samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
 
     // the interrupt handler might have stopped samples already so thsi check is required
     if core_is_currently_sampling(my_core_id) {
-        stop_samples(my_core_id, &mut samples)?;
+        stop_samples(my_core_id, samples)?;
     }
     
     sampling_results_have_been_retrieved(my_core_id)?;
@@ -845,7 +845,7 @@ pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static
     let current_count = samples.sample_count;
     // if all samples have already been taken, calls the function to turn off the counter
     if current_count == 0 {
-        stop_samples(my_core_id, &mut samples)?; 
+        stop_samples(my_core_id, samples)?; 
         return Ok(true);
     }
 

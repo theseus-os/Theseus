@@ -92,6 +92,6 @@ const_assert_eq!(core::mem::size_of::<Fadt>(), 244);
 impl Fadt {
     /// Finds the FADT in the given `AcpiTables` and returns a reference to it.
     pub fn get(acpi_tables: &AcpiTables) -> Option<&Fadt> {
-        acpi_tables.table(&FADT_SIGNATURE).ok()
+        acpi_tables.table(FADT_SIGNATURE).ok()
     }
 }

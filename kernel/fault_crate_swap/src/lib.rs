@@ -154,7 +154,7 @@ pub fn do_self_swap(
     debug!("We got a match");
 
     let (new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(0);
-    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(&real_new_namespace, &new_crate_full_name) {
+    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(real_new_namespace, &new_crate_full_name) {
         Some((ocr, _ns)) => {
             ocr
         }

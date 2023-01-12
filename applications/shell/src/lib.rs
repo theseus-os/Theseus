@@ -409,7 +409,7 @@ impl Shell {
                     if task_ref.has_exited() { continue; }
                     match task_ref.kill(KillReason::Requested) {
                         Ok(_) => {
-                            if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
+                            if let Err(e) = runqueue::remove_task_from_all(task_ref) {
                                 error!("Killed task but could not remove it from runqueue: {}", e);
                             }
                         }
@@ -815,7 +815,7 @@ impl Shell {
             t.get_namespace().dir().clone()
         ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
 
-        let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
+        let mut names = namespace_dir.get_file_and_dir_names_starting_with(incomplete_cmd);
 
         // Drop the extension name and hash value.
         let mut clean_name = String::new();
@@ -883,10 +883,10 @@ impl Shell {
         let mut child_list = locked_working_dir.list(); 
         child_list.reverse();
         for child in child_list.iter() {
-            if child.starts_with(&incomplete_node) {
-                if let Some(_) = locked_working_dir.get_file(&child) {
+            if child.starts_with(incomplete_node) {
+                if let Some(_) = locked_working_dir.get_file(child) {
                     match_list.push(child.clone());
-                } else if let Some (_) = locked_working_dir.get_dir(&child) {
+                } else if let Some (_) = locked_working_dir.get_dir(child) {
                     let mut cloned = child.clone();
                     cloned.push('/');
                     match_list.push(cloned);

@@ -386,7 +386,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.text_display.set_text(&slice);
+            self.text_display.set_text(slice);
             self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
