@@ -196,9 +196,12 @@ impl crate::BootInformation for multiboot2::BootInformation {
         .into_iter())
     }
 
-    fn kernel_end(&self) -> Result<PhysicalAddress, &'static str> {
-        let reserved_region = kernel_memory_region(self)?;
-        Ok(reserved_region.start + reserved_region.len)
+    fn kernel_end(&self) -> Result<VirtualAddress, &'static str> {
+        use crate::ElfSection;
+        self.elf_sections()?
+            .map(|section| section.start() + section.len())
+            .max()
+            .ok_or("no elf sections")
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {

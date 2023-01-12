@@ -16,6 +16,7 @@ AP_NMI_LINT         equ TRAMPOLINE + 56
 AP_NMI_FLAGS        equ TRAMPOLINE + 64
 AP_MAX_FB_WIDTH     equ TRAMPOLINE + 72
 AP_MAX_FB_HEIGHT    equ TRAMPOLINE + 80
+AP_GDT              equ TRAMPOLINE + 88
 
 ; Kernel is linked to run at -2Gb
 KERNEL_OFFSET equ 0xFFFFFFFF80000000

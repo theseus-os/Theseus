@@ -1,26 +1,15 @@
 use crate::{early_setup, nano_core, try_exit};
 use boot_info::uefi::STACK_SIZE;
-use bootloader_api::{config::Mapping, BootloaderConfig};
 use core::arch::asm;
 use memory::VirtualAddress;
+use uefi_bootloader_api::BootInformation;
 
-#[used]
-#[link_section = ".bootloader-config"]
-pub static __BOOTLOADER_CONFIG: [u8; BootloaderConfig::SERIALIZED_LEN] = {
-    let mut config = BootloaderConfig::new_default();
-    config.mappings.physical_memory = Some(Mapping::Dynamic);
-    config.mappings.page_table_recursive =
-        Some(Mapping::FixedAddress(0o177777_776_000_000_000_0000));
-    config.kernel_stack_size = STACK_SIZE as u64;
-    config.serialize()
-};
-
-/// This is effectively a trampoline function that sets up the proper 
+/// This is effectively a trampoline function that sets up the proper
 /// argument values in the proper registers before calling `rust_entry`.
 #[naked]
 #[no_mangle]
 #[link_section = ".init.text"]
-pub extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
+pub extern "C" fn _start(boot_info: &'static BootInformation) {
     unsafe {
         asm!(
             // Upon entering this function:
@@ -33,18 +22,18 @@ pub extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
             // ^                                           ^                    ^
             // |                                           |                   rsi
             // kernel_stack_start                  rsp (top of stack)
-            // 
+            //
             // The guard page and double fault stack are both one page in size;
             // the kernel stack is `KERNEL_STACK_SIZE_IN_PAGES` pages.
             //
             // Stacks grow downwards on x86, meaning that the stack pointer will grow
             // towards the guard page. That's why we start it at the top (the highest vaddr).
-            
+
             // Before invoking `rust_entry`, we need to set up:
             // 1. First arg  (in rdi): a reference to the boot info (just pass it through).
             // 2. Second arg (in rsi): the top vaddr of the double fault handler stack.
             "mov rsi, rsp", // Handle #2 above
-            
+
             // Now, adjust the stack pointer to the page before the double fault stack,
             // which is the top of the initial kernel stack that was allocated for us.
             "sub rsp, 4096",
@@ -58,10 +47,7 @@ pub extern "C" fn _start(boot_info: &'static bootloader_api::BootInfo) {
     };
 }
 
-fn rust_entry(
-    boot_info: &'static bootloader_api::BootInfo,
-    double_fault_stack: usize,
-) {
+fn rust_entry(boot_info: &'static BootInformation, double_fault_stack: usize) {
     try_exit!(early_setup(double_fault_stack));
     // See the above diagram in `_start`.
     let kernel_stack_start = VirtualAddress::new_canonical(double_fault_stack - STACK_SIZE);

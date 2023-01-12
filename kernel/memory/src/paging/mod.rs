@@ -19,7 +19,7 @@ pub use self::{
     temporary_page::TemporaryPage,
     mapper::{
         Mapper, MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
-        Mutability, Mutable, Immutable,
+        Mutability, Mutable, Immutable, translate,
     },
 };
 
@@ -216,13 +216,13 @@ pub fn init(
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
 
-    let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)?;
-    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
-    
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current()
         .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;
     debug!("Bootstrapped initial {:?}", page_table);
+
+    let (aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info, |virtual_address| page_table.translate(virtual_address))?;
+    debug!("{:X?}\n{:X?}", aggregated_section_memory_bounds, _sections_memory_bounds);
 
     let boot_info_start_vaddr = boot_info.start().ok_or("boot_info start virtual address was invalid")?;
     let boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or("Couldn't get boot_info start physical address")?;
@@ -303,7 +303,10 @@ pub fn init(
 
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
         let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
-        let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())?;
+        let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(text_start_phys.value()),
+            text_end_phys.value() - text_start_phys.value(),
+        )?;
         text_identity_mapped_pages = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         });
@@ -312,7 +315,10 @@ pub fn init(
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
         let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
-        let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())?;
+        let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(rodata_start_phys.value()),
+            rodata_end_phys.value() - rodata_start_phys.value(),
+        )?;
         rodata_identity_mapped_pages = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
         });
@@ -320,7 +326,10 @@ pub fn init(
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
         let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
-        let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())?;
+        let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(data_start_phys.value()),
+            data_end_phys.value() - data_start_phys.value(),
+        )?;
         data_identity_mapped_pages = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, &data_frames, data_flags)?
         });
