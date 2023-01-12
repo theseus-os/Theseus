@@ -306,7 +306,7 @@ pub fn constant_offset_fix(
 pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
     let taskref = task::get_my_current_task()
-        .ok_or_else(|| format!("failed to get current task"))?;
+        .ok_or_else(|| "failed to get current task".to_string())?;
 
     #[cfg(not(downtime_eval))]
     debug!("The taskref is {:?}",taskref);

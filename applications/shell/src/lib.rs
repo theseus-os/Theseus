@@ -782,7 +782,7 @@ impl Shell {
                             format!("{:?} command not found.\n", command)
                         }
                     },
-                    AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
+                    AppErr::NamespaceErr      => "Failed to find directory of application executables.\n".to_string(),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
                 self.terminal.lock().print_to_terminal(err_msg);

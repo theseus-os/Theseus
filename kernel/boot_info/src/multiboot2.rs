@@ -99,7 +99,6 @@ fn kernel_memory_region(
 
     for section in boot_info
         .elf_sections()?
-        .into_iter()
         .filter(|section| section.is_allocated())
     {
         physical_start = cmp::min(section.start_address() as usize, physical_start);

@@ -53,7 +53,10 @@ use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
     format,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -275,7 +278,7 @@ impl fmt::Debug for LoadedCrate {
             .field("name", &self.crate_name)
             .field("object_file", &self.object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string())
             )
             .finish_non_exhaustive()
     }

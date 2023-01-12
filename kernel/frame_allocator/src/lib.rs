@@ -18,6 +18,7 @@
 //! We don't need to do so until we actually run out of address space or until 
 //! a requested address is in a chunk that needs to be merged.
 
+#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 
 extern crate alloc;

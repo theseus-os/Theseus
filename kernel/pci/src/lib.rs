@@ -297,7 +297,7 @@ impl PciLocation {
             // iterate through the linked list of capabilities until the requested capability is found or the list reaches its end
             while cap_addr != final_capability {
                 // the capability header is a 16 bit value which contains the current capability ID and the pointer to the next capability
-                let cap_header = self.pci_read_16(cap_addr as u16);
+                let cap_header = self.pci_read_16(cap_addr);
 
                 // the id is the lower byte of the header
                 let cap_id = cap_header & 0xFF;

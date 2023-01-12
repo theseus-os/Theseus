@@ -352,6 +352,7 @@ impl FileDescriptorTable {
     /// # Return
     /// If successful, returns resulting file descriptor number.
     /// Otherwise, returns a wasi::Errno.
+    #[allow(clippy::too_many_arguments)]
     pub fn open_path(
         &mut self,
         path: &str,
@@ -485,12 +486,10 @@ impl FileDescriptorTable {
     /// # Return
     /// Returns corresponding file system node if exists.
     pub fn get_posix_node(&mut self, fd: wasi::Fd) -> Option<&mut PosixNode> {
-        match self.get_posix_node_or_stdio(fd) {
-            Some(posix_node_or_stdio) => match posix_node_or_stdio {
-                PosixNodeOrStdio::Inode(posix_node) => Some(posix_node),
-                _ => None,
-            },
-            None => None,
-        }
+        if let Some(PosixNodeOrStdio::Inode(posix_node)) = self.get_posix_node_or_stdio(fd) {
+            Some(posix_node)
+        } else {
+            None
+        }        
     }
 }

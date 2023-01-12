@@ -9,6 +9,7 @@
 //! [tb]:  fn.new_task_builder.html
 //! [atb]: fn.new_application_task_builder.html
 
+#![allow(clippy::type_complexity)]
 #![no_std]
 #![feature(stmt_expr_attributes)]
 #![feature(naked_functions)]
