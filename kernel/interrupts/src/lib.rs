@@ -225,7 +225,7 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
     // try to find an unused interrupt number in the IDT
     let interrupt_num = idt.slice(32..=255)
         .iter()
-        .rposition(|&entry| entry.handler_addr().as_u64() as usize== unimplemented_interrupt_handler as usize)
+        .rposition(|&entry| entry.handler_addr().as_u64() as usize == unimplemented_interrupt_handler as usize)
         .map(|entry| entry + 32)
         .ok_or("register_msi_interrupt: no available interrupt handlers (BUG: IDT is full?)")?;
 
