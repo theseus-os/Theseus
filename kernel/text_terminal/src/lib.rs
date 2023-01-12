@@ -989,7 +989,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             *self.scrollback_cursor,
             self.screen_cursor.position,
             num_units,
-            &self.scrollback_buffer,
+            self.scrollback_buffer,
             self.backend.screen_size(),
             wrap,
         );
