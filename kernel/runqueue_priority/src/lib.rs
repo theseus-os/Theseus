@@ -65,13 +65,12 @@ impl PriorityTaskRef {
     /// We just give an initial number of tokens to run the task till 
     /// next scheduling epoch
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
-        let priority_taskref = PriorityTaskRef {
+        PriorityTaskRef {
             taskref: taskref,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
             context_switches: 0,
-        };
-        priority_taskref
+        }
     }
 
     /// Increment the number of times the task is picked

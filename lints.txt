@@ -210,7 +210,7 @@ iter-skip-next
 just-underscores-and-digits
 len-without-is-empty
 len-zero
-# let-and-return
+let-and-return
 let-unit-value
 main-recursion
 manual-async-fn
