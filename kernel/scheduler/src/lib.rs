@@ -11,8 +11,6 @@ use log::error;
 use mutex_preemption::RwLockPreempt;
 use task::TaskRef;
 
-// TODO: Is RwLockPreempt necessary? We already hold_preemption when we enter
-// the schedule function.
 static RUN_QUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
 
 pub fn init(core: u8, idle_task: TaskRef) -> Result<(), &'static str> {

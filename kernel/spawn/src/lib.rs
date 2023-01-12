@@ -418,7 +418,6 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        // TODO: Make nicer.
         if !self.idle {
             if let Some(core) = self.pin_on_core {
                 scheduler::add_task_to_specific_run_queue(core, task_ref.clone())?;

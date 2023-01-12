@@ -6,15 +6,8 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-spin = "0.9.4"
 log = "0.4.8"
 cfg-if = "1.0.0"
-
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
-
-[dependencies.apic]
-path= "../apic"
 
 [dependencies.task]
 path = "../task"
