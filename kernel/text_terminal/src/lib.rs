@@ -820,7 +820,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
             if let Some(line) = self.scrollback_buffer.get(self.scrollback_cursor.line_idx.0) {
                 // We're within the bounds of an existing Line, so there's nothing else to do.
                 self.screen_cursor.underneath = line.get(self.scrollback_cursor.unit_idx.0)
-                    .map(|unit| unit.clone())
+                    .cloned()
                     .unwrap_or_else(|| Unit {
                         style: line.last().map(|last_unit| last_unit.style).unwrap_or_default(),
                         ..Default::default()
@@ -2329,9 +2329,10 @@ impl WideDisplayedUnit {
     /// of a previous character Unit, i.e., `TabFill` or `MultiFill`.
     #[inline(always)]
     fn is_continuance(&self) -> bool {
-        match self {
-            &Self::TabFill | &Self::MultiFill => true,
-            _ => false,
-        }
+        // match self {
+        //     &Self::TabFill | &Self::MultiFill => true,
+        //     _ => false,
+        // }
+        matches!(self, &Self::TabFill | &Self::MultiFill)
     }
 }
