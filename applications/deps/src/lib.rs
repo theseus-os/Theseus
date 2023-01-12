@@ -406,16 +406,17 @@ fn find_crate(crate_name: &str) -> Result<(StrRef, StrongCrateRef), String> {
 fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
     let namespace = get_my_current_namespace();
     let matching_symbols = namespace.find_symbols_starting_with(section_name);
-    
     match matching_symbols.len() {
-        1 => {
-            return matching_symbols[0].1.upgrade()
-            .ok_or_else(|| format!("Found matching symbol name but couldn't get reference to section"));
-        },
-        2.. => {
-            return Err(matching_symbols.into_iter().map(|(k, _v)| k).collect::<Vec<String>>().join("\n"));
-        },
-        _ => {},
+        0 => { /* continue on */ },
+        1 => return matching_symbols[0].1
+            .upgrade()
+            .ok_or_else(|| format!("Found matching symbol name but couldn't get reference to section")),
+        2.. => return Err(matching_symbols
+            .into_iter()
+            .map(|(k, _v)| k)
+            .collect::<Vec<String>>()
+            .join("\n")
+        ),
     }
 
     // If it wasn't a global section in the symbol map, then we need to find its containing crate
