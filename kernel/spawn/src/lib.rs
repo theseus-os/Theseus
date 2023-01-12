@@ -355,6 +355,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
     ///
     /// This merely creates the new task and makes it `Runnable`.
     /// It does not switch to it immediately; that will happen on the next scheduler invocation.
+    ///
+    /// Idle tasks are not added to the run queue, as it does not yet exist.
     #[inline(never)]
     pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
