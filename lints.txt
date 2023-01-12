@@ -217,7 +217,7 @@ manual-async-fn
 manual-bits
 manual-map
 manual-non-exhaustive
-# manual-range-contains
+manual-range-contains
 manual-saturating-arithmetic
 # map-clone
 map-collect-result-unit
