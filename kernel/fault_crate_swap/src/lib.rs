@@ -101,7 +101,7 @@ pub fn do_self_swap(
     let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, crate_name);
 
     // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 0 {
+    if matching_crates.is_empty() {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
 
@@ -142,7 +142,7 @@ pub fn do_self_swap(
     let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, ocn);
 
     // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 0 {
+    if matching_crates.is_empty() {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
 

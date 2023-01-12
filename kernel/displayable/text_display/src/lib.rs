@@ -41,7 +41,7 @@ impl Displayable for TextDisplay {
         coordinate: Coord,
         framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str> {
-        let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
+        let (string, col, line) = if !self.cache.is_empty() && self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
                 self.next_col,
