@@ -197,7 +197,7 @@ fn-to-numeric-cast-with-truncation
 for-kv-map
 from-over-into
 from-str-radix-10
-# inconsistent-digit-grouping
+inconsistent-digit-grouping
 infallible-destructuring-match
 inherent-to-string
 init-numbered-fields
