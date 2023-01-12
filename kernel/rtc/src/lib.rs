@@ -186,8 +186,7 @@ fn log2(value: usize) -> usize {
 /// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
 pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
-    if !(rate.is_power_of_two() && rate >= 2 && rate <= 8192) {
-    if !(rate.is_power_of_two() && (2..=8192).contains(&rate) ) {
+    if !(rate.is_power_of_two() && (2..=8192).contains(&rate)) {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
         return Err(());
     }

@@ -999,6 +999,7 @@ impl RelocationEntry {
             R_X86_64_64 => true,
             _ => false,
         }
+        // matches!(self.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 
