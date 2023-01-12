@@ -130,6 +130,7 @@
 <a href="#130" id="130">130</a>
 <a href="#131" id="131">131</a>
 <a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate provides an abstraction over multiboot2 and UEFI boot
 //! information.
 //!
@@ -170,7 +171,8 @@
     <span class="doccomment">/// Returns the section&#39;s starting virtual address.
     </span><span class="kw">fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VirtualAddress;
 
-    <span class="doccomment">/// Returns the section&#39;s length.
+    <span class="doccomment">/// Returns the section&#39;s length in memory, as opposed to its length in the
+    /// ELF file.
     </span><span class="kw">fn </span>len(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize;
 
     <span class="doccomment">/// Returns whether the section is empty.
@@ -253,8 +255,8 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::AdditionalReservedMemoryRegions, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 
-    <span class="doccomment">/// Returns the end of the kernel&#39;s image in physical memory.
-    </span><span class="kw">fn </span>kernel_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;PhysicalAddress, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+    <span class="doccomment">/// Returns the end of the kernel&#39;s image in memory.
+    </span><span class="kw">fn </span>kernel_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;VirtualAddress, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 
     <span class="doccomment">/// Returns the RSDP if it was provided by the bootloader.
     </span><span class="kw">fn </span>rsdp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;;

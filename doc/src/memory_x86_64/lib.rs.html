@@ -296,11 +296,6 @@
 <a href="#296" id="296">296</a>
 <a href="#297" id="297">297</a>
 <a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
-<a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a>
-<a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //!
 //! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
@@ -363,7 +358,10 @@
 ///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections 
 ///    that share the same page table mapping flags and can thus be logically combined.
 ///  * The list of all individual sections found. 
-</span><span class="kw">pub fn </span>find_section_memory_bounds(boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation) -&gt; <span class="prelude-ty">Result</span>&lt;(AggregatedSectionMemoryBounds, [<span class="prelude-ty">Option</span>&lt;SectionMemoryBounds&gt;; <span class="number">32</span>]), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>find_section_memory_bounds&lt;F&gt;(boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation, translate: F) -&gt; <span class="prelude-ty">Result</span>&lt;(AggregatedSectionMemoryBounds, [<span class="prelude-ty">Option</span>&lt;SectionMemoryBounds&gt;; <span class="number">32</span>]), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+<span class="kw">where
+    </span>F: Fn(VirtualAddress) -&gt; <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
+{
     <span class="kw">let </span><span class="kw-2">mut </span>index = <span class="number">0</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>init_start:        <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>init_end:          <span class="prelude-ty">Option</span>&lt;(VirtualAddress, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
@@ -394,24 +392,16 @@
         <span class="macro">debug!</span>(<span class="string">&quot;Looking at loaded section {} at {:#X}, size {:#X}&quot;</span>, section.name(), section.start(), section.len());
         <span class="kw">let </span>flags = convert_to_pte_flags(<span class="kw-2">&amp;</span>section);
 
-        <span class="comment">// even though the linker stipulates that the kernel sections have a higher-half virtual address,
-        // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
-        // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
-        // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-        </span><span class="kw">let </span><span class="kw-2">mut </span>start_phys_addr = section.start().value();
-        <span class="kw">if </span>start_phys_addr &gt;= KERNEL_OFFSET {
-            <span class="comment">// true for all sections but the first section (inittext)
-            </span>start_phys_addr -= KERNEL_OFFSET;
-        }
+        <span class="kw">let </span><span class="kw-2">mut </span>start_virt_addr = VirtualAddress::new(section.start().value())
+            .ok_or(<span class="string">&quot;section had invalid starting virtual address&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>start_phys_addr = translate(start_virt_addr)
+            .ok_or(<span class="string">&quot;couldn&#39;t translate section&#39;s starting virtual address&quot;</span>)<span class="question-mark">?</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>start_virt_addr = section.start().value();
-        <span class="kw">if </span>start_virt_addr &lt; KERNEL_OFFSET {
+        <span class="kw">if </span>start_virt_addr.value() &lt; KERNEL_OFFSET {
             <span class="comment">// special case to handle the first section only
             </span>start_virt_addr += KERNEL_OFFSET;
         }
 
-        <span class="kw">let </span>start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or(<span class="string">&quot;section had invalid starting physical address&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or(<span class="string">&quot;section had invalid ending physical address&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>end_virt_addr = start_virt_addr + section.len();
         <span class="kw">let </span>end_phys_addr = start_phys_addr + section.len();
 

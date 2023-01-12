@@ -478,6 +478,9 @@
 <a href="#478" id="478">478</a>
 <a href="#479" id="479">479</a>
 <a href="#480" id="480">480</a>
+<a href="#481" id="481">481</a>
+<a href="#482" id="482">482</a>
+<a href="#483" id="483">483</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -848,11 +851,14 @@
                 <span class="attr">#[doc = <span class="string">&quot;A convenience method for creating a new `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;` that spans \
                     all [`&quot; </span><span class="macro-nonterminal">$chunk </span><span class="string">&quot;`]s from the given [`&quot; </span><span class="macro-nonterminal">$address </span><span class="string">&quot;`] to an end bound based on the given size.&quot;</span>]
                 </span><span class="kw">pub fn </span>[&lt;from_ <span class="macro-nonterminal">$short </span>_addr&gt;](starting_addr: <span class="macro-nonterminal">$address</span>, size_in_bytes: usize) -&gt; <span class="macro-nonterminal">$TypeName </span>{
-                    <span class="macro">assert!</span>(size_in_bytes &gt; <span class="number">0</span>);
-                    <span class="kw">let </span>start = <span class="macro-nonterminal">$chunk::containing_address</span>(starting_addr);
-                    <span class="comment">// The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
-                    </span><span class="kw">let </span>end = <span class="macro-nonterminal">$chunk::containing_address</span>(starting_addr + (size_in_bytes - <span class="number">1</span>));
-                    <span class="macro-nonterminal">$TypeName::new</span>(start, end)
+                    <span class="kw">if </span>size_in_bytes == <span class="number">0 </span>{
+                        <span class="macro-nonterminal">$TypeName::empty</span>()
+                    } <span class="kw">else </span>{
+                        <span class="kw">let </span>start = <span class="macro-nonterminal">$chunk::containing_address</span>(starting_addr);
+                        <span class="comment">// The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
+                        </span><span class="kw">let </span>end = <span class="macro-nonterminal">$chunk::containing_address</span>(starting_addr + (size_in_bytes - <span class="number">1</span>));
+                        <span class="macro-nonterminal">$TypeName::new</span>(start, end)
+                    }
                 }
 
                 <span class="attr">#[doc = <span class="string">&quot;Returns the [`&quot; </span><span class="macro-nonterminal">$address </span><span class="string">&quot;`] of the starting [`&quot; </span><span class="macro-nonterminal">$chunk </span><span class="string">&quot;`] in this `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;`.&quot;</span>]

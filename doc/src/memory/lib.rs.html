@@ -262,6 +262,18 @@
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
 <a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -285,6 +297,7 @@
 <span class="kw">pub use </span><span class="self">self</span>::paging::{
     PageTable, Mapper, Mutability, Mutable, Immutable,
     MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
+    translate,
 };
 
 <span class="kw">pub use </span>memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
@@ -484,7 +497,18 @@
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new frame allocator!&quot;</span>);
     frame_allocator::dump_frame_allocator_state();
 
-    page_allocator::init(VirtualAddress::new_canonical(boot_info.kernel_end()<span class="question-mark">?</span>.value()))<span class="question-mark">?</span>;
+    page_allocator::init(
+        VirtualAddress::new(
+            <span class="comment">// We subtract 1 when translating because `kernel_end` returns an exclusive
+            // upper bound, which can cause problems if the kernel ends on a page boundary.
+            // We then add it back later to get the correct identity virtual address.
+            </span>translate(boot_info.kernel_end()<span class="question-mark">? </span>- <span class="number">1</span>)
+                .ok_or(<span class="string">&quot;couldn&#39;t translate kernel end virtual address&quot;</span>)<span class="question-mark">?
+                </span>.value()
+                + <span class="number">1</span>,
+        )
+        .ok_or(<span class="string">&quot;couldn&#39;t convert kernel end physical address into virtual address&quot;</span>)<span class="question-mark">?</span>,
+    )<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Initialized new page allocator!&quot;</span>);
     page_allocator::dump_page_allocator_state();
 

@@ -478,6 +478,12 @@
 <a href="#478" id="478">478</a>
 <a href="#479" id="479">479</a>
 <a href="#480" id="480">480</a>
+<a href="#481" id="481">481</a>
+<a href="#482" id="482">482</a>
+<a href="#483" id="483">483</a>
+<a href="#484" id="484">484</a>
+<a href="#485" id="485">485</a>
+<a href="#486" id="486">486</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. 
 //! 
 //! These functions are intended to be invoked from the main core
@@ -502,6 +508,7 @@
 <span class="kw">extern crate </span>pause;
 
 <span class="kw">use </span>core::{
+    convert::TryInto,
     ops::DerefMut,
     sync::atomic::Ordering,
 };
@@ -674,6 +681,7 @@
     kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    ap_gdt: VirtualAddress,
     max_framebuffer_resolution: <span class="prelude-ty">Option</span>&lt;(u16, u16)&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;u32, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
@@ -741,6 +749,7 @@
     </span><span class="kw">let </span>(max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
     ap_trampoline_data.ap_max_fb_width.write(max_width);
     ap_trampoline_data.ap_max_fb_height.write(max_height);
+    ap_trampoline_data.ap_gdt.write(ap_gdt.value().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;AP_GDT physical address larger than u32::MAX&quot;</span>)<span class="question-mark">?</span>);
 
     <span class="kw">let </span>acpi_tables = acpi::get_acpi_tables().lock();
     <span class="kw">let </span>madt = Madt::get(<span class="kw-2">&amp;</span>acpi_tables)
@@ -818,7 +827,7 @@
 /// # Important Layout Note
 /// The order of the members in this struct must exactly match how they are used
 /// and specified in the AP bootup code (at the top of `defines.asm`).
-</span><span class="attr">#[derive(FromBytes)]
+</span><span class="attr">#[derive(Debug, FromBytes)]
 #[repr(C)]
 </span><span class="kw">struct </span>ApTrampolineData {
     <span class="doccomment">/// A flag that indicates whether the new AP is ready. 
@@ -852,6 +861,9 @@
     /// when changing graphical framebuffer modes in its 16-bit real-mode code. 
     </span>ap_max_fb_height:  Volatile&lt;u16&gt;,
     _padding5:         [u8; <span class="number">6</span>],
+    <span class="doccomment">/// The location of the GDT_AP symbol in physical memory.
+    </span>ap_gdt:            Volatile&lt;u32&gt;,
+    _padding6:         [u8; <span class="number">4</span>],
 }
 
 

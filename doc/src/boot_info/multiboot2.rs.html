@@ -224,6 +224,9 @@
 <a href="#224" id="224">224</a>
 <a href="#225" id="225">225</a>
 <a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{ElfSectionFlags, ReservedMemoryRegion};
 <span class="kw">use </span>core::{cmp, iter::Iterator};
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
@@ -422,9 +425,12 @@
         .into_iter())
     }
 
-    <span class="kw">fn </span>kernel_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;PhysicalAddress, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>reserved_region = kernel_memory_region(<span class="self">self</span>)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(reserved_region.start + reserved_region.len)
+    <span class="kw">fn </span>kernel_end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;VirtualAddress, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">use </span><span class="kw">crate</span>::ElfSection;
+        <span class="self">self</span>.elf_sections()<span class="question-mark">?
+            </span>.map(|section| section.start() + section.len())
+            .max()
+            .ok_or(<span class="string">&quot;no elf sections&quot;</span>)
     }
 
     <span class="kw">fn </span>rsdp(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt; {

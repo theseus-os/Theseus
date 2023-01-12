@@ -419,6 +419,15 @@
 <a href="#419" id="419">419</a>
 <a href="#420" id="420">420</a>
 <a href="#421" id="421">421</a>
+<a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -440,7 +449,7 @@
     temporary_page::TemporaryPage,
     mapper::{
         Mapper, MappedPages, BorrowedMappedPages, BorrowedSliceMappedPages,
-        Mutability, Mutable, Immutable,
+        Mutability, Mutable, Immutable, translate,
     },
 };
 
@@ -637,13 +646,13 @@
     // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
     </span>mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
 
-    <span class="kw">let </span>(aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info)<span class="question-mark">?</span>;
-    <span class="macro">debug!</span>(<span class="string">&quot;{:X?}\n{:X?}&quot;</span>, aggregated_section_memory_bounds, _sections_memory_bounds);
-    
     <span class="comment">// bootstrap a PageTable from the currently-loaded page table
     </span><span class="kw">let </span><span class="kw-2">mut </span>page_table = PageTable::from_current()
         .map_err(|<span class="kw">_</span>| <span class="string">&quot;Failed to allocate frame for initial page table; is it merged with another section?&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;Bootstrapped initial {:?}&quot;</span>, page_table);
+
+    <span class="kw">let </span>(aggregated_section_memory_bounds, _sections_memory_bounds) = find_section_memory_bounds(boot_info, |virtual_address| page_table.translate(virtual_address))<span class="question-mark">?</span>;
+    <span class="macro">debug!</span>(<span class="string">&quot;{:X?}\n{:X?}&quot;</span>, aggregated_section_memory_bounds, _sections_memory_bounds);
 
     <span class="kw">let </span>boot_info_start_vaddr = boot_info.start().ok_or(<span class="string">&quot;boot_info start virtual address was invalid&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>boot_info_start_paddr = page_table.translate(boot_info_start_vaddr).ok_or(<span class="string">&quot;Couldn&#39;t get boot_info start physical address&quot;</span>)<span class="question-mark">?</span>;
@@ -724,7 +733,10 @@
 
         <span class="kw">let </span>text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())<span class="question-mark">?</span>;
-        <span class="kw">let </span>text_pages_identity = page_allocator::allocate_pages_by_bytes_at(text_start_virt - KERNEL_OFFSET, text_end_virt.value() - text_start_virt.value())<span class="question-mark">?</span>;
+        <span class="kw">let </span>text_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(text_start_phys.value()),
+            text_end_phys.value() - text_start_phys.value(),
+        )<span class="question-mark">?</span>;
         text_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, <span class="kw-2">&amp;</span>text_frames, text_flags)<span class="question-mark">?
         </span>});
@@ -733,7 +745,10 @@
 
         <span class="kw">let </span>rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())<span class="question-mark">?</span>;
-        <span class="kw">let </span>rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt - KERNEL_OFFSET, rodata_end_virt.value() - rodata_start_virt.value())<span class="question-mark">?</span>;
+        <span class="kw">let </span>rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(rodata_start_phys.value()),
+            rodata_end_phys.value() - rodata_start_phys.value(),
+        )<span class="question-mark">?</span>;
         rodata_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, <span class="kw-2">&amp;</span>rodata_frames, rodata_flags)<span class="question-mark">?
         </span>});
@@ -741,7 +756,10 @@
 
         <span class="kw">let </span>data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())<span class="question-mark">?</span>;
         <span class="kw">let </span>data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())<span class="question-mark">?</span>;
-        <span class="kw">let </span>data_pages_identity = page_allocator::allocate_pages_by_bytes_at(data_start_virt - KERNEL_OFFSET, data_end_virt.value() - data_start_virt.value())<span class="question-mark">?</span>;
+        <span class="kw">let </span>data_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+            VirtualAddress::new_canonical(data_start_phys.value()),
+            data_end_phys.value() - data_start_phys.value(),
+        )<span class="question-mark">?</span>;
         data_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, <span class="kw-2">&amp;</span>data_frames, data_flags)<span class="question-mark">?
         </span>});
