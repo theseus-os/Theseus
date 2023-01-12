@@ -223,10 +223,10 @@ map-clone
 map-collect-result-unit
 match-like-matches-macro
 match-overlapping-arm
-# match-ref-pats
+match-ref-pats
 match-result-ok
 mem-replace-option-with-none
-# mem-replace-with-default
+mem-replace-with-default
 # missing-safety-doc
 mixed-case-hex-literals
 module-inception
