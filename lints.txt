@@ -221,7 +221,7 @@ manual-range-contains
 manual-saturating-arithmetic
 map-clone
 map-collect-result-unit
-# match-like-matches-macro
+match-like-matches-macro
 match-overlapping-arm
 # match-ref-pats
 match-result-ok

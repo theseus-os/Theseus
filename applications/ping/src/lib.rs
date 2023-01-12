@@ -70,7 +70,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
 
-    if matches.free.len() != 0 {
+    if !matches.free.is_empty() {
         match IpAddress::from_str(&matches.free[0]) {
             Ok(address) => {
                 let ping_address = address;
