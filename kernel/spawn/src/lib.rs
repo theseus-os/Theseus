@@ -888,6 +888,9 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
+    
+    // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+    #[allow(clippy::empty_loop)]
     loop { }
 }
 
@@ -970,6 +973,9 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
+    
+    // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+    #[allow(clippy::empty_loop)]
     loop { }
 }
 

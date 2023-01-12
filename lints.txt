@@ -326,7 +326,7 @@ cast-enum-constructor
 cast-enum-truncation
 crate-in-macro-def
 drop-non-drop
-# empty-loop
+empty-loop
 float-equality-without-abs
 for-loops-over-fallibles
 forget-non-drop

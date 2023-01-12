@@ -1543,6 +1543,8 @@ fn bootstrap_task_cleanup_failure(current_task: ExitableTaskRef, kill_reason: Ki
         current_task,
         kill_reason,
     );
+    // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+    #[allow(clippy::empty_loop)]
     loop { }
 }
 
