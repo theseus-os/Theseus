@@ -201,7 +201,7 @@ inconsistent-digit-grouping
 infallible-destructuring-match
 inherent-to-string
 init-numbered-fields
-# into-iter-on-ref
+into-iter-on-ref
 is-digit-ascii-radix
 iter-cloned-collect
 iter-next-slice

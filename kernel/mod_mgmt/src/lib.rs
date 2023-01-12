@@ -2626,7 +2626,7 @@ impl CrateNamespace {
                         fuzzy_matches.len(), 
                         demangled_full_symbol, 
                         temp_backup_namespace.name, 
-                        fuzzy_matches.into_iter().map(|tup| &tup.0).collect::<Vec<_>>()
+                        fuzzy_matches.iter().map(|tup| &tup.0).collect::<Vec<_>>()
                     );
                     return None;
                 }
