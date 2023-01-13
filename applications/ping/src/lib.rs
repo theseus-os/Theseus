@@ -334,8 +334,8 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
         0 as f64
     };
      
-    let min_ping = times.iter().min().unwrap_or_else(|x| &0);
-    let max_ping = times.iter().max().unwrap_or_else(|x| &0);
+    let min_ping = times.iter().min().unwrap_or_else(|| &0);
+    let max_ping = times.iter().max().unwrap_or_else(|| &0);
     
     println!("\n--- {} ping statistics ---", remote_addr);
     println!("{} packets transmitted, {} received, {:.0}% packet loss \nrtt min/avg/max = {}/{}/{}",
