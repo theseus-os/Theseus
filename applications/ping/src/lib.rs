@@ -334,18 +334,8 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
         0 as f64
     };
      
-    let min_ping = match times.iter().min() {
-            Some(min) => min,
-            None => &0,
-    };
-
-    let max_ping = match times.iter().max() {
-            Some(max) => max,
-            None => &0,
-    };
-        
-    
-    
+    let min_ping = times.iter().min().unwrap_or_else(&0);
+    let max_ping = times.iter().max().unwrap_or_else(&0);
     
     println!("\n--- {} ping statistics ---", remote_addr);
     println!("{} packets transmitted, {} received, {:.0}% packet loss \nrtt min/avg/max = {}/{}/{}",
@@ -353,8 +343,6 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     if received == 0{         
             println!("\nwarning: Ping/ICMP will not work in QEMU unless you specifically enable it. If you are able to ping  \nthe qemu gateway address 10.0.2.2 and not other addresses, your ICMP is most likely disabled");
     }
-
-
 }
 
 fn print_usage(opts: &Options) -> isize {
