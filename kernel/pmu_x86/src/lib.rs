@@ -86,7 +86,10 @@ use alloc::{
 };
 use bit_field::BitField;
 use core::{
-    convert::TryFrom,
+    any::{
+        Any,
+        TypeId,
+    },
     sync::atomic::{Ordering, AtomicU64, AtomicU8},
 };
 
@@ -701,7 +704,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     // This check can never trigger since `event_per_sample` is a `u32`
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We'll check anyways, just in case `event_per_sample`'s type is changed.
-    if u32::try_from(event_per_sample).is_ok() {
+    if event_per_sample.type_id() == TypeId::of::<u32>() {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
 
