@@ -1,13 +1,13 @@
-use crate::prevention::{private::Sealed, DeadlockPrevention };
+use crate::prevention::DeadlockPrevention;
 
 pub struct Spin {}
 
-impl Sealed for Spin {}
-
 impl DeadlockPrevention for Spin {
-    type Guard = ();
+    type GuardMarker = lock_api::GuardSend;
 
-    fn enter() -> Self::Guard {
-        ()
-    }
+    #[inline]
+    fn enter() {}
+
+    #[inline]
+    fn exit() {}
 }

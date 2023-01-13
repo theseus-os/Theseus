@@ -1,75 +1,62 @@
-use core::ops::{Deref, DerefMut};
+use crate::Flavour;
+use core::sync::atomic::{AtomicBool, Ordering};
 
-use crate::prevention::{GuardData, LockData, MutexFlavour};
-
-pub struct Mutex<P, T>
+#[doc(hidden)]
+pub struct RawMutex<T>
 where
-    P: MutexFlavour,
+    T: Flavour,
 {
-    inner: spin::Mutex<T>,
-    prevention: P::LockData,
+    lock: AtomicBool,
+    pub(crate) data: T::LockData,
 }
 
-impl<P, T> Mutex<P, T>
+unsafe impl<T> lock_api::RawMutex for RawMutex<T>
 where
-    P: MutexFlavour,
+    T: Flavour,
 {
-    #[inline]
-    pub fn new(data: T) -> Self {
-        Self {
-            inner: spin::Mutex::new(data),
-            prevention: P::LockData::new(),
-        }
-    }
+    const INIT: Self = Self {
+        lock: AtomicBool::new(false),
+        data: T::INIT,
+    };
+
+    type GuardMarker = T::GuardMarker;
 
     #[inline]
-    pub fn try_lock(&self) -> Option<MutexGuard<'_, P, T>> {
-        if self.inner.is_locked() {
-            None
-        } else {
-            let prevention = P::GuardData::new(&self.prevention);
-            self.inner.try_lock().map(|guard| MutexGuard {
-                inner: guard,
-                _prevention: prevention,
-            })
+    fn lock(&self) {
+        if self.try_lock_weak() {
+            return;
         }
+
+        T::mutex_slow_path(self);
     }
 
     #[inline]
-    pub fn lock(&self) -> MutexGuard<'_, P, T> {
-        if let Some(guard) = self.try_lock() {
-            return guard;
-        }
+    fn try_lock(&self) -> bool {
+        self.lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
+    }
 
-        P::slow_path(&self.prevention, || self.try_lock())
+    #[inline]
+    unsafe fn unlock(&self) {
+        self.lock.store(false, Ordering::Release);
+        T::post_unlock(self);
+    }
+
+    #[inline]
+    fn is_locked(&self) -> bool {
+        self.lock.load(Ordering::Relaxed)
     }
 }
 
-pub struct MutexGuard<'a, P, T>
+impl<T> RawMutex<T>
 where
-    P: MutexFlavour,
+    T: Flavour,
 {
-    inner: spin::MutexGuard<'a, T>,
-    // The guard data is dropped after the inner mutex guard.
-    _prevention: P::GuardData<'a>,
-}
-
-impl<P, T> Deref for MutexGuard<'_, P, T>
-where
-    P: MutexFlavour,
-{
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        self.inner.deref()
-    }
-}
-
-impl<P, T> DerefMut for MutexGuard<'_, P, T>
-where
-    P: MutexFlavour,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.inner.deref_mut()
+    #[inline]
+    pub(crate) fn try_lock_weak(&self) -> bool {
+        self.lock
+            .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .is_ok()
     }
 }

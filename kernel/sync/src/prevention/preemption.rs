@@ -1,15 +1,17 @@
-use crate::prevention::{private::Sealed, DeadlockPrevention};
+use crate::prevention::DeadlockPrevention;
 
 pub struct PreemptionSafe {}
 
-impl Sealed for PreemptionSafe {}
-
-impl Sealed for preemption::PreemptionGuard {}
-
 impl DeadlockPrevention for PreemptionSafe {
-    type Guard = preemption::PreemptionGuard;
+    type GuardMarker = lock_api::GuardNoSend;
 
-    fn enter() -> Self::Guard {
-        preemption::hold_preemption()
+    #[inline]
+    fn enter() {
+        preemption::enable_preemption()
+    }
+
+    #[inline]
+    fn exit() {
+        preemption::disable_preemption()
     }
 }

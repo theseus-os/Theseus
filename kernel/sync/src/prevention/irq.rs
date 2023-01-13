@@ -1,15 +1,18 @@
-use crate::prevention::{private::Sealed, DeadlockPrevention};
+use crate::prevention::DeadlockPrevention;
 
 pub struct IrqSafe {}
 
-impl Sealed for IrqSafe {}
-
-impl Sealed for irq_safety::HeldInterrupts {}
-
 impl DeadlockPrevention for IrqSafe {
-    type Guard = irq_safety::HeldInterrupts;
+    type GuardMarker = lock_api::GuardNoSend;
 
-    fn enter() -> Self::Guard {
-        irq_safety::hold_interrupts()
+    #[inline]
+    fn enter() {
+        // FIXME: Recursive disabling doesn't work.
+        irq_safety::disable_interrupts();
+    }
+
+    #[inline]
+    fn exit() {
+        irq_safety::enable_interrupts();
     }
 }

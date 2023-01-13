@@ -28,18 +28,33 @@ static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CO
 /// until the returned guard object is dropped.
 pub fn hold_preemption() -> PreemptionGuard {
     let cpu_id = apic::current_cpu();
-    let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_add(1, Ordering::Relaxed);
-    // If the previous counter value was 0, that indicates we are transitioning
-    // from preemption being enabled to disabled on this CPU.
+    let prev_val = enable_preemption_inner(cpu_id);
+
     let preemption_was_enabled = prev_val == 0;
     // Create a guard here immediately after incrementing the counter,
     // in order to guarantee that a failure below will drop it and decrement the counter.
-    let guard = PreemptionGuard {
+    PreemptionGuard {
         cpu_id,
         preemption_was_enabled,
-    };
+    }
+}
 
-    if preemption_was_enabled {
+pub fn enable_preemption() {
+    let cpu_id = apic::current_cpu();
+    enable_preemption_inner(cpu_id);
+}
+
+pub fn disable_preemption() {
+    let cpu_id = apic::current_cpu();
+    disable_preemption_inner(cpu_id);
+}
+
+fn enable_preemption_inner(cpu_id: u8) -> u8 {
+    let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_add(1, Ordering::Relaxed);
+
+    // If the previous counter value was 0, that indicates we are transitioning
+    // from preemption being enabled to disabled on this CPU.
+    if prev_val == 0 {
         // log::trace!(" CPU {}:   disabling preemption", cpu_id);
         
         // When transitioning from preemption being enabled to disabled,
@@ -53,9 +68,26 @@ pub fn hold_preemption() -> PreemptionGuard {
         panic!("BUG: Overflow occurred in the preemption counter for CPU {}", cpu_id);
     }
 
-    guard
+    prev_val
 }
 
+fn disable_preemption_inner(cpu_id: u8) {
+    let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_sub(1, Ordering::Relaxed);
+    if prev_val == 1 {
+        // log::trace!("CPU {}: re-enabling preemption", cpu_id);
+
+        // If the previous counter value was 1, that means the current value is 1,
+        // which indicates we are transitioning from preemption disabled to enabled on this CPU.
+        // Thus, we re-enable the local APIC timer used for preemptive task switching.
+        apic::get_my_apic()
+            .expect("BUG: PreemptionGuard::drop() couldn't get local APIC")
+            .write()
+            .enable_lvt_timer(true);
+    } else if prev_val == 0 {
+        // Underflow occurred and the counter value wrapped around, which is a bug.
+        panic!("BUG: Underflow occurred in the preemption counter for CPU {}", cpu_id);
+    }
+}
 
 /// A guard type that ensures preemption is disabled as long as it is held.
 /// 
@@ -112,22 +144,7 @@ impl Drop for PreemptionGuard {
             "PreemptionGuard::drop(): BUG: CPU IDs did not match! \
             This indicates an unexpected task migration across CPUs."
         );
-
-        let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_sub(1, Ordering::Relaxed);
-        if prev_val == 1 {
-            // log::trace!("CPU {}: re-enabling preemption", cpu_id);
-
-            // If the previous counter value was 1, that means the current value is 1,
-            // which indicates we are transitioning from preemption disabled to enabled on this CPU.
-            // Thus, we re-enable the local APIC timer used for preemptive task switching.
-            apic::get_my_apic()
-                .expect("BUG: PreemptionGuard::drop() couldn't get local APIC")
-                .write()
-                .enable_lvt_timer(true);
-        } else if prev_val == 0 {
-            // Underflow occurred and the counter value wrapped around, which is a bug.
-            panic!("BUG: Underflow occurred in the preemption counter for CPU {}", cpu_id);
-        }
+        disable_preemption_inner(cpu_id);
     }
 }
 

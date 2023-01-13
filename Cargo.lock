@@ -98,7 +98,7 @@ dependencies = [
  "memory",
  "no_drop",
  "page_attribute_table",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "stack",
 ]
@@ -314,7 +314,7 @@ dependencies = [
  "pmu_x86",
  "rendezvous",
  "runqueue",
- "scheduler",
+ "scheduler 0.1.0",
  "simple_ipc",
  "spawn",
  "task",
@@ -376,7 +376,7 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
- "scheduler",
+ "scheduler 0.1.0",
  "simd_personality",
  "spawn",
  "stack",
@@ -754,7 +754,7 @@ dependencies = [
  "debugit",
  "interrupts",
  "log",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "task",
  "x86_64",
@@ -911,7 +911,7 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "mutex_sleep",
- "scheduler",
+ "scheduler 0.1.0",
  "sleep",
  "spawn",
  "task",
@@ -968,6 +968,27 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
+]
+
+[[package]]
+name = "errno"
+version = "0.2.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f639046355ee4f37944e44f60642c6f3a7efa3cf6b78c78a0d989a8ce6c396a1"
+dependencies = [
+ "errno-dragonfly",
+ "libc",
+ "winapi",
+]
+
+[[package]]
+name = "errno-dragonfly"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
+dependencies = [
+ "cc",
+ "libc",
 ]
 
 [[package]]
@@ -1481,7 +1502,7 @@ dependencies = [
  "log",
  "memory",
  "pic",
- "scheduler",
+ "scheduler 0.1.0",
  "sleep",
  "spin 0.9.4",
  "tss",
@@ -2081,6 +2102,13 @@ name = "mpmc"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf78b1242a953be96e01b5f8ed8ffdfc8055c0a2b779899b3835e5d27a69dced"
+
+[[package]]
+name = "mpmc_queue"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+]
 
 [[package]]
 name = "msr"
@@ -2689,7 +2717,7 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "getopts",
- "scheduler",
+ "scheduler 0.1.0",
  "task",
 ]
 
@@ -2857,7 +2885,7 @@ dependencies = [
  "hpet",
  "irq_safety",
  "log",
- "scheduler",
+ "scheduler 0.1.0",
  "spin 0.9.4",
  "task",
  "wait_queue",
@@ -3061,12 +3089,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "scheduler"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6fa43f074ab0432dea0abfafb02b211ff81fb4119617d1c9148a5e7b9c372038"
+dependencies = [
+ "errno",
+ "libc",
+]
+
+[[package]]
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
  "log",
  "logger",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "task",
 ]
@@ -3230,7 +3268,7 @@ dependencies = [
  "path",
  "root",
  "runqueue",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "spin 0.9.4",
  "stdio",
@@ -3321,7 +3359,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "lazy_static",
- "scheduler",
+ "scheduler 0.1.0",
  "task",
 ]
 
@@ -3380,7 +3418,7 @@ dependencies = [
  "pause",
  "preemption",
  "runqueue",
- "scheduler",
+ "scheduler 0.1.0",
  "spin 0.9.4",
  "stack",
  "task",
@@ -3542,6 +3580,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "lock_api",
+ "mpmc_queue",
+ "preemption",
+ "scheduler 0.1.3",
+ "spin 0.9.4",
+ "task",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3636,7 +3687,7 @@ dependencies = [
  "getopts",
  "log",
  "rendezvous",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "spin 0.9.4",
  "task",
@@ -3657,7 +3708,7 @@ dependencies = [
  "log",
  "rendezvous",
  "runqueue",
- "scheduler",
+ "scheduler 0.1.0",
  "shapes",
  "spawn",
  "spin 0.9.4",
@@ -3714,7 +3765,7 @@ dependencies = [
  "cpu",
  "log",
  "mutex_sleep",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "task",
 ]
@@ -3734,7 +3785,7 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "log",
- "scheduler",
+ "scheduler 0.1.0",
  "sleep",
  "spawn",
 ]
@@ -3799,7 +3850,7 @@ dependencies = [
  "app_io",
  "cpu",
  "log",
- "scheduler",
+ "scheduler 0.1.0",
  "spawn",
  "spin 0.9.4",
  "task",
@@ -4226,7 +4277,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
- "scheduler",
+ "scheduler 0.1.0",
  "task",
 ]
 
@@ -4492,7 +4543,7 @@ dependencies = [
  "mouse_data",
  "mpmc",
  "path",
- "scheduler",
+ "scheduler 0.1.0",
  "shapes",
  "spawn",
  "spin 0.9.4",
