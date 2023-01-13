@@ -79,11 +79,17 @@ use x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::Interrup
 use raw_cpuid::*;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use alloc::vec::Vec;
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::{String, ToString};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::{String, ToString},
+    vec::Vec,
+};
 use bit_field::BitField;
-use core::sync::atomic::{Ordering, AtomicU64, AtomicU8};
+use core::{
+    convert::TryFrom,
+    sync::atomic::{Ordering, AtomicU64, AtomicU8},
+};
+
 
 pub mod stat;
 
@@ -695,8 +701,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     // This check can never trigger since `event_per_sample` is a `u32`
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We'll check anyways, just in case `event_per_sample`'s type is changed.
-    #[allow(clippy::absurd_extreme_comparisons)]
-    if !(core::u32::MIN..=core::u32::MAX).contains(&event_per_sample) {
+    if u32::try_from(event_per_sample).is_ok() {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
 

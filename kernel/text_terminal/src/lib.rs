@@ -2329,10 +2329,6 @@ impl WideDisplayedUnit {
     /// of a previous character Unit, i.e., `TabFill` or `MultiFill`.
     #[inline(always)]
     fn is_continuance(&self) -> bool {
-        // match self {
-        //     &Self::TabFill | &Self::MultiFill => true,
-        //     _ => false,
-        // }
         matches!(self, &Self::TabFill | &Self::MultiFill)
     }
 }
