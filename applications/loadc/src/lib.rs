@@ -71,7 +71,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
         )
     ).map_err(|_| String::from("failed to get current task"))?;
 
-    let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
+    let path = matches.free.get(0).ok_or_else(|| "Missing path to ELF executable".to_string())?;
     let path = Path::new(path.clone());
     let file_ref = path.get_file(&curr_wd)
         .ok_or_else(|| format!("Failed to access file at {:?}", path))?;
