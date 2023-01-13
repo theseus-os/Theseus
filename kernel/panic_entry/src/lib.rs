@@ -4,6 +4,8 @@
 //! They should never be directly invoked by developers, only by the compiler. 
 //! 
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]
@@ -83,9 +85,6 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 #[doc(hidden)]
 extern "C" fn rust_eh_personality() -> ! {
     error!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
-    
-    // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-    #[allow(clippy::empty_loop)]
     loop { }
 }
 
@@ -118,9 +117,6 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
             Ok(()) => error!("BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()"),
             Err(e) => error!("_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}", e),
         }
-        
-        // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-        #[allow(clippy::empty_loop)]
         loop { }
     }
 }

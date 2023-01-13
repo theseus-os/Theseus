@@ -1,5 +1,7 @@
 //! Exception handlers that are task-aware, and will kill a task on an exception.
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
@@ -231,9 +233,6 @@ fn kill_and_halt(
     // But in general, this task should have already been marked as killed and thus no longer schedulable,
     // so it should not reach this point. 
     // Only exceptions during the early OS initialization process will get here, meaning that the OS will basically stop.
-    
-    // TODO: Add criteria for replacing this empty loop with something else
-    #[allow(clippy::empty_loop)]
     loop { }
 }
 
@@ -362,9 +361,6 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame,
     }
     
     kill_and_halt(0x8, &stack_frame, Some(error_code.into()), false);
-    
-    // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-    #[allow(clippy::empty_loop)]
     loop {}
 }
 
@@ -428,9 +424,6 @@ extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFra
 extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
     println_both!("\nEXCEPTION: MACHINE CHECK\n{:#X?}", stack_frame);
     kill_and_halt(0x12, &stack_frame, None, true);
-    
-    // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-    #[allow(clippy::empty_loop)]
     loop {}
 }
 
