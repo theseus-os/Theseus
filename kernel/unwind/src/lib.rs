@@ -98,7 +98,7 @@ pub struct UnwindingContext {
     /// A reference to the current task that is being unwound.
     current_task: TaskRef,
 }
-impl From<UnwindingContext> for (StackFrameIter, KillReason, TaskRef){
+impl From<UnwindingContext> for (StackFrameIter, KillReason, TaskRef) {
     fn from(val: UnwindingContext) -> Self {
         (val.stack_frame_iter, val.cause, val.current_task)
     }
@@ -665,15 +665,6 @@ impl UnwindRowReference {
                 "gimli error while finding unwind info for address"
             })?;
             
-            // debug!("FDE: {:?} ", fde);
-            // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
-            // while let Some(instr) = instructions.next().map_err(|_e| {
-            //     error!("FDE instructions gimli error: {:?}", _e);
-            //     "gimli error while iterating through eh_frame FDE instructions list"
-            // })? {
-            //     debug!("    FDE instr: {:?}", instr);
-            // }
-
             f(&fde, unwind_table_row)
         };
 
