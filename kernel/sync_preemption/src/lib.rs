@@ -3,6 +3,7 @@
 pub type Mutex<T> = sync::Mutex<DisablePreemption, T>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisablePreemption, T>;
 
+#[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DisablePreemption {}
 
 impl sync::DeadlockPrevention for DisablePreemption {

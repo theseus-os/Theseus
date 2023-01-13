@@ -139,8 +139,9 @@ impl<T> fmt::Debug for ExchangeState<T> {
 /// in order to exchange a message. 
 /// 
 /// Returns a tuple of `(Sender, Receiver)`.
-pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
-    let channel = Arc::new(Channel::<T> {
+#[allow(invalid_type_param_default)]
+pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Receiver<T, P>) {
+    let channel = Arc::new(Channel::<T, P> {
         slot: ExchangeSlot::new(),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
@@ -162,7 +163,7 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
 /// Sender-side and Receiver-side references to an exchange slot can be obtained in both 
 /// a blocking and non-blocking fashion, 
 /// which supports both synchronous (rendezvous-based) and asynchronous channels.
-struct Channel<T: Send, P: DeadlockPrevention = Spin> {
+struct Channel<T: Send, P: DeadlockPrevention> {
     /// In a zero-capacity synchronous channel, there is only a single slot,
     /// but senders and receivers perform a blocking wait on it until the slot becomes available.
     /// In contrast, a synchronous channel with a capacity of 1 would return a "channel full" error
@@ -172,7 +173,7 @@ struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     waiting_receivers: WaitQueue<P>,
 }
 
-impl<T: Send> Channel<T> {
+impl<T: Send, P: DeadlockPrevention> Channel<T, P> {
     /// Obtain a sender slot, blocking until one is available.
     fn take_sender_slot(&self) -> SenderSlot<T> {
         // Fast path: the uncontended case.
@@ -211,10 +212,10 @@ impl<T: Send> Channel<T> {
 
 /// The sender (transmit) side of a channel.
 #[derive(Clone)]
-pub struct Sender<T: Send> {
-    channel: Arc<Channel<T>>,
+pub struct Sender<T: Send, P: DeadlockPrevention = Spin> {
+    channel: Arc<Channel<T, P>>,
 }
-impl <T: Send> Sender<T> {
+impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
     /// Send a message, blocking until a receiver is ready.
     /// 
     /// Returns `Ok(())` if the message was sent and received successfully,
@@ -375,10 +376,10 @@ impl <T: Send> Sender<T> {
 
 /// The receiver side of a channel.
 #[derive(Clone)]
-pub struct Receiver<T: Send> {
-    channel: Arc<Channel<T>>,
+pub struct Receiver<T: Send, P: DeadlockPrevention = Spin> {
+    channel: Arc<Channel<T, P>>,
 }
-impl <T: Send> Receiver<T> {
+impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
     /// Receive a message, blocking until a sender is ready. 
     /// 
     /// Returns the message if it was received properly,

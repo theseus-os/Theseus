@@ -49,8 +49,8 @@ use sync_spin::Spin;
 /// until the channel's buffer is drained by a receiver and space in the buffer becomes available.
 /// 
 /// Returns a tuple of `(Sender, Receiver)`.
-pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
-    let channel = Arc::new(Channel::<T> {
+pub fn new_channel<T: Send, P: DeadlockPrevention>(minimum_capacity: usize) -> (Sender<T, P>, Receiver<T, P>) {
+    let channel = Arc::new(Channel::<T, P> {
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
@@ -105,7 +105,7 @@ impl From<Error> for core2::io::Error {
 /// 
 /// This channel object is not Send/Sync or cloneable itself;
 /// it can be shared across tasks using an `Arc`.
-struct Channel<T: Send, P: DeadlockPrevention = Spin> {
+struct Channel<T: Send, P: DeadlockPrevention> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue<P>,
     waiting_receivers: WaitQueue<P>,
@@ -117,7 +117,7 @@ struct Channel<T: Send, P: DeadlockPrevention = Spin> {
 // Ensure that `AtomicCell<ChannelStatus>` is actually a lock-free atomic.
 const_assert!(AtomicCell::<ChannelStatus>::is_lock_free());
 
-impl <T: Send> Channel<T> {
+impl <T: Send, P: DeadlockPrevention> Channel<T, P> {
     /// Returns true if the channel is disconnected.
     #[inline(always)]
     fn is_disconnected(&self) -> bool {
@@ -134,7 +134,7 @@ impl <T: Send> Channel<T> {
     ///
     /// This increments the channel's sender count.
     /// If there were previously no senders, the channel status is updated to `Connected`.
-    fn add_sender(channel: &Arc<Channel<T>>) -> Sender<T> {
+    fn add_sender(channel: &Arc<Self>) -> Sender<T, P> {
         if channel.sender_count.fetch_add(1, Ordering::SeqCst) == 0 {
             channel.channel_status.store(ChannelStatus::Connected);
         }
@@ -145,7 +145,7 @@ impl <T: Send> Channel<T> {
     ///
     /// This increments the channel's receiver count.
     /// If there were previously no receivers, the channel status is updated to `Connected`.
-    fn add_receiver(channel: &Arc<Channel<T>>) -> Receiver<T> {
+    fn add_receiver(channel: &Arc<Self>) -> Receiver<T, P> {
         if channel.receiver_count.fetch_add(1, Ordering::SeqCst) == 0 {
             channel.channel_status.store(ChannelStatus::Connected);
         }
@@ -154,11 +154,11 @@ impl <T: Send> Channel<T> {
 }
 
 /// The sender (transmit) side of a channel.
-pub struct Sender<T: Send> {
-    channel: Arc<Channel<T>>,
+pub struct Sender<T: Send, P: DeadlockPrevention = Spin> {
+    channel: Arc<Channel<T, P>>,
 }
 
-impl<T:Send> Clone for Sender<T> {
+impl<T:Send, P: DeadlockPrevention> Clone for Sender<T, P> {
     /// Clones this `Sender`, returning another `Sender` connected to the same channel.
     ///
     /// This increments the channel's sender count.
@@ -168,7 +168,7 @@ impl<T:Send> Clone for Sender<T> {
     }
 }
 
-impl <T: Send> Sender<T> {
+impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
     /// Send a message, blocking until space in the channel's buffer is available. 
     /// 
     /// Returns `Ok(())` if the message was sent successfully,
@@ -345,17 +345,17 @@ impl <T: Send> Sender<T> {
     }
 
     /// Obtain a `Receiver` endpoint connected to the same channel as this `Sender`.
-    pub fn receiver(&self) -> Receiver<T> {
+    pub fn receiver(&self) -> Receiver<T, P> {
         Channel::add_receiver( &self.channel )
     }
 }
 
 /// The receiver side of a channel.
-pub struct Receiver<T: Send> {
-    channel: Arc<Channel<T>>,
+pub struct Receiver<T: Send, P: DeadlockPrevention = Spin> {
+    channel: Arc<Channel<T, P>>,
 }
 
-impl<T: Send> Clone for Receiver<T> {
+impl<T: Send, P: DeadlockPrevention> Clone for Receiver<T, P> {
     /// Clones this `Receiver`, returning another `Receiver` connected to the same channel.
     ///
     /// This increments the channel's receiver count.
@@ -365,7 +365,7 @@ impl<T: Send> Clone for Receiver<T> {
     }
 }
 
-impl <T: Send> Receiver<T> {
+impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
     /// Returns the message if it was received properly, otherwise returns an [`Error`].
@@ -497,7 +497,7 @@ impl <T: Send> Receiver<T> {
     }
 
     /// Obtain a `Sender` endpoint connected to the same channel as this `Receiver`.
-    pub fn sender(&self) -> Sender<T> {
+    pub fn sender(&self) -> Sender<T, P> {
         Channel::add_sender( &self.channel )
     }
 }
@@ -505,7 +505,7 @@ impl <T: Send> Receiver<T> {
 
 /// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
 /// and notify all of the `Senders`
-impl<T: Send> Drop for Receiver<T> {
+impl<T: Send, P: DeadlockPrevention> Drop for Receiver<T, P> {
     fn drop(&mut self) {
         // trace!("Dropping a receiver");
         if self.channel.receiver_count.fetch_sub(1, Ordering::SeqCst) == 1 {
@@ -517,7 +517,7 @@ impl<T: Send> Drop for Receiver<T> {
 
 /// When the only remaining `Sender` is dropped, we mark the channel as disconnected
 /// and notify all of the `Receivers`
-impl<T: Send> Drop for Sender<T> {
+impl<T: Send, P: DeadlockPrevention> Drop for Sender<T, P> {
     fn drop(&mut self) {
         // trace!("Dropping a sender");
         if self.channel.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {

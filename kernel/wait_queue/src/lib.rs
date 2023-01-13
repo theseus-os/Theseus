@@ -5,16 +5,16 @@ use sync::DeadlockPrevention;
 use sync_spin::Spin;
 use task::{get_my_current_task, TaskRef};
 
-pub struct WaitQueue<F = Spin>
+pub struct WaitQueue<P = Spin>
 where
-    F: DeadlockPrevention,
+    P: DeadlockPrevention,
 {
-    inner: Queue<F, TaskRef>,
+    inner: Queue<P, TaskRef>,
 }
 
-impl<F> WaitQueue<F>
+impl<P> WaitQueue<P>
 where
-    F: DeadlockPrevention,
+    P: DeadlockPrevention,
 {
     pub const fn new() -> Self {
         Self {
@@ -22,9 +22,9 @@ where
         }
     }
 
-    pub fn wait_until<A, B>(&self, mut condition: A) -> B
+    pub fn wait_until<F, T>(&self, mut condition: F) -> T
     where
-        A: FnMut() -> Option<B>,
+        F: FnMut() -> Option<T>,
     {
         loop {
             let task = get_my_current_task().unwrap();

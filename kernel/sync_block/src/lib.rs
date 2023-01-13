@@ -4,6 +4,7 @@ use sync::{mutex, Flavour};
 use sync_spin::Spin;
 use wait_queue::WaitQueue;
 
+#[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Block {}
 
 unsafe impl Flavour for Block {
