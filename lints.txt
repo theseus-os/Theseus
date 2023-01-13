@@ -1,4 +1,4 @@
-# Complexity
+Complexity
 bind-instead-of-map
 bool-comparison
 borrowed-box
@@ -88,7 +88,7 @@ unnecessary-unwrap
 unneeded-wildcard-pattern
 useless-asref
 useless-conversion
-# useless-format
+useless-format
 vec-box
 while-let-loop
 wildcard-in-or-patterns

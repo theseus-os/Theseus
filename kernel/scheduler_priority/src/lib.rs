@@ -98,7 +98,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         if let Some(pinned) = t.pinned_core() {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, t);
                 return None;
             }
         }
@@ -168,7 +168,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         if let Some(pinned) = t.pinned_core() {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, t);
                 return false;
             }
         }
