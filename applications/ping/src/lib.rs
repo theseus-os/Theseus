@@ -24,6 +24,7 @@ use core::str::FromStr;
 use hashbrown::HashMap;
 use alloc::vec::Vec;        
 use alloc::string::String;
+use alloc::string::ToString;
 use hpet::get_hpet;
 use smoltcp::{
     socket::{SocketSet, IcmpSocket, IcmpSocketBuffer, IcmpPacketMetadata, IcmpEndpoint},

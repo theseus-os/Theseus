@@ -85,9 +85,7 @@ use alloc::{
     vec::Vec,
 };
 use bit_field::BitField;
-use core::{
-    any::TypeId,
-    sync::atomic::{Ordering, AtomicU64, AtomicU8},
+use core::sync::atomic::{Ordering, AtomicU64, AtomicU8,
 };
 
 
