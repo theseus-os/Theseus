@@ -2,15 +2,17 @@
 
 extern crate task;
 #[macro_use] extern crate app_io;
-#[macro_use] extern crate alloc;
-// #[macro_use] extern crate log;
+extern crate alloc;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    string::String,
+    string::ToString,
+    vec::Vec,
+};
+use core::fmt::Write;
 use fs_node::{FileOrDir, DirRef};
 use getopts::Options;
 use path::Path;
