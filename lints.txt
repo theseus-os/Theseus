@@ -1,4 +1,4 @@
-Complexity
+complexity
 bind-instead-of-map
 bool-comparison
 borrowed-box
