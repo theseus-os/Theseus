@@ -136,7 +136,7 @@ Note: building and running Theseus within a Docker container may be slower than 
 
 Notes on Docker usage:    
   * The docker-based workflow should only require you to re-run the `run_docker.sh` script multiple times when re-building or running Theseus after modifying its code. You shouldn't need to re-run `build_docker.sh` multiple times, though it won't hurt.
-  * KVM doesn't currently work in docker. To run Theseus in QEMU using KVM, you can build Theseus within docker, exit the container (via `Ctrl+D`), and then run `make orun host=yes` on your host machine.
+  * KVM doesn't currently work in docker. To run Theseus in QEMU using KVM, you can build Theseus within docker, exit the container (via <kbd>Ctrl</kbd> + <kbd>D</kbd>`), and then run `make orun host=yes` on your host machine.
 
 
 ## Building and Running
@@ -145,7 +145,7 @@ Build the default Theseus OS image and run it in QEMU:
 make run
 ```
 
-Build a full Theseus OS image with all features and crates enabled:
+Or, build a full Theseus OS image with all features and crates enabled:
 ```sh
 make full   ## or `make all`
 ```
@@ -240,22 +240,7 @@ For VS Code, recommended plugins are:
  * **rust-analyzer**, by matklad
  * **Better TOML**, by bungcip
  * **x86 and x86_64 Assembly**, by 13xforever
-
-### Fixing Rustup, Rust Toolchain, or RLS Problems
-Sometimes things just don't want to behave, especially if there were issues with the currently-chosen Rust nightly version.
-In that case, try the following steps to fix it:
- * Set your default Rust toolchain to the one version in the `rust-toolchain` file, for example:
-    ```sh
-    rustup default $(cat rust-toolchain)
-    ```
- * With your newly-set default toolchain, add the necessary components:    
-    ```
-    rustup component add rust-src
-    ```
- * In VS Code (or whatever IDE you're using), uninstall and reinstall the Rust-related extension(s), restarting the IDE each time.
- * Check your IDE's settings to make sure that no weird Rust settings have been selected; building Theseus doesn't require any special settings. 
- * If you're still having issues, remove all other Rust toolchain versions besides the default one and try again. You can see other installed toolchains with `rustup toolchain list`.
-
+ 
 
 ## Acknowledgements
 We would like to express our thanks to the [OS Dev wiki](https://wiki.osdev.org/) and its community and to Philipp Oppermann's [blog_os](https://os.phil-opp.com/) for serving as excellent starting points for Theseus. The early days of Theseus's development progress are indebted to these resources. 
