@@ -47,7 +47,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     let path = Path::new(matches.free[0].to_string());
 
-    // navigate to the path specified by first argument
+    // Navigate to the path specified by first argument
     match path.get(&curr_wd) {
         Some(FileOrDir::Dir(dir)) => {
             print_children(&dir);
