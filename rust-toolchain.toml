@@ -1,0 +1,7 @@
+[toolchain]
+channel = "nightly-2023-01-11"
+components = [ "rust-src", "clippy" ]
+## Rustup always installs the host target by default, so we don't need to specify it here.
+## All we need to specify is the uefi target(s) used to build our `uefi-bootloader`.
+targets = [ "x86_64-unknown-uefi" ]
+profile = "default"
