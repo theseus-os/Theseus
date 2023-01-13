@@ -146,7 +146,7 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
         .iter()
         .next()
         .cloned()
-        .ok_or_else(|| format!("no network interfaces available"))
+        .ok_or_else(|| "no network interfaces available".to_string())
 }
 
 // Retrieves the echo reply contained in the receive buffer and prints data pertaining to the packet
@@ -163,7 +163,7 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, t
             
             waiting_queue.remove(&seq_no);
             *received += 1;
-            times.push((timestamp - packet_timestamp_ms) as u64);
+            times.push(timestamp - packet_timestamp_ms);
             *total_time += timestamp - packet_timestamp_ms;
         }
     } 
@@ -171,7 +171,7 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, t
 
 fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: bool, buffer_size: usize) {
 
-    let startup_time = hpet_ticks!() as u64;
+    let startup_time = hpet_ticks!();
     let remote_addr = address;
     let mut times = Vec::new();
     
@@ -195,7 +195,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
     let mut sockets = SocketSet::new(vec![]);
     let icmp_handle = sockets.add(icmp_socket);
     
-    let mut send_at = match millis_since(startup_time as u64) {
+    let mut send_at = match millis_since(startup_time) {
         Ok(time) => time,
         Err(err) => return println!("couldn't get time since start_up: {}", err),
     };
@@ -227,7 +227,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
             }
         }
         {
-            let timestamp = match millis_since(startup_time as u64) {
+            let timestamp = match millis_since(startup_time) {
                 Ok(time) => time,
                 Err(err) => return println!("couldn't get timestamp:{}", err),
             };
@@ -335,12 +335,12 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
      
     let min_ping = match times.iter().min() {
             Some(min) => min,
-            None => &(0 as u64),
+            None => &0,
     };
 
     let max_ping = match times.iter().max() {
             Some(max) => max,
-            None => &(0 as u64),
+            None => &0,
     };
         
     
@@ -357,7 +357,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
 }
 
 fn print_usage(opts: &Options) -> isize {
-    let mut brief = format!("Usage: ping DESTINATION \n \n");
+    let mut brief = "Usage: ping DESTINATION \n \n".to_string();
 
     brief.push_str("pings an IPv4 address and returns ping statistics");
 
