@@ -316,7 +316,7 @@ to-string-in-format-args
 unnecessary-to-owned
 useless-vec
 vec-init-then-push
-Suspicious
+suspicious
 await-holding-invalid-type
 await-holding-lock
 await-holding-refcell-ref
