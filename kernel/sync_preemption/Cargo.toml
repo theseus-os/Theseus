@@ -1,0 +1,8 @@
+[package]
+name = "sync_preemption"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+preemption = { path = "../preemption" }
+sync = { path = "../../libs/sync" }

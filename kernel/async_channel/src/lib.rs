@@ -19,6 +19,8 @@ extern crate wait_queue;
 extern crate mpmc;
 extern crate crossbeam_utils;
 extern crate core2;
+extern crate sync;
+extern crate sync_spin;
 
 #[cfg(downtime_eval)]
 extern crate hpet;
@@ -30,6 +32,8 @@ use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
 use crossbeam_utils::atomic::AtomicCell;
 use core::sync::atomic::{AtomicUsize, Ordering};
+use sync::DeadlockPrevention;
+use sync_spin::Spin;
 
 /// Create a new channel that allows senders and receivers to 
 /// asynchronously exchange messages via an internal intermediary buffer.
@@ -82,8 +86,6 @@ pub enum Error {
     WouldBlock,
     /// Occurs when one end of channel is dropped
     ChannelDisconnected,
-    /// Occurs when an error occur in `WaitQueue`
-    WaitError(wait_queue::WaitError)
 }
 
 impl From<Error> for core2::io::Error {
@@ -91,7 +93,6 @@ impl From<Error> for core2::io::Error {
         match e {
             Error::WouldBlock => core2::io::ErrorKind::WouldBlock,
             Error::ChannelDisconnected => core2::io::ErrorKind::BrokenPipe,
-            Error::WaitError(_) => core2::io::ErrorKind::Other,
         }
         .into()
     }
@@ -104,10 +105,10 @@ impl From<Error> for core2::io::Error {
 /// 
 /// This channel object is not Send/Sync or cloneable itself;
 /// it can be shared across tasks using an `Arc`.
-struct Channel<T: Send> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     queue: MpmcQueue<T>,
-    waiting_senders: WaitQueue,
-    waiting_receivers: WaitQueue,
+    waiting_senders: WaitQueue<P>,
+    waiting_receivers: WaitQueue<P>,
     channel_status: AtomicCell<ChannelStatus>,
     sender_count: AtomicUsize,
     receiver_count: AtomicUsize,
@@ -231,10 +232,7 @@ impl <T: Send> Sender<T> {
         // When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), 
         // Error in the condition (channel disconnection) marked as Ok(Err()),
         // or the wait_until runs into error (Err()) 
-        let res =  match self.channel.waiting_senders.wait_until_mut(&mut closure) {
-            Ok(r) => r,
-            Err(wait_error) => Err(Error::WaitError(wait_error)),
-        };
+        let res = self.channel.waiting_senders.wait_until(&mut closure);
 
         // trace!("... sending space became available.");
 
@@ -409,12 +407,7 @@ impl <T: Send> Receiver<T> {
         // When wait returns it can be either a successful receiver marked as  Ok(Ok(msg)), 
         // Error in wait condition marked as Ok(Err(error)),
         // or the wait_until runs into error (Err()) 
-        let res =  match self.channel.waiting_receivers.wait_until(& closure) {
-            Ok(Ok(x)) => Ok(x),
-            Ok(Err(error)) => Err(error),
-            Err(wait_error) => Err(Error::WaitError(wait_error)),
-        };
-
+        let res =  self.channel.waiting_receivers.wait_until(&closure);
         // trace!("... received msg.");
 
         // If we successfully received a message, we need to notify any waiting senders.

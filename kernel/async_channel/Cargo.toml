@@ -25,6 +25,12 @@ path = "../task"
 [dependencies.hpet]
 path = "../acpi/hpet"
 
+[dependencies.sync]
+path = "../../libs/sync"
+
+[dependencies.sync_spin]
+path = "../../libs/sync_spin"
+
 [dependencies.core2]
 version = "0.4.0"
 default-features = false

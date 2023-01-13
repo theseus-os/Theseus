@@ -1,13 +1,25 @@
-mod irq;
-mod preemption;
-mod spin;
+#![no_std]
 
-use crate::{mutex, Flavour, Sealed};
-use lock_api::RawMutex;
+pub mod mutex;
 
-pub use self::preemption::PreemptionSafe;
-pub use self::spin::Spin;
-pub use irq::IrqSafe;
+pub use lock_api::{GuardNoSend, GuardSend};
+pub use mutex::{Mutex, MutexGuard};
+
+pub unsafe trait Flavour {
+    const INIT: Self::LockData;
+
+    type LockData;
+
+    type GuardMarker;
+
+    fn mutex_lock(mutex: &mutex::RawMutex<Self>)
+    where
+        Self: Sized;
+
+    fn post_unlock(mutex: &mutex::RawMutex<Self>)
+    where
+        Self: Sized;
+}
 
 pub trait DeadlockPrevention {
     type GuardMarker;
@@ -16,8 +28,6 @@ pub trait DeadlockPrevention {
 
     fn exit();
 }
-
-impl<T> Sealed for T where T: DeadlockPrevention {}
 
 unsafe impl<T> Flavour for T
 where
@@ -30,7 +40,9 @@ where
     type GuardMarker = <Self as DeadlockPrevention>::GuardMarker;
 
     #[inline]
-    fn mutex_slow_path(mutex: &mutex::RawMutex<Self>) {
+    fn mutex_lock(mutex: &mutex::RawMutex<Self>) {
+        use lock_api::RawMutex;
+
         T::enter();
         while !mutex.try_lock_weak() {
             T::exit();

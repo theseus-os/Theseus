@@ -1,0 +1,7 @@
+[package]
+name = "sync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+lock_api = "0.4.9"

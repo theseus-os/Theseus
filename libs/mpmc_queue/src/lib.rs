@@ -13,11 +13,14 @@ use core::{
     ptr::NonNull,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use spin::{Mutex, MutexGuard};
+use sync::{Flavour, Mutex, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
-pub struct Queue<T> {
-    pointers: Mutex<Pointers<T>>,
+pub struct Queue<F, T>
+where
+    F: Flavour,
+{
+    pointers: Mutex<F, Pointers<T>>,
     /// Prevents unnecessary locking in the fast path.
     len: AtomicUsize,
 }
@@ -40,7 +43,10 @@ impl<T> Node<T> {
     }
 }
 
-impl<T> Queue<T> {
+impl<F, T> Queue<F, T>
+where
+    F: Flavour,
+{
     pub const fn new() -> Self {
         Self {
             pointers: Mutex::new(Pointers {
@@ -68,9 +74,9 @@ impl<T> Queue<T> {
         unsafe { self.push_inner(pointers, node, node, 1) };
     }
 
-    pub fn push_if_fail<F, U>(&self, item: T, condition: F) -> Option<U>
+    pub fn push_if_fail<A, B>(&self, item: T, condition: A) -> Option<B>
     where
-        F: FnOnce() -> Option<U>,
+        A: FnOnce() -> Option<B>,
     {
         let node = box_pointer(Node::new(item));
         let pointers = self.pointers.lock();
@@ -117,7 +123,7 @@ impl<T> Queue<T> {
     /// of the batch. The batch must be `len` nodes long.
     unsafe fn push_inner(
         &self,
-        mut pointers: MutexGuard<'_, Pointers<T>>,
+        mut pointers: MutexGuard<'_, F, Pointers<T>>,
         head: NonNull<Node<T>>,
         tail: NonNull<Node<T>>,
         len: usize,

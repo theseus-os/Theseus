@@ -1,13 +1,15 @@
 use crate::Flavour;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-#[doc(hidden)]
+pub type Mutex<F, T> = lock_api::Mutex<RawMutex<F>, T>;
+pub type MutexGuard<'a, F, T> = lock_api::MutexGuard<'a, RawMutex<F>, T>;
+
 pub struct RawMutex<T>
 where
     T: Flavour,
 {
     lock: AtomicBool,
-    pub(crate) data: T::LockData,
+    pub data: T::LockData,
 }
 
 unsafe impl<T> lock_api::RawMutex for RawMutex<T>
@@ -23,11 +25,7 @@ where
 
     #[inline]
     fn lock(&self) {
-        if self.try_lock_weak() {
-            return;
-        }
-
-        T::mutex_slow_path(self);
+        T::mutex_lock(self);
     }
 
     #[inline]
@@ -54,7 +52,7 @@ where
     T: Flavour,
 {
     #[inline]
-    pub(crate) fn try_lock_weak(&self) -> bool {
+    pub fn try_lock_weak(&self) -> bool {
         self.lock
             .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
             .is_ok()

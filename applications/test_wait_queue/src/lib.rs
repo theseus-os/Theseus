@@ -83,12 +83,10 @@ fn rmain() -> Result<(), &'static str> {
 }
 
 
-fn wait_task<WF: WaitConditionFn>((wc, ready): (Arc<WaitCondition<WF>>, Arc<Mutex<bool>>)) -> Result<(), &'static str> {
+fn wait_task<WF: WaitConditionFn>((wc, ready): (Arc<WaitCondition<WF>>, Arc<Mutex<bool>>)) {
     warn!("  wait_task:  entered task. Calling wait()...");
-    let retval = wc.wait();
-    warn!("  wait_task:  wait() returned {:?}", retval);
+    wc.wait();
     warn!("  wait_task:  after waiting, ready is {:?}", ready);
-    retval.map_err(|_e| "wc.wait() error")
 }
 
 

@@ -1,12 +1,4 @@
-ignore = [
-    "/applications",
-    "/compiler_plugins",
-    "/kernel",
-    "/libs",
-    "/libtheseus",
-    "/old_crates",
-    "/ports",
-    "/theseus_features",
-    "/tlibc",
-    "/tools"
-]
+edition = "2021"
+format_code_in_doc_comments = true
+format_strings = true
+wrap_comments = true

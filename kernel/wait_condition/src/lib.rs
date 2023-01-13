@@ -7,8 +7,7 @@
 extern crate task;
 extern crate wait_queue;
 
-use task::TaskRef;
-use wait_queue::{WaitQueue, WaitError};
+use wait_queue::WaitQueue;
 
 
 /// The closure type that can be used within a `WaitCondition`:
@@ -52,9 +51,9 @@ impl<F: Fn() -> bool> WaitCondition<F> {
     /// Therefore, there is no need for the caller to check for spurious wakeups.
     /// 
     /// This function blocks until the `Task` is woken up through the notify mechanism.
-    pub fn wait(&self) -> Result<(), WaitError> {
+    pub fn wait(&self) {
         if (self.condition_fn)() {
-            return Ok(());
+            return;
         }
         self.wait_queue.wait_until(&|| {
             if (self.condition_fn)() {
@@ -90,6 +89,7 @@ impl<F: Fn() -> bool> WaitCondition<F> {
 pub struct SatisfiedWaitCondition<'wc, F: WaitConditionFn> {
     inner: &'wc WaitCondition<F>,
 }
+
 impl<'wc, F: WaitConditionFn> SatisfiedWaitCondition<'wc, F> {
     /// Wake up a random `Task` that is waiting on this condition.
     /// # Return
@@ -97,13 +97,5 @@ impl<'wc, F: WaitConditionFn> SatisfiedWaitCondition<'wc, F> {
     /// * returns `Ok(false)` if there were no `Task`s waiting.
     pub fn notify_one(&self) -> bool {
         self.inner.wait_queue.notify_one()
-    }
-
-    /// Wake up a specific `Task` that is waiting on this condition.
-    /// # Return
-    /// * returns `true` if the given `Task` was waiting and was successfully woken up,
-    /// * returns `false` if there was no such `Task` waiting.
-    pub fn notify_specific(&self, task_to_wakeup: &TaskRef) -> bool {
-        self.inner.wait_queue.notify_specific(task_to_wakeup)
     }
 }

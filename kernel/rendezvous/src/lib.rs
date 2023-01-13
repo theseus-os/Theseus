@@ -24,8 +24,11 @@ extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate wait_queue;
+extern crate wait_guard;
 extern crate task;
 extern crate scheduler;
+extern crate sync;
+extern crate sync_spin;
 
 #[cfg(downtime_eval)]
 extern crate hpet;
@@ -34,7 +37,10 @@ use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
 use spin::Mutex;
-use wait_queue::{WaitQueue, WaitGuard, WaitError};
+use wait_queue::WaitQueue;
+use wait_guard::WaitGuard;
+use sync::DeadlockPrevention;
+use sync_spin::Spin;
 
 
 /// A wrapper type for an `ExchangeSlot` that is used for sending only.
@@ -156,40 +162,37 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
 /// Sender-side and Receiver-side references to an exchange slot can be obtained in both 
 /// a blocking and non-blocking fashion, 
 /// which supports both synchronous (rendezvous-based) and asynchronous channels.
-struct Channel<T: Send> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     /// In a zero-capacity synchronous channel, there is only a single slot,
     /// but senders and receivers perform a blocking wait on it until the slot becomes available.
     /// In contrast, a synchronous channel with a capacity of 1 would return a "channel full" error
     /// if the slot was taken, instead of blocking. 
     slot: ExchangeSlot<T>,
-    waiting_senders: WaitQueue,
-    waiting_receivers: WaitQueue,
+    waiting_senders: WaitQueue<P>,
+    waiting_receivers: WaitQueue<P>,
 }
+
 impl<T: Send> Channel<T> {
     /// Obtain a sender slot, blocking until one is available.
-    fn take_sender_slot(&self) -> Result<SenderSlot<T>, WaitError> {
+    fn take_sender_slot(&self) -> SenderSlot<T> {
         // Fast path: the uncontended case.
         if let Some(s) = self.try_take_sender_slot() {
-            return Ok(s);
+            return s;
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire sender slot...");
-        let res = self.waiting_senders.wait_until(&|| self.try_take_sender_slot());
-        // trace!("... acquired sender slot!");
-        res
+        self.waiting_senders.wait_until(&|| self.try_take_sender_slot())
     }
     
     /// Obtain a receiver slot, blocking until one is available.
-    fn take_receiver_slot(&self) -> Result<ReceiverSlot<T>, WaitError> {
+    fn take_receiver_slot(&self) -> ReceiverSlot<T> {
         // Fast path: the uncontended case.
         if let Some(s) = self.try_take_receiver_slot() {
-            return Ok(s);
+            return s;
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire receiver slot...");
-        let res = self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot());
-        // trace!("... acquired receiver slot!");
-        res
+        self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot())
     }
 
     /// Try to obtain a sender slot in a non-blocking fashion,
@@ -231,7 +234,7 @@ impl <T: Send> Sender<T> {
         }
 
         // obtain a sender-side exchange slot, blocking if necessary
-        let sender_slot = self.channel.take_sender_slot().map_err(|_| "failed to take_sender_slot")?;
+        let sender_slot = self.channel.take_sender_slot();
 
         // Here, either the sender (this task) arrived first and needs to wait for a receiver,
         // or a receiver has already arrived and is waiting for a sender. 
@@ -385,7 +388,7 @@ impl <T: Send> Receiver<T> {
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
         
         // obtain a receiver-side exchange slot, blocking if necessary
-        let receiver_slot = self.channel.take_receiver_slot().map_err(|_| "failed to take_receiver_slot")?;
+        let receiver_slot = self.channel.take_receiver_slot();
 
         // Here, either the receiver (this task) arrived first and needs to wait for a sender,
         // or a sender has already arrived and is waiting for a receiver. 
