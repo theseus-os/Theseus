@@ -737,7 +737,7 @@ impl CommandQueue {
     pub fn create_and_execute_command(&mut self, parameters: CommandBuilder, init_segment: &mut InitializationSegment) -> Result<Command<{CmdState::Completed}>, CommandQueueError> {
         Ok( self.create_command(parameters)?
                 .post(init_segment)
-                .complete(&self) )
+                .complete(self) )
     }
     
     /// Fill in the fields of a command queue entry.

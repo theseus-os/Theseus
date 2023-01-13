@@ -1,3 +1,6 @@
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
+
 use core::{fmt, ops::{Deref, DerefMut}};
 use preemption::{PreemptionGuard, hold_preemption};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};

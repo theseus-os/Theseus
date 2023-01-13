@@ -67,10 +67,10 @@ pub fn create_raw_packet(
 
     let mut transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN as u16 + len)?;
     let buffer = &mut transmit_buffer;
-    buffer[0..MAC_ADDR_LEN].copy_from_slice(&dest_mac_address);
-    buffer[6..(6 + MAC_ADDR_LEN)].copy_from_slice(&source_mac_address);
+    buffer[0..MAC_ADDR_LEN].copy_from_slice(dest_mac_address);
+    buffer[6..(6 + MAC_ADDR_LEN)].copy_from_slice(source_mac_address);
     buffer[12..(12 + ETHER_TYPE_LEN)].copy_from_slice(&ether_type);
-    buffer[14..(14 + message.len())].copy_from_slice(&message);
+    buffer[14..(14 + message.len())].copy_from_slice(message);
 
     Ok(transmit_buffer)
 }

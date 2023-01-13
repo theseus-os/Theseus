@@ -85,7 +85,7 @@ pub fn connect(
         remote_endpoint,
     );
 
-    let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+    let _packet_io_occurred = poll_iface(iface, sockets, startup_time)?;
 
     sockets.get::<TcpSocket>(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
         error!("smoltcp_helper: failed to connect socket, error: {:?}", _e);
@@ -93,7 +93,7 @@ pub fn connect(
     })?;
 
     loop {
-        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+        let _packet_io_occurred = poll_iface(iface, sockets, startup_time)?;
         
         // if the socket actually connected, it should be able to send/recv
         let socket = sockets.get::<TcpSocket>(tcp_handle);

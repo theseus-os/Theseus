@@ -190,7 +190,7 @@ impl Terminal {
             // Obtains a vector of the indices of the slice where newlines occur in ascending order
             let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
             // if there are no new lines in the slice
-            if new_line_indices.len() == 0 {
+            if new_line_indices.is_empty() {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
                 if end_idx < self.scrollback_buffer.len() {
@@ -386,7 +386,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.text_display.set_text(&slice);
+            self.text_display.set_text(slice);
             self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");

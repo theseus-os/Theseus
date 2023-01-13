@@ -31,6 +31,8 @@
 //! [register unwinding information]: https://github.com/bytecodealliance/wasmtime/blob/7cf5f058303d2ee8c42df658d4ca608771a8561d/crates/jit/src/code_memory.rs#L185
 //! [`wasmtime-jit`]: https://docs.rs/wasmtime-jit/latest/wasmtime_jit/
 
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
 #![no_std]
 #![feature(map_try_insert)]
 

@@ -134,7 +134,7 @@ impl FrameCompositor {
         let pixel_slice = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
         // Skip if the rows are already cached
-        if self.is_cached(&pixel_slice, &coordinate_start, src_width) {
+        if self.is_cached(pixel_slice, &coordinate_start, src_width) {
             return Ok(true);
         }
 

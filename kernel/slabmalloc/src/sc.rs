@@ -285,17 +285,7 @@ impl<'a, P: AllocablePage> SCAllocator<'a, P> {
             }
         };
 
-        let res = NonNull::new(ptr).ok_or("AllocationError::OutOfMemory");
-
-        // if !ptr.is_null() {
-        //     trace!(
-        //         "SCAllocator({}) allocated ptr=0x{:x}",
-        //         self.size,
-        //         ptr as usize
-        //     );
-        // }
-
-        res
+        NonNull::new(ptr).ok_or("AllocationError::OutOfMemory")
     }
 
     /// Deallocates a previously allocated `ptr` described by `layout`.

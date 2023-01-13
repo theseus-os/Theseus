@@ -139,13 +139,13 @@ impl TryFrom<usize> for SystemCall {
     }
 }
 
-impl Into<usize> for SystemCall {
+impl From<SystemCall> for usize {
     /// Get system call number from this SystemCall enum.
     ///
     /// # Return
     /// Returns system call number of this SystemCall enum.
-    fn into(self) -> usize {
-        match self {
+    fn from(val: SystemCall) -> Self {
+        match val {
             SystemCall::ProcExit => 0,
             SystemCall::FdClose => 1,
             SystemCall::FdWrite => 2,
@@ -165,13 +165,13 @@ impl Into<usize> for SystemCall {
     }
 }
 
-impl Into<Signature> for SystemCall {
+impl From<SystemCall> for Signature {
     /// Get wasmi function signature of SystemCall enum.
     ///
     /// # Return
     /// Returns wasmi function signature of this SystemCall enum.
-    fn into(self) -> Signature {
-        match self {
+    fn from(val: SystemCall) -> Self {
+        match val {
             SystemCall::ProcExit => sig!((I32)),
             SystemCall::FdClose => sig!((I32)->I32),
             SystemCall::FdWrite => sig!((I32,I32,I32,I32)->I32),

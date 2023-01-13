@@ -195,44 +195,44 @@ field-reassign-with-default
 fn-to-numeric-cast
 fn-to-numeric-cast-with-truncation
 for-kv-map
-# from-over-into
+from-over-into
 from-str-radix-10
-# inconsistent-digit-grouping
+inconsistent-digit-grouping
 infallible-destructuring-match
 inherent-to-string
 init-numbered-fields
-# into-iter-on-ref
+into-iter-on-ref
 is-digit-ascii-radix
 iter-cloned-collect
 iter-next-slice
-# iter-nth-zero
-# iter-skip-next
+iter-nth-zero
+iter-skip-next
 just-underscores-and-digits
-# len-without-is-empty
-# len-zero
-# let-and-return
+len-without-is-empty
+len-zero
+let-and-return
 let-unit-value
 main-recursion
 manual-async-fn
 manual-bits
 manual-map
 manual-non-exhaustive
-# manual-range-contains
+manual-range-contains
 manual-saturating-arithmetic
-# map-clone
+map-clone
 map-collect-result-unit
-# match-like-matches-macro
+match-like-matches-macro
 match-overlapping-arm
-# match-ref-pats
+match-ref-pats
 match-result-ok
 mem-replace-option-with-none
-# mem-replace-with-default
-# missing-safety-doc
+mem-replace-with-default
+missing-safety-doc
 mixed-case-hex-literals
 module-inception
 must-use-unit
 mut-mutex-lock
-# needless-borrow
+needless-borrow
 # needless-doctest-main
 # needless-late-init
 # needless-range-loop
@@ -326,7 +326,7 @@ cast-enum-constructor
 cast-enum-truncation
 crate-in-macro-def
 drop-non-drop
-# empty-loop
+empty-loop
 float-equality-without-abs
 for-loops-over-fallibles
 forget-non-drop

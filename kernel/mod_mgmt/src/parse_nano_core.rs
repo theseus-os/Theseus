@@ -165,9 +165,9 @@ fn parse_nano_core_symbol_file_or_binary(
         debug_symbols_file:  Arc::downgrade(&nano_core_file),
         object_file:         nano_core_file,
         sections:            HashMap::new(),
-        text_pages:          Some((text_pages.clone(),   mp_range(&text_pages))),
-        rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
-        data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
+        text_pages:          Some((text_pages.clone(),   mp_range(text_pages))),
+        rodata_pages:        Some((rodata_pages.clone(), mp_range(rodata_pages))),
+        data_pages:          Some((data_pages.clone(),   mp_range(data_pages))),
         global_sections:     BTreeSet::new(),
         tls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
@@ -175,12 +175,12 @@ fn parse_nano_core_symbol_file_or_binary(
     });
 
     let parsed_crate_items = f(
-        &bytes,
+        bytes,
         real_namespace, 
         CowArc::downgrade(&nano_core_crate_ref), 
-        &text_pages, 
-        &rodata_pages, 
-        &data_pages
+        text_pages, 
+        rodata_pages, 
+        data_pages
     )?;
 
     // Access and propertly set the new_crate's sections list and other items.
@@ -572,7 +572,7 @@ fn parse_nano_core_binary(
                     Arc::new(LoadedSection::new(
                         typ,
                         section_name_str_ref(&typ),
-                        Arc::clone(&rodata_pages),
+                        Arc::clone(rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
                         sec_size,
@@ -593,7 +593,7 @@ fn parse_nano_core_binary(
                     Arc::new(LoadedSection::new(
                         typ,
                         section_name_str_ref(&typ),
-                        Arc::clone(&rodata_pages),
+                        Arc::clone(rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
                         sec_size,

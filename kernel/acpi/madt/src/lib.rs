@@ -71,10 +71,10 @@ pub struct Madt<'t> {
 impl<'t> Madt<'t> {
     /// Finds the MADT in the given `AcpiTables` and returns a reference to it.
     pub fn get(acpi_tables: &'t AcpiTables) -> Option<Madt<'t>> {
-        let table: &MadtAcpiTable = acpi_tables.table(&MADT_SIGNATURE).ok()?;
+        let table: &MadtAcpiTable = acpi_tables.table(MADT_SIGNATURE).ok()?;
         let total_length = table.header.length as usize;
         let dynamic_part_length = total_length - size_of::<MadtAcpiTable>();
-        let loc = acpi_tables.table_location(&MADT_SIGNATURE)?;
+        let loc = acpi_tables.table_location(MADT_SIGNATURE)?;
         Some(Madt {
             table: table,
             mapped_pages: acpi_tables.mapping(),

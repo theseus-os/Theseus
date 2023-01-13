@@ -119,7 +119,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
             self.regs.set_rdt(cur as u32); 
 
             if self.rx_descs[cur].end_of_packet() {
-                let buffers = core::mem::replace(&mut receive_buffers_in_frame, Vec::new());
+                let buffers = core::mem::take(&mut receive_buffers_in_frame);
                 self.received_frames.push_back(ReceivedFrame(buffers));
             } else {
                 warn!("NIC::poll_queue_and_store_received_packets(): Received multi-rxbuffer frame, this scenario not fully tested!");
