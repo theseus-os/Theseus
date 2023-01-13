@@ -20,7 +20,10 @@ extern crate spin;
 
 use alloc::{
     collections::BTreeSet,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     vec::Vec,
     sync::Arc,
 };
