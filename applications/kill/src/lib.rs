@@ -9,6 +9,7 @@ extern crate getopts;
 use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
+use alloc::string::ToString;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();

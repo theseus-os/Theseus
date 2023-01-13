@@ -18,6 +18,7 @@ use core::{
 };
 use alloc::{
     string::String,
+    string::ToString,
     sync::Arc,
     vec::Vec,
 };
