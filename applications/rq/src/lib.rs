@@ -46,11 +46,12 @@ pub fn main(args: Vec<String>) -> isize {
         if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
-                write!(runqueue_contents, "{} ({}) {}\n", 
+                writeln!(runqueue_contents, "{} ({}) {}", 
                     task.name, 
                     task.id,
                     if task.is_running() { "*" } else { "" }
-                );
+                )
+                .expect("Failed to add task info into runqueue_contents");
             }
             println!("RunQueue:\n{}", runqueue_contents);
         }
