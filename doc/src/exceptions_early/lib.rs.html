@@ -253,9 +253,13 @@
 <a href="#253" id="253">253</a>
 <a href="#254" id="254">254</a>
 <a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.
 
-</span><span class="attr">#![no_std]
+</span><span class="comment">// TODO: Add direct explanation to why each empty loop is necessary and criteria for replacing it with something else
+</span><span class="attr">#![allow(clippy::empty_loop)]
+#![no_std]
 #![feature(abi_x86_interrupt)]
 
 </span><span class="kw">use </span>spin::Mutex;

@@ -332,7 +332,6 @@
 <a href="#332" id="332">332</a>
 <a href="#333" id="333">333</a>
 <a href="#334" id="334">334</a>
-<a href="#335" id="335">335</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `RunQueue` structure, for priority scheduler. 
 //! `RunQueue` structure is essentially a list of Tasks
 //! that it used for scheduling purposes.
@@ -400,13 +399,12 @@
     /// We just give an initial number of tokens to run the task till 
     /// next scheduling epoch
     </span><span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; PriorityTaskRef {
-        <span class="kw">let </span>priority_taskref = PriorityTaskRef {
+        PriorityTaskRef {
             taskref: taskref,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
             context_switches: <span class="number">0</span>,
-        };
-        priority_taskref
+        }
     }
 
     <span class="doccomment">/// Increment the number of times the task is picked

@@ -412,7 +412,7 @@
         slave: <span class="kw-2">&amp;</span>Channel,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>canonical = <span class="self">self</span>.canonical.lock().unwrap();
-        <span class="self">self</span>.process_input_byte_internal(byte, master, slave, (<span class="kw-2">&amp;mut *</span>canonical).as_mut())
+        <span class="self">self</span>.process_input_byte_internal(byte, master, slave, (<span class="kw-2">*</span>canonical).as_mut())
     }
 
     <span class="kw">fn </span>process_input_byte_internal(
@@ -504,14 +504,14 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>canonical = <span class="self">self</span>.canonical.lock().unwrap();
         <span class="kw">for </span>byte <span class="kw">in </span>buf {
-            <span class="self">self</span>.process_input_byte_internal(<span class="kw-2">*</span>byte, master, slave, (<span class="kw-2">&amp;mut *</span>canonical).as_mut())<span class="question-mark">?</span>;
+            <span class="self">self</span>.process_input_byte_internal(<span class="kw-2">*</span>byte, master, slave, (<span class="kw-2">*</span>canonical).as_mut())<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>process_output_byte(<span class="kw-2">&amp;</span><span class="self">self</span>, byte: u8, master: <span class="kw-2">&amp;</span>Channel) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
         <span class="kw">if </span>byte == <span class="string">b&#39;\n&#39; </span>{
-            master.send_all(<span class="kw-2">&amp;</span>[<span class="string">b&#39;\r&#39;</span>, <span class="string">b&#39;\n&#39;</span>])
+            master.send_all([<span class="string">b&#39;\r&#39;</span>, <span class="string">b&#39;\n&#39;</span>])
         } <span class="kw">else </span>{
             master.send(byte)
         }

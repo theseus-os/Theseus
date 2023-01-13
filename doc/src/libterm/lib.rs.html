@@ -850,7 +850,7 @@
             <span class="comment">// Obtains a vector of the indices of the slice where newlines occur in ascending order
             </span><span class="kw">let </span>new_line_indices: Vec&lt;(usize, <span class="kw-2">&amp;</span>str)&gt; = slice.match_indices(<span class="string">&#39;\n&#39;</span>).collect();
             <span class="comment">// if there are no new lines in the slice
-            </span><span class="kw">if </span>new_line_indices.len() == <span class="number">0 </span>{
+            </span><span class="kw">if </span>new_line_indices.is_empty() {
                 <span class="comment">// indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 </span>end_idx += buffer_height * buffer_width;
                 <span class="kw">if </span>end_idx &lt; <span class="self">self</span>.scrollback_buffer.len() {
@@ -1046,7 +1046,7 @@
         };
         <span class="kw">let </span>result  = <span class="self">self</span>.scrollback_buffer.get(start_idx..=end_idx); <span class="comment">// =end_idx includes the end index in the slice
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
-            <span class="self">self</span>.text_display.set_text(<span class="kw-2">&amp;</span>slice);
+            <span class="self">self</span>.text_display.set_text(slice);
             <span class="self">self</span>.display_text()<span class="question-mark">?</span>;
         } <span class="kw">else </span>{
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;could not get slice of scrollback buffer string&quot;</span>);

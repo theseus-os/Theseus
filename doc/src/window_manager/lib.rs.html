@@ -810,8 +810,6 @@
 <a href="#810" id="810">810</a>
 <a href="#811" id="811">811</a>
 <a href="#812" id="812">812</a>
-<a href="#813" id="813">813</a>
-<a href="#814" id="814">814</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate acts as a manager of a list of windows. It defines a `WindowManager` structure and an instance of it. 
 //!
 //! A window manager holds a set of `WindowInner` objects, including an active window, a list of shown windows and a list of hidden windows. The hidden windows are totally overlapped by others.
@@ -937,14 +935,14 @@
             <span class="prelude-val">None </span>=&gt; <span class="bool-val">true</span>,
         };
         
-        <span class="kw">match </span><span class="self">self</span>.is_window_in_show_list(<span class="kw-2">&amp;</span>inner_ref) {
+        <span class="kw">match </span><span class="self">self</span>.is_window_in_show_list(inner_ref) {
             <span class="comment">// remove item in current list
             </span><span class="prelude-val">Some</span>(i) =&gt; {
                 <span class="self">self</span>.show_list.remove(i);
             }
             <span class="prelude-val">None </span>=&gt; {}
         }
-        <span class="kw">match </span><span class="self">self</span>.is_window_in_hide_list(<span class="kw-2">&amp;</span>inner_ref) {
+        <span class="kw">match </span><span class="self">self</span>.is_window_in_hide_list(inner_ref) {
             <span class="comment">// remove item in current list
             </span><span class="prelude-val">Some</span>(i) =&gt; {
                 <span class="self">self</span>.hide_list.remove(i);
@@ -1178,10 +1176,8 @@
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(current_active) = <span class="self">self</span>.active.upgrade() {
             <span class="kw">let </span>current_active_win = current_active.lock();
             <span class="kw">let </span>current_coordinate = current_active_win.get_position();
-            <span class="kw">if </span>current_active_win.contains(<span class="kw-2">*</span>coordinate - current_coordinate) || <span class="kw">match </span>current_active_win.moving {
-                WindowMovingStatus::Moving(<span class="kw">_</span>) =&gt; <span class="bool-val">true</span>,
-                <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-            }{
+            <span class="kw">if </span>current_active_win.contains(<span class="kw-2">*</span>coordinate - current_coordinate) || <span class="macro">matches!</span>(current_active_win.moving, WindowMovingStatus::Moving(<span class="kw">_</span>))
+            {
                 event.coordinate = <span class="kw-2">*</span>coordinate - current_coordinate;
                 <span class="comment">// debug!(&quot;pass to active: {}, {}&quot;, event.x, event.y);
                 </span>current_active_win.send_event(Event::MousePositionEvent(event))

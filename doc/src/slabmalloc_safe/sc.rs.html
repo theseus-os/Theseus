@@ -321,16 +321,6 @@
 <a href="#321" id="321">321</a>
 <a href="#322" id="322">322</a>
 <a href="#323" id="323">323</a>
-<a href="#324" id="324">324</a>
-<a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a>
-<a href="#327" id="327">327</a>
-<a href="#328" id="328">328</a>
-<a href="#329" id="329">329</a>
-<a href="#330" id="330">330</a>
-<a href="#331" id="331">331</a>
-<a href="#332" id="332">332</a>
-<a href="#333" id="333">333</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A SCAllocator that can allocate fixed size objects.
 
 </span><span class="kw">use crate</span>::<span class="kw-2">*</span>;
@@ -588,17 +578,7 @@
             }
         };
 
-        <span class="kw">let </span>res = NonNull::new(ptr).ok_or(<span class="string">&quot;AllocationError::OutOfMemory&quot;</span>);
-
-        <span class="comment">// if !ptr.is_null() {
-        //     trace!(
-        //         &quot;SCAllocator({}) allocated ptr=0x{:x}&quot;,
-        //         self.size,
-        //         ptr as usize
-        //     );
-        // }
-
-        </span>res
+        NonNull::new(ptr).ok_or(<span class="string">&quot;AllocationError::OutOfMemory&quot;</span>)
     }
 
     <span class="doccomment">/// Deallocates a previously allocated `ptr` described by `Layout`.

@@ -188,7 +188,7 @@
         coordinate: Coord,
         framebuffer: <span class="kw-2">&amp;mut </span>Framebuffer&lt;P&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Rectangle, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>(string, col, line) = <span class="kw">if </span><span class="self">self</span>.cache.len() &gt; <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.text.starts_with(<span class="self">self</span>.cache.as_str()) {
+        <span class="kw">let </span>(string, col, line) = <span class="kw">if </span>!<span class="self">self</span>.cache.is_empty() &amp;&amp; <span class="self">self</span>.text.starts_with(<span class="self">self</span>.cache.as_str()) {
             (
                 <span class="kw-2">&amp;</span><span class="self">self</span>.text.as_str()[<span class="self">self</span>.cache.len()..<span class="self">self</span>.text.len()],
                 <span class="self">self</span>.next_col,

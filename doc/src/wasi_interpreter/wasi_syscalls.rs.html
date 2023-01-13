@@ -784,7 +784,7 @@
 
         <span class="comment">// Write content of current arg to argv_data buffer.
         </span>memory
-            .set(argv_data.checked_add(argv_data_pos).unwrap(), <span class="kw-2">&amp;</span>arg)
+            .set(argv_data.checked_add(argv_data_pos).unwrap(), arg)
             .unwrap();
         argv_data_pos = argv_data_pos
             .checked_add(u32::try_from(arg.len()).unwrap())

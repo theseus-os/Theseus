@@ -401,10 +401,10 @@
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;t</span>&gt; Dmar&lt;<span class="lifetime">&#39;t</span>&gt; {
     <span class="doccomment">/// Finds the DMAR in the given `AcpiTables` and returns a reference to it.
     </span><span class="kw">pub fn </span>get(acpi_tables: <span class="kw-2">&amp;</span><span class="lifetime">&#39;t </span>AcpiTables) -&gt; <span class="prelude-ty">Option</span>&lt;Dmar&lt;<span class="lifetime">&#39;t</span>&gt;&gt; {
-        <span class="kw">let </span>table: <span class="kw-2">&amp;</span>DmarReporting = acpi_tables.table(<span class="kw-2">&amp;</span>DMAR_SIGNATURE).ok()<span class="question-mark">?</span>;
+        <span class="kw">let </span>table: <span class="kw-2">&amp;</span>DmarReporting = acpi_tables.table(DMAR_SIGNATURE).ok()<span class="question-mark">?</span>;
         <span class="kw">let </span>total_length = table.header.length <span class="kw">as </span>usize;
         <span class="kw">let </span>dynamic_part_length = total_length - size_of::&lt;DmarReporting&gt;();
-        <span class="kw">let </span>loc = acpi_tables.table_location(<span class="kw-2">&amp;</span>DMAR_SIGNATURE)<span class="question-mark">?</span>;
+        <span class="kw">let </span>loc = acpi_tables.table_location(DMAR_SIGNATURE)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(Dmar {
             table,
             mapped_pages: acpi_tables.mapping(),

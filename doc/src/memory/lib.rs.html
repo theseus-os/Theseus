@@ -273,7 +273,6 @@
 <a href="#273" id="273">273</a>
 <a href="#274" id="274">274</a>
 <a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -325,7 +324,6 @@
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>alloc::sync::Arc;
 <span class="kw">use </span>no_drop::NoDrop;
-<span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">pub use </span>kernel_config::memory::PAGE_SIZE;
 
 <span class="doccomment">/// The memory management info and address space of the kernel

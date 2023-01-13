@@ -394,7 +394,7 @@
         .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
             .ok()
             .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        ).map(|arc_ref| arc_ref.clone());
+        ).cloned();
 
     logger::init(<span class="prelude-val">None</span>, logger_writers).map_err(|_e| <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Initialized full logger.&quot;</span>);

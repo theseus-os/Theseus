@@ -294,7 +294,7 @@
             <span class="self">self</span>.regs.set_rdt(cur <span class="kw">as </span>u32); 
 
             <span class="kw">if </span><span class="self">self</span>.rx_descs[cur].end_of_packet() {
-                <span class="kw">let </span>buffers = core::mem::replace(<span class="kw-2">&amp;mut </span>receive_buffers_in_frame, Vec::new());
+                <span class="kw">let </span>buffers = core::mem::take(<span class="kw-2">&amp;mut </span>receive_buffers_in_frame);
                 <span class="self">self</span>.received_frames.push_back(ReceivedFrame(buffers));
             } <span class="kw">else </span>{
                 <span class="macro">warn!</span>(<span class="string">&quot;NIC::poll_queue_and_store_received_packets(): Received multi-rxbuffer frame, this scenario not fully tested!&quot;</span>);

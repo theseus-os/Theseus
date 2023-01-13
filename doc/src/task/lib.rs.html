@@ -1677,7 +1677,6 @@
 <a href="#1677" id="1677">1677</a>
 <a href="#1678" id="1678">1678</a>
 <a href="#1679" id="1679">1679</a>
-<a href="#1680" id="1680">1680</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -1704,7 +1703,9 @@
 //! }
 //! ```
 
-</span><span class="attr">#![no_std]
+</span><span class="comment">// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+</span><span class="attr">#![allow(clippy::empty_loop)]
+#![no_std]
 #![feature(panic_info_message)]
 #![feature(thread_local)]
 #![feature(negative_impls)]
@@ -1857,10 +1858,10 @@
 }
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>KillReason {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; <span class="prelude-ty">Result</span>&lt;(), fmt::Error&gt; {
-        <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self </span>{
-            <span class="kw-2">&amp;</span><span class="self">Self</span>::Requested         =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Requested&quot;</span>),
-            <span class="kw-2">&amp;</span><span class="self">Self</span>::Panic(panic_info) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Panicked at {}&quot;</span>, panic_info),
-            <span class="kw-2">&amp;</span><span class="self">Self</span>::Exception(num)    =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Exception {:#X}({})&quot;</span>, num, num),
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Requested         =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Requested&quot;</span>),
+            <span class="self">Self</span>::Panic(panic_info) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Panicked at {}&quot;</span>, panic_info),
+            <span class="self">Self</span>::Exception(num)    =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;Exception {:#X}({})&quot;</span>, num, num),
         }
     }
 }
@@ -1941,9 +1942,9 @@
         OptionU8(opt)
     }
 }
-<span class="kw">impl </span>Into&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt; <span class="kw">for </span>OptionU8 {
-    <span class="kw">fn </span>into(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-        <span class="self">self</span>.<span class="number">0
+<span class="kw">impl </span>From&lt;OptionU8&gt; <span class="kw">for </span><span class="prelude-ty">Option</span>&lt;u8&gt; {
+    <span class="kw">fn </span>from(val: OptionU8) -&gt; <span class="self">Self </span>{
+        val.<span class="number">0
     </span>}
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>OptionU8 {
@@ -2326,10 +2327,7 @@
     <span class="doccomment">/// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     </span><span class="kw">pub fn </span>has_exited(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">match </span><span class="self">self</span>.runstate() {
-            RunState::Exited | RunState::Reaped =&gt; <span class="bool-val">true</span>,
-            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-        }
+        <span class="macro">matches!</span>(<span class="self">self</span>.runstate(), RunState::Exited | RunState::Reaped)
     }
 
     <span class="doccomment">/// Returns `true` if this is an application `Task`. 

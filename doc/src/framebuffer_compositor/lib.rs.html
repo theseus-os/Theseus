@@ -409,7 +409,7 @@
         <span class="kw">let </span>pixel_slice = <span class="kw-2">&amp;</span>src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
         <span class="comment">// Skip if the rows are already cached
-        </span><span class="kw">if </span><span class="self">self</span>.is_cached(<span class="kw-2">&amp;</span>pixel_slice, <span class="kw-2">&amp;</span>coordinate_start, src_width) {
+        </span><span class="kw">if </span><span class="self">self</span>.is_cached(pixel_slice, <span class="kw-2">&amp;</span>coordinate_start, src_width) {
             <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
         }
 

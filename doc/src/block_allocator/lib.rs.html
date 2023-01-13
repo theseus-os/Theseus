@@ -129,6 +129,9 @@
 <a href="#129" id="129">129</a>
 <a href="#130" id="130">130</a>
 <a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -141,7 +144,10 @@
 // Allocator code taken from Philipp Oppermann&#39;s blog &quot;Writing an OS in Rust&quot; (https://github.com/phil-opp/blog_os/tree/post-11)
 // and modified by Ramla Ijaz
 
-</span><span class="attr">#![feature(const_mut_refs)]
+
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it&#39;s safe or unsafe to use it.
+</span><span class="attr">#![allow(clippy::missing_safety_doc)]
+#![feature(const_mut_refs)]
 #![no_std]
 
 </span><span class="kw">extern crate </span>alloc;

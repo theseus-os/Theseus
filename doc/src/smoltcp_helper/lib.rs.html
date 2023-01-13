@@ -215,7 +215,7 @@
         remote_endpoint,
     );
 
-    <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, sockets, startup_time)<span class="question-mark">?</span>;
+    <span class="kw">let </span>_packet_io_occurred = poll_iface(iface, sockets, startup_time)<span class="question-mark">?</span>;
 
     sockets.get::&lt;TcpSocket&gt;(tcp_handle).connect(remote_endpoint, local_port).map_err(|_e| {
         <span class="macro">error!</span>(<span class="string">&quot;smoltcp_helper: failed to connect socket, error: {:?}&quot;</span>, _e);
@@ -223,7 +223,7 @@
     </span>})<span class="question-mark">?</span>;
 
     <span class="kw">loop </span>{
-        <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, sockets, startup_time)<span class="question-mark">?</span>;
+        <span class="kw">let </span>_packet_io_occurred = poll_iface(iface, sockets, startup_time)<span class="question-mark">?</span>;
         
         <span class="comment">// if the socket actually connected, it should be able to send/recv
         </span><span class="kw">let </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);

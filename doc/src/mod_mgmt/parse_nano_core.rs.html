@@ -1019,9 +1019,9 @@
         debug_symbols_file:  Arc::downgrade(<span class="kw-2">&amp;</span>nano_core_file),
         object_file:         nano_core_file,
         sections:            HashMap::new(),
-        text_pages:          <span class="prelude-val">Some</span>((text_pages.clone(),   mp_range(<span class="kw-2">&amp;</span>text_pages))),
-        rodata_pages:        <span class="prelude-val">Some</span>((rodata_pages.clone(), mp_range(<span class="kw-2">&amp;</span>rodata_pages))),
-        data_pages:          <span class="prelude-val">Some</span>((data_pages.clone(),   mp_range(<span class="kw-2">&amp;</span>data_pages))),
+        text_pages:          <span class="prelude-val">Some</span>((text_pages.clone(),   mp_range(text_pages))),
+        rodata_pages:        <span class="prelude-val">Some</span>((rodata_pages.clone(), mp_range(rodata_pages))),
+        data_pages:          <span class="prelude-val">Some</span>((data_pages.clone(),   mp_range(data_pages))),
         global_sections:     BTreeSet::new(),
         tls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
@@ -1029,12 +1029,12 @@
     });
 
     <span class="kw">let </span>parsed_crate_items = f(
-        <span class="kw-2">&amp;</span>bytes,
+        bytes,
         real_namespace, 
         CowArc::downgrade(<span class="kw-2">&amp;</span>nano_core_crate_ref), 
-        <span class="kw-2">&amp;</span>text_pages, 
-        <span class="kw-2">&amp;</span>rodata_pages, 
-        <span class="kw-2">&amp;</span>data_pages
+        text_pages, 
+        rodata_pages, 
+        data_pages
     )<span class="question-mark">?</span>;
 
     <span class="comment">// Access and propertly set the new_crate&#39;s sections list and other items.
@@ -1426,7 +1426,7 @@
                     Arc::new(LoadedSection::new(
                         typ,
                         section_name_str_ref(<span class="kw-2">&amp;</span>typ),
-                        Arc::clone(<span class="kw-2">&amp;</span>rodata_pages),
+                        Arc::clone(rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
                         sec_size,
@@ -1447,7 +1447,7 @@
                     Arc::new(LoadedSection::new(
                         typ,
                         section_name_str_ref(<span class="kw-2">&amp;</span>typ),
-                        Arc::clone(<span class="kw-2">&amp;</span>rodata_pages),
+                        Arc::clone(rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
                         sec_size,

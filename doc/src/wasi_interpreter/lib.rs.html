@@ -274,7 +274,7 @@
         <span class="kw">let </span>_curr_fd: wasi::Fd = ext
             .fd_table
             .open_path(
-                <span class="kw-2">&amp;</span>preopen_dir,
+                preopen_dir,
                 task::with_current_task(|t|
                     t.get_env().lock().working_dir.clone()
                 ).expect(<span class="string">&quot;couldn&#39;t get current task&quot;</span>),

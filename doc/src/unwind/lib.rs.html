@@ -948,15 +948,6 @@
 <a href="#948" id="948">948</a>
 <a href="#949" id="949">949</a>
 <a href="#950" id="950">950</a>
-<a href="#951" id="951">951</a>
-<a href="#952" id="952">952</a>
-<a href="#953" id="953">953</a>
-<a href="#954" id="954">954</a>
-<a href="#955" id="955">955</a>
-<a href="#956" id="956">956</a>
-<a href="#957" id="957">957</a>
-<a href="#958" id="958">958</a>
-<a href="#959" id="959">959</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.
 //! 
 //! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
@@ -1057,9 +1048,9 @@
     <span class="doccomment">/// A reference to the current task that is being unwound.
     </span>current_task: TaskRef,
 }
-<span class="kw">impl </span>Into&lt;(StackFrameIter, KillReason, TaskRef)&gt; <span class="kw">for </span>UnwindingContext {
-    <span class="kw">fn </span>into(<span class="self">self</span>) -&gt; (StackFrameIter, KillReason, TaskRef) {
-        (<span class="self">self</span>.stack_frame_iter, <span class="self">self</span>.cause, <span class="self">self</span>.current_task)
+<span class="kw">impl </span>From&lt;UnwindingContext&gt; <span class="kw">for </span>(StackFrameIter, KillReason, TaskRef) {
+    <span class="kw">fn </span>from(val: UnwindingContext) -&gt; <span class="self">Self </span>{
+        (val.stack_frame_iter, val.cause, val.current_task)
     }
 }
 
@@ -1624,16 +1615,7 @@
                 <span class="string">&quot;gimli error while finding unwind info for address&quot;
             </span>})<span class="question-mark">?</span>;
             
-            <span class="comment">// debug!(&quot;FDE: {:?} &quot;, fde);
-            // let mut instructions = fde.instructions(&amp;eh_frame, &amp;self.base_addrs);
-            // while let Some(instr) = instructions.next().map_err(|_e| {
-            //     error!(&quot;FDE instructions gimli error: {:?}&quot;, _e);
-            //     &quot;gimli error while iterating through eh_frame FDE instructions list&quot;
-            // })? {
-            //     debug!(&quot;    FDE instr: {:?}&quot;, instr);
-            // }
-
-            </span>f(<span class="kw-2">&amp;</span>fde, <span class="kw-2">&amp;</span>unwind_table_row)
+            f(<span class="kw-2">&amp;</span>fde, unwind_table_row)
         };
 
         <span class="comment">// The actual logic of this function that handles the `EhFrameReference` abstraction.
@@ -1701,7 +1683,7 @@
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    Arc::clone(<span class="kw-2">&amp;</span>namespace),
+                    Arc::clone(namespace),
                     <span class="comment">// we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     </span>Registers::default()
                 ), 
@@ -1737,11 +1719,11 @@
         continue_unwinding(unwinding_context_ptr)
     });
 
-    <span class="kw">match </span><span class="kw-2">&amp;</span>res {
-        <span class="kw-2">&amp;</span><span class="prelude-val">Ok</span>(()) =&gt; {
+    <span class="kw">match </span>res {
+        <span class="prelude-val">Ok</span>(()) =&gt; {
             <span class="macro">debug!</span>(<span class="string">&quot;unwinding procedure has reached the end of the stack.&quot;</span>);
         }
-        <span class="kw-2">&amp;</span><span class="prelude-val">Err</span>(e) =&gt; {
+        <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: unwinding the first stack frame returned unexpectedly. Error: {}&quot;</span>, e);
         }
     }

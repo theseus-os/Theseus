@@ -651,7 +651,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>matching_crates = CrateNamespace::get_crates_starting_with(namespace, crate_name);
 
     <span class="comment">// There can be only one matching crate for a given crate name
-    </span><span class="kw">if </span>matching_crates.len() == <span class="number">0 </span>{
+    </span><span class="kw">if </span>matching_crates.is_empty() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No crates currently loaded matches &quot;</span>.to_string() + crate_name);
     }
 
@@ -692,7 +692,7 @@
     </span><span class="kw">let </span><span class="kw-2">mut </span>matching_crates = CrateNamespace::get_crates_starting_with(namespace, ocn);
 
     <span class="comment">// There can be only one matching crate for a given crate name
-    </span><span class="kw">if </span>matching_crates.len() == <span class="number">0 </span>{
+    </span><span class="kw">if </span>matching_crates.is_empty() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;No crates currently loaded matches &quot;</span>.to_string() + crate_name);
     }
 
@@ -704,7 +704,7 @@
     </span><span class="macro">debug!</span>(<span class="string">&quot;We got a match&quot;</span>);
 
     <span class="kw">let </span>(new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(<span class="number">0</span>);
-    <span class="kw">let </span>new_crate_ref = <span class="kw">match </span>CrateNamespace::get_crate_and_namespace(<span class="kw-2">&amp;</span>real_new_namespace, <span class="kw-2">&amp;</span>new_crate_full_name) {
+    <span class="kw">let </span>new_crate_ref = <span class="kw">match </span>CrateNamespace::get_crate_and_namespace(real_new_namespace, <span class="kw-2">&amp;</span>new_crate_full_name) {
         <span class="prelude-val">Some</span>((ocr, _ns)) =&gt; {
             ocr
         }

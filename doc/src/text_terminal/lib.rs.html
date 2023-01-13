@@ -2332,9 +2332,6 @@
 <a href="#2332" id="2332">2332</a>
 <a href="#2333" id="2333">2333</a>
 <a href="#2334" id="2334">2334</a>
-<a href="#2335" id="2335">2335</a>
-<a href="#2336" id="2336">2336</a>
-<a href="#2337" id="2337">2337</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A text-mode terminal emulator. 
 //!
 //! This provides basic support for various standards of control codes and escape sequences:
@@ -2961,7 +2958,7 @@
 
         <span class="comment">// Now that we&#39;ve handled modifying the scrollback buffer, we can move refresh the display.
         </span><span class="kw">let </span>_orig_screen_cursor = <span class="self">self</span>.screen_cursor.position;
-        <span class="kw">let </span>new_screen_cursor = <span class="self">self</span>.backend.display(display_action, <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer, <span class="prelude-val">None</span>).unwrap();
+        <span class="kw">let </span>new_screen_cursor = <span class="self">self</span>.backend.display(display_action, <span class="self">self</span>.scrollback_buffer, <span class="prelude-val">None</span>).unwrap();
         <span class="self">self</span>.screen_cursor.position = new_screen_cursor;
 
         <span class="macro">debug!</span>(<span class="string">&quot;print({:?}): moved cursors from:\n\t {:?} -&gt; {:?} \n\t {:?} -&gt; {:?}&quot;</span>,
@@ -3005,7 +3002,7 @@
                     <span class="kw-2">*</span><span class="self">self</span>.scrollback_cursor,
                     <span class="self">self</span>.screen_cursor.position,
                     <span class="number">1</span>,
-                    <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer,
+                    <span class="self">self</span>.scrollback_buffer,
                     screen_size,
                     wrap,
                 );
@@ -3022,7 +3019,7 @@
                     scrollback_start: new_scrollback_position,
                     num_units: num_units_removed,
                 };
-                <span class="kw">let </span>screen_cursor_after_display = <span class="self">self</span>.backend.display(display_action, <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer, <span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>screen_cursor_after_display = <span class="self">self</span>.backend.display(display_action, <span class="self">self</span>.scrollback_buffer, <span class="prelude-val">None</span>).unwrap();
                 <span class="macro">debug!</span>(<span class="string">&quot;After BackwardsDelete, screen cursor moved from {:?} -&gt; {:?}&quot;</span>, <span class="self">self</span>.screen_cursor.position, screen_cursor_after_display);
                 <span class="self">self</span>.screen_cursor.position = screen_cursor_after_display;
                 <span class="comment">// warn!(&quot;Scrollback Buffer: {:?}&quot;, self.scrollback_buffer);
@@ -3087,7 +3084,7 @@
                     num_units: num_units_removed,
                     scrollback_start: scrollback_cursor,
                 };
-                <span class="kw">let </span>_screen_cursor_after_display = <span class="self">self</span>.backend.display(display_action, <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer, <span class="prelude-val">None</span>).unwrap();
+                <span class="kw">let </span>_screen_cursor_after_display = <span class="self">self</span>.backend.display(display_action, <span class="self">self</span>.scrollback_buffer, <span class="prelude-val">None</span>).unwrap();
                 <span class="macro">assert_eq!</span>(<span class="self">self</span>.screen_cursor.position, _screen_cursor_after_display);
             }
             (<span class="string">&#39;~&#39;</span>, HOME_KEY_PARAM) =&gt; {
@@ -3157,7 +3154,7 @@
             <span class="kw">if let </span><span class="prelude-val">Some</span>(line) = <span class="self">self</span>.scrollback_buffer.get(<span class="self">self</span>.scrollback_cursor.line_idx.<span class="number">0</span>) {
                 <span class="comment">// We&#39;re within the bounds of an existing Line, so there&#39;s nothing else to do.
                 </span><span class="self">self</span>.screen_cursor.underneath = line.get(<span class="self">self</span>.scrollback_cursor.unit_idx.<span class="number">0</span>)
-                    .map(|unit| unit.clone())
+                    .cloned()
                     .unwrap_or_else(|| Unit {
                         style: line.last().map(|last_unit| last_unit.style).unwrap_or_default(),
                         ..Default::default()
@@ -3260,7 +3257,7 @@
             //
             // (orig_scrollback_position, orig_screen_position),
             </span>(<span class="self">self</span>.scroll_position.start_point(), ScreenPoint::default()),
-            <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer,
+            <span class="self">self</span>.scrollback_buffer,
             screen_size
         );
         <span class="kw-2">*</span><span class="self">self</span>.scrollback_cursor = new_scrollback_position;
@@ -3295,7 +3292,7 @@
 
         </span><span class="kw">let </span>new_scrollback_position = <span class="self">self</span>.screen_cursor.position.to_scrollback_point(
             (orig_scrollback_position, orig_screen_position),
-            <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer,
+            <span class="self">self</span>.scrollback_buffer,
             screen_size
         );
         <span class="kw-2">*</span><span class="self">self</span>.scrollback_cursor = new_scrollback_position;
@@ -3306,7 +3303,7 @@
             <span class="kw-2">*</span><span class="self">self</span>.scrollback_cursor,
             <span class="self">self</span>.screen_cursor.position,
             num_units,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer,
+            <span class="self">self</span>.scrollback_buffer,
             <span class="self">self</span>.backend.screen_size(),
             wrap,
         );
@@ -3326,7 +3323,7 @@
             <span class="kw-2">*</span><span class="self">self</span>.scrollback_cursor,
             <span class="self">self</span>.screen_cursor.position,
             num_units,
-            <span class="kw-2">&amp;</span><span class="self">self</span>.scrollback_buffer,
+            <span class="self">self</span>.scrollback_buffer,
             <span class="self">self</span>.backend.screen_size(),
             wrap,
         );
@@ -4666,10 +4663,7 @@ is actually handled and processed.&quot;</span>]
     /// of a previous character Unit, i.e., `TabFill` or `MultiFill`.
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">fn </span>is_continuance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">match </span><span class="self">self </span>{
-            <span class="kw-2">&amp;</span><span class="self">Self</span>::TabFill | <span class="kw-2">&amp;</span><span class="self">Self</span>::MultiFill =&gt; <span class="bool-val">true</span>,
-            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-        }
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="self">Self</span>::TabFill | <span class="kw-2">&amp;</span><span class="self">Self</span>::MultiFill)
     }
 }
 </code></pre></div>

@@ -126,13 +126,17 @@
 <a href="#126" id="126">126</a>
 <a href="#127" id="127">127</a>
 <a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides the default entry points and lang items for panics and unwinding. 
 //! 
 //! These lang items are required by the Rust compiler. 
 //! They should never be directly invoked by developers, only by the compiler. 
 //! 
 
-</span><span class="attr">#![no_std]
+</span><span class="comment">// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+</span><span class="attr">#![allow(clippy::empty_loop)]
+#![no_std]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]
 #![feature(panic_info_message)]

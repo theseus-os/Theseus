@@ -1106,10 +1106,6 @@
 <a href="#1106" id="1106">1106</a>
 <a href="#1107" id="1107">1107</a>
 <a href="#1108" id="1108">1108</a>
-<a href="#1109" id="1109">1109</a>
-<a href="#1110" id="1110">1110</a>
-<a href="#1111" id="1111">1111</a>
-<a href="#1112" id="1112">1112</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1882,7 +1878,7 @@
     </span><span class="kw">pub fn </span>section_name_without_hash(sec_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="kw-2">&amp;</span>str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(<span class="number">0 </span>.. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or(<span class="kw-2">&amp;</span>sec_name)
+            .unwrap_or(sec_name)
     }
 
     <span class="doccomment">/// Returns the index of the first `WeakDependent` object in this `LoadedSection`&#39;s `sections_dependent_on_me` list
@@ -2106,11 +2102,7 @@
     /// does NOT depend on the target section&#39;s address itself in any way 
     /// (i.e., it only depends on the source section)
     </span><span class="kw">pub fn </span>is_absolute(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="kw">match </span><span class="self">self</span>.typ {
-            R_X86_64_32 | 
-            R_X86_64_64 =&gt; <span class="bool-val">true</span>,
-            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-        }
+        <span class="macro">matches!</span>(<span class="self">self</span>.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 

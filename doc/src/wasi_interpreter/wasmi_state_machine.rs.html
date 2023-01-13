@@ -317,7 +317,7 @@
                 memory: RefCell::new(<span class="kw-2">&amp;mut </span>imported_memory),
             };
             <span class="kw">let </span>not_started =
-                wasmi::ModuleInstance::new(<span class="kw-2">&amp;</span>module, <span class="kw-2">&amp;</span>resolve).map_err(NewErr::Interpreter)<span class="question-mark">?</span>;
+                wasmi::ModuleInstance::new(module, <span class="kw-2">&amp;</span>resolve).map_err(NewErr::Interpreter)<span class="question-mark">?</span>;
             (not_started, imported_memory)
         };
 

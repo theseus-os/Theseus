@@ -1410,7 +1410,7 @@
 
                 <span class="attr">#[cfg(not(loscd_eval))]
                 </span><span class="macro">debug!</span>(<span class="string">&quot;swap_crates(): copying .data or .bss section from old {:?} to new {:?}&quot;</span>, <span class="kw-2">&amp;*</span>old_sec, new_dest_sec);
-                old_sec.copy_section_data_to(<span class="kw-2">&amp;</span>new_dest_sec)<span class="question-mark">?</span>;
+                old_sec.copy_section_data_to(new_dest_sec)<span class="question-mark">?</span>;
             }
 
             <span class="attr">#[cfg(loscd_eval)] </span>{
@@ -1575,8 +1575,8 @@
                     // and that it now depends on the new source_sec.
                     </span><span class="kw">let </span><span class="kw-2">mut </span>found_strong_dependency = <span class="bool-val">false</span>;
                     <span class="kw">for </span><span class="kw-2">mut </span>strong_dep <span class="kw">in </span>target_sec.inner.write().sections_i_depend_on.iter_mut() {
-                        <span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>strong_dep.section, <span class="kw-2">&amp;</span>old_sec) &amp;&amp; strong_dep.relocation == relocation_entry {
-                            strong_dep.section = Arc::clone(<span class="kw-2">&amp;</span>new_source_sec);
+                        <span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>strong_dep.section, old_sec) &amp;&amp; strong_dep.relocation == relocation_entry {
+                            strong_dep.section = Arc::clone(new_source_sec);
                             found_strong_dependency = <span class="bool-val">true</span>;
                             <span class="kw">break</span>;
                         }
@@ -1757,7 +1757,7 @@
             //        based on which directory its object file 
             </span>{
                 <span class="kw">let </span>objfile_path = Path::new(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
-                <span class="kw">if </span>objfile_path.components().skip(<span class="number">1</span>).next() == <span class="prelude-val">Some</span>(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
+                <span class="kw">if </span>objfile_path.components().nth(<span class="number">1</span>) == <span class="prelude-val">Some</span>(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
                     <span class="kw">let </span>new_target_ns = this_namespace.recursive_namespace().unwrap_or(this_namespace);
                     <span class="attr">#[cfg(not(loscd_eval))]
                     </span><span class="macro">warn!</span>(<span class="string">&quot;temp fix: changing target_ns from {} to {}, for crate {:?}&quot;</span>, this_namespace.name(), new_target_ns.name(), new_crate_ref);

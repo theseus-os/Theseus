@@ -448,9 +448,13 @@
 <a href="#448" id="448">448</a>
 <a href="#449" id="449">449</a>
 <a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.
 
-</span><span class="attr">#![no_std]
+</span><span class="comment">// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+</span><span class="attr">#![allow(clippy::empty_loop)]
+#![no_std]
 #![feature(abi_x86_interrupt)]
 
 </span><span class="kw">use </span>log::{warn, debug, trace};
@@ -579,7 +583,7 @@
 
         <span class="kw">if </span><span class="bool-val">false </span>{
             <span class="kw">let </span><span class="kw-2">mut </span>debug = debug_info::DebugSymbols::Unloaded(debug_symbols_file);
-            <span class="kw">let </span>debug_sections = debug.load(<span class="kw-2">&amp;</span>app_crate, <span class="kw-2">&amp;</span>curr_task.get_namespace()).unwrap();
+            <span class="kw">let </span>debug_sections = debug.load(<span class="kw-2">&amp;</span>app_crate, curr_task.get_namespace()).unwrap();
             <span class="kw">let </span>instr_ptr = stack_frame.instruction_pointer.as_u64() <span class="kw">as </span>usize - <span class="number">1</span>; <span class="comment">// points to the next instruction (at least for a page fault)
 
             </span><span class="kw">let </span>res = debug_sections.find_subprogram_containing(VirtualAddress::new_canonical(instr_ptr));

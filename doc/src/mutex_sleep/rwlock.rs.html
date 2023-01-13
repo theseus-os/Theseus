@@ -319,10 +319,10 @@
 <a href="#319" id="319">319</a>
 <a href="#320" id="320">320</a>
 <a href="#321" id="321">321</a>
-<a href="#322" id="322">322</a>
-<a href="#323" id="323">323</a>
-<a href="#324" id="324">324</a>
-</pre><pre class="rust"><code><span class="kw">use </span>core::fmt;
+</pre><pre class="rust"><code><span class="comment">// TODO: add documentation to each unsafe block, laying out all the conditions under which it&#39;s safe or unsafe to use it.
+</span><span class="attr">#![allow(clippy::missing_safety_doc)]
+
+</span><span class="kw">use </span>core::fmt;
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 <span class="kw">use </span>wait_queue::WaitQueue;
@@ -387,8 +387,6 @@
 
 <span class="kw">impl</span>&lt;T: <span class="question-mark">?</span>Sized&gt; RwLockSleep&lt;T&gt; {
     <span class="doccomment">/// Returns `true` if the lock is currently held.
-    ///
-    /// # Safety
     ///
     /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
@@ -458,8 +456,6 @@
 
     <span class="doccomment">/// Return the number of readers that currently hold the lock (including upgradable readers).
     ///
-    /// # Safety
-    ///
     /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
     </span><span class="kw">pub fn </span>reader_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
@@ -469,8 +465,6 @@
     <span class="doccomment">/// Return the number of writers that currently hold the lock.
     ///
     /// Because [`RwLockSleep`] guarantees exclusive mutable access, this function may only return either `0` or `1`.
-    ///
-    /// # Safety
     ///
     /// This function provides no synchronization guarantees and so its result should be considered &#39;out of date&#39;
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.

@@ -896,6 +896,11 @@
 <a href="#896" id="896">896</a>
 <a href="#897" id="897">897</a>
 <a href="#898" id="898">898</a>
+<a href="#899" id="899">899</a>
+<a href="#900" id="900">900</a>
+<a href="#901" id="901">901</a>
+<a href="#902" id="902">902</a>
+<a href="#903" id="903">903</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit 
 //! 
 //! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.
@@ -977,11 +982,17 @@
 <span class="kw">use </span>raw_cpuid::<span class="kw-2">*</span>;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
-<span class="kw">use </span>alloc::vec::Vec;
-<span class="kw">use </span>alloc::collections::{BTreeMap, BTreeSet};
-<span class="kw">use </span>alloc::string::{String, ToString};
+<span class="kw">use </span>alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::{String, ToString},
+    vec::Vec,
+};
 <span class="kw">use </span>bit_field::BitField;
-<span class="kw">use </span>core::sync::atomic::{Ordering, AtomicU64, AtomicU8};
+<span class="kw">use </span>core::{
+    convert::TryFrom,
+    sync::atomic::{Ordering, AtomicU64, AtomicU8},
+};
+
 
 <span class="kw">pub mod </span>stat;
 
@@ -1593,8 +1604,7 @@
     <span class="comment">// This check can never trigger since `event_per_sample` is a `u32`
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We&#39;ll check anyways, just in case `event_per_sample`&#39;s type is changed.
-    </span><span class="attr">#[allow(clippy::absurd_extreme_comparisons)]
-    </span><span class="kw">if </span>event_per_sample &gt; core::u32::MAX || event_per_sample &lt; core::u32::MIN {
+    </span><span class="kw">if </span>u32::try_from(event_per_sample).is_ok() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Number of events per sample invalid: must be within unsigned 32 bit&quot;</span>);
     }
 
@@ -1653,11 +1663,11 @@
     <span class="kw">let </span>my_core_id = apic::current_cpu();
 
     <span class="kw">let </span><span class="kw-2">mut </span>sampling_info = SAMPLING_INFO.lock();
-    <span class="kw">let </span><span class="kw-2">mut </span>samples = sampling_info.get_mut(<span class="kw-2">&amp;</span>my_core_id).ok_or(<span class="string">&quot;pmu_x86::retrieve_samples: could not retrieve sampling information for this core&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>samples = sampling_info.get_mut(<span class="kw-2">&amp;</span>my_core_id).ok_or(<span class="string">&quot;pmu_x86::retrieve_samples: could not retrieve sampling information for this core&quot;</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// the interrupt handler might have stopped samples already so thsi check is required
     </span><span class="kw">if </span>core_is_currently_sampling(my_core_id) {
-        stop_samples(my_core_id, <span class="kw-2">&amp;mut </span>samples)<span class="question-mark">?</span>;
+        stop_samples(my_core_id, samples)<span class="question-mark">?</span>;
     }
     
     sampling_results_have_been_retrieved(my_core_id)<span class="question-mark">?</span>;
@@ -1743,7 +1753,7 @@
     <span class="kw">let </span>current_count = samples.sample_count;
     <span class="comment">// if all samples have already been taken, calls the function to turn off the counter
     </span><span class="kw">if </span>current_count == <span class="number">0 </span>{
-        stop_samples(my_core_id, <span class="kw-2">&amp;mut </span>samples)<span class="question-mark">?</span>; 
+        stop_samples(my_core_id, samples)<span class="question-mark">?</span>; 
         <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
     }
 

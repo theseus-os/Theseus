@@ -978,7 +978,7 @@
 }
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>e1000_handler(_stack_frame: InterruptStackFrame) {
-    <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>e1000_nic_ref) = E1000_NIC.get() {
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(e1000_nic_ref) = E1000_NIC.get() {
         <span class="kw">let </span><span class="kw-2">mut </span>e1000_nic = e1000_nic_ref.lock();
         <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = e1000_nic.handle_interrupt() {
             <span class="macro">error!</span>(<span class="string">&quot;e1000_handler(): error handling interrupt: {:?}&quot;</span>, e);

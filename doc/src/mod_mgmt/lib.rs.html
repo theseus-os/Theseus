@@ -3340,9 +3340,6 @@
 <a href="#3340" id="3340">3340</a>
 <a href="#3341" id="3341">3341</a>
 <a href="#3342" id="3342">3342</a>
-<a href="#3343" id="3343">3343</a>
-<a href="#3344" id="3344">3344</a>
-<a href="#3345" id="3345">3345</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(let_chains)]
@@ -3925,7 +3922,7 @@
     /// including all crates in any recursive namespaces as well if `recursive` is `true`.
     /// This is a slow method mostly for debugging, since it allocates a new vector of crate names.
     </span><span class="kw">pub fn </span>crate_names(<span class="kw-2">&amp;</span><span class="self">self</span>, recursive: bool) -&gt; Vec&lt;StrRef&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>crates: Vec&lt;StrRef&gt; = <span class="self">self</span>.crate_tree.lock().keys().map(|n| n.clone()).collect();
+        <span class="kw">let </span><span class="kw-2">mut </span>crates: Vec&lt;StrRef&gt; = <span class="self">self</span>.crate_tree.lock().keys().cloned().collect();
 
         <span class="kw">if </span>recursive {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>crates_recursive) = <span class="self">self</span>.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
@@ -4640,7 +4637,7 @@
 
             <span class="comment">// Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
             </span><span class="kw">else if </span>{
-                <span class="kw">match </span>sec.get_name(<span class="kw-2">&amp;</span>elf_file) {
+                <span class="kw">match </span>sec.get_name(elf_file) {
                     <span class="prelude-val">Ok</span>(RODATA_SECTION_NAME)           =&gt; is_rodata           = <span class="bool-val">true</span>,
                     <span class="prelude-val">Ok</span>(EH_FRAME_SECTION_NAME)         =&gt; is_eh_frame         = <span class="bool-val">true</span>,
                     <span class="prelude-val">Ok</span>(GCC_EXCEPT_TABLE_SECTION_NAME) =&gt; is_gcc_except_table = <span class="bool-val">true</span>,
@@ -4673,7 +4670,7 @@
             <span class="comment">// Finally, any other section type is considered unhandled, so return an error!
             </span><span class="kw">else </span>{
                 <span class="comment">// .debug_* sections are handled separately and loaded on demand later.
-                </span><span class="kw">let </span>sec_name = sec.get_name(<span class="kw-2">&amp;</span>elf_file);
+                </span><span class="kw">let </span>sec_name = sec.get_name(elf_file);
                 <span class="kw">if </span>sec_name.map_or(<span class="bool-val">false</span>, |n| n.starts_with(<span class="string">&quot;.debug&quot;</span>)) {
                     <span class="kw">continue</span>;
                 }
@@ -4685,7 +4682,7 @@
             // Skip TLS BSS (.tbss) sections, which have no data and occupy no space in memory.
             </span><span class="kw">if </span>typ != SectionType::TlsBss {
                 <span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)<span class="question-mark">?</span>;
-                <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+                <span class="kw">match </span>sec.get_data(elf_file) {
                     <span class="prelude-val">Ok</span>(SectionData::Undefined(sec_data)) =&gt; dest_slice.copy_from_slice(sec_data),
                     <span class="prelude-val">Ok</span>(SectionData::Empty) =&gt; dest_slice.fill(<span class="number">0</span>),
                     _other =&gt; {
@@ -4736,7 +4733,7 @@
         // The above loop just handled the merged sections, none of which should be made global.
         </span><span class="kw">let </span><span class="kw-2">mut </span>global_sections: BTreeSet&lt;usize&gt; = BTreeSet::new();
 
-        <span class="kw">let </span>symtab = find_symbol_table(<span class="kw-2">&amp;</span>elf_file)<span class="question-mark">?</span>;
+        <span class="kw">let </span>symtab = find_symbol_table(elf_file)<span class="question-mark">?</span>;
         <span class="kw">use </span>xmas_elf::symbol_table::Entry;
         <span class="kw">for </span>(_sym_num, symbol_entry) <span class="kw">in </span>symtab.iter().enumerate() {
             <span class="kw">let </span>sec_type = symbol_entry.get_type().map_err(|_e| {
@@ -4754,7 +4751,7 @@
             // Get the relevant section info from the symtab entry
             </span><span class="kw">let </span>sec_size = symbol_entry.size() <span class="kw">as </span>usize;
             <span class="kw">let </span>sec_value = symbol_entry.value() <span class="kw">as </span>usize;
-            <span class="kw">let </span>sec_name = symbol_entry.get_name(<span class="kw-2">&amp;</span>elf_file).map_err(|_e| {
+            <span class="kw">let </span>sec_name = symbol_entry.get_name(elf_file).map_err(|_e| {
                 <span class="macro">error!</span>(<span class="string">&quot;BUG: Error: {:?}, couldn&#39;t get symtab entry name: {}&quot;</span>, _e, symbol_entry <span class="kw">as </span><span class="kw-2">&amp;</span><span class="kw">dyn </span>Entry);
                 <span class="string">&quot;BUG: couldn&#39;t get symtab entry name&quot;
             </span>})<span class="question-mark">?</span>;
@@ -4955,7 +4952,7 @@
         </span><span class="kw">let </span>global_sections: BTreeSet&lt;Shndx&gt; = {
             <span class="comment">// For us to properly load the ELF file, it must NOT have been fully stripped,
             // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
-            </span><span class="kw">let </span>symtab = find_symbol_table(<span class="kw-2">&amp;</span>elf_file)<span class="question-mark">?</span>;
+            </span><span class="kw">let </span>symtab = find_symbol_table(elf_file)<span class="question-mark">?</span>;
 
             <span class="kw">let </span><span class="kw-2">mut </span>globals: BTreeSet&lt;Shndx&gt; = BTreeSet::new();
             <span class="kw">use </span>xmas_elf::symbol_table::Entry;
@@ -5067,7 +5064,7 @@
 
             <span class="comment">// Even if we&#39;re using the next section&#39;s data (for a zero-sized section, as handled below),
             // we still want to use this current section&#39;s actual name and flags!
-            </span><span class="kw">let </span>sec_name = <span class="kw">match </span>sec.get_name(<span class="kw-2">&amp;</span>elf_file) {
+            </span><span class="kw">let </span>sec_name = <span class="kw">match </span>sec.get_name(elf_file) {
                 <span class="prelude-val">Ok</span>(name) =&gt; name,
                 <span class="prelude-val">Err</span>(_e) =&gt; {
                     <span class="macro">error!</span>(<span class="string">&quot;Couldn&#39;t get section name for section [{}]: {:?}\n    error: {}&quot;</span>, shndx, sec, _e);
@@ -5175,7 +5172,7 @@
                     } <span class="kw">else </span>{
                         <span class="comment">// Here: copy the TLS .tdata section&#39;s contents to the proper address in the read-only pages.
                         </span><span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8] = rp.as_slice_mut(rodata_offset, sec_size)<span class="question-mark">?</span>;
-                        <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+                        <span class="kw">match </span>sec.get_data(elf_file) {
                             <span class="prelude-val">Ok</span>(SectionData::Undefined(sec_data)) =&gt; dest_slice.copy_from_slice(sec_data),
                             _other =&gt; {
                                 <span class="macro">error!</span>(<span class="string">&quot;load_crate_sections(): Couldn&#39;t get section data for TLS .tdata section [{}] {}: {:?}&quot;</span>, shndx, sec_name, _other);
@@ -5241,7 +5238,7 @@
                     </span><span class="kw">let </span>dest_vaddr = dp.address_at_offset(data_offset)
                         .ok_or(<span class="string">&quot;BUG: data_offset wasn&#39;t within data_pages&quot;</span>)<span class="question-mark">?</span>;
                     <span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8] = dp.as_slice_mut(data_offset, sec_size)<span class="question-mark">?</span>;
-                    <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+                    <span class="kw">match </span>sec.get_data(elf_file) {
                         <span class="prelude-val">Ok</span>(SectionData::Undefined(sec_data)) =&gt; dest_slice.copy_from_slice(sec_data),
                         <span class="prelude-val">Ok</span>(SectionData::Empty) =&gt; dest_slice.fill(<span class="number">0</span>),
                         _other =&gt; {
@@ -5282,7 +5279,7 @@
                     </span><span class="kw">let </span>dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or(<span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
                     <span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8] = rp.as_slice_mut(rodata_offset, sec_size)<span class="question-mark">?</span>;
-                    <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+                    <span class="kw">match </span>sec.get_data(elf_file) {
                         <span class="prelude-val">Ok</span>(SectionData::Undefined(sec_data)) =&gt; dest_slice.copy_from_slice(sec_data),
                         <span class="prelude-val">Ok</span>(SectionData::Empty) =&gt; dest_slice.fill(<span class="number">0</span>),
                         _other =&gt; {
@@ -5326,7 +5323,7 @@
                     </span><span class="kw">let </span>dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or(<span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
                     <span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8]  = rp.as_slice_mut(rodata_offset, sec_size)<span class="question-mark">?</span>;
-                    <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+                    <span class="kw">match </span>sec.get_data(elf_file) {
                         <span class="prelude-val">Ok</span>(SectionData::Undefined(sec_data)) =&gt; dest_slice.copy_from_slice(sec_data),
                         <span class="prelude-val">Ok</span>(SectionData::Empty) =&gt; dest_slice.fill(<span class="number">0</span>),
                         _other =&gt; {
@@ -5365,7 +5362,7 @@
                     </span><span class="kw">let </span>dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or(<span class="string">&quot;BUG: rodata_offset wasn&#39;t within rodata_mapped_pages&quot;</span>)<span class="question-mark">?</span>;
                     <span class="kw">let </span>dest_slice: <span class="kw-2">&amp;mut </span>[u8]  = rp.as_slice_mut(rodata_offset, sec_size)<span class="question-mark">?</span>;
-                    <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+                    <span class="kw">match </span>sec.get_data(elf_file) {
                         <span class="prelude-val">Ok</span>(SectionData::Undefined(sec_data)) =&gt; dest_slice.copy_from_slice(sec_data),
                         <span class="prelude-val">Ok</span>(SectionData::Empty) =&gt; dest_slice.fill(<span class="number">0</span>),
                         _other =&gt; {
@@ -5430,7 +5427,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>new_crate = new_crate_ref.lock_as_mut()
             .ok_or(<span class="string">&quot;BUG: perform_relocations(): couldn&#39;t get exclusive mutable access to new_crate&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">if </span>verbose_log { <span class="macro">debug!</span>(<span class="string">&quot;=========== moving on to the relocations for crate {} =========&quot;</span>, new_crate.crate_name); }
-        <span class="kw">let </span>symtab = find_symbol_table(<span class="kw-2">&amp;</span>elf_file)<span class="question-mark">?</span>;
+        <span class="kw">let </span>symtab = find_symbol_table(elf_file)<span class="question-mark">?</span>;
 
         <span class="comment">// Fix up the sections that were just loaded, using proper relocation info.
         // Iterate over every non-zero relocation section in the file
@@ -5438,17 +5435,17 @@
             <span class="kw">use </span>xmas_elf::sections::SectionData::Rela64;
             <span class="kw">if </span>verbose_log { 
                 <span class="macro">trace!</span>(<span class="string">&quot;Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}&quot;</span>, 
-                sec.get_name(<span class="kw-2">&amp;</span>elf_file), sec.get_type(), sec.info()); 
+                sec.get_name(elf_file), sec.get_type(), sec.info()); 
             }
 
             <span class="comment">// Debug sections are handled separately
-            </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(name) = sec.get_name(<span class="kw-2">&amp;</span>elf_file) {
+            </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(name) = sec.get_name(elf_file) {
                 <span class="kw">if </span>name.starts_with(<span class="string">&quot;.rela.debug&quot;</span>) { <span class="comment">// ignore debug special sections for now
                     </span><span class="kw">continue</span>;
                 }
             }
 
-            <span class="kw">let </span>rela_array = <span class="kw">match </span>sec.get_data(<span class="kw-2">&amp;</span>elf_file) {
+            <span class="kw">let </span>rela_array = <span class="kw">match </span>sec.get_data(elf_file) {
                 <span class="prelude-val">Ok</span>(Rela64(rela_arr)) =&gt; rela_arr,
                 <span class="kw">_ </span>=&gt; {
                     <span class="macro">error!</span>(<span class="string">&quot;Found Rela section that wasn&#39;t able to be parsed as Rela64: {:?}&quot;</span>, sec);
@@ -5464,7 +5461,7 @@
             // Get the target section (that we already loaded) for this rela_array Rela section.
             </span><span class="kw">let </span>target_sec_shndx = sec.info() <span class="kw">as </span>usize;
             <span class="kw">let </span>target_sec = new_crate.sections.get(<span class="kw-2">&amp;</span>target_sec_shndx).ok_or_else(|| {
-                <span class="macro">error!</span>(<span class="string">&quot;ELF file error: target section was not loaded for Rela section {:?}!&quot;</span>, sec.get_name(<span class="kw-2">&amp;</span>elf_file));
+                <span class="macro">error!</span>(<span class="string">&quot;ELF file error: target section was not loaded for Rela section {:?}!&quot;</span>, sec.get_name(elf_file));
                 <span class="string">&quot;target section was not loaded for Rela section&quot;
             </span>})<span class="question-mark">?</span>; 
 
@@ -5492,8 +5489,8 @@
                     <span class="kw">let </span>source_sec_shndx = source_sec_entry.shndx() <span class="kw">as </span>usize; 
                     <span class="kw">let </span>source_sec_value = source_sec_entry.value() <span class="kw">as </span>usize;
                     <span class="kw">if </span>verbose_log { 
-                        <span class="kw">let </span>source_sec_header_name = source_sec_entry.get_section_header(<span class="kw-2">&amp;</span>elf_file, rela_entry.get_symbol_table_index() <span class="kw">as </span>usize)
-                            .and_then(|s| s.get_name(<span class="kw-2">&amp;</span>elf_file));
+                        <span class="kw">let </span>source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() <span class="kw">as </span>usize)
+                            .and_then(|s| s.get_name(elf_file));
                         <span class="macro">trace!</span>(<span class="string">&quot;             relevant section [{}]: {:?}, value: {:#X}&quot;</span>, source_sec_shndx, source_sec_header_name, source_sec_value);
                         <span class="comment">// trace!(&quot;             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}&quot;, 
                         //     source_sec_entry.name(), source_sec_entry.get_name(&amp;elf_file), 
@@ -5514,7 +5511,7 @@
                         // Thus, we must get the source section&#39;s name and check our list of foreign crates to see if it&#39;s there.
                         // At this point, there&#39;s no other way to search for the source section besides its name.
                         </span><span class="prelude-val">None </span>=&gt; {
-                            <span class="kw">if let </span><span class="prelude-val">Ok</span>(source_sec_name) = source_sec_entry.get_name(<span class="kw-2">&amp;</span>elf_file) {
+                            <span class="kw">if let </span><span class="prelude-val">Ok</span>(source_sec_name) = source_sec_entry.get_name(elf_file) {
                                 <span class="kw">const </span>DATARELRO: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.data.rel.ro.&quot;</span>;
                                 <span class="kw">let </span>source_sec_name = <span class="kw">if </span>source_sec_name.starts_with(DATARELRO) {
                                     source_sec_name.get(DATARELRO.len() ..).ok_or(<span class="string">&quot;Couldn&#39;t get name of .data.rel.ro. section&quot;</span>)<span class="question-mark">?
@@ -5530,8 +5527,8 @@
                             }
                             <span class="kw">else </span>{
                                 <span class="kw">let </span>_source_sec_header = source_sec_entry
-                                    .get_section_header(<span class="kw-2">&amp;</span>elf_file, rela_entry.get_symbol_table_index() <span class="kw">as </span>usize)
-                                    .and_then(|s| s.get_name(<span class="kw-2">&amp;</span>elf_file));
+                                    .get_section_header(elf_file, rela_entry.get_symbol_table_index() <span class="kw">as </span>usize)
+                                    .and_then(|s| s.get_name(elf_file));
                                 <span class="macro">error!</span>(<span class="string">&quot;Couldn&#39;t get name of source section [{}] {:?}, needed for non-local relocation entry&quot;</span>, source_sec_shndx, _source_sec_header);
                                 <span class="prelude-val">Err</span>(<span class="string">&quot;Couldn&#39;t get source section&#39;s name, needed for non-local relocation entry&quot;</span>)
                             }
@@ -5559,7 +5556,7 @@
                     <span class="kw">else </span>{
                         <span class="comment">// tell the source_sec that the target_sec is dependent upon it
                         </span><span class="kw">let </span>weak_dep = WeakDependent {
-                            section: Arc::downgrade(<span class="kw-2">&amp;</span>target_sec),
+                            section: Arc::downgrade(target_sec),
                             relocation: relocation_entry,
                         };
                         source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
@@ -5696,7 +5693,7 @@
         <span class="comment">// add all the global symbols to the symbol map, in a way that lets us inspect/log each one
         </span><span class="kw">let </span><span class="kw-2">mut </span>count = <span class="number">0</span>;
         <span class="kw">for </span>sec <span class="kw">in </span>sections.into_iter() {
-            <span class="kw">let </span>condition = filter_func(<span class="kw-2">&amp;</span>sec) &amp;&amp; sec.global;
+            <span class="kw">let </span>condition = filter_func(sec) &amp;&amp; sec.global;
             <span class="kw">if </span>condition {
                 <span class="comment">// trace!(&quot;add_symbols_filtered(): adding symbol {:?}&quot;, sec);
                 </span><span class="kw">let </span>added = CrateNamespace::add_symbol(<span class="kw-2">&amp;mut </span>existing_map, sec.name.clone(), sec, log_replacements);
@@ -5704,10 +5701,7 @@
                     count += <span class="number">1</span>;
                 }
             }
-            <span class="comment">// else {
-            //     trace!(&quot;add_symbols_filtered(): skipping symbol {:?}&quot;, sec);
-            // }
-        </span>}
+        }
         
         count
     }
@@ -5971,7 +5965,7 @@
                         fuzzy_matches.len(), 
                         demangled_full_symbol, 
                         temp_backup_namespace.name, 
-                        fuzzy_matches.into_iter().map(|tup| <span class="kw-2">&amp;</span>tup.<span class="number">0</span>).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
+                        fuzzy_matches.iter().map(|tup| <span class="kw-2">&amp;</span>tup.<span class="number">0</span>).collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;()
                     );
                     <span class="kw">return </span><span class="prelude-val">None</span>;
                 }
@@ -6379,7 +6373,7 @@
     <span class="kw">let </span>symtab_data = elf_file.section_iter()
         .find(|sec| sec.get_type() == <span class="prelude-val">Ok</span>(ShType::SymTab))
         .ok_or(<span class="string">&quot;no symtab section&quot;</span>)
-        .and_then(|s| s.get_data(<span class="kw-2">&amp;</span>elf_file));
+        .and_then(|s| s.get_data(elf_file));
 
     <span class="kw">match </span>symtab_data {
         <span class="prelude-val">Ok</span>(SymbolTable64(symtab)) =&gt; <span class="prelude-val">Ok</span>(symtab),

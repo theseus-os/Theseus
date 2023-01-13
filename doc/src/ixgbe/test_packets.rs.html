@@ -143,10 +143,10 @@
 
     <span class="kw">let </span><span class="kw-2">mut </span>transmit_buffer = TransmitBuffer::new(ETHERNET_HEADER_LEN <span class="kw">as </span>u16 + len)<span class="question-mark">?</span>;
     <span class="kw">let </span>buffer = <span class="kw-2">&amp;mut </span>transmit_buffer;
-    buffer[<span class="number">0</span>..MAC_ADDR_LEN].copy_from_slice(<span class="kw-2">&amp;</span>dest_mac_address);
-    buffer[<span class="number">6</span>..(<span class="number">6 </span>+ MAC_ADDR_LEN)].copy_from_slice(<span class="kw-2">&amp;</span>source_mac_address);
+    buffer[<span class="number">0</span>..MAC_ADDR_LEN].copy_from_slice(dest_mac_address);
+    buffer[<span class="number">6</span>..(<span class="number">6 </span>+ MAC_ADDR_LEN)].copy_from_slice(source_mac_address);
     buffer[<span class="number">12</span>..(<span class="number">12 </span>+ ETHER_TYPE_LEN)].copy_from_slice(<span class="kw-2">&amp;</span>ether_type);
-    buffer[<span class="number">14</span>..(<span class="number">14 </span>+ message.len())].copy_from_slice(<span class="kw-2">&amp;</span>message);
+    buffer[<span class="number">14</span>..(<span class="number">14 </span>+ message.len())].copy_from_slice(message);
 
     <span class="prelude-val">Ok</span>(transmit_buffer)
 }

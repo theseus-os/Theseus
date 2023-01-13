@@ -839,7 +839,7 @@
                 socket.close(); 
                 socket.abort(); 
             }
-            <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
+            <span class="kw">let </span>_packet_io_occurred = poll_iface(iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
             
             <span class="comment">// second, create an entirely new socket and connect it
             </span>local_port = STARTING_FREE_PORT + (rng.next_u32() <span class="kw">as </span>u16 % rng_upper_bound);
@@ -853,7 +853,7 @@
 
         <span class="comment">// send the HTTP request and obtain a response
         </span><span class="kw">let </span>response = {
-            <span class="kw">let </span><span class="kw-2">mut </span>connected_tcp_socket = ConnectedTcpSocket::new(<span class="kw-2">&amp;</span>iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle)<span class="question-mark">?</span>;
+            <span class="kw">let </span><span class="kw-2">mut </span>connected_tcp_socket = ConnectedTcpSocket::new(iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle)<span class="question-mark">?</span>;
             send_request(http_request, <span class="kw-2">&amp;mut </span>connected_tcp_socket, <span class="prelude-val">Some</span>(HTTP_REQUEST_TIMEOUT_MILLIS))<span class="question-mark">?
         </span>};
 
@@ -876,7 +876,7 @@
     <span class="kw">loop </span>{
         _loop_ctr += <span class="number">1</span>;
 
-        <span class="kw">let </span>_packet_io_occurred = poll_iface(<span class="kw-2">&amp;</span>iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
+        <span class="kw">let </span>_packet_io_occurred = poll_iface(iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
         <span class="kw">if </span>!issued_close {

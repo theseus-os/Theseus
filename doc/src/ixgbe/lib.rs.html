@@ -2661,10 +2661,10 @@
 /// It returns the interrupt number for the rx queue &#39;qid&#39;.
 </span><span class="kw">fn </span>rx_interrupt_handler(qid: u8, nic_id: PciLocation) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
     <span class="kw">match </span>get_ixgbe_nic(nic_id) {
-        <span class="prelude-val">Ok</span>(<span class="kw-2">ref </span>ixgbe_nic_ref) =&gt; {
+        <span class="prelude-val">Ok</span>(ixgbe_nic_ref) =&gt; {
             <span class="kw">let </span><span class="kw-2">mut </span>ixgbe_nic = ixgbe_nic_ref.lock();
             <span class="kw">let _ </span>= ixgbe_nic.rx_queues[qid <span class="kw">as </span>usize].poll_queue_and_store_received_packets();
-            ixgbe_nic.interrupt_num.get(<span class="kw-2">&amp;</span>qid).map(|int| <span class="kw-2">*</span>int)
+            ixgbe_nic.interrupt_num.get(<span class="kw-2">&amp;</span>qid).cloned()
         }
         <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: ixgbe_handler_{}(): {}&quot;</span>, qid, e);

@@ -2660,7 +2660,7 @@
     </span><span class="kw">pub fn </span>create_and_execute_command(<span class="kw-2">&amp;mut </span><span class="self">self</span>, parameters: CommandBuilder, init_segment: <span class="kw-2">&amp;mut </span>InitializationSegment) -&gt; <span class="prelude-ty">Result</span>&lt;Command&lt;{CmdState::Completed}&gt;, CommandQueueError&gt; {
         <span class="prelude-val">Ok</span>( <span class="self">self</span>.create_command(parameters)<span class="question-mark">?
                 </span>.post(init_segment)
-                .complete(<span class="kw-2">&amp;</span><span class="self">self</span>) )
+                .complete(<span class="self">self</span>) )
     }
     
     <span class="doccomment">/// Fill in the fields of a command queue entry.

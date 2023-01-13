@@ -372,13 +372,13 @@
     }
 }
 
-<span class="kw">impl </span>Into&lt;usize&gt; <span class="kw">for </span>SystemCall {
+<span class="kw">impl </span>From&lt;SystemCall&gt; <span class="kw">for </span>usize {
     <span class="doccomment">/// Get system call number from this SystemCall enum.
     ///
     /// # Return
     /// Returns system call number of this SystemCall enum.
-    </span><span class="kw">fn </span>into(<span class="self">self</span>) -&gt; usize {
-        <span class="kw">match </span><span class="self">self </span>{
+    </span><span class="kw">fn </span>from(val: SystemCall) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>val {
             SystemCall::ProcExit =&gt; <span class="number">0</span>,
             SystemCall::FdClose =&gt; <span class="number">1</span>,
             SystemCall::FdWrite =&gt; <span class="number">2</span>,
@@ -398,13 +398,13 @@
     }
 }
 
-<span class="kw">impl </span>Into&lt;Signature&gt; <span class="kw">for </span>SystemCall {
+<span class="kw">impl </span>From&lt;SystemCall&gt; <span class="kw">for </span>Signature {
     <span class="doccomment">/// Get wasmi function signature of SystemCall enum.
     ///
     /// # Return
     /// Returns wasmi function signature of this SystemCall enum.
-    </span><span class="kw">fn </span>into(<span class="self">self</span>) -&gt; Signature {
-        <span class="kw">match </span><span class="self">self </span>{
+    </span><span class="kw">fn </span>from(val: SystemCall) -&gt; <span class="self">Self </span>{
+        <span class="kw">match </span>val {
             SystemCall::ProcExit =&gt; <span class="macro">sig!</span>((I32)),
             SystemCall::FdClose =&gt; <span class="macro">sig!</span>((I32)-&gt;I32),
             SystemCall::FdWrite =&gt; <span class="macro">sig!</span>((I32,I32,I32,I32)-&gt;I32),

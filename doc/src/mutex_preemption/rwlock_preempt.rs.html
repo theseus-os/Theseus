@@ -293,7 +293,13 @@
 <a href="#293" id="293">293</a>
 <a href="#294" id="294">294</a>
 <a href="#295" id="295">295</a>
-</pre><pre class="rust"><code><span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+</pre><pre class="rust"><code><span class="comment">// TODO: add documentation to each unsafe block, laying out all the conditions under which it&#39;s safe or unsafe to use it.
+</span><span class="attr">#![allow(clippy::missing_safety_doc)]
+
+</span><span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
 <span class="kw">use </span>preemption::{PreemptionGuard, hold_preemption};
 <span class="kw">use </span>spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 <span class="kw">use </span>lockable::{Lockable, LockableSized};

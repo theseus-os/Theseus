@@ -398,7 +398,7 @@
 <span class="doccomment">/// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
 </span><span class="kw">pub fn </span>set_rtc_frequency(rate: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
-    <span class="kw">if </span>!(rate.is_power_of_two() &amp;&amp; rate &gt;= <span class="number">2 </span>&amp;&amp; rate &lt;= <span class="number">8192</span>) {
+    <span class="kw">if </span>!(rate.is_power_of_two() &amp;&amp; (<span class="number">2</span>..=<span class="number">8192</span>).contains(<span class="kw-2">&amp;</span>rate)) {
         <span class="macro">error!</span>(<span class="string">&quot;RTC rate was {}, must be a power of two between [2: 8192] inclusive!&quot;</span>, rate);
         <span class="kw">return </span><span class="prelude-val">Err</span>(());
     }

@@ -600,7 +600,7 @@
         <span class="kw">if </span>b.bus_number == bus {
             <span class="kw">for </span>d <span class="kw">in </span><span class="kw-2">&amp;</span>b.devices {
                 <span class="kw">if </span>d.slot == slot &amp;&amp; d.func == func {
-                    <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>d);
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(d);
                 }
             }
         }
