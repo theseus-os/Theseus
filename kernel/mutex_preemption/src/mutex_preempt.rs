@@ -138,7 +138,7 @@ impl<'a, T: ?Sized> Deref for MutexPreemptGuard<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-        &(self.guard) 
+        &self.guard 
     }
 }
 

@@ -262,7 +262,7 @@ impl<'rwlock, T: ?Sized> Deref for RwLockPreemptReadGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-       &(self.guard) 
+       &self.guard 
     }
 }
 
@@ -270,7 +270,7 @@ impl<'rwlock, T: ?Sized> Deref for RwLockPreemptWriteGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-        &(self.guard)
+        &self.guard
     }
 }
 
