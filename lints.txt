@@ -297,7 +297,7 @@ cmp-owned
 expect-fun-call
 extend-with-drain
 format-in-format-args
-# format-push-string
+format-push-string
 iter-nth
 iter-overeager-cloned
 large-const-arrays
@@ -316,7 +316,7 @@ to-string-in-format-args
 unnecessary-to-owned
 useless-vec
 vec-init-then-push
-# Suspicious
+Suspicious
 await-holding-invalid-type
 await-holding-lock
 await-holding-refcell-ref

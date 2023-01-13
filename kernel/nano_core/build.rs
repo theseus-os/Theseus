@@ -1,4 +1,10 @@
-use std::{env, io::Write, path::PathBuf, process::Command};
+use std::{
+    env, 
+    fmt::Write as stdWrite,
+    io::Write, 
+    path::PathBuf, 
+    process::Command
+};
 
 /// Whether or not to use the `built` crate to emit the default `built.rs` file.
 const EMIT_BUILT_RS_FILE: bool = false;
@@ -76,7 +82,7 @@ fn emit_built_rs_file() {
 
             custom_cfgs_str.push_str(&key);
             if !v.is_empty() {
-                custom_cfgs_str.push_str(&format!("=\"{}\"", v));
+                write!(custom_cfgs_str, "=\"{}\"", v).expect("Failed to add String value to custom_cfgs_str variable");
             }
             custom_cfgs_str.push(' ');
 
