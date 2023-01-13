@@ -31,6 +31,8 @@
 //! [register unwinding information]: https://github.com/bytecodealliance/wasmtime/blob/7cf5f058303d2ee8c42df658d4ca608771a8561d/crates/jit/src/code_memory.rs#L185
 //! [`wasmtime-jit`]: https://docs.rs/wasmtime-jit/latest/wasmtime_jit/
 
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
 #![no_std]
 #![feature(map_try_insert)]
 
@@ -60,9 +62,6 @@ pub struct ExternalUnwindInfo {
 /// 
 /// Returns an error if unwinding information has already been registered 
 /// for the given `text_section_base_address`.
-/// 
-/// # Safety
-/// [TODO: Add safety documentation]
 pub unsafe fn register_unwind_info(
     text_section_base_address: *mut u8,
     text_section_len: usize,
@@ -94,9 +93,6 @@ pub unsafe fn register_unwind_info(
 /// 
 /// Returns an error if no unwinding information was registered
 /// for the given `text_section_base_address`.
-/// 
-/// # Safety
-/// [TODO: Add safety documentation]
 pub unsafe fn deregister_unwind_info(
     text_section_base_address: *mut u8
 ) -> Result<(), ()> {
