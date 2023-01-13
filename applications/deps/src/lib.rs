@@ -134,7 +134,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
         count_private_rodata_sections()
     }
     else {
-        Err(format!("no supported options/arguments found."))
+        Err("no supported options/arguments found.".to_string())
     }
 }
 
@@ -317,7 +317,7 @@ fn section_dependency_count(sec: &StrongSectionRef) -> (usize, usize, usize) {
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching crate names separated by the newline character `'\n'`.
 fn crates_dependent_on_me(_crate_name: &str) -> Result<(), String> {
-    Err(format!("unimplemented"))
+    Err("unimplemented".to_string())
 }
 
 
@@ -409,7 +409,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
     match matching_symbols.len() {
         1 => return matching_symbols[0].1
             .upgrade()
-            .ok_or_else(|| format!("Found matching symbol name but couldn't get reference to section")),
+            .ok_or_else(|| "Found matching symbol name but couldn't get reference to section".to_string()),
         2.. => return Err(matching_symbols
             .into_iter()
             .map(|(k, _v)| k)
