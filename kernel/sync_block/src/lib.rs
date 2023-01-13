@@ -29,7 +29,6 @@ unsafe impl Flavour for Block {
 
     #[inline]
     fn post_unlock(mutex: &mutex::RawMutex<Self>) {
-        let _ = &mutex.data;
-        todo!();
+        mutex.data.notify_one();
     }
 }

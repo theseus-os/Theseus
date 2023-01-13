@@ -10,11 +10,11 @@ impl sync::DeadlockPrevention for DisablePreemption {
 
     #[inline]
     fn enter() {
-        preemption::enable_preemption()
+        preemption::disable_preemption()
     }
 
     #[inline]
     fn exit() {
-        preemption::disable_preemption()
+        preemption::enable_preemption()
     }
 }
