@@ -1,0 +1,9 @@
+[package]
+name = "sync"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+preemption = { path = "../preemption" }
+spin = "0.9.4"
