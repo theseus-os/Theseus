@@ -6,26 +6,36 @@ pub use lock_api::{GuardNoSend, GuardSend};
 pub use mutex::{Mutex, MutexGuard};
 
 pub unsafe trait Flavour {
+    /// Initial value for the lock data.
     const INIT: Self::LockData;
 
+    /// Additional data stored on the lock.
     type LockData;
 
+    /// Marker type to determine whether a lock guard should be send. Use either
+    /// [`GuardSend`] or [`GuardNoSend`].
     type GuardMarker;
 
+    /// Acquires the given mutex.
     fn mutex_lock(mutex: &mutex::RawMutex<Self>)
     where
         Self: Sized;
 
+    /// Performs any necessary actions after unlocking the mutex.
     fn post_unlock(mutex: &mutex::RawMutex<Self>)
     where
         Self: Sized;
 }
 
 pub trait DeadlockPrevention {
+    /// Marker type to determine whether a lock guard should be send. Use either
+    /// [`GuardSend`] or [`GuardNoSend`].
     type GuardMarker;
 
+    /// Performs any necessary actions prior to locking.
     fn enter();
 
+    /// Performs any necessary actions after unlocking.
     fn exit();
 }
 

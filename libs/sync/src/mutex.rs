@@ -51,6 +51,7 @@ impl<T> RawMutex<T>
 where
     T: Flavour,
 {
+    /// Tries to lock the mutex using [`AtomicBool::compare_exchange_weak`].
     #[inline]
     pub fn try_lock_weak(&self) -> bool {
         self.lock

@@ -28,7 +28,7 @@ static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CO
 /// until the returned guard object is dropped.
 pub fn hold_preemption() -> PreemptionGuard {
     let cpu_id = apic::current_cpu();
-    let prev_val = enable_preemption_inner(cpu_id);
+    let prev_val = disable_preemption_inner(cpu_id);
 
     let preemption_was_enabled = prev_val == 0;
     // Create a guard here immediately after incrementing the counter,
@@ -39,17 +39,23 @@ pub fn hold_preemption() -> PreemptionGuard {
     }
 }
 
-pub fn enable_preemption() {
-    let cpu_id = apic::current_cpu();
-    enable_preemption_inner(cpu_id);
-}
-
+/// Disables preemption (preemptive task switching).
+///
+/// It must be manually re-enabled using [`enable_preemption`].
 pub fn disable_preemption() {
     let cpu_id = apic::current_cpu();
     disable_preemption_inner(cpu_id);
 }
 
-fn enable_preemption_inner(cpu_id: u8) -> u8 {
+/// Enables preemption (preemptive task switching).
+///
+/// This must only be called after a call to [`disable_preemption`].
+pub fn enable_preemption() {
+    let cpu_id = apic::current_cpu();
+    enable_preemption_inner(cpu_id);
+}
+
+fn disable_preemption_inner(cpu_id: u8) -> u8 {
     let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_add(1, Ordering::Relaxed);
 
     // If the previous counter value was 0, that indicates we are transitioning
@@ -71,7 +77,7 @@ fn enable_preemption_inner(cpu_id: u8) -> u8 {
     prev_val
 }
 
-fn disable_preemption_inner(cpu_id: u8) {
+fn enable_preemption_inner(cpu_id: u8) {
     let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_sub(1, Ordering::Relaxed);
     if prev_val == 1 {
         // log::trace!("CPU {}: re-enabling preemption", cpu_id);
@@ -144,7 +150,7 @@ impl Drop for PreemptionGuard {
             "PreemptionGuard::drop(): BUG: CPU IDs did not match! \
             This indicates an unexpected task migration across CPUs."
         );
-        disable_preemption_inner(cpu_id);
+        enable_preemption_inner(cpu_id);
     }
 }
 

@@ -4,6 +4,8 @@ use sync::{mutex, Flavour};
 use sync_spin::Spin;
 use wait_queue::WaitQueue;
 
+/// A synchronisation flavour that blocks the current thread while waiting for
+/// the lock to become available.
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Block {}
 
