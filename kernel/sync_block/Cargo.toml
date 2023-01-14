@@ -1,6 +1,7 @@
 [package]
 name = "sync_block"
 version = "0.1.0"
+description = "Blocking synchronisation primitives"
 edition = "2021"
 
 [dependencies]

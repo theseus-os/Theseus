@@ -1,3 +1,12 @@
+//! Only synchronisation primitive implementations should depend on this crate.
+//!
+//! If a crate uses a synchronisation primitive, it should depend on one of the
+//! following:
+//! - `sync_spin`
+//! - `sync_preemption`
+//! - `sync_irq`
+//! - `sync_block`
+
 #![no_std]
 
 pub mod mutex;

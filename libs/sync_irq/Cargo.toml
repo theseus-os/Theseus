@@ -1,6 +1,7 @@
 [package]
 name = "sync_irq"
 version = "0.1.0"
+description = "Interrupt-request-disabling synchronisation primitives"
 edition = "2021"
 
 [dependencies]

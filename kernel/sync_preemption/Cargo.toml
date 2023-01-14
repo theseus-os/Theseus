@@ -1,6 +1,7 @@
 [package]
 name = "sync_preemption"
 version = "0.1.0"
+description = "Preemption-disabling synchronisation primitives"
 edition = "2021"
 
 [dependencies]

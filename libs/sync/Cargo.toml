@@ -1,6 +1,7 @@
 [package]
 name = "sync"
 version = "0.1.0"
+description = "Synchronisation primitive building blocks"
 edition = "2021"
 
 [dependencies]
