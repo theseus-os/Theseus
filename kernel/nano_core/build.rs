@@ -82,7 +82,7 @@ fn emit_built_rs_file() {
 
             custom_cfgs_str.push_str(&key);
             if !v.is_empty() {
-                write!(custom_cfgs_str, "=\"{}\"", v).expect("Failed to add String value to custom_cfgs_str variable");
+                write!(custom_cfgs_str, "=\"{}\"", v).expect("Failed to write to custom_cfgs_str");
             }
             custom_cfgs_str.push(' ');
 

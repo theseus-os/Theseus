@@ -51,7 +51,7 @@ pub fn main(args: Vec<String>) -> isize {
                     task.id,
                     if task.is_running() { "*" } else { "" }
                 )
-                .expect("Failed to add task info into runqueue_contents");
+                .expect("Failed to write to runqueue_contents");
             }
             println!("RunQueue:\n{}", runqueue_contents);
         }

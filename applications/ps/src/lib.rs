@@ -48,7 +48,7 @@ pub fn main(args: Vec<String>) -> isize {
     for (id, task) in TASKLIST.lock().iter() {
         num_tasks += 1;
         if matches.opt_present("b") {
-            writeln!(task_string, "{0:<5}  {1}", id, task.name).expect("Failed to add id and task.name into task_string.");
+            writeln!(task_string, "{0:<5}  {1}", id, task.name).expect("Failed to write to task_string.");
         }
         else {
             // All printed fields below must be strings to ensure the width formatting specifier below works properly.
@@ -68,7 +68,7 @@ pub fn main(args: Vec<String>) -> isize {
             }
             #[cfg(not(priority_scheduler))] {
                 writeln!(task_string, "{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}", 
-                    id, runstate, cpu, pinned, task_type, task.name).expect("Failed to add id, runstate, cpu, pinned, task_type and/or task.name to task_string.");
+                    id, runstate, cpu, pinned, task_type, task.name).expect("Failed to write to task_string.");
             }
         }
     }

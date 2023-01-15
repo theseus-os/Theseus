@@ -69,7 +69,7 @@ fn print_children(dir: &DirRef) {
     let mut child_list = dir.lock().list(); 
     child_list.reverse();
     for child in child_list.iter() {
-        writeln!(child_string, "{}", child).expect("Failed to add child to child_string");
+        writeln!(child_string, "{}", child).expect("Failed to write child_string");
     }
     println!("{}", child_string);
 }
