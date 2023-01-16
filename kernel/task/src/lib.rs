@@ -220,12 +220,6 @@ pub enum RunState {
 }
 
 
-#[cfg(runqueue_spillful)]
-/// A callback that will be invoked to remove a specific task from a specific runqueue.
-/// Should be initialized by the runqueue crate.
-pub static RUNQUEUE_REMOVAL_FUNCTION: spin::Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = spin::Once::new();
-
-
 #[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -386,10 +380,6 @@ pub struct Task {
     /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
     tls_area: TlsDataImage,
     
-    #[cfg(runqueue_spillful)]
-    /// The runqueue that this Task is on.
-    on_runqueue: AtomicCell<OptionU8>,
-
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
@@ -519,9 +509,6 @@ impl Task {
             failure_cleanup_function,
             tls_area,
 
-            #[cfg(runqueue_spillful)]
-            on_runqueue: AtomicCell::new(None.into()),
-            
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }
@@ -672,18 +659,6 @@ impl Task {
     /// Obtains the lock on this `Task`'s inner state in order to access it.
     pub fn is_restartable(&self) -> bool {
         self.inner.lock().restart_info.is_some()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Returns the runqueue on which this `Task` is currently enqueued.
-    pub fn on_runqueue(&self) -> Option<u8> {
-        self.on_runqueue.load().into()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Marks this `Task` as enqueued on the given runqueue.
-    pub fn set_on_runqueue(&self, runqueue: Option<u8>) {
-        self.on_runqueue.store(runqueue.into());
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
@@ -1401,14 +1376,6 @@ impl TaskRef {
             
             if let Some(waker) = self.inner.lock().waker.take() {
                 waker.wake();
-            }
-        }
-
-        #[cfg(runqueue_spillful)] {   
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = self.on_runqueue() {
-                    remove_from_runqueue(self, rq)?;
-                }
             }
         }
 
