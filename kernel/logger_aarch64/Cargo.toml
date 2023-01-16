@@ -1,5 +1,5 @@
 [package]
-name = "logger"
+name = "logger_aarch64"
 version = "0.1.0"
 edition = "2021"
 

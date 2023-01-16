@@ -9,19 +9,19 @@
 #![no_std]
 #![feature(trait_alias)]
 
-extern crate log;
-extern crate alloc;
-extern crate spin;
-extern crate irq_safety;
-extern crate serial_port_basic;
-
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
-use spin::Once;
 use irq_safety::MutexIrqSafe;
-use serial_port_basic::SerialPort;
 use alloc::{sync::Arc, vec::Vec};
 
+#[cfg(target_arch = "x86_64")]
+use {
+    serial_port_basic::SerialPort,
+    spin::Once,
+};
+
+#[cfg(target_arch = "aarch64")]
+use pl011_qemu::{PL011, UART1};
 
 /// By default, Theseus will print all log levels, including `Trace` and above.
 pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
