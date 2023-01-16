@@ -3064,11 +3064,11 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log",
- "logger",
+ "app_io",
+ "getopts",
  "scheduler",
  "spawn",
- "task",
+ "time",
 ]
 
 [[package]]
@@ -3751,6 +3751,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_scheduler"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "logger",
+ "scheduler",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
@@ -3894,6 +3905,7 @@ dependencies = [
  "test_panic",
  "test_realtime",
  "test_restartable",
+ "test_scheduler",
  "test_serial_echo",
  "test_std_fs",
  "test_task_cancel",
