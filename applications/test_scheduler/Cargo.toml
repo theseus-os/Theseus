@@ -11,9 +11,6 @@ version = "0.4.8"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.logger]
-path = "../../kernel/logger"
-
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 

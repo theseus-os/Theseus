@@ -2961,6 +2961,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rq_access_eval"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "cpu",
+ "getopts",
+ "irq_safety",
+ "runqueue",
+ "time",
+]
+
+[[package]]
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
@@ -3106,11 +3118,11 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log",
- "logger_x86_64",
+ "app_io",
+ "getopts",
  "scheduler",
  "spawn",
- "task",
+ "time",
 ]
 
 [[package]]
@@ -3793,6 +3805,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_scheduler"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "scheduler",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "test_serial_echo"
 version = "0.1.0"
 dependencies = [
@@ -3918,6 +3940,7 @@ dependencies = [
  "raw_mode",
  "rm",
  "rq",
+ "rq_access_eval",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
@@ -3936,6 +3959,7 @@ dependencies = [
  "test_panic",
  "test_realtime",
  "test_restartable",
+ "test_scheduler",
  "test_serial_echo",
  "test_std_fs",
  "test_task_cancel",
