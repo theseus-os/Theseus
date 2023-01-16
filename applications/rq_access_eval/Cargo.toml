@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 app_io = { path = "../../kernel/app_io" }
-apic = { path = "../../kernel/apic" }
+cpu = { path = "../../kernel/cpu" }
 getopts = "0.2"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 runqueue = { path = "../../kernel/runqueue" }

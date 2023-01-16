@@ -2922,8 +2922,8 @@ dependencies = [
 name = "rq_access_eval"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
+ "cpu",
  "getopts",
  "irq_safety",
  "runqueue",

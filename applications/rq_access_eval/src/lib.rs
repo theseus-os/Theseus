@@ -50,7 +50,7 @@ pub fn main(args: Vec<String>) -> isize {
             num,
         )
     } else {
-        let cpu_count = apic::cpu_count();
+        let cpu_count = cpu::cpu_count();
         run(
             |count| {
                 runqueue::get_runqueue((count % cpu_count as u32) as u8);
