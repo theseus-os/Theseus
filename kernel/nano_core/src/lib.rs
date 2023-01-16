@@ -24,7 +24,12 @@ extern crate panic_entry;
 use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
+
+#[cfg(target_arch = "x86_64")]
 use vga_buffer::println_raw;
+
+#[cfg(target_arch = "aarch64")]
+use log::info as println_raw;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "bios")] {
@@ -72,27 +77,29 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// 2. Dumping basic information about the Theseus build
 /// 3. Initialising early exceptions
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
-    irq_safety::disable_interrupts();
-    println_raw!("Entered early_setup(). Interrupts disabled.");
+    #[cfg(target_arch = "x86_64")] {
+        irq_safety::disable_interrupts();
+        println_raw!("Entered early_setup(). Interrupts disabled.");
 
-    let logger_ports = [serial_port_basic::take_serial_port(
-        serial_port_basic::SerialPortAddress::COM1,
-    )];
-    logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|_| "failed to initialise early logging")?;
-    log::info!("initialised early logging");
-    println_raw!("early_setup(): initialized logger.");
+        let logger_ports = [serial_port_basic::take_serial_port(
+            serial_port_basic::SerialPortAddress::COM1,
+        )];
+        logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
+            .map_err(|_| "failed to initialise early logging")?;
+        log::info!("initialised early logging");
+        println_raw!("early_setup(): initialized logger.");
 
-    // Dump basic information about this build of Theseus.
-    log::info!("\n    \
-        ===================== Theseus build info: =====================\n    \
-        CUSTOM CFGs: {} \n    \
-        ===============================================================",
-        build_info::CUSTOM_CFG_STR,
-    );
+        // Dump basic information about this build of Theseus.
+        log::info!("\n    \
+            ===================== Theseus build info: =====================\n    \
+            CUSTOM CFGs: {} \n    \
+            ===============================================================",
+            build_info::CUSTOM_CFG_STR,
+        );
 
-    exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
-    println_raw!("early_setup(): initialized early IDT with exception handlers.");
+        exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
+        println_raw!("early_setup(): initialized early IDT with exception handlers.");
+    }
 
     Ok(())
 }
@@ -200,10 +207,10 @@ where
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core(): invoking the captain...");
-    #[cfg(not(loadable))] {
+    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
         captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
-    #[cfg(loadable)] {
+    #[cfg(all(target_arch = "x86_64", loadable))] {
         use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
         use no_drop::NoDrop;
         use stack::Stack;

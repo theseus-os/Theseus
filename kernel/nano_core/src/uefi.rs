@@ -11,6 +11,7 @@ use uefi_bootloader_api::BootInformation;
 #[link_section = ".init.text"]
 pub extern "C" fn _start(boot_info: &'static BootInformation) {
     unsafe {
+        #[cfg(target_arch = "x86_64")]
         asm!(
             // Upon entering this function:
             // * rdi contains the first argument, a reference to the boot info.
@@ -43,7 +44,41 @@ pub extern "C" fn _start(boot_info: &'static BootInformation) {
             "jmp KEXIT",
             sym rust_entry,
             options(noreturn),
-        )
+        );
+
+        #[cfg(target_arch = "aarch64")]
+        asm!(
+            // Upon entering this function:
+            // * x0 contains the first argument, a reference to the boot info.
+            // * the stack pointer (sp) points to the top of the double fault stack:
+            //
+            // +------------+------------------------------+--------------------+
+            // | guard page | kernel stack (several pages) | double fault stack |
+            // +------------+------------------------------+--------------------+
+            // ^                                           ^                    ^
+            // |                                           |                   x1
+            // kernel_stack_start                   sp (top of stack)
+            //
+            // The guard page and double fault stack are both one page in size;
+            // the kernel stack is `KERNEL_STACK_SIZE_IN_PAGES` pages.
+            //
+            // Stacks grow downwards on aarch64, meaning that the stack pointer will grow
+            // towards the guard page. That's why we start it at the top (the highest vaddr).
+
+            // Before invoking `rust_entry`, we need to set up:
+            // 1. First arg  (in x0): a reference to the boot info (just pass it through).
+            // 2. Second arg (in x1): the top vaddr of the double fault handler stack.
+            "mov x1, sp", // Handle #2 above
+
+            // Now, adjust the stack pointer to the page before the double fault stack,
+            // which is the top of the initial kernel stack that was allocated for us.
+            "sub sp, sp, 4096",
+            // Now invoke the `rust_entry` function.
+            "b {}",
+            // Execution can never return to this point.
+            sym rust_entry,
+            options(noreturn),
+        );
     };
 }
 
@@ -58,6 +93,7 @@ fn rust_entry(boot_info: &'static BootInformation, double_fault_stack: usize) {
 #[no_mangle]
 #[link_section = ".init.text"]
 pub extern "C" fn _error() {
+    #[cfg(target_arch = "x86_64")]
     unsafe {
         asm!(
             // "2:" is a label.
@@ -66,6 +102,16 @@ pub extern "C" fn _error() {
             "hlt",
             "jmp 2b", // jump backwards ("b") to label "2:".
             options(noreturn)
-        )
+        );
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        asm!(
+            "2:",
+            "wfe",
+            "bl 2b",
+            options(noreturn)
+        );
     }
 }
