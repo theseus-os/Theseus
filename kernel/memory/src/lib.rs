@@ -37,12 +37,17 @@ pub use frame_allocator::{
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::{
-    find_section_memory_bounds, get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4,
+    get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4,
+};
+
+#[cfg(target_arch = "aarch64")]
+use memory_aarch64::{
+    tlb_flush_virt_addr, tlb_flush_all, get_p4,
 };
 
 pub use pte_flags::*;
 
-use boot_info::{BootInformation, MemoryRegion};
+use boot_info::{BootInformation, MemoryRegion, find_section_memory_bounds};
 use log::debug;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
@@ -184,8 +189,8 @@ pub fn init(
     
     // Add the VGA display's memory region to the list of reserved physical memory areas.
     // Currently this is covered by the first 1MiB region, but it's okay to duplicate it here.
-    let (vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()?;
-    let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
+    // let (vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()?;
+    // let vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
     
     // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
     let mut free_regions: [Option<PhysicalMemoryRegion>; 32] = Default::default();
@@ -195,8 +200,8 @@ pub fn init(
 
     reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
     reserved_index += 1;
-    reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
-    reserved_index += 1;
+    // reserved_regions[reserved_index] = Some(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
+    // reserved_index += 1;
 
     for region in boot_info.memory_regions()? {
         let frames = FrameRange::from_phys_addr(region.start(), region.len());

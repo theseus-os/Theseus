@@ -31,13 +31,18 @@ use log::debug;
 use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET, InitialMemoryMappings
+    KERNEL_OFFSET, InitialMemoryMappings
 };
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
 use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX};
 
+#[cfg(target_arch = "aarch64")]
+use memory_aarch64::set_as_active_page_table_root;
+
+#[cfg(target_arch = "x86_64")]
+use super::get_vga_mem_addr;
 
 /// A top-level root (P4) page table.
 /// 
@@ -183,6 +188,8 @@ impl PageTable {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
         // perform the actual page table switch
+
+        #[cfg(target_arch = "x86_64")]
         unsafe { 
             use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
             Cr3::write(
@@ -190,6 +197,9 @@ impl PageTable {
                 Cr3Flags::empty(),
             )
         };
+
+        #[cfg(target_arch = "aarch64")]
+        set_as_active_page_table_root(new_table.physical_address());
     }
 
 
@@ -359,18 +369,26 @@ pub fn init(
             NoDrop::new(stack_mapped_pages.ok_or("no pages were allocated for the stack")?),
         );
 
-        // Map the VGA display memory as writable. 
-        // We map this *only* using an identity mapping, as it is only used during early init
-        // by both the bootstrap CPU and secondary CPUs.
-        let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
-        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
-            VirtualAddress::new_canonical(vga_phys_addr.value()),
-            vga_size_in_bytes,
-        )?;
-        let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
-        additional_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(
-            vga_display_pages_identity, vga_display_frames, vga_flags,
-        )?);
+        #[cfg(target_arch = "x86_64")]
+        {
+            // Map the VGA display memory as writable. 
+            // We map this *only* using an identity mapping, as it is only used during early init
+            // by both the bootstrap CPU and secondary CPUs.
+            let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
+            let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+                VirtualAddress::new_canonical(vga_phys_addr.value()),
+                vga_size_in_bytes,
+            )?;
+            let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
+            additional_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(
+                vga_display_pages_identity, vga_display_frames, vga_flags,
+            )?);
+        }
+
+        #[cfg(target_arch = "aarch64")]
+        {
+            additional_mapped_pages = NoDrop::new(MappedPages::empty());
+        }
 
         // Map the bootloader info, a separate region of read-only memory, so that we can access it later.
         // This does not need to be identity mapped.
