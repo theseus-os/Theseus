@@ -305,7 +305,7 @@ pub fn swap_crates(
 
                 #[cfg(not(loscd_eval))]
                 debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
-                old_sec.copy_section_data_to(&new_dest_sec)?;
+                old_sec.copy_section_data_to(new_dest_sec)?;
             }
 
             #[cfg(loscd_eval)] {
@@ -470,8 +470,8 @@ pub fn swap_crates(
                     // and that it now depends on the new source_sec.
                     let mut found_strong_dependency = false;
                     for mut strong_dep in target_sec.inner.write().sections_i_depend_on.iter_mut() {
-                        if Arc::ptr_eq(&strong_dep.section, &old_sec) && strong_dep.relocation == relocation_entry {
-                            strong_dep.section = Arc::clone(&new_source_sec);
+                        if Arc::ptr_eq(&strong_dep.section, old_sec) && strong_dep.relocation == relocation_entry {
+                            strong_dep.section = Arc::clone(new_source_sec);
                             found_strong_dependency = true;
                             break;
                         }
@@ -652,7 +652,7 @@ pub fn swap_crates(
             //        based on which directory its object file 
             {
                 let objfile_path = Path::new(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
-                if objfile_path.components().skip(1).next() == Some(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
+                if objfile_path.components().nth(1) == Some(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
                     let new_target_ns = this_namespace.recursive_namespace().unwrap_or(this_namespace);
                     #[cfg(not(loscd_eval))]
                     warn!("temp fix: changing target_ns from {} to {}, for crate {:?}", this_namespace.name(), new_target_ns.name(), new_crate_ref);

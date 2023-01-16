@@ -133,7 +133,7 @@ impl ProcessStateMachine {
                 memory: RefCell::new(&mut imported_memory),
             };
             let not_started =
-                wasmi::ModuleInstance::new(&module, &resolve).map_err(NewErr::Interpreter)?;
+                wasmi::ModuleInstance::new(module, &resolve).map_err(NewErr::Interpreter)?;
             (not_started, imported_memory)
         };
 

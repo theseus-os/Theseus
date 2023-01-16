@@ -24,6 +24,8 @@
 //! }
 //! ```
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(thread_local)]
@@ -177,10 +179,10 @@ pub enum KillReason {
 }
 impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match &self {
-            &Self::Requested         => write!(f, "Requested"),
-            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        match self {
+            Self::Requested         => write!(f, "Requested"),
+            Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
+            Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
         }
     }
 }
@@ -261,9 +263,9 @@ impl From<Option<u8>> for OptionU8 {
         OptionU8(opt)
     }
 }
-impl Into<Option<u8>> for OptionU8 {
-    fn into(self) -> Option<u8> {
-        self.0
+impl From<OptionU8> for Option<u8> {
+    fn from(val: OptionU8) -> Self {
+        val.0
     }
 }
 impl fmt::Debug for OptionU8 {
@@ -646,10 +648,7 @@ impl Task {
     /// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        match self.runstate() {
-            RunState::Exited | RunState::Reaped => true,
-            _ => false,
-        }
+        matches!(self.runstate(), RunState::Exited | RunState::Reaped)
     }
 
     /// Returns `true` if this is an application `Task`. 

@@ -679,7 +679,7 @@ impl DebugSymbols {
             let mut sections: HashMap<usize, &DebugSection> = HashMap::new();
             sections.insert(debug_str.shndx, &debug_str);
             if let Some(ref debug_loc) = debug_loc {
-                sections.insert(debug_loc.shndx, &debug_loc);
+                sections.insert(debug_loc.shndx, debug_loc);
             }
             sections.insert(debug_abbrev.shndx, &debug_abbrev);
             sections.insert(debug_info.shndx, &debug_info);

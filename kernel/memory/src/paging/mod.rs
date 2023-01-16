@@ -28,10 +28,11 @@ use core::{
     fmt,
 };
 use log::debug;
-use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+use super::{
+    Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    KERNEL_OFFSET, InitialMemoryMappings
+    InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
+    get_p4, find_section_memory_bounds,
 };
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;

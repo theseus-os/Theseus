@@ -580,7 +580,7 @@ impl CrateNamespace {
     /// including all crates in any recursive namespaces as well if `recursive` is `true`.
     /// This is a slow method mostly for debugging, since it allocates a new vector of crate names.
     pub fn crate_names(&self, recursive: bool) -> Vec<StrRef> {
-        let mut crates: Vec<StrRef> = self.crate_tree.lock().keys().map(|n| n.clone()).collect();
+        let mut crates: Vec<StrRef> = self.crate_tree.lock().keys().cloned().collect();
 
         if recursive {
             if let Some(mut crates_recursive) = self.recursive_namespace.as_ref().map(|r_ns| r_ns.crate_names(recursive)) {
@@ -1295,7 +1295,7 @@ impl CrateNamespace {
 
             // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
             else if {
-                match sec.get_name(&elf_file) {
+                match sec.get_name(elf_file) {
                     Ok(RODATA_SECTION_NAME)           => is_rodata           = true,
                     Ok(EH_FRAME_SECTION_NAME)         => is_eh_frame         = true,
                     Ok(GCC_EXCEPT_TABLE_SECTION_NAME) => is_gcc_except_table = true,
@@ -1328,7 +1328,7 @@ impl CrateNamespace {
             // Finally, any other section type is considered unhandled, so return an error!
             else {
                 // .debug_* sections are handled separately and loaded on demand later.
-                let sec_name = sec.get_name(&elf_file);
+                let sec_name = sec.get_name(elf_file);
                 if sec_name.map_or(false, |n| n.starts_with(".debug")) {
                     continue;
                 }
@@ -1340,7 +1340,7 @@ impl CrateNamespace {
             // Skip TLS BSS (.tbss) sections, which have no data and occupy no space in memory.
             if typ != SectionType::TlsBss {
                 let dest_slice: &mut [u8] = mapped_pages.as_slice_mut(mapped_pages_offset, sec_size)?;
-                match sec.get_data(&elf_file) {
+                match sec.get_data(elf_file) {
                     Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                     Ok(SectionData::Empty) => dest_slice.fill(0),
                     _other => {
@@ -1391,7 +1391,7 @@ impl CrateNamespace {
         // The above loop just handled the merged sections, none of which should be made global.
         let mut global_sections: BTreeSet<usize> = BTreeSet::new();
 
-        let symtab = find_symbol_table(&elf_file)?;
+        let symtab = find_symbol_table(elf_file)?;
         use xmas_elf::symbol_table::Entry;
         for (_sym_num, symbol_entry) in symtab.iter().enumerate() {
             let sec_type = symbol_entry.get_type().map_err(|_e| {
@@ -1409,7 +1409,7 @@ impl CrateNamespace {
             // Get the relevant section info from the symtab entry
             let sec_size = symbol_entry.size() as usize;
             let sec_value = symbol_entry.value() as usize;
-            let sec_name = symbol_entry.get_name(&elf_file).map_err(|_e| {
+            let sec_name = symbol_entry.get_name(elf_file).map_err(|_e| {
                 error!("BUG: Error: {:?}, couldn't get symtab entry name: {}", _e, symbol_entry as &dyn Entry);
                 "BUG: couldn't get symtab entry name"
             })?;
@@ -1610,7 +1610,7 @@ impl CrateNamespace {
         let global_sections: BTreeSet<Shndx> = {
             // For us to properly load the ELF file, it must NOT have been fully stripped,
             // meaning that it must still have its symbol table section. Otherwise, relocations will not work.
-            let symtab = find_symbol_table(&elf_file)?;
+            let symtab = find_symbol_table(elf_file)?;
 
             let mut globals: BTreeSet<Shndx> = BTreeSet::new();
             use xmas_elf::symbol_table::Entry;
@@ -1722,7 +1722,7 @@ impl CrateNamespace {
 
             // Even if we're using the next section's data (for a zero-sized section, as handled below),
             // we still want to use this current section's actual name and flags!
-            let sec_name = match sec.get_name(&elf_file) {
+            let sec_name = match sec.get_name(elf_file) {
                 Ok(name) => name,
                 Err(_e) => {
                     error!("Couldn't get section name for section [{}]: {:?}\n    error: {}", shndx, sec, _e);
@@ -1830,7 +1830,7 @@ impl CrateNamespace {
                     } else {
                         // Here: copy the TLS .tdata section's contents to the proper address in the read-only pages.
                         let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
-                        match sec.get_data(&elf_file) {
+                        match sec.get_data(elf_file) {
                             Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                             _other => {
                                 error!("load_crate_sections(): Couldn't get section data for TLS .tdata section [{}] {}: {:?}", shndx, sec_name, _other);
@@ -1896,7 +1896,7 @@ impl CrateNamespace {
                     let dest_vaddr = dp.address_at_offset(data_offset)
                         .ok_or("BUG: data_offset wasn't within data_pages")?;
                     let dest_slice: &mut [u8] = dp.as_slice_mut(data_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
+                    match sec.get_data(elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                         Ok(SectionData::Empty) => dest_slice.fill(0),
                         _other => {
@@ -1937,7 +1937,7 @@ impl CrateNamespace {
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or("BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                     let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
+                    match sec.get_data(elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                         Ok(SectionData::Empty) => dest_slice.fill(0),
                         _other => {
@@ -1981,7 +1981,7 @@ impl CrateNamespace {
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or("BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                     let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
+                    match sec.get_data(elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                         Ok(SectionData::Empty) => dest_slice.fill(0),
                         _other => {
@@ -2020,7 +2020,7 @@ impl CrateNamespace {
                     let dest_vaddr = rp.address_at_offset(rodata_offset)
                         .ok_or("BUG: rodata_offset wasn't within rodata_mapped_pages")?;
                     let dest_slice: &mut [u8]  = rp.as_slice_mut(rodata_offset, sec_size)?;
-                    match sec.get_data(&elf_file) {
+                    match sec.get_data(elf_file) {
                         Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
                         Ok(SectionData::Empty) => dest_slice.fill(0),
                         _other => {
@@ -2085,7 +2085,7 @@ impl CrateNamespace {
         let mut new_crate = new_crate_ref.lock_as_mut()
             .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
-        let symtab = find_symbol_table(&elf_file)?;
+        let symtab = find_symbol_table(elf_file)?;
 
         // Fix up the sections that were just loaded, using proper relocation info.
         // Iterate over every non-zero relocation section in the file
@@ -2093,17 +2093,17 @@ impl CrateNamespace {
             use xmas_elf::sections::SectionData::Rela64;
             if verbose_log { 
                 trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
-                sec.get_name(&elf_file), sec.get_type(), sec.info()); 
+                sec.get_name(elf_file), sec.get_type(), sec.info()); 
             }
 
             // Debug sections are handled separately
-            if let Ok(name) = sec.get_name(&elf_file) {
+            if let Ok(name) = sec.get_name(elf_file) {
                 if name.starts_with(".rela.debug") { // ignore debug special sections for now
                     continue;
                 }
             }
 
-            let rela_array = match sec.get_data(&elf_file) {
+            let rela_array = match sec.get_data(elf_file) {
                 Ok(Rela64(rela_arr)) => rela_arr,
                 _ => {
                     error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
@@ -2119,7 +2119,7 @@ impl CrateNamespace {
             // Get the target section (that we already loaded) for this rela_array Rela section.
             let target_sec_shndx = sec.info() as usize;
             let target_sec = new_crate.sections.get(&target_sec_shndx).ok_or_else(|| {
-                error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(&elf_file));
+                error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(elf_file));
                 "target section was not loaded for Rela section"
             })?; 
 
@@ -2147,8 +2147,8 @@ impl CrateNamespace {
                     let source_sec_shndx = source_sec_entry.shndx() as usize; 
                     let source_sec_value = source_sec_entry.value() as usize;
                     if verbose_log { 
-                        let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                            .and_then(|s| s.get_name(&elf_file));
+                        let source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() as usize)
+                            .and_then(|s| s.get_name(elf_file));
                         trace!("             relevant section [{}]: {:?}, value: {:#X}", source_sec_shndx, source_sec_header_name, source_sec_value);
                         // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
                         //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
@@ -2169,7 +2169,7 @@ impl CrateNamespace {
                         // Thus, we must get the source section's name and check our list of foreign crates to see if it's there.
                         // At this point, there's no other way to search for the source section besides its name.
                         None => {
-                            if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
+                            if let Ok(source_sec_name) = source_sec_entry.get_name(elf_file) {
                                 const DATARELRO: &'static str = ".data.rel.ro.";
                                 let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
                                     source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
@@ -2185,8 +2185,8 @@ impl CrateNamespace {
                             }
                             else {
                                 let _source_sec_header = source_sec_entry
-                                    .get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                                    .and_then(|s| s.get_name(&elf_file));
+                                    .get_section_header(elf_file, rela_entry.get_symbol_table_index() as usize)
+                                    .and_then(|s| s.get_name(elf_file));
                                 error!("Couldn't get name of source section [{}] {:?}, needed for non-local relocation entry", source_sec_shndx, _source_sec_header);
                                 Err("Couldn't get source section's name, needed for non-local relocation entry")
                             }
@@ -2214,7 +2214,7 @@ impl CrateNamespace {
                     else {
                         // tell the source_sec that the target_sec is dependent upon it
                         let weak_dep = WeakDependent {
-                            section: Arc::downgrade(&target_sec),
+                            section: Arc::downgrade(target_sec),
                             relocation: relocation_entry,
                         };
                         source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
@@ -2351,7 +2351,7 @@ impl CrateNamespace {
         // add all the global symbols to the symbol map, in a way that lets us inspect/log each one
         let mut count = 0;
         for sec in sections.into_iter() {
-            let condition = filter_func(&sec) && sec.global;
+            let condition = filter_func(sec) && sec.global;
             if condition {
                 // trace!("add_symbols_filtered(): adding symbol {:?}", sec);
                 let added = CrateNamespace::add_symbol(&mut existing_map, sec.name.clone(), sec, log_replacements);
@@ -2359,9 +2359,6 @@ impl CrateNamespace {
                     count += 1;
                 }
             }
-            // else {
-            //     trace!("add_symbols_filtered(): skipping symbol {:?}", sec);
-            // }
         }
         
         count
@@ -2626,7 +2623,7 @@ impl CrateNamespace {
                         fuzzy_matches.len(), 
                         demangled_full_symbol, 
                         temp_backup_namespace.name, 
-                        fuzzy_matches.into_iter().map(|tup| &tup.0).collect::<Vec<_>>()
+                        fuzzy_matches.iter().map(|tup| &tup.0).collect::<Vec<_>>()
                     );
                     return None;
                 }
@@ -3034,7 +3031,7 @@ pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
     let symtab_data = elf_file.section_iter()
         .find(|sec| sec.get_type() == Ok(ShType::SymTab))
         .ok_or("no symtab section")
-        .and_then(|s| s.get_data(&elf_file));
+        .and_then(|s| s.get_data(elf_file));
 
     match symtab_data {
         Ok(SymbolTable64(symtab)) => Ok(symtab),

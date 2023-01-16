@@ -92,22 +92,6 @@ endif
 
 
 ###################################################################################################
-### For ensuring that the host computer has the proper version of the Rust compiler
-###################################################################################################
-RUSTC_VERSION := $(shell cat rust-toolchain)
-check-rustc:
-## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
-## If it still doesn't work, issue an error, since 'rustup' is probably missing.
-	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || \
-	(\
-		echo -e "\nError: 'rustup' isn't installed.";\
-		echo -e "Please install rustup and try again.\n";\
-		exit 1 \
-	)
-
-
-
-###################################################################################################
 ### This section contains targets to actually build Theseus components and create an iso file.
 ###################################################################################################
 
@@ -147,7 +131,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all full \
-		check-rustc check-usb \
+		check-usb \
 		clean clean-doc clean-old-build \
 		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
@@ -304,7 +288,7 @@ endif
 
 ## This target invokes the actual Rust build process via `cargo`.
 cargo : export override FEATURES+=--features nano_core/$(boot_spec)
-cargo: check-rustc 
+cargo:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
@@ -592,7 +576,7 @@ docs: doc
 doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
 doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
-doc: check-rustc
+doc:
 ## Build the docs for select library crates, namely those not hosted online.
 ## We do this first such that the main `cargo doc` invocation below can see and link to them.
 	@cargo doc --no-deps \

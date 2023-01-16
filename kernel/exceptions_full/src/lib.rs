@@ -1,5 +1,7 @@
 //! Exception handlers that are task-aware, and will kill a task on an exception.
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
@@ -129,7 +131,7 @@ fn kill_and_halt(
 
         if false {
             let mut debug = debug_info::DebugSymbols::Unloaded(debug_symbols_file);
-            let debug_sections = debug.load(&app_crate, &curr_task.get_namespace()).unwrap();
+            let debug_sections = debug.load(&app_crate, curr_task.get_namespace()).unwrap();
             let instr_ptr = stack_frame.instruction_pointer.as_u64() as usize - 1; // points to the next instruction (at least for a page fault)
 
             let res = debug_sections.find_subprogram_containing(VirtualAddress::new_canonical(instr_ptr));

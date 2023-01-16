@@ -88,7 +88,7 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
         if b.bus_number == bus {
             for d in &b.devices {
                 if d.slot == slot && d.func == func {
-                    return Some(&d);
+                    return Some(d);
                 }
             }
         }

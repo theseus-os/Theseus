@@ -127,12 +127,7 @@ fn parse_input_tuples(args: &str) -> Result<Vec<(&str, &str, bool)>, String> {
         match parsed {
             Some((o, n, reexport)) => {
                 println!("found triple: {:?}, {:?}, {:?}", o, n, reexport);
-                let reexport_bool = match reexport {
-                    Some("true")  => true, 
-                    Some("yes")   => true, 
-                    Some("y")     => true, 
-                    _             => false,
-                };
+                let reexport_bool = matches!(reexport, Some("true") | Some("yes") | Some("y"));
                 v.push((o, n, reexport_bool));
             }
             _ => return Err("list of crate tuples is formatted incorrectly.".to_string()),

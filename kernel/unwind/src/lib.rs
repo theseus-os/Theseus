@@ -98,9 +98,9 @@ pub struct UnwindingContext {
     /// A reference to the current task that is being unwound.
     current_task: TaskRef,
 }
-impl Into<(StackFrameIter, KillReason, TaskRef)> for UnwindingContext {
-    fn into(self) -> (StackFrameIter, KillReason, TaskRef) {
-        (self.stack_frame_iter, self.cause, self.current_task)
+impl From<UnwindingContext> for (StackFrameIter, KillReason, TaskRef) {
+    fn from(val: UnwindingContext) -> Self {
+        (val.stack_frame_iter, val.cause, val.current_task)
     }
 }
 
@@ -665,16 +665,7 @@ impl UnwindRowReference {
                 "gimli error while finding unwind info for address"
             })?;
             
-            // debug!("FDE: {:?} ", fde);
-            // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
-            // while let Some(instr) = instructions.next().map_err(|_e| {
-            //     error!("FDE instructions gimli error: {:?}", _e);
-            //     "gimli error while iterating through eh_frame FDE instructions list"
-            // })? {
-            //     debug!("    FDE instr: {:?}", instr);
-            // }
-
-            f(&fde, &unwind_table_row)
+            f(&fde, unwind_table_row)
         };
 
         // The actual logic of this function that handles the `EhFrameReference` abstraction.
@@ -742,7 +733,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    Arc::clone(&namespace),
+                    Arc::clone(namespace),
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -778,11 +769,11 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         continue_unwinding(unwinding_context_ptr)
     });
 
-    match &res {
-        &Ok(()) => {
+    match res {
+        Ok(()) => {
             debug!("unwinding procedure has reached the end of the stack.");
         }
-        &Err(e) => {
+        Err(e) => {
             error!("BUG: unwinding the first stack frame returned unexpectedly. Error: {}", e);
         }
     }
