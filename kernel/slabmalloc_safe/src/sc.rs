@@ -255,17 +255,7 @@ impl SCAllocator {
             }
         };
 
-        let res = NonNull::new(ptr).ok_or("AllocationError::OutOfMemory");
-
-        // if !ptr.is_null() {
-        //     trace!(
-        //         "SCAllocator({}) allocated ptr=0x{:x}",
-        //         self.size,
-        //         ptr as usize
-        //     );
-        // }
-
-        res
+        NonNull::new(ptr).ok_or("AllocationError::OutOfMemory")
     }
 
     /// Deallocates a previously allocated `ptr` described by `Layout`.
@@ -289,7 +279,7 @@ impl SCAllocator {
         // );
 
         // let page_addr = (ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize;
-        let page_vaddr = VirtualAddress::new((ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1) as usize)
+        let page_vaddr = VirtualAddress::new((ptr.as_ptr() as usize) & !(MappedPages8k::SIZE - 1))
             .ok_or("pointer to deallocate was an invalid virtual address")?;
 
         // Figure out which page we are on and retrieve a reference to it

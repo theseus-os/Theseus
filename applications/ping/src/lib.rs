@@ -8,7 +8,7 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate smoltcp;
 extern crate network_manager;
 extern crate byteorder;
@@ -70,7 +70,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
 
-    if matches.free.len() != 0 {
+    if !matches.free.is_empty() {
         match IpAddress::from_str(&matches.free[0]) {
             Ok(address) => {
                 let ping_address = address;

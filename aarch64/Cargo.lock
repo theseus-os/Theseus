@@ -54,6 +54,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "context_switch_regular"
+version = "0.1.0"
+dependencies = [
+ "zerocopy",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -170,6 +177,7 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "irq_safety",
  "log",
  "pl011_qemu",
 ]
@@ -240,6 +248,7 @@ dependencies = [
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
+ "context_switch_regular",
  "frame_allocator",
  "kernel_config",
  "log",
@@ -250,6 +259,7 @@ dependencies = [
  "pte_flags",
  "uefi",
  "uefi-services",
+ "zerocopy",
 ]
 
 [[package]]
@@ -300,7 +310,6 @@ dependencies = [
 name = "page_table_entry"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0",
  "frame_allocator",
  "kernel_config",
  "memory_structs",

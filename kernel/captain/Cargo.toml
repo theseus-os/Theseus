@@ -46,8 +46,8 @@ path = "../exceptions_full"
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.spawn]
 path = "../spawn"
@@ -82,8 +82,8 @@ path = "../scheduler"
 [dependencies.console]
 path = "../console"
 
-[dependencies.print]
-path = "../print"
+[dependencies.app_io]
+path = "../app_io"
 
 [dependencies.network_manager]
 path = "../network_manager"
@@ -102,6 +102,10 @@ path = "../task_fs"
 
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
+
+[features]
+# TODO: Remove when UEFI is fully implemented
+uefi = []
 
 [lib]
 crate-type = ["rlib"]

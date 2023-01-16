@@ -1,5 +1,7 @@
 //! Early exception handlers that do nothing but print an error and hang.
 
+// TODO: Add direct explanation to why each empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
@@ -54,7 +56,7 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         unsafe {
             CS::set_reg(kernel_cs);          // reload code segment register
             load_tss(tss_segment);           // load TSS
-            SS::set_reg(kernel_ds.clone());  // unsure if necessary, but doesn't hurt
+            SS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
             DS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
         }
     }

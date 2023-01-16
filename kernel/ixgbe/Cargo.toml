@@ -34,9 +34,6 @@ path = "../kernel_config"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
-
 [dependencies.pic]
 path = "../pic"
 

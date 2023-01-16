@@ -108,9 +108,9 @@ impl CompositableRegion for Coord {
         dest_coord: Coord,        
         _src_fb_row_range: Range<usize>,
     ) -> Result<(), &'static str>{
-        let relative_coord = self.clone() - dest_coord;
+        let relative_coord = *self - dest_coord;
         if let Some(pixel) = src_fb.get_pixel(relative_coord) {
-            dest_fb.draw_pixel(self.clone(), pixel);
+            dest_fb.draw_pixel(*self, pixel);
         }
         Ok(())
     }
@@ -190,7 +190,7 @@ impl CompositableRegion for Rectangle {
                 Some(index) => index,
                 None => {continue;}
             };
-            dest_fb.composite_buffer(&(src_buffer[src_start_index..src_end_index]), dest_start_index as usize);
+            dest_fb.composite_buffer(&src_buffer[src_start_index..src_end_index], dest_start_index);
         }
 
         Ok(())

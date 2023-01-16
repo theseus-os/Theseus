@@ -7,6 +7,7 @@ edition = "2021"
 
 
 [dependencies]
+cfg-if = "1.0.0"
 multiboot2 = { version = "0.14.0", optional = true }
 libm = "0.2.1"
 
@@ -57,10 +58,21 @@ path = "../memory_initialization"
 
 [dependencies.boot_info]
 path = "../boot_info"
+features = ["multiboot2"]
+
+[dependencies.uefi-bootloader-api]
+git = "https://github.com/theseus-os/uefi-bootloader"
+optional = true
+
+[build-dependencies]
+cfg-if = "1.0.0"
 
 [features]
 default = [ "bios" ]
+## Build for a system that boots via legacy BIOS (multiboot2).
 bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
+## Build for a system that boots via UEFI.
+uefi = ["boot_info/uefi", "captain/uefi", "dep:uefi-bootloader-api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

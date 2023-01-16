@@ -374,7 +374,7 @@ fn download_files<S: AsRef<str>>(
                 socket.close(); 
                 socket.abort(); 
             }
-            let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
+            let _packet_io_occurred = poll_iface(iface, &mut sockets, startup_time)?;
             
             // second, create an entirely new socket and connect it
             local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
@@ -388,7 +388,7 @@ fn download_files<S: AsRef<str>>(
 
         // send the HTTP request and obtain a response
         let response = {
-            let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
+            let mut connected_tcp_socket = ConnectedTcpSocket::new(iface, &mut sockets, tcp_handle)?;
             send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
         };
 
@@ -411,7 +411,7 @@ fn download_files<S: AsRef<str>>(
     loop {
         _loop_ctr += 1;
 
-        let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
+        let _packet_io_occurred = poll_iface(iface, &mut sockets, startup_time)?;
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
         if !issued_close {

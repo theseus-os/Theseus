@@ -6,7 +6,7 @@ extern crate alloc;
 extern crate log;
 extern crate theseus_std;
 extern crate core2;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 
 use alloc::{string::String, vec::Vec};
 use core2::io::{self, Write};

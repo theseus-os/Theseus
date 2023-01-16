@@ -398,8 +398,9 @@ pub enum QueryHcaCapMaxOpMod {
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::QueryHcaCap`] and we want to retrieve current values of capabilities.
 #[derive(Copy, Clone)]
 pub enum QueryHcaCapCurrentOpMod {
+    #[allow(clippy::identity_op)]
     GeneralDeviceCapabilities       = (0x0 << 1) | 0x1,
-    EthernetOffloadCapabilities     = (0x1 << 1) | 0x1
+    EthernetOffloadCapabilities     = (0x1 << 1) | 0x1,
 }
 
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::AccessRegister`].
@@ -736,7 +737,7 @@ impl CommandQueue {
     pub fn create_and_execute_command(&mut self, parameters: CommandBuilder, init_segment: &mut InitializationSegment) -> Result<Command<{CmdState::Completed}>, CommandQueueError> {
         Ok( self.create_command(parameters)?
                 .post(init_segment)
-                .complete(&self) )
+                .complete(self) )
     }
     
     /// Fill in the fields of a command queue entry.
@@ -1078,6 +1079,7 @@ impl CommandQueue {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_send_queue_context_to_mailbox(
         input_mailbox_buffers: &mut [MailboxBuffer],
         pages: Vec<PhysicalAddress>, 

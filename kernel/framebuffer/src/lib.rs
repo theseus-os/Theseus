@@ -16,28 +16,25 @@ pub use pixel::*;
 /// because its memory is directly mapped to the VESA display device's underlying physical memory.
 pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
     // get the graphic mode information
-    let vesa_display_phys_start: PhysicalAddress;
-    let buffer_width: usize;
-    let buffer_height: usize;
-    {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
-            graphic_info.width(),
-            graphic_info.height(),
-            graphic_info.physical_address(),
-        );
-        if graphic_info.physical_address() == 0 {
-            return Err("Failed to get graphic mode information!");
-        }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() as usize)
-            .ok_or("Graphic mode physical address was invalid")?;
-        buffer_width = graphic_info.width() as usize;
-        buffer_height = graphic_info.height() as usize;
-    };
+    let graphic_info = multicore_bringup::get_graphic_info()
+        .ok_or("Failed to get graphic mode information!")?;
+
+    let vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() as usize)
+        .ok_or("Graphic mode physical address was invalid")?;
+    let buffer_width = graphic_info.width() as usize;
+    let buffer_height = graphic_info.height() as usize;
+    info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
+        graphic_info.width(),
+        graphic_info.height(),
+        graphic_info.physical_address(),
+    );
 
     // create and return the final framebuffer
-    let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-    Ok(framebuffer)
+    Framebuffer::new(
+        buffer_width,
+        buffer_height,
+        Some(vesa_display_phys_start),
+    )
 }
 
 /// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
@@ -152,7 +149,7 @@ impl<P: Pixel> Framebuffer<P> {
     /// at that `coordinate` in this framebuffer.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
         if let Some(index) = self.index_of(coordinate) {
-            self.buffer[index] = pixel.blend(self.buffer[index]).into();
+            self.buffer[index] = pixel.blend(self.buffer[index]);
         }
     }
 

@@ -284,11 +284,11 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
 fn read_encoded_pointer<R: gimli::Reader>(reader: &mut R, encoding: DwEhPe) -> gimli::Result<u64> {
     match encoding {
         DW_EH_PE_omit     => Err(gimli::Error::CannotParseOmitPointerEncoding),
-        DW_EH_PE_absptr   => reader.read_u64().map(|v| v as u64),
-        DW_EH_PE_uleb128  => reader.read_uleb128().map(|v| v as u64),
+        DW_EH_PE_absptr   => reader.read_u64(),
+        DW_EH_PE_uleb128  => reader.read_uleb128(),
         DW_EH_PE_udata2   => reader.read_u16().map(|v| v as u64),
         DW_EH_PE_udata4   => reader.read_u32().map(|v| v as u64),
-        DW_EH_PE_udata8   => reader.read_u64().map(|v| v as u64),
+        DW_EH_PE_udata8   => reader.read_u64(),
         DW_EH_PE_sleb128  => reader.read_sleb128().map(|v| v as u64),
         DW_EH_PE_sdata2   => reader.read_i16().map(|v| v as u64),
         DW_EH_PE_sdata4   => reader.read_i32().map(|v| v as u64),

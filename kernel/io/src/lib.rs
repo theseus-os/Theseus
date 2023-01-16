@@ -124,6 +124,7 @@ impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
 /// A trait that represents an I/O stream that has a known length, e.g., a disk drive.
 ///
 /// This trait exists to enable seeking to an offset from the end of the stream.
+#[allow(clippy::len_without_is_empty)]
 pub trait KnownLength {
     /// Returns the length (size in bytes) of this I/O stream or device.
     fn len(&self) -> usize;
@@ -324,7 +325,6 @@ impl<R> From<R> for ByteReaderWrapper<R> where R: BlockReader {
 impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
-        let offset = offset as usize;
 
         let transfers = blocks_from_bytes(offset .. offset + buffer.len(), self.block_size());
         for transfer in transfers.iter().flatten() {

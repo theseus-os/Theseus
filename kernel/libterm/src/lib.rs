@@ -9,11 +9,10 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
-extern crate print;
 extern crate event_types;
 extern crate displayable;
 extern crate font;
@@ -191,10 +190,10 @@ impl Terminal {
             // Obtains a vector of the indices of the slice where newlines occur in ascending order
             let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
             // if there are no new lines in the slice
-            if new_line_indices.len() == 0 {
+            if new_line_indices.is_empty() {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
-                if end_idx <= self.scrollback_buffer.len() -1 {
+                if end_idx < self.scrollback_buffer.len() {
                     return Ok(end_idx); 
                 } else {
                     return Err(ScrollError::OffEndBound);
@@ -235,7 +234,7 @@ impl Terminal {
                 end_idx += last_line_chars;
             }
 
-            if end_idx <= self.scrollback_buffer.len() -1 {
+            if end_idx < self.scrollback_buffer.len() {
                 return Ok(end_idx); 
             } else {
                 return Err(ScrollError::OffEndBound);
@@ -387,7 +386,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.text_display.set_text(&slice);
+            self.text_display.set_text(slice);
             self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -449,7 +448,7 @@ impl Terminal {
         };
         terminal.display_text()?;
 
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
+        terminal.print_to_terminal("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n".to_string());
         Ok(terminal)
     }
 

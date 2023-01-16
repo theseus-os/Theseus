@@ -6,6 +6,7 @@
 //! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 #![no_std]
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(abi_x86_interrupt)]
 
@@ -22,7 +23,6 @@ extern crate pit_clock_basic;
 extern crate bit_field;
 extern crate interrupts;
 extern crate x86_64;
-extern crate apic;
 extern crate pic;
 extern crate acpi;
 extern crate volatile;
@@ -258,6 +258,7 @@ impl IxgbeNic {
     /// * `rx_buffer_size_kbytes`: The size of receive buffers. 
     /// * `num_rx_descriptors`: The number of descriptors in each receive queue.
     /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
+    #[allow(clippy::too_many_arguments)]
     pub fn init(
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
@@ -1040,6 +1041,7 @@ impl IxgbeNic {
     /// * `protocol`: IP L4 protocol
     /// * `priority`: priority relative to other filters, can be from 0 (lowest) to 7 (highest)
     /// * `qid`: number of the queue to forward packet to
+    #[allow(clippy::too_many_arguments)]
     pub fn set_5_tuple_filter(
         &mut self, 
         source_ip: Option<[u8;4]>, 
@@ -1303,8 +1305,8 @@ pub enum FilterProtocol {
 pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
-    nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
-    let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
+    nic.rx_queues[qid].poll_queue_and_store_received_packets()?;
+    let frame = nic.rx_queues[qid].return_frame().ok_or("no frame")?;
     Ok(frame)
 }
 
@@ -1322,10 +1324,10 @@ pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer
 /// It returns the interrupt number for the rx queue 'qid'.
 fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
     match get_ixgbe_nic(nic_id) {
-        Ok(ref ixgbe_nic_ref) => {
+        Ok(ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
-            ixgbe_nic.interrupt_num.get(&qid).map(|int| *int)
+            ixgbe_nic.interrupt_num.get(&qid).cloned()
         }
         Err(e) => {
             error!("BUG: ixgbe_handler_{}(): {}", qid, e);

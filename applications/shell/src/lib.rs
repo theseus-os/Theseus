@@ -20,8 +20,6 @@ extern crate stdio;
 extern crate core2;
 extern crate app_io;
 extern crate fs_node;
-extern crate terminal_print;
-extern crate print;
 extern crate environment;
 extern crate libterm;
 
@@ -164,6 +162,7 @@ struct Shell {
     /// The consumer to the terminal's print dfqueue
     print_consumer: DFQueueConsumer<Event>,
     /// The producer to the terminal's print dfqueue
+    #[allow(dead_code)]
     print_producer: DFQueueProducer<Event>,
     /// The terminal's current environment
     env: Arc<Mutex<Environment>>,
@@ -185,11 +184,6 @@ impl Shell {
         let key_event_queue: KeyEventQueue = KeyEventQueue::new();
         let key_event_producer = key_event_queue.get_writer();
         let key_event_consumer = key_event_queue.get_reader();
-
-        // Sets up the kernel to print to this terminal instance.
-        // Note that if this has already been previously set by an existing shell,
-        // this function call will do nothing. 
-        print::set_default_print_output(print_producer.obtain_producer());
 
         let env = Environment::default();
 
@@ -410,32 +404,30 @@ impl Shell {
 
             if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
                 // Lock the shared structure in `app_io` and then kill the running application
-                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
-                    // Kill all tasks in the job.
-                    for task_ref in task_refs {
-                        if task_ref.has_exited() { continue; }
-                        match task_ref.kill(KillReason::Requested) {
-                            Ok(_) => {
-                                if let Err(e) = runqueue::remove_task_from_all(&task_ref) {
-                                    error!("Killed task but could not remove it from runqueue: {}", e);
-                                }
+                // Kill all tasks in the job.
+                for task_ref in task_refs {
+                    if task_ref.has_exited() { continue; }
+                    match task_ref.kill(KillReason::Requested) {
+                        Ok(_) => {
+                            if let Err(e) = runqueue::remove_task_from_all(task_ref) {
+                                error!("Killed task but could not remove it from runqueue: {}", e);
                             }
-                            Err(e) => error!("Could not kill task, error: {}", e),
                         }
+                        Err(e) => error!("Could not kill task, error: {}", e),
+                    }
 
-                        // Here we must wait for the running application to quit before releasing the lock,
-                        // because the previous `kill` method will NOT stop the application immediately.
-                        // We must circumvent the situation where the application is killed while holding the
-                        // lock. We wait for the application to finish its last time slice. It will then be
-                        // removed from the run queue. We can thereafter release the lock.
-                        loop {
-                            scheduler::schedule(); // yield the CPU
-                            if !task_ref.is_running() {
-                                break;
-                            }
+                    // Here we must wait for the running application to quit before releasing the lock,
+                    // because the previous `kill` method will NOT stop the application immediately.
+                    // We must circumvent the situation where the application is killed while holding the
+                    // lock. We wait for the application to finish its last time slice. It will then be
+                    // removed from the run queue. We can thereafter release the lock.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref.is_running() {
+                            break;
                         }
                     }
-                });
+                }
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
             } else {
                 self.clear_cmdline(true)?;
@@ -458,27 +450,23 @@ impl Shell {
             };
 
             if let Some(task_refs) = self.jobs.get(&fg_job_num).map(|job| &job.tasks) {
-                // Lock the shared structure in `app_io` and then stop the running application
-                app_io::lock_and_execute(&|_flags_guard, _streams_guard| {
-                    // Stop all tasks in the job.
-                    for task_ref in task_refs {
-                        if task_ref.block().is_err() {
-                            continue;
-                        }
+                // Stop all tasks in the job.
+                for task_ref in task_refs {
+                    if task_ref.has_exited() { continue; }
+                    if task_ref.block().is_err() { continue; }
 
-                        // Here we must wait for the running application to stop before releasing the lock,
-                        // because the previous `block` method will NOT stop the application immediately.
-                        // We must circumvent the situation where the application is stopped while holding the
-                        // lock. We wait for the application to finish its last time slice. It will then be
-                        // truly blocked. We can thereafter release the lock.
-                        loop {
-                            scheduler::schedule(); // yield the CPU
-                            if !task_ref.is_running() {
-                                break;
-                            }
+                    // Here we must wait for the running application to stop before releasing the lock,
+                    // because the previous `block` method will NOT stop the application immediately.
+                    // We must circumvent the situation where the application is stopped while holding the
+                    // lock. We wait for the application to finish its last time slice. It will then be
+                    // truly blocked. We can thereafter release the lock.
+                    loop {
+                        scheduler::schedule(); // yield the CPU
+                        if !task_ref.is_running() {
+                            break;
                         }
                     }
-                });
+                }
             }
             return Ok(());
         }
@@ -519,7 +507,7 @@ impl Shell {
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
-            if cmdline.len() == 0 && self.fg_job_num.is_none() {
+            if cmdline.is_empty() && self.fg_job_num.is_none() {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
@@ -627,15 +615,8 @@ impl Shell {
                 Some(c) => {
                     // If currently we have a task running, insert it to the input buffer, otherwise
                     // to the cmdline.
-                    if let Some(fg_job_num) = self.fg_job_num {
+                    if let Some(_fg_job_num) = self.fg_job_num {
                         self.insert_char_to_input_buff(c, true)?;
-                        if let Some(job) = self.jobs.get(&fg_job_num) {
-                            if app_io::is_requesting_instant_flush(&job.task_ids[0])? {
-                                job.stdin_writer.lock().write_all(self.input_buffer.as_bytes())
-                                    .or(Err("shell failed to write to stdin"))?;
-                                self.input_buffer.clear();
-                            }
-                        }
                         return Ok(());
                     }
                     else {
@@ -741,24 +722,17 @@ impl Shell {
                 for task_id in &task_ids {
                     let stdio_queue_for_stdin_and_stdout = Stdio::new();
                     let stdio_queue_for_stderr = Stdio::new();
-                    let streams = IoStreams::new(
-                        previous_queue_reader,
-                        stdio_queue_for_stdin_and_stdout.get_writer(),
-                        stdio_queue_for_stderr.get_writer(),
-                        self.key_event_consumer.clone(),
-                        self.terminal.clone(),
-                    );
+                    let streams = IoStreams {
+                        stdin: Arc::new(previous_queue_reader),
+                        stdout: Arc::new(stdio_queue_for_stdin_and_stdout.get_writer()),
+                        stderr: Arc::new(stdio_queue_for_stderr.get_writer()),
+                        discipline: None,
+                    };
                     app_io::insert_child_streams(*task_id, streams);
 
                     previous_queue_reader = stdio_queue_for_stdin_and_stdout.get_reader();
                     stderr_queues.push(stdio_queue_for_stderr);
                     pipe_queues.push(stdio_queue_for_stdin_and_stdout);
-
-                    // Insert print event producer to `terminal_print` to support legacy output.
-                    if let Err(msg) = terminal_print::add_child(*task_id, self.print_producer.obtain_producer()) {
-                        self.terminal.lock().print_to_terminal(format!("{}\n", msg));
-                        return Err(msg);
-                    }
                 }
 
                 let job_stdout_reader = previous_queue_reader;
@@ -808,7 +782,7 @@ impl Shell {
                             format!("{:?} command not found.\n", command)
                         }
                     },
-                    AppErr::NamespaceErr      => format!("Failed to find directory of application executables.\n"),
+                    AppErr::NamespaceErr      => "Failed to find directory of application executables.\n".to_string(),
                     AppErr::SpawnErr(e)       => format!("Failed to spawn new task to run command. Error: {}.\n", e),
                 };
                 self.terminal.lock().print_to_terminal(err_msg);
@@ -841,7 +815,7 @@ impl Shell {
             t.get_namespace().dir().clone()
         ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
 
-        let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
+        let mut names = namespace_dir.get_file_and_dir_names_starting_with(incomplete_cmd);
 
         // Drop the extension name and hash value.
         let mut clean_name = String::new();
@@ -874,13 +848,10 @@ impl Shell {
         };
 
         // Check if the last character is a slash.
-        let slash_ending = match incomplete_cmd.chars().last() {
-            Some('/') => true,
-            _ => false
-        };
+        let slash_ending = matches!(incomplete_cmd.chars().last(), Some('/'));
 
         // Split the path by slash and filter out consecutive slashes.
-        let mut nodes: Vec<_> = incomplete_cmd.split('/').filter(|node| { node.len() > 0 }).collect();
+        let mut nodes: Vec<_> = incomplete_cmd.split('/').filter(|node| { !node.is_empty() }).collect();
 
         // Get the last node in the path, which is to be completed.
         let incomplete_node = {
@@ -912,10 +883,10 @@ impl Shell {
         let mut child_list = locked_working_dir.list(); 
         child_list.reverse();
         for child in child_list.iter() {
-            if child.starts_with(&incomplete_node) {
-                if let Some(_) = locked_working_dir.get_file(&child) {
+            if child.starts_with(incomplete_node) {
+                if let Some(_) = locked_working_dir.get_file(child) {
                     match_list.push(child.clone());
-                } else if let Some (_) = locked_working_dir.get_dir(&child) {
+                } else if let Some (_) = locked_working_dir.get_dir(child) {
                     let mut cloned = child.clone();
                     cloned.push('/');
                     match_list.push(cloned);
@@ -1081,7 +1052,6 @@ impl Shell {
                                 format!("task [{}] was killed because {:?}\n", exited_task_id, kill_reason)
                             );
                         }
-
                         Err(_e) => {
                             let err_msg = format!("Failed to `join` task [{}] {:?}, error: {:?}",
                                 exited_task_id, task_ref, _e,
@@ -1090,9 +1060,6 @@ impl Shell {
                             self.terminal.lock().print_to_terminal(err_msg);
                         }
                     }
-
-                    // Remove the queue for legacy terminal print
-                    terminal_print::remove_child(exited_task_id)?;
 
                     need_refresh = true;
 
@@ -1191,7 +1158,7 @@ impl Shell {
             if let Some(job) = self.jobs.remove(&finished_job_num) {
                 for task_id in job.task_ids {
                     self.task_to_job.remove(&task_id);
-                    app_io::remove_child_streams(&task_id);
+                    app_io::remove_child_streams(task_id);
                 }
             }
         }
@@ -1215,7 +1182,7 @@ impl Shell {
         // Support for legacy output by `terminal_print`.
         if let Some(print_event) = self.print_consumer.peek() {
             match print_event.deref() {
-                &Event::OutputEvent(ref s) => {
+                Event::OutputEvent(ref s) => {
                     self.terminal.lock().print_to_terminal(s.clone());
                 },
                 _ => { },
@@ -1428,7 +1395,7 @@ impl Shell {
             self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
             return Ok(());
         }
-        if let Some('%') = args[0].chars().nth(0) {
+        if let Some('%') = args[0].chars().next() {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
@@ -1461,7 +1428,7 @@ impl Shell {
             self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
             return Ok(());
         }
-        if let Some('%') = args[0].chars().nth(0) {
+        if let Some('%') = args[0].chars().next() {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {

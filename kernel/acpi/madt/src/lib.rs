@@ -9,7 +9,7 @@ use core::mem::size_of;
 use alloc::{boxed::Box, format};
 use log::{error, warn, trace};
 use memory::{MappedPages, PageTable, PhysicalAddress}; 
-use apic::{LocalApic, get_bsp_id, LapicInitError, get_my_apic_id};
+use apic::{LocalApic, bootstrap_cpu, LapicInitError, current_cpu};
 use sdt::Sdt;
 use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
@@ -71,10 +71,10 @@ pub struct Madt<'t> {
 impl<'t> Madt<'t> {
     /// Finds the MADT in the given `AcpiTables` and returns a reference to it.
     pub fn get(acpi_tables: &'t AcpiTables) -> Option<Madt<'t>> {
-        let table: &MadtAcpiTable = acpi_tables.table(&MADT_SIGNATURE).ok()?;
+        let table: &MadtAcpiTable = acpi_tables.table(MADT_SIGNATURE).ok()?;
         let total_length = table.header.length as usize;
         let dynamic_part_length = total_length - size_of::<MadtAcpiTable>();
-        let loc = acpi_tables.table_location(&MADT_SIGNATURE)?;
+        let loc = acpi_tables.table_location(MADT_SIGNATURE)?;
         Some(Madt {
             table: table,
             mapped_pages: acpi_tables.mapping(),
@@ -328,7 +328,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 Ok(()) => { } // fall through
             };
 
-            assert!(get_my_apic_id() == lapic_entry.apic_id);
+            assert!(current_cpu() == lapic_entry.apic_id);
             let bsp_id = lapic_entry.apic_id;
 
             // redirect every IoApic's interrupts to the one BSP
@@ -350,7 +350,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
         }
     }
 
-    let bsp_id = get_bsp_id().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
+    let bsp_id = bootstrap_cpu().ok_or("handle_bsp_lapic_entry(): Couldn't find BSP LocalApic in Madt!")?;
 
     // now that we've established the BSP, go through the interrupt source override entries
     for madt_entry in madt_iter {

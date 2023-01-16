@@ -67,10 +67,10 @@ type Xsdt<'t> = (&'t Sdt, &'t [u8]);
 impl<'t> RsdtXsdt<'t> {
     /// Finds the RSDT or XSDT in the given `AcpiTables` and returns a reference to it.
     pub fn get(acpi_tables: &'t AcpiTables) -> Option<RsdtXsdt<'t>> {
-        if let (Ok(sdt), Ok(addrs)) = (acpi_tables.table::<Sdt>(&RSDT_SIGNATURE), acpi_tables.table_slice::<u8>(&RSDT_SIGNATURE)) {
+        if let (Ok(sdt), Ok(addrs)) = (acpi_tables.table::<Sdt>(RSDT_SIGNATURE), acpi_tables.table_slice::<u8>(RSDT_SIGNATURE)) {
             Some(RsdtXsdt(RsdtOrXsdt::Regular((sdt, addrs))))
         }
-        else if let (Ok(sdt), Ok(addrs)) = (acpi_tables.table::<Sdt>(&XSDT_SIGNATURE), acpi_tables.table_slice::<u8>(&XSDT_SIGNATURE)) {
+        else if let (Ok(sdt), Ok(addrs)) = (acpi_tables.table::<Sdt>(XSDT_SIGNATURE), acpi_tables.table_slice::<u8>(XSDT_SIGNATURE)) {
             Some(RsdtXsdt(RsdtOrXsdt::Extended((sdt, addrs))))
         } 
         else {
@@ -88,7 +88,7 @@ impl<'t> RsdtXsdt<'t> {
 
     /// Returns an [`Iterator`] over the `PhysicalAddress`es of the SDT entries
     /// included in this RSDT or XSDT.
-    pub fn addresses<'r>(&'r self) -> impl Iterator<Item = PhysicalAddress> + 'r {
+    pub fn addresses(&self) -> impl Iterator<Item = PhysicalAddress> + '_ {
         let mut rsdt_iter = None;
         let mut xsdt_iter = None;
         match &self.0 {

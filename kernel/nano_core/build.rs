@@ -7,7 +7,22 @@ const EMIT_BUILT_RS_FILE: bool = false;
 /// when it transforms them into environment variables.
 const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
 
-const BOOT_SPECIFICATION: &str = "bios";
+// We put the feature checks here because the build script will give unhelpful
+// errors if it's built with the wrong combination of features.
+//
+// We prefer BIOS over UEFI to avoid mutually exclusive features as they mess up
+// building with --all-features.
+// https://doc.rust-lang.org/cargo/reference/features.html#mutually-exclusive-features
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "bios")] {
+        const BOOT_SPECIFICATION: &str = "bios";
+    } else if #[cfg(feature = "uefi")] {
+        const BOOT_SPECIFICATION: &str = "uefi";
+    } else {
+        compile_error!("either the bios or uefi features must be enabled");
+    }
+}
 
 /// The set of built-in environment variables defined by cargo.
 static NON_CUSTOM_CFGS: [&str; 12] = [
@@ -107,17 +122,28 @@ fn compile_asm() {
     //       This is currently favored because it is fast and avoids the need for a `make clean`.
     println!("cargo:rerun-if-changed={}", out_dir.display());
 
-    let asm_path = include_path.join(BOOT_SPECIFICATION);
+    let mut cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
+    if BOOT_SPECIFICATION == "bios" {
+        cflags.push_str(" -DBIOS");
+    }
 
-    let cflags = env::var("THESEUS_CFLAGS").unwrap_or_default();
+    let include_files = match include_path.read_dir() {
+        Ok(include_files) => include_files,
+        Err(_) => panic!("failed to open include dir: {}", include_path.display()),
+    };
+    let files = if BOOT_SPECIFICATION == "bios" {
+        let asm_path = include_path.join(BOOT_SPECIFICATION);
+        include_files
+            .chain(match asm_path.read_dir() {
+                Ok(asm_files) => asm_files,
+                Err(_) => panic!("failed to open asm dir: {}", asm_path.display()),
+            })
+            .collect::<Vec<_>>()
+    } else {
+        include_files.collect::<Vec<_>>()
+    };
 
-    for file in include_path
-        .read_dir()
-        .unwrap_or_else(|_| panic!("failed to open dir: {}", include_path.display()))
-        .chain(
-            asm_path.read_dir().unwrap_or_else(|_| panic!("failed to open asm dir: {}", asm_path.display()))
-        )
-    {
+    for file in files {
         let file = file.expect("failed to read asm file");
         if file
             .file_type()
@@ -141,7 +167,8 @@ fn compile_asm() {
                 .args(cflags.split(' '))
                 .status()
                 .expect("failed to acquire nasm output status")
-                .success());
+                .success()
+            );
         }
     }
 }

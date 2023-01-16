@@ -91,7 +91,7 @@ fn args_or_env_get(
 
         // Write content of current arg to argv_data buffer.
         memory
-            .set(argv_data.checked_add(argv_data_pos).unwrap(), &arg)
+            .set(argv_data.checked_add(argv_data_pos).unwrap(), arg)
             .unwrap();
         argv_data_pos = argv_data_pos
             .checked_add(u32::try_from(arg.len()).unwrap())
@@ -123,15 +123,15 @@ pub fn execute_system_call(
     wasmi_args: RuntimeArgs,
 ) -> Result<Option<RuntimeValue>, Trap> {
     // Handles to wasmi memory and Theseus I/O.
-    let ref mut memory = match h_ext.memory {
+    let memory = &mut match h_ext.memory {
         Some(ref mut mem) => mem,
         None => {
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOMEM))));
         }
     };
-    let ref mut fd_table = h_ext.fd_table;
-    let ref theseus_env_vars = h_ext.theseus_env_vars;
-    let ref theseus_args = h_ext.theseus_args;
+    let fd_table = &mut h_ext.fd_table;
+    let theseus_env_vars = &h_ext.theseus_env_vars;
+    let theseus_args = &h_ext.theseus_args;
 
     match system_call {
         // Terminate process with given exit code.
@@ -307,7 +307,7 @@ pub fn execute_system_call(
                 let ptr: u32 = ptr_and_len[0];
                 let len: wasi::Size = wasi::Size::try_from(ptr_and_len[1]).unwrap();
 
-                let ref mut read_buf = vec![0; len];
+                let read_buf = &mut vec![0; len];
 
                 // retrieve data to read.
                 let bytes_read: wasi::Size = match posix_node_or_stdio.read(read_buf) {
@@ -546,7 +546,7 @@ pub fn execute_system_call(
                 FileOrDir::File { .. } => {
                     return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                FileOrDir::Dir(dir_ref) => dir_ref.clone(),
+                FileOrDir::Dir(dir_ref) => dir_ref,
             };
 
             let lookup_flags: wasi::Lookupflags = wasmi_args.nth_checked(1).unwrap();

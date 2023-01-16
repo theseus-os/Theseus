@@ -1,0 +1,14 @@
+[package]
+name = "uefi_builder_common"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+descriptions = "Architecture-agnostic functionality for creating UEFI-compatible boot images"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+fatfs = "0.3"
+gpt = "3.0"
+ovmf-prebuilt = "0.1.0-alpha.1"
+tempfile = "3.3"

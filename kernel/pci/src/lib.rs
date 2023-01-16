@@ -88,7 +88,7 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
         if b.bus_number == bus {
             for d in &b.devices {
                 if d.slot == slot && d.func == func {
-                    return Some(&d);
+                    return Some(d);
                 }
             }
         }
@@ -297,7 +297,7 @@ impl PciLocation {
             // iterate through the linked list of capabilities until the requested capability is found or the list reaches its end
             while cap_addr != final_capability {
                 // the capability header is a 16 bit value which contains the current capability ID and the pointer to the next capability
-                let cap_header = self.pci_read_16(cap_addr as u16);
+                let cap_header = self.pci_read_16(cap_addr);
 
                 // the id is the lower byte of the header
                 let cap_id = cap_header & 0xFF;
