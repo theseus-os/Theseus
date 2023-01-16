@@ -85,7 +85,13 @@ use alloc::{
     vec::Vec,
 };
 use bit_field::BitField;
-use core::sync::atomic::{Ordering, AtomicU64, AtomicU8,
+use core::{
+    convert::TryFrom,
+    sync::atomic::{
+        Ordering, 
+        AtomicU64, 
+        AtomicU8
+    },
 };
 
 
@@ -700,7 +706,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We'll check anyways, just in case `event_per_sample`'s type is changed.
     
-    if (u32::MIN..=u32::MAX).contains(&event_per_sample) {
+    if u32::try_from(event_per_sample).is_err() {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
 

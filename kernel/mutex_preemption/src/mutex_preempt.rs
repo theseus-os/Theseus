@@ -144,7 +144,7 @@ impl<'a, T: ?Sized> Deref for MutexPreemptGuard<'a, T> {
 
 impl<'a, T: ?Sized> DerefMut for MutexPreemptGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut T { 
-        &mut (self.guard)
+        &mut self.guard
     }
 }
 
