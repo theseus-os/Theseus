@@ -286,7 +286,7 @@ impl RunQueue {
                 None => continue,
             }
         }
-        return None;
+        None
     }
 
 }

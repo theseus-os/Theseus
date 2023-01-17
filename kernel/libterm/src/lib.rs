@@ -161,10 +161,10 @@ impl Terminal {
             }
 
             // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
-            return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
+            (start_idx, (total_lines - 1) * buffer_width + last_line_chars)
 
         } else {
-            return (0,0); /* WARNING: should change to Option<> rather than returning (0, 0) */
+            (0,0) /* WARNING: should change to Option<> rather than returning (0, 0) */
         }   
     }
 
@@ -233,12 +233,12 @@ impl Terminal {
             }
 
             if end_idx < self.scrollback_buffer.len() {
-                return Ok(end_idx); 
+                Ok(end_idx)
             } else {
-                return Err(ScrollError::OffEndBound);
+                Err(ScrollError::OffEndBound)
             }
         } else {
-            return Ok(self.scrollback_buffer.len() - 1) /* WARNING: maybe should return Error? */
+            Ok(self.scrollback_buffer.len() - 1) /* WARNING: maybe should return Error? */
         }
     }
 

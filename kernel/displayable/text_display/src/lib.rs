@@ -71,7 +71,7 @@ impl Displayable for TextDisplay {
         self.next_line = next_line;
         self.cache = self.text.clone();
 
-        return Ok(bounding_box + coordinate);
+        Ok(bounding_box + coordinate)
     }
 
     fn set_size(&mut self, width: usize, height: usize) {

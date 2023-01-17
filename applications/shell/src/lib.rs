@@ -657,7 +657,7 @@ impl Shell {
         taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
-        return Ok(taskref);
+        Ok(taskref)
     }
 
     /// Evaluate the command line. It creates a sequence of jobs, which forms a chain of applications that

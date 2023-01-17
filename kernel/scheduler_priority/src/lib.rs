@@ -220,5 +220,5 @@ fn assign_tokens(apic_id: u8) -> bool  {
         // break; 
     }
 
-    return true;
+    true
 }
