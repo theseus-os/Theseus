@@ -927,8 +927,8 @@ where
         let restartable_info = current_task.with_restart_info(|restart_info_opt| {
             restart_info_opt.map(|restart_info| {
                 #[cfg(use_crate_replacement)] {
-                    let func_ptr = &(restart_info.func) as *const _ as usize;
-                    let arg_ptr = &(restart_info.argument) as *const _ as usize;
+                    let func_ptr = &restart_info.func as *const _ as usize;
+                    let arg_ptr = &restart_info.argument as *const _ as usize;
 
                     #[cfg(not(downtime_eval))] {
                         debug!("func_ptr {:#X}", func_ptr);

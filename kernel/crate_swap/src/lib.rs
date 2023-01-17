@@ -304,7 +304,7 @@ pub fn swap_crates(
                 }?;
 
                 #[cfg(not(loscd_eval))]
-                debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", &*old_sec, new_dest_sec);
+                debug!("swap_crates(): copying .data or .bss section from old {:?} to new {:?}", old_sec, new_dest_sec);
                 old_sec.copy_section_data_to(new_dest_sec)?;
             }
 
@@ -364,7 +364,7 @@ pub fn swap_crates(
                         "couldn't find section in the new crate that corresponds to a match of the old section"
                     })?;
                     #[cfg(not(loscd_eval))]
-                    debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", &*old_sec, &*new_crate_source_sec);
+                    debug!("swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}", old_sec, &*new_crate_source_sec);
 
                     if reexport_new_symbols_as_old && old_sec.global {
                         // reexport the new source section under the old sec's name, i.e., redirect the old mapping to the new source sec
@@ -417,7 +417,7 @@ pub fn swap_crates(
                     }
 
                     #[cfg(not(loscd_eval))]
-                    debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", &*target_sec, &*old_sec, &*new_source_sec);
+                    debug!("    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}", target_sec, old_sec, new_source_sec);
 
                     // If the target_sec's mapped pages aren't writable (which is common in the case of swapping),
                     // then we need to temporarily remap them as writable here so we can fix up the target_sec's new relocation entry.
@@ -718,7 +718,7 @@ pub fn swap_crates(
             if let Some(ocn) = old_crate_name {
                 #[cfg(not(any(loscd_eval, downtime_eval)))]
                 trace!("swap_crates(): new_crate_object_file did not replace old_crate's object file, so we're removing the old_crate's object file now");
-                let (old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, &*ocn).ok_or_else(|| {
+                let (old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, ocn).ok_or_else(|| {
                     error!("BUG: swap_crates(): couldn't find old crate's object file starting with {:?} in old namespace {:?}.", ocn, old_namespace.name());
                     "BUG: swap_crates(): couldn't find old crate's object file in old namespace!"
                 })?;

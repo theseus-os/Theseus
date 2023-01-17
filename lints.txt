@@ -1,4 +1,4 @@
-# Complexity
+complexity
 bind-instead-of-map
 bool-comparison
 borrowed-box
@@ -77,9 +77,9 @@ transmute-int-to-float
 transmute-num-to-bytes
 transmute-ptr-to-ref
 transmutes-expressible-as-ptr-casts
-# type-complexity
+type-complexity
 unit-arg
-# unnecessary-cast
+unnecessary-cast
 unnecessary-filter-map
 unnecessary-find-map
 unnecessary-operation
@@ -87,8 +87,8 @@ unnecessary-sort-by
 unnecessary-unwrap
 unneeded-wildcard-pattern
 useless-asref
-# useless-conversion
-# useless-format
+useless-conversion
+useless-format
 vec-box
 while-let-loop
 wildcard-in-or-patterns
@@ -297,7 +297,7 @@ cmp-owned
 expect-fun-call
 extend-with-drain
 format-in-format-args
-# format-push-string
+format-push-string
 iter-nth
 iter-overeager-cloned
 large-const-arrays
@@ -316,7 +316,7 @@ to-string-in-format-args
 unnecessary-to-owned
 useless-vec
 vec-init-then-push
-# Suspicious
+suspicious
 await-holding-invalid-type
 await-holding-lock
 await-holding-refcell-ref

@@ -4,6 +4,8 @@
 //! <https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/scheduler/vm.rs>
 //!
 
+#![allow(clippy::type_complexity)]
+
 use alloc::string::String;
 use core::{cell::RefCell, convert::TryFrom as _};
 

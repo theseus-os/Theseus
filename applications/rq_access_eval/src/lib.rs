@@ -53,7 +53,7 @@ pub fn main(args: Vec<String>) -> isize {
         let cpu_count = cpu::cpu_count();
         run(
             |count| {
-                runqueue::get_runqueue((count % cpu_count as u32) as u8);
+                runqueue::get_runqueue((count % cpu_count) as u8);
             },
             num,
         )

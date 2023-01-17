@@ -2997,7 +2997,7 @@ fn dump_dependent_crates(krate: &LoadedCrate, prefix: String) {
 		let strong_crate_ref = weak_crate_ref.upgrade().unwrap();
         let strong_crate = strong_crate_ref.lock_as_ref();
 		debug!("{}{}", prefix, strong_crate.crate_name);
-		dump_dependent_crates(&*strong_crate, format!("{}  ", prefix));
+		dump_dependent_crates(&strong_crate, format!("{}  ", prefix));
 	}
 }
 
@@ -3010,7 +3010,7 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 		for weak_dep in &sec_inner.sections_dependent_on_me {
 			if let Some(wds) = weak_dep.section.upgrade() {
 				let prefix = format!("{}  ", prefix); // add two spaces of indentation to the prefix
-				dump_weak_dependents(&*wds, prefix);
+				dump_weak_dependents(&wds, prefix);
 			}
 			else {
 				debug!("{}ERROR: weak dependent failed to upgrade()", prefix);

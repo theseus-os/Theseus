@@ -112,7 +112,7 @@ impl WindowManager {
         // if it is currently actived, just return
         let first_active = match self.active.upgrade() {
             Some(current_active) => {
-                if Arc::ptr_eq(&(current_active), inner_ref) {
+                if Arc::ptr_eq(&current_active, inner_ref) {
                     return Ok(true); // do nothing
                 } else {
                     // save this to show_list
@@ -157,7 +157,7 @@ impl WindowManager {
     fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         for (i, item) in self.show_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
@@ -169,7 +169,7 @@ impl WindowManager {
     fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         for (i, item) in self.hide_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }

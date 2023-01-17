@@ -100,7 +100,7 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain(matches: Matches) -> Result<(), String> {
     let mut remote_endpoint = if let Some(ip_str) = matches.opt_str("d") {
         IpEndpoint::from_str(&ip_str)
-            .map_err(|_e| format!("couldn't parse destination IP address/port"))?
+            .map_err(|_e| "couldn't parse destination IP address/port".to_string())?
     } else {
         ota_update_client::default_remote_endpoint()
     };
@@ -140,7 +140,7 @@ fn list(remote_endpoint: IpEndpoint, update_build: Option<&String>) -> Result<()
     let iface = get_default_iface()?;
 
     if let Some(ub) = update_build {
-        let listing = ota_update_client::download_listing(&iface, remote_endpoint, &*ub)
+        let listing = ota_update_client::download_listing(&iface, remote_endpoint, ub)
             .map_err(|e| e.to_string())?;
         println!("{}", listing.join("\n"));
     } else {
@@ -217,10 +217,10 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 /// that must be in the given base directory.
 fn apply(base_dir_path: &Path) -> Result<(), String> {
     if cfg!(not(loadable)) {
-        return Err(format!("Evolutionary updates can only be applied when Theseus is built in loadable mode."));
+        return Err("Evolutionary updates can only be applied when Theseus is built in loadable mode.".to_string());
     }
 
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel MMI".to_string())?;
     let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         return Err("failed to get current task's working directory".to_string());
     };
@@ -310,7 +310,7 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
         .iter()
         .next()
         .cloned()
-        .ok_or_else(|| format!("no network interfaces available"))
+        .ok_or_else(|| "no network interfaces available".to_string())
 }
 
 
