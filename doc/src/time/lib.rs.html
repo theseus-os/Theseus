@@ -295,11 +295,33 @@
 <a href="#295" id="295">295</a>
 <a href="#296" id="296">296</a>
 <a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains abstractions to interact with hardware clocks.
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
+</span><span class="kw">use </span>core::ops;
+<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 
 <span class="kw">mod </span>dummy;
 
@@ -326,7 +348,9 @@
 }
 
 <span class="kw">impl </span>Instant {
-    <span class="kw">const </span>ZERO: <span class="self">Self </span>= <span class="self">Self </span>{ counter: <span class="number">0 </span>};
+    <span class="kw">pub const </span>ZERO: <span class="self">Self </span>= <span class="self">Self </span>{ counter: <span class="number">0 </span>};
+
+    <span class="kw">pub const </span>MAX: <span class="self">Self </span>= <span class="self">Self </span>{ counter: u64::MAX };
 
     <span class="kw">pub fn </span>new(counter: u64) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ counter }
@@ -347,7 +371,13 @@
     }
 }
 
-<span class="kw">impl </span>core::ops::Add&lt;Duration&gt; <span class="kw">for </span>Instant {
+<span class="kw">impl </span>Default <span class="kw">for </span>Instant {
+    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::ZERO
+    }
+}
+
+<span class="kw">impl </span>ops::Add&lt;Duration&gt; <span class="kw">for </span>Instant {
     <span class="kw">type </span>Output = <span class="self">Self</span>;
 
     <span class="kw">fn </span>add(<span class="self">self</span>, rhs: Duration) -&gt; <span class="self">Self</span>::Output {
@@ -362,7 +392,13 @@
     }
 }
 
-<span class="kw">impl </span>core::ops::Sub&lt;Duration&gt; <span class="kw">for </span>Instant {
+<span class="kw">impl </span>ops::AddAssign&lt;Duration&gt; <span class="kw">for </span>Instant {
+    <span class="kw">fn </span>add_assign(<span class="kw-2">&amp;mut </span><span class="self">self</span>, rhs: Duration) {
+        <span class="kw-2">*</span><span class="self">self </span>= <span class="kw-2">*</span><span class="self">self </span>+ rhs;
+    }
+}
+
+<span class="kw">impl </span>ops::Sub&lt;Duration&gt; <span class="kw">for </span>Instant {
     <span class="kw">type </span>Output = <span class="self">Self</span>;
 
     <span class="kw">fn </span>sub(<span class="self">self</span>, rhs: Duration) -&gt; <span class="self">Self</span>::Output {
@@ -377,11 +413,17 @@
     }
 }
 
-<span class="kw">impl </span>core::ops::Sub&lt;Instant&gt; <span class="kw">for </span>Instant {
+<span class="kw">impl </span>ops::Sub&lt;Instant&gt; <span class="kw">for </span>Instant {
     <span class="kw">type </span>Output = Duration;
 
     <span class="kw">fn </span>sub(<span class="self">self</span>, rhs: Instant) -&gt; <span class="self">Self</span>::Output {
         <span class="self">self</span>.duration_since(rhs)
+    }
+}
+
+<span class="kw">impl </span>ops::SubAssign&lt;Duration&gt; <span class="kw">for </span>Instant {
+    <span class="kw">fn </span>sub_assign(<span class="kw-2">&amp;mut </span><span class="self">self</span>, rhs: Duration) {
+        <span class="kw-2">*</span><span class="self">self </span>= <span class="kw-2">*</span><span class="self">self </span>- rhs;
     }
 }
 

@@ -390,7 +390,6 @@
 <a href="#390" id="390">390</a>
 <a href="#391" id="391">391</a>
 <a href="#392" id="392">392</a>
-<a href="#393" id="393">393</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Basic interrupt handling structures and simple handler routines.
 
 </span><span class="attr">#![no_std]
@@ -696,8 +695,7 @@
 
     // Callback to the sleep API to unblock tasks whose waiting time is over
     // and alert to update the number of ticks elapsed
-    </span>sleep::increment_tick_count();
-    sleep::unblock_sleeping_tasks();
+    </span>sleep::unblock_sleeping_tasks();
     
     <span class="comment">// we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn&#39;t return
     </span>eoi(<span class="prelude-val">None</span>); <span class="comment">// None, because 0x22 IRQ cannot possibly be a PIC interrupt

@@ -41,6 +41,8 @@
 <a href="#41" id="41">41</a>
 <a href="#42" id="42">42</a>
 <a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Utilities for tracking time.
 
 </span><span class="kw">use </span>core::{
@@ -48,6 +50,8 @@
     pin::Pin,
     task::{Context, Poll},
 };
+
+<span class="kw">pub use </span>time::Duration;
 
 <span class="doccomment">/// Waits until the specified number of ticks has elapsed.
 ///
@@ -61,16 +65,16 @@
 /// # }
 /// ```
 /// Would take 1000 ticks to complete.
-</span><span class="kw">pub fn </span>sleep(ticks: usize) -&gt; Sleep {
-    <span class="kw">let </span>current_ticks = sleep::get_current_time_in_ticks();
-    <span class="kw">let </span>until = current_ticks + ticks;
+</span><span class="kw">pub fn </span>sleep(duration: Duration) -&gt; Sleep {
+    <span class="kw">let </span>current_time = time::now::&lt;time::Monotonic&gt;();
+    <span class="kw">let </span>until = current_time + duration;
     Sleep { until }
 }
 
 <span class="doccomment">/// Future returned by [`sleep`].
 </span><span class="attr">#[must_use = <span class="string">&quot;futures do nothing unless you `.await` or poll them&quot;</span>]
 </span><span class="kw">pub struct </span>Sleep {
-    until: usize,
+    until: time::Instant,
 }
 
 <span class="kw">impl </span>Future <span class="kw">for </span>Sleep {

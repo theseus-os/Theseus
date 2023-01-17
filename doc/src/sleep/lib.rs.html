@@ -179,23 +179,6 @@
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
 <a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
-<a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
-<a href="#190" id="190">190</a>
-<a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
-<a href="#193" id="193">193</a>
-<a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides APIs for tasks to sleep for specified time durations.
 //!
 //! Key functions:
@@ -212,16 +195,22 @@
 <span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>lazy_static;
 <span class="kw">extern crate </span>scheduler;
+<span class="kw">extern crate </span>time;
+<span class="kw">extern crate </span>crossbeam_utils;
 
-<span class="kw">use </span>core::{sync::atomic::{Ordering, AtomicUsize}, task::Waker};
+<span class="kw">use </span>core::task::Waker;
 <span class="kw">use </span>alloc::collections::binary_heap::BinaryHeap;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>task::{get_my_current_task, TaskRef, RunState};
+<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
+<span class="kw">use </span>time::{now, Instant, Monotonic};
+
+<span class="kw">pub use </span>time::Duration;
 
 <span class="doccomment">/// Contains the `TaskRef` and the associated wakeup time for an entry in DELAYED_TASKLIST.
 </span><span class="attr">#[derive(Clone)]
 </span><span class="kw">struct </span>SleepingTaskNode {
-    resume_time: usize,
+    resume_time: Instant,
     action: Action,
 }
 
@@ -275,22 +264,7 @@
 }
 
 <span class="doccomment">/// Keeps track of the next task that needs to unblock, by default, it is the maximum time
-</span><span class="kw">static </span>NEXT_DELAYED_TASK_UNBLOCK_TIME : AtomicUsize = AtomicUsize::new(usize::MAX);
-
-<span class="doccomment">/// This variable will track the number of ticks elapsed on the system to keep track of time
-</span><span class="kw">static </span>TICK_COUNT: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
-
-<span class="doccomment">/// Returns the current time in ticks
-</span><span class="kw">pub fn </span>get_current_time_in_ticks() -&gt; usize {
-    TICK_COUNT.load(Ordering::SeqCst)
-}
-
-<span class="doccomment">/// Update the current tick count
-/// Used as a callback in the systick handler
-</span><span class="kw">pub fn </span>increment_tick_count() {
-    TICK_COUNT.fetch_add(<span class="number">1</span>, Ordering::SeqCst);
-}
-
+</span><span class="kw">static </span>NEXT_DELAYED_TASK_UNBLOCK_TIME: AtomicCell&lt;Instant&gt; = AtomicCell::new(Instant::MAX);
 
 <span class="doccomment">/// Helper function adds the id associated with a TaskRef to the list of delayed task.
 /// If the resume time is less than the current earliest resume time, then update it.
@@ -298,9 +272,9 @@
     <span class="kw">let </span>SleepingTaskNode { resume_time, .. } = new_node;
     DELAYED_TASKLIST.lock().push(new_node);
     
-    <span class="kw">let </span>next_unblock_time = NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst);
+    <span class="kw">let </span>next_unblock_time = NEXT_DELAYED_TASK_UNBLOCK_TIME.load();
     <span class="kw">if </span>resume_time &lt; next_unblock_time {
-        NEXT_DELAYED_TASK_UNBLOCK_TIME.store(resume_time, Ordering::SeqCst);
+        NEXT_DELAYED_TASK_UNBLOCK_TIME.store(resume_time);
     }
 }
 
@@ -312,8 +286,8 @@
 
         <span class="kw">match </span>delayed_tasklist.peek() {
             <span class="prelude-val">Some</span>(SleepingTaskNode { resume_time, .. }) =&gt; 
-                NEXT_DELAYED_TASK_UNBLOCK_TIME.store(<span class="kw-2">*</span>resume_time, Ordering::SeqCst),
-            <span class="prelude-val">None </span>=&gt; NEXT_DELAYED_TASK_UNBLOCK_TIME.store(usize::MAX, Ordering::SeqCst),
+                NEXT_DELAYED_TASK_UNBLOCK_TIME.store(<span class="kw-2">*</span>resume_time),
+            <span class="prelude-val">None </span>=&gt; NEXT_DELAYED_TASK_UNBLOCK_TIME.store(Instant::MAX),
         }
     }
 }
@@ -321,8 +295,8 @@
 <span class="doccomment">/// Remove all tasks that have been delayed but are able to be unblocked now,
 /// the current tick count is provided by the system&#39;s interrupt tick count.
 </span><span class="kw">pub fn </span>unblock_sleeping_tasks() {
-    <span class="kw">let </span>ticks = TICK_COUNT.load(Ordering::SeqCst);
-    <span class="kw">while </span>ticks &gt; NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst) {
+    <span class="kw">let </span>time = now::&lt;Monotonic&gt;();
+    <span class="kw">while </span>time &gt; NEXT_DELAYED_TASK_UNBLOCK_TIME.load() {
         remove_next_task_from_delayed_tasklist();
     }
 }
@@ -330,9 +304,9 @@
 <span class="doccomment">/// Blocks the current task by putting it to sleep for `duration` ticks.
 ///
 /// Returns the current task&#39;s run state if it can&#39;t be blocked.
-</span><span class="kw">pub fn </span>sleep(duration: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), RunState&gt; {
-    <span class="kw">let </span>current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
-    <span class="kw">let </span>resume_time = current_tick_count + duration;
+</span><span class="kw">pub fn </span>sleep(duration: Duration) -&gt; <span class="prelude-ty">Result</span>&lt;(), RunState&gt; {
+    <span class="kw">let </span>current_time = now::&lt;Monotonic&gt;();
+    <span class="kw">let </span>resume_time = current_time + duration;
 
     <span class="kw">let </span>current_task = get_my_current_task().unwrap();
     <span class="comment">// Add the current task to the delayed tasklist and then block it.
@@ -346,22 +320,14 @@
 /// given by `resume_time`.
 ///
 /// Returns the current task&#39;s run state if it can&#39;t be blocked.
-</span><span class="kw">pub fn </span>sleep_until(resume_time: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), RunState&gt; {
-    <span class="kw">let </span>current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
+</span><span class="kw">pub fn </span>sleep_until(resume_time: Instant) -&gt; <span class="prelude-ty">Result</span>&lt;(), RunState&gt; {
+    <span class="kw">let </span>current_time = now::&lt;Monotonic&gt;();
 
-    <span class="kw">if </span>resume_time &gt; current_tick_count {
-        sleep(resume_time - current_tick_count)<span class="question-mark">?</span>;
+    <span class="kw">if </span>resume_time &gt; current_time {
+        sleep(resume_time - current_time)<span class="question-mark">?</span>;
     }
     
     <span class="prelude-val">Ok</span>(())
-}
-
-<span class="doccomment">/// Blocks the current task for a fixed time `period`, which starts from the given `last_resume_time`.
-///
-/// Returns the current task&#39;s run state if it can&#39;t be blocked.
-</span><span class="kw">pub fn </span>sleep_periodic(last_resume_time: <span class="kw-2">&amp;</span>AtomicUsize, period: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), RunState&gt; {
-    <span class="kw">let </span>new_resume_time = last_resume_time.fetch_add(period, Ordering::SeqCst) + period;
-    sleep_until(new_resume_time)
 }
 
 <span class="doccomment">/// Asynchronous sleep methods that operate on wakers.
@@ -370,9 +336,9 @@
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
     <span class="doccomment">/// Wakes up the waker after the specified duration.
-    </span><span class="kw">pub fn </span>sleep(duration: usize, waker: Waker) {
-        <span class="kw">let </span>current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
-        <span class="kw">let </span>resume_time = current_tick_count + duration;
+    </span><span class="kw">pub fn </span>sleep(duration: Duration, waker: Waker) {
+        <span class="kw">let </span>current_time = now::&lt;Monotonic&gt;();
+        <span class="kw">let </span>resume_time = current_time + duration;
 
         add_to_delayed_tasklist(
             SleepingTaskNode {
@@ -383,10 +349,10 @@
     }
 
     <span class="doccomment">/// Wakes up the waker at the specified time.
-    </span><span class="kw">pub fn </span>sleep_until(resume_time: usize, waker: <span class="kw-2">&amp;</span>Waker) -&gt; Poll&lt;()&gt; {
-        <span class="kw">let </span>current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
+    </span><span class="kw">pub fn </span>sleep_until(resume_time: Instant, waker: <span class="kw-2">&amp;</span>Waker) -&gt; Poll&lt;()&gt; {
+        <span class="kw">let </span>current_time = now::&lt;Monotonic&gt;();
 
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(duration) = resume_time.checked_sub(current_tick_count) {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(duration) = resume_time.checked_duration_since(current_time) {
             sleep(duration, waker.clone());
             Poll::Pending
         } <span class="kw">else </span>{
