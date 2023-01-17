@@ -236,3 +236,9 @@ impl WaitQueue {
         }
     }
 }
+
+impl Default for WaitQueue {
+    fn default() -> Self {
+        Self::new()
+    }
+}
