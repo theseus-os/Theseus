@@ -69,7 +69,10 @@ else
 endif
 
 ### Handle multiple bootloader options and ensure the corresponding tools are installed.
-ifeq ($(bootloader),grub)
+ifeq ($(boot_spec),uefi)
+	bootloader = bootloader-none
+# bootloader option isn't required for UEFI
+else ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
 		GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
@@ -246,7 +249,7 @@ endif
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
-	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
+#	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
 	@cp -rf ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
@@ -333,7 +336,8 @@ endif
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
-	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
+#	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
+	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -378,6 +382,9 @@ limine:
 		$(ISOFILES)/ -o $(iso)
 	@$(MAKE) -C $(LIMINE_DIR)
 	@$(LIMINE_DIR)/limine-deploy $(iso)
+
+bootloader-none:
+# do nothing
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
@@ -898,8 +905,9 @@ wasmtime: run
 
 
 ### builds and runs Theseus in QEMU
-run: $(iso) 
-	qemu-system-x86_64 $(QEMU_FLAGS)
+run: $(iso)
+	qemu-system-aarch64 -machine virt -cpu cortex-a72 -device ramfb -smp 4 -m 1000 -net none -drive if=pflash,format=raw,file=aarch64/resources/qemu-efi.fd -drive format=raw,file=build/theseus-aarch64.efi
+	# qemu-system-x86_64 $(QEMU_FLAGS)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
