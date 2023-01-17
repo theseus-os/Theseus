@@ -286,7 +286,7 @@ zero-ptr
 empty-line-after-outer-attr
 fallible-impl-from
 mutex-integer
-# needless-borrow
+needless-borrow
 panicking-unwrap
 range-plus-one
 unnecessary-unwrap
