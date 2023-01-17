@@ -288,7 +288,7 @@ fallible-impl-from
 mutex-integer
 # needless-borrow
 panicking-unwrap
-# range-plus-one
+range-plus-one
 unnecessary-unwrap
 perf
 box-collection

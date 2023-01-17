@@ -37,9 +37,9 @@
 //! in which the next read or write operation will start where the prior one ended.
 //!
 
+#![allow(clippy::range_plus_one)]
 #![no_std]
 
-// #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate delegate;
 extern crate spin;
