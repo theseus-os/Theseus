@@ -233,7 +233,7 @@ module-inception
 must-use-unit
 mut-mutex-lock
 needless-borrow
-# needless-doctest-main
+needless-doctest-main
 # needless-late-init
 # needless-range-loop
 # needless-return

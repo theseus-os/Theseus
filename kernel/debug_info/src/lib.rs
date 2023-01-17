@@ -136,18 +136,16 @@ impl DebugSections {
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
     /// ```rust,no_run
-    /// fn main() { // start
-    ///     let a = 5;
+    /// let a = 5;
+    /// { // start
+    ///     let b = 6
     ///     { // start
-    ///         let b = 6
-    ///         { // start
-    ///             let c = 10;
-    ///         } // end
+    ///         let c = 10;
     ///     } // end
-    ///     { // start
-    ///         let d = 8;
-    ///     } // end
-    /// } //end
+    /// } // end
+    /// { // start
+    ///     let d = 8;
+    /// } // end
     /// ```
     /// 
     /// # Arguments
@@ -373,18 +371,16 @@ impl DebugSections {
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
     /// ```rust,no_run
-    /// fn main() { // start
-    ///     let a = 5;
+    /// let a = 5;
+    /// { // start
+    ///     let b = 6
     ///     { // start
-    ///         let b = 6
-    ///         { // start
-    ///             let c = 10;
-    ///         } // end
+    ///         let c = 10;
     ///     } // end
-    ///     { // start
-    ///         let d = 8;
-    ///     } // end
-    /// } //end
+    /// } // end
+    /// { // start
+    ///     let d = 8;
+    /// } // end
     /// ```
     ///
     /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
