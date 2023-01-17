@@ -33,7 +33,7 @@ pub struct HeapFile {
 impl HeapFile {
     /// Creates a new file with empty content in the given `parent` directory. 
     /// No allocation is performed.
-    pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
+    pub fn create(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         Self::from_vec(Vec::new(), name, parent)
     }
 
