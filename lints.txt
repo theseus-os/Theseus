@@ -234,8 +234,8 @@ must-use-unit
 mut-mutex-lock
 needless-borrow
 needless-doctest-main
-# needless-late-init
-# needless-range-loop
+needless-late-init
+needless-range-loop
 # needless-return
 neg-multiply
 # new-ret-no-self
