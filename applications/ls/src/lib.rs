@@ -61,7 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
             println!("Couldn't find path: {}", path); 
             -1
         }
-    };
+    }
 }
 
 fn print_children(dir: &DirRef) {
