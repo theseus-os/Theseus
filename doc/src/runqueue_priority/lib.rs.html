@@ -290,48 +290,6 @@
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
-<a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a>
-<a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a>
-<a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a>
-<a href="#321" id="321">321</a>
-<a href="#322" id="322">322</a>
-<a href="#323" id="323">323</a>
-<a href="#324" id="324">324</a>
-<a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a>
-<a href="#327" id="327">327</a>
-<a href="#328" id="328">328</a>
-<a href="#329" id="329">329</a>
-<a href="#330" id="330">330</a>
-<a href="#331" id="331">331</a>
-<a href="#332" id="332">332</a>
-<a href="#333" id="333">333</a>
-<a href="#334" id="334">334</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `RunQueue` structure, for priority scheduler. 
 //! `RunQueue` structure is essentially a list of Tasks
 //! that it used for scheduling purposes.
@@ -469,11 +427,6 @@
             queue: VecDeque::new(),
         });
 
-        <span class="attr">#[cfg(runqueue_spillful)] 
-        </span>{
-            task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
-        }
-
         <span class="kw">if </span>RUNQUEUES.insert(which_core, new_rq).is_some() {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {}!&quot;</span>, which_core);
             <span class="prelude-val">Err</span>(<span class="string">&quot;runqueue already exists for this core&quot;</span>)
@@ -537,10 +490,6 @@
 
     <span class="doccomment">/// Adds a `TaskRef` to this RunQueue.
     </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {        
-        <span class="attr">#[cfg(runqueue_spillful)] </span>{
-            task.set_on_runqueue(<span class="prelude-val">Some</span>(<span class="self">self</span>.core));
-        }
-
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
         <span class="kw">let </span>priority_task_ref = PriorityTaskRef::new(task);
@@ -558,8 +507,8 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// The internal function that actually removes the task from the runqueue.
-    </span><span class="kw">fn </span>remove_internal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="doccomment">/// Removes a `TaskRef` from this RunQueue.
+    </span><span class="kw">pub fn </span>remove_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
         <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.taskref != task);
 
@@ -574,21 +523,6 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-
-    <span class="doccomment">/// Removes a `TaskRef` from this RunQueue.
-    </span><span class="kw">pub fn </span>remove_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="attr">#[cfg(runqueue_spillful)] </span>{
-            <span class="comment">// For the runqueue state spill evaluation, we disable this method because we 
-            // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
-            // trace!(&quot;skipping remove_task() on core {}, task {:?}&quot;, self.core, _task);
-            </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
-        }
-        <span class="attr">#[cfg(not(runqueue_spillful))] </span>{
-            <span class="self">self</span>.remove_internal(_task)
-        }
-    }
-
-
     <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
@@ -597,24 +531,6 @@
             rq.write().remove_task(task)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
-    }
-
-
-    <span class="attr">#[cfg(runqueue_spillful)]
-    </span><span class="doccomment">/// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
-    /// Note: This method is only used by the state spillful runqueue implementation.
-    </span><span class="kw">pub fn </span>remove_task_from_within_task(task: <span class="kw-2">&amp;</span>TaskRef, core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// warn!(&quot;remove_task_from_within_task(): core {}, task: {:?}&quot;, core, task);
-        </span>task.set_on_runqueue(<span class="prelude-val">None</span>);
-        RUNQUEUES.get(<span class="kw-2">&amp;</span>core)
-            .ok_or(<span class="string">&quot;Couldn&#39;t get runqueue for specified core&quot;</span>)
-            .and_then(|rq| {
-                <span class="comment">// Instead of calling `remove_task`, we directly call `remove_internal`
-                // because we want to actually remove the task from the runqueue,
-                // as calling `remove_task` would do nothing due to it skipping the actual removal
-                // when the `runqueue_spillful` cfg is enabled.
-                </span>rq.write().remove_internal(task)
-            })
     }
 
     <span class="doccomment">/// The internal function that sets the priority of a given `Task` in a single `RunQueue`

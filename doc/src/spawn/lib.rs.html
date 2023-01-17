@@ -1018,13 +1018,6 @@
 <a href="#1018" id="1018">1018</a>
 <a href="#1019" id="1019">1019</a>
 <a href="#1020" id="1020">1020</a>
-<a href="#1021" id="1021">1021</a>
-<a href="#1022" id="1022">1022</a>
-<a href="#1023" id="1023">1023</a>
-<a href="#1024" id="1024">1024</a>
-<a href="#1025" id="1025">1025</a>
-<a href="#1026" id="1026">1026</a>
-<a href="#1027" id="1027">1027</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -2006,14 +1999,7 @@
 </span><span class="kw">fn </span>remove_current_task_from_runqueue(current_task: <span class="kw-2">&amp;</span>ExitableTaskRef) {
     <span class="comment">// Special behavior when evaluating runqueues
     </span><span class="attr">#[cfg(rq_eval)] </span>{
-        <span class="comment">// The special spillful version does nothing here, since it was already done in `internal_exit()`
-        </span><span class="attr">#[cfg(runqueue_spillful)] </span>{
-            <span class="comment">// do nothing
-        </span>}
-        <span class="comment">// The regular spill-free version does brute-force removal of the task from ALL runqueues.
-        </span><span class="attr">#[cfg(not(runqueue_spillful))] </span>{
-            runqueue::remove_task_from_all(current_task).unwrap();
-        }
+        runqueue::remove_task_from_all(current_task).unwrap();
     }
 
     <span class="comment">// In the regular case, we do not perform task migration between cores,
