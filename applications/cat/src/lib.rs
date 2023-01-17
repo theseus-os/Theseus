@@ -85,7 +85,7 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    return 0;
+    0
 }
 
 fn print_usage(opts: Options) {
