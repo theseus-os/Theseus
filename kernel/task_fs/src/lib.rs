@@ -54,7 +54,7 @@ pub const TASKS_DIRECTORY_PATH: &str = "/tasks";
 
 /// Initializes the tasks virtual filesystem directory within the root directory.
 pub fn init() -> Result<(), &'static str> {
-    TaskFs::new()?;
+    TaskFs::create()?;
     Ok(())
 }
 
@@ -65,7 +65,7 @@ pub fn init() -> Result<(), &'static str> {
 pub struct TaskFs { }
 
 impl TaskFs {
-    fn new() -> Result<DirRef, &'static str> {
+    fn create() -> Result<DirRef, &'static str> {
         let root = root::get_root();
         let dir_ref = Arc::new(Mutex::new(TaskFs { })) as DirRef;
         root.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;

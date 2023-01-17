@@ -236,10 +236,10 @@ needless-borrow
 needless-doctest-main
 needless-late-init
 needless-range-loop
-# needless-return
+needless-return
 neg-multiply
-# new-ret-no-self
-# new-without-default
+new-ret-no-self
+new-without-default
 ok-expect
 # op-ref
 option-map-or-none

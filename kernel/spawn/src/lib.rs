@@ -406,7 +406,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
                 .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
-        let task_ref = TaskRef::new(new_task);
+        let task_ref = TaskRef::create(new_task);
         let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if let Some(_existing_task) = _existing_task {
