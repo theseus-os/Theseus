@@ -1,23 +1,13 @@
 [package]
 name = "scheduler_eval"
 version = "0.1.0"
-authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Scheduler benchmark"
+edition = "2021"
 
 [dependencies]
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.spawn]
-path = "../../kernel/spawn"
-
-[dependencies.logger]
-path = "../../kernel/logger"
-
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
-[dependencies.task]
-path = "../../kernel/task"
-
-
+app_io = { path = "../../kernel/app_io" }
+getopts = "0.2"
+scheduler = { path = "../../kernel/scheduler" }
+spawn = { path = "../../kernel/spawn" }
+time = { path = "../../kernel/time" }
