@@ -290,7 +290,7 @@ mutex-integer
 panicking-unwrap
 # range-plus-one
 unnecessary-unwrap
-# Perf
+perf
 box-collection
 boxed-local
 cmp-owned
