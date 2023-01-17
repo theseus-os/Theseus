@@ -200,7 +200,7 @@ impl RunQueue {
     fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
-        let priority_task_ref = PriorityTaskRef::new(task);
+        let priority_task_ref = PriorityTaskRef::create(task);
         self.push_back(priority_task_ref);
         
         #[cfg(single_simd_task_optimization)]
