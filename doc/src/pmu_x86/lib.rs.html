@@ -901,6 +901,11 @@
 <a href="#901" id="901">901</a>
 <a href="#902" id="902">902</a>
 <a href="#903" id="903">903</a>
+<a href="#904" id="904">904</a>
+<a href="#905" id="905">905</a>
+<a href="#906" id="906">906</a>
+<a href="#907" id="907">907</a>
+<a href="#908" id="908">908</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Performance Monitoring Unit 
 //! 
 //! We have support for PMU version 2. Each succesive PMU version includes the features provided by the previous versions.
@@ -990,7 +995,11 @@
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>core::{
     convert::TryFrom,
-    sync::atomic::{Ordering, AtomicU64, AtomicU8},
+    sync::atomic::{
+        Ordering, 
+        AtomicU64, 
+        AtomicU8
+    },
 };
 
 
@@ -1604,7 +1613,8 @@
     <span class="comment">// This check can never trigger since `event_per_sample` is a `u32`
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We&#39;ll check anyways, just in case `event_per_sample`&#39;s type is changed.
-    </span><span class="kw">if </span>u32::try_from(event_per_sample).is_ok() {
+    </span><span class="attr">#[allow(clippy::useless_conversion)]
+    </span><span class="kw">if </span>u32::try_from(event_per_sample).is_err() {
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Number of events per sample invalid: must be within unsigned 32 bit&quot;</span>);
     }
 

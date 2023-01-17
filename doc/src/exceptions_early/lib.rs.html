@@ -306,7 +306,7 @@
         <span class="macro">println_raw!</span>(<span class="string">&quot;exceptions_early(): Created TSS: {:?}&quot;</span>, tss);
         <span class="kw-2">*</span>EARLY_TSS.lock() = tss;
         
-        <span class="kw">let </span>(gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(<span class="kw-2">&amp;*</span>EARLY_TSS.lock());
+        <span class="kw">let </span>(gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(<span class="kw-2">&amp;</span>EARLY_TSS.lock());
         <span class="kw-2">*</span>EARLY_GDT.lock() = gdt;
         EARLY_GDT.lock().load();
 

@@ -587,7 +587,7 @@
     <span class="kw">type </span>Target = T;
 
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T { 
-       &amp; <span class="kw-2">*</span>(<span class="self">self</span>.guard) 
+       <span class="kw-2">&amp;</span><span class="self">self</span>.guard
     }
 }
 
@@ -595,13 +595,13 @@
     <span class="kw">type </span>Target = T;
 
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>T { 
-        &amp; <span class="kw-2">*</span>(<span class="self">self</span>.guard)
+        <span class="kw-2">&amp;</span><span class="self">self</span>.guard
     }
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;rwlock</span>, T: <span class="question-mark">?</span>Sized&gt; DerefMut <span class="kw">for </span>RwLockSleepWriteGuard&lt;<span class="lifetime">&#39;rwlock</span>, T&gt; {
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>T { 
-        <span class="kw-2">&amp;mut *</span>(<span class="self">self</span>.guard)
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.guard
     }
 }
 

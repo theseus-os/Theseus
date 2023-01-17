@@ -274,17 +274,23 @@
 <a href="#274" id="274">274</a>
 <a href="#275" id="275">275</a>
 <a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 </span><span class="doccomment">/// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
 /// directories via the Path struct 
 </span><span class="comment">// #[macro_use] extern crate log;
-</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+</span><span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>spin;
 <span class="kw">extern crate </span>fs_node;
 <span class="kw">extern crate </span>root;
 
-<span class="kw">use </span>core::fmt;
-<span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>core::{
+    fmt,
+    fmt::Write,
+    ops::{Deref, DerefMut},
+};
 <span class="kw">use </span>alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -410,7 +416,7 @@
                 first_cmpnt = <span class="bool-val">false</span>;
             } 
             <span class="kw">else </span>{
-                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{component}&quot;</span>));
+                <span class="macro">write!</span>(new_path, <span class="string">&quot;/{component}&quot;</span>).expect(<span class="string">&quot;Failed to create new path from its components&quot;</span>);
             }
         }
         Path::new(new_path)
@@ -453,7 +459,7 @@
         <span class="comment">// Create the new path from its components 
         </span><span class="kw">let </span><span class="kw-2">mut </span>new_path = String::new();
         <span class="kw">for </span>component <span class="kw">in </span>comps.iter() {
-                new_path.push_str(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{component}/&quot;</span>));
+            <span class="macro">write!</span>(new_path, <span class="string">&quot;{component}/&quot;</span>).expect(<span class="string">&quot;Failed to create new path from its components&quot;</span>);
         }
         <span class="comment">// Remove the trailing slash after the final path component
         </span>new_path.pop();

@@ -1409,7 +1409,7 @@
                 }<span class="question-mark">?</span>;
 
                 <span class="attr">#[cfg(not(loscd_eval))]
-                </span><span class="macro">debug!</span>(<span class="string">&quot;swap_crates(): copying .data or .bss section from old {:?} to new {:?}&quot;</span>, <span class="kw-2">&amp;*</span>old_sec, new_dest_sec);
+                </span><span class="macro">debug!</span>(<span class="string">&quot;swap_crates(): copying .data or .bss section from old {:?} to new {:?}&quot;</span>, old_sec, new_dest_sec);
                 old_sec.copy_section_data_to(new_dest_sec)<span class="question-mark">?</span>;
             }
 
@@ -1469,7 +1469,7 @@
                         <span class="string">&quot;couldn&#39;t find section in the new crate that corresponds to a match of the old section&quot;
                     </span>})<span class="question-mark">?</span>;
                     <span class="attr">#[cfg(not(loscd_eval))]
-                    </span><span class="macro">debug!</span>(<span class="string">&quot;swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}&quot;</span>, <span class="kw-2">&amp;*</span>old_sec, <span class="kw-2">&amp;*</span>new_crate_source_sec);
+                    </span><span class="macro">debug!</span>(<span class="string">&quot;swap_crates(): found match for old source_sec {:?}, new source_sec: {:?}&quot;</span>, old_sec, <span class="kw-2">&amp;*</span>new_crate_source_sec);
 
                     <span class="kw">if </span>reexport_new_symbols_as_old &amp;&amp; old_sec.global {
                         <span class="comment">// reexport the new source section under the old sec&#39;s name, i.e., redirect the old mapping to the new source sec
@@ -1522,7 +1522,7 @@
                     }
 
                     <span class="attr">#[cfg(not(loscd_eval))]
-                    </span><span class="macro">debug!</span>(<span class="string">&quot;    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}&quot;</span>, <span class="kw-2">&amp;*</span>target_sec, <span class="kw-2">&amp;*</span>old_sec, <span class="kw-2">&amp;*</span>new_source_sec);
+                    </span><span class="macro">debug!</span>(<span class="string">&quot;    swap_crates(): target_sec: {:?}, old source sec: {:?}, new source sec: {:?}&quot;</span>, target_sec, old_sec, new_source_sec);
 
                     <span class="comment">// If the target_sec&#39;s mapped pages aren&#39;t writable (which is common in the case of swapping),
                     // then we need to temporarily remap them as writable here so we can fix up the target_sec&#39;s new relocation entry.
@@ -1823,7 +1823,7 @@
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(ocn) = old_crate_name {
                 <span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
                 </span><span class="macro">trace!</span>(<span class="string">&quot;swap_crates(): new_crate_object_file did not replace old_crate&#39;s object file, so we&#39;re removing the old_crate&#39;s object file now&quot;</span>);
-                <span class="kw">let </span>(old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, <span class="kw-2">&amp;*</span>ocn).ok_or_else(|| {
+                <span class="kw">let </span>(old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, ocn).ok_or_else(|| {
                     <span class="macro">error!</span>(<span class="string">&quot;BUG: swap_crates(): couldn&#39;t find old crate&#39;s object file starting with {:?} in old namespace {:?}.&quot;</span>, ocn, old_namespace.name());
                     <span class="string">&quot;BUG: swap_crates(): couldn&#39;t find old crate&#39;s object file in old namespace!&quot;
                 </span>})<span class="question-mark">?</span>;

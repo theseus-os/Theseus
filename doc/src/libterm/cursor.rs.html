@@ -196,7 +196,7 @@
     </span><span class="kw">pub fn </span>blink(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
         <span class="kw">if </span><span class="self">self</span>.enabled {
             <span class="kw">let </span>time = tsc_ticks();
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(duration) = time.sub(<span class="kw-2">&amp;</span>(<span class="self">self</span>.time)) {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(duration) = time.sub(<span class="kw-2">&amp;</span><span class="self">self</span>.time) {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(ns) = duration.to_ns() {
                     <span class="kw">if </span>ns &gt;= <span class="self">self</span>.freq {
                         <span class="self">self</span>.time = time;

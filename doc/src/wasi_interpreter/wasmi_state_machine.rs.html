@@ -182,11 +182,15 @@
 <a href="#182" id="182">182</a>
 <a href="#183" id="183">183</a>
 <a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Module for resolving memory and function imports from WebAssembly module into state machine.
 //!
 //! Subset of functionality borrowed from tomaka/redshirt:
 //! &lt;https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/scheduler/vm.rs&gt;
 //!
+
+</span><span class="attr">#![allow(clippy::type_complexity)]
 
 </span><span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::{cell::RefCell, convert::TryFrom <span class="kw">as _</span>};

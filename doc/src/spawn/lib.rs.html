@@ -1954,8 +1954,8 @@
         </span><span class="kw">let </span>restartable_info = current_task.with_restart_info(|restart_info_opt| {
             restart_info_opt.map(|restart_info| {
                 <span class="attr">#[cfg(use_crate_replacement)] </span>{
-                    <span class="kw">let </span>func_ptr = <span class="kw-2">&amp;</span>(restart_info.func) <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
-                    <span class="kw">let </span>arg_ptr = <span class="kw-2">&amp;</span>(restart_info.argument) <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
+                    <span class="kw">let </span>func_ptr = <span class="kw-2">&amp;</span>restart_info.func <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
+                    <span class="kw">let </span>arg_ptr = <span class="kw-2">&amp;</span>restart_info.argument <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
 
                     <span class="attr">#[cfg(not(downtime_eval))] </span>{
                         <span class="macro">debug!</span>(<span class="string">&quot;func_ptr {:#X}&quot;</span>, func_ptr);

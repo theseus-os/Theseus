@@ -548,7 +548,7 @@
 
     <span class="doccomment">/// Tries to find a free block within `data` that satisfies `alignment` requirement.
     </span><span class="kw">fn </span>first_fit(<span class="kw-2">&amp;</span><span class="self">self</span>, layout: Layout) -&gt; <span class="prelude-ty">Option</span>&lt;(usize, usize)&gt; {
-        <span class="kw">let </span>base_addr = (<span class="kw-2">&amp;*</span><span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="self">Self </span><span class="kw">as </span><span class="kw-2">*const </span>u8) <span class="kw">as </span>usize;
+        <span class="kw">let </span>base_addr = (<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="self">Self </span><span class="kw">as </span><span class="kw-2">*const </span>u8) <span class="kw">as </span>usize;
         <span class="self">self</span>.bitfield().first_fit(base_addr, layout, <span class="self">Self</span>::SIZE, <span class="self">Self</span>::METADATA_SIZE)
     }
 
@@ -646,7 +646,7 @@
 
     <span class="doccomment">/// Tries to find a free block within `data` that satisfies `alignment` requirement.
     </span><span class="kw">fn </span>first_fit(<span class="kw-2">&amp;</span><span class="self">self</span>, layout: Layout) -&gt; <span class="prelude-ty">Option</span>&lt;(usize, usize)&gt; {
-        <span class="kw">let </span>base_addr = (<span class="kw-2">&amp;*</span><span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="self">Self </span><span class="kw">as </span><span class="kw-2">*const </span>u8) <span class="kw">as </span>usize;
+        <span class="kw">let </span>base_addr = (<span class="self">self </span><span class="kw">as </span><span class="kw-2">*const </span><span class="self">Self </span><span class="kw">as </span><span class="kw-2">*const </span>u8) <span class="kw">as </span>usize;
         <span class="self">self</span>.bitfield().first_fit(base_addr, layout, <span class="self">Self</span>::SIZE, <span class="self">Self</span>::METADATA_SIZE)
     }
 
