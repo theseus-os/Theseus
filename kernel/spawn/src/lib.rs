@@ -979,14 +979,7 @@ where
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     // Special behavior when evaluating runqueues
     #[cfg(rq_eval)] {
-        // The special spillful version does nothing here, since it was already done in `internal_exit()`
-        #[cfg(runqueue_spillful)] {
-            // do nothing
-        }
-        // The regular spill-free version does brute-force removal of the task from ALL runqueues.
-        #[cfg(not(runqueue_spillful))] {
-            runqueue::remove_task_from_all(current_task).unwrap();
-        }
+        runqueue::remove_task_from_all(current_task).unwrap();
     }
 
     // In the regular case, we do not perform task migration between cores,
