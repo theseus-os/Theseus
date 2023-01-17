@@ -22,6 +22,7 @@
 //! * <https://vt100.net/docs/vt510-rm/chapter4.html>
 //! * <https://en.wikipedia.org/wiki/ANSI_escape_code>
 
+#![allow(clippy::range_plus_one)]
 #![no_std]
 #![feature(drain_filter)]
 
