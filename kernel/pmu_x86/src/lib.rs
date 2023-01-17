@@ -705,7 +705,6 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     // This check can never trigger since `event_per_sample` is a `u32`
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We'll check anyways, just in case `event_per_sample`'s type is changed.
-    
     if u32::try_from(event_per_sample).is_err() {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
