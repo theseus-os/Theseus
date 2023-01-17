@@ -102,7 +102,7 @@ nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.
 ## The output file path of the fully-linked nano_core kernel binary.
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
-linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half.ld
+linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
 efi_firmware := $(BUILD_DIR)/ovmf.fd
 ## The assembly files compiled by the nano_core build script.
 compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/$(boot_spec)/*.o
