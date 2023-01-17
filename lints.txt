@@ -94,7 +94,7 @@ while-let-loop
 wildcard-in-or-patterns
 zero-divided-by-zero
 zero-prefixed-literal
-# Correctness
+correctness
 absurd-extreme-comparisons
 almost-swapped
 approx-constant
