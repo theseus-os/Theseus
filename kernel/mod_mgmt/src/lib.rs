@@ -2665,7 +2665,7 @@ impl CrateNamespace {
         // We add a shared reference to that section's parent crate to this namespace as well, 
         // to prevent that crate from being dropped while this namespace still relies on it.
         self.crate_tree.lock().insert(parent_crate_name, parent_crate_ref);
-        return Some(sec);
+        Some(sec)
     }
 
 
