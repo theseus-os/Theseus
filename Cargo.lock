@@ -915,6 +915,7 @@ dependencies = [
  "sleep",
  "spawn",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -3331,10 +3332,12 @@ dependencies = [
 name = "sleep"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "lazy_static",
  "scheduler",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -3749,6 +3752,7 @@ dependencies = [
  "scheduler",
  "sleep",
  "spawn",
+ "time",
 ]
 
 [[package]]

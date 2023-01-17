@@ -4,7 +4,12 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 use app_io::println;
-use dreadnought::{block_on, select_biased, task::spawn_async, time, FutureExt};
+use dreadnought::{
+    block_on, select_biased,
+    task::spawn_async,
+    time::{sleep, Duration},
+    FutureExt,
+};
 
 pub fn main(_: Vec<String>) -> isize {
     block_on(async {
@@ -31,14 +36,14 @@ pub fn main(_: Vec<String>) -> isize {
 
 async fn foo() -> u8 {
     println!("called foo");
-    time::sleep(1000).await;
+    sleep(Duration::from_secs(2)).await;
     println!("foo sleep done");
     0
 }
 
 async fn bar() -> u8 {
     println!("called bar");
-    time::sleep(10).await;
+    sleep(Duration::from_secs(1)).await;
     println!("bar sleep done");
     1
 }
