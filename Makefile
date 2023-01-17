@@ -177,7 +177,7 @@ ifeq ($(boot_spec), uefi)
 		--release \
 		-Z bindeps \
 		--manifest-path \
-		$(ROOT_DIR)/tools/uefi_builder/x86_64/Cargo.toml -- \
+		$(ROOT_DIR)/tools/uefi_builder/$(ARCH)/Cargo.toml -- \
 		--kernel $(nano_core_binary) \
 		--modules $(OBJECT_FILES_BUILD_DIR) \
 		--efi-image $(iso) \
