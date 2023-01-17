@@ -88,13 +88,12 @@ impl Terminal {
     fn calc_start_idx(&self, end_idx: usize) -> (usize, usize) {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
         let mut start_idx = end_idx;
-        let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        if end_idx > buffer_width * buffer_height {
-            result = self.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx);
+        let result = if end_idx > buffer_width * buffer_height {
+            self.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx)
         } else {
-            result = self.scrollback_buffer.get(0..end_idx);
-        }
+            self.scrollback_buffer.get(0..end_idx)
+        };
 
         if let Some(slice) = result {
             let mut total_lines = 0;
@@ -176,13 +175,12 @@ impl Terminal {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
-        let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
-            result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
+        let result = if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
+            self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1)
         } else {
-            result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
-        }
+            self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height)
+        };
 
         // calculate the starting index for the slice
         if let Some(slice) = result {
@@ -283,12 +281,11 @@ impl Terminal {
     /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self) {
         let buffer_width = self.get_text_dimensions().0;
-        let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end {
             return;
         } 
-        prev_start_idx = self.scroll_start_idx;
+        let prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
