@@ -205,7 +205,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 
     // if downloaded, save the diff file into the base directory
     if let Some(diffs) = diff_file_lines {
-        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
+        let cfile = MemFile::create(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
         cfile.lock().write_at(diffs.join("\n").as_bytes(), 0)?;
     }
 
