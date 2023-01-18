@@ -78,7 +78,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     let file = file_ref.lock();
 
     // Parse the file as an ELF executable
-    let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
+    let file_mp = file.as_mapping().map_err(String::from)?;
     let byte_slice: &[u8] = file_mp.as_slice(0, file.len())?;
 
     let (mut segments, entry_point, _vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
