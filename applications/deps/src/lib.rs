@@ -295,7 +295,7 @@ fn count_private_rodata_sections() -> Result<(), String> {
 /// for all sections in the given crate. .
 fn crate_dependency_count(crate_ref: &StrongCrateRef) -> (usize, usize, usize) {
     let res = crate_ref.lock_as_ref().sections.values()
-        .map(|sec| section_dependency_count(sec))
+        .map(section_dependency_count)
         .fold((0, 0, 0), |(acc_s, acc_w, acc_i), (s, w, i)| (acc_s + s, acc_w + w, acc_i + i));
     // trace!("crate {:?} has deps {:?}", crate_ref, res);
     res
@@ -463,5 +463,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: deps OPTION ARG
+const USAGE: &str = "Usage: deps OPTION ARG
 Outputs runtime dependency information and metadata known by Theseus's crate manager.";
