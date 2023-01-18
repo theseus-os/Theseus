@@ -93,7 +93,7 @@ fn load_crate(output: &mut String, crate_file_ref: FileRef, namespace: &Arc<Crat
         None,
         kernel_mmi_ref,
         false
-    ).map_err(|e| String::from(e))?;
+    ).map_err(String::from)?;
     writeln!(output, "Loaded crate with {} new symbols from {}", _new_syms, crate_file_ref.lock().get_absolute_path()).unwrap();
     Ok(())
 }
