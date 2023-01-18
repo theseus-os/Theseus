@@ -145,5 +145,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "\nUsage: ns [OPTION]
+const USAGE: &str = "\nUsage: ns [OPTION]
 Lists the crates that are loaded in the currently-active crate namespace.";
