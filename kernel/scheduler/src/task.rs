@@ -340,6 +340,14 @@ pub struct Task {
     /// 
     /// This is not public because it permits interior mutability.
     joinable: AtomicBool,
+    /// Whether the task is currently on a run queue.
+    ///
+    /// If it is, we don't need to enqueue the task when unblocking it, because
+    /// it hasn't yet been popped off the run queue it was originally on.
+    ///
+    /// This lets the run queues use a more efficient data structure that only
+    /// supports FIFO operations.
+    pub(crate) is_on_run_queue: AtomicBool,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -484,6 +492,7 @@ impl Task {
             suspended: AtomicBool::new(false),
             // Tasks are not considered "joinable" until passed to `TaskRef::new()`
             joinable: AtomicBool::new(false),
+            is_on_run_queue: AtomicBool::new(false),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -674,25 +683,6 @@ impl Task {
         }
     }
 
-    /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on
-    /// error. Will only succed if the task is blocked or already runnable.
-    pub fn unblock(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable};
-
-        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
-            Ok(Blocked)
-        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
-            warn!("Unblocked an already runnable task: {:?}\n\t --> Current {:?}",
-                self, get_my_current_task()
-            );
-            Ok(Runnable)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-    
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -1392,6 +1382,32 @@ impl TaskRef {
             self.0.exit_value_mailbox.lock().take()
         } else {
             None
+        }
+    }
+
+    /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only succed if the task is blocked or already runnable.
+    pub fn unblock(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
+            // TODO: Can this be relaxed?
+            if !self.is_on_run_queue.load(Ordering::Acquire) {
+                crate::add_task_to_any_run_queue(self.clone()).unwrap();
+            }
+            Ok(Blocked)
+        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
+            warn!("Unblocked an already runnable task: {:?}\n\t --> Current {:?}",
+                self, get_my_current_task()
+            );
+            if !self.is_on_run_queue.load(Ordering::Acquire) {
+                crate::add_task_to_any_run_queue(self.clone()).unwrap();
+            }
+            Ok(Runnable)
+        } else {
+            Err(self.runstate.load())
         }
     }
 }

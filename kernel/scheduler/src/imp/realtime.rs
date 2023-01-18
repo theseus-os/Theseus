@@ -1,5 +1,6 @@
 use crate::TaskRef;
 use alloc::collections::VecDeque;
+use core::{intrinsics::unlikely, sync::atomic::Ordering};
 
 #[derive(Debug)]
 pub(crate) struct Queue {
@@ -39,6 +40,28 @@ impl Queue {
     }
 
     pub(crate) fn next(&mut self) -> Option<TaskRef> {
+        let mut index = 0;
+        // TODO: This is inefficient.
+        while index < self.inner.len() {
+            let task = &self.inner[index];
+            if !task.inner.is_runnable() {
+                task.inner.is_on_run_queue.store(false, Ordering::Release);
+                // Checking this prevents an interleaving where `TaskRef::unblock` wouldn't add
+                // the task back onto the run queue. `TaskRef::unblock` sets the run state and
+                // then checks is_on_run_queue so we have to do the opposite.
+                //
+                // TODO: This could be a relaxed load followed by a fence in the if statement.
+                if unlikely(task.inner.is_runnable()) {
+                    task.inner.is_on_run_queue.store(true, Ordering::Release);
+                    index += 1;
+                } else {
+                    self.inner.remove(index).unwrap();
+                }
+            } else {
+                index += 1;
+            }
+        }
+
         let index = self
             .inner
             .iter()

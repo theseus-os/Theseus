@@ -1,4 +1,4 @@
-#![feature(thread_local, negative_impls, panic_info_message)]
+#![feature(core_intrinsics, thread_local, negative_impls, panic_info_message)]
 #![no_std]
 
 extern crate alloc;

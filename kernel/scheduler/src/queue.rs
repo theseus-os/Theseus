@@ -1,5 +1,6 @@
 use crate::imp;
 use crate::TaskRef;
+use core::sync::atomic::Ordering;
 
 #[derive(Debug)]
 pub struct RunQueue {
@@ -27,6 +28,7 @@ impl RunQueue {
     }
 
     pub fn add(&mut self, task: TaskRef) {
+        task.is_on_run_queue.store(true, Ordering::Release);
         self.queue.add(task);
         #[cfg(single_simd_task_optimization)]
         if task.simd {
