@@ -14,8 +14,5 @@ spin = "0.9.4"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.thread_local_macro]
 path = "../thread_local_macro"

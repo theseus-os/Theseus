@@ -22,8 +22,8 @@ path = "../cpu"
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
-[dependencies.task]
-path = "../task"
+[dependencies.scheduler]
+path = "../scheduler"
 
 [dependencies.fault_log]
 path = "../fault_log"

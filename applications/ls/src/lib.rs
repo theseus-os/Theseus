@@ -1,6 +1,6 @@
 #![no_std]
 
-extern crate task;
+extern crate scheduler;
 #[macro_use] extern crate app_io;
 extern crate alloc;
 extern crate fs_node;
@@ -35,7 +35,7 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
-    let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+    let Ok(curr_wd) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         println!("failed to get current task");
         return -1;
     };

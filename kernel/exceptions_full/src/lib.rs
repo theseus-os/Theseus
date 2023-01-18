@@ -109,16 +109,16 @@ fn kill_and_halt(
 
 
     #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
-        println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
+        println_both!("Unwinding {:?} due to exception {}.", scheduler::get_my_current_task(), exception_number);
     }
     #[cfg(not(unwind_exceptions))] {
-        println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", task::get_my_current_task(), exception_number);
+        println_both!("Killing task without unwinding {:?} due to exception {}. (cfg `unwind_exceptions` is not set.)", scheduler::get_my_current_task(), exception_number);
     }
     
     // Dump some info about the this loaded app crate
     // and test out using debug info for recovery
     if false {
-        let curr_task = task::get_my_current_task().expect("kill_and_halt: no current task");
+        let curr_task = scheduler::get_my_current_task().expect("kill_and_halt: no current task");
         let app_crate = curr_task.app_crate.as_ref().expect("kill_and_halt: no app_crate").clone_shallow();
         let debug_symbols_file = {
             let krate = app_crate.lock_as_ref();
@@ -166,16 +166,16 @@ fn kill_and_halt(
         }
     }
 
-    let cause = task::KillReason::Exception(exception_number);
+    let cause = scheduler::KillReason::Exception(exception_number);
 
     // Call this task's kill handler, if it has one.
-    if let Some(ref kh_func) = task::take_kill_handler() {
+    if let Some(ref kh_func) = scheduler::take_kill_handler() {
         #[cfg(not(downtime_eval))]
-        debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+        debug!("Found kill handler callback to invoke in Task {:?}", scheduler::get_my_current_task());
         kh_func(&cause);
     } else {
         #[cfg(not(downtime_eval))]
-        debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
+        debug!("No kill handler callback in Task {:?}", scheduler::get_my_current_task());
     }
 
     // Invoke the proper signal handler registered for this task, if one exists.
@@ -204,18 +204,18 @@ fn kill_and_halt(
                 println_both!("BUG: when handling exception {}, start_unwinding() returned an Ok() value, \
                     which is unexpected because it means no unwinding actually occurred. Task: {:?}.", 
                     exception_number,
-                    task::get_my_current_task()
+                    scheduler::get_my_current_task()
                 );
             }
             Err(e) => {
                 println_both!("Task {:?} was unable to start unwinding procedure after exception {}, error: {}.",
-                    task::get_my_current_task(), exception_number, e
+                    scheduler::get_my_current_task(), exception_number, e
                 );
             }
         }
     }
     #[cfg(not(unwind_exceptions))] {
-        let res = task::with_current_task(|t| {
+        let res = scheduler::with_current_task(|t| {
             let kill_result = t.kill(cause);
             match kill_result {
                 Ok(()) => { println_both!("Task {:?} killed itself successfully", t); }
@@ -240,7 +240,7 @@ fn kill_and_halt(
 /// Checks whether the given `vaddr` falls within a stack guard page, indicating stack overflow. 
 fn is_stack_overflow(vaddr: VirtualAddress) -> bool {
     let page = Page::containing_address(vaddr);
-    task::with_current_task(|t|
+    scheduler::with_current_task(|t|
         t.with_kstack(|kstack| kstack.guard_page().contains(&page))
     ).unwrap_or(false)
 }

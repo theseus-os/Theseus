@@ -2,7 +2,7 @@
 
 use crate::{Error, Result};
 use alloc::vec::Vec;
-use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
+use scheduler::{ExitValue, JoinableTaskRef, KillReason, RunState};
 
 /// A shell job consisting of multiple parts.
 ///

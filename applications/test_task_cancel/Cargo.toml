@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 log = "0.4"
 spawn = { path = "../../kernel/spawn" }
+scheduler = { path = "../../kernel/scheduler" }
 spin = "0.9"
-task = { path = "../../kernel/task" }

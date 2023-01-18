@@ -11,7 +11,7 @@
 #[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
-extern crate task;
+extern crate scheduler;
 extern crate cpu;
 extern crate irq_safety;
 
@@ -145,7 +145,7 @@ fn update_and_insert_fault_entry_internal(
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
-    let curr_task = match task::get_my_current_task() {
+    let curr_task = match scheduler::get_my_current_task() {
         Some(x) => x,
         _ => {
             FAULT_LIST.lock().push(fe);

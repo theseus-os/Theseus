@@ -10,7 +10,6 @@ mutex_sleep = { path = "../mutex_sleep" }
 scheduler = { path = "../scheduler" }
 sleep = { path = "../sleep" }
 spawn = { path = "../spawn" }
-task = { path = "../task" }
 time = { path = "../time" }
 
 [dependencies.futures]

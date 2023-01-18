@@ -5,7 +5,6 @@ extern crate alloc;
 #[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate spin;
-extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;

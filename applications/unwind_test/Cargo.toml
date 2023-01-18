@@ -14,8 +14,8 @@ version = "0.4.8"
 [dependencies.app_io]
 path = "../../kernel/app_io"
 
-[dependencies.task]
-path = "../../kernel/task"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
 
 [dependencies.catch_unwind]
 path = "../../kernel/catch_unwind"

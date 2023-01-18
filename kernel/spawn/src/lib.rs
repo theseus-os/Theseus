@@ -31,7 +31,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
+use scheduler::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -39,7 +39,7 @@ use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
 
 #[cfg(simd_personality)]
-use task::SimdExt;
+use scheduler::SimdExt;
 
 
 /// Initializes tasking for the given AP core, including creating a runqueue for it
@@ -50,7 +50,7 @@ pub fn init(
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
-        task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+        scheduler::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
     let idle_task = create_idle_task(apic_id)?;
     scheduler::init(apic_id, idle_task)?;
     
@@ -65,7 +65,7 @@ pub fn init(
     })
 }
 
-/// The set of bootstrap tasks that are created using `task::bootstrap_task()`.
+/// The set of bootstrap tasks that are created using `scheduler::bootstrap_task()`.
 /// These require special cleanup; see [`cleanup_bootstrap_tasks()`].
 static BOOTSTRAP_TASKS: Mutex<Vec<JoinableTaskRef>> = Mutex::new(Vec::new());
 
@@ -111,7 +111,7 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 /// it should invoke [`BootstrapTaskRef::finish()`] to indicate that it's finished,
 /// which will then mark itself as exited and remove itself from runqueues.
 /// 
-/// See [`init()`] and [`task::bootstrap_task()`].
+/// See [`init()`] and [`scheduler::bootstrap_task()`].
 #[derive(Debug)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
@@ -202,7 +202,7 @@ pub fn new_application_task_builder(
 ) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
     
     let namespace = new_namespace
-        .or_else(|| task::with_current_task(|t| t.get_namespace().clone()).ok())
+        .or_else(|| scheduler::with_current_task(|t| t.get_namespace().clone()).ok())
         .ok_or("spawn::new_application_task_builder(): couldn't get current task")?;
     
     let crate_object_file = match crate_object_file.get(namespace.dir())
@@ -535,7 +535,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
 // /// 
 // /// [`spawn`]: TaskBuilder::spawn
 // /// [`join`]: TaskRef::join
-// /// [exit value]: task::ExitValue
+// /// [exit value]: scheduler::ExitValue
 // pub struct TaskJoiner<R: Send + 'static> {
 //     task: JoinableTaskRef,
 //     _phantom: PhantomData<R>,
@@ -646,7 +646,7 @@ pub fn setup_context_trampoline(
 /// shared by `task_wrapper` and `task_wrapper_restartable`.
 fn task_wrapper_internal<F, A, R>(
     current_task_id: usize,
-) -> (Result<R, task::KillReason>, ExitableTaskRef)
+) -> (Result<R, scheduler::KillReason>, ExitableTaskRef)
 where
     A: Send + 'static,
     R: Send + 'static,
@@ -664,7 +664,7 @@ where
     {
         // Set this task as the current task.
         // We cannot do until this task is actually running, because it uses thread-local storage.
-        exitable_taskref = task::init_current_task(
+        exitable_taskref = scheduler::init_current_task(
             current_task_id,
             None,
         ).unwrap_or_else(|_|
@@ -814,7 +814,7 @@ fn task_restartable_cleanup_success<F, A, R>(current_task: ExitableTaskRef, exit
 
 /// Internal function that cleans up a task that did not exit properly.
 #[inline(always)]
-fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: task::KillReason) -> (PreemptionGuard, ExitableTaskRef) {
+fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: scheduler::KillReason) -> (PreemptionGuard, ExitableTaskRef) {
     // Disable preemption.
     let preemption_guard = hold_preemption();
 
@@ -836,7 +836,7 @@ fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: tas
 /// 
 /// The generic type parameters are derived from the original `task_wrapper` invocation,
 /// and are here to provide type information needed when cleaning up a failed task.
-fn task_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: task::KillReason) -> !
+fn task_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: scheduler::KillReason) -> !
     where A: Send + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R, 
@@ -846,7 +846,7 @@ fn task_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: tas
 }
 
 /// Similar to `task_cleanup_failure` but used on restartable_tasks
-fn task_restartable_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: task::KillReason) -> !
+fn task_restartable_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill_reason: scheduler::KillReason) -> !
     where A: Send + Clone + 'static, 
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone + 'static, 
@@ -1014,7 +1014,7 @@ pub fn create_idle_task(apic_id: u8) -> Result<TaskRef, &'static str> {
 /// so we use `()` here instead. 
 #[inline(never)]
 fn idle_task_entry(_apic_id: u8) {
-    info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), task::get_my_current_task());
+    info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), scheduler::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state
         pause::spin_loop_hint();

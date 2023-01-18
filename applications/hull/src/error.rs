@@ -1,7 +1,7 @@
 //! Shell-specific errors.
 
 use alloc::string::String;
-use task::RunState;
+use scheduler::RunState;
 
 pub type Result<T> = core::result::Result<T, Error>;
 

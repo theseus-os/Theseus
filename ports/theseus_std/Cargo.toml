@@ -7,7 +7,7 @@ edition = "2018"
 
 [dependencies]
 lockable = { path = "../../libs/lockable" }
-theseus_task = { path = "../../kernel/task", package = "task" }
+theseus_scheduler = { path = "../../kernel/scheduler", package = "scheduler" }
 theseus_path = { path = "../../kernel/path", package = "path" }
 theseus_fs_node = { path = "../../kernel/fs_node", package = "fs_node" }
 theseus_io = { path = "../../kernel/io", package = "io" }

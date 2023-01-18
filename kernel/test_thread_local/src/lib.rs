@@ -12,7 +12,7 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate spawn;
-extern crate task; 
+extern crate scheduler; 
 
 use core::cell::Cell;
 use alloc::{string::String, vec::Vec};
@@ -62,7 +62,7 @@ impl Complex {
 }
 
 pub fn test_tls(_x: usize) {
-    let curr_task = task::get_my_current_task().unwrap();
+    let curr_task = scheduler::get_my_current_task().unwrap();
     let local_zero = LOCAL_ZERO.get();
     debug!("Task {:?}, LOCAL_ZERO: {:#X?}", curr_task, local_zero);
 

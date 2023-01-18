@@ -37,8 +37,8 @@ path = "../../libs/msr"
 [dependencies.raw-cpuid]
 version = "10.6.0"
 
-[dependencies.task]
-path = "../task"
+[dependencies.scheduler]
+path = "../scheduler"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

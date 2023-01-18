@@ -26,29 +26,6 @@
 
 // TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
 #![allow(clippy::empty_loop)]
-#![no_std]
-#![feature(panic_info_message)]
-#![feature(thread_local)]
-#![feature(negative_impls)]
-
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
-#[macro_use] extern crate static_assertions;
-extern crate irq_safety;
-extern crate memory;
-extern crate stack;
-extern crate tss;
-extern crate mod_mgmt;
-extern crate context_switch;
-extern crate preemption;
-extern crate environment;
-extern crate root;
-extern crate x86_64;
-extern crate spin;
-extern crate kernel_config;
-extern crate crossbeam_utils;
-extern crate no_drop;
-
 
 use core::{
     any::Any,
@@ -64,6 +41,7 @@ use alloc::{
     collections::BTreeMap,
     string::String,
     sync::Arc,
+    format,
 };
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{MutexIrqSafe, hold_interrupts};
@@ -76,6 +54,8 @@ use spin::Mutex;
 use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
+use log::{error, trace, warn};
+use static_assertions::{assert_not_impl_any, const_assert};
 
 /// The function signature of the callback that will be invoked
 /// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
@@ -1657,3 +1637,4 @@ mod tls_current_task {
         }
     }
 }
+

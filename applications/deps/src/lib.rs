@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate itertools;
 
 extern crate getopts;
-extern crate task;
+extern crate scheduler;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate crate_name_utils;
@@ -451,7 +451,7 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::with_current_task(|t| t.get_namespace().clone())
+    scheduler::with_current_task(|t| t.get_namespace().clone())
         .or_else(|_| mod_mgmt::get_initial_kernel_namespace().cloned().ok_or(()))
         .map_err(|_| "couldn't get current task's namespace or default namespace")
         .unwrap()

@@ -8,9 +8,6 @@ version = "0.1.0"
 log = "0.4.8"
 x86_64 = "0.14.8"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.scheduler]
 path = "../scheduler"
 

@@ -30,10 +30,10 @@
 extern crate spin;
 extern crate fs_node;
 extern crate memory;
-extern crate task;
 extern crate path;
 extern crate root;
 extern crate io;
+extern crate scheduler;
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
@@ -41,7 +41,7 @@ use spin::Mutex;
 use alloc::sync::Arc;
 use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 use memory::MappedPages;
-use task::{TaskRef, TASKLIST};
+use scheduler::{TaskRef, TASKLIST};
 use path::Path;
 use io::{ByteReader, ByteWriter, KnownLength, IoError};
 
@@ -78,7 +78,7 @@ impl TaskFs {
 
     fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {
         let id = node.parse::<usize>().map_err(|_e| "could not parse Task id as usize")?;
-        let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
+        let task_ref = scheduler::get_task(id).ok_or("could not get taskref from TASKLIST")?;
         let parent_dir = self.get_self_pointer().ok_or("BUG: tasks directory wasn't in root")?;
         let dir_name = task_ref.id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir

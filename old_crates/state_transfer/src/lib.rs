@@ -7,7 +7,7 @@ extern crate mod_mgmt;
 // #[macro_use] extern crate lazy_static;
 extern crate irq_safety;
 extern crate atomic_linked_list;
-extern crate task;
+extern crate scheduler;
 extern crate hpet;
 
 extern crate runqueue_round_robin;
@@ -19,7 +19,7 @@ use mod_mgmt::CrateNamespace;
 // use lazy_static::lazy::Lazy;
 use irq_safety::RwLockIrqSafe;
 use atomic_linked_list::atomic_map::AtomicMap;
-// use task::TaskRef;
+// use scheduler::TaskRef;
 
 
 /// This function is used for live evolution from a round robin scheduler to a priority scheduler. 

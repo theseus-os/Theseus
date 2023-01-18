@@ -10,9 +10,6 @@ spin = "0.9.4"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.task]
-path = "../../kernel/task"
-
 [dependencies.cpu]
 path = "../../kernel/cpu"
 

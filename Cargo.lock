@@ -133,8 +133,8 @@ dependencies = [
  "lazy_static",
  "logger",
  "mutex_sleep",
+ "scheduler",
  "stdio",
- "task",
  "tty",
 ]
 
@@ -156,7 +156,6 @@ dependencies = [
  "mpmc",
  "spin 0.9.4",
  "static_assertions",
- "task",
  "wait_queue",
 ]
 
@@ -316,7 +315,6 @@ dependencies = [
  "scheduler",
  "simple_ipc",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -379,7 +377,6 @@ dependencies = [
  "simd_personality",
  "spawn",
  "stack",
- "task",
  "task_fs",
  "tlb_shootdown",
  "tsc",
@@ -396,7 +393,7 @@ dependencies = [
  "getopts",
  "log",
  "path",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -404,7 +401,7 @@ name = "catch_unwind"
 version = "0.1.0"
 dependencies = [
  "log",
- "task",
+ "scheduler",
  "unwind",
 ]
 
@@ -425,7 +422,7 @@ dependencies = [
  "log",
  "path",
  "root",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -448,8 +445,8 @@ dependencies = [
  "cpu",
  "getopts",
  "log",
+ "scheduler",
  "spawn",
- "task",
  "unified_channel",
 ]
 
@@ -477,9 +474,9 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
+ "scheduler",
  "serial_port",
  "spawn",
- "task",
  "tty",
 ]
 
@@ -755,7 +752,6 @@ dependencies = [
  "log",
  "scheduler",
  "spawn",
- "task",
  "x86_64",
 ]
 
@@ -810,8 +806,8 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "scheduler",
  "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -913,7 +909,6 @@ dependencies = [
  "scheduler",
  "sleep",
  "spawn",
- "task",
  "time",
 ]
 
@@ -936,9 +931,9 @@ dependencies = [
  "nic_initialization",
  "nic_queues",
  "pci",
+ "scheduler",
  "spin 0.9.4",
  "static_assertions",
- "task",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -1027,9 +1022,9 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
+ "scheduler",
  "signal_handler",
  "stack_trace",
- "task",
  "tlb_shootdown",
  "tss",
  "unwind",
@@ -1083,7 +1078,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "path",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -1095,7 +1090,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "task",
+ "scheduler",
  "vga_buffer",
 ]
 
@@ -1441,8 +1436,8 @@ dependencies = [
  "noline",
  "path",
  "root",
+ "scheduler",
  "spawn",
- "task",
  "tty",
 ]
 
@@ -1627,7 +1622,7 @@ dependencies = [
  "app_io",
  "debugit",
  "getopts",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -1653,7 +1648,6 @@ dependencies = [
  "path",
  "spin 0.9.4",
  "stdio",
- "task",
 ]
 
 [[package]]
@@ -1703,7 +1697,6 @@ dependencies = [
  "pmu_x86",
  "scheduler",
  "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -1725,7 +1718,7 @@ dependencies = [
  "mod_mgmt",
  "path",
  "rustc-demangle",
- "task",
+ "scheduler",
  "xmas-elf",
 ]
 
@@ -1782,7 +1775,7 @@ dependencies = [
  "getopts",
  "log",
  "path",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -1950,7 +1943,7 @@ dependencies = [
  "app_io",
  "fs_node",
  "getopts",
- "task",
+ "scheduler",
  "vfs_node",
 ]
 
@@ -2148,7 +2141,6 @@ dependencies = [
  "lockable",
  "log",
  "spin 0.9.4",
- "task",
  "wait_queue",
 ]
 
@@ -2291,7 +2283,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "path",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -2375,11 +2367,11 @@ dependencies = [
  "network_manager",
  "percent-encoding",
  "rand",
+ "scheduler",
  "sha3",
  "smoltcp 0.5.0",
  "smoltcp_helper",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -2451,9 +2443,9 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "scheduler",
  "stack_trace",
  "stack_trace_frame_pointers",
- "task",
  "unwind",
 ]
 
@@ -2615,8 +2607,8 @@ dependencies = [
  "pit_clock",
  "port_io",
  "raw-cpuid",
+ "scheduler",
  "spin 0.9.4",
- "task",
  "x86_64",
 ]
 
@@ -2685,7 +2677,6 @@ dependencies = [
  "app_io",
  "getopts",
  "scheduler",
- "task",
 ]
 
 [[package]]
@@ -2725,7 +2716,7 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "getopts",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -2854,7 +2845,6 @@ dependencies = [
  "log",
  "scheduler",
  "spin 0.9.4",
- "task",
  "wait_queue",
 ]
 
@@ -2889,7 +2879,7 @@ dependencies = [
  "log",
  "path",
  "root",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -2910,7 +2900,6 @@ dependencies = [
  "app_io",
  "getopts",
  "scheduler",
- "task",
 ]
 
 [[package]]
@@ -2937,7 +2926,6 @@ dependencies = [
  "log",
  "scheduler",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -3008,10 +2996,24 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "cfg-if 1.0.0",
+ "context_switch",
+ "cpu",
+ "crossbeam-utils",
+ "environment",
+ "irq_safety",
+ "kernel_config",
  "log",
+ "memory",
+ "mod_mgmt",
  "mutex_preemption",
+ "no_drop",
  "preemption",
- "task",
+ "root",
+ "spin 0.9.4",
+ "stack",
+ "static_assertions",
+ "tss",
+ "x86_64",
 ]
 
 [[package]]
@@ -3156,7 +3158,6 @@ dependencies = [
  "spawn",
  "spin 0.9.4",
  "stdio",
- "task",
  "window_manager",
 ]
 
@@ -3168,7 +3169,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
- "task",
  "thread_local_macro",
  "x86_64",
 ]
@@ -3185,7 +3185,6 @@ dependencies = [
  "mod_mgmt",
  "pit_clock",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -3211,7 +3210,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
  "log",
- "task",
 ]
 
 [[package]]
@@ -3245,7 +3243,6 @@ dependencies = [
  "irq_safety",
  "lazy_static",
  "scheduler",
- "task",
  "time",
 ]
 
@@ -3306,7 +3303,6 @@ dependencies = [
  "scheduler",
  "spin 0.9.4",
  "stack",
- "task",
  "thread_local_macro",
 ]
 
@@ -3358,7 +3354,7 @@ dependencies = [
  "fallible-iterator",
  "log",
  "mod_mgmt",
- "task",
+ "scheduler",
  "unwind",
 ]
 
@@ -3433,7 +3429,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "path",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -3465,29 +3461,6 @@ version = "0.12.5"
 source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36cc66df0ac4569df1b20a16ca914f417b85a"
 
 [[package]]
-name = "task"
-version = "0.1.0"
-dependencies = [
- "context_switch",
- "cpu",
- "crossbeam-utils",
- "environment",
- "irq_safety",
- "kernel_config",
- "log",
- "memory",
- "mod_mgmt",
- "no_drop",
- "preemption",
- "root",
- "spin 0.9.4",
- "stack",
- "static_assertions",
- "tss",
- "x86_64",
-]
-
-[[package]]
 name = "task_fs"
 version = "0.1.0"
 dependencies = [
@@ -3497,8 +3470,8 @@ dependencies = [
  "memory",
  "path",
  "root",
+ "scheduler",
  "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -3516,7 +3489,6 @@ dependencies = [
  "app_io",
  "backtrace",
  "log",
- "task",
 ]
 
 [[package]]
@@ -3529,7 +3501,6 @@ dependencies = [
  "io",
  "log",
  "storage_manager",
- "task",
 ]
 
 [[package]]
@@ -3542,10 +3513,8 @@ dependencies = [
  "getopts",
  "log",
  "rendezvous",
- "scheduler",
  "spawn",
  "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -3566,7 +3535,6 @@ dependencies = [
  "shapes",
  "spawn",
  "spin 0.9.4",
- "task",
  "unified_channel",
  "window",
 ]
@@ -3621,7 +3589,6 @@ dependencies = [
  "mutex_sleep",
  "scheduler",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -3630,7 +3597,7 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "log",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -3664,7 +3631,6 @@ dependencies = [
  "logger",
  "scheduler",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -3677,7 +3643,6 @@ dependencies = [
  "irq_safety",
  "log",
  "serial_port",
- "task",
 ]
 
 [[package]]
@@ -3695,9 +3660,9 @@ name = "test_task_cancel"
 version = "0.1.0"
 dependencies = [
  "log",
+ "scheduler",
  "spawn",
  "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -3705,8 +3670,8 @@ name = "test_thread_local"
 version = "0.1.0"
 dependencies = [
  "log",
+ "scheduler",
  "spawn",
- "task",
 ]
 
 [[package]]
@@ -3719,7 +3684,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "spin 0.9.4",
- "task",
  "wait_condition",
 ]
 
@@ -3732,7 +3696,7 @@ dependencies = [
  "getopts",
  "log",
  "path",
- "task",
+ "scheduler",
  "wasmtime",
 ]
 
@@ -3837,8 +3801,8 @@ dependencies = [
  "lockable",
  "memfs",
  "path",
+ "scheduler",
  "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -3987,7 +3951,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -3997,7 +3961,7 @@ dependencies = [
  "app_io",
  "catch_unwind",
  "log",
- "task",
+ "scheduler",
 ]
 
 [[package]]
@@ -4015,9 +3979,9 @@ dependencies = [
  "network_manager",
  "ota_update_client",
  "path",
+ "scheduler",
  "smoltcp 0.5.0",
  "spin 0.9.4",
- "task",
  "vfs_node",
 ]
 
@@ -4135,7 +4099,7 @@ dependencies = [
 name = "wait_condition"
 version = "0.1.0"
 dependencies = [
- "task",
+ "scheduler",
  "wait_queue",
 ]
 
@@ -4146,7 +4110,6 @@ dependencies = [
  "irq_safety",
  "log",
  "scheduler",
- "task",
 ]
 
 [[package]]
@@ -4171,7 +4134,7 @@ dependencies = [
  "memfs",
  "path",
  "root",
- "task",
+ "scheduler",
  "wasi 0.10.0+wasi-snapshot-preview1",
  "wasmi",
 ]
@@ -4184,7 +4147,7 @@ dependencies = [
  "fs_node",
  "getopts",
  "path",
- "task",
+ "scheduler",
  "wasi_interpreter",
 ]
 
@@ -4320,9 +4283,9 @@ dependencies = [
  "mutex_sleep",
  "rand",
  "region",
+ "scheduler",
  "signal_handler",
  "spin 0.9.4",
- "task",
  "theseus_std",
  "thiserror_core2",
  "thread_local_macro",

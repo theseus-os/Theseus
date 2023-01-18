@@ -22,8 +22,8 @@ path = "../../kernel/crate_swap"
 [dependencies.memory]
 path = "../../kernel/memory"
 
-[dependencies.task]
-path = "../../kernel/task"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
 
 [dependencies.hpet]
 path = "../../kernel/acpi/hpet"

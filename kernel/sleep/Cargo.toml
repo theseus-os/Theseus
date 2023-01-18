@@ -10,9 +10,6 @@ version = "0.1.0"
 features = ["spin_no_std"]
 version = "1.2.0"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety" 
 

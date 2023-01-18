@@ -1,5 +1,5 @@
 use crate::imp;
-use task::TaskRef;
+use crate::TaskRef;
 
 #[derive(Debug)]
 pub struct RunQueue {

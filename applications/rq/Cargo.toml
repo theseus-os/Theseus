@@ -12,9 +12,6 @@ path = "../../kernel/app_io"
 [dependencies.apic]
 path = "../../kernel/apic"
 
-[dependencies.task]
-path = "../../kernel/task"
-
 [dependencies.scheduler]
 path = "../../kernel/scheduler"
 

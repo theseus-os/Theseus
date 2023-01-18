@@ -4,7 +4,6 @@ extern crate alloc;
 
 extern crate apic;
 extern crate getopts;
-extern crate task;
 extern crate scheduler;
 
 use getopts::Options;

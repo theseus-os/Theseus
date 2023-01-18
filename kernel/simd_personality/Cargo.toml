@@ -16,9 +16,6 @@ version = "0.4.8"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.spawn]
 path = "../spawn"
 

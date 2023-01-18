@@ -16,7 +16,6 @@
 #[macro_use] extern crate log;
 extern crate alloc;
 #[macro_use] extern crate app_io;
-extern crate task;
 extern crate cpu;
 extern crate spawn;
 extern crate scheduler;
@@ -30,7 +29,7 @@ use alloc::{
 };
 use getopts::{Matches, Options};
 use hpet::get_hpet;
-use task::{Task, TaskRef};
+use scheduler::{Task, TaskRef};
 use libtest::{hpet_timing_overhead, hpet_2_us};
 
 

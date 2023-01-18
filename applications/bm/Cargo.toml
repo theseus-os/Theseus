@@ -15,9 +15,6 @@ version = "0.4.8"
 [dependencies.app_io]
 path = "../../kernel/app_io"
 
-[dependencies.task]
-path = "../../kernel/task"
-
 [dependencies.hpet]
 path = "../../kernel/acpi/hpet"
 

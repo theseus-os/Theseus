@@ -9,7 +9,6 @@
 #![no_std]
 
 #[macro_use] extern crate alloc;
-extern crate task;
 extern crate hpet;
 #[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
@@ -244,7 +243,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static
 
 	start_hpet = hpet.get_counter();
 	for _ in 0..tmp_iterations {
-		mypid = task::get_my_current_task_id();
+		mypid = scheduler::get_my_current_task_id();
 	}
 	end_hpet = hpet.get_counter();
 
@@ -320,7 +319,7 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Get path to application "hello" that we're going to spawn
-	let namespace = task::with_current_task(|t| t.get_namespace().clone())
+	let namespace = scheduler::with_current_task(|t| t.get_namespace().clone())
 		.map_err(|_| "could not find the application namespace")?;
 	let namespace_dir = namespace.dir();
 	let app_path = namespace_dir.get_file_starting_with("hello-")
@@ -1523,7 +1522,7 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 
 /// Helper function to get the name of current task
 fn get_prog_name() -> String {
-	task::with_current_task(|t| t.name.clone())
+	scheduler::with_current_task(|t| t.name.clone())
 		.unwrap_or_else(|_| {
             printlninfo!("failed to get current task");
             "Unknown".to_string()
@@ -1532,7 +1531,7 @@ fn get_prog_name() -> String {
 
 /// Helper function to get the PID of current task
 fn getpid() -> usize {
-	task::get_my_current_task_id()
+	scheduler::get_my_current_task_id()
 }
 
 
@@ -1551,7 +1550,7 @@ fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
 
 /// Helper function to get current working directory
 fn get_cwd() -> Option<DirRef> {
-	task::with_current_task(|t| 
+	scheduler::with_current_task(|t| 
 		Arc::clone(&t.get_env().lock().working_dir)
 	).ok()
 }

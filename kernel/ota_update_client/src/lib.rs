@@ -10,7 +10,7 @@ extern crate smoltcp;
 extern crate network_manager;
 extern crate hpet;
 extern crate spawn;
-extern crate task;
+extern crate scheduler;
 extern crate sha3;
 extern crate percent_encoding;
 extern crate rand;

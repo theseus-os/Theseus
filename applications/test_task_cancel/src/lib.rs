@@ -16,7 +16,7 @@ pub fn main(_: Vec<String>) -> isize {
 
     while !lock.is_locked() {}
 
-    task.kill(task::KillReason::Requested)
+    task.kill(scheduler::KillReason::Requested)
         .expect("failed to abort task");
 
     log::debug!("waiting for lock to be unlocked");

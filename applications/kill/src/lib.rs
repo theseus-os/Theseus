@@ -3,7 +3,7 @@ extern crate alloc;
 #[macro_use] extern crate app_io;
 // #[macro_use] extern crate debugit;
 
-extern crate task;
+extern crate scheduler;
 extern crate getopts;
 
 use getopts::Options;
@@ -59,8 +59,8 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
-    if let Some(task_ref) = task::get_task(task_id) {
-        if task_ref.kill(task::KillReason::Requested)
+    if let Some(task_ref) = scheduler::get_task(task_id) {
+        if task_ref.kill(scheduler::KillReason::Requested)
             .and_then(|_| runqueue::remove_task_from_all(&task_ref))
             .is_ok() 
         {

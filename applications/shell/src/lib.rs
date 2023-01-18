@@ -9,7 +9,6 @@ extern crate keycodes_ascii;
 extern crate spin;
 extern crate dfqueue;
 extern crate spawn;
-extern crate task;
 extern crate event_types; 
 extern crate window_manager;
 extern crate path;
@@ -30,7 +29,7 @@ use keycodes_ascii::{Keycode, KeyAction, KeyEvent};
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use path::Path;
-use task::{ExitValue, KillReason, JoinableTaskRef};
+use scheduler::{ExitValue, KillReason, JoinableTaskRef};
 use libterm::Terminal;
 use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
@@ -104,7 +103,7 @@ pub fn main(_args: Vec<String>) -> isize {
     }
 
     // block this task, because it never needs to actually run again
-    task::with_current_task(|t| t.block())
+    scheduler::with_current_task(|t| t.block())
         .expect("shell::main(): failed to get current task")
         .expect("shell:main(): failed to block the main shell task");
     scheduler::schedule();
@@ -631,7 +630,7 @@ impl Shell {
     fn create_single_task(&mut self, cmd: String, args: Vec<String>) -> Result<JoinableTaskRef, AppErr> {
 
         // Check that the application actually exists
-        let namespace_dir = task::with_current_task(|t|
+        let namespace_dir = scheduler::with_current_task(|t|
             t.get_namespace().dir().clone()
         ).map_err(|_| AppErr::NamespaceErr)?;
         let cmd_crate_name = format!("{}-", cmd);
@@ -806,7 +805,7 @@ impl Shell {
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
     fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
-        let namespace_dir = task::with_current_task(|t|
+        let namespace_dir = scheduler::with_current_task(|t|
             t.get_namespace().dir().clone()
         ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
 
@@ -836,7 +835,7 @@ impl Shell {
         // Stores all possible matches.
         let mut match_list = Vec::new();
         // Get current working dir.
-        let Ok(mut curr_wd) = task::with_current_task(|t|
+        let Ok(mut curr_wd) = scheduler::with_current_task(|t|
             t.get_env().lock().working_dir.clone()
         ) else {
             return Err("failed to get current task while completing cmdline");

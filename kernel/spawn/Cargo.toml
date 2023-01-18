@@ -29,9 +29,6 @@ path = "../stack"
 [dependencies.cpu]
 path = "../cpu"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.catch_unwind]
 path = "../catch_unwind"
 

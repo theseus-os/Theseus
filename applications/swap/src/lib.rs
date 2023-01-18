@@ -14,7 +14,7 @@ extern crate memory;
 extern crate mod_mgmt;
 extern crate crate_swap;
 extern crate hpet;
-extern crate task;
+extern crate scheduler;
 extern crate path;
 extern crate fs_node;
 
@@ -68,7 +68,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-    let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+    let Ok(curr_dir) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         return Err("failed to get current task".to_string());
     };
     let override_namespace_crate_dir = if let Some(path) = matches.opt_str("d") {
@@ -153,7 +153,7 @@ fn do_swap(
     cache_old_crates: bool
 ) -> Result<(), String> {
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel_mmi_ref".to_string())?;
-    let namespace = task::with_current_task(|t| t.get_namespace().clone())
+    let namespace = scheduler::with_current_task(|t| t.get_namespace().clone())
         .map_err(|_| "Couldn't get current task")?;
 
     let swap_requests = {

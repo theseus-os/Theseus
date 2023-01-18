@@ -14,7 +14,7 @@ extern crate path;
 extern crate memory;
 extern crate rustc_demangle;
 extern crate mod_mgmt;
-extern crate task;
+extern crate scheduler;
 extern crate xmas_elf;
 extern crate libc; // for basic C types/typedefs used in libc
 
@@ -63,7 +63,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<c_int, String> {
-    let (curr_wd, namespace, mmi) = task::with_current_task(|curr_task|
+    let (curr_wd, namespace, mmi) = scheduler::with_current_task(|curr_task|
         (
             curr_task.get_env().lock().working_dir.clone(),
             curr_task.get_namespace().clone(),
@@ -277,7 +277,7 @@ fn parse_and_load_elf_executable(
         // debug!("Adjusted segment vaddr: {:#X}, size: {:#X}, {:?}", start_vaddr, memory_size_in_bytes, this_ap.start_address());
 
         let initial_flags = convert_to_pte_flags(prog_hdr.flags());
-        let mmi = task::with_current_task(|t| t.mmi.clone()).unwrap();
+        let mmi = scheduler::with_current_task(|t| t.mmi.clone()).unwrap();
         // Must initially map the memory as writable so we can copy the segment data to it later. 
         let mut mp = mmi.lock().page_table
             .map_allocated_pages(this_ap, initial_flags.writable(true))

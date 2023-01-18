@@ -2,7 +2,6 @@
 extern crate alloc;
 #[macro_use] extern crate app_io;
 
-extern crate task;
 extern crate getopts;
 extern crate scheduler;
 
@@ -10,7 +9,7 @@ use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
 use core::fmt::Write;
-use task::TASKLIST;
+use scheduler::TASKLIST;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();

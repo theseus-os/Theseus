@@ -11,8 +11,8 @@ getopts = "0.2.21"
 [dependencies.app_io]
 path = "../../kernel/app_io"
 
-[dependencies.task]
-path = "../../kernel/task"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"
 
 [dependencies.path]
 path = "../../kernel/path"

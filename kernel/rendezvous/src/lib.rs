@@ -24,7 +24,6 @@ extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate wait_queue;
-extern crate task;
 extern crate scheduler;
 
 #[cfg(downtime_eval)]
@@ -220,7 +219,7 @@ impl <T: Send> Sender<T> {
             let value = hpet::get_hpet().as_ref().unwrap().get_counter();
             // debug!("Value {} {}", value, value % 1024);
             // Fault mimicing a memory write. Function could panic when getting task
-            if (value % 4096) == 0  && task::with_current_task(|t| t.is_restartable()).unwrap_or(false) {
+            if (value % 4096) == 0  && scheduler::with_current_task(|t| t.is_restartable()).unwrap_or(false) {
                 // debug!("Fake error {}", value);
                 unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
             }
@@ -240,7 +239,7 @@ impl <T: Send> Sender<T> {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    let curr = task::get_my_current_task().ok_or("couldn't get current task")?;
+                    let curr = scheduler::get_my_current_task().ok_or("couldn't get current task")?;
                     *exchange_state = ExchangeState::WaitingForReceiver(
                         WaitGuard::new(curr).map_err(|_| "failed to create wait guard")?,
                         msg,
@@ -287,7 +286,7 @@ impl <T: Send> Sender<T> {
                 let exchange_state = sender_slot.0.lock();
                 match &*exchange_state {
                     ExchangeState::WaitingForReceiver(blocked_sender, ..) => {
-                        if task::with_current_task(|t| t != blocked_sender.task())
+                        if scheduler::with_current_task(|t| t != blocked_sender.task())
                             .unwrap_or(true)
                         {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
@@ -378,7 +377,7 @@ impl <T: Send> Receiver<T> {
     /// otherwise returns an error.
     pub fn receive(&self) -> Result<T, &'static str> {
         // trace!("rendezvous: receive() entry");
-        let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
+        let curr_task = scheduler::get_my_current_task().ok_or("couldn't get current task")?;
         
         // obtain a receiver-side exchange slot, blocking if necessary
         let receiver_slot = self.channel.take_receiver_slot().map_err(|_| "failed to take_receiver_slot")?;

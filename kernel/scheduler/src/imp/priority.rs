@@ -1,6 +1,6 @@
+use crate::TaskRef;
 use alloc::collections::VecDeque;
 use core::cmp::{max, min};
-use task::TaskRef;
 
 const MAX_PRIORITY: u8 = 40;
 const DEFAULT_PRIORITY: u8 = 20;

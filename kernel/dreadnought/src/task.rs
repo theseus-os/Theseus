@@ -7,7 +7,7 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use task::{ExitValue, JoinableTaskRef, KillReason, PanicInfoOwned};
+use scheduler::{ExitValue, JoinableTaskRef, KillReason, PanicInfoOwned};
 
 /// Spawns a new asynchronous task, returning a [`JoinableAsyncTaskRef`] for it.
 ///

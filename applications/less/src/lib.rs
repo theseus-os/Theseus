@@ -4,7 +4,7 @@
 // FIXME
 
 extern crate alloc;
-// extern crate task;
+// extern crate scheduler;
 // extern crate getopts;
 // extern crate path;
 // extern crate fs_node;
@@ -41,7 +41,7 @@ use alloc::{
 
 // /// Read the whole file to a String.
 // fn get_content_string(file_path: String) -> Result<String, String> {
-//     let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+//     let Ok(curr_wd) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
 //         return Err("failed to get current task".to_string());
 //     };
 //     let path = Path::new(file_path);

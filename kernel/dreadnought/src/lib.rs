@@ -44,7 +44,7 @@ where
     // Pin the future onto the stack. This works because we don't send it anywhere.
     pin_mut!(future);
     let activated = Arc::new(Mutex::new(false));
-    let task = ::task::get_my_current_task().expect("failed to get current task");
+    let task = ::scheduler::get_my_current_task().expect("failed to get current task");
     let waker = core::task::Waker::from(Arc::new(Waker {
         activated: activated.clone(),
         task: task.clone(),
@@ -78,7 +78,7 @@ struct Waker {
     /// `execute` blocking the task. The field cannot be an atomic as the lock
     /// must be held while blocking or unblocking the task.
     activated: Arc<Mutex<bool>>,
-    task: ::task::TaskRef,
+    task: ::scheduler::TaskRef,
 }
 
 impl Wake for Waker {

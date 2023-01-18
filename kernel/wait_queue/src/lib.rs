@@ -4,13 +4,12 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate irq_safety;
-extern crate task;
 extern crate scheduler;
 
 
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
-use task::{TaskRef, RunState};
+use scheduler::{TaskRef, RunState};
 
 
 /// An object that holds a blocked `Task` 
@@ -23,7 +22,7 @@ impl WaitGuard {
     /// that will automatically unblock that Task when it is dropped. 
     ///
     /// Returns an error if the task cannot be blocked;
-    /// see [`task::Task::block()`] for more details.
+    /// see [`scheduler::Task::block()`] for more details.
     pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
         task.block()?;
         Ok(WaitGuard { task })
@@ -33,7 +32,7 @@ impl WaitGuard {
     /// which is useful to re-block a task after it spuriously woke up. 
     ///
     /// Returns an error if the task cannot be blocked;
-    /// see [`task::Task::block()`] for more details.
+    /// see [`scheduler::Task::block()`] for more details.
     pub fn block_again(&self) -> Result<RunState, RunState> {
         self.task.block()
     }
@@ -125,7 +124,7 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                task::with_current_task(|curr_task| {
+                scheduler::with_current_task(|curr_task| {
                     // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
                     if !wq_locked.contains(curr_task) {
                         wq_locked.push_back(curr_task.clone());
@@ -157,7 +156,7 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                task::with_current_task(|curr_task| {
+                scheduler::with_current_task(|curr_task| {
                     // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
                     if !wq_locked.contains(curr_task) {
                         wq_locked.push_back(curr_task.clone());

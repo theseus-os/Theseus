@@ -8,7 +8,7 @@ extern crate alloc;
 #[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate unified_channel;
-extern crate task;
+extern crate scheduler;
 extern crate spawn;
 extern crate cpu;
 

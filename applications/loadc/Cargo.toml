@@ -26,5 +26,5 @@ path = "../../kernel/memory"
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"
 
-[dependencies.task]
-path = "../../kernel/task"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

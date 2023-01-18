@@ -1,5 +1,5 @@
+use crate::TaskRef;
 use alloc::collections::VecDeque;
-use task::TaskRef;
 
 #[derive(Debug)]
 pub(crate) struct Queue {

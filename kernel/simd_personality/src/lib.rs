@@ -69,7 +69,7 @@ extern crate compiler_builtins as _compiler_builtins;
 #[macro_use] extern crate alloc;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate task;
+extern crate scheduler;
 extern crate spawn;
 extern crate cpu;
 extern crate fs_node;
@@ -80,7 +80,7 @@ use alloc::{
 	sync::Arc,
 };
 use mod_mgmt::{CrateNamespace, CrateType, NamespaceDir, get_initial_kernel_namespace, get_namespaces_directory};
-use task::SimdExt;
+use scheduler::SimdExt;
 
 
 /// Initializes a new SIMD personality based on the provided `simd_ext` level of given SIMD extensions, e.g., SSE, AVX.

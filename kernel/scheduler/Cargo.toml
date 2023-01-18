@@ -6,11 +6,39 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-log = "0.4.8"
 cfg-if = "1.0.0"
+spin = "0.9.4"
+x86_64 = "0.14.8"
+static_assertions = "1.1.0"
+crossbeam-utils = { version = "0.8.12", default-features = false }
+log = "0.4.8"
 
-[dependencies.task]
-path = "../task"
+[dependencies.atomic_linked_list]
+path = "../../libs/atomic_linked_list"
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.cpu]
+path = "../cpu"
+
+[dependencies.tss]
+path = "../tss"
+
+[dependencies.kernel_config]
+path = "../kernel_config"
+
+[dependencies.memory]
+path = "../memory"
+
+[dependencies.stack]
+path = "../stack"
+
+[dependencies.mod_mgmt]
+path = "../mod_mgmt"
+
+[dependencies.context_switch]
+path = "../context_switch"
 
 [dependencies.preemption]
 path = "../preemption"
@@ -18,8 +46,14 @@ path = "../preemption"
 [dependencies.mutex_preemption]
 path = "../mutex_preemption"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
+[dependencies.environment]
+path = "../environment"
+
+[dependencies.root]
+path = "../root"
+
+[dependencies.no_drop]
+path = "../no_drop"
 
 [lib]
 crate-type = ["rlib"]

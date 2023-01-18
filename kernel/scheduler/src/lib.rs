@@ -1,15 +1,23 @@
+#![feature(thread_local, negative_impls, panic_info_message)]
 #![no_std]
 
 extern crate alloc;
 
 mod imp;
 mod queue;
+mod task;
 
 use crate::queue::RunQueue;
 use atomic_linked_list::atomic_map::AtomicMap;
 use log::error;
 use mutex_preemption::RwLockPreempt;
-use task::TaskRef;
+
+pub use task::{
+    bootstrap_task, get_my_current_task, get_my_current_task_id, get_task, init_current_task,
+    set_kill_handler, take_kill_handler, with_current_task, with_current_task_and_value, ExitValue,
+    ExitableTaskRef, JoinableTaskRef, KillReason, PanicInfoOwned, RestartInfo, RunState, Task,
+    TaskRef, TASKLIST,
+};
 
 static RUN_QUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
 

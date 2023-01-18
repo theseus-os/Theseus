@@ -10,7 +10,7 @@ extern crate mod_mgmt;
 extern crate fs_node;
 extern crate path;
 extern crate crate_swap;
-extern crate task;
+extern crate scheduler;
 extern crate fault_log;
 
 use core::ptr;
@@ -305,7 +305,7 @@ pub fn constant_offset_fix(
 /// This function handles 1 and 2 operations and 3 is handled in the call site depending on necessity
 pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
-    let taskref = task::get_my_current_task()
+    let taskref = scheduler::get_my_current_task()
         .ok_or_else(|| "failed to get current task".to_string())?;
 
     #[cfg(not(downtime_eval))]
@@ -346,7 +346,7 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
         }
     };
 
-    for (_id, taskref) in task::TASKLIST.lock().iter() {
+    for (_id, taskref) in scheduler::TASKLIST.lock().iter() {
         let (bottom, top) = taskref.with_kstack(|kstack| 
             (kstack.bottom().value(), kstack.top_usable().value())
         ); 

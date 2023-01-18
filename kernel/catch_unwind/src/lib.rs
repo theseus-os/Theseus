@@ -4,11 +4,11 @@
 #![feature(core_intrinsics)]
 
 extern crate alloc; 
-extern crate task;
+extern crate scheduler;
 
 use core::mem::ManuallyDrop;
 use alloc::boxed::Box;
-use task::KillReason;
+use scheduler::KillReason;
 
 /// Invokes the given closure `f`, catching a panic as it is unwinding the stack.
 /// 
@@ -112,6 +112,6 @@ pub fn resume_unwind(caught_panic_reason: KillReason) -> ! {
     // `start_unwinding` should not return
     panic!("BUG: start_unwinding() returned {:?}. This is an unexpected failure, as no unwinding occurred. Task: {:?}.",
         result,
-        task::get_my_current_task()
+        scheduler::get_my_current_task()
     );
 }

@@ -2,14 +2,14 @@
 #[macro_use] extern crate app_io;
 
 extern crate alloc;
-extern crate task;
+extern crate scheduler;
 extern crate getopts;
 
 use alloc::vec::Vec;
 use alloc::string::String;
 
 pub fn main(_args: Vec<String>) -> isize {
-    task::with_current_task(|t| {
+    scheduler::with_current_task(|t| {
         println!("{}", t.get_env().lock().cwd());
         0
     }).unwrap_or_else(|_| {

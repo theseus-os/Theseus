@@ -11,7 +11,7 @@ extern crate alloc;
 extern crate itertools;
 
 extern crate getopts;
-extern crate task;
+extern crate scheduler;
 extern crate ota_update_client;
 extern crate network_manager;
 extern crate memory;
@@ -189,7 +189,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
     };
     
     // save each new crate to a file 
-    let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+    let Ok(curr_dir) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         return Err("failed to get current task's working directory".to_string());
     };
     let new_namespace_dir = NamespaceDir::new(make_unique_directory(update_build, &curr_dir)?);
@@ -221,7 +221,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     }
 
     let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel MMI".to_string())?;
-    let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+    let Ok(curr_dir) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         return Err("failed to get current task's working directory".to_string());
     };
     let new_namespace_dir = match base_dir_path.get(&curr_dir) {
@@ -295,7 +295,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
 
 
 fn get_my_current_namespace() -> Arc<CrateNamespace> {
-    task::with_current_task(|t| t.get_namespace().clone())
+    scheduler::with_current_task(|t| t.get_namespace().clone())
         .unwrap_or_else(|_|
             mod_mgmt::get_initial_kernel_namespace()
                 .expect("BUG: initial kernel namespace wasn't initialized")

@@ -25,9 +25,6 @@ path = "../../kernel/event_types"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.task]
-path = "../../kernel/task"
-
 [dependencies.window_manager]
 path = "../../kernel/window_manager"
 

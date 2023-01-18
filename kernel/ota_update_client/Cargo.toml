@@ -24,8 +24,8 @@ path = "../acpi/hpet"
 [dependencies.spawn]
 path = "../spawn"
 
-[dependencies.task]
-path = "../task"
+[dependencies.scheduler]
+path = "../scheduler"
 
 [dependencies.http_client]
 path = "../http_client"

@@ -24,7 +24,7 @@ extern crate spin;
 extern crate memchr;
 extern crate cbitset;
 extern crate memory;
-extern crate task;
+extern crate scheduler;
 extern crate cstr_core;
 extern crate core2;
 

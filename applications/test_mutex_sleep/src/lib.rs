@@ -2,7 +2,6 @@
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
-extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate mutex_sleep;
@@ -73,7 +72,7 @@ fn test_contention() -> Result<(), &'static str> {
 
 
 fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
-    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+    let curr_task = scheduler::with_current_task(|t| format!("{}", t.deref()))
         .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
@@ -131,7 +130,7 @@ fn test_lockstep() -> Result<(), &'static str> {
 
 
 fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(), &'static str> {
-    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+    let curr_task = scheduler::with_current_task(|t| format!("{}", t.deref()))
         .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 

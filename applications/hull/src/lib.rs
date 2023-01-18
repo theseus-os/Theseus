@@ -198,7 +198,7 @@ impl Shell {
     }
 
     fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<Job> {
-        let namespace_dir = task::get_my_current_task()
+        let namespace_dir = scheduler::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .expect("couldn't get namespace dir");
 

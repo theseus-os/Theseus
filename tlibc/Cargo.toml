@@ -17,9 +17,6 @@ cbitset = "0.2.0"
 [dependencies.memory]
 path = "../kernel/memory"
 
-[dependencies.task]
-path = "../kernel/task"
-
 [dependencies.app_io]
 path = "../kernel/app_io"
 

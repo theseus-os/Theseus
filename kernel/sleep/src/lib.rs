@@ -9,7 +9,6 @@
 //! TODO: use regular time-keeping abstractions like Duration and Instant.
 
 #![no_std]
-extern crate task;
 extern crate irq_safety;
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
@@ -20,7 +19,7 @@ extern crate crossbeam_utils;
 use core::task::Waker;
 use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
-use task::{get_my_current_task, TaskRef, RunState};
+use scheduler::{get_my_current_task, TaskRef, RunState};
 use crossbeam_utils::atomic::AtomicCell;
 use time::{now, Instant, Monotonic};
 

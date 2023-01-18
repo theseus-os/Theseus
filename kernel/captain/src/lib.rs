@@ -33,7 +33,6 @@ extern crate cpu;
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate tsc;
-extern crate task; 
 extern crate interrupts;
 extern crate acpi;
 extern crate device_manager;
@@ -169,9 +168,9 @@ pub fn init(
     // create a SIMD personality
     #[cfg(simd_personality)] {
         #[cfg(simd_personality_sse)]
-        let simd_ext = task::SimdExt::SSE;
+        let simd_ext = scheduler::SimdExt::SSE;
         #[cfg(simd_personality_avx)]
-        let simd_ext = task::SimdExt::AVX;
+        let simd_ext = scheduler::SimdExt::AVX;
         warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
         spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
             .name(alloc::format!("setup_simd_personality_{:?}", simd_ext))

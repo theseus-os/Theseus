@@ -4,10 +4,10 @@
 #![feature(trait_alias)]
 
 // #[macro_use] extern crate log;
-extern crate task;
+extern crate scheduler;
 extern crate wait_queue;
 
-use task::TaskRef;
+use scheduler::TaskRef;
 use wait_queue::{WaitQueue, WaitError};
 
 

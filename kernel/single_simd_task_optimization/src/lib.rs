@@ -17,9 +17,9 @@ cfg_if! { if #[cfg(single_simd_task_optimization)] {
 
 
 #[macro_use] extern crate log;
-extern crate task;
+extern crate scheduler;
 
-use task::TaskRef;
+use scheduler::TaskRef;
 
 
 /// This function should be called when there was a new SIMD-enabled Task

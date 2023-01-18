@@ -118,7 +118,7 @@ pub fn remove_child_streams(task_id: usize) -> Option<IoStreams> {
 }
 
 pub fn streams() -> Result<IoStreams, &'static str> {
-    let task_id = task::get_my_current_task_id();
+    let task_id = scheduler::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(streams) => Ok(streams.clone()),
@@ -133,7 +133,7 @@ pub fn streams() -> Result<IoStreams, &'static str> {
 /// the map. Shells should make sure to store IoStreams for the newly spawned
 /// app first, and then unblocks the app to let it run.
 pub fn stdin() -> Result<Arc<dyn ImmutableRead>, &'static str> {
-    let task_id = task::get_my_current_task_id();
+    let task_id = scheduler::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdin.clone()),
@@ -148,7 +148,7 @@ pub fn stdin() -> Result<Arc<dyn ImmutableRead>, &'static str> {
 /// the map. Shells should make sure to store IoStreams for the newly spawned
 /// app first, and then unblocks the app to let it run.
 pub fn stdout() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
-    let task_id = task::get_my_current_task_id();
+    let task_id = scheduler::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stdout.clone()),
@@ -163,7 +163,7 @@ pub fn stdout() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
 /// the map. Shells should make sure to store IoStreams for the newly spawned
 /// app first, and then unblocks the app to let it run.
 pub fn stderr() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
-    let task_id = task::get_my_current_task_id();
+    let task_id = scheduler::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(queues) => Ok(queues.stderr.clone()),
@@ -173,7 +173,7 @@ pub fn stderr() -> Result<Arc<dyn ImmutableWrite>, &'static str> {
 
 /// Returns the application's line discipline.
 pub fn line_discipline() -> Result<Arc<LineDiscipline>, &'static str> {
-    let task_id = task::get_my_current_task_id();
+    let task_id = scheduler::get_my_current_task_id();
     let locked_streams = shared_maps::lock_stream_map();
     match locked_streams.get(&task_id) {
         Some(IoStreams {
@@ -204,7 +204,7 @@ macro_rules! print {
 /// Converts the given `core::fmt::Arguments` to a `String` and enqueues the
 /// string into the correct terminal print-producer
 pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
-    let task_id = task::get_my_current_task_id();
+    let task_id = scheduler::get_my_current_task_id();
 
     // Obtains the correct stdout stream and push the output bytes.
     let locked_streams = shared_maps::lock_stream_map();

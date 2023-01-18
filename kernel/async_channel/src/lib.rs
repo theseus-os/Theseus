@@ -23,7 +23,7 @@ extern crate core2;
 #[cfg(downtime_eval)]
 extern crate hpet;
 #[cfg(downtime_eval)]
-extern crate task;
+extern crate scheduler;
 
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
@@ -300,7 +300,7 @@ impl <T: Send> Sender<T> {
             let value = hpet::get_hpet().as_ref().unwrap().get_counter();
             // debug!("Value {} {}", value, value % 1024);
 
-            let is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(false);
+            let is_restartable = scheduler::with_current_task(|t| t.is_restartable()).unwrap_or(false);
             // We restrict the fault to a specific task to make measurements consistent
             if (value % 4096) == 0  && is_restartable {
                 // debug!("Fake error {}", value);

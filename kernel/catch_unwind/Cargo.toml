@@ -10,8 +10,8 @@ version = "0.4.8"
 [dependencies.unwind]
 path = "../unwind"
 
-[dependencies.task]
-path = "../task"
+[dependencies.scheduler]
+path = "../scheduler"
 
 [lib]
 crate-type = ["rlib"]

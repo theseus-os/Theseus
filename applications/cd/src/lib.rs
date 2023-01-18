@@ -7,7 +7,7 @@ extern crate fs_node;
 extern crate getopts;
 extern crate path;
 extern crate root;
-extern crate task;
+extern crate scheduler;
 
 use alloc::string::String;
 use alloc::string::ToString;
@@ -29,7 +29,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    let Ok(curr_env) = task::with_current_task(|t| t.get_env()) else {
+    let Ok(curr_env) = scheduler::with_current_task(|t| t.get_env()) else {
         println!("failed to get current task");
         return -1;
     };

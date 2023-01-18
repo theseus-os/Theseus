@@ -7,7 +7,7 @@ extern crate alloc;
 
 extern crate getopts;
 extern crate memory;
-extern crate task;
+extern crate scheduler;
 extern crate mod_mgmt;
 extern crate fs_node;
 extern crate path;
@@ -60,7 +60,7 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-    let (namespace, curr_wd) = task::with_current_task(|t|
+    let (namespace, curr_wd) = scheduler::with_current_task(|t|
         (t.get_namespace().clone(), t.get_env().lock().working_dir.clone())
     ).map_err(|_| String::from("failed to get current task"))?;
 

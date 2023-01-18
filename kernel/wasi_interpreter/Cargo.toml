@@ -26,5 +26,5 @@ path = "../../kernel/path"
 [dependencies.root]
 path = "../../kernel/root"
 
-[dependencies.task]
-path = "../../kernel/task"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

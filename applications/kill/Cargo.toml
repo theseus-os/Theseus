@@ -12,5 +12,5 @@ path = "../../libs/debugit"
 [dependencies.app_io]
 path = "../../kernel/app_io"
 
-[dependencies.task]
-path = "../../kernel/task"
+[dependencies.scheduler]
+path = "../../kernel/scheduler"

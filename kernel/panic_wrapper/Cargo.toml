@@ -18,8 +18,8 @@ path = "../mod_mgmt"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.task]
-path = "../task"
+[dependencies.scheduler]
+path = "../scheduler"
 
 [dependencies.unwind]
 path = "../unwind"

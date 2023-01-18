@@ -24,7 +24,7 @@ extern crate app_io;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
-extern crate task;
+extern crate scheduler;
 extern crate wasi_interpreter;
 
 use alloc::{string::String, vec::Vec};
@@ -59,7 +59,7 @@ pub fn main(args: Vec<String>) -> isize {
     let preopened_dirs: Vec<String> = matches.opt_strs("d");
 
     // Get current working directory.
-    let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+    let Ok(curr_wd) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         println!("failed to get current task");
         return -1;
     };

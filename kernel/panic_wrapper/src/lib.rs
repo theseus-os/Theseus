@@ -9,7 +9,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate task;
+extern crate scheduler;
 extern crate unwind;
 extern crate stack_trace;
 extern crate stack_trace_frame_pointers;
@@ -18,7 +18,7 @@ extern crate fault_log;
 use core::panic::PanicInfo;
 // use alloc::string::String;
 use memory::VirtualAddress;
-use task::{KillReason, PanicInfoOwned};
+use scheduler::{KillReason, PanicInfoOwned};
 use fault_log::log_panic_entry;
 
 /// Performs the standard panic handling routine, which involves the following:
@@ -56,7 +56,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         }
         #[cfg(frame_pointers)] {
             error!("------------------ Stack Trace (frame pointers) ------------------");
-            let (namespace, mmi_ref) = match task::with_current_task(|t|
+            let (namespace, mmi_ref) = match scheduler::with_current_task(|t|
                 (t.get_namespace().clone(), t.mmi.clone())
             ) {
                 Ok((ns, mmi)) => (ns, mmi),
@@ -93,11 +93,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     error!("------------------------------------------------------------------");
 
     // Call this task's kill handler, if it has one.
-    if let Some(ref kh_func) = task::take_kill_handler() {
-        debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
+    if let Some(ref kh_func) = scheduler::take_kill_handler() {
+        debug!("Found kill handler callback to invoke in Task {:?}", scheduler::get_my_current_task());
         kh_func(&KillReason::Panic(PanicInfoOwned::from(panic_info)));
     } else {
-        debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
+        debug!("No kill handler callback in Task {:?}", scheduler::get_my_current_task());
     }
 
     // Start the unwinding process
@@ -105,11 +105,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         let cause = KillReason::Panic(PanicInfoOwned::from(panic_info));
         match unwind::start_unwinding(cause, 5) {
             Ok(_) => {
-                warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", task::get_my_current_task());
+                warn!("BUG: start_unwinding() returned an Ok() value, which is unexpected because it means no unwinding actually occurred. Task: {:?}.", scheduler::get_my_current_task());
                 Ok(())
             }
             Err(e) => {
-                error!("Task {:?} was unable to start unwinding procedure, error: {}.", task::get_my_current_task(), e);
+                error!("Task {:?} was unable to start unwinding procedure, error: {}.", scheduler::get_my_current_task(), e);
                 Err(e)
             }
         }

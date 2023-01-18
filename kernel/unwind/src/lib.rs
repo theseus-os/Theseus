@@ -41,7 +41,7 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mod_mgmt;
-extern crate task;
+extern crate scheduler;
 extern crate gimli;
 extern crate fallible_iterator;
 extern crate interrupts;
@@ -79,7 +79,7 @@ use mod_mgmt::{
     StrongSectionRef,
 };
 use memory::VirtualAddress;
-use task::{TaskRef, KillReason};
+use scheduler::{TaskRef, KillReason};
 
 
 /// This is the context/state that is used during unwinding and passed around
@@ -727,7 +727,7 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
-        let current_task = task::get_my_current_task().ok_or("couldn't get current task")?;
+        let current_task = scheduler::get_my_current_task().ok_or("couldn't get current task")?;
         let namespace = current_task.get_namespace();
 
         Box::into_raw(Box::new(
@@ -944,7 +944,7 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     
     (current_task.failure_cleanup_function)(
-        task::ExitableTaskRef::obtain_for_unwinder(current_task),
+        scheduler::ExitableTaskRef::obtain_for_unwinder(current_task),
         cause,
     )
 }

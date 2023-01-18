@@ -147,7 +147,7 @@ impl PosixNode {
     /// Returns relative path of file descriptor as a string.
     pub fn get_relative_path(&self) -> String {
         let absolute_path = Path::new(self.theseus_file_or_dir.get_absolute_path());
-        let wd_path = task::with_current_task(|t|
+        let wd_path = scheduler::with_current_task(|t|
             Path::new(t.get_env().lock().cwd())
         ).expect("couldn't get current task");
 

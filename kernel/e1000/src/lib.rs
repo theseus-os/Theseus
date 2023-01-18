@@ -26,7 +26,7 @@ extern crate nic_queues;
 extern crate nic_initialization;
 extern crate net;
 extern crate deferred_interrupt_tasks;
-extern crate task;
+extern crate scheduler;
 
 pub mod test_e1000_driver;
 mod regs;
@@ -145,7 +145,7 @@ pub struct E1000Nic {
     regs: BorrowedMappedPages<E1000Registers, Mutable>,
     /// memory-mapped registers holding the MAC address
     mac_regs: BorrowedMappedPages<E1000MacRegisters, Mutable>,
-    deferred_task: Option<task::JoinableTaskRef>,
+    deferred_task: Option<scheduler::JoinableTaskRef>,
 }
 
 

@@ -65,7 +65,7 @@ extern crate spin;
 extern crate x86_64;
 extern crate msr;
 extern crate raw_cpuid;
-extern crate task;
+extern crate scheduler;
 extern crate memory;
 extern crate irq_safety;
 extern crate alloc;
@@ -790,7 +790,7 @@ pub fn print_samples(sample_results: &SampleResults) {
 
 /// Finds the corresponding function for each instruction pointer and calculates the percentage amount each function occured in the samples
 pub fn find_function_names_from_samples(sample_results: &SampleResults) -> Result<(), &'static str> {
-    let namespace = task::with_current_task(|f| f.get_namespace().clone())
+    let namespace = scheduler::with_current_task(|f| f.get_namespace().clone())
         .map_err(|_| "pmu_x86::get_function_names_from_samples: couldn't get current task")?;
     debug!("Analyze Samples:");
 
@@ -862,7 +862,7 @@ pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static
     samples.sample_count = current_count - 1;
 
     // if the running task is the requested one or if one isn't requested, records the IP
-    task::with_current_task(|taskref| {
+    scheduler::with_current_task(|taskref| {
         let requested_task_id = samples.task_id;
         let task_id = taskref.id;
         if (requested_task_id == 0) | (requested_task_id == task_id) {

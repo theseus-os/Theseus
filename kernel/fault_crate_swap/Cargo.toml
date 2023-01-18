@@ -24,8 +24,8 @@ path = "../mod_mgmt"
 [dependencies.crate_swap]
 path = "../crate_swap"
 
-[dependencies.task]
-path = "../task"
+[dependencies.scheduler]
+path = "../scheduler"
 
 [dependencies.fault_log]
 path = "../fault_log"

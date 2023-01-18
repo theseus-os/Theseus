@@ -3,7 +3,7 @@
 // #[macro_use] extern crate log;
 
 #[macro_use] extern crate alloc;
-extern crate task;
+extern crate scheduler;
 extern crate getopts;
 extern crate path;
 extern crate fs_node;
@@ -43,7 +43,7 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
     
-    let Ok(cwd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+    let Ok(cwd) = scheduler::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         println!("failed to get current task");
         return -1;
     };

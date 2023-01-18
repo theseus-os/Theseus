@@ -49,14 +49,13 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate x86_64;
-extern crate task;
 extern crate spawn;
 extern crate scheduler;
 #[macro_use] extern crate debugit;
 extern crate interrupts;
 
 use alloc::string::String;
-use task::{get_my_current_task, JoinableTaskRef};
+use scheduler::{get_my_current_task, JoinableTaskRef};
 
 pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
 

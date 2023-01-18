@@ -4,7 +4,6 @@
 extern crate alloc;
 extern crate spawn;
 extern crate scheduler;
-extern crate task;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -66,7 +65,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
 fn worker(_: ()) {
     for i in 0..1000 {
-       debug!("Task_ID : {} , Instance : {}", task::get_my_current_task_id(), i);
+       debug!("Task_ID : {} , Instance : {}", scheduler::get_my_current_task_id(), i);
        scheduler::schedule();
     }
 }

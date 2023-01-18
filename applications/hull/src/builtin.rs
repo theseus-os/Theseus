@@ -69,7 +69,7 @@ impl Shell {
             "/".to_owned()
         });
 
-        let task = task::get_my_current_task().ok_or(Error::CurrentTaskUnavailable)?;
+        let task = scheduler::get_my_current_task().ok_or(Error::CurrentTaskUnavailable)?;
 
         match task.get_env().lock().chdir(&path) {
             Ok(()) => Ok(()),

@@ -20,12 +20,12 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate mod_mgmt;
-extern crate task;
+extern crate scheduler;
 extern crate unwind;
 extern crate fallible_iterator;
 
 pub use mod_mgmt::{CrateNamespace, StrongSectionRef};
-pub use task::get_my_current_task;
+pub use scheduler::get_my_current_task;
 
 use unwind::{StackFrame, StackFrameIter};
 use fallible_iterator::FallibleIterator;
@@ -66,7 +66,7 @@ pub fn stack_trace(
     let max_recursion = max_recursion.unwrap_or(usize::MAX);
 
     unwind::invoke_with_current_registers(&mut |registers| {
-        let namespace = task::with_current_task(|t| t.get_namespace().clone())
+        let namespace = scheduler::with_current_task(|t| t.get_namespace().clone())
             .or_else(|_| mod_mgmt::get_initial_kernel_namespace().cloned().ok_or(()))
             .map_err(|_| "couldn't get current task's namespace or default namespace")?;
         let mut stack_frame_iter = StackFrameIter::new(namespace, registers);
