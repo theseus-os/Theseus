@@ -121,8 +121,8 @@ impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> ConnectedTcpSocket<'i, 's, 'soc
         }
 
         Ok(ConnectedTcpSocket {
-            iface: iface,
-            sockets: sockets,
+            iface,
+            sockets,
             handle: tcp_socket_handle,
         })
     }

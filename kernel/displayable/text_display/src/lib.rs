@@ -96,13 +96,13 @@ impl TextDisplay {
         bg_color: Color,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
-            width: width,
-            height: height,
+            width,
+            height,
             next_col: 0,
             next_line: 0,
             text: String::new(),
-            fg_color: fg_color,
-            bg_color: bg_color,
+            fg_color,
+            bg_color,
             cache: String::new(),
         })
     }

@@ -280,7 +280,7 @@ impl<'a> AllocablePage for ObjectPage8k<'a> {
         ObjectPage8k {
             data: [0; ObjectPage8k::SIZE -ObjectPage8k::METADATA_SIZE],
             mp: Some(mp),
-            heap_id: heap_id,
+            heap_id,
             next: Rawlink::default(),
             prev: Rawlink::default(),
             bitfield: [AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0), AtomicU64::new(0),AtomicU64::new(0) ],

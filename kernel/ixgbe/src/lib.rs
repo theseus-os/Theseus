@@ -366,7 +366,7 @@ impl IxgbeNic {
         let mut id = 0;
         while !tx_descs.is_empty() {
             let tx_queue = TxQueue {
-                id: id,
+                id,
                 regs: tx_mapped_registers.remove(0),
                 tx_descs: tx_descs.remove(0),
                 num_tx_descs: num_tx_descriptors,

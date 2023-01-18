@@ -110,7 +110,7 @@ impl FaultEntry {
         fault_type: FaultType
     ) -> FaultEntry {
         FaultEntry {
-            fault_type: fault_type,
+            fault_type,
             error_code: None,
             core: None,
             running_task: None,

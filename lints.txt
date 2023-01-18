@@ -250,7 +250,7 @@ ptr-arg
 ptr-eq
 question-mark
 redundant-closure
-# redundant-field-names
+redundant-field-names
 redundant-pattern
 # redundant-pattern-matching
 # redundant-static-lifetimes

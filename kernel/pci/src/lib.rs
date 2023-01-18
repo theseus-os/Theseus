@@ -147,7 +147,7 @@ fn scan_pci() -> Vec<PciBus> {
                 }
 
                 let device = PciDevice {
-                    vendor_id:        vendor_id,
+                    vendor_id,
                     device_id:        location.pci_read_16(PCI_DEVICE_ID), 
                     command:          location.pci_read_16(PCI_COMMAND),
                     status:           location.pci_read_16(PCI_STATUS),
@@ -169,7 +169,7 @@ fn scan_pci() -> Vec<PciBus> {
                                       ],
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
-                    location:              location,
+                    location,
                 };
 
                 device_list.push(device);

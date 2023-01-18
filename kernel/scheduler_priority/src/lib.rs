@@ -129,7 +129,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
         .map(|taskref| NextTaskResult {
             taskref : Some(taskref),
-            idle_task  : idle_task, 
+            idle_task, 
         })
 }
 

@@ -1101,7 +1101,7 @@ impl CrateNamespace {
 
         // Create the new `LoadedCrate` now such that its sections can refer back to it.
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:              crate_name,
+            crate_name,
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
             sections:                HashMap::new(),

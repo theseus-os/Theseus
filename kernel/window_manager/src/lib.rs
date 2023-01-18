@@ -143,7 +143,7 @@ impl WindowManager {
             let top_left = window.get_position();
             let (width, height) = window.get_size();          
             Rectangle {
-                top_left: top_left,
+                top_left,
                 bottom_right: top_left + (width as isize, height as isize)
             }
         };
@@ -188,8 +188,8 @@ impl WindowManager {
         };
         let area = Some(
             Rectangle {
-                top_left: top_left,
-                bottom_right: bottom_right
+                top_left,
+                bottom_right
             }
         );
 

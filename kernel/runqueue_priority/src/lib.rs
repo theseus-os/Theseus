@@ -66,7 +66,7 @@ impl PriorityTaskRef {
     /// next scheduling epoch
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         PriorityTaskRef {
-            taskref: taskref,
+            taskref,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
             context_switches: 0,

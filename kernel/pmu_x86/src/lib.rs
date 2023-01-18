@@ -598,7 +598,7 @@ fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
     
     Ok(Counter {
         start_count: count, 
-        msr_mask: msr_mask, 
+        msr_mask, 
         pmc: -1, 
         core: my_core
     })

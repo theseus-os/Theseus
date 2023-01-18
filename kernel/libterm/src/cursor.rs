@@ -109,7 +109,7 @@ impl Cursor {
                 (line * CHARACTER_HEIGHT) as isize,
             );
         let bounding_box = Rectangle {
-            top_left: top_left,
+            top_left,
             bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
         };
 

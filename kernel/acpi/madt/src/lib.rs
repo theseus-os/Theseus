@@ -76,7 +76,7 @@ impl<'t> Madt<'t> {
         let dynamic_part_length = total_length - size_of::<MadtAcpiTable>();
         let loc = acpi_tables.table_location(MADT_SIGNATURE)?;
         Some(Madt {
-            table: table,
+            table,
             mapped_pages: acpi_tables.mapping(),
             dynamic_entries_starting_offset: loc.slice_offset_and_length?.0,
             dynamic_entries_total_size: dynamic_part_length,
