@@ -135,17 +135,19 @@ impl DebugSections {
     /// This can be either a variable node itself or anything that may contain a variable node, e.g., lexical blocks.
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
-    /// ```rust,no_run
-    /// let a = 5;
-    /// { // start
-    ///     let b = 6
+    /// ```rust,ignore
+    /// fn main() {
+    ///     let a = 5;
     ///     { // start
-    ///         let c = 10;
+    ///         let b = 6
+    ///         { // start
+    ///              let c = 10;
+    ///         } // end
     ///     } // end
-    /// } // end
-    /// { // start
-    ///     let d = 8;
-    /// } // end
+    ///     { // start
+    ///         let d = 8;
+    ///     } // end
+    /// }
     /// ```
     /// 
     /// # Arguments
@@ -370,17 +372,19 @@ impl DebugSections {
     /// while looking for a subprogram node that contains the given instruction pointer.
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
-    /// ```rust,no_run
-    /// let a = 5;
-    /// { // start
-    ///     let b = 6
+    /// ```rust,ignore
+    /// fn main() {
+    ///     let a = 5;
     ///     { // start
-    ///         let c = 10;
+    ///         let b = 6
+    ///         { // start
+    ///             let c = 10;
+    ///         } // end
     ///     } // end
-    /// } // end
-    /// { // start
-    ///     let d = 8;
-    /// } // end
+    ///     { // start
+    ///         let d = 8;
+    ///     } // end
+    /// }
     /// ```
     ///
     /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
