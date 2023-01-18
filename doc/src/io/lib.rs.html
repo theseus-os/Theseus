@@ -1064,10 +1064,10 @@
 //! in which the next read or write operation will start where the prior one ended.
 //!
 
-</span><span class="attr">#![no_std]
+</span><span class="attr">#![allow(clippy::range_plus_one)]
+#![no_std]
 
-</span><span class="comment">// #[macro_use] extern crate log;
-</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
+#[macro_use] </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>delegate;
 <span class="kw">extern crate </span>spin;
 <span class="kw">extern crate </span>core2;

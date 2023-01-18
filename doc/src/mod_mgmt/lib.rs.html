@@ -3473,16 +3473,16 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(DirRef, NamespaceDir), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
     <span class="comment">// create the top-level directory to hold all default namespaces
-    </span><span class="kw">let </span>namespaces_dir = VFSDirectory::new(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>namespaces_dir = VFSDirectory::create(NAMESPACES_DIRECTORY_NAME.to_string(), root::get_root())<span class="question-mark">?</span>;
     <span class="comment">// create the top-level directory to hold all extra files
-    </span><span class="kw">let </span>extra_files_dir = VFSDirectory::new(EXTRA_FILES_DIRECTORY_NAME.to_string(), root::get_root())<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>extra_files_dir = VFSDirectory::create(EXTRA_FILES_DIRECTORY_NAME.to_string(), root::get_root())<span class="question-mark">?</span>;
 
     <span class="comment">// a map that associates a prefix string (e.g., &quot;sse&quot; in &quot;ksse#crate.o&quot;) to a namespace directory of object files 
     </span><span class="kw">let </span><span class="kw-2">mut </span>prefix_map: BTreeMap&lt;String, NamespaceDir&gt; = BTreeMap::new();
 
     <span class="comment">// Closure to create the directory for a new namespace.
     </span><span class="kw">let </span>create_dir = |dir_name: <span class="kw-2">&amp;</span>str| -&gt; <span class="prelude-ty">Result</span>&lt;NamespaceDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        VFSDirectory::new(dir_name.to_string(), <span class="kw-2">&amp;</span>namespaces_dir).map(|d| NamespaceDir(d))
+        VFSDirectory::create(dir_name.to_string(), <span class="kw-2">&amp;</span>namespaces_dir).map(|d| NamespaceDir(d))
     };
 
     <span class="kw">let </span><span class="kw-2">mut </span>process_module = |name: <span class="kw-2">&amp;</span>str, size, pages| -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -3598,7 +3598,7 @@
         <span class="kw">if </span>iter.peek().is_some() {
             <span class="kw">let </span>existing_dir = parent_dir.lock().get_dir(path_component);
             parent_dir = existing_dir
-                .or_else(|| VFSDirectory::new(path_component.to_string(), <span class="kw-2">&amp;</span>parent_dir).ok())
+                .or_else(|| VFSDirectory::create(path_component.to_string(), <span class="kw-2">&amp;</span>parent_dir).ok())
                 .ok_or_else(|| {
                     <span class="macro">error!</span>(<span class="string">&quot;Failed to get or create directory {:?} for extra file {:?}&quot;</span>, path_component, extra_file_name);
                     <span class="string">&quot;Failed to get or create directory for extra file&quot;
@@ -3714,7 +3714,7 @@
     /// * The file &quot;a#ps.o&quot; will be placed into &quot;./ps.o&quot;. 
     </span><span class="kw">pub fn </span>write_crate_object_file(<span class="kw-2">&amp;</span><span class="self">self</span>, crate_object_file_name: <span class="kw-2">&amp;</span>str, content: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>(_crate_type, _prefix, objfilename) = CrateType::from_module_name(crate_object_file_name)<span class="question-mark">?</span>;
-        <span class="kw">let </span>cfile = MemFile::new(String::from(objfilename), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>cfile = MemFile::create(String::from(objfilename), <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)<span class="question-mark">?</span>;
         cfile.lock().write_at(content, <span class="number">0</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(cfile)
     }
@@ -6007,7 +6007,7 @@
         <span class="comment">// We add a shared reference to that section&#39;s parent crate to this namespace as well, 
         // to prevent that crate from being dropped while this namespace still relies on it.
         </span><span class="self">self</span>.crate_tree.lock().insert(parent_crate_name, parent_crate_ref);
-        <span class="kw">return </span><span class="prelude-val">Some</span>(sec);
+        <span class="prelude-val">Some</span>(sec)
     }
 
 

@@ -2002,7 +2002,7 @@
             </span><span class="kw">let </span>swsm = regs.swsm.read() &amp; !(SWSM_SMBI) &amp; !(SWSM_SWESMBI);
             regs.swsm.write(swsm);
 
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="bool-val">true</span>);
+            <span class="prelude-val">Ok</span>(<span class="bool-val">true</span>)
         }
 
         <span class="comment">//resource is not available

@@ -747,7 +747,7 @@
         .set(argv_buf_size_out, <span class="kw-2">&amp;</span>argv_buf_size.to_le_bytes())
         .unwrap();
 
-    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
 }
 
 <span class="doccomment">/// Helper function to support retrieving args/env data.
@@ -797,7 +797,7 @@
         argv_data_pos = argv_data_pos.checked_add(<span class="number">1</span>).unwrap();
     }
 
-    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+    <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
 }
 
 <span class="doccomment">/// Executes specified system calls by interacting with wasmi memory and Theseus I/O.
@@ -914,7 +914,7 @@
             <span class="comment">// write bytes written to return pointer.
             </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
             memory.set(ret_ptr, <span class="kw-2">&amp;</span>total_written.to_le_bytes()).unwrap();
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Move the offset of a file descriptor. This is similar to lseek in POSIX.
@@ -953,7 +953,7 @@
             <span class="comment">// write new offset to return pointer.
             </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
             memory.set(ret_ptr, <span class="kw-2">&amp;</span>new_offset.to_le_bytes()).unwrap();
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Read from a file descriptor. This is similar to readv in POSIX.
@@ -1017,7 +1017,7 @@
             <span class="comment">// write bytes read to return pointer.
             </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">3</span>).unwrap();
             memory.set(ret_ptr, <span class="kw-2">&amp;</span>total_read.to_le_bytes()).unwrap();
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Get the attributes of a file descriptor.
@@ -1081,7 +1081,7 @@
                 )
                 .unwrap();
 
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Return environment variable data sizes.
@@ -1155,7 +1155,7 @@
                 .set(ret_ptr.checked_add(<span class="number">4</span>).unwrap(), <span class="kw-2">&amp;</span>pr_name_len.to_le_bytes())
                 .unwrap();
 
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Return the directory name of the given preopened file descriptor.
@@ -1196,7 +1196,7 @@
             <span class="comment">// write directory name to path.
             </span>memory.set(path, <span class="kw-2">&amp;</span>name.as_bytes()[..path_out_len]).unwrap();
 
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Open file or directory. This is similar to openat in POSIX.
@@ -1285,7 +1285,7 @@
             <span class="comment">// write opened file descriptor to return pointer.
             </span><span class="kw">let </span>opened_fd_ptr: u32 = wasmi_args.nth_checked(<span class="number">8</span>).unwrap();
             memory.set(opened_fd_ptr, <span class="kw-2">&amp;</span>opened_fd.to_le_bytes()).unwrap();
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Adjust the flags associated with a file descriptor.
@@ -1318,7 +1318,7 @@
                 }
             };
 
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         <span class="comment">// Return argument data sizes.
@@ -1380,7 +1380,7 @@
             <span class="comment">// write time to return pointer.
             </span><span class="kw">let </span>ret_ptr: u32 = wasmi_args.nth_checked(<span class="number">2</span>).unwrap();
             memory.set(ret_ptr, <span class="kw-2">&amp;</span>timestamp.to_le_bytes()).unwrap();
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
     }
 }

@@ -423,11 +423,6 @@
 <a href="#423" id="423">423</a>
 <a href="#424" id="424">424</a>
 <a href="#425" id="425">425</a>
-<a href="#426" id="426">426</a>
-<a href="#427" id="427">427</a>
-<a href="#428" id="428">428</a>
-<a href="#429" id="429">429</a>
-<a href="#430" id="430">430</a>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -713,11 +708,6 @@
         <span class="kw">let </span>rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         <span class="kw">let </span>data_flags    = aggregated_section_memory_bounds.data.flags;
 
-        <span class="kw">let </span>init_identity_mapped_pages:    NoDrop&lt;MappedPages&gt;;
-        <span class="kw">let </span>text_identity_mapped_pages:    NoDrop&lt;MappedPages&gt;;
-        <span class="kw">let </span>rodata_identity_mapped_pages:  NoDrop&lt;MappedPages&gt;;
-        <span class="kw">let </span>data_identity_mapped_pages:    NoDrop&lt;MappedPages&gt;;
-        <span class="kw">let </span>additional_mapped_pages:       NoDrop&lt;MappedPages&gt;;
         <span class="kw">let </span><span class="kw-2">mut </span>boot_info_mapped_pages:    <span class="prelude-ty">Option</span>&lt;MappedPages&gt; = <span class="prelude-val">None</span>;
 
         <span class="kw">let </span>init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())<span class="question-mark">?</span>;
@@ -726,7 +716,7 @@
             VirtualAddress::new_canonical(init_start_phys.value()),
             init_end_phys.value() - init_start_phys.value(),
         )<span class="question-mark">?</span>;
-        init_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
+        <span class="kw">let </span>init_identity_mapped_pages: NoDrop&lt;MappedPages&gt; = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, <span class="kw-2">&amp;</span>init_frames, init_flags)<span class="question-mark">?
         </span>});
         <span class="kw">let </span><span class="kw-2">mut </span>init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)<span class="question-mark">?</span>;
@@ -737,7 +727,7 @@
             VirtualAddress::new_canonical(text_start_phys.value()),
             text_end_phys.value() - text_start_phys.value(),
         )<span class="question-mark">?</span>;
-        text_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
+        <span class="kw">let </span>text_identity_mapped_pages: NoDrop&lt;MappedPages&gt; = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, <span class="kw-2">&amp;</span>text_frames, text_flags)<span class="question-mark">?
         </span>});
         init_mapped_pages.merge(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)<span class="question-mark">?</span>).map_err(|(error, <span class="kw">_</span>)| error)<span class="question-mark">?</span>;
@@ -749,7 +739,7 @@
             VirtualAddress::new_canonical(rodata_start_phys.value()),
             rodata_end_phys.value() - rodata_start_phys.value(),
         )<span class="question-mark">?</span>;
-        rodata_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
+        <span class="kw">let </span>rodata_identity_mapped_pages: NoDrop&lt;MappedPages&gt; = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, <span class="kw-2">&amp;</span>rodata_frames, rodata_flags)<span class="question-mark">?
         </span>});
         <span class="kw">let </span>rodata_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)<span class="question-mark">?</span>);
@@ -760,7 +750,7 @@
             VirtualAddress::new_canonical(data_start_phys.value()),
             data_end_phys.value() - data_start_phys.value(),
         )<span class="question-mark">?</span>;
-        data_identity_mapped_pages = NoDrop::new( <span class="kw">unsafe </span>{
+        <span class="kw">let </span>data_identity_mapped_pages: NoDrop&lt;MappedPages&gt; = NoDrop::new( <span class="kw">unsafe </span>{
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, <span class="kw-2">&amp;</span>data_frames, data_flags)<span class="question-mark">?
         </span>});
         <span class="kw">let </span>data_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)<span class="question-mark">?</span>);
@@ -798,7 +788,7 @@
             vga_size_in_bytes,
         )<span class="question-mark">?</span>;
         <span class="kw">let </span>vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)<span class="question-mark">?</span>;
-        additional_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(
+        <span class="kw">let </span>additional_mapped_pages: NoDrop&lt;MappedPages&gt; = NoDrop::new(new_mapper.map_allocated_pages_to(
             vga_display_pages_identity, vga_display_frames, vga_flags,
         )<span class="question-mark">?</span>);
 

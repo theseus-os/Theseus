@@ -802,7 +802,7 @@
 </span><span class="kw">fn </span>handle_ioapic_entries(madt_iter: MadtIter, page_table: <span class="kw-2">&amp;mut </span>PageTable) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter {
         <span class="kw">if let </span>MadtEntry::IoApic(ioa) = madt_entry {
-            ioapic::IoApic::new(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address <span class="kw">as </span>usize), ioa.gsi_base)<span class="question-mark">?</span>;
+            ioapic::IoApic::create(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address <span class="kw">as </span>usize), ioa.gsi_base)<span class="question-mark">?</span>;
         }
     }
     <span class="prelude-val">Ok</span>(())

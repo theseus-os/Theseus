@@ -235,7 +235,7 @@
 <span class="kw">impl </span>IoApic {
     <span class="doccomment">/// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`,
     /// and then adds it to the system-wide list of all IOAPICs.
-    </span><span class="kw">pub fn </span>new(page_table: <span class="kw-2">&amp;mut </span>PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>create(page_table: <span class="kw-2">&amp;mut </span>PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>new_page = allocate_pages(<span class="number">1</span>).ok_or(<span class="string">&quot;IoApic::new(): couldn&#39;t allocate_pages!&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>frame = allocate_frames_at(phys_addr, <span class="number">1</span>).map_err(|_e| <span class="string">&quot;Couldn&#39;t allocate physical frame for IOAPIC&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>ioapic_mapped_page = page_table.map_allocated_pages_to(

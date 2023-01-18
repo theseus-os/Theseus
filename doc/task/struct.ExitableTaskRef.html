@@ -76,7 +76,7 @@ it will finish running its current timeslice, and then never be run again.</p>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.is_joinable" class="method has-srclink"><a class="srclink rightside" href="../src/task/lib.rs.html#557-559">source</a><h4 class="code-header">pub fn <a href="#method.is_joinable" class="fn">is_joinable</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Returns <code>true</code> if this task is joinable, <code>false</code> if not.</p>
 <ul>
 <li>If <code>true</code>, another task holds the <a href="struct.JoinableTaskRef.html" title="JoinableTaskRef"><code>JoinableTaskRef</code></a> object that was created
-by <a href="struct.TaskRef.html#method.new" title="TaskRef::new()"><code>TaskRef::new()</code></a>, which indicates that that other task is able to
+by [<code>TaskRef::new()</code>], which indicates that that other task is able to
 wait for this task to exit and thus be able to obtain this task’s exit value.</li>
 <li>If <code>false</code>, the <a href="struct.JoinableTaskRef.html" title="JoinableTaskRef"><code>JoinableTaskRef</code></a> object was dropped, and therefore no other task
 can join this task or obtain its exit value.</li>

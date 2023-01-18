@@ -343,7 +343,7 @@
 
     <span class="doccomment">/// checks if the coordinate is within the block
     </span><span class="kw">fn </span>contains(<span class="kw-2">&amp;</span><span class="self">self</span>, coordinate: Coord) -&gt; bool {
-        <span class="kw">return </span>coordinate.x &gt;= <span class="self">self</span>.block.top_left.x
+        coordinate.x &gt;= <span class="self">self</span>.block.top_left.x
             &amp;&amp; coordinate.x &lt; <span class="self">self</span>.block.bottom_right.x
             &amp;&amp; coordinate.y &gt;= <span class="self">self</span>.block.top_left.y
             &amp;&amp; coordinate.y &lt; <span class="self">self</span>.block.bottom_right.y
@@ -377,10 +377,10 @@
             <span class="prelude-val">Some</span>(cache) =&gt; {
                 <span class="comment">// The same hash and width means the cache block is identical to the row pixels.
                 // We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
-                </span><span class="kw">return </span>cache.content_hash == hash(row_pixels) &amp;&amp; (cache.block.bottom_right.x - cache.block.top_left.x) <span class="kw">as </span>usize == width
+                </span>cache.content_hash == hash(row_pixels) &amp;&amp; (cache.block.bottom_right.x - cache.block.top_left.x) <span class="kw">as </span>usize == width
             }
-            <span class="prelude-val">None </span>=&gt; <span class="kw">return </span><span class="bool-val">false</span>,
-        }
+            <span class="prelude-val">None </span>=&gt; <span class="bool-val">false
+        </span>}
     }
 
     <span class="doccomment">/// This function will return true if several continuous rows in the framebuffer are cached.
@@ -464,7 +464,7 @@
 
         cache_row_end = core::cmp::min(cache_row_end, src_fb_height);
 
-        <span class="kw">return </span>cache_row_start..cache_row_end
+        cache_row_start..cache_row_end
     }
 
 }

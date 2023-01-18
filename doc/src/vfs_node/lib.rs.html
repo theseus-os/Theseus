@@ -123,7 +123,7 @@
 
 <span class="kw">impl </span>VFSDirectory {
     <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output
-    </span><span class="kw">pub fn </span>new(name: String, parent: <span class="kw-2">&amp;</span>DirRef)  -&gt; <span class="prelude-ty">Result</span>&lt;DirRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>create(name: String, parent: <span class="kw-2">&amp;</span>DirRef)  -&gt; <span class="prelude-ty">Result</span>&lt;DirRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="comment">// creates a copy of the parent pointer so that we can add the newly created folder to the parent&#39;s children later
         </span><span class="kw">let </span>directory = VFSDirectory {
             name,

@@ -907,7 +907,7 @@
                     } <span class="kw">else if </span>truncate_file_to_size_zero {
                         <span class="comment">// HACK: Truncate file by overwriting file.
                         </span><span class="kw">let </span>new_file: FileRef =
-                            MemFile::new(String::from(base_name), <span class="kw-2">&amp;</span>parent_dir).unwrap();
+                            MemFile::create(String::from(base_name), <span class="kw-2">&amp;</span>parent_dir).unwrap();
                         FileOrDir::File(new_file)
                     } <span class="kw">else </span>{
                         file_or_dir
@@ -918,7 +918,7 @@
             <span class="prelude-val">None </span>=&gt; {
                 <span class="kw">if </span>create_file_if_no_exist {
                     <span class="kw">let </span>new_file: FileRef =
-                        MemFile::new(String::from(base_name), <span class="kw-2">&amp;</span>parent_dir).unwrap();
+                        MemFile::create(String::from(base_name), <span class="kw-2">&amp;</span>parent_dir).unwrap();
                     FileOrDir::File(new_file)
                 } <span class="kw">else </span>{
                     <span class="kw">return </span><span class="prelude-val">Err</span>(wasi::ERRNO_NOENT);

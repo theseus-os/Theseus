@@ -519,7 +519,7 @@
 
 <span class="doccomment">/// Initializes the tasks virtual filesystem directory within the root directory.
 </span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    TaskFs::new()<span class="question-mark">?</span>;
+    TaskFs::create()<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(())
 }
 
@@ -530,7 +530,7 @@
 </span><span class="kw">pub struct </span>TaskFs { }
 
 <span class="kw">impl </span>TaskFs {
-    <span class="kw">fn </span>new() -&gt; <span class="prelude-ty">Result</span>&lt;DirRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">fn </span>create() -&gt; <span class="prelude-ty">Result</span>&lt;DirRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>root = root::get_root();
         <span class="kw">let </span>dir_ref = Arc::new(Mutex::new(TaskFs { })) <span class="kw">as </span>DirRef;
         root.lock().insert(FileOrDir::Dir(dir_ref.clone()))<span class="question-mark">?</span>;

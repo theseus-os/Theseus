@@ -1242,7 +1242,7 @@
         <span class="kw">let </span>app_crate = app_crate_ref.lock_as_ref();
         <span class="kw">let </span>expected_main_section_name = <span class="macro">format!</span>(<span class="string">&quot;{}{}{}&quot;</span>, app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
         app_crate.find_section(|sec| 
-            sec.typ == SectionType::Text &amp;&amp; sec.name_without_hash() == <span class="kw-2">&amp;</span>expected_main_section_name
+            sec.typ == SectionType::Text &amp;&amp; sec.name_without_hash() == expected_main_section_name
         ).cloned()
     };
     <span class="kw">let </span>main_func_sec = main_func_sec_opt.ok_or(<span class="string">&quot;spawn::new_application_task_builder(): couldn&#39;t find \&quot;main\&quot; function, expected function name like \&quot;&lt;crate_name&gt;::main::&lt;hash&gt;\&quot;\
@@ -1426,7 +1426,7 @@
                 .map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: newly-spawned task was not in the Initing runstate&quot;</span>)<span class="question-mark">?</span>;
         }
 
-        <span class="kw">let </span>task_ref = TaskRef::new(new_task);
+        <span class="kw">let </span>task_ref = TaskRef::create(new_task);
         <span class="kw">let </span>_existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
         <span class="comment">// insert should return None, because that means there was no existing task with the same ID 
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(_existing_task) = _existing_task {

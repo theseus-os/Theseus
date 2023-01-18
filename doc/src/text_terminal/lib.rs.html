@@ -2332,6 +2332,7 @@
 <a href="#2332" id="2332">2332</a>
 <a href="#2333" id="2333">2333</a>
 <a href="#2334" id="2334">2334</a>
+<a href="#2335" id="2335">2335</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A text-mode terminal emulator. 
 //!
 //! This provides basic support for various standards of control codes and escape sequences:
@@ -2356,7 +2357,8 @@
 //! * &lt;https://vt100.net/docs/vt510-rm/chapter4.html&gt;
 //! * &lt;https://en.wikipedia.org/wiki/ANSI_escape_code&gt;
 
-</span><span class="attr">#![no_std]
+</span><span class="attr">#![allow(clippy::range_plus_one)]
+#![no_std]
 #![feature(drain_filter)]
 
 </span><span class="comment">// TODO: FIXME: remove this once the implementation is complete.

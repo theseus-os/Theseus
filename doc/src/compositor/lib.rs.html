@@ -196,10 +196,12 @@
 <a href="#196" id="196">196</a>
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a trait of `Compositor`  .
 //! A compositor composites a list of sources buffers to a single destination buffer.
 
-</span><span class="attr">#![no_std]
+</span><span class="attr">#![allow(clippy::range_plus_one)]
+#![no_std]
 
 </span><span class="kw">extern crate </span>framebuffer;
 <span class="kw">extern crate </span>shapes;

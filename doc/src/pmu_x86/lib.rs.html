@@ -1496,7 +1496,7 @@
             core: my_core
         });
     }
-    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;All programmable counters currently in use.&quot;</span>);
+    <span class="prelude-val">Err</span>(<span class="string">&quot;All programmable counters currently in use.&quot;</span>)
 }
 
 <span class="doccomment">/// Creates a counter object for a fixed hardware counter
@@ -1504,12 +1504,12 @@
     <span class="kw">let </span>my_core = apic::current_cpu();
     <span class="kw">let </span>count = rdpmc(msr_mask);
     
-    <span class="kw">return </span><span class="prelude-val">Ok</span>(Counter {
+    <span class="prelude-val">Ok</span>(Counter {
         start_count: count, 
         msr_mask: msr_mask, 
         pmc: -<span class="number">1</span>, 
         core: my_core
-    });
+    })
 }
 
 <span class="doccomment">/// Checks that the PMU has been initialized. If it has been,
@@ -1633,7 +1633,7 @@
         Msr::new(IA32_PERFEVTSEL0).write(event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
     }
 
-    <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+    <span class="prelude-val">Ok</span>(())
 
 }
 
@@ -1658,7 +1658,7 @@
 
     <span class="macro">trace!</span>(<span class="string">&quot;Stopped taking samples with the PMU&quot;</span>);
     
-    <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="doccomment">/// Stores the instruction pointers and corresponding task IDs from the samples

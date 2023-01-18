@@ -218,7 +218,7 @@
         <span class="self">self</span>.next_line = next_line;
         <span class="self">self</span>.cache = <span class="self">self</span>.text.clone();
 
-        <span class="kw">return </span><span class="prelude-val">Ok</span>(bounding_box + coordinate);
+        <span class="prelude-val">Ok</span>(bounding_box + coordinate)
     }
 
     <span class="kw">fn </span>set_size(<span class="kw-2">&amp;mut </span><span class="self">self</span>, width: usize, height: usize) {

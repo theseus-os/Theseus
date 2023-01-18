@@ -2964,7 +2964,7 @@
     /// ## Return
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to &quot;join&quot; this task (wait for it to exit) and obtain its exit value.
-    </span><span class="kw">pub fn </span>new(task: Task) -&gt; JoinableTaskRef {
+    </span><span class="kw">pub fn </span>create(task: Task) -&gt; JoinableTaskRef {
         <span class="kw">let </span>exit_value_mailbox = Mutex::new(<span class="prelude-val">None</span>);
         <span class="kw">let </span>taskref = TaskRef(Arc::new(TaskRefInner { task, exit_value_mailbox }));
 
@@ -3114,7 +3114,7 @@
     bootstrap_task.running_on_cpu.store(<span class="prelude-val">Some</span>(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = <span class="prelude-val">Some</span>(apic_id); <span class="comment">// can only run on this CPU core
     </span><span class="kw">let </span>bootstrap_task_id = bootstrap_task.id;
-    <span class="kw">let </span>joinable_taskref = TaskRef::new(bootstrap_task);
+    <span class="kw">let </span>joinable_taskref = TaskRef::create(bootstrap_task);
 
     <span class="comment">// Set this task as this CPU&#39;s current task, as it&#39;s already running.
     </span>joinable_taskref.set_as_current_task();

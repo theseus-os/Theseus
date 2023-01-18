@@ -197,7 +197,7 @@
 
 <span class="kw">impl </span>MemFile {
     <span class="doccomment">/// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
-    </span><span class="kw">pub fn </span>new(name: String, parent: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>create(name: String, parent: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>new_file = <span class="self">Self</span>::from_mapped_pages(MappedPages::empty(), name, <span class="number">0</span>, parent)<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(new_file)
     }

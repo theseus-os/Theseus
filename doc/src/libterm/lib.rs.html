@@ -655,9 +655,6 @@
 <a href="#655" id="655">655</a>
 <a href="#656" id="656">656</a>
 <a href="#657" id="657">657</a>
-<a href="#658" id="658">658</a>
-<a href="#659" id="659">659</a>
-<a href="#660" id="660">660</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic terminal emulator library.
 //!
 //! The terminal has several main responsibilities: 
@@ -748,13 +745,12 @@
     </span><span class="kw">fn </span>calc_start_idx(<span class="kw-2">&amp;</span><span class="self">self</span>, end_idx: usize) -&gt; (usize, usize) {
         <span class="kw">let </span>(buffer_width, buffer_height) = <span class="self">self</span>.get_text_dimensions();
         <span class="kw">let </span><span class="kw-2">mut </span>start_idx = end_idx;
-        <span class="kw">let </span>result;
         <span class="comment">// Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        </span><span class="kw">if </span>end_idx &gt; buffer_width * buffer_height {
-            result = <span class="self">self</span>.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx);
+        </span><span class="kw">let </span>result = <span class="kw">if </span>end_idx &gt; buffer_width * buffer_height {
+            <span class="self">self</span>.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx)
         } <span class="kw">else </span>{
-            result = <span class="self">self</span>.scrollback_buffer.get(<span class="number">0</span>..end_idx);
-        }
+            <span class="self">self</span>.scrollback_buffer.get(<span class="number">0</span>..end_idx)
+        };
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
             <span class="kw">let </span><span class="kw-2">mut </span>total_lines = <span class="number">0</span>;
@@ -822,10 +818,10 @@
             </span>}
 
             <span class="comment">// If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
-            </span><span class="kw">return </span>(start_idx, (total_lines - <span class="number">1</span>) * buffer_width + last_line_chars);
+            </span>(start_idx, (total_lines - <span class="number">1</span>) * buffer_width + last_line_chars)
 
         } <span class="kw">else </span>{
-            <span class="kw">return </span>(<span class="number">0</span>,<span class="number">0</span>); <span class="comment">/* WARNING: should change to Option&lt;&gt; rather than returning (0, 0) */
+            (<span class="number">0</span>,<span class="number">0</span>) <span class="comment">/* WARNING: should change to Option&lt;&gt; rather than returning (0, 0) */
         </span>}   
     }
 
@@ -836,13 +832,12 @@
         <span class="kw">let </span>(buffer_width, buffer_height) = <span class="self">self</span>.get_text_dimensions();
         <span class="kw">let </span>scrollback_buffer_len = <span class="self">self</span>.scrollback_buffer.len();
         <span class="kw">let </span><span class="kw-2">mut </span>end_idx = start_idx;
-        <span class="kw">let </span>result;
         <span class="comment">// Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        </span><span class="kw">if </span>start_idx + buffer_width * buffer_height &gt; scrollback_buffer_len {
-            result = <span class="self">self</span>.scrollback_buffer.get(start_idx..scrollback_buffer_len-<span class="number">1</span>);
+        </span><span class="kw">let </span>result = <span class="kw">if </span>start_idx + buffer_width * buffer_height &gt; scrollback_buffer_len {
+            <span class="self">self</span>.scrollback_buffer.get(start_idx..scrollback_buffer_len-<span class="number">1</span>)
         } <span class="kw">else </span>{
-            result = <span class="self">self</span>.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
-        }
+            <span class="self">self</span>.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height)
+        };
 
         <span class="comment">// calculate the starting index for the slice
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(slice) = result {
@@ -895,12 +890,12 @@
             }
 
             <span class="kw">if </span>end_idx &lt; <span class="self">self</span>.scrollback_buffer.len() {
-                <span class="kw">return </span><span class="prelude-val">Ok</span>(end_idx); 
+                <span class="prelude-val">Ok</span>(end_idx)
             } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Err</span>(ScrollError::OffEndBound);
+                <span class="prelude-val">Err</span>(ScrollError::OffEndBound)
             }
         } <span class="kw">else </span>{
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">self</span>.scrollback_buffer.len() - <span class="number">1</span>) <span class="comment">/* WARNING: maybe should return Error? */
+            <span class="prelude-val">Ok</span>(<span class="self">self</span>.scrollback_buffer.len() - <span class="number">1</span>) <span class="comment">/* WARNING: maybe should return Error? */
         </span>}
     }
 
@@ -943,12 +938,11 @@
     <span class="doccomment">/// Scrolls the text display down one line
     </span><span class="kw">fn </span>scroll_down_one_line(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>buffer_width = <span class="self">self</span>.get_text_dimensions().<span class="number">0</span>;
-        <span class="kw">let </span>prev_start_idx;
         <span class="comment">// Prevents the user from scrolling down if already at the bottom of the page
         </span><span class="kw">if </span><span class="self">self</span>.is_scroll_end {
             <span class="kw">return</span>;
         } 
-        prev_start_idx = <span class="self">self</span>.scroll_start_idx;
+        <span class="kw">let </span>prev_start_idx = <span class="self">self</span>.scroll_start_idx;
         <span class="kw">let </span>result = <span class="self">self</span>.calc_end_idx(prev_start_idx);
         <span class="kw">let </span><span class="kw-2">mut </span>end_idx = <span class="kw">match </span>result {
             <span class="prelude-val">Ok</span>(end_idx) =&gt; end_idx,
