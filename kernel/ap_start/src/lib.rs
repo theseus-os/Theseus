@@ -88,7 +88,8 @@ pub fn kstart_ap(
     ).unwrap();
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
-    // task management subsystem and create the idle task for this CPU.
+    // task management subsystem, which creates the idle task and
+    // scheduler runqueues for this CPU.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
 
     // The PAT must be initialized explicitly on every CPU,
