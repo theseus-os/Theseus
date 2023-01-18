@@ -1005,7 +1005,7 @@ pub fn create_idle_task(apic_id: u8) -> Result<TaskRef, &'static str> {
         .name(format!("idle_task_core_{}", apic_id))
         .idle(apic_id)
         .spawn_restartable(None)
-        .map(|task| task.clone())
+        .map(|task| task.orphan())
 }
 
 /// A basic idle task that does nothing but loop endlessly.

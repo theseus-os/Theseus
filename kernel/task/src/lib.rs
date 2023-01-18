@@ -57,7 +57,7 @@ use core::{
     ops::Deref,
     panic::PanicInfo,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering, fence},
-    task::Waker,
+    task::Waker, mem::ManuallyDrop,
 };
 use alloc::{
     boxed::Box,
@@ -1127,7 +1127,7 @@ fn task_switch_inner(
 // /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
 // /// which is intended to be the public-facing interface for joining a task.
 pub struct JoinableTaskRef {
-    task: TaskRef,
+    task: ManuallyDrop<TaskRef>,
 }
 assert_not_impl_any!(JoinableTaskRef: Clone);
 impl fmt::Debug for JoinableTaskRef {
@@ -1169,12 +1169,25 @@ impl JoinableTaskRef {
         self.reap_exit_value()
             .ok_or("BUG: `join()` could not retrieve `ExitValue` after task had exited.")
     }
+
+    /// Drops this `JoinableTaskRef`, making the task an orphan by ensuring that
+    /// it can never be joined.
+    ///
+    /// This guarantees that it will be auto-reaped upon exit.
+    pub fn orphan(mut self) -> TaskRef {
+        self.task.joinable.store(false, Ordering::Relaxed);
+        // SAFETY: We forget self and so it is never dropped.
+        let task = unsafe { ManuallyDrop::take(&mut self.task) };
+        core::mem::forget(self);
+        task
+    }
 }
 impl Drop for JoinableTaskRef {
     /// Marks the inner [`Task`] as not joinable, meaning that it is an orphaned task
     /// that will be auto-reaped after exiting.
     fn drop(&mut self) {
         self.task.joinable.store(false, Ordering::Relaxed);
+        unsafe { ManuallyDrop::drop(&mut self.task) };
     }
 }
 
@@ -1324,7 +1337,7 @@ impl TaskRef {
 
         // Mark this task as joinable, now that it has been wrapped in the proper type.
         taskref.joinable.store(true, Ordering::Relaxed);
-        JoinableTaskRef { task: taskref }
+        JoinableTaskRef { task: ManuallyDrop::new(taskref) }
     }
 
     /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
@@ -1473,7 +1486,7 @@ pub fn bootstrap_task(
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
     let Ok(exitable_taskref) = init_current_task(
-        bootstrap_task_id, 
+        bootstrap_task_id,
         Some(joinable_taskref.clone()),
     ) else {
         error!("BUG: failed to set boostrapped task as current task on AP {}", apic_id);
