@@ -87,19 +87,20 @@ pub fn schedule() -> bool {
     }
 
     let apic_id = preemption_guard.cpu_id();
-    let mut run_queue = match RUN_QUEUES.get(&apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            error!(
-                "BUG: schedule(): couldn't get run queue for core {}",
-                apic_id
-            );
-            return false;
-        }
-    };
 
-    let next_task = run_queue.next();
-    drop(run_queue);
+    let next_task = {
+        let mut run_queue = match RUN_QUEUES.get(&apic_id) {
+            Some(rq) => rq.write(),
+            _ => {
+                error!(
+                    "BUG: schedule(): couldn't get run queue for core {}",
+                    apic_id
+                );
+                return false;
+            }
+        };
+        run_queue.next()
+    };
 
     let (did_switch, recovered_preemption_guard) =
         task::task_switch(next_task, apic_id, preemption_guard);
