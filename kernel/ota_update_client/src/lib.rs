@@ -159,7 +159,7 @@ fn download_string_file(
 pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
     str::from_utf8(bytes)
         .map_err(|_e| "couldn't convert file into a UTF8 string")
-        .map(|files| files.lines().map(|s| String::from(s)).collect())
+        .map(|files| files.lines().map(String::from).collect())
 }
 
 

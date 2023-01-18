@@ -90,7 +90,7 @@ pub fn insert_state<S: Any>(state: S) -> Option<S> {
 	// and then obtain a single-count Arc<S> from that &Arc<S>,
 	// while we achieve by cloning the &Arc<S> and then letting it drop out of scope.
 	let solo_arc = match old_val {
-		Some(g) => g.downcast_ref::<Arc<S>>().map( |a| Arc::clone(a)),
+		Some(g) => g.downcast_ref::<Arc<S>>().map(Arc::clone),
 		_ => None,
 	};
 

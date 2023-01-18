@@ -215,7 +215,7 @@ pub fn send_request(
                             Ok(httparse::Status::Complete(total_header_len)) => {
                                 packet_header_length = Some(total_header_len);
                                 response_status_code = response.code;
-                                response_reason = response.reason.map(|s| String::from(s));
+                                response_reason = response.reason.map(String::from);
 
                                 // Here: we've received all headers, but we may not be done receiving the full response.
                                 // If there is a "Content-Length" header present, we can use that to see if all the bytes are received.

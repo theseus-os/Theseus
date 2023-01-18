@@ -149,19 +149,19 @@ impl<'t> Iterator for MadtIter<'t> {
             if (self.offset + entry_size) <= self.end_of_entries {
                 let entry: Option<MadtEntry> = match entry_type {
                     ENTRY_TYPE_LOCAL_APIC if entry_size == size_of::<MadtLocalApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::LocalApic(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::LocalApic)
                     },
                     ENTRY_TYPE_IO_APIC if entry_size == size_of::<MadtIoApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::IoApic(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::IoApic)
                     },
                     ENTRY_TYPE_INT_SRC_OVERRIDE if entry_size == size_of::<MadtIntSrcOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::IntSrcOverride(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::IntSrcOverride)
                     },
                     ENTRY_TYPE_NON_MASKABLE_INTERRUPT if entry_size == size_of::<MadtNonMaskableInterrupt>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::NonMaskableInterrupt(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::NonMaskableInterrupt)
                     },
                     ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE if entry_size == size_of::<MadtLocalApicAddressOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::LocalApicAddressOverride(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::LocalApicAddressOverride)
                     },
                     _ => None,
                 };

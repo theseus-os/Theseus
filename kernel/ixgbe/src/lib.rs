@@ -1312,7 +1312,7 @@ pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'st
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
 pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer>) -> Result<(), &'static str> {
-    let packet = packet.map(Ok).unwrap_or_else(|| test_packets::create_dhcp_test_packet())?;
+    let packet = packet.map(Ok).unwrap_or_else(test_packets::create_dhcp_test_packet)?;
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();  
 

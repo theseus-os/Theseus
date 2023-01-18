@@ -626,7 +626,7 @@ impl CrateNamespace {
     /// [`CowArc::clone()`] function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
         self.crate_tree.lock().get(crate_name.as_bytes())
-            .map(|c| CowArc::clone_shallow(c))
+            .map(CowArc::clone_shallow)
             .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
 

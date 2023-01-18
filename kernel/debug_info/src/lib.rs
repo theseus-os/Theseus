@@ -251,7 +251,7 @@ impl DebugSections {
         else if tag == gimli::DW_TAG_variable {
             let variable_name = entry.attr(gimli::DW_AT_name)?.expect("Variable DIE didn't have a DW_AT_name attribute")
                 .string_value(context.debug_str_sec).expect("Couldn't convert variable name attribute value to string")
-                .to_string().map(|s| String::from(s))?;
+                .to_string().map(String::from)?;
             debug!("{:indent$}Variable {:?}", "", variable_name, indent = ((depth) * 2));
 
             // Find the latest location that this variable existed (before the instruction pointer, of course).
@@ -404,12 +404,12 @@ impl DebugSections {
         if tag == gimli::constants::DW_TAG_subprogram {
             let _subprogram_name = entry.attr(gimli::DW_AT_name)?.and_then(|attr| 
                 attr.string_value(context.debug_str_sec).and_then(|s| 
-                    s.to_string().ok().map(|s| String::from(s))
+                    s.to_string().ok().map(String::from)
                 )
             );
             let _subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)?.and_then(|attr| 
                 attr.string_value(context.debug_str_sec).and_then(|s| 
-                    s.to_string().ok().map(|s| String::from(s))
+                    s.to_string().ok().map(String::from)
                 )
             );
 
@@ -808,7 +808,7 @@ impl DebugSymbols {
         let create_debug_section_slice = |debug_sec: DebugSection| -> Result<DebugSectionSlice, &'static str> {
             ArcRef::new(Arc::clone(&debug_sections_mp))
                 .try_map(|mp| mp.as_slice::<u8>(debug_sec.mp_offset, debug_sec.size))
-                .map(|arcref| DebugSectionSlice(arcref))
+                .map(DebugSectionSlice)
         };
 
         let loaded = DebugSections {
