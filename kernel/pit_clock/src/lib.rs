@@ -48,7 +48,7 @@ pub fn enable_interrupts(freq_hertz: u32) -> Result<(), &'static str> {
     // Register the interrupt handler
     match interrupts::register_interrupt(PIT_CHANNEL_0_IRQ, pit_timer_handler) {
         Ok(_) => { /* success, do nothing */}
-        Err(handler) if handler == pit_timer_handler as u64 => { /* already registered, do nothing */ }
+        Err(handler) if handler == pit_timer_handler as usize => { /* already registered, do nothing */ }
         Err(_other) => return Err(" PIT clock IRQ was already in use; sharing IRQs is currently unsupported"),
     }
 

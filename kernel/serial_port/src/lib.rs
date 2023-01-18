@@ -204,7 +204,7 @@ impl SerialPort {
                 };                
             }
             Err(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) => {
-                if existing_handler_address != interrupt_handler as u64 {
+                if existing_handler_address != interrupt_handler as usize {
                     error!("Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
                         Existing interrupt handler was a different handler, at address {:#X}.",
                         irq, base_port, existing_handler_address,

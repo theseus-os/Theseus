@@ -50,6 +50,11 @@ use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
 /// that it is only invoked for `UnmappedFrames`.
 pub(super) static INTO_ALLOCATED_FRAMES_FUNC: Once<fn(FrameRange) -> AllocatedFrames> = Once::new();
 
+/// A convenience function to translate the given virtual address into a
+/// physical address using the currently-active page table.
+pub fn translate(virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
+    Mapper::from_current().translate(virtual_address)
+}
 
 pub struct Mapper {
     p4: Unique<Table<Level4>>,

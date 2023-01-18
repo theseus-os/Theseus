@@ -127,7 +127,7 @@ where
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core(): parsing nano_core crate, please wait ...");
-    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core::parse_nano_core(
+    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt) = match mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
         rodata_mapped_pages.into_inner(),
@@ -145,8 +145,28 @@ where
                 .get("ap_start_realmode_end")
                 .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
                 .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
+
+            let ap_gdt = {
+                let mut ap_gdt_virtual_address = None;
+                for (_, section) in nano_core_crate_ref.lock_as_ref().sections.iter() {
+                    if section.name == "GDT_AP".into() {
+                        ap_gdt_virtual_address = Some(section.virt_addr);
+                        break;
+                    }
+                }
+
+                // The identity-mapped virtual address of GDT_AP.
+                VirtualAddress::new(
+                    memory::translate(ap_gdt_virtual_address.ok_or(
+                        "Missing/invalid symbol expected from data section \"GDT_AP\"",
+                    )?)
+                    .ok_or("Failed to translate \"GDT_AP\"")?
+                    .value(),
+                )
+                .ok_or("couldn't convert \"GDT_AP\" physical address to virtual")?
+            };
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
-            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)
+            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
         Err((msg, mapped_pages_array)) => {
             // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
@@ -181,14 +201,12 @@ where
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core(): invoking the captain...");
     #[cfg(not(loadable))] {
-        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)?;
+        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
     #[cfg(loadable)] {
-        extern crate alloc;
-
-        use alloc::vec::Vec;
-        use memory::{MmiRef, MappedPages, PhysicalAddress};
+        use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
         use no_drop::NoDrop;
+        use stack::Stack;
 
         let section = default_namespace
             .get_symbol_starting_with("captain::init::")
@@ -196,10 +214,10 @@ where
             .ok_or("no single symbol matching \"captain::init\"")?;
         log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, NoDrop<Vec<MappedPages>>, NoDrop<stack::Stack>, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<EarlyIdentityMappedPages>, NoDrop<Stack>, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
-        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)?;
+        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
 
     // the captain shouldn't return ...

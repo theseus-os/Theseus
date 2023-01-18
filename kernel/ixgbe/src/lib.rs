@@ -6,6 +6,7 @@
 //! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 #![no_std]
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(abi_x86_interrupt)]
 
@@ -1303,8 +1304,8 @@ pub enum FilterProtocol {
 pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
-    nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
-    let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
+    nic.rx_queues[qid].poll_queue_and_store_received_packets()?;
+    let frame = nic.rx_queues[qid].return_frame().ok_or("no frame")?;
     Ok(frame)
 }
 
