@@ -69,7 +69,7 @@ fn args_or_env_sizes_get(
 /// # Return
 /// A WASI errno.
 fn args_or_env_get(
-    list: &Vec<String>,
+    list: &[String],
     argv_pointers: u32,
     argv_data: u32,
     memory: &MemoryRef,
