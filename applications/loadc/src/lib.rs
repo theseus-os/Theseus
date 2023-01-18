@@ -343,7 +343,7 @@ fn parse_and_load_elf_executable(
 /// rather than using the duplicate instance of those data sections in the executable itself. 
 fn overwrite_relocations(
     namespace: &Arc<CrateNamespace>,
-    segments: &mut Vec<LoadedSegment>,
+    segments: &mut [LoadedSegment],
     elf_file: &ElfFile,
     mmi: &memory::MmiRef,
     verbose_log: bool
