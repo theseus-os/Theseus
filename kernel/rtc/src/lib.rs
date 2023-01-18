@@ -133,15 +133,20 @@ pub fn read_rtc() -> RtcTime {
     }
 }
 
-pub fn get_rtc_ticks() -> Result<usize, ()> {
+/// Returns rtc ticks if exists, otherwise returns RtcError::NotFound
+pub fn get_rtc_ticks() -> Result<usize, RtcError> {
      if let Some(ticks) = RTC_TICKS.get() {
-         Ok(ticks.load(Ordering::Acquire))
+        Ok(ticks.load(Ordering::Acquire))
      }
      else {
-        Err(())
+        Err(RtcError::NotFound)
      }
 }
 
+pub enum RtcError {
+    NotFound,
+    InvalidInput,
+}
 
 /// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
 pub fn enable_rtc_interrupt()
@@ -185,10 +190,10 @@ fn log2(value: usize) -> usize {
 
 /// sets the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
-pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
+pub fn set_rtc_frequency(rate: usize) -> Result<(), RtcError> {
     if !(rate.is_power_of_two() && (2..=8192).contains(&rate)) {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
-        return Err(());
+        return Err(RtcError::InvalidInput);
     }
 
     // formula is "rate = 32768 Hz >> (dividor - 1)"
