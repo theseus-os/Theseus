@@ -1403,7 +1403,6 @@ dependencies = [
  "memory",
  "sdt",
  "spin 0.9.4",
- "static_assertions",
  "time",
  "volatile 0.2.7",
  "zerocopy",
@@ -1813,7 +1812,6 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 

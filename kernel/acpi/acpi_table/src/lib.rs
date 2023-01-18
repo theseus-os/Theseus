@@ -37,7 +37,8 @@ pub struct TableLocation {
 /// which is necessary because they may span multiple pages/frames,
 /// and generally should not be multiply aliased/accessed due to potential race conditions.
 /// As more ACPI tables are discovered, the single MappedPages object is
-pub struct AcpiTables { //^FIXME: is what?
+/// extended to cover them.
+pub struct AcpiTables {
     /// The range of pages that cover all of the discovered ACPI tables.
     mapped_pages: MappedPages,
     /// The physical memory frames that hold the ACPI tables,

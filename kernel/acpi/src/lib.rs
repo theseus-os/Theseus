@@ -92,6 +92,7 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
             );
 
             for table in dmar_table.iter() {
+                #[allow(clippy::single_match)]
                 match table {
                     dmar::DmarEntry::Drhd(drhd) => {
                         debug!("Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}", 
@@ -117,7 +118,7 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
                             debug!("                  path: {:?}", dev_scope.path());
                         }
                     }
-                    _ => { error!("other DMAR entries are currently unhandled") }
+                    _ => {  }
                 }
             }
         }
