@@ -132,7 +132,7 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "USAGE:
+const USAGE: &str = "USAGE:
     wasm [option]... WASM_BINARY_PATH [arg]...
 
 EXAMPLES:
