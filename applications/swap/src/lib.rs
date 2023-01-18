@@ -220,7 +220,7 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: swap (OLD1, NEW1 [, true | false]) [(OLD2, NEW2 [, true | false])]...
+const USAGE: &str = "Usage: swap (OLD1, NEW1 [, true | false]) [(OLD2, NEW2 [, true | false])]...
 Swaps the given list of crate tuples, with NEW# replacing OLD# in each tuple.
 The OLD and NEW values are crate names, such as \"my_crate-<hash>\".
 Both the old crate name and the new crate name can be prefixes, e.g., \"my_cra\" will find \"my_crate-<hash>\", 
