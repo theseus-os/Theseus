@@ -101,9 +101,15 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    let ps2_controller = ps2::init()?;
-    keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
-    mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
+    match ps2::init() {
+        Ok(ps2_controller) => {
+            keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
+            mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
+        },
+        Err(_) => {
+            trace!("ps2 controller not present");
+        }
+    }
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
@@ -174,15 +180,15 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
                 ixgbe_devs.push(ixgbe_nic);
                 continue;
             }
-            if dev.vendor_id == mlx5::MLX_VEND && (dev.device_id == mlx5::CONNECTX5_DEV || dev.device_id == mlx5::CONNECTX5_EX_DEV) {
-                info!("mlx5 PCI device found at: {:?}", dev.location);
-                const RX_DESCS: usize = 512;
-                const TX_DESCS: usize = 8192;
-                const MAX_MTU:  u16 = 9000;
+            // if dev.vendor_id == mlx5::MLX_VEND && (dev.device_id == mlx5::CONNECTX5_DEV || dev.device_id == mlx5::CONNECTX5_EX_DEV) {
+            //     info!("mlx5 PCI device found at: {:?}", dev.location);
+            //     const RX_DESCS: usize = 512;
+            //     const TX_DESCS: usize = 8192;
+            //     const MAX_MTU:  u16 = 9000;
 
-                mlx5::ConnectX5Nic::init(dev, TX_DESCS, RX_DESCS, MAX_MTU)?;
-                continue;
-            }
+            //     mlx5::ConnectX5Nic::init(dev, TX_DESCS, RX_DESCS, MAX_MTU)?;
+            //     continue;
+            // }
 
             // here: check for and initialize other ethernet cards
         }
