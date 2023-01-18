@@ -14,11 +14,6 @@ use task::TaskRef;
 static RUN_QUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
 
 pub fn init(core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
-    #[cfg(runqueue_spillful)]
-    {
-        task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| remove_task_from_within_task);
-    }
-
     if RUN_QUEUES
         .insert(core, RwLockPreempt::new(RunQueue::new(core, idle_task)))
         .is_some()
@@ -71,24 +66,6 @@ pub fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue>> {
     }
 
     min_rq.map(|m| m.0)
-}
-
-#[cfg(runqueue_spillful)]
-/// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
-/// Note: This method is only used by the state spillful runqueue
-/// implementation.
-pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
-    task.set_on_runqueue(None);
-    RUN_QUEUES
-        .get(&core)
-        .ok_or("Couldn't get runqueue for specified core")
-        .and_then(|rq| {
-            // Instead of calling `remove_task`, we directly call `remove_internal`
-            // because we want to actually remove the task from the runqueue,
-            // as calling `remove_task` would do nothing due to it skipping the actual
-            // removal when the `runqueue_spillful` cfg is enabled.
-            rq.write().remove_internal(task)
-        })
 }
 
 /// Yields the current CPU by selecting a new `Task` to run

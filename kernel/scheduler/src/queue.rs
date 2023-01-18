@@ -34,14 +34,6 @@ impl RunQueue {
         }
     }
 
-    #[cfg(runqueue_spillful)]
-    pub fn remove(&mut self, _: &TaskRef) {
-        // For the runqueue state spill evaluation, we disable this method
-        // because we only want to allow removing a task from a runqueue
-        // from within the TaskRef::internal_exit() method.
-    }
-
-    #[cfg(not(runqueue_spillful))]
     pub fn remove(&mut self, task: &TaskRef) {
         self.queue.remove(task);
         #[cfg(single_simd_task_optimization)]
