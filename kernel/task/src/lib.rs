@@ -77,7 +77,7 @@ use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
 
-/// Error types for Task module
+/// Error types for Task module. If you add another field, then also add corresponding change to the Display impl for TaskError. 
 #[derive(Debug)]
 pub enum TaskError {
     NotFound,
@@ -86,7 +86,14 @@ pub enum TaskError {
 
 impl fmt::Display for TaskError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self}")
+        match self {
+            TaskError::AlreadyExists => {
+                write!(f, "AlreadyExists")
+            },
+            TaskError::NotFound => {
+                write!(f, "NotFound")
+            },
+        }
     }
 }
 
