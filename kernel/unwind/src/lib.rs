@@ -297,7 +297,7 @@ impl FallibleIterator for StackFrameIter {
                     // Thus, we want to skip the error code so we can get the instruction pointer, 
                     // i.e., the value at CFA + 0x08.
                     if reg_num == X86_64::RA {
-                        if let Some(_) = prev_cfa_adjustment {
+                        if prev_cfa_adjustment.is_some() {
                             let size_of_error_code = core::mem::size_of::<usize>();
                             // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
                             let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };

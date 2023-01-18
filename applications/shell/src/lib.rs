@@ -884,9 +884,9 @@ impl Shell {
         child_list.reverse();
         for child in child_list.iter() {
             if child.starts_with(incomplete_node) {
-                if let Some(_) = locked_working_dir.get_file(child) {
+                if locked_working_dir.get_file(child).is_some() {
                     match_list.push(child.clone());
-                } else if let Some (_) = locked_working_dir.get_dir(child) {
+                } else if locked_working_dir.get_dir(child).is_some() {
                     let mut cloned = child.clone();
                     cloned.push('/');
                     match_list.push(cloned);
@@ -1400,7 +1400,7 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     for task_ref in &job.tasks {
-                        if let Err(_) = task_ref.unblock() {
+                        if task_ref.unblock().is_err() {
                             job.status = JobStatus::Stopped;
                         } else {
                             job.status = JobStatus::Running;
@@ -1434,7 +1434,7 @@ impl Shell {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
                     for task_ref in &job.tasks {
-                        if let Err(_) = task_ref.unblock() {
+                        if task_ref.unblock().is_err() {
                             job.status = JobStatus::Stopped;
                         } else {
                             job.status = JobStatus::Running;

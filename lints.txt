@@ -252,7 +252,7 @@ question-mark
 redundant-closure
 redundant-field-names
 redundant-pattern
-# redundant-pattern-matching
+redundant-pattern-matching
 # redundant-static-lifetimes
 result-map-or-into-option
 # result-unit-err
