@@ -79,6 +79,6 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: ls [DIR | FILE]
+const USAGE: &str = "Usage: ls [DIR | FILE]
 List the contents of the given directory or info about the given file.
 If no arguments are provided, it lists the contents of the current directory.";
