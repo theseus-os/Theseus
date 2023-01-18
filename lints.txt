@@ -247,7 +247,7 @@ print-literal
 print-with-newline
 println-empty-string
 ptr-arg
-# ptr-eq
+ptr-eq
 question-mark
 # redundant-closure
 # redundant-field-names

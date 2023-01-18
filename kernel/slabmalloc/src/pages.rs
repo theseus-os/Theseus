@@ -515,7 +515,7 @@ impl<'a, T: AllocablePage> PageList<'a, T> {
     /// Does the list contain `s`?
     pub(crate) fn contains(&mut self, s: *const T) -> bool {
         for slab_page in self.iter_mut() {
-            if slab_page as *const T == s as *const T {
+            if core::ptr::eq(slab_page, s) {
                 return true;
             }
         }
