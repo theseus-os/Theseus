@@ -810,7 +810,7 @@ impl IxgbeNic {
     fn rx_init(
         regs1: &mut IntelIxgbeRegisters1, 
         regs: &mut IntelIxgbeRegisters2, 
-        rx_regs: &mut Vec<IxgbeRxQueueRegisters>,
+        rx_regs: &mut [IxgbeRxQueueRegisters],
         num_rx_descs: u16,
         rx_buffer_size_kbytes: RxBufferSizeKiB
     ) -> Result<(
@@ -896,7 +896,7 @@ impl IxgbeNic {
     fn tx_init(
         regs: &mut IntelIxgbeRegisters2, 
         regs_mac: &mut IntelIxgbeMacRegisters, 
-        tx_regs: &mut Vec<IxgbeTxQueueRegisters>,
+        tx_regs: &mut [IxgbeTxQueueRegisters],
         num_tx_descs: u16
     ) -> Result<Vec<BorrowedSliceMappedPages<AdvancedTxDescriptor, Mutable>>, &'static str> {
         // disable transmission

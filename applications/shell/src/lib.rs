@@ -810,7 +810,7 @@ impl Shell {
 
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
-    fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+    fn find_app_name_match(&mut self, incomplete_cmd: &str) -> Result<Vec<String>, &'static str> {
         let namespace_dir = task::with_current_task(|t|
             t.get_namespace().dir().clone()
         ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
@@ -836,7 +836,7 @@ impl Shell {
     /// current command is `foo/bar/examp`, it first tries to walk the directory of `foo/bar`. If
     /// it succeeds, it then lists all filenames under `foo/bar` and tries to match `examp` against
     /// those filenames. It returns a vector that contains all matching results.
-    fn find_file_path_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+    fn find_file_path_match(&mut self, incomplete_cmd: &str) -> Result<Vec<String>, &'static str> {
 
         // Stores all possible matches.
         let mut match_list = Vec::new();
