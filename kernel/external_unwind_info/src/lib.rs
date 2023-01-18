@@ -95,11 +95,11 @@ pub unsafe fn register_unwind_info(
 /// for the given `text_section_base_address`.
 pub unsafe fn deregister_unwind_info(
     text_section_base_address: *mut u8
-) -> Result<(), ()> {
+) -> Result<(), ExternalUnwindInfoError> {
     EXTERNAL_UNWIND_INFO.lock()
         .remove(&VirtualAddress::new_canonical(text_section_base_address as usize))
         .map(|_| ())
-        .ok_or(())
+        .ok_or(ExternalUnwindInfoError::NotFound)
 }
 
 
@@ -120,4 +120,5 @@ pub fn get_unwind_info(
 
 pub enum ExternalUnwindInfoError {
     AlreadyExists,
+    NotFound,
 }

@@ -77,6 +77,19 @@ use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
 
+/// Error types for Task module
+#[derive(Debug)]
+pub enum TaskError {
+    NotFound,
+    AlreadyExists,
+}
+
+impl fmt::Display for TaskError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self}")
+    }
+}
+
 /// The function signature of the callback that will be invoked
 /// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
 pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
@@ -1518,6 +1531,7 @@ pub use tls_current_task::*;
 /// A private module to ensure the below TLS variables aren't modified directly.
 mod tls_current_task {
     use core::cell::{Cell, RefCell};
+    use TaskError;
     use super::{TASKLIST, TaskRef, ExitableTaskRef};
 
     /// The TLS area that holds the current task's ID.
@@ -1533,14 +1547,14 @@ mod tls_current_task {
     /// This is useful to avoid cloning a reference to the current task.
     /// 
     /// Returns an `Err` if the current task cannot be obtained.
-    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    pub fn with_current_task<F, R>(function: F) -> Result<R, TaskError>
     where
         F: FnOnce(&TaskRef) -> R
     {
         if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
             Ok(function(t))
         } else {
-            Err(())
+            Err(TaskError::NotFound)
         }
     }
 
@@ -1602,17 +1616,17 @@ mod tls_current_task {
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, ()> {
+    ) -> Result<ExitableTaskRef, TaskError> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(());
+                return Err(TaskError::AlreadyExists);
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(())?
+                .ok_or(TaskError::AlreadyExists)?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
@@ -1621,7 +1635,7 @@ mod tls_current_task {
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(()),
+            _ => Err(TaskError::AlreadyExists),
         }
     }
 

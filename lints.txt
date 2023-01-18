@@ -255,7 +255,7 @@ redundant-pattern
 redundant-pattern-matching
 redundant-static-lifetimes
 result-map-or-into-option
-# result-unit-err
+result-unit-err
 same-item-push
 self-named-constructors
 should-implement-trait
