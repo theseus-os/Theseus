@@ -79,11 +79,21 @@ use x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::Interrup
 use raw_cpuid::*;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use alloc::vec::Vec;
-use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::string::{String, ToString};
+use alloc::{
+    collections::{BTreeMap, BTreeSet},
+    string::{String, ToString},
+    vec::Vec,
+};
 use bit_field::BitField;
-use core::sync::atomic::{Ordering, AtomicU64, AtomicU8};
+use core::{
+    convert::TryFrom,
+    sync::atomic::{
+        Ordering, 
+        AtomicU64, 
+        AtomicU8
+    },
+};
+
 
 pub mod stat;
 
@@ -578,7 +588,7 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
             core: my_core
         });
     }
-    return Err("All programmable counters currently in use.");
+    Err("All programmable counters currently in use.")
 }
 
 /// Creates a counter object for a fixed hardware counter
@@ -586,12 +596,12 @@ fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
     let my_core = apic::current_cpu();
     let count = rdpmc(msr_mask);
     
-    return Ok(Counter {
+    Ok(Counter {
         start_count: count, 
         msr_mask: msr_mask, 
         pmc: -1, 
         core: my_core
-    });
+    })
 }
 
 /// Checks that the PMU has been initialized. If it has been,
@@ -695,8 +705,8 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     // This check can never trigger since `event_per_sample` is a `u32`
     // and is therefore by definition in the range `u32::MIN..=u32::MAX`.
     // We'll check anyways, just in case `event_per_sample`'s type is changed.
-    #[allow(clippy::absurd_extreme_comparisons)]
-    if event_per_sample > core::u32::MAX || event_per_sample < core::u32::MIN {
+    #[allow(clippy::useless_conversion)]
+    if u32::try_from(event_per_sample).is_err() {
         return Err("Number of events per sample invalid: must be within unsigned 32 bit");
     }
 
@@ -715,7 +725,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
         Msr::new(IA32_PERFEVTSEL0).write(event_mask | PMC_ENABLE | INTERRUPT_ENABLE);
     }
 
-    return Ok(());
+    Ok(())
 
 }
 
@@ -740,7 +750,7 @@ fn stop_samples(core_id: u8, samples: &mut SampledEvents) -> Result<(), &'static
 
     trace!("Stopped taking samples with the PMU");
     
-    return Ok(());
+    Ok(())
 }
 
 /// Stores the instruction pointers and corresponding task IDs from the samples
@@ -755,11 +765,11 @@ pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
     let my_core_id = apic::current_cpu();
 
     let mut sampling_info = SAMPLING_INFO.lock();
-    let mut samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
+    let samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
 
     // the interrupt handler might have stopped samples already so thsi check is required
     if core_is_currently_sampling(my_core_id) {
-        stop_samples(my_core_id, &mut samples)?;
+        stop_samples(my_core_id, samples)?;
     }
     
     sampling_results_have_been_retrieved(my_core_id)?;
@@ -845,7 +855,7 @@ pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static
     let current_count = samples.sample_count;
     // if all samples have already been taken, calls the function to turn off the counter
     if current_count == 0 {
-        stop_samples(my_core_id, &mut samples)?; 
+        stop_samples(my_core_id, samples)?; 
         return Ok(true);
     }
 

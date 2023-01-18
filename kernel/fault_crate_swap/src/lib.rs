@@ -101,7 +101,7 @@ pub fn do_self_swap(
     let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, crate_name);
 
     // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 0 {
+    if matching_crates.is_empty() {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
 
@@ -142,7 +142,7 @@ pub fn do_self_swap(
     let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, ocn);
 
     // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 0 {
+    if matching_crates.is_empty() {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
 
@@ -154,7 +154,7 @@ pub fn do_self_swap(
     debug!("We got a match");
 
     let (new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(0);
-    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(&real_new_namespace, &new_crate_full_name) {
+    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(real_new_namespace, &new_crate_full_name) {
         Some((ocr, _ns)) => {
             ocr
         }
@@ -390,7 +390,7 @@ fn null_swap_policy() -> Option<String> {
         }
         log_handled_fault(fe);
     }
-    return None
+    None
 }
 
 /// simple swap policy. 
@@ -535,7 +535,7 @@ pub fn get_crate_to_swap() -> Option<String> {
 
     #[cfg(not(use_crate_replacement))]
     {
-        return null_swap_policy();
+        null_swap_policy()
     }
 
 

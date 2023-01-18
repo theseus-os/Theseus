@@ -1,3 +1,6 @@
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
+
 use core::{fmt, ops::{Deref, DerefMut}};
 use preemption::{PreemptionGuard, hold_preemption};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -259,7 +262,7 @@ impl<'rwlock, T: ?Sized> Deref for RwLockPreemptReadGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-       & *(self.guard) 
+       &self.guard 
     }
 }
 
@@ -267,13 +270,13 @@ impl<'rwlock, T: ?Sized> Deref for RwLockPreemptWriteGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-        & *(self.guard)
+        &self.guard
     }
 }
 
 impl<'rwlock, T: ?Sized> DerefMut for RwLockPreemptWriteGuard<'rwlock, T> {
     fn deref_mut(&mut self) -> &mut T { 
-        &mut *(self.guard)
+        &mut self.guard
     }
 }
 

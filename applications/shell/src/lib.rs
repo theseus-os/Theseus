@@ -502,7 +502,7 @@ impl Shell {
         // Attempts to run the command whenever the user presses enter and updates the cursor tracking variables 
         if keyevent.keycode == Keycode::Enter && keyevent.keycode.to_ascii(keyevent.modifiers).is_some() {
             let cmdline = self.cmdline.clone();
-            if cmdline.len() == 0 && self.fg_job_num.is_none() {
+            if cmdline.is_empty() && self.fg_job_num.is_none() {
                 // reprints the prompt on the next line if the user presses enter and hasn't typed anything into the prompt
                 self.terminal.lock().print_to_terminal("\n".to_string());
                 self.redisplay_prompt();
@@ -652,7 +652,7 @@ impl Shell {
         taskref.set_env(self.env.clone()); // Set environment variable of application to the same as terminal task
 
         // Gets the task id so we can reference this task if we need to kill it with Ctrl+C
-        return Ok(taskref);
+        Ok(taskref)
     }
 
     /// Evaluate the command line. It creates a sequence of jobs, which forms a chain of applications that
@@ -810,7 +810,7 @@ impl Shell {
             t.get_namespace().dir().clone()
         ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
 
-        let mut names = namespace_dir.get_file_and_dir_names_starting_with(&incomplete_cmd);
+        let mut names = namespace_dir.get_file_and_dir_names_starting_with(incomplete_cmd);
 
         // Drop the extension name and hash value.
         let mut clean_name = String::new();
@@ -843,13 +843,10 @@ impl Shell {
         };
 
         // Check if the last character is a slash.
-        let slash_ending = match incomplete_cmd.chars().last() {
-            Some('/') => true,
-            _ => false
-        };
+        let slash_ending = matches!(incomplete_cmd.chars().last(), Some('/'));
 
         // Split the path by slash and filter out consecutive slashes.
-        let mut nodes: Vec<_> = incomplete_cmd.split('/').filter(|node| { node.len() > 0 }).collect();
+        let mut nodes: Vec<_> = incomplete_cmd.split('/').filter(|node| { !node.is_empty() }).collect();
 
         // Get the last node in the path, which is to be completed.
         let incomplete_node = {
@@ -881,10 +878,10 @@ impl Shell {
         let mut child_list = locked_working_dir.list(); 
         child_list.reverse();
         for child in child_list.iter() {
-            if child.starts_with(&incomplete_node) {
-                if let Some(_) = locked_working_dir.get_file(&child) {
+            if child.starts_with(incomplete_node) {
+                if let Some(_) = locked_working_dir.get_file(child) {
                     match_list.push(child.clone());
-                } else if let Some (_) = locked_working_dir.get_dir(&child) {
+                } else if let Some (_) = locked_working_dir.get_dir(child) {
                     let mut cloned = child.clone();
                     cloned.push('/');
                     match_list.push(cloned);
@@ -1393,7 +1390,7 @@ impl Shell {
             self.terminal.lock().print_to_terminal("Usage: bg %job_num\n".to_string());
             return Ok(());
         }
-        if let Some('%') = args[0].chars().nth(0) {
+        if let Some('%') = args[0].chars().next() {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
@@ -1426,7 +1423,7 @@ impl Shell {
             self.terminal.lock().print_to_terminal("Usage: fg %job_num\n".to_string());
             return Ok(());
         }
-        if let Some('%') = args[0].chars().nth(0) {
+        if let Some('%') = args[0].chars().next() {
             let job_num = args[0].chars().skip(1).collect::<String>();
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {

@@ -1,5 +1,7 @@
 //! Early exception handlers that do nothing but print an error and hang.
 
+// TODO: Add direct explanation to why each empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
@@ -47,7 +49,7 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         println_raw!("exceptions_early(): Created TSS: {:?}", tss);
         *EARLY_TSS.lock() = tss;
         
-        let (gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(&*EARLY_TSS.lock());
+        let (gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(&EARLY_TSS.lock());
         *EARLY_GDT.lock() = gdt;
         EARLY_GDT.lock().load();
 

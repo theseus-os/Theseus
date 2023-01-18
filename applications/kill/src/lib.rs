@@ -8,7 +8,7 @@ extern crate getopts;
 
 use getopts::Options;
 use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -31,7 +31,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     println!("`kill` has temporarily been disabled because it needs to be reimplemented.");
-    return -1;
+    -1
 }
 
 /*
@@ -106,7 +106,7 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
 
 #[allow(dead_code)]
 fn print_usage(opts: Options) -> isize {
-    let brief = format!("Usage: kill [OPTS] TASK_ID");
+    let brief = "Usage: kill [OPTS] TASK_ID".to_string();
     println!("{}", opts.usage(&brief));
     0
 }

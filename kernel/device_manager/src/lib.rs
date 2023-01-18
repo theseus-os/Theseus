@@ -82,7 +82,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
             .ok()
             .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        ).map(|arc_ref| arc_ref.clone());
+        ).cloned();
 
     logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
     info!("Initialized full logger.");

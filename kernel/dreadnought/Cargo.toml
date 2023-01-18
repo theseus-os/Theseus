@@ -11,6 +11,7 @@ scheduler = { path = "../scheduler" }
 sleep = { path = "../sleep" }
 spawn = { path = "../spawn" }
 task = { path = "../task" }
+time = { path = "../time" }
 
 [dependencies.futures]
 version = "0.3"

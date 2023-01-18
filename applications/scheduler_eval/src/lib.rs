@@ -1,99 +1,91 @@
 #![no_std]
 
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate spawn;
-extern crate scheduler;
-extern crate task;
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
+use app_io::println;
+use time::{now, Monotonic};
 
+pub fn main(args: Vec<String>) -> isize {
+    let mut options = getopts::Options::new();
+    options
+        .optflag("h", "help", "Display this message")
+        .optopt("t", "threads", "Spawn <num> threads", "<num>")
+        .optopt("y", "yield", "Yield <num> times in each thread", "<num>");
 
-pub fn main(_args: Vec<String>) -> (){
-    let taskref1 = spawn::new_task_builder(test1 ,1)
-        .name(String::from("test1"))
-        .pin_on_core(1)
-        .spawn().expect("failed to initiate task");
+    let matches = match options.parse(args) {
+        Ok(matches) => matches,
+        Err(e) => {
+            println!("{}", e);
+            print_usage(options);
+            return 1;
+        }
+    };
 
-    if let Err(e) = scheduler::set_priority(&taskref1, 30) {
-        error!("scheduler_eval(): Could not set priority to taskref1: {}", e);
+    if matches.opt_present("h") {
+        print_usage(options);
+        return 0;
     }
 
-    debug!("Spawned Task 1");
+    let num_threads = matches
+        .opt_get_default("t", 32)
+        .expect("failed to parse the number of threads");
+    let num_yields = matches
+        .opt_get_default("y", 16384)
+        .expect("failed to parse the number of yields");
 
-    let taskref2 = spawn::new_task_builder(test2 ,2)
-        .name(String::from("test2"))
-        .pin_on_core(1)
-        .spawn().expect("failed to initiate task");
-
-    if let Err(e) = scheduler::set_priority(&taskref2, 20) {
-        error!("scheduler_eval(): Could not set priority to taskref2: {}", e);
+    let mut tasks = Vec::with_capacity(num_threads);
+    for _ in 0..num_threads {
+        tasks.push(
+            spawn::new_task_builder(worker, num_yields)
+                // Currently, if the tasks aren't pinned to a core, the workers on the same core as
+                // the shell finish significantly slower. The majority of the runtime is taken up by
+                // the shell rather than by our workers, invalidating the benchmark. To fix this we
+                // pin the workers on core 3, assuming the shell is on some other core. This means
+                // the benchmark doesn't incorporate work stealing, but the only reason we're having
+                // this problem in the first place is because work stealing isn't implemented so...
+                // TODO: Remove this when work stealing is implemented.
+                .pin_on_core(3)
+                .block()
+                .spawn()
+                .expect("failed to spawn task"),
+        );
     }
 
-    debug!("Spawned Task 2");
-
-    let taskref3 = spawn::new_task_builder(test3 ,3)
-        .name(String::from("test3"))
-        .pin_on_core(1)
-        .spawn().expect("failed to initiate task");
-
-    if let Err(e) = scheduler::set_priority(&taskref3, 10) {
-        error!("scheduler_eval(): Could not set priority to taskref3: {}", e);
+    let start = now::<Monotonic>();
+    for task in tasks.iter() {
+        task.unblock().expect("failed to unblock task");
     }
 
-    debug!("Spawned Task 3");
+    for task in tasks {
+        // JoinableTaskRef::join is inlined so that we can yield if the worker hasn't
+        // exited minimising the impact our task has on the worker tasks.
+        // TODO: Call join directly once it is properly implemented.
+        // TODO: Remove dependency on scheduler.
+        while !task.has_exited() {
+            scheduler::schedule();
+        }
 
-    debug!("Spawned all tasks");
+        while task.is_running() {
+            scheduler::schedule();
+        }
 
-    let _priority1 = scheduler::get_priority(&taskref1);
-    let _priority2 = scheduler::get_priority(&taskref2);
-    let _priority3 = scheduler::get_priority(&taskref3);
-
-    #[cfg(priority_scheduler)]
-    {
-        assert_eq!(_priority1,Some(30));
-        assert_eq!(_priority2,Some(20));
-        assert_eq!(_priority3,Some(10));
+        task.join().expect("failed to join task");
     }
+    let end = now::<Monotonic>();
 
-    taskref1.join().expect("Task 1 join failed");
-    taskref2.join().expect("Task 2 join failed");
-    taskref3.join().expect("Task 3 join failed");
+    println!("time: {:#?}", end - start);
+
+    0
 }
 
-fn test1(_a: u32) -> u32 {
-    //let mut i = 1;
-    //loop{
-    for i in 0..1000 {
-       let task_id = task::get_my_current_task_id();
-       debug!("Task_ID : {} , Instance : {}", task_id, i);
-       scheduler::schedule();
-       //i = i + 1; 
-    }
-    _a
+fn print_usage(options: getopts::Options) {
+    let brief = alloc::format!("Usage: {} [OPTIONS]", env!("CARGO_CRATE_NAME"));
+    println!("{}", options.usage(&brief));
 }
 
-fn test2(_a: u32) -> u32 {
-    //let mut i = 1;
-    //loop{
-    for i in 0..1000 {
-       let task_id = task::get_my_current_task_id();
-       debug!("Task_ID : {} , Instance : {}", task_id, i);
-       scheduler::schedule();
-       //i = i + 1; 
+fn worker(num_yields: u32) {
+    for _ in 0..num_yields {
+        scheduler::schedule();
     }
-    _a
-}
-
-fn test3(_a: u32) -> u32 {
-    //let mut i = 1;
-    //loop{
-    for i in 0..1000 {
-       let task_id = task::get_my_current_task_id();
-       debug!("Task_ID : {} , Instance : {}", task_id, i);
-       scheduler::schedule();
-       //i = i + 1; 
-    }
-    _a
 }

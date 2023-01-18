@@ -112,7 +112,7 @@ impl WindowManager {
         // if it is currently actived, just return
         let first_active = match self.active.upgrade() {
             Some(current_active) => {
-                if Arc::ptr_eq(&(current_active), inner_ref) {
+                if Arc::ptr_eq(&current_active, inner_ref) {
                     return Ok(true); // do nothing
                 } else {
                     // save this to show_list
@@ -123,14 +123,14 @@ impl WindowManager {
             None => true,
         };
         
-        match self.is_window_in_show_list(&inner_ref) {
+        match self.is_window_in_show_list(inner_ref) {
             // remove item in current list
             Some(i) => {
                 self.show_list.remove(i);
             }
             None => {}
         }
-        match self.is_window_in_hide_list(&inner_ref) {
+        match self.is_window_in_hide_list(inner_ref) {
             // remove item in current list
             Some(i) => {
                 self.hide_list.remove(i);
@@ -157,7 +157,7 @@ impl WindowManager {
     fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         for (i, item) in self.show_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
@@ -169,7 +169,7 @@ impl WindowManager {
     fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         for (i, item) in self.hide_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
@@ -364,10 +364,8 @@ impl WindowManager {
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            if current_active_win.contains(*coordinate - current_coordinate) || match current_active_win.moving {
-                WindowMovingStatus::Moving(_) => true,
-                _ => false,
-            }{
+            if current_active_win.contains(*coordinate - current_coordinate) || matches!(current_active_win.moving, WindowMovingStatus::Moving(_))
+            {
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win.send_event(Event::MousePositionEvent(event))

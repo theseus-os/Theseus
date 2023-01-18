@@ -24,6 +24,8 @@
 //! }
 //! ```
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(thread_local)]
@@ -177,10 +179,10 @@ pub enum KillReason {
 }
 impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match &self {
-            &Self::Requested         => write!(f, "Requested"),
-            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        match self {
+            Self::Requested         => write!(f, "Requested"),
+            Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
+            Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
         }
     }
 }
@@ -220,12 +222,6 @@ pub enum RunState {
 }
 
 
-#[cfg(runqueue_spillful)]
-/// A callback that will be invoked to remove a specific task from a specific runqueue.
-/// Should be initialized by the runqueue crate.
-pub static RUNQUEUE_REMOVAL_FUNCTION: spin::Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = spin::Once::new();
-
-
 #[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -261,9 +257,9 @@ impl From<Option<u8>> for OptionU8 {
         OptionU8(opt)
     }
 }
-impl Into<Option<u8>> for OptionU8 {
-    fn into(self) -> Option<u8> {
-        self.0
+impl From<OptionU8> for Option<u8> {
+    fn from(val: OptionU8) -> Self {
+        val.0
     }
 }
 impl fmt::Debug for OptionU8 {
@@ -386,10 +382,6 @@ pub struct Task {
     /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
     tls_area: TlsDataImage,
     
-    #[cfg(runqueue_spillful)]
-    /// The runqueue that this Task is on.
-    on_runqueue: AtomicCell<OptionU8>,
-
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
@@ -519,9 +511,6 @@ impl Task {
             failure_cleanup_function,
             tls_area,
 
-            #[cfg(runqueue_spillful)]
-            on_runqueue: AtomicCell::new(None.into()),
-            
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }
@@ -646,10 +635,7 @@ impl Task {
     /// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        match self.runstate() {
-            RunState::Exited | RunState::Reaped => true,
-            _ => false,
-        }
+        matches!(self.runstate(), RunState::Exited | RunState::Reaped)
     }
 
     /// Returns `true` if this is an application `Task`. 
@@ -672,18 +658,6 @@ impl Task {
     /// Obtains the lock on this `Task`'s inner state in order to access it.
     pub fn is_restartable(&self) -> bool {
         self.inner.lock().restart_info.is_some()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Returns the runqueue on which this `Task` is currently enqueued.
-    pub fn on_runqueue(&self) -> Option<u8> {
-        self.on_runqueue.load().into()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Marks this `Task` as enqueued on the given runqueue.
-    pub fn set_on_runqueue(&self, runqueue: Option<u8>) {
-        self.on_runqueue.store(runqueue.into());
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
@@ -1344,7 +1318,7 @@ impl TaskRef {
     /// ## Return
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
-    pub fn new(task: Task) -> JoinableTaskRef {
+    pub fn create(task: Task) -> JoinableTaskRef {
         let exit_value_mailbox = Mutex::new(None);
         let taskref = TaskRef(Arc::new(TaskRefInner { task, exit_value_mailbox }));
 
@@ -1401,14 +1375,6 @@ impl TaskRef {
             
             if let Some(waker) = self.inner.lock().waker.take() {
                 waker.wake();
-            }
-        }
-
-        #[cfg(runqueue_spillful)] {   
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = self.on_runqueue() {
-                    remove_from_runqueue(self, rq)?;
-                }
             }
         }
 
@@ -1502,7 +1468,7 @@ pub fn bootstrap_task(
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
-    let joinable_taskref = TaskRef::new(bootstrap_task);
+    let joinable_taskref = TaskRef::create(bootstrap_task);
 
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();

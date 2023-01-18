@@ -55,7 +55,7 @@ pub fn remove_task_from_all(task: &TaskRef) {
     }
 }
 
-fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue>> {
+pub fn get_least_busy_run_queue() -> Option<&'static RwLockPreempt<RunQueue>> {
     let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
 
     for (_, rq) in RUN_QUEUES.iter() {

@@ -166,7 +166,7 @@ pub fn send_request(
     loop { 
         _loop_ctr += 1;
 
-        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+        let _packet_io_occurred = poll_iface(iface, sockets, startup_time)?;
 
         // check if we have timed out
         if let Some(t) = timeout_millis {

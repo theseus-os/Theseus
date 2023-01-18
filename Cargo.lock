@@ -914,6 +914,7 @@ dependencies = [
  "sleep",
  "spawn",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -2913,6 +2914,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rq_access_eval"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "cpu",
+ "getopts",
+ "irq_safety",
+ "scheduler",
+ "time",
+]
+
+[[package]]
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
@@ -2993,14 +3006,11 @@ checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
  "cfg-if 1.0.0",
- "irq_safety",
  "log",
  "mutex_preemption",
  "preemption",
- "spin 0.9.4",
  "task",
 ]
 
@@ -3008,11 +3018,11 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log",
- "logger",
+ "app_io",
+ "getopts",
  "scheduler",
  "spawn",
- "task",
+ "time",
 ]
 
 [[package]]
@@ -3231,10 +3241,12 @@ dependencies = [
 name = "sleep"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "lazy_static",
  "scheduler",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -3630,6 +3642,7 @@ dependencies = [
  "scheduler",
  "sleep",
  "spawn",
+ "time",
 ]
 
 [[package]]
@@ -3641,6 +3654,17 @@ dependencies = [
  "log",
  "spawn",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "test_scheduler"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "logger",
+ "scheduler",
+ "spawn",
+ "task",
 ]
 
 [[package]]
@@ -3769,6 +3793,7 @@ dependencies = [
  "raw_mode",
  "rm",
  "rq",
+ "rq_access_eval",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
@@ -3787,6 +3812,7 @@ dependencies = [
  "test_panic",
  "test_realtime",
  "test_restartable",
+ "test_scheduler",
  "test_serial_echo",
  "test_std_fs",
  "test_task_cancel",

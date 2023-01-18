@@ -6,6 +6,8 @@ use core::{
     task::{Context, Poll},
 };
 
+pub use time::Duration;
+
 /// Waits until the specified number of ticks has elapsed.
 ///
 /// The end number of ticks is calculated when the function is called so:
@@ -18,16 +20,16 @@ use core::{
 /// # }
 /// ```
 /// Would take 1000 ticks to complete.
-pub fn sleep(ticks: usize) -> Sleep {
-    let current_ticks = sleep::get_current_time_in_ticks();
-    let until = current_ticks + ticks;
+pub fn sleep(duration: Duration) -> Sleep {
+    let current_time = time::now::<time::Monotonic>();
+    let until = current_time + duration;
     Sleep { until }
 }
 
 /// Future returned by [`sleep`].
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct Sleep {
-    until: usize,
+    until: time::Instant,
 }
 
 impl Future for Sleep {

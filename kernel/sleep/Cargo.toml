@@ -19,5 +19,12 @@ git = "https://github.com/theseus-os/irq_safety"
 [dependencies.scheduler]
 path = "../scheduler"
 
+[dependencies.time]
+path = "../time"
+
+[dependencies.crossbeam-utils]
+version = "0.8.12"
+default-features = false
+
 [lib]
 crate-type = ["rlib"]

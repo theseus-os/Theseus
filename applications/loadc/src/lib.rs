@@ -71,7 +71,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
         )
     ).map_err(|_| String::from("failed to get current task"))?;
 
-    let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
+    let path = matches.free.get(0).ok_or_else(|| "Missing path to ELF executable".to_string())?;
     let path = Path::new(path.clone());
     let file_ref = path.get_file(&curr_wd)
         .ok_or_else(|| format!("Failed to access file at {:?}", path))?;
@@ -348,7 +348,7 @@ fn overwrite_relocations(
     mmi: &memory::MmiRef,
     verbose_log: bool
 ) -> Result<(), String> {
-    let symtab = find_symbol_table(&elf_file)?;
+    let symtab = find_symbol_table(elf_file)?;
 
     // Fix up the sections that were just loaded, using proper relocation info.
     // Iterate over every non-zero relocation section in the file
@@ -356,11 +356,11 @@ fn overwrite_relocations(
         use xmas_elf::sections::SectionData::Rela64;
         if verbose_log { 
             trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
-                sec.get_name(&elf_file), sec.get_type(), sec.info()
+                sec.get_name(elf_file), sec.get_type(), sec.info()
             ); 
         }
 
-        let rela_sec_name = sec.get_name(&elf_file).unwrap();
+        let rela_sec_name = sec.get_name(elf_file).unwrap();
         // Skip debug special sections for now, those can be processed later. 
         if rela_sec_name.starts_with(".rela.debug")  { 
             continue;
@@ -371,7 +371,7 @@ fn overwrite_relocations(
             continue;
         }
 
-        let rela_array = match sec.get_data(&elf_file) {
+        let rela_array = match sec.get_data(elf_file) {
             Ok(Rela64(rela_arr)) => rela_arr,
             _ => {
                 let err = format!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
@@ -390,7 +390,7 @@ fn overwrite_relocations(
         let target_segment = segments.iter_mut()
             .find(|seg| seg.section_ndxs.contains(&target_sec_shndx))
             .ok_or_else(|| {
-                let err = format!("ELF file error: couldn't find loaded segment that contained section for Rela section {:?}!", sec.get_name(&elf_file));
+                let err = format!("ELF file error: couldn't find loaded segment that contained section for Rela section {:?}!", sec.get_name(elf_file));
                 error!("{}", err);
                 err
             })?;
@@ -418,17 +418,17 @@ fn overwrite_relocations(
             }
 
             let source_sec_shndx = source_sec_entry.shndx() as usize; 
-            let source_sec_name = match source_sec_entry.get_name(&elf_file) {
+            let source_sec_name = match source_sec_entry.get_name(elf_file) {
                 Ok(name) => name,
                 _ => continue,
             };
 
             if verbose_log { 
-                let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                    .and_then(|s| s.get_name(&elf_file));
+                let source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() as usize)
+                    .and_then(|s| s.get_name(elf_file));
                 trace!("             --> Points to relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
                 trace!("                 Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
-                    source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                    source_sec_entry.name(), source_sec_entry.get_name(elf_file), 
                     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
                     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
             }

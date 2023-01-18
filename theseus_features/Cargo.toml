@@ -61,6 +61,7 @@ test_mutex_sleep = { path = "../applications/test_mutex_sleep", optional = true 
 test_panic = { path = "../applications/test_panic", optional = true }
 test_realtime = { path = "../applications/test_realtime", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
+test_scheduler = { path = "../applications/test_scheduler", optional = true }
 test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
 test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
@@ -74,6 +75,7 @@ unwind_test = { path = "../applications/unwind_test", optional = true }
 bm = { path = "../applications/bm", optional = true }
 channel_eval = { path = "../applications/channel_eval", optional = true }
 heap_eval = { path = "../applications/heap_eval", optional = true }
+rq_access_eval = { path = "../applications/rq_access_eval",  optional = true }
 rq_eval = { path = "../applications/rq_eval",  optional = true }
 scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
 
@@ -132,6 +134,7 @@ theseus_benchmarks = [
     "bm",
     "channel_eval",
     "heap_eval",
+    "rq_access_eval",
     "rq_eval",
     "scheduler_eval",
 ]
@@ -155,6 +158,7 @@ theseus_tests = [
     "test_panic",
     "test_realtime",
     "test_restartable",
+    "test_scheduler",
     "test_serial_echo",
     "test_std_fs",
     "test_task_cancel",
