@@ -222,7 +222,7 @@ pub fn new_application_task_builder(
         let app_crate = app_crate_ref.lock_as_ref();
         let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
         app_crate.find_section(|sec| 
-            sec.typ == SectionType::Text && sec.name_without_hash() == &expected_main_section_name
+            sec.typ == SectionType::Text && sec.name_without_hash() == expected_main_section_name
         ).cloned()
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
@@ -406,7 +406,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
                 .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
-        let task_ref = TaskRef::new(new_task);
+        let task_ref = TaskRef::create(new_task);
         let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
         // insert should return None, because that means there was no existing task with the same ID 
         if let Some(_existing_task) = _existing_task {

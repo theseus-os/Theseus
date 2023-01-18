@@ -87,7 +87,7 @@ pub fn main(args: Vec<String>) -> isize {
             }
             _ => { 
                 println!("Invalid argument {}, not a valid adress", matches.free[0]); 
-                return -1;
+                -1
             },
         }   
     
@@ -95,7 +95,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     else {
         println!("no arguments provided");
-        return 0;
+        0
     }
 }
 

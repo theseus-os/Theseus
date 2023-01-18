@@ -205,7 +205,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 
     // if downloaded, save the diff file into the base directory
     if let Some(diffs) = diff_file_lines {
-        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
+        let cfile = MemFile::create(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
         cfile.lock().write_at(diffs.join("\n").as_bytes(), 0)?;
     }
 
@@ -319,12 +319,12 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 /// it will create a directory "my_dir.2" if "my_dir" and "my_dir.1" already exist.
 fn make_unique_directory(base_name: &str, parent_dir: &DirRef) -> Result<DirRef, &'static str> {
     if parent_dir.lock().get(base_name).is_none() {
-        return VFSDirectory::new(base_name.to_string(), parent_dir);
+        return VFSDirectory::create(base_name.to_string(), parent_dir);
     }
     for i in 1.. {
         let new_base_name = format!("{}.{}", base_name, i);
         if parent_dir.lock().get(&new_base_name).is_none() {
-            return VFSDirectory::new(new_base_name, parent_dir);
+            return VFSDirectory::create(new_base_name, parent_dir);
         }   
     }
 

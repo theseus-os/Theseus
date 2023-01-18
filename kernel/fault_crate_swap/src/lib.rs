@@ -390,7 +390,7 @@ fn null_swap_policy() -> Option<String> {
         }
         log_handled_fault(fe);
     }
-    return None
+    None
 }
 
 /// simple swap policy. 
@@ -535,7 +535,7 @@ pub fn get_crate_to_swap() -> Option<String> {
 
     #[cfg(not(use_crate_replacement))]
     {
-        return null_swap_policy();
+        null_swap_policy()
     }
 
 

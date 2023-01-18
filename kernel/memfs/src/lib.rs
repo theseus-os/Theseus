@@ -36,7 +36,7 @@ pub struct MemFile {
 
 impl MemFile {
     /// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
-    pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
+    pub fn create(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         let new_file = Self::from_mapped_pages(MappedPages::empty(), name, 0, parent)?;
         Ok(new_file)
     }

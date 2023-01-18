@@ -665,7 +665,7 @@ impl IxgbeNic {
             let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
             regs.swsm.write(swsm);
 
-            return Ok(true);
+            Ok(true)
         }
 
         //resource is not available

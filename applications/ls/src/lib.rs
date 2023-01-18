@@ -51,17 +51,17 @@ pub fn main(args: Vec<String>) -> isize {
     match path.get(&curr_wd) {
         Some(FileOrDir::Dir(dir)) => {
             print_children(&dir);
-            return 0;
+            0
         }
         Some(FileOrDir::File(file)) => {
             println!("'{}' is not a directory; `ls` currently only supports listing directory contents.", file.lock().get_name());
-            return -1;
+            -1
         }
         _ => {
             println!("Couldn't find path: {}", path); 
-            return -1;
+            -1
         }
-    };
+    }
 }
 
 fn print_children(dir: &DirRef) {

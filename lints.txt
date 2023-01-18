@@ -94,7 +94,7 @@ while-let-loop
 wildcard-in-or-patterns
 zero-divided-by-zero
 zero-prefixed-literal
-# Correctness
+correctness
 absurd-extreme-comparisons
 almost-swapped
 approx-constant
@@ -233,17 +233,17 @@ module-inception
 must-use-unit
 mut-mutex-lock
 needless-borrow
-# needless-doctest-main
-# needless-late-init
-# needless-range-loop
-# needless-return
+needless-doctest-main
+needless-late-init
+needless-range-loop
+needless-return
 neg-multiply
-# new-ret-no-self
-# new-without-default
+new-ret-no-self
+new-without-default
 ok-expect
-# op-ref
+op-ref
 option-map-or-none
-# print-literal
+print-literal
 print-with-newline
 println-empty-string
 # ptr-arg
@@ -286,11 +286,11 @@ zero-ptr
 empty-line-after-outer-attr
 fallible-impl-from
 mutex-integer
-# needless-borrow
+needless-borrow
 panicking-unwrap
-# range-plus-one
+range-plus-one
 unnecessary-unwrap
-# Perf
+perf
 box-collection
 boxed-local
 cmp-owned

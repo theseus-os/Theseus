@@ -32,7 +32,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     println!("`kill` has temporarily been disabled because it needs to be reimplemented.");
-    return -1;
+    -1
 }
 
 /*
