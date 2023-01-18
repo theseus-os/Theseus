@@ -508,5 +508,5 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "Usage: loadc [ARGS] PATH
+const USAGE: &str = "Usage: loadc [ARGS] PATH
 Loads C language ELF executables on Theseus.";
