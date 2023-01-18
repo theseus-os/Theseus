@@ -34,10 +34,10 @@ pub mod replace_nano_core_crates;
 mod serde;
 
 /// The name of the directory that contains all of the CrateNamespace files.
-pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
+pub const NAMESPACES_DIRECTORY_NAME: &str = "namespaces";
 
 /// The name of the directory that contains all other "extra_files" contents.
-pub const EXTRA_FILES_DIRECTORY_NAME: &'static str = "extra_files";
+pub const EXTRA_FILES_DIRECTORY_NAME: &str = "extra_files";
 const EXTRA_FILES_DIRECTORY_DELIMITER: char = '!';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
@@ -1655,16 +1655,16 @@ impl CrateNamespace {
         // keeping track of the offset into each of their MappedPages as we go.
         let (mut rodata_offset, mut data_offset) = (0 , 0);
                     
-        const TEXT_PREFIX:             &'static str = ".text.";
-        const UNLIKELY_PREFIX:         &'static str = "unlikely."; // the full section prefix is ".text.unlikely."
-        const RODATA_PREFIX:           &'static str = ".rodata.";
-        const DATA_PREFIX:             &'static str = ".data.";
-        const BSS_PREFIX:              &'static str = ".bss.";
-        const TLS_DATA_PREFIX:         &'static str = ".tdata.";
-        const TLS_BSS_PREFIX:          &'static str = ".tbss.";
+        const TEXT_PREFIX:             &str = ".text.";
+        const UNLIKELY_PREFIX:         &str = "unlikely."; // the full section prefix is ".text.unlikely."
+        const RODATA_PREFIX:           &str = ".rodata.";
+        const DATA_PREFIX:             &str = ".data.";
+        const BSS_PREFIX:              &str = ".bss.";
+        const TLS_DATA_PREFIX:         &str = ".tdata.";
+        const TLS_BSS_PREFIX:          &str = ".tbss.";
         // const RELRO_PREFIX:            &'static str = "rel.ro.";
-        const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
-        const EH_FRAME_NAME:           &'static str = ".eh_frame";
+        const GCC_EXCEPT_TABLE_PREFIX: &str = ".gcc_except_table.";
+        const EH_FRAME_NAME:           &str = ".eh_frame";
 
         /// A convenient macro to obtain the rest of the symbol name after its prefix,
         /// i.e., the characters after '.text', '.rodata', '.data', etc.
@@ -2170,7 +2170,7 @@ impl CrateNamespace {
                         // At this point, there's no other way to search for the source section besides its name.
                         None => {
                             if let Ok(source_sec_name) = source_sec_entry.get_name(elf_file) {
-                                const DATARELRO: &'static str = ".data.rel.ro.";
+                                const DATARELRO: &str = ".data.rel.ro.";
                                 let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
                                     source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
                                 } else {

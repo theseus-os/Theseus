@@ -37,7 +37,7 @@ pub use device_scope::*;
 // pub use satc::*;
 
 
-pub const DMAR_SIGNATURE: &'static [u8; 4] = b"DMAR";
+pub const DMAR_SIGNATURE: &[u8; 4] = b"DMAR";
 
 
 /// The handler for parsing the DMAR table and adding it to the ACPI tables list.

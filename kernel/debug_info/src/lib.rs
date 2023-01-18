@@ -750,7 +750,7 @@ impl DebugSymbols {
                     // At this point, there's no other way to search for the source section besides its name.
                     None => {
                         if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
-                            const DATARELRO: &'static str = ".data.rel.ro.";
+                            const DATARELRO: &str = ".data.rel.ro.";
                             let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
                                 source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
                             } else {

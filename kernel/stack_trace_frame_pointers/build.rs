@@ -2,7 +2,7 @@
 //! if the corresponding rustflags value is set.
 
 /// The prefix that must come before each custom cfg option.
-const CFG_PREFIX: &'static str = "cargo:rustc-cfg=";
+const CFG_PREFIX: &str = "cargo:rustc-cfg=";
 
 
 fn main() {

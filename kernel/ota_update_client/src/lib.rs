@@ -62,22 +62,22 @@ const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
 /// The path of the update builds file, located at the root of the build server.
 /// This file contains the list of all update build instances available,
 /// listed in reverse chronological order (most recent builds first).
-const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
+const UPDATE_BUILDS_PATH: &str = "/updates.txt";
 
 /// The name (and relative path) of the listing file inside each update build directory,
 /// which contains the names of all crate object files that were built.  
-const LISTING_FILE_NAME: &'static str = "listing.txt";
+const LISTING_FILE_NAME: &str = "listing.txt";
 
 /// The name (and relative path) of the diff file inside each update build directory,
 /// which contains the mapping of old crates to new crates, indicating how a swap should take place. 
-pub const DIFF_FILE_NAME: &'static str = "diff.txt";
+pub const DIFF_FILE_NAME: &str = "diff.txt";
 
 /// The name of the directory containing the checksums of each crate object file
 /// inside of a given update build.
-const CHECKSUMS_DIR_NAME: &'static str = "checksums";
+const CHECKSUMS_DIR_NAME: &str = "checksums";
 
 /// The file extension that is appended onto each crate object file's checksum file.
-const CHECKSUM_FILE_EXTENSION: &'static str = ".sha512";
+const CHECKSUM_FILE_EXTENSION: &str = ".sha512";
 
 
 

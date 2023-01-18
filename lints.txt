@@ -253,7 +253,7 @@ redundant-closure
 redundant-field-names
 redundant-pattern
 redundant-pattern-matching
-# redundant-static-lifetimes
+redundant-static-lifetimes
 result-map-or-into-option
 # result-unit-err
 same-item-push

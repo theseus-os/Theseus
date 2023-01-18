@@ -15,7 +15,7 @@ use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 use static_assertions::const_assert_eq;
 
-pub const MADT_SIGNATURE: &'static [u8; 4] = b"APIC";
+pub const MADT_SIGNATURE: &[u8; 4] = b"APIC";
 
 /// The handler for parsing the MADT table and adding it to the ACPI tables list.
 pub fn handle(
