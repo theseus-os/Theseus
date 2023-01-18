@@ -136,7 +136,7 @@ impl DebugSections {
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
     /// ```rust,ignore
-    /// fn main() {
+    /// fn main() { // start
     ///     let a = 5;
     ///     { // start
     ///         let b = 6
@@ -147,7 +147,7 @@ impl DebugSections {
     ///     { // start
     ///         let d = 8;
     ///     } // end
-    /// }
+    /// } // end
     /// ```
     /// 
     /// # Arguments
