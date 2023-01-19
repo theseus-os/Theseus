@@ -1,0 +1,11 @@
+[package]
+name = "preemption_eval"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+app_io = { path = "../../kernel/app_io" }
+preemption = { path = "../../kernel/preemption" }
+scheduler = { path = "../../kernel/scheduler" }
+spawn = { path = "../../kernel/spawn" }
+time = { path = "../../kernel/time" }

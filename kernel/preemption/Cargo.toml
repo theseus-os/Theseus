@@ -11,5 +11,8 @@ log = "0.4.8"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.cache_line]
+path = "../../libs/cache_line"
+
 [lib]
 crate-type = ["rlib"]
