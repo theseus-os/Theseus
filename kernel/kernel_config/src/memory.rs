@@ -8,6 +8,25 @@
 //!        of an upcoming new page table.
 //! * 507 down to 0: available for general usage.
 
+// On x86_64, addresses must be sign-extended.
+// On theseus, we choose to have all addresses
+// with the sign bit set, i.e. the 16 most
+// important bits must be set.
+#[cfg(target_arch = "x86_64")]
+const fn canonicalize(addr: usize) -> usize {
+    addr | 0xFFFF_0000_0000_0000
+}
+
+// On aarch64, the 16 most important bits must
+// match the address space ID (ASID) of the
+// address space they belong to. In Theseus,
+// our ASID is currently zero: these bits must
+// be cleared.
+#[cfg(target_arch = "aarch64")]
+const fn canonicalize(addr: usize) -> usize {
+    addr & !0xFFFF_0000_0000_0000
+}
+
 /// 64-bit architecture results in 8 bytes per address.
 pub const BYTES_PER_ADDR: usize = core::mem::size_of::<usize>();
 
@@ -28,7 +47,7 @@ pub const P4_INDEX_SHIFT: usize = P3_INDEX_SHIFT + 9;
 /// Value: 512 GiB.
 pub const ADDRESSABILITY_PER_P4_ENTRY: usize = 1 << (PAGE_SHIFT + P4_INDEX_SHIFT);
 
-pub const MAX_VIRTUAL_ADDRESS: usize = usize::MAX;
+pub const MAX_VIRTUAL_ADDRESS: usize = canonicalize(usize::MAX);
 
 pub const TEMPORARY_PAGE_VIRT_ADDR: usize = MAX_VIRTUAL_ADDRESS;
 
@@ -55,34 +74,41 @@ pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 16;
 #[cfg(debug_assertions)]
 pub const KERNEL_STACK_SIZE_IN_PAGES: usize = 32; // debug builds require more stack space.
 
+const TWO_GIGABYTES: usize = 0x8000_0000;
+
 /// The virtual address where the initial kernel (the nano_core) is mapped to.
-/// Actual value: 0xFFFFFFFF80000000.
+/// Actual value: 0xFFFFFFFF80000000 on x86_64.
 /// i.e., the linear offset between physical memory and kernel memory.
-/// So, for example, the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000.
+/// So, for example, the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000 (on x86_64).
 /// This is -2GiB from the end of the 64-bit address space.
-pub const KERNEL_OFFSET: usize = 0xFFFF_FFFF_8000_0000;
-
-
+pub const KERNEL_OFFSET: usize = canonicalize(MAX_VIRTUAL_ADDRESS - TWO_GIGABYTES);
 
 /// The kernel text region is where we load kernel modules. 
 /// It starts at the 511th P4 entry and goes up until the KERNEL_OFFSET,
 /// which is where the nano_core itself starts. 
-/// Actual value: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
-pub const KERNEL_TEXT_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_TEXT_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
-/// The size in bytes, not in pages.
-pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - (2 * 1024 * 1024 * 1024); // because the KERNEL_OFFSET starts at -2GiB
+/// Actual value on x86_64: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
+pub const KERNEL_TEXT_START: usize = canonicalize(KERNEL_TEXT_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
 
+/// The size in bytes, not in pages.
+///
+/// the KERNEL_OFFSET starts at (MAX_ADDR - 2GiB),
+/// and .text contains nano_core, so this is the
+/// first 510GiB of the 511th P4 entry.
+pub const KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - TWO_GIGABYTES;
 
 /// The higher-half heap gets the 512GB address range starting at the 509th P4 entry,
 /// which is the slot right below the recursive P4 entry (510).
 /// Actual value: 0o177777_775_000_000_000_0000, or 0xFFFF_FE80_0000_0000
-pub const KERNEL_HEAP_START: usize = 0xFFFF_0000_0000_0000 | (KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
+pub const KERNEL_HEAP_START: usize = canonicalize(KERNEL_HEAP_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
+
 #[cfg(not(debug_assertions))]
 pub const KERNEL_HEAP_INITIAL_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
+
 #[cfg(debug_assertions)]
 pub const KERNEL_HEAP_INITIAL_SIZE: usize = 256 * 1024 * 1024; // 256 MiB, debug builds require more heap space.
+
 /// the kernel heap gets the whole 509th P4 entry.
 pub const KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
 /// The system (page allocator) must not use addresses at or above this address.
-pub const UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START: usize = 0xFFFF_0000_0000_0000 | (UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));
+pub const UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START: usize = canonicalize(UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (P4_INDEX_SHIFT + PAGE_SHIFT));

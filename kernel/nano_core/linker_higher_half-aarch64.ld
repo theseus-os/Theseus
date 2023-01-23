@@ -1,7 +1,8 @@
 ENTRY(_start)
 OUTPUT_FORMAT(elf64-littleaarch64)
 
-KERNEL_OFFSET = 0x20000;
+/* the last 2GiB of mappable memory */
+KERNEL_OFFSET = 0xFFFF80000000;
 
 SECTIONS {
 
@@ -9,15 +10,13 @@ SECTIONS {
      * In general, we align each section up to a 4K page boundary in order for Theseus 
      * to be able to map them to separately-owned pages.
      */
-    /* . = 1M; */
+    . += KERNEL_OFFSET;
 
     .init ALIGN(4K) :
     {
         KEEP(*(.multiboot_header))
         *(.init .init.*)
     }
-
-    . += KERNEL_OFFSET;
     
     .text ALIGN(4K) : AT(ADDR(.text) - KERNEL_OFFSET)
     {
