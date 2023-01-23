@@ -203,8 +203,16 @@ impl Mapper {
 
         // Only the lowest-level P1 entry can be considered exclusive, and only when
         // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
+        #[cfg(target_arch = "x86_64")]
         let actual_flags = flags
             .valid(true)
+            .exclusive(Frames::OWNED);
+
+        #[cfg(target_arch = "aarch64")]
+        let actual_flags = flags
+            .valid(true)
+            .accessed(true)
+            .page_descriptor(true)
             .exclusive(Frames::OWNED);
 
         let pages_count = pages.size_in_pages();
@@ -275,9 +283,17 @@ impl Mapper {
 
         // Only the lowest-level P1 entry can be considered exclusive, and only because
         // we are mapping it exclusively (to owned `AllocatedFrames`).
+        #[cfg(target_arch = "x86_64")]
         let actual_flags = flags
-            .exclusive(true)
-            .valid(true);
+            .valid(true)
+            .exclusive(true);
+
+        #[cfg(target_arch = "aarch64")]
+        let actual_flags = flags
+            .accessed(true)
+            .page_descriptor(true)
+            .valid(true)
+            .exclusive(true);
 
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;

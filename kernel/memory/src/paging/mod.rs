@@ -52,6 +52,7 @@ pub struct PageTable {
     mapper: Mapper,
     p4_table: AllocatedFrames,
 }
+
 impl fmt::Debug for PageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "PageTable(p4: {:#X})", self.p4_table.start_address()) 
@@ -106,9 +107,9 @@ impl PageTable {
         let p4_frame = *new_p4_frame.start();
 
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
-        temporary_page.with_table_and_frame(|table, frame| {
-            table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(
+        temporary_page.with_table_and_frame(|new_table, frame| {
+            new_table.zero();
+            new_table[RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
@@ -201,6 +202,8 @@ impl PageTable {
 
         #[cfg(target_arch = "aarch64")]
         set_as_active_page_table_root(new_table.physical_address());
+
+        tlb_flush_all();
     }
 
 
