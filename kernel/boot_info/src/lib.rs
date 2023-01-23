@@ -273,7 +273,7 @@ where
                 rodata_flags = Some(flags);
 
                 #[cfg(target_arch = "aarch64")]
-                rodata_end = Some((end_virt_addr, end_phys_addr));
+                { rodata_end = Some((end_virt_addr, end_phys_addr)); }
 
                 "nano_core .rodata"
             }
