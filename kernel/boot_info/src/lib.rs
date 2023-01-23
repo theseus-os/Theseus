@@ -9,6 +9,7 @@
 
 #[cfg(feature = "multiboot2")]
 pub mod multiboot2;
+
 #[cfg(feature = "uefi")]
 pub mod uefi;
 
@@ -16,6 +17,8 @@ use log::{debug, error};
 use core::iter::Iterator;
 use memory_structs::{PhysicalAddress, VirtualAddress};
 use pte_flags::PteFlags;
+
+#[cfg(target_arch = "x86_64")]
 use kernel_config::memory::KERNEL_OFFSET;
 
 pub trait MemoryRegion {
@@ -214,11 +217,12 @@ where
         debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.len());
         let flags = convert_to_pte_flags(&section);
 
-        let mut start_virt_addr = VirtualAddress::new(section.start().value())
+        let start_virt_addr = VirtualAddress::new(section.start().value())
             .ok_or("section had invalid starting virtual address")?;
         let start_phys_addr = translate(start_virt_addr)
             .ok_or("couldn't translate section's starting virtual address")?;
 
+        #[cfg(target_arch = "x86_64")]
         if start_virt_addr.value() < KERNEL_OFFSET {
             // special case to handle the first section only
             start_virt_addr += KERNEL_OFFSET;
@@ -266,6 +270,11 @@ where
             }
             ".rodata" => {
                 rodata_start = Some((start_virt_addr, start_phys_addr));
+                rodata_flags = Some(flags);
+
+                #[cfg(target_arch = "aarch64")]
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+
                 "nano_core .rodata"
             }
             ".eh_frame" => {
