@@ -58,7 +58,7 @@ pub(crate) const P4: *mut Table<Level4> = VirtualAddress::new_canonical(
 /// This works by being a virtual address that always results in the 508th entry
 /// of the page table being accessed, at all four levels of paging.
 ///
-/// Thus, the value of this should be `0o177777_774_774_774_774_0000` (octal).
+/// Thus, the value of this should be `0o177777_774_774_774_774_0000` (octal) on x86_64.
 pub(crate) const UPCOMING_P4: *mut Table<Level4> = VirtualAddress::new_canonical(
     UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (PAGE_SHIFT + P1_INDEX_SHIFT)
     | UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (PAGE_SHIFT + P2_INDEX_SHIFT)
@@ -100,7 +100,6 @@ impl<L: HierarchicalLevel> Table<L> {
     /// and so on for P3 -> P3 and P2 -> P1.
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let pte_flags = self[index].flags();
-
 
         if pte_flags.is_valid() && !is_huge(&pte_flags) {
             let table_address = self as *const _ as usize;
