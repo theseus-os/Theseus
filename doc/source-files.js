@@ -166,7 +166,6 @@ var sourcesIndex = JSON.parse('{\
 "tss":["",[],["lib.rs"]],\
 "tty":["",[],["channel.rs","discipline.rs","lib.rs"]],\
 "unwind":["",[],["lib.rs","lsda.rs","registers.rs"]],\
-"util":["",[],["lib.rs"]],\
 "vfs_node":["",[],["lib.rs"]],\
 "vga_buffer":["",[],["lib.rs"]],\
 "virtual_nic":["",[],["lib.rs"]],\

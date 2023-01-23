@@ -1019,12 +1019,6 @@
 <a href="#1019" id="1019">1019</a>
 <a href="#1020" id="1020">1020</a>
 <a href="#1021" id="1021">1021</a>
-<a href="#1022" id="1022">1022</a>
-<a href="#1023" id="1023">1023</a>
-<a href="#1024" id="1024">1024</a>
-<a href="#1025" id="1025">1025</a>
-<a href="#1026" id="1026">1026</a>
-<a href="#1027" id="1027">1027</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and types for expressing I/O transfers of both byte-wise and block-wise granularity.
 //! 
 //! The important items are summarized below:
@@ -1066,6 +1060,7 @@
 
 </span><span class="attr">#![allow(clippy::range_plus_one)]
 #![no_std]
+#![feature(int_roundings)]
 
 #[macro_use] </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>delegate;
@@ -1996,7 +1991,7 @@
                 };
                 transfers[transfer_idx] = <span class="prelude-val">Some</span>(BlockByteTransfer {
                     byte_range_absolute: curr_byte .. end_byte,
-                    block_range: curr_block .. (round_up(end_byte, block_size) / block_size),
+                    block_range: curr_block .. (end_byte.next_multiple_of(block_size) / block_size),
                     bytes_in_block_range: <span class="number">0 </span>.. (end_byte - curr_byte),
                 });
                 transfer_idx += <span class="number">1</span>;
@@ -2005,7 +2000,7 @@
         }
         <span class="comment">// Otherwise, if the curr_byte is NOT block-aligned, then we can only do a single-block transfer.
         </span><span class="kw">else </span>{
-            <span class="kw">let </span>end_byte = min(byte_range.end, round_up(curr_byte, block_size));
+            <span class="kw">let </span>end_byte = min(byte_range.end, curr_byte.next_multiple_of(block_size));
             transfers[transfer_idx] = <span class="prelude-val">Some</span>(BlockByteTransfer {
                 byte_range_absolute: curr_byte .. end_byte,
                 block_range: curr_block .. curr_block + <span class="number">1</span>, <span class="comment">// just one block
@@ -2040,16 +2035,9 @@
     </span><span class="kw">pub </span>bytes_in_block_range: Range&lt;usize&gt;,
 }
 
-
-<span class="doccomment">/// Rounds the given `value` up to the nearest `multiple`.
-</span><span class="attr">#[inline]
-</span><span class="kw">pub fn </span>round_up(value: usize, multiple: usize) -&gt; usize {
-    ((value + multiple - <span class="number">1</span>) / multiple) * multiple
-}
-
 <span class="doccomment">/// Rounds the given `value` down to the nearest `multiple`.
 </span><span class="attr">#[inline]
-</span><span class="kw">pub fn </span>round_down(value: usize, multiple: usize) -&gt; usize {
+</span><span class="kw">fn </span>round_down(value: usize, multiple: usize) -&gt; usize {
     (value / multiple) * multiple
 }
 </code></pre></div>

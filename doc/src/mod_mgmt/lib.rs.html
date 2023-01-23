@@ -3342,6 +3342,7 @@
 <a href="#3342" id="3342">3342</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
+#![feature(int_roundings)]
 #![feature(let_chains)]
 
 #[macro_use] </span><span class="kw">extern crate </span>alloc;
@@ -3356,7 +3357,6 @@
 };
 <span class="kw">use </span>spin::{Mutex, Once};
 <span class="kw">use </span>xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-<span class="kw">use </span>util::round_up_power_of_two;
 <span class="kw">use </span>memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 <span class="kw">use </span>bootloader_modules::BootloaderModule;
 <span class="kw">use </span>cow_arc::CowArc;
@@ -5207,7 +5207,7 @@
                     </span>loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 <span class="kw">else </span>{
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling TLS section&quot;</span>);
@@ -5262,7 +5262,7 @@
                     );
                     data_sections.insert(shndx);
 
-                    data_offset += round_up_power_of_two(sec_size, sec_align);
+                    data_offset += sec_size.next_multiple_of(sec_align);
                 }
                 <span class="kw">else </span>{
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no data_pages were allocated for .data/.bss section&quot;</span>);
@@ -5302,7 +5302,7 @@
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 <span class="kw">else </span>{
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .rodata section&quot;</span>);
@@ -5347,7 +5347,7 @@
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 <span class="kw">else </span>{
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .gcc_except_table&quot;</span>);
@@ -5386,7 +5386,7 @@
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 <span class="kw">else </span>{
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no rodata_pages were allocated when handling .eh_frame&quot;</span>);
@@ -6261,7 +6261,7 @@
 
             <span class="kw">let </span>size = sec.size() <span class="kw">as </span>usize;
             <span class="kw">let </span>align = sec.align() <span class="kw">as </span>usize;
-            <span class="kw">let </span>addend = round_up_power_of_two(size, align);
+            <span class="kw">let </span>addend = size.next_multiple_of(align);
 
             <span class="comment">// filter flags for ones we care about (we already checked that it&#39;s loaded (SHF_ALLOC))
             </span><span class="kw">let </span>is_write = sec_flags &amp; SHF_WRITE     == SHF_WRITE;
@@ -6505,7 +6505,7 @@
         // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
         </span><span class="kw">let </span>range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
         <span class="kw">for </span>gap <span class="kw">in </span><span class="self">self</span>.dynamic_section_offsets.gaps(<span class="kw-2">&amp;</span>range_after_tls_self_pointer) {
-            <span class="kw">let </span>aligned_start = util::round_up(gap.start, alignment);
+            <span class="kw">let </span>aligned_start = gap.start.next_multiple_of(alignment);
             <span class="kw">if </span>aligned_start + section.size &lt;= gap.end {
                 start_index = <span class="prelude-val">Some</span>(aligned_start);
                 <span class="kw">break</span>;

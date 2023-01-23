@@ -2333,6 +2333,11 @@
 <a href="#2333" id="2333">2333</a>
 <a href="#2334" id="2334">2334</a>
 <a href="#2335" id="2335">2335</a>
+<a href="#2336" id="2336">2336</a>
+<a href="#2337" id="2337">2337</a>
+<a href="#2338" id="2338">2338</a>
+<a href="#2339" id="2339">2339</a>
+<a href="#2340" id="2340">2340</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A text-mode terminal emulator. 
 //!
 //! This provides basic support for various standards of control codes and escape sequences:
@@ -2371,7 +2376,6 @@
 <span class="kw">extern crate </span>unicode_width;
 <span class="kw">extern crate </span>core2;
 <span class="kw">extern crate </span>vte;
-<span class="kw">extern crate </span>util;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>derive_more;
 
 <span class="attr">#[cfg(test)]
@@ -3212,7 +3216,7 @@
 
         <span class="kw">let </span>unit_idx = <span class="self">self</span>.scrollback_cursor.unit_idx;
         <span class="kw">let </span>screen_width = <span class="self">self</span>.backend.screen_size().num_columns.<span class="number">0 </span><span class="kw">as </span>usize;
-        <span class="kw">let </span>index_of_previous_wrap = util::round_down(unit_idx.<span class="number">0</span>, screen_width); 
+        <span class="kw">let </span>index_of_previous_wrap = round_down(unit_idx.<span class="number">0</span>, screen_width); 
         
         <span class="macro">debug!</span>(<span class="string">&quot;carriage_return: setting scrollback buffer at {:?} from {:?} to {:?}&quot;</span>,
             <span class="self">self</span>.scrollback_cursor.line_idx, <span class="self">self</span>.scrollback_cursor.unit_idx, index_of_previous_wrap
@@ -3372,7 +3376,7 @@
     <span class="kw">if </span>wrap == Wrap::No {
         <span class="comment">// Don&#39;t decrement past the beginning of a screen row. 
         </span><span class="kw">let </span>new_scrollback_position = max(
-            util::round_down(scrollback_position.unit_idx.<span class="number">0</span>, screen_width),
+            round_down(scrollback_position.unit_idx.<span class="number">0</span>, screen_width),
             scrollback_position.unit_idx.<span class="number">0</span>.saturating_sub(num_units)
         );
         <span class="kw">let </span>new_scrollback_unit_idx = scrollback_buffer[scrollback_position.line_idx]
@@ -3484,7 +3488,7 @@
         <span class="kw">let </span>line = <span class="kw-2">&amp;</span>scrollback_buffer[scrollback_position.line_idx];
         <span class="comment">// Don&#39;t increment past the last screen column or past the end of this line.
         </span><span class="kw">let </span>new_scrollback_unit_idx = min(min(
-            util::round_down(scrollback_position.unit_idx.<span class="number">0</span>, screen_width) + screen_width - <span class="number">1</span>,
+            round_down(scrollback_position.unit_idx.<span class="number">0</span>, screen_width) + screen_width - <span class="number">1</span>,
             line.len()), <span class="comment">// not `len() - 1` because we want to move the cursor to right after the last unit
             </span>scrollback_position.unit_idx.<span class="number">0</span>.saturating_add(num_units),
         );
@@ -3804,7 +3808,7 @@
             <span class="comment">// The scrollback buffer had enough lines.
             </span>ScrollbackBufferPoint {
                 line_idx,
-                unit_idx: UnitIndex(util::round_down(unit_idx.<span class="number">0</span>, screen_width) + target_column),
+                unit_idx: UnitIndex(round_down(unit_idx.<span class="number">0</span>, screen_width) + target_column),
             }
         }
     }
@@ -4006,7 +4010,7 @@
     <span class="kw">if </span>wrap_lines == Wrap::No {
         <span class="comment">// Don&#39;t decrement past the beginning of a screen row. 
         </span>scrollback_cursor.unit_idx.<span class="number">0 </span>= max(
-            util::round_down(scrollback_cursor.unit_idx.<span class="number">0</span>, screen_width.<span class="number">0 </span><span class="kw">as </span>usize),
+            round_down(scrollback_cursor.unit_idx.<span class="number">0</span>, screen_width.<span class="number">0 </span><span class="kw">as </span>usize),
             scrollback_cursor.unit_idx.<span class="number">0</span>.saturating_sub(num_units)
         );
     } <span class="kw">else </span>{
@@ -4667,6 +4671,12 @@ is actually handled and processed.&quot;</span>]
     </span><span class="kw">fn </span>is_continuance(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="kw-2">&amp;</span><span class="self">Self</span>::TabFill | <span class="kw-2">&amp;</span><span class="self">Self</span>::MultiFill)
     }
+}
+
+<span class="doccomment">/// Rounds the given `value` down to the nearest `multiple`.
+</span><span class="attr">#[inline]
+</span><span class="kw">const fn </span>round_down(value: usize, multiple: usize) -&gt; usize {
+    (value / multiple) * multiple
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="text_terminal" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

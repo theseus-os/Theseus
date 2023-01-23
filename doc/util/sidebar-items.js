@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":[["log2","the log base 2 of an integer value"],["round_down","Rounds the given `value` down to the nearest `multiple`."],["round_up","Rounds the given `value` up to the nearest `multiple`."],["round_up_power_of_two","rounds the given `value` to the nearest base, which must be a power of two"]]};

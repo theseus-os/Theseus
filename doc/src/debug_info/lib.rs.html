@@ -976,13 +976,13 @@
 //! &lt;http://www.dwarfstd.org/doc/Debugging%20using%20DWARF.pdf&gt;
 
 </span><span class="attr">#![no_std]
+#![feature(int_roundings)]
 
 </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="kw">extern crate </span>gimli;
 <span class="kw">extern crate </span>xmas_elf;
 <span class="kw">extern crate </span>goblin;
-<span class="kw">extern crate </span>util;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>fs_node;
 <span class="kw">extern crate </span>owning_ref;
@@ -1844,7 +1844,7 @@
 
         <span class="kw">let </span>size = sec.size() <span class="kw">as </span>usize;
         <span class="kw">let </span>align = sec.align() <span class="kw">as </span>usize;
-        <span class="kw">let </span>addend = util::round_up_power_of_two(size, align);
+        <span class="kw">let </span>addend = size.next_multiple_of(align);
 
         <span class="comment">// trace!(&quot;  Looking at debug sec {:?}, size {:#X}, align {:#X} --&gt; addend {:#X}&quot;, sec.get_name(elf_file), size, align, addend);
         </span>ro_bytes += addend;
