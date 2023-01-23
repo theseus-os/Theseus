@@ -4,13 +4,13 @@
 //! <http://www.dwarfstd.org/doc/Debugging%20using%20DWARF.pdf>
 
 #![no_std]
+#![feature(int_roundings)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate gimli;
 extern crate xmas_elf;
 extern crate goblin;
-extern crate util;
 extern crate memory;
 extern crate fs_node;
 extern crate owning_ref;
@@ -872,7 +872,7 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
 
         let size = sec.size() as usize;
         let align = sec.align() as usize;
-        let addend = util::round_up_power_of_two(size, align);
+        let addend = size.next_multiple_of(align);
 
         // trace!("  Looking at debug sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
         ro_bytes += addend;

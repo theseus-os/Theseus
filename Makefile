@@ -593,8 +593,7 @@ doc:
 		--package percent-encoding \
 		--package port_io \
 		--package stdio \
-		--package str_ref \
-		--package util
+		--package str_ref
 ## Now, build the docs for all of Theseus's main kernel crates.
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs

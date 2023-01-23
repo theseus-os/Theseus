@@ -739,7 +739,6 @@ dependencies = [
  "mod_mgmt",
  "owning_ref",
  "rustc-demangle",
- "util",
  "xmas-elf",
 ]
 
@@ -2024,7 +2023,6 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "util",
  "vfs_node",
  "xmas-elf",
 ]
@@ -3869,7 +3867,6 @@ dependencies = [
  "event_types",
  "log",
  "unicode-width",
- "util",
  "vte",
 ]
 
@@ -4136,10 +4133,6 @@ name = "utf8parse"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
-
-[[package]]
-name = "util"
-version = "0.1.0"
 
 [[package]]
 name = "vcell"

@@ -1,5 +1,6 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
+#![feature(int_roundings)]
 #![feature(let_chains)]
 
 #[macro_use] extern crate alloc;
@@ -14,7 +15,6 @@ use alloc::{
 };
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
@@ -1865,7 +1865,7 @@ impl CrateNamespace {
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling TLS section");
@@ -1920,7 +1920,7 @@ impl CrateNamespace {
                     );
                     data_sections.insert(shndx);
 
-                    data_offset += round_up_power_of_two(sec_size, sec_align);
+                    data_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no data_pages were allocated for .data/.bss section");
@@ -1960,7 +1960,7 @@ impl CrateNamespace {
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling .rodata section");
@@ -2005,7 +2005,7 @@ impl CrateNamespace {
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling .gcc_except_table");
@@ -2044,7 +2044,7 @@ impl CrateNamespace {
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling .eh_frame");
@@ -2919,7 +2919,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 
             let size = sec.size() as usize;
             let align = sec.align() as usize;
-            let addend = round_up_power_of_two(size, align);
+            let addend = size.next_multiple_of(align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
             let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
@@ -3163,7 +3163,7 @@ impl TlsInitializer {
         // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
         let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
         for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
-            let aligned_start = util::round_up(gap.start, alignment);
+            let aligned_start = gap.start.next_multiple_of(alignment);
             if aligned_start + section.size <= gap.end {
                 start_index = Some(aligned_start);
                 break;
