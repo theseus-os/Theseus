@@ -1,32 +1,32 @@
-# Complexity
+complexity
 bind-instead-of-map
 bool-comparison
 borrowed-box
 bytes-count-to-len
-# char-lit-as-u8
-# clone-on-copy
+char-lit-as-u8
+clone-on-copy
 crosspointer-transmute
 deprecated-cfg-attr
 deref-addrof
-# derivable-impls
+derivable-impls
 diverging-sub-expression
 double-comparisons
 double-parens
 duration-subsec
-# explicit-counter-loop
+explicit-counter-loop
 explicit-write
 extra-unused-lifetimes
 filter-map-identity
 filter-next
 flat-map-identity
 get-last-with-len
-# identity-op
+identity-op
 inspect-for-each
-# int-plus-one
+int-plus-one
 iter-count
 manual-filter-map
 manual-find-map
-# manual-flatten
+manual-flatten
 manual-split-once
 manual-strip
 manual-swap
@@ -38,11 +38,11 @@ match-single-binding
 needless-arbitrary-self-type
 needless-bool
 needless-borrowed-reference
-# needless-lifetimes
+needless-lifetimes
 needless-match
 needless-option-as-deref
 needless-option-take
-# needless-question-mark
+needless-question-mark
 needless-splitn
 needless-update
 neg-cmp-op-on-partial-ord
@@ -55,7 +55,7 @@ or-then-unwrap
 overflow-check-conditional
 partialeq-ne-impl
 precedence
-# ptr-offset-with-cast
+ptr-offset-with-cast
 range-zip-with-len
 redundant-closure-call
 redundant-slicing
@@ -68,7 +68,7 @@ skip-while-next
 string-from-utf8-as-bytes
 strlen-on-c-strings
 temporary-assignment
-# too-many-arguments
+too-many-arguments
 transmute-bytes-to-str
 transmute-float-to-int
 transmute-int-to-bool
@@ -77,9 +77,9 @@ transmute-int-to-float
 transmute-num-to-bytes
 transmute-ptr-to-ref
 transmutes-expressible-as-ptr-casts
-# type-complexity
+type-complexity
 unit-arg
-# unnecessary-cast
+unnecessary-cast
 unnecessary-filter-map
 unnecessary-find-map
 unnecessary-operation
@@ -87,14 +87,14 @@ unnecessary-sort-by
 unnecessary-unwrap
 unneeded-wildcard-pattern
 useless-asref
-# useless-conversion
-# useless-format
+useless-conversion
+useless-format
 vec-box
 while-let-loop
 wildcard-in-or-patterns
 zero-divided-by-zero
 zero-prefixed-literal
-# Correctness
+correctness
 absurd-extreme-comparisons
 almost-swapped
 approx-constant
@@ -128,7 +128,6 @@ invisible-characters
 iter-next-loop
 iterator-step-by-zero
 let-underscore-lock
-logic-bug
 match-str-case-mismatch
 mem-replace-with-uninit
 min-max
@@ -142,6 +141,7 @@ nonsensical-open-options
 not-unsafe-ptr-arg-deref
 option-env-unwrap
 out-of-bounds-indexing
+overly-complex-bool-expr
 panicking-unwrap
 possible-missing-comma
 recursive-format-impl
@@ -168,8 +168,8 @@ zst-offset
 # Style
 assertions-on-constants
 assign-op-pattern
-blacklisted-name
-# blocks-in-if-conditions
+disallowed-names
+blocks-in-if-conditions
 bool-assert-comparison
 borrow-interior-mutable-const
 builtin-type-shadow
@@ -179,10 +179,10 @@ chars-next-cmp
 cmp-null
 collapsible-else-if
 collapsible-if
-# collapsible-match
-# comparison-chain
+collapsible-match
+comparison-chain
 comparison-to-empty
-# declare-interior-mutable-const
+declare-interior-mutable-const
 disallowed-methods
 disallowed-types
 double-must-use
@@ -192,63 +192,63 @@ enum-variant-names
 err-expect
 excessive-precision
 field-reassign-with-default
-# fn-to-numeric-cast
+fn-to-numeric-cast
 fn-to-numeric-cast-with-truncation
 for-kv-map
-# from-over-into
+from-over-into
 from-str-radix-10
-# inconsistent-digit-grouping
+inconsistent-digit-grouping
 infallible-destructuring-match
 inherent-to-string
 init-numbered-fields
-# into-iter-on-ref
+into-iter-on-ref
 is-digit-ascii-radix
 iter-cloned-collect
 iter-next-slice
-# iter-nth-zero
-# iter-skip-next
+iter-nth-zero
+iter-skip-next
 just-underscores-and-digits
-# len-without-is-empty
-# len-zero
-# let-and-return
+len-without-is-empty
+len-zero
+let-and-return
 let-unit-value
 main-recursion
 manual-async-fn
 manual-bits
 manual-map
 manual-non-exhaustive
-# manual-range-contains
+manual-range-contains
 manual-saturating-arithmetic
-# map-clone
+map-clone
 map-collect-result-unit
-# match-like-matches-macro
+match-like-matches-macro
 match-overlapping-arm
-# match-ref-pats
+match-ref-pats
 match-result-ok
 mem-replace-option-with-none
-# mem-replace-with-default
-# missing-safety-doc
+mem-replace-with-default
+missing-safety-doc
 mixed-case-hex-literals
 module-inception
 must-use-unit
 mut-mutex-lock
-# needless-borrow
-# needless-doctest-main
-# needless-late-init
-# needless-range-loop
-# needless-return
+needless-borrow
+needless-doctest-main
+needless-late-init
+needless-range-loop
+needless-return
 neg-multiply
-# new-ret-no-self
-# new-without-default
+new-ret-no-self
+new-without-default
 ok-expect
-# op-ref
+op-ref
 option-map-or-none
-# print-literal
+print-literal
 print-with-newline
-# println-empty-string
+println-empty-string
 # ptr-arg
 # ptr-eq
-# question-mark
+question-mark
 # redundant-closure
 # redundant-field-names
 redundant-pattern
@@ -265,7 +265,7 @@ single-component-path-imports
 string-extend-chars
 # tabs-in-doc-comments
 to-digit-is-some
-# toplevel-ref-arg
+toplevel-ref-arg
 trim-split-whitespace
 unnecessary-fold
 # unnecessary-lazy-evaluations
@@ -273,10 +273,10 @@ unnecessary-fold
 unnecessary-owned-empty-strings
 unsafe-removed-from-name
 # unused-unit
-# unusual-byte-groupings
+unusual-byte-groupings
 unwrap-or-else-default
 # upper-case-acronyms
-# while-let-on-iterator
+while-let-on-iterator
 write-literal
 write-with-newline
 writeln-empty-string
@@ -286,22 +286,22 @@ zero-ptr
 empty-line-after-outer-attr
 fallible-impl-from
 mutex-integer
-# needless-borrow
+needless-borrow
 panicking-unwrap
-# range-plus-one
+range-plus-one
 unnecessary-unwrap
-# Perf
+perf
 box-collection
 boxed-local
 cmp-owned
 expect-fun-call
 extend-with-drain
 format-in-format-args
-# format-push-string
+format-push-string
 iter-nth
 iter-overeager-cloned
 large-const-arrays
-# large-enum-variant
+large-enum-variant
 manual-memcpy
 manual-str-repeat
 map-entry
@@ -316,7 +316,7 @@ to-string-in-format-args
 unnecessary-to-owned
 useless-vec
 vec-init-then-push
-# Suspicious
+suspicious
 await-holding-invalid-type
 await-holding-lock
 await-holding-refcell-ref
@@ -326,7 +326,7 @@ cast-enum-constructor
 cast-enum-truncation
 crate-in-macro-def
 drop-non-drop
-# empty-loop
+empty-loop
 float-equality-without-abs
 for-loops-over-fallibles
 forget-non-drop

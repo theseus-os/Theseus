@@ -10,8 +10,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 version = "0.4.8"
 
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.test_thread_local]
 path = "../../kernel/test_thread_local"

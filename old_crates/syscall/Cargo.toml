@@ -18,8 +18,8 @@ path = "../gdt"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.task]
 path = "../task"

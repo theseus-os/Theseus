@@ -6,8 +6,8 @@
 #![no_std]
 #![feature(slice_concat_ext)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 extern crate itertools;
 
 extern crate getopts;
@@ -100,7 +100,7 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain(matches: Matches) -> Result<(), String> {
     let mut remote_endpoint = if let Some(ip_str) = matches.opt_str("d") {
         IpEndpoint::from_str(&ip_str)
-            .map_err(|_e| format!("couldn't parse destination IP address/port"))?
+            .map_err(|_e| "couldn't parse destination IP address/port".to_string())?
     } else {
         ota_update_client::default_remote_endpoint()
     };
@@ -140,7 +140,7 @@ fn list(remote_endpoint: IpEndpoint, update_build: Option<&String>) -> Result<()
     let iface = get_default_iface()?;
 
     if let Some(ub) = update_build {
-        let listing = ota_update_client::download_listing(&iface, remote_endpoint, &*ub)
+        let listing = ota_update_client::download_listing(&iface, remote_endpoint, ub)
             .map_err(|e| e.to_string())?;
         println!("{}", listing.join("\n"));
     } else {
@@ -205,7 +205,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 
     // if downloaded, save the diff file into the base directory
     if let Some(diffs) = diff_file_lines {
-        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
+        let cfile = MemFile::create(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
         cfile.lock().write_at(diffs.join("\n").as_bytes(), 0)?;
     }
 
@@ -217,10 +217,10 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 /// that must be in the given base directory.
 fn apply(base_dir_path: &Path) -> Result<(), String> {
     if cfg!(not(loadable)) {
-        return Err(format!("Evolutionary updates can only be applied when Theseus is built in loadable mode."));
+        return Err("Evolutionary updates can only be applied when Theseus is built in loadable mode.".to_string());
     }
 
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel MMI".to_string())?;
     let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         return Err("failed to get current task's working directory".to_string());
     };
@@ -310,7 +310,7 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
         .iter()
         .next()
         .cloned()
-        .ok_or_else(|| format!("no network interfaces available"))
+        .ok_or_else(|| "no network interfaces available".to_string())
 }
 
 
@@ -319,12 +319,12 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 /// it will create a directory "my_dir.2" if "my_dir" and "my_dir.1" already exist.
 fn make_unique_directory(base_name: &str, parent_dir: &DirRef) -> Result<DirRef, &'static str> {
     if parent_dir.lock().get(base_name).is_none() {
-        return VFSDirectory::new(base_name.to_string(), parent_dir);
+        return VFSDirectory::create(base_name.to_string(), parent_dir);
     }
     for i in 1.. {
         let new_base_name = format!("{}.{}", base_name, i);
         if parent_dir.lock().get(&new_base_name).is_none() {
-            return VFSDirectory::new(new_base_name, parent_dir);
+            return VFSDirectory::create(new_base_name, parent_dir);
         }   
     }
 

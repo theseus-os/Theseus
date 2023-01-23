@@ -5,8 +5,8 @@
 #![no_std]
 #![feature(slice_concat_ext)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 extern crate itertools;
 
 extern crate getopts;
@@ -106,12 +106,12 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
 /// Takes a string of arguments and parses it into a series of tuples, formatted as 
 /// `(OLD,NEW[,REEXPORT]) (OLD,NEW[,REEXPORT]) (OLD,NEW[,REEXPORT])...`
-fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>, String> {
+fn parse_input_tuples(args: &str) -> Result<Vec<(&str, &str, bool)>, String> {
     let mut v: Vec<(&str, &str, bool)> = Vec::new();
-    let mut open_paren_iter = args.match_indices('(');
+    let open_paren_iter = args.match_indices('(');
 
     // looking for open parenthesis
-    while let Some((paren_start, _)) = open_paren_iter.next() {
+    for (paren_start, _) in open_paren_iter {
         let the_rest = args.get((paren_start + 1) ..).ok_or_else(|| "unmatched open parenthesis.".to_string())?;
         // find close parenthesis
         let parsed = the_rest.find(')')
@@ -127,12 +127,7 @@ fn parse_input_tuples<'a>(args: &'a str) -> Result<Vec<(&'a str, &'a str, bool)>
         match parsed {
             Some((o, n, reexport)) => {
                 println!("found triple: {:?}, {:?}, {:?}", o, n, reexport);
-                let reexport_bool = match reexport {
-                    Some("true")  => true, 
-                    Some("yes")   => true, 
-                    Some("y")     => true, 
-                    _             => false,
-                };
+                let reexport_bool = matches!(reexport, Some("true") | Some("yes") | Some("y"));
                 v.push((o, n, reexport_bool));
             }
             _ => return Err("list of crate tuples is formatted incorrectly.".to_string()),

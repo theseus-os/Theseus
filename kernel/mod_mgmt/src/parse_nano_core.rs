@@ -3,6 +3,8 @@
 //! As such, it performs no loading, but rather just creates metadata that represents
 //! the existing kernel code that was loaded by the bootloader, and adds those functions to the system map.
 
+#![allow(clippy::type_complexity)]
+
 use crate::{CrateNamespace, mp_range};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 use fs_node::FileRef;
@@ -134,6 +136,7 @@ pub fn parse_nano_core(
     Ok(try_mp!(parse_result))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse_nano_core_symbol_file_or_binary(
     f: fn(
         &[u8],
@@ -162,9 +165,9 @@ fn parse_nano_core_symbol_file_or_binary(
         debug_symbols_file:  Arc::downgrade(&nano_core_file),
         object_file:         nano_core_file,
         sections:            HashMap::new(),
-        text_pages:          Some((text_pages.clone(),   mp_range(&text_pages))),
-        rodata_pages:        Some((rodata_pages.clone(), mp_range(&rodata_pages))),
-        data_pages:          Some((data_pages.clone(),   mp_range(&data_pages))),
+        text_pages:          Some((text_pages.clone(),   mp_range(text_pages))),
+        rodata_pages:        Some((rodata_pages.clone(), mp_range(rodata_pages))),
+        data_pages:          Some((data_pages.clone(),   mp_range(data_pages))),
         global_sections:     BTreeSet::new(),
         tls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
@@ -172,12 +175,12 @@ fn parse_nano_core_symbol_file_or_binary(
     });
 
     let parsed_crate_items = f(
-        &bytes,
+        bytes,
         real_namespace, 
         CowArc::downgrade(&nano_core_crate_ref), 
-        &text_pages, 
-        &rodata_pages, 
-        &data_pages
+        text_pages, 
+        rodata_pages, 
+        data_pages
     )?;
 
     // Access and propertly set the new_crate's sections list and other items.
@@ -200,7 +203,7 @@ fn parse_nano_core_symbol_file_or_binary(
     drop(new_crate_mut);
 
     // Add the newly-parsed nano_core crate to the kernel namespace.
-    real_namespace.crate_tree.lock().insert(crate_name.into(), nano_core_crate_ref.clone_shallow());
+    real_namespace.crate_tree.lock().insert(crate_name, nano_core_crate_ref.clone_shallow());
     info!("Finished parsing nano_core crate, {} new symbols.", new_syms);
     Ok((nano_core_crate_ref, parsed_crate_items.init_symbols, new_syms))
 }
@@ -569,7 +572,7 @@ fn parse_nano_core_binary(
                     Arc::new(LoadedSection::new(
                         typ,
                         section_name_str_ref(&typ),
-                        Arc::clone(&rodata_pages),
+                        Arc::clone(rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
                         sec_size,
@@ -590,7 +593,7 @@ fn parse_nano_core_binary(
                     Arc::new(LoadedSection::new(
                         typ,
                         section_name_str_ref(&typ),
-                        Arc::clone(&rodata_pages),
+                        Arc::clone(rodata_pages),
                         mapped_pages_offset,
                         sec_vaddr,
                         sec_size,
@@ -698,6 +701,7 @@ struct MainSectionInfo {
 /// A convenience function that separates out the logic 
 /// of actually creating and adding a new LoadedSection instance
 /// after it has been parsed. 
+#[allow(clippy::too_many_arguments)]
 fn add_new_section(
     namespace:           &Arc<CrateNamespace>,
     main_section_info:   &MainSectionInfo,

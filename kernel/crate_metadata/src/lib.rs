@@ -53,7 +53,10 @@ use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
     format,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -168,7 +171,7 @@ impl CrateType {
     /// let result = CrateType::from_module_name("ksse#my_crate.o");
     /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
+    pub fn from_module_name(module_name: &str) -> Result<(CrateType, &str, &str), &'static str> {
         let mut iter = module_name.split(MODULE_PREFIX_DELIMITER);
         let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
         let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
@@ -275,7 +278,7 @@ impl fmt::Debug for LoadedCrate {
             .field("name", &self.crate_name)
             .field("object_file", &self.object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string())
             )
             .finish_non_exhaustive()
     }
@@ -689,6 +692,7 @@ pub struct LoadedSection {
 }
 impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         typ: SectionType, 
         name: StrRef, 
@@ -716,6 +720,7 @@ impl LoadedSection {
     }
 
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_dependencies(
         typ: SectionType, 
         name: StrRef, 
@@ -765,7 +770,7 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or(&sec_name)
+            .unwrap_or(sec_name)
     }
 
     /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list
@@ -989,11 +994,7 @@ impl RelocationEntry {
     /// does NOT depend on the target section's address itself in any way 
     /// (i.e., it only depends on the source section)
     pub fn is_absolute(&self) -> bool {
-        match self.typ {
-            R_X86_64_32 | 
-            R_X86_64_64 => true,
-            _ => false,
-        }
+        matches!(self.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 

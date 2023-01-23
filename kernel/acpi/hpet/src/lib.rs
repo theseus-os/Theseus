@@ -10,6 +10,7 @@ use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAdd
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
 use static_assertions::const_assert_eq;
+use time::Instant;
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
 static HPET: Once<RwLock<BorrowedMappedPages<Hpet, Mutable>>> = Once::new();
@@ -106,6 +107,13 @@ impl Hpet {
     }
 }
 
+impl time::ClockSource for Hpet {
+    type ClockType = time::Monotonic;
+
+    fn now() -> Instant {
+        Instant::new(get_hpet().expect("couldn't get HPET").get_counter())
+    }
+}
 
 /// A structure that wraps HPET I/O register for each timer comparator, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
@@ -125,7 +133,7 @@ pub struct HpetTimer {
 const_assert_eq!(core::mem::size_of::<HpetTimer>(), 32);
 
 
-pub const HPET_SIGNATURE: &'static [u8; 4] = b"HPET";
+pub const HPET_SIGNATURE: &[u8; 4] = b"HPET";
 
 /// The handler for parsing the HPET table and adding it to the ACPI tables list.
 pub fn handle(
@@ -155,8 +163,8 @@ const_assert_eq!(core::mem::size_of::<HpetAcpiTable>(), 56);
 
 impl HpetAcpiTable {
     /// Finds the HPET in the given `AcpiTables` and returns a reference to it.
-    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t HpetAcpiTable> {
-        acpi_tables.table(&HPET_SIGNATURE).ok()
+    pub fn get(acpi_tables: &AcpiTables) -> Option<&HpetAcpiTable> {
+        acpi_tables.table(HPET_SIGNATURE).ok()
     }
 
     /// Initializes the HPET counter-based timer

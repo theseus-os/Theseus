@@ -18,7 +18,7 @@ use core::{
     cmp::{min, max},
     fmt,
     iter::Step,
-    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
+    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign}
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
@@ -113,6 +113,8 @@ macro_rules! implement_address {
                     *self = $TypeName::new_canonical(self.0.saturating_sub(rhs));
                 }
             }
+
+            #[allow(clippy::from_over_into)]
             impl Into<usize> for $TypeName {
                 #[inline]
                 fn into(self) -> usize {
@@ -129,10 +131,7 @@ mod canonical_address {
 
     #[inline]
     pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => true,
-            _ => false,
-        }
+        matches!(virt_addr.get_bits(47..64), 0 | 0b1_1111_1111_1111_1111)
     }
 
     #[inline]
@@ -148,10 +147,7 @@ mod canonical_address {
 
     #[inline]
     pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
-        match phys_addr.get_bits(52..64) {
-            0 => true,
-            _ => false,
-        }
+        matches!(phys_addr.get_bits(52..64), 0)
     }
 
     #[inline]
@@ -164,20 +160,31 @@ mod canonical_address {
 mod canonical_address {
     use bit_field::BitField;
 
-    // aarch64 doesn't have a concept of canonical VA
-    // so this always returns true
+    /// On aarch64, VAs are composed of an ASID
+    /// which is 8 or 16 bits long depending
+    /// on MMU config. In Theseus, we use 8-bits
+    /// and the next 8 bits are unused.
+    /// Our ASID is zero, so a "canonical" VA has
+    /// the 16 most significant bits cleared.
     #[inline]
-    pub fn is_canonical_virtual_address(_virt_addr: usize) -> bool {
-        true
+    pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+        match virt_addr.get_bits(48..64) {
+            0 => true,
+            _ => false,
+        }
     }
-    
-    // aarch64 doesn't have a concept of canonical VA
-    // so this returns the address as-is
+
+    /// On aarch64, VAs are composed of an ASID
+    /// which is 8 or 16 bits long depending
+    /// on MMU config. In Theseus, we use 8-bits
+    /// and the next 8 bits are unused.
+    /// Our ASID is zero, so a "canonical" VA has
+    /// the 16 most significant bits cleared.
     #[inline]
     pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
-        virt_addr
+        virt_addr & 0x0000_FFFF_FFFF_FFFF
     }
-    
+
     /// On aarch64, we configure the MMU to use 48-bit
     /// physical addresses; "canonical" physical addresses
     /// have the 16 most significant bits cleared.
@@ -188,7 +195,7 @@ mod canonical_address {
             _ => false,
         }
     }
-    
+
     /// On aarch64, we configure the MMU to use 48-bit
     /// physical addresses; "canonical" physical addresses
     /// have the 16 most significant bits cleared.
@@ -331,7 +338,7 @@ impl Page {
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped [`Frame`]  using `PageTableEntry::pointed_frame()`.
     pub const fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0x1FF
+        self.number & 0x1FF
     }
 }
 
@@ -361,11 +368,14 @@ macro_rules! implement_page_frame_range {
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
                     all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
                 pub fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
-                    assert!(size_in_bytes > 0);
-                    let start = $chunk::containing_address(starting_addr);
-                    // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
-                    let end = $chunk::containing_address(starting_addr + (size_in_bytes - 1));
-                    $TypeName::new(start, end)
+                    if size_in_bytes == 0 {
+                        $TypeName::empty()
+                    } else {
+                        let start = $chunk::containing_address(starting_addr);
+                        // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
+                        let end = $chunk::containing_address(starting_addr + (size_in_bytes - 1));
+                        $TypeName::new(start, end)
+                    }
                 }
 
                 #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]

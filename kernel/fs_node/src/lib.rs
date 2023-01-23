@@ -48,13 +48,13 @@ pub trait FsNode {
             let parent_path = &cur_dir.lock().get_absolute_path();
             // Check if the parent path is root 
             if parent_path == "/" {
-                path.insert_str(0, &format!("{}", parent_path));
+                path.insert_str(0,  parent_path);
                 return path;
             }
-            path.insert_str(0, &format!("{}/", parent_path));
+            path.insert_str(0, &format!("{parent_path}/"));
             return path;
         }
-        return path;
+        path
     }
 
     /// Returns the string name of the node

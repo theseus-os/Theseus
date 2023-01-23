@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 
 extern crate alloc;
 extern crate task;
@@ -28,7 +28,7 @@ pub fn main(args: Vec<String>) -> isize {
 
     for dir_name in args.iter() {
         // add child dir to current directory
-        if let Err(err) = VFSDirectory::new(dir_name.to_string(), &curr_wd) {
+        if let Err(err) = VFSDirectory::create(dir_name.to_string(), &curr_wd) {
             println!("Error creating {:?}: {}", dir_name, err);
             ret = -1;
         }

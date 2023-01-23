@@ -19,6 +19,15 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
+boot_spec ?= bios
+
+ifeq ($(boot_spec), bios)
+	ISO_EXTENSION := iso
+else ifeq ($(boot_spec), uefi)
+	ISO_EXTENSION := efi
+else
+$(error Error:unsupported option "boot_spec=$(boot_spec)". Options are 'bios' or 'uefi')
+endif
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
@@ -29,7 +38,7 @@ IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 ###################################################################################################
 BUILD_DIR               := $(ROOT_DIR)/build
 NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
-iso                     := $(BUILD_DIR)/theseus-$(ARCH).iso
+iso                     := $(BUILD_DIR)/theseus-$(ARCH).$(ISO_EXTENSION)
 ISOFILES                := $(BUILD_DIR)/isofiles
 OBJECT_FILES_BUILD_DIR  := $(ISOFILES)/modules
 DEBUG_SYMBOLS_DIR       := $(BUILD_DIR)/debug_symbols
@@ -76,25 +85,10 @@ else ifeq ($(bootloader),limine)
 	else
 $(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
 	endif
-else
+# bootloader option isn't required for UEFI
+else ifneq ($(boot_spec), uefi)
 $(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
 endif
-
-
-###################################################################################################
-### For ensuring that the host computer has the proper version of the Rust compiler
-###################################################################################################
-RUSTC_VERSION := $(shell cat rust-toolchain)
-check-rustc:
-## Building Theseus requires the 'rust-src' component. If we can't install that, install the required rust toolchain and retry.
-## If it still doesn't work, issue an error, since 'rustup' is probably missing.
-	@rustup component add rust-src || (rustup toolchain install $(RUSTC_VERSION) && rustup component add rust-src) || \
-	(\
-		echo -e "\nError: 'rustup' isn't installed.";\
-		echo -e "Please install rustup and try again.\n";\
-		exit 1 \
-	)
-
 
 
 ###################################################################################################
@@ -103,18 +97,15 @@ check-rustc:
 
 ## The linker script applied to each output file in $(OBJECT_FILES_BUILD_DIR).
 partial_relinking_script := cfg/partial_linking_combine_sections.ld
-## This is the default output path defined by cargo.
+## The default file path where cargo outputs the nano_core's static library.
 nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.a
-## The directory where the nano_core source files are
-NANO_CORE_SRC_DIR := $(ROOT_DIR)/kernel/nano_core/src
-## The output directory of where the nano_core binary should go
+## The output file path of the fully-linked nano_core kernel binary.
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
-## The linker script for linking the nano_core_binary to the assembly files
-linker_script := $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/linker_higher_half.ld
-assembly_source_files := $(wildcard $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/*.asm)
-assembly_object_files := $(patsubst $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm, \
-	$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o, $(assembly_source_files))
-
+## The linker script for linking the `nano_core_binary` with the compiled assembly files.
+linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half.ld
+efi_firmware := $(BUILD_DIR)/ovmf.fd
+## The assembly files compiled by the nano_core build script.
+compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/$(boot_spec)/*.o
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -140,12 +131,11 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 ### PHONY is the list of targets that *always* get rebuilt regardless of dependent files' modification timestamps.
 ### Most targets are PHONY because cargo itself handles whether or not to rebuild the Rust code base.
 .PHONY: all full \
-		check-rustc check-usb \
+		check-usb \
 		clean clean-doc clean-old-build \
 		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
-		$(assembly_source_files) \
 		gdb \
 		doc docs view-doc view-docs book view-book
 
@@ -167,10 +157,10 @@ export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 
 
 ### Convenience targets for building the entire Theseus workspace
-### with all optional features enabled. 
+### with all optional components included. 
 ### See `theseus_features/src/lib.rs` for more details on what this includes.
 all: full
-full : export override FEATURES += --all-features
+full : export override FEATURES += --features theseus_features/everything
 ifeq (,$(findstring --workspace,$(FEATURES)))
 full : export override FEATURES += --workspace
 endif
@@ -181,8 +171,18 @@ full: iso
 iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso): clean-old-build build extra_files copy_kernel $(bootloader)
-
+$(iso) $(efi_firmware): clean-old-build build extra_files copy_kernel $(bootloader)
+ifeq ($(boot_spec), uefi)
+	@cargo r \
+		--release \
+		-Z bindeps \
+		--manifest-path \
+		$(ROOT_DIR)/tools/uefi_builder/x86_64/Cargo.toml -- \
+		--kernel $(nano_core_binary) \
+		--modules $(OBJECT_FILES_BUILD_DIR) \
+		--efi-image $(iso) \
+		--efi-firmware $(efi_firmware)
+endif
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
 ## Should be invoked after building all Theseus kernel/application crates.
@@ -248,7 +248,7 @@ endif
 	@rm -rf $(THESEUS_BUILD_TOML)
 	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
-	@cp -f ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
+	@cp -rf ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'sysroot = "./sysroot"' >> $(THESEUS_BUILD_TOML)
 	@echo -e 'rustflags = "$(RUSTFLAGS)"' >> $(THESEUS_BUILD_TOML)
@@ -287,13 +287,23 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo: check-rustc 
+cargo : export override FEATURES+=--features nano_core/$(boot_spec)
+cargo:
+	@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(NANO_CORE_BUILD_DIR)
+	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
+	@mkdir -p $(DEPS_BUILD_DIR)
+
+ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
+	$(eval CFLAGS += -DVGA_TEXT_MODE)
+endif
+
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)' RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -322,13 +332,8 @@ cargo: check-rustc
 
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
-$(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(linker_script)
-	@mkdir -p $(BUILD_DIR)
-	@mkdir -p $(NANO_CORE_BUILD_DIR)
-	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
-	@mkdir -p $(DEPS_BUILD_DIR)
-
-	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(assembly_object_files) $(nano_core_static_lib)
+$(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
+	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -348,23 +353,6 @@ $(nano_core_binary): cargo $(nano_core_static_lib) $(assembly_object_files) $(li
 ## `.bin`: this doesn't parse the object file at compile time, instead including the nano_core binary as a boot module so it can then be parsed during
 ## boot. See pull request #542 for more details. 
 ##	@cp $(nano_core_binary) $(OBJECT_FILES_BUILD_DIR)/$(KERNEL_PREFIX)nano_core.bin
-
-### This compiles the assembly files in the nano_core. 
-### This target is currently rebuilt every time to accommodate changing CFLAGS.
-$(NANO_CORE_BUILD_DIR)/boot/$(ARCH)/%.o: $(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/%.asm
-	@mkdir -p $(shell dirname $@)
-    ## If the user chose to enable VGA text mode by means of setting `THESEUS_CONFIG`,
-    ## then we need to set CFLAGS such that the assembly code can know about it.
-    ## TODO: move this whole part about invoking `nasm` into a dedicated build.rs script in the nano_core.
-ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
-	$(eval CFLAGS += -DVGA_TEXT_MODE)
-endif
-	@nasm -f elf64 \
-		-i "$(NANO_CORE_SRC_DIR)/boot/arch_$(ARCH)/" \
-		$< \
-		-o $@ \
-		$(CFLAGS)
-
 
 
 ### This target auto-generates a new grub.cfg file and uses grub to build a bootable ISO.
@@ -588,26 +576,26 @@ docs: doc
 doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
 doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
-doc: check-rustc
+doc:
 ## Build the docs for select library crates, namely those not hosted online.
-## We do this first such that the main `cargo doc` invocation below can see and link to these library docs.
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/atomic_linked_list/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/cow_arc/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/debugit/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dereffer/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/dfqueue/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/keycodes_ascii/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/lockable/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/locked_idt/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/mouse_data/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/msr/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/owned_borrowed_trait/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/percent_encoding/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/port_io/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/stdio/Cargo.toml
-	@cargo doc --target-dir target/ --no-deps --manifest-path libs/str_ref/Cargo.toml
+## We do this first such that the main `cargo doc` invocation below can see and link to them.
+	@cargo doc --no-deps \
+		--package atomic_linked_list \
+		--package cow_arc \
+		--package debugit \
+		--package dereffer \
+		--package dfqueue \
+		--package keycodes_ascii \
+		--package lockable \
+		--package locked_idt \
+		--package mouse_data \
+		--package owned_borrowed_trait \
+		--package percent-encoding \
+		--package port_io \
+		--package stdio \
+		--package str_ref
 ## Now, build the docs for all of Theseus's main kernel crates.
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES))
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
@@ -641,14 +629,14 @@ ifneq ($(shell mdbook --version > /dev/null 2>&1 && echo $$?), 0)
 	@echo -e "    cargo +stable install mdbook-linkcheck --force"
 	@exit 1
 endif
-	@mdbook build $(BOOK_SRC) -d $(BOOK_OUT)
+	@mdbook build $(MDBOOK_ARGS) $(BOOK_SRC) -d $(BOOK_OUT)
 	@echo -e "\nThe Theseus Book is now available at \"$(BOOK_OUT_FILE)\"."
 
 
 ### Opens the Theseus book.
+export override MDBOOK_ARGS+=--open
 view-book: book
-	@echo -e "Opening the Theseus book in your browser..."
-	@mdbook build --open $(BOOK_SRC) -d $(BOOK_OUT)
+	@echo -e "Opened the Theseus book in your browser."
 
 
 ### Removes all built documentation
@@ -665,7 +653,7 @@ help:
 
 	@echo -e "   all:"
 	@echo -e "   full:"
-	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling all Cargo features ('--all-features')."
+	@echo -e "\t Same as 'iso', but builds all Theseus OS crates by enabling the 'theseus_features/everything' feature."
 
 	@echo -e "   run:"
 	@echo -e "\t Builds Theseus (via the 'iso' target) and runs it using QEMU."
@@ -790,7 +778,12 @@ ifdef IOMMU
 endif
 
 ## Boot from the cd-rom drive
-QEMU_FLAGS += -cdrom $(iso) -boot d
+ifeq ($(boot_spec), bios)
+	QEMU_FLAGS += -cdrom $(iso) -boot d
+else ifeq ($(boot_spec), uefi)
+	QEMU_FLAGS += -bios $(efi_firmware)
+	QEMU_FLAGS += -drive format=raw,file=$(iso)
+endif
 ## Don't reboot or shutdown upon failure or a triple reset
 QEMU_FLAGS += -no-reboot -no-shutdown
 ## Enable a GDB stub so we can connect GDB to the QEMU instance 

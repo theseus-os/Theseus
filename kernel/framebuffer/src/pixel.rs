@@ -85,7 +85,7 @@ impl From<Color> for RGBPixel {
 impl Pixel for AlphaPixel {   
     fn composite_buffer(src: &[Self], dest: &mut[Self]) {
         for i in 0..src.len() {
-            dest[i] = AlphaPixel::from(src[i]).blend(AlphaPixel::from(dest[i])).into();
+            dest[i] = src[i].blend(dest[i]);
         }
     }
 

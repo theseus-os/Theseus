@@ -7,8 +7,8 @@ description = "An app for interacting with crate namespaces"
 [dependencies]
 getopts = "0.2.21"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.mod_mgmt]
 path = "../../kernel/mod_mgmt"

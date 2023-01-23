@@ -15,11 +15,11 @@ use core::fmt;
 use core::ptr::Unique;
 use spin::Mutex;
 use volatile::Volatile;
-use kernel_config::memory::KERNEL_OFFSET;
 
 
-/// defined by x86's physical memory maps
-const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
+/// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
+/// We must rely on the early bootstrap code to identity map this address.
+const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000;
 
 /// height of the VGA text window
 const BUFFER_HEIGHT: usize = 25;
@@ -36,6 +36,11 @@ static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
     }
 );
 
+
+// Note: we can't put this cfg block inside the macro, because then it will be
+//       enabled based on the chosen features of the foreign crate that
+//       *calls* this macro, rather than the features activated in *this* crate.
+#[cfg(feature = "bios")]
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
@@ -43,10 +48,22 @@ macro_rules! print_raw {
     });
 }
 
+// Note: we can't put this cfg block inside the macro, because then it will be
+//       enabled based on the chosen features of the foreign crate that
+//       *calls* this macro, rather than the features activated in *this* crate.
+#[cfg(not(feature = "bios"))]
+#[macro_export]
+macro_rules! print_raw {
+    ($($arg:tt)*) => ({
+        // to silence warnings about unused variables
+        let _ = format_args!($($arg)*);
+    });
+}
+
 #[macro_export]
 macro_rules! println_raw {
-    ($fmt:expr) => (print_raw!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (print_raw!(concat!($fmt, "\n"), $($arg)*));
+    ($fmt:expr) => ($crate::print_raw!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print_raw!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[doc(hidden)]

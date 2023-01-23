@@ -1,0 +1,19 @@
+[package]
+name = "dreadnought"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "An asynchronous executor"
+edition = "2021"
+
+[dependencies]
+mutex_sleep = { path = "../mutex_sleep" }
+scheduler = { path = "../scheduler" }
+sleep = { path = "../sleep" }
+spawn = { path = "../spawn" }
+task = { path = "../task" }
+time = { path = "../time" }
+
+[dependencies.futures]
+version = "0.3"
+default-features = false
+features = ["alloc", "async-await"]

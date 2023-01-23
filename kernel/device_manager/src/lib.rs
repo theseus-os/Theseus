@@ -37,6 +37,7 @@ use alloc::vec::Vec;
 use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
 use serial_port::{SerialPortAddress, take_serial_port_basic};
 use storage_manager::StorageDevice;
+use memory::PhysicalAddress;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
@@ -51,13 +52,16 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// This includes:
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
-pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static str> {
+pub fn early_init(
+    rsdp_address: Option<PhysicalAddress>,
+    kernel_mmi: &mut MemoryManagementInfo
+) -> Result<(), &'static str> {
     // First, initialize the local APIC hardware such that we can populate
     // and initialize each LocalAPIC discovered in the ACPI table initialization routine below.
     apic::init();
     
     // Then, parse the ACPI tables to acquire system configuration info.
-    acpi::init(&mut kernel_mmi.page_table)?;
+    acpi::init(rsdp_address, &mut kernel_mmi.page_table)?;
 
     Ok(())
 }
@@ -68,7 +72,7 @@ pub fn early_init(kernel_mmi: &mut MemoryManagementInfo) -> Result<(), &'static 
 /// Devices include:
 /// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,
 /// * The fully-featured system [`logger`],
-/// * PS2 [`keyboard`] and [`mouse`],
+/// * The legacy PS2 controller and any connected devices: [`keyboard`] and [`mouse`],
 /// * All other devices discovered on the [`pci`] bus.
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
 
@@ -78,7 +82,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
             .ok()
             .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        ).map(|arc_ref| arc_ref.clone());
+        ).cloned();
 
     logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
     info!("Initialized full logger.");
@@ -97,9 +101,9 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    ps2_controller::init()?;
-    keyboard::init(key_producer)?;
-    mouse::init(mouse_producer)?;
+    let ps2_controller = ps2::init()?;
+    keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
+    mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
@@ -138,7 +142,8 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
                 let nic = e1000::E1000Nic::init(dev)?;
-                net::register_device(nic);
+                let interface = net::register_device(nic);
+                nic.lock().init_interrupts(interface)?;
 
                 let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
                 add_to_network_interfaces(e1000_interface);
@@ -194,6 +199,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             &DEFAULT_GATEWAY_IP
         )?;
         add_to_network_interfaces(ixgbe_interface);
+        net::register_device(ixgbe_nic_ref);
     }
 
     // Convenience notification for developers to inform them of no networking devices

@@ -3,14 +3,14 @@
 extern crate alloc;
 
 use alloc::{string::String, vec, vec::Vec};
-use app_io::{print, println};
+use app_io::println;
 use core::str::FromStr;
 use getopts::{Matches, Options};
 use net::{
+    icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket},
     phy::ChecksumCapabilities,
-    socket::icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket},
     wire::{Icmpv4Packet, Icmpv4Repr},
-    IpAddress, SocketSet,
+    IpAddress,
 };
 
 pub fn main(args: Vec<String>) -> isize {
@@ -56,7 +56,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
     let remote = IpAddress::from_str(matches.free.get(0).ok_or("no arguments_provided")?)
         .map_err(|_| "invalid argument")?;
 
-    let iface = net::get_default_interface().ok_or("no network interfaces available")?;
+    let interface = net::get_default_interface().ok_or("no network interfaces available")?;
 
     let count = matches
         .opt_get_default("c", 4)
@@ -78,42 +78,45 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
     let tx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
 
     let socket = Socket::new(rx_buffer, tx_buffer);
-
-    let mut sockets = SocketSet::new(vec![]);
-    let handle = sockets.add(socket);
+    let socket = interface.add_socket(socket);
 
     let mut sent = 0;
     let mut received = 0;
 
     loop {
-        iface.poll(&mut sockets).map_err(|_| "failed to poll socket")?;
-
-        let socket = sockets.get_mut::<Socket>(handle);
-
-        if !socket.is_open() {
+        if !socket.lock().is_open() {
             socket
+                .lock()
                 .bind(Endpoint::Ident(0x22b))
                 .map_err(|_| "failed to bind to endpoint")?;
         }
 
-        if socket.can_send() && sent == received && sent < count {
+        if socket.lock().can_send() && sent == received && sent < count {
             let repr = Icmpv4Repr::EchoRequest {
                 ident: 0x22b,
                 seq_no: sent,
                 data: &data,
             };
 
-            let payload = socket
+            let mut locked = socket.lock();
+            let payload = locked
                 .send(repr.buffer_len(), remote)
                 .map_err(|_| "failed to send packet")?;
             let mut packet = Icmpv4Packet::new_unchecked(payload);
-
             repr.emit(&mut packet, &ChecksumCapabilities::ignored());
+            drop(locked);
+
+            // Poll the socket to send the packet. Once we have a custom socket type this
+            // won't be necessary.
+            interface
+                .poll()
+                .map_err(|_| "failed to poll interface after sending")?;
             sent += 1;
         }
 
-        if socket.can_recv() {
-            let (payload, _) = socket.recv().map_err(|_| "failed to receive packet")?;
+        if socket.lock().can_recv() {
+            let mut locked = socket.lock();
+            let (payload, _) = locked.recv().map_err(|_| "failed to receive packet")?;
             let packet = Icmpv4Packet::new_checked(&payload)
                 .map_err(|_| "incoming packet had incorrect length")?;
             let repr = Icmpv4Repr::parse(&packet, &ChecksumCapabilities::ignored())
@@ -121,6 +124,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
 
             if let Icmpv4Repr::EchoReply { seq_no, .. } = repr {
                 println!("{} bytes from {}: seq_no={}", payload.len(), remote, seq_no);
+                drop(locked);
                 received += 1;
             }
         }

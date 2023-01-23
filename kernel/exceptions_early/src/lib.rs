@@ -1,5 +1,7 @@
 //! Early exception handlers that do nothing but print an error and hang.
 
+// TODO: Add direct explanation to why each empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
@@ -16,7 +18,7 @@ use x86_64::{
 };
 use locked_idt::LockedIdt;
 use gdt::{Gdt, create_gdt};
-use vga_buffer::{print_raw, println_raw};
+use vga_buffer::println_raw;
 
 /// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
 /// This is no longer used after interrupts are set up properly, it's just a failsafe.
@@ -47,14 +49,14 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
         println_raw!("exceptions_early(): Created TSS: {:?}", tss);
         *EARLY_TSS.lock() = tss;
         
-        let (gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(&*EARLY_TSS.lock());
+        let (gdt, kernel_cs, kernel_ds, _user_cs_32, _user_ds_32, _user_cs_64, _user_ds_64, tss_segment) = create_gdt(&EARLY_TSS.lock());
         *EARLY_GDT.lock() = gdt;
         EARLY_GDT.lock().load();
 
         unsafe {
             CS::set_reg(kernel_cs);          // reload code segment register
             load_tss(tss_segment);           // load TSS
-            SS::set_reg(kernel_ds.clone());  // unsure if necessary, but doesn't hurt
+            SS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
             DS::set_reg(kernel_ds);          // unsure if necessary, but doesn't hurt
         }
     }

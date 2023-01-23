@@ -1,21 +1,15 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
-description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
 version = "0.1.0"
-build = "build.rs"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
+edition = "2021"
 
 
 [dependencies]
-spin = "0.9.4"
-multiboot2 = "0.14.0"
+cfg-if = "1.0.0"
+multiboot2 = { version = "0.14.0", optional = true }
 libm = "0.2.1"
-
-
-# [dependencies.compiler_builtins]
-# git = "https://github.com/rust-lang-nursery/compiler-builtins"
-# default-features = false
-# features = [ "no-lang-items" ]
 
 [dependencies.log]
 version = "0.4.8"
@@ -62,11 +56,28 @@ path = "../vga_buffer"
 [dependencies.memory_initialization]
 path = "../memory_initialization"
 
+[dependencies.boot_info]
+path = "../boot_info"
+features = ["multiboot2"]
+
+[dependencies.uefi-bootloader-api]
+git = "https://github.com/theseus-os/uefi-bootloader"
+optional = true
+
+[build-dependencies]
+cfg-if = "1.0.0"
+
+[features]
+default = [ "bios" ]
+## Build for a system that boots via legacy BIOS (multiboot2).
+bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
+## Build for a system that boots via UEFI.
+uefi = ["boot_info/uefi", "captain/uefi", "dep:uefi-bootloader-api"]
+
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
 # that we can jump to from the bootloader.
 crate-type = ["staticlib"]  
-
 
 ## Currently not used; see the `build.rs` script.
 # [build-dependencies]

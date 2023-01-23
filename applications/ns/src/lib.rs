@@ -2,8 +2,8 @@
 //! specifically `CrateNamespace`s.
 
 #![no_std]
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 
 extern crate getopts;
 extern crate memory;
@@ -18,6 +18,7 @@ use core::{
 };
 use alloc::{
     string::String,
+    string::ToString,
     sync::Arc,
     vec::Vec,
 };
@@ -86,7 +87,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
 
 fn load_crate(output: &mut String, crate_file_ref: FileRef, namespace: &Arc<CrateNamespace>) -> Result<(), String> {
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("Cannot get kernel_mmi_ref"))?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "Cannot get kernel_mmi_ref".to_string())?;
     let (_new_crate_ref, _new_syms) = namespace.load_crate(
         &crate_file_ref,
         None,

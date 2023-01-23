@@ -8,4 +8,5 @@ path = "lib.rs"
 
 [dependencies]
 log = "0.4.17"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 pl011_qemu = { git = "https://github.com/theseus-os/pl011/", branch = "aarch64-qemu-virt-test" }

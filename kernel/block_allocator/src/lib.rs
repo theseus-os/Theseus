@@ -10,6 +10,9 @@
 // Allocator code taken from Philipp Oppermann's blog "Writing an OS in Rust" (https://github.com/phil-opp/blog_os/tree/post-11)
 // and modified by Ramla Ijaz
 
+
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
 #![feature(const_mut_refs)]
 #![no_std]
 

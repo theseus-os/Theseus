@@ -29,7 +29,7 @@ extern crate logger;
 extern crate memory; // the virtual memory subsystem 
 extern crate no_drop;
 extern crate stack;
-extern crate apic; 
+extern crate cpu; 
 extern crate mod_mgmt;
 extern crate spawn;
 extern crate tsc;
@@ -39,7 +39,7 @@ extern crate acpi;
 extern crate device_manager;
 extern crate e1000;
 extern crate scheduler;
-#[cfg(mirror_log_to_vga)] #[macro_use] extern crate print;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate app_io;
 extern crate first_application;
 extern crate exceptions_full;
 extern crate network_manager;
@@ -50,9 +50,8 @@ extern crate console;
 #[cfg(simd_personality)] extern crate simd_personality;
 
 
-use alloc::vec::Vec;
 use core::ops::DerefMut;
-use memory::{VirtualAddress, MappedPages, MmiRef};
+use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
@@ -82,10 +81,12 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 /// * `ap_start_realmode_end`: the end bound (exlusive) of the AP's realmode boot code.
 pub fn init(
     kernel_mmi_ref: MmiRef,
-    identity_mapped_pages: NoDrop<Vec<MappedPages>>,
+    identity_mapped_pages: NoDrop<EarlyIdentityMappedPages>,
     bsp_initial_stack: NoDrop<Stack>,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
+    ap_gdt: VirtualAddress,
+    rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
     #[cfg(mirror_log_to_vga)]
     {
@@ -99,7 +100,7 @@ pub fn init(
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
-    device_manager::early_init(kernel_mmi_ref.lock().deref_mut())?;
+    device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
     let (double_fault_stack, privilege_stack) = {
@@ -114,7 +115,7 @@ pub fn init(
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
     // get BSP's apic id
-    let bsp_apic_id = apic::get_bsp_id().ok_or("captain::init(): Coudln't get BSP's apic_id!")?;
+    let bsp_apic_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
 
     // create the initial `Task`, which is bootstrapped from this execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
@@ -128,6 +129,7 @@ pub fn init(
         &kernel_mmi_ref,
         ap_start_realmode_begin,
         ap_start_realmode_end,
+        ap_gdt,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
     let cpu_count = ap_count + 1;
@@ -140,6 +142,11 @@ pub fn init(
     // Initialize the per-core heaps.
     multiple_heaps::switch_to_multiple_heaps()?;
     info!("Initialized per-core heaps");
+
+    #[cfg(feature = "uefi")] {
+        log::error!("uefi boot cannot proceed as it is not fully implemented");
+        loop {}
+    }
 
     // Initialize the window manager, and also the PAT, if available.
     // The PAT supports write-combining caching of graphics video memory for better performance

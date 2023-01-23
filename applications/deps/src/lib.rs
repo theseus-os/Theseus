@@ -6,8 +6,8 @@
 #![feature(slice_concat_ext)]
 
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 extern crate itertools;
 
 extern crate getopts;
@@ -20,7 +20,10 @@ extern crate spin;
 
 use alloc::{
     collections::BTreeSet,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     vec::Vec,
     sync::Arc,
 };
@@ -134,7 +137,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
         count_private_rodata_sections()
     }
     else {
-        Err(format!("no supported options/arguments found."))
+        Err("no supported options/arguments found.".to_string())
     }
 }
 
@@ -317,7 +320,7 @@ fn section_dependency_count(sec: &StrongSectionRef) -> (usize, usize, usize) {
 /// If there are multiple matches, this returns an Error containing 
 /// all of the matching crate names separated by the newline character `'\n'`.
 fn crates_dependent_on_me(_crate_name: &str) -> Result<(), String> {
-    Err(format!("unimplemented"))
+    Err("unimplemented".to_string())
 }
 
 
@@ -406,13 +409,17 @@ fn find_crate(crate_name: &str) -> Result<(StrRef, StrongCrateRef), String> {
 fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
     let namespace = get_my_current_namespace();
     let matching_symbols = namespace.find_symbols_starting_with(section_name);
-    if matching_symbols.len() == 1 {
-        return matching_symbols[0].1.upgrade()
-            .ok_or_else(|| format!("Found matching symbol name but couldn't get reference to section"));
-    } else if matching_symbols.len() > 1 {
-        return Err(matching_symbols.into_iter().map(|(k, _v)| k).collect::<Vec<String>>().join("\n"));
-    } else {
-        // continue on
+    match matching_symbols.len() {
+        1 => return matching_symbols[0].1
+            .upgrade()
+            .ok_or_else(|| "Found matching symbol name but couldn't get reference to section".to_string()),
+        2.. => return Err(matching_symbols
+            .into_iter()
+            .map(|(k, _v)| k)
+            .collect::<Vec<String>>()
+            .join("\n")
+        ),
+        _ => { /* no matches, continue on */ },
     }
 
     // If it wasn't a global section in the symbol map, then we need to find its containing crate

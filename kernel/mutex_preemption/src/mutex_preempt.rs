@@ -59,9 +59,8 @@ impl<T: ?Sized> MutexPreempt<T> {
     #[inline(always)]
     pub fn lock(&self) -> MutexPreemptGuard<T> {
         loop {
-            match self.try_lock() {
-                Some(guard) => return guard,
-                _ => {}
+            if let Some(guard) = self.try_lock() {
+                return guard;
             }
         }
     }
@@ -79,6 +78,7 @@ impl<T: ?Sized> MutexPreempt<T> {
 
     /// Force unlock the spinlock.
     ///
+    /// # Safety
     /// This is *extremely* unsafe if the lock is not held by the current
     /// thread. However, this can be useful in some instances for exposing the
     /// lock to FFI that doesn't know how to deal with RAII.
@@ -137,14 +137,14 @@ impl<T: ?Sized + Default> Default for MutexPreempt<T> {
 impl<'a, T: ?Sized> Deref for MutexPreemptGuard<'a, T> {
     type Target = T;
 
-    fn deref<'b>(&'b self) -> &'b T { 
-        & *(self.guard) 
+    fn deref(&self) -> &T { 
+        &self.guard 
     }
 }
 
 impl<'a, T: ?Sized> DerefMut for MutexPreemptGuard<'a, T> {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { 
-        &mut *(self.guard)
+    fn deref_mut(&mut self) -> &mut T { 
+        &mut self.guard
     }
 }
 

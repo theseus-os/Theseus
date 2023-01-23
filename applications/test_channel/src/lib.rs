@@ -1,8 +1,8 @@
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate getopts;
 extern crate spin;
 extern crate task;
@@ -10,7 +10,7 @@ extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;
 extern crate async_channel;
-extern crate apic;
+extern crate cpu;
 
 
 use alloc::{
@@ -158,7 +158,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send a single message
 fn rendezvous_test_oneshot() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let (sender, receiver) = rendezvous::new_channel();
 
@@ -197,7 +197,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
 /// Optionally can set panics at `send_panic` and `receive_panic` locations
 fn rendezvous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let (sender, receiver) = rendezvous::new_channel();
 
@@ -278,7 +278,7 @@ fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sende
 /// A simple test that spawns a sender & receiver task to send a single message
 /// Optionally can set panics at `send_panic` and `receive_panic` locations
 fn asynchronous_test_oneshot() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let (sender, receiver) = async_channel::new_channel(2);
 
@@ -321,7 +321,7 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
 fn asynchronous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let (sender, receiver) = async_channel::new_channel(2);
 

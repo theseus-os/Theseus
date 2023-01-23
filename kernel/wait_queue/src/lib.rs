@@ -1,3 +1,4 @@
+#![allow(clippy::new_without_default)]
 #![no_std]
 
 extern crate alloc;
@@ -195,7 +196,7 @@ impl WaitQueue {
         for t in self.0.lock().drain(..) {
             if t.unblock().is_err() {
                 warn!("WaitQueue::notify_all(): failed to unblock {:?}", t);
-            };
+            }
         }
     }
     

@@ -181,7 +181,7 @@ pub trait AllocablePage {
 
     /// Tries to find a free block within `data` that satisfies `alignment` requirement.
     fn first_fit(&self, layout: Layout) -> Option<(usize, usize)> {
-        let base_addr = (&*self as *const Self as *const u8) as usize;
+        let base_addr = (self as *const Self as *const u8) as usize;
         self.bitfield().first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
     }
 
