@@ -220,6 +220,7 @@ impl PteFlagsAarch64 {
         Self::from_bits_truncate(
             Self::NORMAL_MEMORY.bits
             | Self::OUTER_SHAREABLE.bits
+            | Self::PAGE_DESCRIPTOR.bits
             | Self::READ_ONLY.bits
             | Self::ACCESSED.bits
             | Self::_NOT_GLOBAL.bits
