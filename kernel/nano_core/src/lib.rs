@@ -124,20 +124,7 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    let _mapped = {
-        let mut locked = kernel_mmi_ref.lock();
-        let page_table = &mut locked.deref_mut().page_table;
-
-        let mmio_flags = PteFlags::DEVICE_MEMORY
-                       | PteFlags::NOT_EXECUTABLE
-                       | PteFlags::WRITABLE;
-
-        let pages = allocate_pages_at(VirtualAddress::new_canonical(0x0900_0000), 1).unwrap();
-        let frames = allocate_frames_at(PhysicalAddress::new_canonical(0x0900_0000), 1).unwrap();
-
-        page_table.map_allocated_pages_to(pages, frames, mmio_flags).unwrap()
-    };
-
+    #[cfg(target_arch = "aarch64")]
     logger_aarch64::init().unwrap();
 
     println_raw!("nano_core(): initialized memory subsystem.");

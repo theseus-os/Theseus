@@ -1,18 +1,19 @@
 #![no_std]
 
-use pl011_qemu::{PL011, UART1};
+use pl011_qemu::PL011;
 use log::{Record, Metadata, Log, set_logger, set_max_level, STATIC_MAX_LEVEL};
 use core::fmt::Write;
+use core::ops::DerefMut;
 use irq_safety::MutexIrqSafe;
 
-type QemuVirtUart = PL011<UART1>;
+use memory::{PhysicalAddress, PageTable, PageRange, FrameRange, MappedPages, PteFlags, get_kernel_mmi_ref, allocate_pages, allocate_frames_at};
 
 /// This wraps a UART channel handle.
-pub struct QemuVirtUartLogger {
-    pub(crate) uart: MutexIrqSafe<QemuVirtUart>,
+pub struct UartLogger {
+    pub(crate) uart: MutexIrqSafe<PL011>,
 }
 
-impl Log for QemuVirtUartLogger {
+impl Log for UartLogger {
     fn enabled(&self, _metadata: &Metadata) -> bool {
         // allow all messages
         true
@@ -33,7 +34,10 @@ impl Log for QemuVirtUartLogger {
 }
 
 // Global logger Singleton
-static mut LOGGER: Option<QemuVirtUartLogger> = None;
+static mut LOGGER: Option<UartLogger> = None;
+
+// Mapped Pages for the UART MMIO
+static mut UART_MMIO: MappedPages = MappedPages::empty();
 
 /// Initialize the internal global "LOGGER" singleton
 /// and sets it as the system-wide logger for the `log`
@@ -45,12 +49,30 @@ static mut LOGGER: Option<QemuVirtUartLogger> = None;
 pub fn init() -> Result<(), &'static str> {
     set_max_level(STATIC_MAX_LEVEL);
 
-    let uart1 = UART1::take().unwrap();
-    let logger = QemuVirtUartLogger {
-        uart: MutexIrqSafe::new(QemuVirtUart::new(uart1)),
+    let kernel_mmi_ref = get_kernel_mmi_ref()
+        .ok_or("logger_aarch64: couldn't map the UART interface")?;
+
+    let mut locked = kernel_mmi_ref.lock();
+    let page_table = &mut locked.deref_mut().page_table;
+
+    let mmio_flags = PteFlags::DEVICE_MEMORY
+                   | PteFlags::NOT_EXECUTABLE
+                   | PteFlags::WRITABLE;
+
+    let pages = allocate_pages(1).unwrap();
+
+    let qemu_uart_frame = PhysicalAddress::new_canonical(0x0900_0000);
+    let frames = allocate_frames_at(qemu_uart_frame, 1).unwrap();
+
+    let mapped_pages = page_table.map_allocated_pages_to(pages, frames, mmio_flags).unwrap();
+
+    let addr = mapped_pages.start_address().value();
+    let logger = UartLogger {
+        uart: MutexIrqSafe::new(PL011::new(addr as *mut _)),
     };
 
     let logger_static = unsafe {
+        UART_MMIO = mapped_pages;
         LOGGER = Some(logger);
         LOGGER.as_ref().unwrap()
     };
