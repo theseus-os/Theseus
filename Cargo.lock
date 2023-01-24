@@ -1784,6 +1784,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "log",
+ "memory",
  "pl011_qemu",
 ]
 
@@ -2206,6 +2207,7 @@ dependencies = [
  "multiboot2",
  "no_drop",
  "panic_entry",
+ "pte_flags",
  "serial_port_basic",
  "stack",
  "state_store",
@@ -2614,7 +2616,7 @@ dependencies = [
 [[package]]
 name = "pl011_qemu"
 version = "0.2.0"
-source = "git+https://github.com/theseus-os/pl011/?branch=aarch64-qemu-virt-test#3b3c3f6260cfaa5ca97ab6989bdb141c1276257e"
+source = "git+https://github.com/theseus-os/pl011/?branch=aarch64-qemu-virt-test#2c2cec84ca9653efa9e370460e7e0e1c94140080"
 dependencies = [
  "cortex-m",
  "embedded-hal",
