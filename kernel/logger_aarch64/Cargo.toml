@@ -1,4 +1,5 @@
 [package]
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "logger_aarch64"
 version = "0.1.0"
 edition = "2021"
