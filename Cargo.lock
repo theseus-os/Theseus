@@ -4093,7 +4093,7 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
-source = "git+https://github.com/theseus-os/uefi-bootloader#1aeb6f29bf2f3cc2cd2ab2dee893bef5caa1f96c"
+source = "git+https://github.com/theseus-os/uefi-bootloader#593fd590f55b4756ced5389146d987cebd491c4f"
 
 [[package]]
 name = "unicode-ident"
