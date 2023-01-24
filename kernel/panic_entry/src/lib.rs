@@ -107,9 +107,10 @@ extern "C" fn rust_eh_personality() -> ! {
 /// that invokes the real `unwind_resume()` function in the `unwind` crate, 
 /// but does so dynamically in loadable mode.
 #[no_mangle]
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 extern "C" fn _Unwind_Resume(arg: usize) -> ! {
     #[cfg(target_arch = "aarch64")]
-    loop {}
+    loop { }
 
     #[cfg(all(target_arch = "x86_64", not(loadable)))] {
         unwind::unwind_resume(arg)

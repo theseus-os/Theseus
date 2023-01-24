@@ -2207,7 +2207,6 @@ dependencies = [
  "multiboot2",
  "no_drop",
  "panic_entry",
- "pte_flags",
  "serial_port_basic",
  "stack",
  "state_store",

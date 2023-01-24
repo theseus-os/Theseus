@@ -22,8 +22,7 @@
 extern crate panic_entry;
 
 use core::ops::DerefMut;
-use memory::{VirtualAddress, PhysicalAddress, PageRange, FrameRange, allocate_pages_at, allocate_frames_at};
-use pte_flags::PteFlags;
+use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 
 #[cfg(target_arch = "x86_64")]
@@ -77,6 +76,7 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// 1. Setting up logging
 /// 2. Dumping basic information about the Theseus build
 /// 3. Initialising early exceptions
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
     #[cfg(target_arch = "x86_64")] {
         irq_safety::disable_interrupts();
@@ -106,6 +106,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
 }
 
 /// The nano core routine. See crate-level documentation for more information.
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation

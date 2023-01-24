@@ -6,7 +6,7 @@ use core::fmt::Write;
 use core::ops::DerefMut;
 use irq_safety::MutexIrqSafe;
 
-use memory::{PhysicalAddress, PageTable, PageRange, FrameRange, MappedPages, PteFlags, get_kernel_mmi_ref, allocate_pages, allocate_frames_at};
+use memory::{PhysicalAddress, MappedPages, PteFlags, get_kernel_mmi_ref, allocate_pages, allocate_frames_at};
 
 /// This wraps a UART channel handle.
 pub struct UartLogger {

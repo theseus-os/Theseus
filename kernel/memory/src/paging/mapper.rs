@@ -26,11 +26,14 @@ use crate::paging::{
 };
 use pte_flags::PteFlagsArch;
 use spin::Once;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::PAGE_SIZE;
 use super::tlb_flush_virt_addr;
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
 use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
+
+#[cfg(target_arch = "x86_64")]
+use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
 /// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
 /// 

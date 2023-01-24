@@ -21,7 +21,6 @@ no_drop = { path = "../no_drop" }
 stack = { path = "../stack" }
 mod_mgmt = { path = "../mod_mgmt" }
 panic_entry = { path = "../panic_entry" }
-pte_flags = { path = "../pte_flags" }
 memory_initialization = { path = "../memory_initialization" }
 boot_info = { path = "../boot_info" }
 

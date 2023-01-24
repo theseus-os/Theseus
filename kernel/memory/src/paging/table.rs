@@ -83,7 +83,7 @@ impl<L: TableLevel> Table<L> {
 }
 
 #[cfg(target_arch = "aarch64")]
-fn is_huge(flags: &PteFlagsArch) -> bool {
+fn is_huge(_flags: &PteFlagsArch) -> bool {
     false
 }
 
