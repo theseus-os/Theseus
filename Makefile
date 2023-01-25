@@ -19,7 +19,12 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
-boot_spec ?= bios
+
+ifeq ($(ARCH),aarch64)
+	boot_spec ?= uefi
+else
+	boot_spec ?= bios
+endif
 
 ifeq ($(boot_spec), bios)
 	ISO_EXTENSION := iso
