@@ -25,7 +25,7 @@ On Linux (Debian-like distros), do the following:
     ```
  3. Install dependencies:
     ```
-    sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm
+    sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
     ```
  4. Build and run (in QEMU):
     ```sh
@@ -61,16 +61,16 @@ curl https://sh.rustup.rs -sSf | sh
 ### Building on Linux or WSL (Windows Subsystem for Linux)
 Install the following dependencies using your package manager:
 ```bash
-sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm
+sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
 ```
 
   * Or:
     ```bash
     # Arch Linux
-    sudo pacman -S make gcc nasm pkg-config grub mtools xorriso qemu
+    sudo pacman -S make gcc nasm pkg-config grub mtools xorriso qemu wget
 
     # Fedora
-    sudo dnf install make gcc nasm pkg-config grub2 mtools xorriso qemu
+    sudo dnf install make gcc nasm pkg-config grub2 mtools xorriso qemu wget
     ```
 
 If you're on WSL, also do the following steps:
@@ -161,6 +161,17 @@ git -C limine-prebuilt reset --hard 3f6a330
 make run bootloader=limine
 ```
 Feel free to try newer versions, however they may not work.
+
+
+## Targeting ARMv8
+There is an ongoing effort to port Theseus to ARMv8 (AKA aarch64).
+To build and run for ARMv8:
+```sh
+# obtain the toolchain for aarch64 using your package manager (mine is pacman):
+sudo pacman -S aarch64-linux-gnu-gcc
+# build & run:
+make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run
+```
 
 
 ## Using QEMU
