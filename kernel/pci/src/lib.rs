@@ -2,20 +2,17 @@
 
 #![allow(dead_code)]
 
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate spin;
-extern crate port_io;
-extern crate memory;
-extern crate bit_field;
 
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
+use log::{trace, debug};
+use modular_bitfield::{bitfield, BitfieldSpecifier};
+use modular_bitfield::specifiers::{B1, B30, B28};
 use port_io::Port;
 use spin::{Once, Mutex};
 use memory::PhysicalAddress;
-use bit_field::BitField;
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
@@ -52,10 +49,6 @@ pub const PCI_MAX_LATENCY:           u16 = 0x3F;
 pub const MSI_CAPABILITY:           u16 = 0x05;
 pub const MSIX_CAPABILITY:          u16 = 0x11;
 
-/// If a BAR's bits [2:1] equal this value, that BAR describes a 64-bit address.
-/// If not, that BAR describes a 32-bit address.
-const BAR_ADDRESS_IS_64_BIT: u32 = 2;
-
 /// The maximum number of PCI buses.
 const MAX_NUM_PCI_BUSES: u16 = 256;
 /// The maximum number of PCI slots on one PCI bus.
@@ -77,7 +70,7 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
 pub fn get_pci_buses() -> &'static Vec<PciBus> {
     static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
-    PCI_BUSES.call_once( || scan_pci() )
+    PCI_BUSES.call_once(scan_pci)
 }
 
 
@@ -147,7 +140,7 @@ fn scan_pci() -> Vec<PciBus> {
                 }
 
                 let device = PciDevice {
-                    vendor_id:        vendor_id,
+                    vendor_id,
                     device_id:        location.pci_read_16(PCI_DEVICE_ID), 
                     command:          location.pci_read_16(PCI_COMMAND),
                     status:           location.pci_read_16(PCI_STATUS),
@@ -169,7 +162,7 @@ fn scan_pci() -> Vec<PciBus> {
                                       ],
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
-                    location:              location,
+                    location,
                 };
 
                 device_list.push(device);
@@ -323,7 +316,7 @@ impl fmt::Display for PciLocation {
 
 impl fmt::Debug for PciLocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 
@@ -370,33 +363,41 @@ impl PciDevice {
     /// Note that if the given `BAR` actually indicates it is part of a 64-bit address,
     /// it will be used together with the BAR right above it (`bar + 1`), e.g., `BAR1:BAR0`.
     /// If it is a 32-bit address, then only the given `BAR` will be accessed.
-    ///
-    /// TODO: currently we assume the BAR represents a memory space (memory mapped I/O) 
-    ///       rather than I/O space like Port I/O. Obviously, this is not always the case.
-    ///       Instead, we should return an enum specifying which kind of memory space the calculated base address is.
-    pub fn determine_mem_base(&self, bar_index: usize) -> Result<PhysicalAddress, &'static str> {
-        let mut bar = if let Some(bar_value) = self.bars.get(bar_index) {
-            *bar_value
-        } else {
-            return Err("BAR index must be between 0 and 5 inclusive");
-        };
+    /// 
+    /// TODO: If it is always known which kind of BAR is returned for a given device,
+    ///       returning an enum is kind of non-sensical. I don't know for sure.
+    pub fn determine_mem_base(&self, bar_index: usize) -> Result<BaseAddress, &'static str> {
+        let bar = self.bars.get(bar_index).ok_or("BAR index must be between 0 and 5 inclusive")?;
+        
+        //the first bit of the bar is 1 if it is in io space
+        let is_io_space = bar & 1 == 1; //TODO: I imagine an API where we immediately parse into an enum
 
-        // Check bits [2:1] of the bar to determine address length (64-bit or 32-bit)
-        let mem_base = if bar.get_bits(1..3) == BAR_ADDRESS_IS_64_BIT { 
-            // Here: this BAR is the lower 32-bit part of a 64-bit address, 
-            // so we need to access the next highest BAR to get the address's upper 32 bits.
-            let next_bar = *self.bars.get(bar_index + 1).ok_or("next highest BAR index is out of range")?;
-            // Clear the bottom 4 bits because it's a 16-byte aligned address
-            PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize | ((next_bar as usize) << 32))
-                .ok_or("determine_mem_base(): [64-bit] BAR physical address was invalid")?
+        if is_io_space {
+            let bar = IOSpaceBAR::from_bytes(bar.to_le_bytes());
+
+            PhysicalAddress::new(bar.address_aligned_to_4_byte() as usize)
+                .ok_or("base_address(): [32-bit] BAR physical address was invalid")
+                .map(BaseAddress::IO)
         } else {
-            // Here: this BAR is the lower 32-bit part of a 64-bit address, 
-            // so we need to access the next highest BAR to get the address's upper 32 bits.
-            // Also, clear the bottom 4 bits because it's a 16-byte aligned address.
-            PhysicalAddress::new(*bar.set_bits(0..4, 0) as usize)
-                .ok_or("determine_mem_base(): [32-bit] BAR physical address was invalid")?
-        };  
-        Ok(mem_base)
+            let bar = MemorySpaceBAR::from_bytes(bar.to_le_bytes());
+            // Determine address length (64-bit or 32-bit)
+            use MemoryBARType::*;
+            match bar.r#type() {
+                Address64bit => {
+                    // This BAR is the lower 32-bit part of a 64-bit address, 
+                    // so we need to access the next highest BAR to get the address's upper 32 bits.
+                    let next_bar = *self.bars.get(bar_index + 1).ok_or("next highest BAR index is out of range")?;
+
+                    PhysicalAddress::new(bar.address_aligned_to_16_byte() as usize | ((next_bar as usize) << 32))
+                        .ok_or("base_address(): [64-bit] BAR physical address was invalid")
+                        .map(BaseAddress::Memory)
+                }
+                Address32bit => PhysicalAddress::new(bar.address_aligned_to_16_byte() as usize)
+                    .ok_or("base_address(): [32-bit] BAR physical address was invalid")
+                    .map(BaseAddress::Memory),
+                Reserved => Err("16-bit memory space is unsupported"),
+            }
+        }
     }
 
     /// Returns the size in bytes of the memory region specified by the given `BAR` 
@@ -420,7 +421,7 @@ impl PciDevice {
 
         self.pci_write(bar_offset, 0xFFFF_FFFF);          // Step 1
         let mut mem_size = self.pci_read_32(bar_offset);  // Step 2
-        mem_size.set_bits(0..4, 0);                       // Step 3
+        mem_size &= 0xFFFFFFF0;                           // Step 3
         mem_size = !(mem_size);                           // Step 4
         mem_size += 1;                                    // Step 4
         self.pci_write(bar_offset, original_value);       // Step 5
@@ -502,8 +503,51 @@ impl DerefMut for PciDevice {
     }
 }
 
+/// contains a port I/O address
+#[bitfield(bits = 32)]
+struct IOSpaceBAR {
+    is_io_space: bool, //TODO: remove/handle outside of type
+    reserved: B1,
+    address_aligned_to_4_byte: B30
+}
+
+/// contains a memory mapped I/O address
+#[bitfield(bits = 32)]
+struct MemorySpaceBAR {
+    is_io_space: bool, //TODO: remove/handle outside of type
+    r#type: MemoryBARType,
+    /// If true, the region does not have read side effects (reading doesn't change any state).
+    /// It is allowed for the CPU to cache loads from that memory region and read it in bursts (typically cache line sized).
+    /// Hardware is also allowed to merge repeated stores to the same address into one store of the latest value.
+    /// If you are using paging and want maximum performance,
+    /// you should map prefetchable MMIO regions as WT (write-through) instead of UC (uncacheable).
+    /// On x86, frame buffers are the exception, they should be almost always be mapped WC (write-combining).
+    /// 
+    /// Any device that has a range that behaves like normal memory should mark the range as prefetchable.
+    /// A linear frame buffer in a graphics device is an example of a range that should be marked prefetchable.
+    prefetchable: bool,
+    address_aligned_to_16_byte: B28
+}
 
 
+#[derive(BitfieldSpecifier)]
+#[bits = 2]
+enum MemoryBARType {
+    Address32bit = 0x0,
+    /// Note: A 64-bit base address register consumes 2 of the base address registers available
+    Address64bit = 0x2,
+    /// Note: In earlier versions (<3.0) this was used to support memory space below 1MB (16-bit).
+    /// "System software should recognize this encoding and handle appropriately."
+    Reserved = 0x1
+}
+
+/// A base address can either be in I/O space or memory space
+pub enum BaseAddress {
+    IO(PhysicalAddress),
+    Memory(PhysicalAddress)
+}
+
+//TODO: incorporate this somewhere else
 /// Lists the 2 possible PCI configuration space access mechanisms
 /// that can be found from the LSB of the devices's BAR0
 pub enum PciConfigSpaceAccessMechanism {
