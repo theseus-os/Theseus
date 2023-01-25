@@ -217,7 +217,8 @@ where
         debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.len());
         let flags = convert_to_pte_flags(&section);
 
-        let start_virt_addr = VirtualAddress::new(section.start().value())
+        #[cfg_attr(target_arch = "aarch64", allow(unused_mut))]
+        let mut start_virt_addr = VirtualAddress::new(section.start().value())
             .ok_or("section had invalid starting virtual address")?;
         let start_phys_addr = translate(start_virt_addr)
             .ok_or("couldn't translate section's starting virtual address")?;
