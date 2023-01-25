@@ -8,6 +8,12 @@ SHELL := /bin/bash
 ## specifies which architecture we're building for
 ARCH ?= x86_64
 
+ifeq ($(ARCH),x86_64)
+	OVMF_FILE ?= RELEASEX64_QEMU.fd
+else
+	OVMF_FILE ?= RELEASEAARCH64_QEMU_EFI.fd
+endif
+
 ## The name of the target JSON file (without the ".json" suffix)
 TARGET ?= $(ARCH)-unknown-theseus
 

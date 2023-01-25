@@ -75,8 +75,7 @@ endif
 
 ### Handle multiple bootloader options and ensure the corresponding tools are installed.
 ifeq ($(boot_spec),uefi)
-	bootloader = bootloader-none
-# bootloader option isn't required for UEFI
+	# a bootloader isn't required, with UEFI
 else ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
@@ -93,8 +92,7 @@ else ifeq ($(bootloader),limine)
 	else
 $(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
 	endif
-# bootloader option isn't required for UEFI
-else ifneq ($(boot_spec), uefi)
+else
 $(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
 endif
 
@@ -111,9 +109,12 @@ nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
-efi_firmware := $(BUILD_DIR)/ovmf.fd
+efi_firmware := $(BUILD_DIR)/$(OVMF_FILE)
+
+ifeq ($(ARCH),x86_64)
 ## The assembly files compiled by the nano_core build script.
 compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/$(boot_spec)/*.o
+endif
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -179,8 +180,11 @@ full: iso
 iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso) $(efi_firmware): clean-old-build build extra_files copy_kernel $(bootloader)
-ifeq ($(boot_spec), uefi)
+$(iso): clean-old-build build extra_files copy_kernel $(iso)-$(boot_spec)
+
+$(iso)-bios: $(bootloader)
+
+$(iso)-uefi: $(efi_firmware)
 	@cargo r \
 		--release \
 		-Z bindeps \
@@ -188,9 +192,7 @@ ifeq ($(boot_spec), uefi)
 		$(ROOT_DIR)/tools/uefi_builder/$(ARCH)/Cargo.toml -- \
 		--kernel $(nano_core_binary) \
 		--modules $(OBJECT_FILES_BUILD_DIR) \
-		--efi-image $(iso) \
-		--efi-firmware $(efi_firmware)
-endif
+		--efi-image $(iso)
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
 ## Should be invoked after building all Theseus kernel/application crates.
@@ -341,8 +343,7 @@ endif
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
-#	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
-	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(nano_core_static_lib)
+	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -389,7 +390,10 @@ limine:
 	@$(LIMINE_DIR)/limine-deploy $(iso)
 
 bootloader-none:
-# do nothing
+# On UEFI, no bootloader is required
+
+$(efi_firmware):
+	wget https://raw.githubusercontent.com/retrage/edk2-nightly/master/bin/$(OVMF_FILE) -O $(efi_firmware)
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
@@ -828,9 +832,6 @@ QEMU_FLAGS += -m $(QEMU_MEMORY)
 QEMU_CPUS ?= 4
 QEMU_FLAGS += -smp $(QEMU_CPUS)
 
-## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
-MAC_ADDR ?= 52:54:00:d1:55:01
-
 ## Add a disk drive, a PATA drive over an IDE controller interface.
 DISK_IMAGE ?= fat32.img
 ifneq ($(wildcard $(DISK_IMAGE)),) 
@@ -839,6 +840,9 @@ endif
 
 ## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
 # QEMU_FLAGS += -drive id=my_disk,file=$(DISK_IMAGE),if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+
+## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
+MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -865,6 +869,10 @@ endif
 ifeq ($(host),yes)
 	## KVM acceleration is required when using the host cpu model
 	QEMU_FLAGS += -cpu host -accel kvm
+else ifeq ($(ARCH),aarch64)
+	QEMU_FLAGS += -machine virt
+	QEMU_FLAGS += -device ramfb
+	QEMU_FLAGS += -cpu cortex-a72
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
@@ -911,8 +919,7 @@ wasmtime: run
 
 ### builds and runs Theseus in QEMU
 run: $(iso)
-	qemu-system-aarch64 -machine virt -cpu cortex-a72 -device ramfb -smp 4 -m 1000 -net none -drive if=pflash,format=raw,file=aarch64/resources/qemu-efi.fd -drive format=raw,file=build/theseus-aarch64.efi
-	# qemu-system-x86_64 $(QEMU_FLAGS)
+	qemu-system-aarch64 $(QEMU_FLAGS)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
