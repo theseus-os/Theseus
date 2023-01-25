@@ -1961,8 +1961,6 @@ name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
  "boot_info",
- "kernel_config",
- "log",
  "memory_structs",
  "pte_flags",
  "x86_64",

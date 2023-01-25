@@ -7,8 +7,6 @@
 #![feature(ptr_internals)]
 #![feature(unboxed_closures)]
 
-#[macro_use] extern crate log;
-extern crate kernel_config;
 extern crate memory_structs;
 extern crate pte_flags;
 extern crate x86_64;
@@ -17,7 +15,6 @@ extern crate boot_info;
 pub use boot_info::{BootInformation, ElfSection, Module};
 use pte_flags::PteFlags;
 
-use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
 use x86_64::{registers::control::Cr3, instructions::tlb};
 

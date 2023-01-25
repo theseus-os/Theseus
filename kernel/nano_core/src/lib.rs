@@ -85,7 +85,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
         let logger_ports = [serial_port_basic::take_serial_port(
             serial_port_basic::SerialPortAddress::COM1,
         )];
-        logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
+        logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
             .map_err(|_| "failed to initialise early logging")?;
         log::info!("initialised early logging");
         println_raw!("early_setup(): initialized logger.");
