@@ -17,7 +17,6 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate static_assertions;
 extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
@@ -351,8 +350,9 @@ pub struct DataChunk {
     pub len: u8,
     pub data: [u8; (64 - 1)],
 }
-const_assert_eq!(core::mem::size_of::<DataChunk>(), 64);
-const_assert_eq!(core::mem::align_of::<DataChunk>(), 64);
+const _: () = assert!(core::mem::size_of::<DataChunk>() == 64);
+const _: () = assert!(core::mem::align_of::<DataChunk>() == 64);
+
 impl DataChunk {
     /// Returns a new `DataChunk` filled with zeroes that can be written into.
     pub const fn empty() -> Self {

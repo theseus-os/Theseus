@@ -388,8 +388,8 @@ pub struct Task {
 }
 
 // Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
-const_assert!(AtomicCell::<OptionU8>::is_lock_free());
-const_assert!(AtomicCell::<RunState>::is_lock_free());
+const _: () = assert!(AtomicCell::<OptionU8>::is_lock_free());
+const _: () = assert!(AtomicCell::<RunState>::is_lock_free());
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
