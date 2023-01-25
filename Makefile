@@ -256,7 +256,7 @@ endif
 ## This includes the target file, host OS dependencies (proc macros, etc)., 
 ## and most importantly, a TOML file to describe these and other config variables.
 	@rm -rf $(THESEUS_BUILD_TOML)
-#	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
+	@cp -f $(CFG_DIR)/$(TARGET).json  $(DEPS_BUILD_DIR)/
 	@mkdir -p $(HOST_DEPS_DIR)
 	@cp -rf ./target/$(BUILD_MODE)/deps/*  $(HOST_DEPS_DIR)/
 	@echo -e 'target = "$(TARGET)"' >> $(THESEUS_BUILD_TOML)
