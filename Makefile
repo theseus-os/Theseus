@@ -899,12 +899,12 @@ QEMU_FLAGS += $(QEMU_EXTRA)
 
 ### Old Run: runs the most recent build without rebuilding
 orun:
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	qemu-system-$(ARCH) $(QEMU_FLAGS)
 
 
 ### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
-	qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-$(ARCH) $(QEMU_FLAGS) -S
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -919,12 +919,12 @@ wasmtime: run
 
 ### builds and runs Theseus in QEMU
 run: $(iso)
-	qemu-system-aarch64 $(QEMU_FLAGS)
+	qemu-system-$(ARCH) $(QEMU_FLAGS)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
-	qemu-system-x86_64 $(QEMU_FLAGS) -S
+	qemu-system-$(ARCH) $(QEMU_FLAGS) -S
 
 
 ### Runs a gdb instance on the host machine. 
