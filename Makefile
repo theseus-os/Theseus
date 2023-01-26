@@ -24,6 +24,8 @@ boot_spec ?= bios
 ifeq ($(boot_spec), bios)
 	ISO_EXTENSION := iso
 else ifeq ($(boot_spec), uefi)
+	## Disable the default "bios" feature of the nano_core
+	export override FEATURES+=--no-default-features
 	ISO_EXTENSION := efi
 else
 $(error Error:unsupported option "boot_spec=$(boot_spec)". Options are 'bios' or 'uefi')
