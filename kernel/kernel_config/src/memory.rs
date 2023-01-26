@@ -81,7 +81,7 @@ const TWO_GIGABYTES: usize = 0x8000_0000;
 /// i.e., the linear offset between physical memory and kernel memory.
 /// So, for example, the VGA buffer will be mapped from 0xb8000 to 0xFFFFFFFF800b8000 (on x86_64).
 /// This is -2GiB from the end of the 64-bit address space.
-pub const KERNEL_OFFSET: usize = canonicalize(MAX_VIRTUAL_ADDRESS - TWO_GIGABYTES);
+pub const KERNEL_OFFSET: usize = canonicalize(MAX_VIRTUAL_ADDRESS - (TWO_GIGABYTES - 1));
 
 /// The kernel text region is where we load kernel modules. 
 /// It starts at the 511th P4 entry and goes up until the KERNEL_OFFSET,
