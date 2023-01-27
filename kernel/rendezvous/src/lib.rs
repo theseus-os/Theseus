@@ -141,7 +141,7 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
 

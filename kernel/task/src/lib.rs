@@ -1532,15 +1532,15 @@ mod tls_current_task {
     /// 
     /// This is useful to avoid cloning a reference to the current task.
     /// 
-    /// Returns an `Err` if the current task cannot be obtained.
-    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, CurrentTaskNotFound>
     where
         F: FnOnce(&TaskRef) -> R
     {
         if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
             Ok(function(t))
         } else {
-            Err(())
+            Err(CurrentTaskNotFound)
         }
     }
 
@@ -1597,22 +1597,22 @@ mod tls_current_task {
     /// * On success, an [`ExitableTaskRef`] for the current task,
     ///   which can only be obtained once at the very start of the task's execution,
     ///   and only from this one function. 
-    /// * Returns an `Err` if the current task has already been set.
+    /// * Returns an `Err` if the current task has already been initialized.
     #[doc(hidden)]
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, ()> {
+    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(());
+                return Err(CurrentTaskAlreadyInited);
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(())?
+                .ok_or(CurrentTaskAlreadyInited)?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
@@ -1621,7 +1621,7 @@ mod tls_current_task {
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(()),
+            _ => Err(CurrentTaskAlreadyInited),
         }
     }
 
@@ -1643,4 +1643,11 @@ mod tls_current_task {
             Err(value)
         }
     }
+
+    /// An error type indicating that the current task was already initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskAlreadyInited;
+    /// An error type indicating that the current task has not yet been initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskNotFound;
 }

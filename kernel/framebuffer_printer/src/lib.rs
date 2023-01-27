@@ -116,8 +116,8 @@ pub fn print_string<P: Pixel>(
     );
 
     let update_area = Rectangle {
-        top_left: top_left,
-        bottom_right: bottom_right,
+        top_left,
+        bottom_right,
     };
 
     // fill the blank of the remaining part

@@ -24,8 +24,8 @@ use sdt::{Sdt, SDT_SIZE_IN_BYTES};
 use acpi_table::{AcpiSignature, AcpiTables};
 
 
-pub const RSDT_SIGNATURE: &'static [u8; 4] = b"RSDT";
-pub const XSDT_SIGNATURE: &'static [u8; 4] = b"XSDT";
+pub const RSDT_SIGNATURE: &[u8; 4] = b"RSDT";
+pub const XSDT_SIGNATURE: &[u8; 4] = b"XSDT";
 
 
 /// The handler for parsing RSDT/XSDT tables and adding them to the ACPI tables list.

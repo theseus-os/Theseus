@@ -37,7 +37,7 @@ pub use device_scope::*;
 // pub use satc::*;
 
 
-pub const DMAR_SIGNATURE: &'static [u8; 4] = b"DMAR";
+pub const DMAR_SIGNATURE: &[u8; 4] = b"DMAR";
 
 
 /// The handler for parsing the DMAR table and adding it to the ACPI tables list.
@@ -212,11 +212,11 @@ impl<'t> DmarEntry<'t> {
         }
         match entry.typ {
             0 => Ok(Self::Drhd(DmarDrhd::from_entry(mp, mp_offset, entry)?)),
-            1 => mp.as_type(mp_offset).map(|ent| Self::Rmrr(ent)),
-            2 => mp.as_type(mp_offset).map(|ent| Self::Atsr(ent)),
-            3 => mp.as_type(mp_offset).map(|ent| Self::Rhsa(ent)),
-            4 => mp.as_type(mp_offset).map(|ent| Self::Andd(ent)),
-            5 => mp.as_type(mp_offset).map(|ent| Self::Satc(ent)),
+            1 => mp.as_type(mp_offset).map(Self::Rmrr),
+            2 => mp.as_type(mp_offset).map(Self::Atsr),
+            3 => mp.as_type(mp_offset).map(Self::Rhsa),
+            4 => mp.as_type(mp_offset).map(Self::Andd),
+            5 => mp.as_type(mp_offset).map(Self::Satc),
             _ => Ok(Self::UnknownOrCorrupt(*entry)),
         }
     }

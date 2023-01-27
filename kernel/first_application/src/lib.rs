@@ -27,7 +27,7 @@ use mod_mgmt::CrateNamespace;
 use path::Path;
 
 /// See the crate-level docs and this crate's `Cargo.toml` for more.
-const FIRST_APPLICATION_CRATE_NAME: &'static str = "shell-";
+const FIRST_APPLICATION_CRATE_NAME: &str = "shell-";
 
 /// Starts the first applications that run in Theseus 
 /// by creating a new "default" application namespace

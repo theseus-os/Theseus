@@ -83,7 +83,7 @@ fn print_usage(opts: Options) -> isize {
     0
 }
 
-const BRIEF: &'static str = "Usage: ps [options]\n
+const BRIEF: &str = "Usage: ps [options]\n
     TYPE:      'I' if an idle task, 'A' if an application task, '-' otherwise.
     CPU:       the cpu core the task is currently running on.
     PIN:       the core the task is pinned on, if any.

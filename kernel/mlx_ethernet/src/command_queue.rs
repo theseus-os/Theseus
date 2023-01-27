@@ -578,7 +578,7 @@ pub struct CommandBuilder {
 impl CommandBuilder {
     pub fn new(opcode: CommandOpcode) -> CommandBuilder {
         CommandBuilder { 
-            opcode: opcode, 
+            opcode, 
             opmod: None, 
             allocated_pages: None, 
             user_access_region: None, 

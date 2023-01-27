@@ -90,5 +90,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: rm [PATH]
+const USAGE: &str = "Usage: rm [PATH]
 Remove files or directories from filesystem";

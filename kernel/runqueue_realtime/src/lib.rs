@@ -60,8 +60,8 @@ impl RealtimeTaskRef {
     /// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
     pub fn new(taskref: TaskRef, period: Option<usize>) -> RealtimeTaskRef {
         RealtimeTaskRef {
-            taskref: taskref,
-            period: period,
+            taskref,
+            period,
             context_switches: 0,
         }
     }

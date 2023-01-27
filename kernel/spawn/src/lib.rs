@@ -170,7 +170,7 @@ pub fn new_task_builder<F, A, R>(
 
 
 /// Every executable application must have an entry function named "main".
-const ENTRY_POINT_SECTION_NAME: &'static str = "main";
+const ENTRY_POINT_SECTION_NAME: &str = "main";
 
 /// The argument type accepted by the `main` function entry point into each application.
 type MainFuncArg = Vec<String>;

@@ -246,16 +246,16 @@ option-map-or-none
 print-literal
 print-with-newline
 println-empty-string
-# ptr-arg
-# ptr-eq
+ptr-arg
+ptr-eq
 question-mark
-# redundant-closure
-# redundant-field-names
+redundant-closure
+redundant-field-names
 redundant-pattern
-# redundant-pattern-matching
-# redundant-static-lifetimes
+redundant-pattern-matching
+redundant-static-lifetimes
 result-map-or-into-option
-# result-unit-err
+result-unit-err
 same-item-push
 self-named-constructors
 should-implement-trait

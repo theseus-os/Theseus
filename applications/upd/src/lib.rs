@@ -337,7 +337,7 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: upd [OPTIONS] COMMAND
+const USAGE: &str = "Usage: upd [OPTIONS] COMMAND
 Runs the given update-related COMMAND. Choices include:
     list
         Lists all available updates from the update server.

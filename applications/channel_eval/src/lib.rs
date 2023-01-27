@@ -112,5 +112,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: channel_eval [ARGS]
+const USAGE: &str = "Usage: channel_eval [ARGS]
 Used for evaluating live evolution between sync/async channels in Theseus.";

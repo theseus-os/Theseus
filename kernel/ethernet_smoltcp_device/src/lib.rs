@@ -145,7 +145,7 @@ impl<N: NetworkInterfaceCard + 'static> EthernetDevice<N> {
     /// Create a new instance of the `EthernetDevice`.
     pub fn new(nic_ref: &'static MutexIrqSafe<N>) -> EthernetDevice<N> {
         EthernetDevice {
-            nic_ref: nic_ref,
+            nic_ref,
         }
     }
 }

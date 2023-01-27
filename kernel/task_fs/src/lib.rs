@@ -157,9 +157,9 @@ impl TaskDir {
     pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDir, &'static str> {
         let task_id = taskref.id;
         let directory = TaskDir {
-            name: name,
+            name,
             path: Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, task_id)),
-            taskref: taskref,
+            taskref,
             parent: Arc::clone(parent),
         };
         Ok(directory)

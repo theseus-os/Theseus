@@ -810,7 +810,7 @@ impl Shell {
 
     /// Try to match the incomplete command against all applications in the same namespace.
     /// Returns a vector that contains all matching results.
-    fn find_app_name_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+    fn find_app_name_match(&mut self, incomplete_cmd: &str) -> Result<Vec<String>, &'static str> {
         let namespace_dir = task::with_current_task(|t|
             t.get_namespace().dir().clone()
         ).map_err(|_| "Failed to get namespace_dir while completing cmdline.")?;
@@ -836,7 +836,7 @@ impl Shell {
     /// current command is `foo/bar/examp`, it first tries to walk the directory of `foo/bar`. If
     /// it succeeds, it then lists all filenames under `foo/bar` and tries to match `examp` against
     /// those filenames. It returns a vector that contains all matching results.
-    fn find_file_path_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
+    fn find_file_path_match(&mut self, incomplete_cmd: &str) -> Result<Vec<String>, &'static str> {
 
         // Stores all possible matches.
         let mut match_list = Vec::new();
@@ -884,9 +884,9 @@ impl Shell {
         child_list.reverse();
         for child in child_list.iter() {
             if child.starts_with(incomplete_node) {
-                if let Some(_) = locked_working_dir.get_file(child) {
+                if locked_working_dir.get_file(child).is_some() {
                     match_list.push(child.clone());
-                } else if let Some (_) = locked_working_dir.get_dir(child) {
+                } else if locked_working_dir.get_dir(child).is_some() {
                     let mut cloned = child.clone();
                     cloned.push('/');
                     match_list.push(cloned);
@@ -1400,7 +1400,7 @@ impl Shell {
             if let Ok(job_num) = job_num.parse::<isize>() {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     for task_ref in &job.tasks {
-                        if let Err(_) = task_ref.unblock() {
+                        if task_ref.unblock().is_err() {
                             job.status = JobStatus::Stopped;
                         } else {
                             job.status = JobStatus::Running;
@@ -1434,7 +1434,7 @@ impl Shell {
                 if let Some(job) = self.jobs.get_mut(&job_num) {
                     self.fg_job_num = Some(job_num);
                     for task_ref in &job.tasks {
-                        if let Err(_) = task_ref.unblock() {
+                        if task_ref.unblock().is_err() {
                             job.status = JobStatus::Stopped;
                         } else {
                             job.status = JobStatus::Running;

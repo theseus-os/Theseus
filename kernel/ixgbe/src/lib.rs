@@ -366,7 +366,7 @@ impl IxgbeNic {
         let mut id = 0;
         while !tx_descs.is_empty() {
             let tx_queue = TxQueue {
-                id: id,
+                id,
                 regs: tx_mapped_registers.remove(0),
                 tx_descs: tx_descs.remove(0),
                 num_tx_descs: num_tx_descriptors,
@@ -810,7 +810,7 @@ impl IxgbeNic {
     fn rx_init(
         regs1: &mut IntelIxgbeRegisters1, 
         regs: &mut IntelIxgbeRegisters2, 
-        rx_regs: &mut Vec<IxgbeRxQueueRegisters>,
+        rx_regs: &mut [IxgbeRxQueueRegisters],
         num_rx_descs: u16,
         rx_buffer_size_kbytes: RxBufferSizeKiB
     ) -> Result<(
@@ -896,7 +896,7 @@ impl IxgbeNic {
     fn tx_init(
         regs: &mut IntelIxgbeRegisters2, 
         regs_mac: &mut IntelIxgbeMacRegisters, 
-        tx_regs: &mut Vec<IxgbeTxQueueRegisters>,
+        tx_regs: &mut [IxgbeTxQueueRegisters],
         num_tx_descs: u16
     ) -> Result<Vec<BorrowedSliceMappedPages<AdvancedTxDescriptor, Mutable>>, &'static str> {
         // disable transmission
@@ -1312,7 +1312,7 @@ pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'st
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
 pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer>) -> Result<(), &'static str> {
-    let packet = packet.map(Ok).unwrap_or_else(|| test_packets::create_dhcp_test_packet())?;
+    let packet = packet.map(Ok).unwrap_or_else(test_packets::create_dhcp_test_packet)?;
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();  
 

@@ -77,7 +77,7 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
 pub fn get_pci_buses() -> &'static Vec<PciBus> {
     static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
-    PCI_BUSES.call_once( || scan_pci() )
+    PCI_BUSES.call_once(scan_pci)
 }
 
 
@@ -147,7 +147,7 @@ fn scan_pci() -> Vec<PciBus> {
                 }
 
                 let device = PciDevice {
-                    vendor_id:        vendor_id,
+                    vendor_id,
                     device_id:        location.pci_read_16(PCI_DEVICE_ID), 
                     command:          location.pci_read_16(PCI_COMMAND),
                     status:           location.pci_read_16(PCI_STATUS),
@@ -169,7 +169,7 @@ fn scan_pci() -> Vec<PciBus> {
                                       ],
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
-                    location:              location,
+                    location,
                 };
 
                 device_list.push(device);

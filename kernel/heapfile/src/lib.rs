@@ -41,8 +41,8 @@ impl HeapFile {
     /// No additional allocation or reallocation is performed.
     pub fn from_vec(vec: Vec<u8>, name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         let hf = HeapFile {
-            name: name, 
-            vec: vec, 
+            name, 
+            vec, 
             parent: Arc::downgrade(parent), 
         };
         let file_ref = Arc::new(Mutex::new(hf)) as FileRef;

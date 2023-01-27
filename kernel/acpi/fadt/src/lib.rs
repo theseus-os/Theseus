@@ -14,7 +14,7 @@ use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 
 
-pub const FADT_SIGNATURE: &'static [u8; 4] = b"FACP";
+pub const FADT_SIGNATURE: &[u8; 4] = b"FACP";
 
 
 /// The handler for parsing the FADT table and adding it to the ACPI tables list.

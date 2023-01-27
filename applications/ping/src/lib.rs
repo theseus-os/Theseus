@@ -155,7 +155,7 @@ fn get_icmp_pong (waiting_queue: &mut HashMap<u16, u64>, times: &mut Vec<u64>, t
     repr: Icmpv4Repr, received: &mut u16, remote_addr: IpAddress, timestamp: u64)  {
     
     if let Icmpv4Repr::EchoReply { seq_no, data, ..} = repr {
-        if let Some(_) = waiting_queue.get(&seq_no) {
+        if waiting_queue.get(&seq_no).is_some() {
             let packet_timestamp_ms = NetworkEndian::read_i64(data) as u64;
             
             println!("{} bytes from {}: icmp_seq={}, time={}ms",
@@ -251,8 +251,8 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                 NetworkEndian::write_i64(&mut echo_payload, timestamp as i64);
 
                 let icmp_repr = Icmpv4Repr::EchoRequest{
-                        ident: ident,
-                        seq_no: seq_no,
+                        ident,
+                        seq_no,
                         data: &echo_payload
                     };
 
