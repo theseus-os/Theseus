@@ -179,6 +179,7 @@ fn log2(value: usize) -> usize {
 }
 
 /// The error returned from [`set_rtc_frequency()`] if an invalid rate is provided.
+#[derive(Debug)]
 pub struct InvalidRtcRate;
 
 /// Sets the period of the RTC interrupt to the given `rate`.

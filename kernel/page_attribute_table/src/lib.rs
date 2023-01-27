@@ -138,6 +138,7 @@ pub fn is_supported() -> bool {
 
 /// An empty error type indicating that the Page Attribute Table
 /// is not supported on this machine.
+#[derive(Debug)]
 pub struct PatNotSupported;
 
 /// Sets up and enables the Page Attribute Table (PAT) for this (the current) CPU.

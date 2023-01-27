@@ -66,9 +66,6 @@ static COM2_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
 static COM3_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
 static COM4_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
 
-pub enum SerialPortError {
-    AlreadyExists,
-}
 
 /// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`],
 /// if it has been initialized (see [`init_serial_port()`]).
@@ -242,6 +239,7 @@ impl SerialPort {
 
 /// An empty error type indicating that a data sender could not be set
 /// for a serial port because a sender had already been set for it.
+#[derive(Debug)]
 pub struct DataSenderAlreadyExists;
 
 
