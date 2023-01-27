@@ -955,7 +955,7 @@
             <span class="kw">let </span>top_left = window.get_position();
             <span class="kw">let </span>(width, height) = window.get_size();          
             Rectangle {
-                top_left: top_left,
+                top_left,
                 bottom_right: top_left + (width <span class="kw">as </span>isize, height <span class="kw">as </span>isize)
             }
         };
@@ -1000,8 +1000,8 @@
         };
         <span class="kw">let </span>area = <span class="prelude-val">Some</span>(
             Rectangle {
-                top_left: top_left,
-                bottom_right: bottom_right
+                top_left,
+                bottom_right
             }
         );
 
@@ -1614,7 +1614,7 @@
 <span class="doccomment">/// handle mouse event, push it to related window or anyone asked for it
 </span><span class="kw">fn </span>cursor_handle_application(mouse_event: MouseEvent) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>wm = WINDOW_MANAGER.get().ok_or(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>.lock();
-    <span class="kw">if let </span><span class="prelude-val">Err</span>(<span class="kw">_</span>) = wm.pass_mouse_event_to_window(mouse_event) {
+    <span class="kw">if </span>wm.pass_mouse_event_to_window(mouse_event).is_err() {
         <span class="comment">// the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area
         // 2. the window is the top one (active window or show_list windows) under the mouse pointer

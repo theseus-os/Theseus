@@ -3376,10 +3376,10 @@
 <span class="kw">mod </span>serde;
 
 <span class="doccomment">/// The name of the directory that contains all of the CrateNamespace files.
-</span><span class="kw">pub const </span>NAMESPACES_DIRECTORY_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;namespaces&quot;</span>;
+</span><span class="kw">pub const </span>NAMESPACES_DIRECTORY_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;namespaces&quot;</span>;
 
 <span class="doccomment">/// The name of the directory that contains all other &quot;extra_files&quot; contents.
-</span><span class="kw">pub const </span>EXTRA_FILES_DIRECTORY_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;extra_files&quot;</span>;
+</span><span class="kw">pub const </span>EXTRA_FILES_DIRECTORY_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;extra_files&quot;</span>;
 <span class="kw">const </span>EXTRA_FILES_DIRECTORY_DELIMITER: char = <span class="string">&#39;!&#39;</span>;
 
 <span class="doccomment">/// The initial `CrateNamespace` that all kernel crates are added to by default.
@@ -3968,7 +3968,7 @@
     /// [`CowArc::clone()`] function on the returned value.
     </span><span class="kw">pub fn </span>get_crate(<span class="kw-2">&amp;</span><span class="self">self</span>, crate_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;StrongCrateRef&gt; {
         <span class="self">self</span>.crate_tree.lock().get(crate_name.as_bytes())
-            .map(|c| CowArc::clone_shallow(c))
+            .map(CowArc::clone_shallow)
             .or_else(|| <span class="self">self</span>.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
 
@@ -4443,7 +4443,7 @@
 
         <span class="comment">// Create the new `LoadedCrate` now such that its sections can refer back to it.
         </span><span class="kw">let </span>new_crate = CowArc::new(LoadedCrate {
-            crate_name:              crate_name,
+            crate_name,
             debug_symbols_file:      Arc::downgrade(<span class="kw-2">&amp;</span>crate_object_file),
             object_file:             crate_object_file, 
             sections:                HashMap::new(),
@@ -4997,16 +4997,16 @@
         // keeping track of the offset into each of their MappedPages as we go.
         </span><span class="kw">let </span>(<span class="kw-2">mut </span>rodata_offset, <span class="kw-2">mut </span>data_offset) = (<span class="number">0 </span>, <span class="number">0</span>);
                     
-        <span class="kw">const </span>TEXT_PREFIX:             <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.text.&quot;</span>;
-        <span class="kw">const </span>UNLIKELY_PREFIX:         <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;unlikely.&quot;</span>; <span class="comment">// the full section prefix is &quot;.text.unlikely.&quot;
-        </span><span class="kw">const </span>RODATA_PREFIX:           <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.rodata.&quot;</span>;
-        <span class="kw">const </span>DATA_PREFIX:             <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.data.&quot;</span>;
-        <span class="kw">const </span>BSS_PREFIX:              <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.bss.&quot;</span>;
-        <span class="kw">const </span>TLS_DATA_PREFIX:         <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.tdata.&quot;</span>;
-        <span class="kw">const </span>TLS_BSS_PREFIX:          <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.tbss.&quot;</span>;
-        <span class="comment">// const RELRO_PREFIX:            &amp;&#39;static str = &quot;rel.ro.&quot;;
-        </span><span class="kw">const </span>GCC_EXCEPT_TABLE_PREFIX: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.gcc_except_table.&quot;</span>;
-        <span class="kw">const </span>EH_FRAME_NAME:           <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.eh_frame&quot;</span>;
+        <span class="kw">const </span>TEXT_PREFIX:             <span class="kw-2">&amp;</span>str = <span class="string">&quot;.text.&quot;</span>;
+        <span class="kw">const </span>UNLIKELY_PREFIX:         <span class="kw-2">&amp;</span>str = <span class="string">&quot;unlikely.&quot;</span>; <span class="comment">// the full section prefix is &quot;.text.unlikely.&quot;
+        </span><span class="kw">const </span>RODATA_PREFIX:           <span class="kw-2">&amp;</span>str = <span class="string">&quot;.rodata.&quot;</span>;
+        <span class="kw">const </span>DATA_PREFIX:             <span class="kw-2">&amp;</span>str = <span class="string">&quot;.data.&quot;</span>;
+        <span class="kw">const </span>BSS_PREFIX:              <span class="kw-2">&amp;</span>str = <span class="string">&quot;.bss.&quot;</span>;
+        <span class="kw">const </span>TLS_DATA_PREFIX:         <span class="kw-2">&amp;</span>str = <span class="string">&quot;.tdata.&quot;</span>;
+        <span class="kw">const </span>TLS_BSS_PREFIX:          <span class="kw-2">&amp;</span>str = <span class="string">&quot;.tbss.&quot;</span>;
+        <span class="comment">// const RELRO_PREFIX:            &amp;str = &quot;rel.ro.&quot;;
+        </span><span class="kw">const </span>GCC_EXCEPT_TABLE_PREFIX: <span class="kw-2">&amp;</span>str = <span class="string">&quot;.gcc_except_table.&quot;</span>;
+        <span class="kw">const </span>EH_FRAME_NAME:           <span class="kw-2">&amp;</span>str = <span class="string">&quot;.eh_frame&quot;</span>;
 
         <span class="doccomment">/// A convenient macro to obtain the rest of the symbol name after its prefix,
         /// i.e., the characters after &#39;.text&#39;, &#39;.rodata&#39;, &#39;.data&#39;, etc.
@@ -5512,7 +5512,7 @@
                         // At this point, there&#39;s no other way to search for the source section besides its name.
                         </span><span class="prelude-val">None </span>=&gt; {
                             <span class="kw">if let </span><span class="prelude-val">Ok</span>(source_sec_name) = source_sec_entry.get_name(elf_file) {
-                                <span class="kw">const </span>DATARELRO: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.data.rel.ro.&quot;</span>;
+                                <span class="kw">const </span>DATARELRO: <span class="kw-2">&amp;</span>str = <span class="string">&quot;.data.rel.ro.&quot;</span>;
                                 <span class="kw">let </span>source_sec_name = <span class="kw">if </span>source_sec_name.starts_with(DATARELRO) {
                                     source_sec_name.get(DATARELRO.len() ..).ok_or(<span class="string">&quot;Couldn&#39;t get name of .data.rel.ro. section&quot;</span>)<span class="question-mark">?
                                 </span>} <span class="kw">else </span>{

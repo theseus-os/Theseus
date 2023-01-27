@@ -1224,12 +1224,12 @@
 <span class="doccomment">/// The Theseus Makefile appends prefixes onto bootloader module names,
 /// which are separated by the &quot;#&quot; character. 
 /// For example, &quot;k#my_crate-hash.o&quot;.
-</span><span class="kw">pub const </span>MODULE_PREFIX_DELIMITER: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;#&quot;</span>;
+</span><span class="kw">pub const </span>MODULE_PREFIX_DELIMITER: <span class="kw-2">&amp;</span>str = <span class="string">&quot;#&quot;</span>;
 <span class="doccomment">/// A crate&#39;s name and its hash are separated by &quot;-&quot;, i.e., &quot;my_crate-hash&quot;.
-</span><span class="kw">pub const </span>CRATE_HASH_DELIMITER: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;-&quot;</span>;
+</span><span class="kw">pub const </span>CRATE_HASH_DELIMITER: <span class="kw-2">&amp;</span>str = <span class="string">&quot;-&quot;</span>;
 <span class="doccomment">/// A section&#39;s demangled name and its hash are separated by &quot;::h&quot;, 
 /// e.g., `&quot;my_crate::section_name::h&lt;hash&gt;&quot;`.
-</span><span class="kw">pub const </span>SECTION_HASH_DELIMITER: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;::h&quot;</span>;
+</span><span class="kw">pub const </span>SECTION_HASH_DELIMITER: <span class="kw-2">&amp;</span>str = <span class="string">&quot;::h&quot;</span>;
 
 
 <span class="doccomment">/// The type of a crate, based on its object file naming convention.

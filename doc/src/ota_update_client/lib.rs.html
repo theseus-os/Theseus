@@ -527,22 +527,22 @@
 <span class="doccomment">/// The path of the update builds file, located at the root of the build server.
 /// This file contains the list of all update build instances available,
 /// listed in reverse chronological order (most recent builds first).
-</span><span class="kw">const </span>UPDATE_BUILDS_PATH: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;/updates.txt&quot;</span>;
+</span><span class="kw">const </span>UPDATE_BUILDS_PATH: <span class="kw-2">&amp;</span>str = <span class="string">&quot;/updates.txt&quot;</span>;
 
 <span class="doccomment">/// The name (and relative path) of the listing file inside each update build directory,
 /// which contains the names of all crate object files that were built.  
-</span><span class="kw">const </span>LISTING_FILE_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;listing.txt&quot;</span>;
+</span><span class="kw">const </span>LISTING_FILE_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;listing.txt&quot;</span>;
 
 <span class="doccomment">/// The name (and relative path) of the diff file inside each update build directory,
 /// which contains the mapping of old crates to new crates, indicating how a swap should take place. 
-</span><span class="kw">pub const </span>DIFF_FILE_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;diff.txt&quot;</span>;
+</span><span class="kw">pub const </span>DIFF_FILE_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;diff.txt&quot;</span>;
 
 <span class="doccomment">/// The name of the directory containing the checksums of each crate object file
 /// inside of a given update build.
-</span><span class="kw">const </span>CHECKSUMS_DIR_NAME: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;checksums&quot;</span>;
+</span><span class="kw">const </span>CHECKSUMS_DIR_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;checksums&quot;</span>;
 
 <span class="doccomment">/// The file extension that is appended onto each crate object file&#39;s checksum file.
-</span><span class="kw">const </span>CHECKSUM_FILE_EXTENSION: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.sha512&quot;</span>;
+</span><span class="kw">const </span>CHECKSUM_FILE_EXTENSION: <span class="kw-2">&amp;</span>str = <span class="string">&quot;.sha512&quot;</span>;
 
 
 
@@ -624,7 +624,7 @@
 </span><span class="kw">pub fn </span>as_lines(bytes: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     str::from_utf8(bytes)
         .map_err(|_e| <span class="string">&quot;couldn&#39;t convert file into a UTF8 string&quot;</span>)
-        .map(|files| files.lines().map(|s| String::from(s)).collect())
+        .map(|files| files.lines().map(String::from).collect())
 }
 
 

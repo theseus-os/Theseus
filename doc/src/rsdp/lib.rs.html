@@ -117,7 +117,7 @@
 <span class="doccomment">/// The ending physical address of the region of memory where the RSDP table exists.
 </span><span class="kw">const </span>RSDP_SEARCH_END:   usize = <span class="number">0xF_FFFF</span>;
 <span class="doccomment">/// The byte-string signature of the RSDP in memory.
-</span><span class="kw">const </span>RSDP_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">8</span>] = <span class="string">b&quot;RSD PTR &quot;</span>;
+</span><span class="kw">const </span>RSDP_SIGNATURE: <span class="kw-2">&amp;</span>[u8; <span class="number">8</span>] = <span class="string">b&quot;RSD PTR &quot;</span>;
 <span class="doccomment">/// The RSDP signature is always aligned on a 16-byte boundary.
 </span><span class="kw">const </span>RSDP_SIGNATURE_ALIGNMENT: usize = <span class="number">16</span>;
 

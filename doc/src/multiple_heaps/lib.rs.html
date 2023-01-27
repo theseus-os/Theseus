@@ -1257,7 +1257,7 @@
             <span class="kw">let </span>ptr = mp.start_address().value();
             <span class="kw">let </span>link = Box::new(LargeAllocation {
                 link: RBTreeLink::new(),
-                mp: mp
+                mp
             });
             map.insert(link);
             <span class="comment">// trace!(&quot;Allocated a large object of {} bytes at address: {:#X}&quot;, layout.size(), ptr as usize);

@@ -675,7 +675,7 @@
             }
             kill_result
         });
-        <span class="kw">if let </span><span class="prelude-val">Err</span>(()) = res {
+        <span class="kw">if </span>res.is_err() {
             <span class="macro">println_both!</span>(<span class="string">&quot;BUG: kill_and_halt(): Couldn&#39;t get current task in order to kill it.&quot;</span>);
         }
     }

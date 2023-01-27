@@ -431,7 +431,7 @@
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>static_assertions::const_assert_eq;
 
-<span class="kw">pub const </span>MADT_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;APIC&quot;</span>;
+<span class="kw">pub const </span>MADT_SIGNATURE: <span class="kw-2">&amp;</span>[u8; <span class="number">4</span>] = <span class="string">b&quot;APIC&quot;</span>;
 
 <span class="doccomment">/// The handler for parsing the MADT table and adding it to the ACPI tables list.
 </span><span class="kw">pub fn </span>handle(
@@ -492,7 +492,7 @@
         <span class="kw">let </span>dynamic_part_length = total_length - size_of::&lt;MadtAcpiTable&gt;();
         <span class="kw">let </span>loc = acpi_tables.table_location(MADT_SIGNATURE)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(Madt {
-            table: table,
+            table,
             mapped_pages: acpi_tables.mapping(),
             dynamic_entries_starting_offset: loc.slice_offset_and_length<span class="question-mark">?</span>.<span class="number">0</span>,
             dynamic_entries_total_size: dynamic_part_length,
@@ -565,19 +565,19 @@
             </span><span class="kw">if </span>(<span class="self">self</span>.offset + entry_size) &lt;= <span class="self">self</span>.end_of_entries {
                 <span class="kw">let </span>entry: <span class="prelude-ty">Option</span>&lt;MadtEntry&gt; = <span class="kw">match </span>entry_type {
                     ENTRY_TYPE_LOCAL_APIC <span class="kw">if </span>entry_size == size_of::&lt;MadtLocalApic&gt;() =&gt; {
-                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::LocalApic(ent))
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(MadtEntry::LocalApic)
                     },
                     ENTRY_TYPE_IO_APIC <span class="kw">if </span>entry_size == size_of::&lt;MadtIoApic&gt;() =&gt; {
-                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::IoApic(ent))
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(MadtEntry::IoApic)
                     },
                     ENTRY_TYPE_INT_SRC_OVERRIDE <span class="kw">if </span>entry_size == size_of::&lt;MadtIntSrcOverride&gt;() =&gt; {
-                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::IntSrcOverride(ent))
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(MadtEntry::IntSrcOverride)
                     },
                     ENTRY_TYPE_NON_MASKABLE_INTERRUPT <span class="kw">if </span>entry_size == size_of::&lt;MadtNonMaskableInterrupt&gt;() =&gt; {
-                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::NonMaskableInterrupt(ent))
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(MadtEntry::NonMaskableInterrupt)
                     },
                     ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE <span class="kw">if </span>entry_size == size_of::&lt;MadtLocalApicAddressOverride&gt;() =&gt; {
-                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(|ent| MadtEntry::LocalApicAddressOverride(ent))
+                        <span class="self">self</span>.mapped_pages.as_type(<span class="self">self</span>.offset).ok().map(MadtEntry::LocalApicAddressOverride)
                     },
                     <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
                 };

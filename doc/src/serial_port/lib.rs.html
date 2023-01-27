@@ -385,6 +385,11 @@
 <a href="#385" id="385">385</a>
 <a href="#386" id="386">386</a>
 <a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.
 //!
 //! This crate builds on  [`serial_port_basic`], which provides the lower-level types
@@ -613,9 +618,9 @@
     </span><span class="kw">pub fn </span>set_data_sender(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         sender: Sender&lt;DataChunk&gt;
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), DataSenderAlreadyExists&gt; {
         <span class="kw">if </span><span class="self">self</span>.data_sender.is_some() { 
-            <span class="prelude-val">Err</span>(())
+            <span class="prelude-val">Err</span>(DataSenderAlreadyExists)
         } <span class="kw">else </span>{
             <span class="self">self</span>.data_sender = <span class="prelude-val">Some</span>(sender);
             <span class="prelude-val">Ok</span>(())
@@ -623,6 +628,11 @@
     }
 
 }
+
+<span class="doccomment">/// An empty error type indicating that a data sender could not be set
+/// for a serial port because a sender had already been set for it.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>DataSenderAlreadyExists;
 
 
 <span class="doccomment">/// A non-blocking implementation of [`core2::io::Read`] that will read bytes into the given `buf`

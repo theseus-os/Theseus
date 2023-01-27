@@ -446,8 +446,8 @@
         }
 
         <span class="prelude-val">Ok</span>(ConnectedTcpSocket {
-            iface: iface,
-            sockets: sockets,
+            iface,
+            sockets,
             handle: tcp_socket_handle,
         })
     }
@@ -540,7 +540,7 @@
                             <span class="prelude-val">Ok</span>(httparse::Status::Complete(total_header_len)) =&gt; {
                                 packet_header_length = <span class="prelude-val">Some</span>(total_header_len);
                                 response_status_code = response.code;
-                                response_reason = response.reason.map(|s| String::from(s));
+                                response_reason = response.reason.map(String::from);
 
                                 <span class="comment">// Here: we&#39;ve received all headers, but we may not be done receiving the full response.
                                 // If there is a &quot;Content-Length&quot; header present, we can use that to see if all the bytes are received.

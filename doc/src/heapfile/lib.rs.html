@@ -148,8 +148,8 @@
     /// No additional allocation or reallocation is performed.
     </span><span class="kw">pub fn </span>from_vec(vec: Vec&lt;u8&gt;, name: String, parent: <span class="kw-2">&amp;</span>DirRef) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>hf = HeapFile {
-            name: name, 
-            vec: vec, 
+            name, 
+            vec, 
             parent: Arc::downgrade(parent), 
         };
         <span class="kw">let </span>file_ref = Arc::new(Mutex::new(hf)) <span class="kw">as </span>FileRef;

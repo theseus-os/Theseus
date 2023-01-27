@@ -358,7 +358,7 @@
     /// next scheduling epoch
     </span><span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; PriorityTaskRef {
         PriorityTaskRef {
-            taskref: taskref,
+            taskref,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
             context_switches: <span class="number">0</span>,

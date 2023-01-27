@@ -1194,7 +1194,7 @@
             <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>current) = reserved_list[i].clone() {
                 <span class="kw">for </span>maybe_other <span class="kw">in </span><span class="kw-2">&amp;mut </span>reserved_list[i + <span class="number">1</span>..] {
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(other) = maybe_other {
-                        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw">_</span>) = current.overlap(other) {
+                        <span class="kw">if </span>current.overlap(other).is_some() {
                             current.frames = FrameRange::new(
                                 min(<span class="kw-2">*</span>current.start(), <span class="kw-2">*</span>other.start()),
                                 max(<span class="kw-2">*</span>current.end(), <span class="kw-2">*</span>other.end()),

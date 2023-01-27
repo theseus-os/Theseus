@@ -1644,6 +1644,13 @@
 <a href="#1644" id="1644">1644</a>
 <a href="#1645" id="1645">1645</a>
 <a href="#1646" id="1646">1646</a>
+<a href="#1647" id="1647">1647</a>
+<a href="#1648" id="1648">1648</a>
+<a href="#1649" id="1649">1649</a>
+<a href="#1650" id="1650">1650</a>
+<a href="#1651" id="1651">1651</a>
+<a href="#1652" id="1652">1652</a>
+<a href="#1653" id="1653">1653</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -3178,15 +3185,15 @@
     /// 
     /// This is useful to avoid cloning a reference to the current task.
     /// 
-    /// Returns an `Err` if the current task cannot be obtained.
-    </span><span class="kw">pub fn </span>with_current_task&lt;F, R&gt;(function: F) -&gt; <span class="prelude-ty">Result</span>&lt;R, ()&gt;
+    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    </span><span class="kw">pub fn </span>with_current_task&lt;F, R&gt;(function: F) -&gt; <span class="prelude-ty">Result</span>&lt;R, CurrentTaskNotFound&gt;
     <span class="kw">where
         </span>F: FnOnce(<span class="kw-2">&amp;</span>TaskRef) -&gt; R
     {
         <span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="kw-2">ref </span>t)) = CURRENT_TASK.try_borrow().as_deref() {
             <span class="prelude-val">Ok</span>(function(t))
         } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(())
+            <span class="prelude-val">Err</span>(CurrentTaskNotFound)
         }
     }
 
@@ -3243,22 +3250,22 @@
     /// * On success, an [`ExitableTaskRef`] for the current task,
     ///   which can only be obtained once at the very start of the task&#39;s execution,
     ///   and only from this one function. 
-    /// * Returns an `Err` if the current task has already been set.
+    /// * Returns an `Err` if the current task has already been initialized.
     </span><span class="attr">#[doc(hidden)]
     </span><span class="kw">pub fn </span>init_current_task(
         current_task_id: usize,
         current_task: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;ExitableTaskRef, ()&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ExitableTaskRef, CurrentTaskAlreadyInited&gt; {
         <span class="kw">let </span>taskref = <span class="kw">if let </span><span class="prelude-val">Some</span>(t) = current_task {
             <span class="kw">if </span>t.id != current_task_id {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(());
+                <span class="kw">return </span><span class="prelude-val">Err</span>(CurrentTaskAlreadyInited);
             }
             t
         } <span class="kw">else </span>{
             TASKLIST.lock()
                 .get(<span class="kw-2">&amp;</span>current_task_id)
                 .cloned()
-                .ok_or(())<span class="question-mark">?
+                .ok_or(CurrentTaskAlreadyInited)<span class="question-mark">?
         </span>};
 
         <span class="kw">match </span>CURRENT_TASK.try_borrow_mut() {
@@ -3267,7 +3274,7 @@
                 CURRENT_TASK_ID.set(current_task_id);
                 <span class="prelude-val">Ok</span>(ExitableTaskRef { task: taskref })
             }
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(()),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(CurrentTaskAlreadyInited),
         }
     }
 
@@ -3289,6 +3296,13 @@
             <span class="prelude-val">Err</span>(value)
         }
     }
+
+    <span class="doccomment">/// An error type indicating that the current task was already initialized.
+    </span><span class="attr">#[derive(Debug)]
+    </span><span class="kw">pub struct </span>CurrentTaskAlreadyInited;
+    <span class="doccomment">/// An error type indicating that the current task has not yet been initialized.
+    </span><span class="attr">#[derive(Debug)]
+    </span><span class="kw">pub struct </span>CurrentTaskNotFound;
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="task" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

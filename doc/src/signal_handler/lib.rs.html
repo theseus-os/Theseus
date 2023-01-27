@@ -167,6 +167,11 @@
 <a href="#167" id="167">167</a>
 <a href="#168" id="168">168</a>
 <a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Signal handlers for CPU exceptions/errors, like POSIX-style signals, but safer and Rusty.
 //! 
 //! Instead of directly supporting POSIX signals like SIGSEGV, SIGILL, etc,
@@ -209,20 +214,25 @@
 /// 
 /// # Return
 /// * `Ok` if the signal handler was registered successfully.
-/// * `Err` if the signal handler was registered successfully.
+/// * `Err` if a handler was already registered for the given `signal`.
 </span><span class="kw">pub fn </span>register_signal_handler(
     signal: Signal,
     handler: Box&lt;<span class="kw">dyn </span>SignalHandler&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), AlreadyRegistered&gt; {
     SIGNAL_HANDLERS.with(|sig_handlers| {
         <span class="kw">let </span>handler_slot = <span class="kw-2">&amp;</span>sig_handlers[signal <span class="kw">as </span>usize];
         <span class="kw">if </span>handler_slot.borrow().is_some() {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(AlreadyRegistered);
         }
         <span class="kw-2">*</span>handler_slot.borrow_mut() = <span class="prelude-val">Some</span>(handler);
         <span class="prelude-val">Ok</span>(())
     })
 }
+
+<span class="doccomment">/// An error type indicating a handler had already been registered
+/// for a particular [`Signal`].
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>AlreadyRegistered;
 
 
 <span class="doccomment">/// Take the [`SignalHandler`] registered for the given `signal` for the current task.

@@ -344,7 +344,7 @@
 // pub use satc::*;
 
 
-</span><span class="kw">pub const </span>DMAR_SIGNATURE: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8; <span class="number">4</span>] = <span class="string">b&quot;DMAR&quot;</span>;
+</span><span class="kw">pub const </span>DMAR_SIGNATURE: <span class="kw-2">&amp;</span>[u8; <span class="number">4</span>] = <span class="string">b&quot;DMAR&quot;</span>;
 
 
 <span class="doccomment">/// The handler for parsing the DMAR table and adding it to the ACPI tables list.
@@ -519,11 +519,11 @@
         }
         <span class="kw">match </span>entry.typ {
             <span class="number">0 </span>=&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::Drhd(DmarDrhd::from_entry(mp, mp_offset, entry)<span class="question-mark">?</span>)),
-            <span class="number">1 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Rmrr(ent)),
-            <span class="number">2 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Atsr(ent)),
-            <span class="number">3 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Rhsa(ent)),
-            <span class="number">4 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Andd(ent)),
-            <span class="number">5 </span>=&gt; mp.as_type(mp_offset).map(|ent| <span class="self">Self</span>::Satc(ent)),
+            <span class="number">1 </span>=&gt; mp.as_type(mp_offset).map(<span class="self">Self</span>::Rmrr),
+            <span class="number">2 </span>=&gt; mp.as_type(mp_offset).map(<span class="self">Self</span>::Atsr),
+            <span class="number">3 </span>=&gt; mp.as_type(mp_offset).map(<span class="self">Self</span>::Rhsa),
+            <span class="number">4 </span>=&gt; mp.as_type(mp_offset).map(<span class="self">Self</span>::Andd),
+            <span class="number">5 </span>=&gt; mp.as_type(mp_offset).map(<span class="self">Self</span>::Satc),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">Ok</span>(<span class="self">Self</span>::UnknownOrCorrupt(<span class="kw-2">*</span>entry)),
         }
     }

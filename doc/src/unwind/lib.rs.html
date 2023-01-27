@@ -946,8 +946,6 @@
 <a href="#946" id="946">946</a>
 <a href="#947" id="947">947</a>
 <a href="#948" id="948">948</a>
-<a href="#949" id="949">949</a>
-<a href="#950" id="950">950</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.
 //! 
 //! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
@@ -1246,16 +1244,14 @@
                     //
                     // Thus, we want to skip the error code so we can get the instruction pointer, 
                     // i.e., the value at CFA + 0x08.
-                    </span><span class="kw">if </span>reg_num == X86_64::RA {
-                        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw">_</span>) = prev_cfa_adjustment {
-                            <span class="kw">let </span>size_of_error_code = core::mem::size_of::&lt;usize&gt;();
-                            <span class="comment">// TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
-                            </span><span class="kw">let </span>value = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(cfa.wrapping_add(size_of_error_code <span class="kw">as </span>u64) <span class="kw">as </span><span class="kw-2">*const </span>u64) };
-                            <span class="attr">#[cfg(not(downtime_eval))]
-                            </span><span class="macro">trace!</span>(<span class="string">&quot;Using return address from CPU-pushed exception stack frame. Value: {:#X}&quot;</span>, value);
-                            newregs[X86_64::RA] = <span class="prelude-val">Some</span>(value);
-                            <span class="kw">continue</span>;
-                        }
+                    </span><span class="kw">if </span>reg_num == X86_64::RA &amp;&amp; prev_cfa_adjustment.is_some() {
+                        <span class="kw">let </span>size_of_error_code = core::mem::size_of::&lt;usize&gt;();
+                        <span class="comment">// TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
+                        </span><span class="kw">let </span>value = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(cfa.wrapping_add(size_of_error_code <span class="kw">as </span>u64) <span class="kw">as </span><span class="kw-2">*const </span>u64) };
+                        <span class="attr">#[cfg(not(downtime_eval))]
+                        </span><span class="macro">trace!</span>(<span class="string">&quot;Using return address from CPU-pushed exception stack frame. Value: {:#X}&quot;</span>, value);
+                        newregs[X86_64::RA] = <span class="prelude-val">Some</span>(value);
+                        <span class="kw">continue</span>;
                     }
 
                     newregs[reg_num] = <span class="kw">match </span><span class="kw-2">*</span>rule {

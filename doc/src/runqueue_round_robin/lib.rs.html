@@ -303,7 +303,7 @@
     <span class="doccomment">/// Creates a new `RoundRobinTaskRef` that wraps the given `TaskRef`.
     </span><span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; RoundRobinTaskRef {
         RoundRobinTaskRef {
-            taskref: taskref,
+            taskref,
             context_switches: <span class="number">0</span>,
         }
     }

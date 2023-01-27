@@ -222,7 +222,7 @@
 </span><span class="kw">pub fn </span>get_containing_crate_name_ranges(demangled_full_symbol: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;Range&lt;usize&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>ranges: Vec&lt;Range&lt;usize&gt;&gt; = Vec::new();
     <span class="comment">// the separator between independent parts of the symbol string
-    </span><span class="kw">const </span>AS: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot; as &quot;</span>;
+    </span><span class="kw">const </span>AS: <span class="kw-2">&amp;</span>str = <span class="string">&quot; as &quot;</span>;
     <span class="comment">// the index at which we are starting our search for a crate name
     </span><span class="kw">let </span><span class="kw-2">mut </span>beginning_bound = <span class="prelude-val">Some</span>(<span class="number">0</span>);
 

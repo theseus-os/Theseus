@@ -2501,7 +2501,7 @@
 <span class="kw">impl </span>CommandBuilder {
     <span class="kw">pub fn </span>new(opcode: CommandOpcode) -&gt; CommandBuilder {
         CommandBuilder { 
-            opcode: opcode, 
+            opcode, 
             opmod: <span class="prelude-val">None</span>, 
             allocated_pages: <span class="prelude-val">None</span>, 
             user_access_region: <span class="prelude-val">None</span>, 

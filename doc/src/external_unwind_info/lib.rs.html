@@ -121,6 +121,14 @@
 <a href="#121" id="121">121</a>
 <a href="#122" id="122">122</a>
 <a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Registers and stores unwind information from external components.
 //! 
 //! Typically, Theseus maintains metadata about all crates loaded and linked into system.
@@ -203,26 +211,26 @@
         unwind_info:  uw_start   .. uw_end,
     };
 
-    uw.try_insert(text_start, uw_info).map_err(|_e| {
-        <span class="macro">error!</span>(<span class="string">&quot;External unwind info for {text_start:#X} was already registered&quot;</span>);
-        ExternalUnwindInfoError::AlreadyExists
-    })<span class="question-mark">?</span>;
-
-    <span class="prelude-val">Ok</span>(())
+    uw.try_insert(text_start, uw_info)
+        .map(|<span class="kw">_</span>| ())
+        .map_err(|_e| {
+            <span class="macro">error!</span>(<span class="string">&quot;External unwind info for {text_start:#X} was already registered&quot;</span>);
+            ExternalUnwindInfoError::AlreadyRegistered
+        })
 }
 
 
 <span class="doccomment">/// Remove a previously-registered section of external unwinding information.
 /// 
-/// Returns an error if no unwinding information was registered
-/// for the given `text_section_base_address`.
+/// Returns [`ExternalUnwindInfoError::NotRegistered`] if no unwinding information
+/// was registered for the given `text_section_base_address`.
 </span><span class="kw">pub unsafe fn </span>deregister_unwind_info(
     text_section_base_address: <span class="kw-2">*mut </span>u8
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), ExternalUnwindInfoError&gt; {
     EXTERNAL_UNWIND_INFO.lock()
         .remove(<span class="kw-2">&amp;</span>VirtualAddress::new_canonical(text_section_base_address <span class="kw">as </span>usize))
         .map(|<span class="kw">_</span>| ())
-        .ok_or(())
+        .ok_or(ExternalUnwindInfoError::NotRegistered)
 }
 
 
@@ -241,8 +249,16 @@
     <span class="prelude-val">None
 </span>}
 
-<span class="kw">pub enum </span>ExternalUnwindInfoError {
-    AlreadyExists,
+<span class="doccomment">/// Errors that may occur when [registering] or [deregistering]
+/// external unwind info.
+///
+/// [registering]: register_unwind_info
+/// [deregistering] deregister_unwind_info
+</span><span class="kw">pub enum </span>ExternalUnwindInfoError {
+    <span class="doccomment">/// The unwinding info trying to be registered was already registered.
+    </span>AlreadyRegistered,
+    <span class="doccomment">/// The unwinding info trying to be deregistered was not yet registered.
+    </span>NotRegistered,
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="external_unwind_info" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

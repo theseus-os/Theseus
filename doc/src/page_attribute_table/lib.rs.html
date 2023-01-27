@@ -160,6 +160,9 @@
 <a href="#160" id="160">160</a>
 <a href="#161" id="161">161</a>
 <a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the Page Attribute Table (PAT) feature on x86.
 //!
 //! PAT replaces the legacy Memory Type Range Registers (MTRRs) on x86.
@@ -221,7 +224,6 @@
     </span>MemoryCachingType::UncachedMinus  <span class="kw">as </span>u8, <span class="comment">// 6: 0b110
     </span>MemoryCachingType::UncachedMinus  <span class="kw">as </span>u8, <span class="comment">// 7: 0b111
 </span>]);
-
 
 <span class="doccomment">/// The Page Attribute Table (PAT) consists of 8 &quot;slots&quot; that can each
 /// be configured with a different [MemoryCachingType].
@@ -299,6 +301,10 @@
     )
 }
 
+<span class="doccomment">/// An empty error type indicating that the Page Attribute Table
+/// is not supported on this machine.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>PatNotSupported;
 
 <span class="doccomment">/// Sets up and enables the Page Attribute Table (PAT) for this (the current) CPU.
 ///
@@ -306,10 +312,10 @@
 /// specified by [`FIXED_PAT`];
 /// thus, it must be done separately on each and every CPU.
 ///
-/// Returns `Ok(())` upon success, and `Err(())` if PAT is unsupported.
-</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+/// Returns `Ok(())` upon success, and `Err(PatNotSupported::Unsupported)` if PAT is unsupported.
+</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), PatNotSupported&gt; {
     <span class="kw">if </span>!is_supported() {
-        <span class="kw">return </span><span class="prelude-val">Err</span>(());
+        <span class="kw">return </span><span class="prelude-val">Err</span>(PatNotSupported);
     }
 
     <span class="comment">// TODO: do we need to disable the cache using CR0 first? or flush it?

@@ -883,7 +883,7 @@
         ObjectPage8k {
             data: [<span class="number">0</span>; ObjectPage8k::SIZE -ObjectPage8k::METADATA_SIZE],
             mp: <span class="prelude-val">Some</span>(mp),
-            heap_id: heap_id,
+            heap_id,
             next: Rawlink::default(),
             prev: Rawlink::default(),
             bitfield: [AtomicU64::new(<span class="number">0</span>), AtomicU64::new(<span class="number">0</span>), AtomicU64::new(<span class="number">0</span>), AtomicU64::new(<span class="number">0</span>), AtomicU64::new(<span class="number">0</span>), AtomicU64::new(<span class="number">0</span>), AtomicU64::new(<span class="number">0</span>),AtomicU64::new(<span class="number">0</span>) ],
@@ -1118,7 +1118,7 @@
     <span class="doccomment">/// Does the list contain `s`?
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>contains(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">*const </span>T) -&gt; bool {
         <span class="kw">for </span>slab_page <span class="kw">in </span><span class="self">self</span>.iter_mut() {
-            <span class="kw">if </span>slab_page <span class="kw">as </span><span class="kw-2">*const </span>T == s <span class="kw">as </span><span class="kw-2">*const </span>T {
+            <span class="kw">if </span>core::ptr::eq(slab_page, s) {
                 <span class="kw">return </span><span class="bool-val">true</span>;
             }
         }

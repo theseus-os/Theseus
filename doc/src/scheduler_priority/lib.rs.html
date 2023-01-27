@@ -353,7 +353,7 @@
         .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
         .map(|taskref| NextTaskResult {
             taskref : <span class="prelude-val">Some</span>(taskref),
-            idle_task  : idle_task, 
+            idle_task, 
         })
 }
 

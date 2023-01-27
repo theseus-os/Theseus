@@ -243,13 +243,13 @@
         bg_color: Color,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;TextDisplay, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="prelude-val">Ok</span>(TextDisplay {
-            width: width,
-            height: height,
+            width,
+            height,
             next_col: <span class="number">0</span>,
             next_line: <span class="number">0</span>,
             text: String::new(),
-            fg_color: fg_color,
-            bg_color: bg_color,
+            fg_color,
+            bg_color,
             cache: String::new(),
         })
     }

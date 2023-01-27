@@ -589,7 +589,7 @@
 /// If the PCI bus hasn&#39;t been initialized, this initializes the PCI bus &amp; scans it to enumerates devices.
 </span><span class="kw">pub fn </span>get_pci_buses() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Vec&lt;PciBus&gt; {
     <span class="kw">static </span>PCI_BUSES: Once&lt;Vec&lt;PciBus&gt;&gt; = Once::new();
-    PCI_BUSES.call_once( || scan_pci() )
+    PCI_BUSES.call_once(scan_pci)
 }
 
 
@@ -659,7 +659,7 @@
                 }
 
                 <span class="kw">let </span>device = PciDevice {
-                    vendor_id:        vendor_id,
+                    vendor_id,
                     device_id:        location.pci_read_16(PCI_DEVICE_ID), 
                     command:          location.pci_read_16(PCI_COMMAND),
                     status:           location.pci_read_16(PCI_STATUS),
@@ -681,7 +681,7 @@
                                       ],
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
-                    location:              location,
+                    location,
                 };
 
                 device_list.push(device);

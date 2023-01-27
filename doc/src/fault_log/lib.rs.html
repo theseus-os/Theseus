@@ -382,7 +382,7 @@
         fault_type: FaultType
     ) -&gt; FaultEntry {
         FaultEntry {
-            fault_type: fault_type,
+            fault_type,
             error_code: <span class="prelude-val">None</span>,
             core: <span class="prelude-val">None</span>,
             running_task: <span class="prelude-val">None</span>,
@@ -462,7 +462,7 @@
 ) {
     <span class="kw">let </span><span class="kw-2">mut </span>fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
-    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    fe.address_accessed  = address_accessed.map(VirtualAddress::new_canonical);
     update_and_insert_fault_entry_internal(fe, <span class="prelude-val">Some</span>(instruction_pointer));
 }
 

@@ -1223,7 +1223,7 @@
         </span><span class="kw">else if </span>tag == gimli::DW_TAG_variable {
             <span class="kw">let </span>variable_name = entry.attr(gimli::DW_AT_name)<span class="question-mark">?</span>.expect(<span class="string">&quot;Variable DIE didn&#39;t have a DW_AT_name attribute&quot;</span>)
                 .string_value(context.debug_str_sec).expect(<span class="string">&quot;Couldn&#39;t convert variable name attribute value to string&quot;</span>)
-                .to_string().map(|s| String::from(s))<span class="question-mark">?</span>;
+                .to_string().map(String::from)<span class="question-mark">?</span>;
             <span class="macro">debug!</span>(<span class="string">&quot;{:indent$}Variable {:?}&quot;</span>, <span class="string">&quot;&quot;</span>, variable_name, indent = ((depth) * <span class="number">2</span>));
 
             <span class="comment">// Find the latest location that this variable existed (before the instruction pointer, of course).
@@ -1376,12 +1376,12 @@
         </span><span class="kw">if </span>tag == gimli::constants::DW_TAG_subprogram {
             <span class="kw">let </span>_subprogram_name = entry.attr(gimli::DW_AT_name)<span class="question-mark">?</span>.and_then(|attr| 
                 attr.string_value(context.debug_str_sec).and_then(|s| 
-                    s.to_string().ok().map(|s| String::from(s))
+                    s.to_string().ok().map(String::from)
                 )
             );
             <span class="kw">let </span>_subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)<span class="question-mark">?</span>.and_then(|attr| 
                 attr.string_value(context.debug_str_sec).and_then(|s| 
-                    s.to_string().ok().map(|s| String::from(s))
+                    s.to_string().ok().map(String::from)
                 )
             );
 
@@ -1722,7 +1722,7 @@
                     // At this point, there&#39;s no other way to search for the source section besides its name.
                     </span><span class="prelude-val">None </span>=&gt; {
                         <span class="kw">if let </span><span class="prelude-val">Ok</span>(source_sec_name) = source_sec_entry.get_name(<span class="kw-2">&amp;</span>elf_file) {
-                            <span class="kw">const </span>DATARELRO: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str = <span class="string">&quot;.data.rel.ro.&quot;</span>;
+                            <span class="kw">const </span>DATARELRO: <span class="kw-2">&amp;</span>str = <span class="string">&quot;.data.rel.ro.&quot;</span>;
                             <span class="kw">let </span>source_sec_name = <span class="kw">if </span>source_sec_name.starts_with(DATARELRO) {
                                 source_sec_name.get(DATARELRO.len() ..).ok_or(<span class="string">&quot;Couldn&#39;t get name of .data.rel.ro. section&quot;</span>)<span class="question-mark">?
                             </span>} <span class="kw">else </span>{
@@ -1780,7 +1780,7 @@
         <span class="kw">let </span>create_debug_section_slice = |debug_sec: DebugSection| -&gt; <span class="prelude-ty">Result</span>&lt;DebugSectionSlice, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
             ArcRef::new(Arc::clone(<span class="kw-2">&amp;</span>debug_sections_mp))
                 .try_map(|mp| mp.as_slice::&lt;u8&gt;(debug_sec.mp_offset, debug_sec.size))
-                .map(|arcref| DebugSectionSlice(arcref))
+                .map(DebugSectionSlice)
         };
 
         <span class="kw">let </span>loaded = DebugSections {

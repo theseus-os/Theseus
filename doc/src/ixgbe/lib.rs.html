@@ -1703,7 +1703,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>id = <span class="number">0</span>;
         <span class="kw">while </span>!tx_descs.is_empty() {
             <span class="kw">let </span>tx_queue = TxQueue {
-                id: id,
+                id,
                 regs: tx_mapped_registers.remove(<span class="number">0</span>),
                 tx_descs: tx_descs.remove(<span class="number">0</span>),
                 num_tx_descs: num_tx_descriptors,
@@ -2147,7 +2147,7 @@
     </span><span class="kw">fn </span>rx_init(
         regs1: <span class="kw-2">&amp;mut </span>IntelIxgbeRegisters1, 
         regs: <span class="kw-2">&amp;mut </span>IntelIxgbeRegisters2, 
-        rx_regs: <span class="kw-2">&amp;mut </span>Vec&lt;IxgbeRxQueueRegisters&gt;,
+        rx_regs: <span class="kw-2">&amp;mut </span>[IxgbeRxQueueRegisters],
         num_rx_descs: u16,
         rx_buffer_size_kbytes: RxBufferSizeKiB
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(
@@ -2233,7 +2233,7 @@
     </span><span class="kw">fn </span>tx_init(
         regs: <span class="kw-2">&amp;mut </span>IntelIxgbeRegisters2, 
         regs_mac: <span class="kw-2">&amp;mut </span>IntelIxgbeMacRegisters, 
-        tx_regs: <span class="kw-2">&amp;mut </span>Vec&lt;IxgbeTxQueueRegisters&gt;,
+        tx_regs: <span class="kw-2">&amp;mut </span>[IxgbeTxQueueRegisters],
         num_tx_descs: u16
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;BorrowedSliceMappedPages&lt;AdvancedTxDescriptor, Mutable&gt;&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="comment">// disable transmission
@@ -2649,7 +2649,7 @@
 
 <span class="doccomment">/// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
 </span><span class="kw">pub fn </span>tx_send_mq(qid: usize, nic_id: PciLocation, packet: <span class="prelude-ty">Option</span>&lt;TransmitBuffer&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>packet = packet.map(<span class="prelude-val">Ok</span>).unwrap_or_else(|| test_packets::create_dhcp_test_packet())<span class="question-mark">?</span>;
+    <span class="kw">let </span>packet = packet.map(<span class="prelude-val">Ok</span>).unwrap_or_else(test_packets::create_dhcp_test_packet)<span class="question-mark">?</span>;
     <span class="kw">let </span>nic_ref = get_ixgbe_nic(nic_id)<span class="question-mark">?</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>nic = nic_ref.lock();  
 

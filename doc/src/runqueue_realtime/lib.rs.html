@@ -363,8 +363,8 @@
     <span class="doccomment">/// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
     </span><span class="kw">pub fn </span>new(taskref: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; RealtimeTaskRef {
         RealtimeTaskRef {
-            taskref: taskref,
-            period: period,
+            taskref,
+            period,
             context_switches: <span class="number">0</span>,
         }
     }

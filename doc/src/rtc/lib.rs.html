@@ -210,6 +210,7 @@
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
 <a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(unboxed_closures)]
 #![feature(abi_x86_interrupt)]
@@ -345,15 +346,10 @@
     }
 }
 
-<span class="kw">pub fn </span>get_rtc_ticks() -&gt; <span class="prelude-ty">Result</span>&lt;usize, ()&gt; {
-     <span class="kw">if let </span><span class="prelude-val">Some</span>(ticks) = RTC_TICKS.get() {
-         <span class="prelude-val">Ok</span>(ticks.load(Ordering::Acquire))
-     }
-     <span class="kw">else </span>{
-        <span class="prelude-val">Err</span>(())
-     }
+<span class="doccomment">/// Returns the current RTC tick count.
+</span><span class="kw">pub fn </span>get_rtc_ticks() -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+    RTC_TICKS.get().map(|ticks| ticks.load(Ordering::Acquire))
 }
-
 
 <span class="doccomment">/// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
 </span><span class="kw">pub fn </span>enable_rtc_interrupt()
@@ -395,12 +391,18 @@
     result
 }
 
-<span class="doccomment">/// sets the period of the RTC interrupt. 
-/// `rate` must be a power of 2, between 2 and 8192 inclusive.
-</span><span class="kw">pub fn </span>set_rtc_frequency(rate: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
+<span class="doccomment">/// The error returned from [`set_rtc_frequency()`] if an invalid rate is provided.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub struct </span>InvalidRtcRate;
+
+<span class="doccomment">/// Sets the period of the RTC interrupt to the given `rate`.
+///
+/// `rate` must be a power of 2, between 2 and 8192 inclusive;
+/// otherwise, an error is returned.
+</span><span class="kw">pub fn </span>set_rtc_frequency(rate: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), InvalidRtcRate&gt; {
     <span class="kw">if </span>!(rate.is_power_of_two() &amp;&amp; (<span class="number">2</span>..=<span class="number">8192</span>).contains(<span class="kw-2">&amp;</span>rate)) {
         <span class="macro">error!</span>(<span class="string">&quot;RTC rate was {}, must be a power of two between [2: 8192] inclusive!&quot;</span>, rate);
-        <span class="kw">return </span><span class="prelude-val">Err</span>(());
+        <span class="kw">return </span><span class="prelude-val">Err</span>(InvalidRtcRate);
     }
 
     <span class="comment">// formula is &quot;rate = 32768 Hz &gt;&gt; (dividor - 1)&quot;
