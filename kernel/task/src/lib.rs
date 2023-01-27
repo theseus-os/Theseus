@@ -77,26 +77,6 @@ use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
 
-/// Error types for Task module. If you add another field, then also add corresponding change to the Display impl for TaskError. 
-#[derive(Debug)]
-pub enum TaskError {
-    NotFound,
-    AlreadyExists,
-}
-
-impl fmt::Display for TaskError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TaskError::AlreadyExists => {
-                write!(f, "AlreadyExists")
-            },
-            TaskError::NotFound => {
-                write!(f, "NotFound")
-            },
-        }
-    }
-}
-
 /// The function signature of the callback that will be invoked
 /// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
 pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
@@ -1538,7 +1518,6 @@ pub use tls_current_task::*;
 /// A private module to ensure the below TLS variables aren't modified directly.
 mod tls_current_task {
     use core::cell::{Cell, RefCell};
-    use TaskError;
     use super::{TASKLIST, TaskRef, ExitableTaskRef};
 
     /// The TLS area that holds the current task's ID.
@@ -1553,15 +1532,15 @@ mod tls_current_task {
     /// 
     /// This is useful to avoid cloning a reference to the current task.
     /// 
-    /// Returns an `Err` if the current task cannot be obtained.
-    pub fn with_current_task<F, R>(function: F) -> Result<R, TaskError>
+    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, CurrentTaskNotFound>
     where
         F: FnOnce(&TaskRef) -> R
     {
         if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
             Ok(function(t))
         } else {
-            Err(TaskError::NotFound)
+            Err(CurrentTaskNotFound)
         }
     }
 
@@ -1618,22 +1597,22 @@ mod tls_current_task {
     /// * On success, an [`ExitableTaskRef`] for the current task,
     ///   which can only be obtained once at the very start of the task's execution,
     ///   and only from this one function. 
-    /// * Returns an `Err` if the current task has already been set.
+    /// * Returns an `Err` if the current task has already been initialized.
     #[doc(hidden)]
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, TaskError> {
+    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(TaskError::AlreadyExists);
+                return Err(CurrentTaskAlreadyInited);
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(TaskError::AlreadyExists)?
+                .ok_or(CurrentTaskAlreadyInited)?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
@@ -1642,7 +1621,7 @@ mod tls_current_task {
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(TaskError::AlreadyExists),
+            _ => Err(CurrentTaskAlreadyInited),
         }
     }
 
@@ -1664,4 +1643,11 @@ mod tls_current_task {
             Err(value)
         }
     }
+
+    /// An error type indicating that the current task was already initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskAlreadyInited;
+    /// An error type indicating that the current task has not yet been initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskNotFound;
 }

@@ -223,8 +223,8 @@ fn kill_and_halt(
             }
             kill_result
         });
-        if let Err(task_error) = res {
-            println_both!("BUG: kill_and_halt(): Couldn't get current task in order to kill it. {}", task_error);
+        if res.is_err() {
+            println_both!("BUG: kill_and_halt(): Couldn't get current task in order to kill it.");
         }
     }
 

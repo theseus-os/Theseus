@@ -1662,7 +1662,7 @@ impl CrateNamespace {
         const BSS_PREFIX:              &str = ".bss.";
         const TLS_DATA_PREFIX:         &str = ".tdata.";
         const TLS_BSS_PREFIX:          &str = ".tbss.";
-        // const RELRO_PREFIX:            &'static str = "rel.ro.";
+        // const RELRO_PREFIX:            &str = "rel.ro.";
         const GCC_EXCEPT_TABLE_PREFIX: &str = ".gcc_except_table.";
         const EH_FRAME_NAME:           &str = ".eh_frame";
 
