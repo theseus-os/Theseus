@@ -393,7 +393,7 @@ bootloader-none:
 # On UEFI, no bootloader is required
 
 $(efi_firmware):
-	wget https://raw.githubusercontent.com/retrage/edk2-nightly/master/bin/$(OVMF_FILE) -O $(efi_firmware)
+	wget https://raw.githubusercontent.com/retrage/edk2-nightly/$(OVMF_COMMIT)/bin/$(OVMF_FILE) -O $(efi_firmware)
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
@@ -798,7 +798,7 @@ endif
 ifeq ($(boot_spec), bios)
 	QEMU_FLAGS += -cdrom $(iso) -boot d
 else ifeq ($(boot_spec), uefi)
-	QEMU_FLAGS += -bios $(efi_firmware)
+	QEMU_FLAGS += -pflash $(efi_firmware)
 	QEMU_FLAGS += -drive format=raw,file=$(iso)
 endif
 ## Don't reboot or shutdown upon failure or a triple reset

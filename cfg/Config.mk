@@ -8,9 +8,14 @@ SHELL := /bin/bash
 ## specifies which architecture we're building for
 ARCH ?= x86_64
 
+## name of EFI firmware file to fetch from
+## https://github.com/retrage/edk2-nightly/
+## and commit hash
 ifeq ($(ARCH),x86_64)
-	OVMF_FILE ?= RELEASEX64_QEMU.fd
+	OVMF_COMMIT = 7ca5064968a54d84831e5785aea87cb9c71d4a3d
+	OVMF_FILE ?= RELEASEX64_OVMF.fd
 else
+	OVMF_COMMIT = 7706abd0defa07249946e5908a5dc84c4c5a7d44
 	OVMF_FILE ?= RELEASEAARCH64_QEMU_EFI.fd
 endif
 
