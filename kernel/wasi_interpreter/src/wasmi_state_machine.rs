@@ -72,8 +72,7 @@ impl ProcessStateMachine {
                     Ok(i) => i,
                     Err(_) => {
                         return Err(wasmi::Error::Instantiation(format!(
-                            "Couldn't resolve `{}`:`{}`",
-                            module_name, field_name
+                            "Couldn't resolve `{module_name}`:`{field_name}`"
                         )))
                     }
                 };

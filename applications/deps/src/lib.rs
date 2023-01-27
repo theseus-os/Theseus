@@ -154,14 +154,14 @@ fn section_containing_address(addr: &str) -> Result<(), String> {
     
     let virt_addr = VirtualAddress::new(
         usize::from_str_radix(addr, 16)
-            .map_err(|_| format!("Error: address {:?} is not a valid hexademical usize value", addr))?
-    ).ok_or_else(|| format!("Error: address {:?} is not a valid VirtualAddress", addr))?;
+            .map_err(|_| format!("Error: address {addr:?} is not a valid hexademical usize value"))?
+    ).ok_or_else(|| format!("Error: address {addr:?} is not a valid VirtualAddress"))?;
 
     if let Some((sec, offset)) = get_my_current_namespace().get_section_containing_address(virt_addr, false) {
         println!("Found {:>#018X} in {} + {:#X}, typ: {:?}", virt_addr, sec.name, offset, sec.typ);
         Ok(())
     } else {
-        Err(format!("Couldn't find section containing address {:>#018X}", virt_addr))
+        Err(format!("Couldn't find section containing address {virt_addr:>#018X}"))
     }
 }
 
@@ -392,7 +392,7 @@ fn find_crate(crate_name: &str) -> Result<(StrRef, StrongCrateRef), String> {
     let namespace = get_my_current_namespace();
     let mut matching_crates = CrateNamespace::get_crates_starting_with(&namespace, crate_name);
     match matching_crates.len() {
-        0 => Err(format!("couldn't find crate matching {:?}", crate_name)),
+        0 => Err(format!("couldn't find crate matching {crate_name:?}")),
         1 => {
             let mc = matching_crates.swap_remove(0);
             Ok((mc.0, mc.1)) 
@@ -424,13 +424,13 @@ fn find_section(section_name: &str) -> Result<StrongSectionRef, String> {
 
     // If it wasn't a global section in the symbol map, then we need to find its containing crate
     // and search that crate's symbols manually.
-    let containing_crate_ref = get_containing_crate_name(section_name).get(0)
-        .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{}-", cname)))
+    let containing_crate_ref = get_containing_crate_name(section_name).first()
+        .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{cname}-")))
         .or_else(|| get_containing_crate_name(section_name).get(1)
-            .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{}-", cname)))
+            .and_then(|cname| CrateNamespace::get_crate_starting_with(&namespace, &format!("{cname}-")))
         )
         .map(|(_cname, crate_ref, _ns)| crate_ref)
-        .ok_or_else(|| format!("Couldn't find section {} in symbol map, and couldn't get its containing crate", section_name))?;
+        .ok_or_else(|| format!("Couldn't find section {section_name} in symbol map, and couldn't get its containing crate"))?;
 
     let mut matching_sections: Vec<StrongSectionRef> = containing_crate_ref.lock_as_ref().sections.values()
         .filter_map(|sec| {

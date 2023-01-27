@@ -139,7 +139,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb \
-		doc docs view-doc view-docs book view-book
+		clippy doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -562,11 +562,16 @@ preserve_old_modules:
 	cargo clean
 
 
-
-
 ###################################################################################################
-############################ Targets for building documentation ###################################
+########################### Targets for clippy and documentation ##################################
 ###################################################################################################
+
+## Runs clippy on a full build of Theseus, with all crates included.
+## Note that this does not cover all combinations of features or cfg values.
+clippy : export override FEATURES += --features theseus_features/everything
+clippy:
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='' cargo clippy $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+
 
 ## The output directory for source-level documentation.
 RUSTDOC_OUT      := $(BUILD_DIR)/doc

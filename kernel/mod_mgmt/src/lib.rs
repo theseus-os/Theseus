@@ -2698,7 +2698,7 @@ impl CrateNamespace {
     ) -> Option<WeakSectionRef> {
         // Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
         for potential_crate_name in get_containing_crate_name(demangled_full_symbol) {
-            let potential_crate_name = format!("{}-", potential_crate_name);
+            let potential_crate_name = format!("{potential_crate_name}-");
  
             // Try to find and load the missing crate object file from this namespace's directory or its recursive namespace's directory,
             // (or from the backup namespace's directory set).
@@ -2849,7 +2849,7 @@ impl CrateNamespace {
 
         if let Some(ref r_ns) = self.recursive_namespace {
             let syms_recursive = r_ns.dump_symbol_map_recursive();
-            syms = format!("{}\n{}", syms, syms_recursive);
+            syms = format!("{syms}\n{syms_recursive}");
         }
 
         syms
@@ -2997,7 +2997,7 @@ fn dump_dependent_crates(krate: &LoadedCrate, prefix: String) {
 		let strong_crate_ref = weak_crate_ref.upgrade().unwrap();
         let strong_crate = strong_crate_ref.lock_as_ref();
 		debug!("{}{}", prefix, strong_crate.crate_name);
-		dump_dependent_crates(&strong_crate, format!("{}  ", prefix));
+		dump_dependent_crates(&strong_crate, format!("{prefix}  "));
 	}
 }
 
@@ -3009,7 +3009,7 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 		debug!("{}Section \"{}\": sections dependent on me (weak dependents):", prefix, sec.name);
 		for weak_dep in &sec_inner.sections_dependent_on_me {
 			if let Some(wds) = weak_dep.section.upgrade() {
-				let prefix = format!("{}  ", prefix); // add two spaces of indentation to the prefix
+				let prefix = format!("{prefix}  "); // add two spaces of indentation to the prefix
 				dump_weak_dependents(&wds, prefix);
 			}
 			else {

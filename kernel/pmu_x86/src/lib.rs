@@ -46,11 +46,11 @@
 //! 
 //! if let Ok(my_sampler) = sampler {
 //! 
-//! 	// wait some time here
-//! 	
-//! 	if let Ok(mut samples) = pmu_x86::retrieve_samples() {
-//! 		pmu_x86::print_samples(&mut samples);
-//! 	}
+//!     // wait some time here
+//!     
+//!     if let Ok(mut samples) = pmu_x86::retrieve_samples() {
+//!         pmu_x86::print_samples(&mut samples);
+//!     }
 //! }
 //! ```
 //!

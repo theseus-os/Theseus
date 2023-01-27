@@ -1,5 +1,7 @@
- //! Defines the Command Queue that is used to pass commands from the driver to the NIC.
- //! Also defines multiple enums that specify the valid input and output values for different commands.
+//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
+//! Also defines multiple enums that specify the valid input and output values for different commands.
+
+#![allow(clippy::upper_case_acronyms)]
 
 use alloc::{vec::Vec, boxed::Box};
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
@@ -1197,7 +1199,7 @@ impl CommandQueue {
 
         let dest_list_mb: usize = libm::ceilf((0x30 + 0x300) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         const DEST_LIST_MB_OFFSET: usize = 304; 
-        let dest_list = DestinationEntry::init(DestinationType::TIR, tirn);
+        let dest_list = DestinationEntry::init(DestinationType::Tir, tirn);
         input_mailbox_buffers[dest_list_mb - 1].write_to_mailbox(dest_list, DEST_LIST_MB_OFFSET)?;
 
         Ok(())

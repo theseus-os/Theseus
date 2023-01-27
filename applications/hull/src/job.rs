@@ -46,29 +46,24 @@ impl Job {
 
     pub(crate) fn update(&mut self) -> Option<isize> {
         for mut part in self.parts.iter_mut() {
-            if part.state == State::Running {
-                match part.task.runstate() {
-                    RunState::Exited => {
-                        let exit_value = match part.task.join().unwrap() {
-                            ExitValue::Completed(status) => {
-                                match status.downcast_ref::<isize>() {
-                                    Some(num) => *num,
-                                    // FIXME: Document/decide on a number for when app doesn't
-                                    // return isize.
-                                    None => 210,
-                                }
-                            }
-                            ExitValue::Killed(reason) => match reason {
-                                // FIXME: Document/decide on a number. This is used by bash.
-                                KillReason::Requested => 130,
-                                KillReason::Panic(_) => 1,
-                                KillReason::Exception(num) => num.into(),
-                            },
-                        };
-                        part.state = State::Complete(exit_value);
+            if part.state == State::Running && part.task.runstate() == RunState::Exited {
+                let exit_value = match part.task.join().unwrap() {
+                    ExitValue::Completed(status) => {
+                        match status.downcast_ref::<isize>() {
+                            Some(num) => *num,
+                            // FIXME: Document/decide on a number for when app doesn't
+                            // return isize.
+                            None => 210,
+                        }
                     }
-                    _ => {}
-                }
+                    ExitValue::Killed(reason) => match reason {
+                        // FIXME: Document/decide on a number. This is used by bash.
+                        KillReason::Requested => 130,
+                        KillReason::Panic(_) => 1,
+                        KillReason::Exception(num) => num.into(),
+                    },
+                };
+                part.state = State::Complete(exit_value);
             }
         }
         self.exit_value()

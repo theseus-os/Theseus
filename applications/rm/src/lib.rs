@@ -59,7 +59,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
         let path = Path::new(path_string.clone());
         let node_to_delete = match path.get(&working_dir) {
             Some(node) => node,
-            _ => return Err(format!("Couldn't find path {}", path)),
+            _ => return Err(format!("Couldn't find path {path}")),
         };
 
         // Only remove directories if the user specified "-r". 

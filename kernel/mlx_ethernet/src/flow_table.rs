@@ -215,8 +215,8 @@ impl FlowContext {
 pub(crate) enum DestinationType {
     VPort           = 0x0,
     FlowTable       = 0x1,
-    TIR             = 0x2,
-    QP              = 0x3,
+    Tir             = 0x2,
+    Qp              = 0x3,
     FlowSampler     = 0x6,
 }
 
@@ -226,7 +226,7 @@ pub(crate) enum DestinationType {
 #[derive(FromBytes, Default)]
 #[repr(C, packed)]
 pub(crate) struct DestinationEntry {
-    /// currently we only set the type to [DestinationType::TIR] and the id is the TIR number for the RQ
+    /// currently we only set the type to [DestinationType::Tir] and the id is the TIR number for the RQ
     pub(crate) id_and_type:                Volatile<U32<BigEndian>>,
     pub(crate) packet_reformat:                 Volatile<U32<BigEndian>>,
 

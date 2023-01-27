@@ -74,7 +74,7 @@ impl PriorityTaskRef {
     }
 
     /// Increment the number of times the task is picked
-    pub fn increment_context_switches(&mut self) -> (){
+    pub fn increment_context_switches(&mut self){
         self.context_switches = self.context_switches.saturating_add(1);
     }
 }

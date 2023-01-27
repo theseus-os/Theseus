@@ -75,7 +75,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
         let path = Path::new(path);
         let dir = match path.get(&curr_dir) {
             Some(FileOrDir::Dir(dir)) => dir,
-            _ => return Err(format!("Error: could not find specified namespace crate directory: {}.", path)),
+            _ => return Err(format!("Error: could not find specified namespace crate directory: {path}.")),
         };
         Some(NamespaceDir::new(dir))
     } else {
@@ -179,7 +179,7 @@ fn do_swap(
                 into_new_crate_file,
                 new_namespace,
                 reexport
-            ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
+            ).map_err(|invalid_req| format!("{invalid_req:#?}"))?;
             requests.push(swap_req);
         }
         requests

@@ -14,7 +14,7 @@ fn main() {
     if let Ok(rustflags) = std::env::var("CARGO_ENCODED_RUSTFLAGS") {
         if rustflags.contains("force-frame-pointers=yes")
         || rustflags.contains("force-frame-pointers=true") {
-            println!("{}frame pointers", CFG_PREFIX);
+            println!("{CFG_PREFIX}frame pointers");
         }
     } else {
         eprintln!("Note: CARGO_ENCODED_RUSTFLAGS env var did not exist.");

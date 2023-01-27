@@ -126,7 +126,7 @@ pub fn download_listing(
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
-    download_string_file(iface, remote_endpoint, &format!("/{}/{}", update_build, LISTING_FILE_NAME))
+    download_string_file(iface, remote_endpoint, &format!("/{update_build}/{LISTING_FILE_NAME}"))
 }
 
 
@@ -138,7 +138,7 @@ pub fn download_diff(
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
-    download_string_file(iface, remote_endpoint, &format!("/{}/{}", update_build, DIFF_FILE_NAME))
+    download_string_file(iface, remote_endpoint, &format!("/{update_build}/{DIFF_FILE_NAME}"))
 }
 
 
@@ -249,8 +249,8 @@ pub fn download_crates(
 
     let mut paths_to_download: Vec<String> = Vec::new();
     for file_name in crates.iter() {
-        let path = format!("/{}/{}", update_build, file_name);
-        let path_sha = format!("/{}/{}/{}{}", update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION);
+        let path = format!("/{update_build}/{file_name}");
+        let path_sha = format!("/{update_build}/{CHECKSUMS_DIR_NAME}/{file_name}{CHECKSUM_FILE_EXTENSION}");
         paths_to_download.push(path);
         paths_to_download.push(path_sha);
     }
@@ -461,5 +461,5 @@ fn download_files<S: AsRef<str>>(
 /// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
 fn verify_hash(content: &[u8], hash: &str) -> bool {
     let result = Sha3_512::digest(content);
-    hash == format!("{:x}", result)
+    hash == format!("{result:x}")
 }

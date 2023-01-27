@@ -1000,7 +1000,7 @@ pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
-        .name(format!("idle_task_core_{}", apic_id))
+        .name(format!("idle_task_core_{apic_id}"))
         .idle(apic_id)
         .spawn_restartable(None)
 }

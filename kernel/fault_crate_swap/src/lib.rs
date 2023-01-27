@@ -87,7 +87,7 @@ pub fn do_self_swap(
             into_new_crate_file,
             new_namespace,
             false, //reexport
-        ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
+        ).map_err(|invalid_req| format!("{invalid_req:#?}"))?;
 
         #[cfg(not(downtime_eval))]
         debug!("swap call {:?}", swap_req);
@@ -352,11 +352,8 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
         ); 
         // debug!("Bottom and top of stack of task {} are {:X} {:X}", taskref.name, bottom, top);
 
-        match constant_offset_fix(&swap_ranges, bottom, top) {
-            Err (e) => {
-                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name, e.to_string()};
-            },
-            _ => {},
+        if let Err (e) = constant_offset_fix(&swap_ranges, bottom, top) {
+            debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name, e.to_string()};
         }
     }
 

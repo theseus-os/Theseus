@@ -202,7 +202,7 @@ impl Shell {
             .map(|t| t.get_namespace().dir().clone())
             .expect("couldn't get namespace dir");
 
-        let crate_name = format!("{}-", cmd);
+        let crate_name = format!("{cmd}-");
         let mut matching_files = namespace_dir
             .get_files_starting_with(&crate_name)
             .into_iter();

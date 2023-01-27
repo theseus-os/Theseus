@@ -917,8 +917,8 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
 
         // TODO: handle scroll action
 
-        let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
-            // TODO: after `to_scrollback_point()` supports backwards navigation from a point below the current screen point,
+        let new_scrollback_position = self.screen_cursor.position.as_scrollback_point(
+            // TODO: after `as_scrollback_point()` supports backwards navigation from a point below the current screen point,
             //       then we can use the original positions. But since it doesn't support that, we must use the current scroll position.
             //
             // (orig_scrollback_position, orig_screen_position),
@@ -956,7 +956,7 @@ impl<'term, Backend: TerminalBackend> TerminalActionHandler<'term, Backend> {
 
         // TODO: handle scroll action
 
-        let new_scrollback_position = self.screen_cursor.position.to_scrollback_point(
+        let new_scrollback_position = self.screen_cursor.position.as_scrollback_point(
             (orig_scrollback_position, orig_screen_position),
             self.scrollback_buffer,
             screen_size
@@ -1268,8 +1268,8 @@ impl Character {
 impl fmt::Display for Character {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self {
-            Character::Single(c) => write!(f, "{}", c),
-            Character::Multi(s)  => write!(f, "{}", s),
+            Character::Single(c) => write!(f, "{c}"),
+            Character::Multi(s)  => write!(f, "{s}"),
         }
     }
 }
@@ -1411,7 +1411,7 @@ impl ScreenPoint {
     /// this returns a `ScrollbackBufferPoint` based on the assumption that 
     /// sufficient empty lines (that occupy one row each) and empty units (that occupy one column each) 
     /// would be inserted into the scrollback buffer.
-    fn to_scrollback_point(
+    fn as_scrollback_point(
         &self,
         known_prior_point: (ScrollbackBufferPoint, ScreenPoint), 
         scrollback_buffer: &ScrollbackBuffer,
@@ -1435,13 +1435,13 @@ impl ScreenPoint {
             let additional_rows = end_row.saturating_sub(start_row);
             row += additional_rows;
 
-            trace!("to_scrollback_point(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}", 
+            trace!("as_scrollback_point(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}", 
                 line_idx, start_row, last_unit, end_row, additional_rows, row, target_row
             );
 
             if row >= target_row {
                 let row_overshoot = row - target_row;
-                trace!("to_scrollback_point(): row_overshoot: {:?}", row_overshoot);
+                trace!("as_scrollback_point(): row_overshoot: {:?}", row_overshoot);
                 unit_idx = UnitIndex(last_unit.saturating_sub(row_overshoot * screen_width));
                 break;
             }
@@ -1452,14 +1452,14 @@ impl ScreenPoint {
             unit_idx = UnitIndex(0);
         }
 
-        trace!("to_scrollback_point(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}", row, target_row, line_idx);
+        trace!("as_scrollback_point(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}", row, target_row, line_idx);
 
         if row < target_row {
             // The scrollback buffer didn't have enough lines.
             // Currently, `line_idx` is right after the last line.
             // We calculate the target line index as: `line_idx - 1 + (target_row - row)`.
             let target_line = line_idx.0.saturating_add(target_row).saturating_sub(row).saturating_sub(1);
-            trace!("to_scrollback_point(): target_line: {:?}", target_line);
+            trace!("as_scrollback_point(): target_line: {:?}", target_line);
             ScrollbackBufferPoint {
                 line_idx: LineIndex(target_line),
                 unit_idx: UnitIndex(target_column),
@@ -1735,7 +1735,7 @@ enum ScreenToScrollbackConversion {
     ClosestPrevious(ScrollbackBufferPoint, ScreenPoint),
 }
 impl ScreenToScrollbackConversion {
-    fn to_option(self) -> Option<ScrollbackBufferPoint> {
+    fn into_option(self) -> Option<ScrollbackBufferPoint> {
         match self {
             Self::ExactMatch(sbp) => Some(sbp),
             _ => None,

@@ -81,11 +81,11 @@ fn emit_built_rs_file() {
     for (k, v) in std::env::vars() {
         if k.starts_with("CARGO_CFG_") && !NON_CUSTOM_CFGS.contains(&k.as_str()) {
             let key = k[CARGO_CFG_PREFIX.len()..].to_lowercase();
-            custom_cfgs = format!("{}(\"{}\", \"{}\"), ", custom_cfgs, key, v);
+            custom_cfgs = format!("{custom_cfgs}(\"{key}\", \"{v}\"), ");
 
             custom_cfgs_str.push_str(&key);
             if !v.is_empty() {
-                write!(custom_cfgs_str, "=\"{}\"", v).expect("Failed to write to custom_cfgs_str");
+                write!(custom_cfgs_str, "=\"{v}\"").expect("Failed to write to custom_cfgs_str");
             }
             custom_cfgs_str.push(' ');
 
@@ -96,16 +96,13 @@ fn emit_built_rs_file() {
     // Append all of the custom cfg values to the built.rs file as an array.
     write!(
         &mut built_file,
-        "#[allow(dead_code)]\npub const CUSTOM_CFG: [(&str, &str); {}] = [{}];\n",
-        num_custom_cfgs,
-        custom_cfgs,
+        "#[allow(dead_code)]\npub const CUSTOM_CFG: [(&str, &str); {num_custom_cfgs}] = [{custom_cfgs}];\n",
     ).unwrap();
 
     // Append all of the custom cfg values to the built.rs file as a single string.
     write!(
         &mut built_file,
-        "#[allow(dead_code)]\npub const CUSTOM_CFG_STR: &str = r#\"{}\"#;\n",
-        custom_cfgs_str,
+        "#[allow(dead_code)]\npub const CUSTOM_CFG_STR: &str = r#\"{custom_cfgs_str}\"#;\n",
     ).unwrap();
 }
 
@@ -119,7 +116,7 @@ fn compile_asm() {
     .join(BOOT_SPECIFICATION);
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
         if e.kind() != std::io::ErrorKind::AlreadyExists {
-            panic!("failed to create compiled_asm directory: {}", e);
+            panic!("failed to create compiled_asm directory: {e}");
         }
     }
     let include_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
@@ -156,7 +153,7 @@ fn compile_asm() {
         let file = file.expect("failed to read asm file");
         if file
             .file_type()
-            .unwrap_or_else(|_| panic!("couldn't get file type of {:?}", file))
+            .unwrap_or_else(|_| panic!("couldn't get file type of {file:?}"))
             .is_file()
         {
             assert_eq!(file.path().extension(), Some("asm".as_ref()),

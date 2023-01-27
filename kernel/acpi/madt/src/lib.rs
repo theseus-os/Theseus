@@ -324,7 +324,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
             ) {
                 // this `lapic_entry` wasn't for the BSP, try the next one.
                 Err(LapicInitError::NotBSP) => continue,
-                Err(other_err) => return Err(Box::leak(format!("{:?}", other_err).into_boxed_str())),
+                Err(other_err) => return Err(Box::leak(format!("{other_err:?}").into_boxed_str())),
                 Ok(()) => { } // fall through
             };
 
@@ -398,15 +398,12 @@ fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Res
 /// If no entry exists, it returns the default NMI entry value: `(lint = 1, flags = 0)`.
 pub fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
     for madt_entry in madt_iter {
-        match madt_entry {
-            MadtEntry::NonMaskableInterrupt(nmi) => {
-                // NMI entries are based on the "processor" id, not the "apic_id"
-                // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
-                if nmi.processor == processor || nmi.processor == 0xFF  {
-                    return (nmi.lint, nmi.flags);
-                }
+        if let MadtEntry::NonMaskableInterrupt(nmi) = madt_entry {
+            // NMI entries are based on the "processor" id, not the "apic_id"
+            // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
+            if nmi.processor == processor || nmi.processor == 0xFF  {
+                return (nmi.lint, nmi.flags);
             }
-            _ => {  }
         }
     }
 
