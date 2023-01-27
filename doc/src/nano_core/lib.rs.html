@@ -278,10 +278,10 @@
 <span class="kw">use </span>vga_buffer::println_raw;
 
 <span class="macro">cfg_if::cfg_if! </span>{
-    <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)] </span>{
-        <span class="kw">mod </span>bios;
-    } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)] </span>{
+    <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)] </span>{
         <span class="kw">mod </span>uefi;
+    } <span class="kw">else if </span><span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)] </span>{
+        <span class="kw">mod </span>bios;
     } <span class="kw">else </span>{
         <span class="macro">compile_error!</span>(<span class="string">&quot;either the &#39;bios&#39; or &#39;uefi&#39; feature must be enabled&quot;</span>);
     }
