@@ -168,7 +168,7 @@ There is an ongoing effort to port Theseus to ARMv8 (AKA aarch64).
 To build and run for ARMv8:
 ```sh
 # obtain the toolchain for aarch64 using your package manager (mine is pacman):
-sudo pacman -S aarch64-linux-gnu-gcc
+sudo pacman -S aarch64-linux-gnu-gcc qemu-system-aarch64
 # build & run:
 make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run
 ```
