@@ -36,18 +36,14 @@ pub use frame_allocator::{
 };
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86_64::{
-    get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4,
-};
+use memory_x86_64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr };
 
 #[cfg(target_arch = "aarch64")]
-use memory_aarch64::{
-    tlb_flush_virt_addr, tlb_flush_all, get_p4,
-};
+use memory_aarch64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds };
 
 pub use pte_flags::*;
 
-use boot_info::{BootInformation, MemoryRegion, find_section_memory_bounds};
+use boot_info::{BootInformation, MemoryRegion};
 use log::debug;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
