@@ -21,14 +21,17 @@ const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
 // https://doc.rust-lang.org/cargo/reference/features.html#mutually-exclusive-features
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "bios")] {
-        const BOOT_SPECIFICATION: &str = "bios";
-    } else if #[cfg(feature = "uefi")] {
+    if #[cfg(feature = "uefi")] {
         const BOOT_SPECIFICATION: &str = "uefi";
+    } else if #[cfg(feature = "bios")] {
+        const BOOT_SPECIFICATION: &str = "bios";
     } else {
         compile_error!("either the bios or uefi features must be enabled");
     }
 }
+
+#[cfg(all(feature = "uefi", feature = "bios"))]
+compile_error!("Both the 'bios' and 'uefi' features cannot be jointly enabled");
 
 /// The set of built-in environment variables defined by cargo.
 static NON_CUSTOM_CFGS: [&str; 12] = [
