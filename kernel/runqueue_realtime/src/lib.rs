@@ -281,7 +281,7 @@ impl RunQueue {
         task: &TaskRef, 
         period: usize
     ) -> Result<(), &'static str> {
-        if let Some(i) = self.iter().position(|rt| rt.taskref == *task ) {
+        if let Some(i) = self.iter().position(|rt| &rt.taskref == task) {
             if let Some(mut realtime_taskref) = self.remove(i) {
                 realtime_taskref.period = Some(period);
                 self.insert_realtime_taskref_at_proper_location(realtime_taskref);
