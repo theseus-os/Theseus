@@ -107,7 +107,7 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
     ).expect("couldn't get current task");
 
     let mut theseus_env_vars: Vec<String> = Vec::new();
-    theseus_env_vars.push(format!("PWD={}", pwd));
+    theseus_env_vars.push(format!("PWD={pwd}"));
 
     // Construct initial host externals.
     let mut ext: HostExternals = HostExternals {

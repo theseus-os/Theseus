@@ -98,7 +98,7 @@ impl fmt::Display for PanicInfoOwned {
 impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
     fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
-            .map(|m| format!("{}", m))
+            .map(|m| format!("{m}"))
             .unwrap_or_default();
         let (file, line, column) = if let Some(loc) = info.location() {
             (String::from(loc.file()), loc.line(), loc.column())
@@ -181,8 +181,8 @@ impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             Self::Requested         => write!(f, "Requested"),
-            Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+            Self::Panic(panic_info) => write!(f, "Panicked at {panic_info}"),
+            Self::Exception(num)    => write!(f, "Exception {num:#X}({num})"),
         }
     }
 }
@@ -498,7 +498,7 @@ impl Task {
                 waker: None,
             }),
             id: task_id,
-            name: format!("task_{}", task_id),
+            name: format!("task_{task_id}"),
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
             suspended: AtomicBool::new(false),
@@ -1463,7 +1463,7 @@ pub fn bootstrap_task(
         None,
         bootstrap_task_cleanup_failure,
     );
-    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
     bootstrap_task.runstate.store(RunState::Runnable);
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core

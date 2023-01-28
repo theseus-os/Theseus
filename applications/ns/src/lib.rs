@@ -70,7 +70,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     if let Some(crate_obj_file_path) = matches.opt_str("load") {
         let path = Path::new(crate_obj_file_path);
         let file = path.get_file(&curr_wd).ok_or_else(||
-            format!("Couldn't resolve path to crate object file at {:?}", path)
+            format!("Couldn't resolve path to crate object file at {path:?}")
         )?;
         load_crate(&mut output, file, &namespace)?;
     } else if matches.opt_present("f") {
@@ -127,7 +127,7 @@ fn print_crates(output: &mut String, indent: usize, namespace: &CrateNamespace, 
     });
     crates.sort();
     for c in crates {
-        writeln!(output, "{}", c)?;
+        writeln!(output, "{c}")?;
     }
 
     if recursive {

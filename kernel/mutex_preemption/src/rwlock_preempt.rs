@@ -94,10 +94,7 @@ impl<T: ?Sized> RwLockPreempt<T> {
     /// ```
     pub fn read(&self) -> RwLockPreemptReadGuard<T> {
         loop {
-            match self.try_read() {
-                Some(guard) => return guard,
-                _ => {}
-            }
+            if let Some(guard) = self.try_read() { return guard }
         }
     }
 
@@ -189,10 +186,7 @@ impl<T: ?Sized> RwLockPreempt<T> {
     /// ```
     pub fn write(&self) -> RwLockPreemptWriteGuard<T> {
         loop {
-            match self.try_write() {
-                Some(guard) => return guard,
-                _ => {}
-            }
+            if let Some(guard) = self.try_write() { return guard }
         }
     }
 

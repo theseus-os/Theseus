@@ -72,7 +72,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         info!("test_multiple(): Entered sender task!");
         for i in 0..iterations {
-            sender.send(format!("Message {:03}", i))?;
+            sender.send(format!("Message {i:03}"))?;
             info!("test_multiple(): Sender sent message {:03}", i);
         }
         Ok(())

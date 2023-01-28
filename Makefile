@@ -21,6 +21,9 @@ merge_sections ?= yes
 bootloader ?= grub
 boot_spec ?= bios
 
+## Set up configuration based on the chosen bootloader specification (boot_spec).
+export override FEATURES+=--features nano_core/$(boot_spec)
+
 ifeq ($(boot_spec), bios)
 	ISO_EXTENSION := iso
 else ifeq ($(boot_spec), uefi)
@@ -139,7 +142,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb \
-		doc docs view-doc view-docs book view-book
+		clippy doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -289,7 +292,6 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo : export override FEATURES+=--features nano_core/$(boot_spec)
 cargo:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
@@ -562,11 +564,23 @@ preserve_old_modules:
 	cargo clean
 
 
-
-
 ###################################################################################################
-############################ Targets for building documentation ###################################
+########################### Targets for clippy and documentation ##################################
 ###################################################################################################
+
+## Runs clippy on a full build of Theseus, with all crates included.
+## Note that this does not cover all combinations of features or cfg values.
+##
+## We allow building with THESEUS_CONFIG options, but not with any other RUSTFLAGS,
+## because the default RUSTFLAGS used to build Theseus aren't compatible with clippy.
+clippy : export override FEATURES += --features theseus_features/everything
+clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
+clippy:
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
+		cargo clippy \
+		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
+		--target $(TARGET)
+
 
 ## The output directory for source-level documentation.
 RUSTDOC_OUT      := $(BUILD_DIR)/doc

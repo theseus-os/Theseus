@@ -123,19 +123,11 @@ impl WindowManager {
             None => true,
         };
         
-        match self.is_window_in_show_list(inner_ref) {
-            // remove item in current list
-            Some(i) => {
-                self.show_list.remove(i);
-            }
-            None => {}
+        if let Some(i) = self.is_window_in_show_list(inner_ref) {
+            self.show_list.remove(i);
         }
-        match self.is_window_in_hide_list(inner_ref) {
-            // remove item in current list
-            Some(i) => {
-                self.hide_list.remove(i);
-            }
-            None => {}
+        if let Some(i) = self.is_window_in_hide_list(inner_ref) {
+            self.hide_list.remove(i);
         }
         self.active = Arc::downgrade(inner_ref);
         let area = {
@@ -402,12 +394,9 @@ impl WindowManager {
         new_border: Rectangle,
     ) -> Result<(), &'static str> {
         // first clear old border if exists
-        match self.repositioned_border {
-            Some(border) => {
-                let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
-                self.refresh_bottom_windows(pixels.into_iter(), true)?;
-            },
-            None =>{}
+        if let Some(border) = self.repositioned_border {
+            let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
+            self.refresh_bottom_windows(pixels.into_iter(), true)?;
         }
 
         // then draw current border

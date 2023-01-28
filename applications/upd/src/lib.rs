@@ -127,7 +127,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
             apply(&Path::new(base_dir_path.clone()))
         }
         other => {
-            Err(format!("unrecognized command {:?}", other))
+            Err(format!("unrecognized command {other:?}"))
         }
     }
 }
@@ -178,7 +178,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
         ota_update_client::download_crates(&iface, remote_endpoint, update_build, crate_set).map_err(|e| e.to_string())?
     } else {
         let diff_lines = ota_update_client::download_diff(&iface, remote_endpoint, update_build)
-            .map_err(|e| format!("failed to download diff file for {}, error: {}", update_build, e))?;
+            .map_err(|e| format!("failed to download diff file for {update_build}, error: {e}"))?;
         let diff = ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string())?;
 
         // download all of the new crates
@@ -226,11 +226,11 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
     };
     let new_namespace_dir = match base_dir_path.get(&curr_dir) {
         Some(FileOrDir::Dir(d)) => NamespaceDir::new(d),
-        _ => return Err(format!("cannot find an update base directory at path {}", base_dir_path)),
+        _ => return Err(format!("cannot find an update base directory at path {base_dir_path}")),
     };
     let diff_file = match new_namespace_dir.lock().get(DIFF_FILE_NAME) { 
         Some(FileOrDir::File(f)) => f,
-        _ => return Err(format!("cannot find diff file expected at {}/{}", base_dir_path, DIFF_FILE_NAME)),
+        _ => return Err(format!("cannot find diff file expected at {base_dir_path}/{DIFF_FILE_NAME}")),
     };
     let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().len()); 
     let _bytes_read = diff_file.lock().read_at(&mut diff_content, 0)?;
@@ -266,7 +266,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         };
         
         let new_crate_file = new_namespace_dir.get_crate_object_file(&new_crate_module_file_name).ok_or_else(|| 
-            format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path)
+            format!("cannot find new crate file {new_crate_module_file_name:?} in new namespace dir {base_dir_path}")
         )?;
 
         let swap_req = SwapRequest::new(
@@ -275,7 +275,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             IntoCrateObjectFile::File(new_crate_file),
             None, // all diff-based swaps occur within the same namespace
             false
-        ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
+        ).map_err(|invalid_req| format!("{invalid_req:#?}"))?;
         swap_requests.push(swap_req);
     }
 
@@ -288,7 +288,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         kernel_mmi_ref,
         false, // verbose logging
         false, // enable_crate_cache
-    ).map_err(|e| format!("crate swapping failed, error: {}", e))?;
+    ).map_err(|e| format!("crate swapping failed, error: {e}"))?;
 
     Ok(())
 }
@@ -322,7 +322,7 @@ fn make_unique_directory(base_name: &str, parent_dir: &DirRef) -> Result<DirRef,
         return VFSDirectory::create(base_name.to_string(), parent_dir);
     }
     for i in 1.. {
-        let new_base_name = format!("{}.{}", base_name, i);
+        let new_base_name = format!("{base_name}.{i}");
         if parent_dir.lock().get(&new_base_name).is_none() {
             return VFSDirectory::create(new_base_name, parent_dir);
         }   

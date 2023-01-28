@@ -323,7 +323,7 @@ impl fmt::Display for PciLocation {
 
 impl fmt::Debug for PciLocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 

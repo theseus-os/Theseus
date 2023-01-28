@@ -328,7 +328,7 @@ impl IxgbeNic {
         Self::clear_stats(&mapped_registers2);
 
         // store the mac address of this device
-        let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers_mac);
+        let mac_addr_hardware = Self::read_mac_address_from_nic(&mapped_registers_mac);
 
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, rx_buffer_size_kbytes as u16 * 1024, &RX_BUFFER_POOL)?;

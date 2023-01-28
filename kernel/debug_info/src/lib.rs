@@ -290,12 +290,9 @@ impl DebugSections {
                 let mut evaluation = location.data.evaluation(context.unit.encoding());
                 let eval_result = evaluation.evaluate()?;
                 debug!("{:indent$}Evaluation result {:X?}", "", eval_result, indent = ((depth+3) * 2));
-                match eval_result {
-                    gimli::EvaluationResult::Complete => {
-                        let pieces = evaluation.result();
-                        debug!("{:indent$}Completed evaluation: {:X?}", "", pieces, indent = ((depth+4) * 2));
-                    }
-                    _ => { }
+                if let gimli::EvaluationResult::Complete = eval_result {
+                    let pieces = evaluation.result();
+                    debug!("{:indent$}Completed evaluation: {:X?}", "", pieces, indent = ((depth+4) * 2));
                 }
                 // TODO FIXME: check if one of the variable's location ranges contains the instruction pointer
                 let _type_signature = match entry.attr_value(gimli::DW_AT_type)? {
