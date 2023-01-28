@@ -568,9 +568,16 @@ preserve_old_modules:
 
 ## Runs clippy on a full build of Theseus, with all crates included.
 ## Note that this does not cover all combinations of features or cfg values.
+##
+## We allow building with THESEUS_CONFIG options, but not with any other RUSTFLAGS,
+## because the default RUSTFLAGS used to build Theseus aren't compatible with clippy.
 clippy : export override FEATURES += --features theseus_features/everything
+clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 clippy:
-	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='' cargo clippy $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
+		cargo clippy \
+		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
+		--target $(TARGET)
 
 
 ## The output directory for source-level documentation.
