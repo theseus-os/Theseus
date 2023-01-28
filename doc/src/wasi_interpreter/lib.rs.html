@@ -256,7 +256,7 @@
     ).expect(<span class="string">&quot;couldn&#39;t get current task&quot;</span>);
 
     <span class="kw">let </span><span class="kw-2">mut </span>theseus_env_vars: Vec&lt;String&gt; = Vec::new();
-    theseus_env_vars.push(<span class="macro">format!</span>(<span class="string">&quot;PWD={}&quot;</span>, pwd));
+    theseus_env_vars.push(<span class="macro">format!</span>(<span class="string">&quot;PWD={pwd}&quot;</span>));
 
     <span class="comment">// Construct initial host externals.
     </span><span class="kw">let </span><span class="kw-2">mut </span>ext: HostExternals = HostExternals {

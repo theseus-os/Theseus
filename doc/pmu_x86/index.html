@@ -42,11 +42,11 @@ A core ID greater than 255 is not supported in Theseus in general since the ID h
  
 <span class="kw">if let </span><span class="prelude-val">Ok</span>(my_sampler) = sampler {
  
-	<span class="comment">// wait some time here
- 	
-	</span><span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>samples) = pmu_x86::retrieve_samples() {
-		pmu_x86::print_samples(<span class="kw-2">&amp;mut </span>samples);
-	}
+    <span class="comment">// wait some time here
+     
+    </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>samples) = pmu_x86::retrieve_samples() {
+        pmu_x86::print_samples(<span class="kw-2">&amp;mut </span>samples);
+    }
 }</code></pre></div>
 <h2 id="note"><a href="#note">Note</a></h2>
 <p>Currently, the PMU-based sampler will only capture samples on the same core as it was initialized and started from. 

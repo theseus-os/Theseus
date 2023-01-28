@@ -210,7 +210,7 @@
     </span><span class="kw">let </span>start = <span class="macro">hpet_ticks!</span>();
     
     <span class="macro">debug!</span>(<span class="string">&quot;smoltcp_helper: connecting from {}:{} to {} ...&quot;</span>,
-        iface.lock().ip_addrs().get(<span class="number">0</span>).map(|ip| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, ip)).unwrap_or_else(|| <span class="string">&quot;ERROR&quot;</span>.to_string()),
+        iface.lock().ip_addrs().get(<span class="number">0</span>).map(|ip| <span class="macro">format!</span>(<span class="string">&quot;{ip}&quot;</span>)).unwrap_or_else(|| <span class="string">&quot;ERROR&quot;</span>.to_string()),
         local_port, 
         remote_endpoint,
     );

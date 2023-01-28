@@ -411,9 +411,6 @@
 <a href="#411" id="411">411</a>
 <a href="#412" id="412">412</a>
 <a href="#413" id="413">413</a>
-<a href="#414" id="414">414</a>
-<a href="#415" id="415">415</a>
-<a href="#416" id="416">416</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the MADT ACPI table, 
 //! which includes interrupt and multicore info.
 
@@ -740,7 +737,7 @@
             ) {
                 <span class="comment">// this `lapic_entry` wasn&#39;t for the BSP, try the next one.
                 </span><span class="prelude-val">Err</span>(LapicInitError::NotBSP) =&gt; <span class="kw">continue</span>,
-                <span class="prelude-val">Err</span>(other_err) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(Box::leak(<span class="macro">format!</span>(<span class="string">&quot;{:?}&quot;</span>, other_err).into_boxed_str())),
+                <span class="prelude-val">Err</span>(other_err) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(Box::leak(<span class="macro">format!</span>(<span class="string">&quot;{other_err:?}&quot;</span>).into_boxed_str())),
                 <span class="prelude-val">Ok</span>(()) =&gt; { } <span class="comment">// fall through
             </span>};
 
@@ -814,15 +811,12 @@
 /// If no entry exists, it returns the default NMI entry value: `(lint = 1, flags = 0)`.
 </span><span class="kw">pub fn </span>find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -&gt; (u8, u16) {
     <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter {
-        <span class="kw">match </span>madt_entry {
-            MadtEntry::NonMaskableInterrupt(nmi) =&gt; {
-                <span class="comment">// NMI entries are based on the &quot;processor&quot; id, not the &quot;apic_id&quot;
-                // Return this Nmi entry if it&#39;s for the given lapic, or if it&#39;s for all lapics
-                </span><span class="kw">if </span>nmi.processor == processor || nmi.processor == <span class="number">0xFF  </span>{
-                    <span class="kw">return </span>(nmi.lint, nmi.flags);
-                }
+        <span class="kw">if let </span>MadtEntry::NonMaskableInterrupt(nmi) = madt_entry {
+            <span class="comment">// NMI entries are based on the &quot;processor&quot; id, not the &quot;apic_id&quot;
+            // Return this Nmi entry if it&#39;s for the given lapic, or if it&#39;s for all lapics
+            </span><span class="kw">if </span>nmi.processor == processor || nmi.processor == <span class="number">0xFF  </span>{
+                <span class="kw">return </span>(nmi.lint, nmi.flags);
             }
-            <span class="kw">_ </span>=&gt; {  }
         }
     }
 

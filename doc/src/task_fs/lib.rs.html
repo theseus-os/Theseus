@@ -591,7 +591,7 @@
     </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>tasks_string = Vec::new();
         <span class="kw">for </span>(id, _taskref) <span class="kw">in </span>TASKLIST.lock().iter() {
-            tasks_string.push(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, id));
+            tasks_string.push(<span class="macro">format!</span>(<span class="string">&quot;{id}&quot;</span>));
         }
         tasks_string
     }
@@ -623,7 +623,7 @@
         <span class="kw">let </span>task_id = taskref.id;
         <span class="kw">let </span>directory = TaskDir {
             name,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, task_id)),
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}&quot;</span>)),
             taskref,
             parent: Arc::clone(parent),
         };
@@ -695,15 +695,15 @@
         TaskFile {
             taskref,
             task_id,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/task_info&quot;</span>, TASKS_DIRECTORY_PATH, task_id)), 
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/task_info&quot;</span>)), 
         }
     }
 
     <span class="doccomment">/// Generates the task info string.
     </span><span class="kw">fn </span>generate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
         <span class="comment">// Print all tasks
-        </span><span class="kw">let </span>cpu = <span class="self">self</span>.taskref.running_on_cpu().map(|cpu| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, cpu)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span><span class="self">self</span>.taskref.pinned_core().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, pin)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        </span><span class="kw">let </span>cpu = <span class="self">self</span>.taskref.running_on_cpu().map(|cpu| <span class="macro">format!</span>(<span class="string">&quot;{cpu}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span><span class="self">self</span>.taskref.pinned_core().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{pin}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
         <span class="kw">let </span>task_type = <span class="kw">if </span><span class="self">self</span>.taskref.is_an_idle_task {
             <span class="string">&quot;I&quot;
         </span>} <span class="kw">else if </span><span class="self">self</span>.taskref.is_application() {
@@ -796,7 +796,7 @@
         MmiDir {
             taskref,
             task_id,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, TASKS_DIRECTORY_PATH, task_id)),
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/mmi&quot;</span>)),
         }
     }
 }
@@ -865,7 +865,7 @@
         MmiFile {
             taskref,
             task_id,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi/MmiInfo&quot;</span>, TASKS_DIRECTORY_PATH, task_id)), 
+            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo&quot;</span>)), 
         }
     }
 

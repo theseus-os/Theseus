@@ -437,7 +437,7 @@
         <span class="prelude-val">Some</span>(queues) =&gt; {
             <span class="kw">if </span>queues
                 .stdout
-                .write_all(<span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, fmt_args).as_bytes())
+                .write_all(<span class="macro">format!</span>(<span class="string">&quot;{fmt_args}&quot;</span>).as_bytes())
                 .is_err()
             {
                 <span class="kw">let _ </span>= logger::write_str(<span class="string">&quot;\x1b[31m [E] failed to write to stdout \x1b[0m\n&quot;</span>);

@@ -290,12 +290,6 @@
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
 </pre><pre class="rust"><code><span class="comment">// TODO: add documentation to each unsafe block, laying out all the conditions under which it&#39;s safe or unsafe to use it.
 </span><span class="attr">#![allow(clippy::missing_safety_doc)]
 
@@ -392,10 +386,7 @@
     /// ```
     </span><span class="kw">pub fn </span>read(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; RwLockPreemptReadGuard&lt;T&gt; {
         <span class="kw">loop </span>{
-            <span class="kw">match </span><span class="self">self</span>.try_read() {
-                <span class="prelude-val">Some</span>(guard) =&gt; <span class="kw">return </span>guard,
-                <span class="kw">_ </span>=&gt; {}
-            }
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(guard) = <span class="self">self</span>.try_read() { <span class="kw">return </span>guard }
         }
     }
 
@@ -487,10 +478,7 @@
     /// ```
     </span><span class="kw">pub fn </span>write(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; RwLockPreemptWriteGuard&lt;T&gt; {
         <span class="kw">loop </span>{
-            <span class="kw">match </span><span class="self">self</span>.try_write() {
-                <span class="prelude-val">Some</span>(guard) =&gt; <span class="kw">return </span>guard,
-                <span class="kw">_ </span>=&gt; {}
-            }
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(guard) = <span class="self">self</span>.try_write() { <span class="kw">return </span>guard }
         }
     }
 

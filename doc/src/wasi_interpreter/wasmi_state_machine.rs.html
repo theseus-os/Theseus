@@ -183,7 +183,6 @@
 <a href="#183" id="183">183</a>
 <a href="#184" id="184">184</a>
 <a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Module for resolving memory and function imports from WebAssembly module into state machine.
 //!
 //! Subset of functionality borrowed from tomaka/redshirt:
@@ -257,10 +256,9 @@
                 <span class="kw">let </span>index = <span class="kw">match </span>closure(module_name, field_name, signature) {
                     <span class="prelude-val">Ok</span>(i) =&gt; i,
                     <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(wasmi::Error::Instantiation(<span class="macro">format!</span>(
-                            <span class="string">&quot;Couldn&#39;t resolve `{}`:`{}`&quot;</span>,
-                            module_name, field_name
-                        )))
+                        <span class="kw">return </span><span class="prelude-val">Err</span>(wasmi::Error::Instantiation(
+                            <span class="macro">format!</span>(<span class="string">&quot;Couldn&#39;t resolve `{module_name}`:`{field_name}`&quot;</span>)
+                        ))
                     }
                 };
 

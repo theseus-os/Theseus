@@ -2020,7 +2020,7 @@
     <span class="macro">debug!</span>(<span class="string">&quot;Spawning a new idle task on core {}&quot;</span>, apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
-        .name(<span class="macro">format!</span>(<span class="string">&quot;idle_task_core_{}&quot;</span>, apic_id))
+        .name(<span class="macro">format!</span>(<span class="string">&quot;idle_task_core_{apic_id}&quot;</span>))
         .idle(apic_id)
         .spawn_restartable(<span class="prelude-val">None</span>)
 }

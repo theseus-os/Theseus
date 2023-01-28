@@ -157,7 +157,7 @@
         <span class="kw">for </span>(i, reg) <span class="kw">in </span><span class="self">self</span>.registers.iter().enumerate() {
             <span class="kw">match </span><span class="kw-2">*</span>reg {
                 <span class="prelude-val">None </span>=&gt; { } <span class="comment">// write!(fmt, &quot;[{}]: None, &quot;, i)?,
-                </span><span class="prelude-val">Some</span>(r) =&gt; <span class="macro">write!</span>(fmt, <span class="string">&quot;[{}]: {:#X}, &quot;</span>, i, r)<span class="question-mark">?</span>,
+                </span><span class="prelude-val">Some</span>(r) =&gt; <span class="macro">write!</span>(fmt, <span class="string">&quot;[{i}]: {r:#X}, &quot;</span>)<span class="question-mark">?</span>,
             }
         }
         <span class="prelude-val">Ok</span>(())

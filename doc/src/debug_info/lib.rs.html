@@ -967,9 +967,6 @@
 <a href="#967" id="967">967</a>
 <a href="#968" id="968">968</a>
 <a href="#969" id="969">969</a>
-<a href="#970" id="970">970</a>
-<a href="#971" id="971">971</a>
-<a href="#972" id="972">972</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for DWARF debug information from ELF files.
 //! 
 //! This is a good intro to the DWARF format:
@@ -1262,12 +1259,9 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>evaluation = location.data.evaluation(context.unit.encoding());
                 <span class="kw">let </span>eval_result = evaluation.evaluate()<span class="question-mark">?</span>;
                 <span class="macro">debug!</span>(<span class="string">&quot;{:indent$}Evaluation result {:X?}&quot;</span>, <span class="string">&quot;&quot;</span>, eval_result, indent = ((depth+<span class="number">3</span>) * <span class="number">2</span>));
-                <span class="kw">match </span>eval_result {
-                    gimli::EvaluationResult::Complete =&gt; {
-                        <span class="kw">let </span>pieces = evaluation.result();
-                        <span class="macro">debug!</span>(<span class="string">&quot;{:indent$}Completed evaluation: {:X?}&quot;</span>, <span class="string">&quot;&quot;</span>, pieces, indent = ((depth+<span class="number">4</span>) * <span class="number">2</span>));
-                    }
-                    <span class="kw">_ </span>=&gt; { }
+                <span class="kw">if let </span>gimli::EvaluationResult::Complete = eval_result {
+                    <span class="kw">let </span>pieces = evaluation.result();
+                    <span class="macro">debug!</span>(<span class="string">&quot;{:indent$}Completed evaluation: {:X?}&quot;</span>, <span class="string">&quot;&quot;</span>, pieces, indent = ((depth+<span class="number">4</span>) * <span class="number">2</span>));
                 }
                 <span class="comment">// TODO FIXME: check if one of the variable&#39;s location ranges contains the instruction pointer
                 </span><span class="kw">let </span>_type_signature = <span class="kw">match </span>entry.attr_value(gimli::DW_AT_type)<span class="question-mark">? </span>{

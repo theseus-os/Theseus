@@ -1665,7 +1665,7 @@
         </span><span class="self">Self</span>::clear_stats(<span class="kw-2">&amp;</span>mapped_registers2);
 
         <span class="comment">// store the mac address of this device
-        </span><span class="kw">let </span>mac_addr_hardware = <span class="self">Self</span>::read_mac_address_from_nic(<span class="kw-2">&amp;mut </span>mapped_registers_mac);
+        </span><span class="kw">let </span>mac_addr_hardware = <span class="self">Self</span>::read_mac_address_from_nic(<span class="kw-2">&amp;</span>mapped_registers_mac);
 
         <span class="comment">// initialize the buffer pool
         </span>init_rx_buf_pool(RX_BUFFER_POOL_SIZE, rx_buffer_size_kbytes <span class="kw">as </span>u16 * <span class="number">1024</span>, <span class="kw-2">&amp;</span>RX_BUFFER_POOL)<span class="question-mark">?</span>;

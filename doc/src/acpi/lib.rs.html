@@ -136,9 +136,6 @@
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
-<a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. 
 </span><span class="attr">#![no_std]
 
@@ -247,32 +244,29 @@
             );
 
             <span class="kw">for </span>table <span class="kw">in </span>dmar_table.iter() {
-                <span class="kw">match </span>table {
-                    dmar::DmarEntry::Drhd(drhd) =&gt; {
-                        <span class="macro">debug!</span>(<span class="string">&quot;Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}&quot;</span>, 
-                            drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
-                        );
-                        <span class="kw">if </span>!drhd.include_pci_all() {
-                            <span class="macro">info!</span>(<span class="string">&quot;No IOMMU support when INCLUDE_PCI_ALL not set in DRHD&quot;</span>);
-                        } <span class="kw">else </span>{
-                            <span class="kw">let </span>register_base_address = PhysicalAddress::new(drhd.register_base_address() <span class="kw">as </span>usize)
-                                .ok_or(<span class="string">&quot;IOMMU register_base_address was invalid&quot;</span>)<span class="question-mark">?</span>;
-                            iommu::init(
-                                dmar_table.host_address_width(),
-                                drhd.segment_number(), 
-                                register_base_address,
-                                page_table
-                            )<span class="question-mark">?</span>;
-                        }
-                        <span class="macro">debug!</span>(<span class="string">&quot;DRHD table has Device Scope entries:&quot;</span>);
-                        <span class="kw">for </span>(_idx, dev_scope) <span class="kw">in </span>drhd.iter().enumerate() {
-                            <span class="macro">debug!</span>(<span class="string">&quot;    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}&quot;</span>, 
-                                _idx, dev_scope.device_type(), dev_scope.enumeration_id(), dev_scope.start_bus_number(),
-                            );
-                            <span class="macro">debug!</span>(<span class="string">&quot;                  path: {:?}&quot;</span>, dev_scope.path());
-                        }
+                <span class="kw">if let </span>dmar::DmarEntry::Drhd(drhd) = table {
+                    <span class="macro">debug!</span>(<span class="string">&quot;Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}&quot;</span>, 
+                        drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
+                    );
+                    <span class="kw">if </span>!drhd.include_pci_all() {
+                        <span class="macro">info!</span>(<span class="string">&quot;No IOMMU support when INCLUDE_PCI_ALL not set in DRHD&quot;</span>);
+                    } <span class="kw">else </span>{
+                        <span class="kw">let </span>register_base_address = PhysicalAddress::new(drhd.register_base_address() <span class="kw">as </span>usize)
+                            .ok_or(<span class="string">&quot;IOMMU register_base_address was invalid&quot;</span>)<span class="question-mark">?</span>;
+                        iommu::init(
+                            dmar_table.host_address_width(),
+                            drhd.segment_number(), 
+                            register_base_address,
+                            page_table
+                        )<span class="question-mark">?</span>;
                     }
-                    <span class="kw">_ </span>=&gt; { }
+                    <span class="macro">debug!</span>(<span class="string">&quot;DRHD table has Device Scope entries:&quot;</span>);
+                    <span class="kw">for </span>(_idx, dev_scope) <span class="kw">in </span>drhd.iter().enumerate() {
+                        <span class="macro">debug!</span>(<span class="string">&quot;    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}&quot;</span>, 
+                            _idx, dev_scope.device_type(), dev_scope.enumeration_id(), dev_scope.start_bus_number(),
+                        );
+                        <span class="macro">debug!</span>(<span class="string">&quot;                  path: {:?}&quot;</span>, dev_scope.path());
+                    }
                 }
             }
         }

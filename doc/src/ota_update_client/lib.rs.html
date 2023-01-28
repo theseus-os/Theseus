@@ -591,7 +591,7 @@
     remote_endpoint: IpEndpoint,
     update_build: <span class="kw-2">&amp;</span>str,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    download_string_file(iface, remote_endpoint, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, update_build, LISTING_FILE_NAME))
+    download_string_file(iface, remote_endpoint, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{update_build}/{LISTING_FILE_NAME}&quot;</span>))
 }
 
 
@@ -603,7 +603,7 @@
     remote_endpoint: IpEndpoint,
     update_build: <span class="kw-2">&amp;</span>str,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    download_string_file(iface, remote_endpoint, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, update_build, DIFF_FILE_NAME))
+    download_string_file(iface, remote_endpoint, <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;/{update_build}/{DIFF_FILE_NAME}&quot;</span>))
 }
 
 
@@ -714,8 +714,8 @@
 
     <span class="kw">let </span><span class="kw-2">mut </span>paths_to_download: Vec&lt;String&gt; = Vec::new();
     <span class="kw">for </span>file_name <span class="kw">in </span>crates.iter() {
-        <span class="kw">let </span>path = <span class="macro">format!</span>(<span class="string">&quot;/{}/{}&quot;</span>, update_build, file_name);
-        <span class="kw">let </span>path_sha = <span class="macro">format!</span>(<span class="string">&quot;/{}/{}/{}{}&quot;</span>, update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION);
+        <span class="kw">let </span>path = <span class="macro">format!</span>(<span class="string">&quot;/{update_build}/{file_name}&quot;</span>);
+        <span class="kw">let </span>path_sha = <span class="macro">format!</span>(<span class="string">&quot;/{update_build}/{CHECKSUMS_DIR_NAME}/{file_name}{CHECKSUM_FILE_EXTENSION}&quot;</span>);
         paths_to_download.push(path);
         paths_to_download.push(path_sha);
     }
@@ -926,7 +926,7 @@
 /// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
 </span><span class="kw">fn </span>verify_hash(content: <span class="kw-2">&amp;</span>[u8], hash: <span class="kw-2">&amp;</span>str) -&gt; bool {
     <span class="kw">let </span>result = Sha3_512::digest(content);
-    hash == <span class="macro">format!</span>(<span class="string">&quot;{:x}&quot;</span>, result)
+    hash == <span class="macro">format!</span>(<span class="string">&quot;{result:x}&quot;</span>)
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ota_update_client" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

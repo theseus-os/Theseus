@@ -2191,12 +2191,12 @@
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		core::str::from_utf8(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
 			.map_err(|<span class="kw">_</span>| fmt::Error)
-			.and_then(|s| <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, s))
+			.and_then(|s| <span class="macro">write!</span>(f, <span class="string">&quot;{s}&quot;</span>))
 	}
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AtaSerialNumber {
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
-		<span class="macro">write!</span>(f, <span class="string">&quot;\&quot;{}\&quot;&quot;</span>, <span class="self">self</span>)
+		<span class="macro">write!</span>(f, <span class="string">&quot;\&quot;{self}\&quot;&quot;</span>)
 	}
 }
 
@@ -2217,12 +2217,12 @@
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		core::str::from_utf8(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
 			.map_err(|<span class="kw">_</span>| fmt::Error)
-			.and_then(|s| <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, s))
+			.and_then(|s| <span class="macro">write!</span>(f, <span class="string">&quot;{s}&quot;</span>))
 	}
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AtaModelNumber {
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
-		<span class="macro">write!</span>(f, <span class="string">&quot;\&quot;{}\&quot;&quot;</span>, <span class="self">self</span>)
+		<span class="macro">write!</span>(f, <span class="string">&quot;\&quot;{self}\&quot;&quot;</span>)
 	}
 }
 
@@ -2238,12 +2238,12 @@
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		core::str::from_utf8(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
 			.map_err(|<span class="kw">_</span>| fmt::Error)
-			.and_then(|s| <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, s))
+			.and_then(|s| <span class="macro">write!</span>(f, <span class="string">&quot;{s}&quot;</span>))
 	}
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AtaFirmwareVersion {
 	<span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
-		<span class="macro">write!</span>(f, <span class="string">&quot;\&quot;{}\&quot;&quot;</span>, <span class="self">self</span>)
+		<span class="macro">write!</span>(f, <span class="string">&quot;\&quot;{self}\&quot;&quot;</span>)
 	}
 }
 </code></pre></div>

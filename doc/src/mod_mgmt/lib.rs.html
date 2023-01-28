@@ -6040,7 +6040,7 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;WeakSectionRef&gt; {
         <span class="comment">// Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
         </span><span class="kw">for </span>potential_crate_name <span class="kw">in </span>get_containing_crate_name(demangled_full_symbol) {
-            <span class="kw">let </span>potential_crate_name = <span class="macro">format!</span>(<span class="string">&quot;{}-&quot;</span>, potential_crate_name);
+            <span class="kw">let </span>potential_crate_name = <span class="macro">format!</span>(<span class="string">&quot;{potential_crate_name}-&quot;</span>);
  
             <span class="comment">// Try to find and load the missing crate object file from this namespace&#39;s directory or its recursive namespace&#39;s directory,
             // (or from the backup namespace&#39;s directory set).
@@ -6191,7 +6191,7 @@
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>r_ns) = <span class="self">self</span>.recursive_namespace {
             <span class="kw">let </span>syms_recursive = r_ns.dump_symbol_map_recursive();
-            syms = <span class="macro">format!</span>(<span class="string">&quot;{}\n{}&quot;</span>, syms, syms_recursive);
+            syms = <span class="macro">format!</span>(<span class="string">&quot;{syms}\n{syms_recursive}&quot;</span>);
         }
 
         syms
@@ -6339,7 +6339,7 @@
 		<span class="kw">let </span>strong_crate_ref = weak_crate_ref.upgrade().unwrap();
         <span class="kw">let </span>strong_crate = strong_crate_ref.lock_as_ref();
 		<span class="macro">debug!</span>(<span class="string">&quot;{}{}&quot;</span>, prefix, strong_crate.crate_name);
-		dump_dependent_crates(<span class="kw-2">&amp;</span>strong_crate, <span class="macro">format!</span>(<span class="string">&quot;{}  &quot;</span>, prefix));
+		dump_dependent_crates(<span class="kw-2">&amp;</span>strong_crate, <span class="macro">format!</span>(<span class="string">&quot;{prefix}  &quot;</span>));
 	}
 }
 
@@ -6351,7 +6351,7 @@
 		<span class="macro">debug!</span>(<span class="string">&quot;{}Section \&quot;{}\&quot;: sections dependent on me (weak dependents):&quot;</span>, prefix, sec.name);
 		<span class="kw">for </span>weak_dep <span class="kw">in </span><span class="kw-2">&amp;</span>sec_inner.sections_dependent_on_me {
 			<span class="kw">if let </span><span class="prelude-val">Some</span>(wds) = weak_dep.section.upgrade() {
-				<span class="kw">let </span>prefix = <span class="macro">format!</span>(<span class="string">&quot;{}  &quot;</span>, prefix); <span class="comment">// add two spaces of indentation to the prefix
+				<span class="kw">let </span>prefix = <span class="macro">format!</span>(<span class="string">&quot;{prefix}  &quot;</span>); <span class="comment">// add two spaces of indentation to the prefix
 				</span>dump_weak_dependents(<span class="kw-2">&amp;</span>wds, prefix);
 			}
 			<span class="kw">else </span>{

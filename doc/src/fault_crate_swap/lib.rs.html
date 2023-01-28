@@ -545,9 +545,6 @@
 <a href="#545" id="545">545</a>
 <a href="#546" id="546">546</a>
 <a href="#547" id="547">547</a>
-<a href="#548" id="548">548</a>
-<a href="#549" id="549">549</a>
-<a href="#550" id="550">550</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines support functions needed for swapping of corrupted crates to a different address for fault tolerance
 //! 
 
@@ -637,7 +634,7 @@
             into_new_crate_file,
             new_namespace,
             <span class="bool-val">false</span>, <span class="comment">//reexport
-        </span>).map_err(|invalid_req| <span class="macro">format!</span>(<span class="string">&quot;{:#?}&quot;</span>, invalid_req))<span class="question-mark">?</span>;
+        </span>).map_err(|invalid_req| <span class="macro">format!</span>(<span class="string">&quot;{invalid_req:#?}&quot;</span>))<span class="question-mark">?</span>;
 
         <span class="attr">#[cfg(not(downtime_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;swap call {:?}&quot;</span>, swap_req);
@@ -902,11 +899,8 @@
         ); 
         <span class="comment">// debug!(&quot;Bottom and top of stack of task {} are {:X} {:X}&quot;, taskref.name, bottom, top);
 
-        </span><span class="kw">match </span>constant_offset_fix(<span class="kw-2">&amp;</span>swap_ranges, bottom, top) {
-            <span class="prelude-val">Err </span>(e) =&gt; {
-                <span class="macro">debug! </span>{<span class="string">&quot;Failed to perform constant offset fix for the stack for task {} due to {}&quot;</span>, taskref.name, e.to_string()};
-            },
-            <span class="kw">_ </span>=&gt; {},
+        </span><span class="kw">if let </span><span class="prelude-val">Err </span>(e) = constant_offset_fix(<span class="kw-2">&amp;</span>swap_ranges, bottom, top) {
+            <span class="macro">debug! </span>{<span class="string">&quot;Failed to perform constant offset fix for the stack for task {} due to {}&quot;</span>, taskref.name, e.to_string()};
         }
     }
 

@@ -3257,8 +3257,8 @@
 
         <span class="comment">// TODO: handle scroll action
 
-        </span><span class="kw">let </span>new_scrollback_position = <span class="self">self</span>.screen_cursor.position.to_scrollback_point(
-            <span class="comment">// TODO: after `to_scrollback_point()` supports backwards navigation from a point below the current screen point,
+        </span><span class="kw">let </span>new_scrollback_position = <span class="self">self</span>.screen_cursor.position.as_scrollback_point(
+            <span class="comment">// TODO: after `as_scrollback_point()` supports backwards navigation from a point below the current screen point,
             //       then we can use the original positions. But since it doesn&#39;t support that, we must use the current scroll position.
             //
             // (orig_scrollback_position, orig_screen_position),
@@ -3296,7 +3296,7 @@
 
         <span class="comment">// TODO: handle scroll action
 
-        </span><span class="kw">let </span>new_scrollback_position = <span class="self">self</span>.screen_cursor.position.to_scrollback_point(
+        </span><span class="kw">let </span>new_scrollback_position = <span class="self">self</span>.screen_cursor.position.as_scrollback_point(
             (orig_scrollback_position, orig_screen_position),
             <span class="self">self</span>.scrollback_buffer,
             screen_size
@@ -3608,8 +3608,8 @@
 <span class="kw">impl </span>fmt::Display <span class="kw">for </span>Character {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
         <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self </span>{
-            Character::Single(c) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, c),
-            Character::Multi(s)  =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{}&quot;</span>, s),
+            Character::Single(c) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{c}&quot;</span>),
+            Character::Multi(s)  =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;{s}&quot;</span>),
         }
     }
 }
@@ -3751,7 +3751,7 @@
     /// this returns a `ScrollbackBufferPoint` based on the assumption that 
     /// sufficient empty lines (that occupy one row each) and empty units (that occupy one column each) 
     /// would be inserted into the scrollback buffer.
-    </span><span class="kw">fn </span>to_scrollback_point(
+    </span><span class="kw">fn </span>as_scrollback_point(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         known_prior_point: (ScrollbackBufferPoint, ScreenPoint), 
         scrollback_buffer: <span class="kw-2">&amp;</span>ScrollbackBuffer,
@@ -3775,13 +3775,13 @@
             <span class="kw">let </span>additional_rows = end_row.saturating_sub(start_row);
             row += additional_rows;
 
-            <span class="macro">trace!</span>(<span class="string">&quot;to_scrollback_point(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}&quot;</span>, 
+            <span class="macro">trace!</span>(<span class="string">&quot;as_scrollback_point(): {:?}: start_row: {:?}, last_unit: {:?}, end_row: {:?}, additional_rows: {:?}, row: {:?}, target_row: {:?}&quot;</span>, 
                 line_idx, start_row, last_unit, end_row, additional_rows, row, target_row
             );
 
             <span class="kw">if </span>row &gt;= target_row {
                 <span class="kw">let </span>row_overshoot = row - target_row;
-                <span class="macro">trace!</span>(<span class="string">&quot;to_scrollback_point(): row_overshoot: {:?}&quot;</span>, row_overshoot);
+                <span class="macro">trace!</span>(<span class="string">&quot;as_scrollback_point(): row_overshoot: {:?}&quot;</span>, row_overshoot);
                 unit_idx = UnitIndex(last_unit.saturating_sub(row_overshoot * screen_width));
                 <span class="kw">break</span>;
             }
@@ -3792,14 +3792,14 @@
             unit_idx = UnitIndex(<span class="number">0</span>);
         }
 
-        <span class="macro">trace!</span>(<span class="string">&quot;to_scrollback_point(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}&quot;</span>, row, target_row, line_idx);
+        <span class="macro">trace!</span>(<span class="string">&quot;as_scrollback_point(): after iterating, row: {:?}, target_row: {:?}, line_idx: {:?}&quot;</span>, row, target_row, line_idx);
 
         <span class="kw">if </span>row &lt; target_row {
             <span class="comment">// The scrollback buffer didn&#39;t have enough lines.
             // Currently, `line_idx` is right after the last line.
             // We calculate the target line index as: `line_idx - 1 + (target_row - row)`.
             </span><span class="kw">let </span>target_line = line_idx.<span class="number">0</span>.saturating_add(target_row).saturating_sub(row).saturating_sub(<span class="number">1</span>);
-            <span class="macro">trace!</span>(<span class="string">&quot;to_scrollback_point(): target_line: {:?}&quot;</span>, target_line);
+            <span class="macro">trace!</span>(<span class="string">&quot;as_scrollback_point(): target_line: {:?}&quot;</span>, target_line);
             ScrollbackBufferPoint {
                 line_idx: LineIndex(target_line),
                 unit_idx: UnitIndex(target_column),
@@ -4075,7 +4075,7 @@
     ClosestPrevious(ScrollbackBufferPoint, ScreenPoint),
 }
 <span class="kw">impl </span>ScreenToScrollbackConversion {
-    <span class="kw">fn </span>to_option(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ScrollbackBufferPoint&gt; {
+    <span class="kw">fn </span>into_option(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ScrollbackBufferPoint&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::ExactMatch(sbp) =&gt; <span class="prelude-val">Some</span>(sbp),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,

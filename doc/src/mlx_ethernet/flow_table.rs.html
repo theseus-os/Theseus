@@ -458,8 +458,8 @@
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">enum </span>DestinationType {
     VPort           = <span class="number">0x0</span>,
     FlowTable       = <span class="number">0x1</span>,
-    TIR             = <span class="number">0x2</span>,
-    QP              = <span class="number">0x3</span>,
+    Tir             = <span class="number">0x2</span>,
+    Qp              = <span class="number">0x3</span>,
     FlowSampler     = <span class="number">0x6</span>,
 }
 
@@ -469,7 +469,7 @@
 </span><span class="attr">#[derive(FromBytes, Default)]
 #[repr(C, packed)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">struct </span>DestinationEntry {
-    <span class="doccomment">/// currently we only set the type to [DestinationType::TIR] and the id is the TIR number for the RQ
+    <span class="doccomment">/// currently we only set the type to [DestinationType::Tir] and the id is the TIR number for the RQ
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) id_and_type:                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) packet_reformat:                 Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 

@@ -1921,8 +1921,12 @@
 <a href="#1921" id="1921">1921</a>
 <a href="#1922" id="1922">1922</a>
 <a href="#1923" id="1923">1923</a>
-</pre><pre class="rust"><code> <span class="doccomment">//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
- //! Also defines multiple enums that specify the valid input and output values for different commands.
+<a href="#1924" id="1924">1924</a>
+<a href="#1925" id="1925">1925</a>
+</pre><pre class="rust"><code><span class="doccomment">//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
+//! Also defines multiple enums that specify the valid input and output values for different commands.
+
+</span><span class="attr">#![allow(clippy::upper_case_acronyms)]
 
 </span><span class="kw">use </span>alloc::{vec::Vec, boxed::Box};
 <span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
@@ -3120,7 +3124,7 @@
 
         <span class="kw">let </span>dest_list_mb: usize = libm::ceilf((<span class="number">0x30 </span>+ <span class="number">0x300</span>) <span class="kw">as </span>f32 / MAILBOX_DATA_SIZE_IN_BYTES <span class="kw">as </span>f32) <span class="kw">as </span>usize;
         <span class="kw">const </span>DEST_LIST_MB_OFFSET: usize = <span class="number">304</span>; 
-        <span class="kw">let </span>dest_list = DestinationEntry::init(DestinationType::TIR, tirn);
+        <span class="kw">let </span>dest_list = DestinationEntry::init(DestinationType::Tir, tirn);
         input_mailbox_buffers[dest_list_mb - <span class="number">1</span>].write_to_mailbox(dest_list, DEST_LIST_MB_OFFSET)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(())

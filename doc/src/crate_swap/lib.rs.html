@@ -1302,7 +1302,7 @@
         (
             SwapRequestList::with_capacity(swap_requests.len()),
             CrateNamespace::new(
-                <span class="macro">format!</span>(<span class="string">&quot;cached_crates--{:?}&quot;</span>, swap_requests), 
+                <span class="macro">format!</span>(<span class="string">&quot;cached_crates--{swap_requests:?}&quot;</span>), 
                 this_namespace.dir().clone(),
                 <span class="prelude-val">None
             </span>),

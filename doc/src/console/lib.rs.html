@@ -266,7 +266,7 @@
         }
 
         <span class="kw">if </span>spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
-            .name(<span class="macro">format!</span>(<span class="string">&quot;{:?}_manager&quot;</span>, serial_port_address))
+            .name(<span class="macro">format!</span>(<span class="string">&quot;{serial_port_address:?}_manager&quot;</span>))
             .spawn()
             .is_err()
         {
@@ -290,10 +290,10 @@
     <span class="kw">let </span>tty = tty::Tty::new();
 
     <span class="kw">let </span>reader_task = spawn::new_task_builder(tty_to_port_loop, (port.clone(), tty.master()))
-        .name(<span class="macro">format!</span>(<span class="string">&quot;tty_to_{:?}&quot;</span>, address))
+        .name(<span class="macro">format!</span>(<span class="string">&quot;tty_to_{address:?}&quot;</span>))
         .spawn()<span class="question-mark">?</span>;
     <span class="kw">let </span>writer_task = spawn::new_task_builder(port_to_tty_loop, (receiver, tty.master()))
-        .name(<span class="macro">format!</span>(<span class="string">&quot;{:?}_to_tty&quot;</span>, address))
+        .name(<span class="macro">format!</span>(<span class="string">&quot;{address:?}_to_tty&quot;</span>))
         .spawn()<span class="question-mark">?</span>;
 
     <span class="kw">let </span>new_app_ns = mod_mgmt::create_application_namespace(<span class="prelude-val">None</span>)<span class="question-mark">?</span>;
@@ -304,7 +304,7 @@
 
     <span class="kw">let </span>path = path::Path::new(app_file.lock().get_absolute_path());
     <span class="kw">let </span>task = spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_ns))<span class="question-mark">?
-        </span>.name(<span class="macro">format!</span>(<span class="string">&quot;{:?}_shell&quot;</span>, address))
+        </span>.name(<span class="macro">format!</span>(<span class="string">&quot;{address:?}_shell&quot;</span>))
         .block()
         .spawn()<span class="question-mark">?</span>;
 

@@ -563,7 +563,7 @@
             interrupt_handler,
             serial_port_receive_deferred,
             serial_port,
-            <span class="prelude-val">Some</span>(<span class="macro">format!</span>(<span class="string">&quot;serial_port_deferred_task_irq_{:#X}&quot;</span>, interrupt_number)),
+            <span class="prelude-val">Some</span>(<span class="macro">format!</span>(<span class="string">&quot;serial_port_deferred_task_irq_{interrupt_number:#X}&quot;</span>)),
         );
 
         <span class="kw">match </span>registration_result {
