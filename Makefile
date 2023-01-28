@@ -21,6 +21,9 @@ merge_sections ?= yes
 bootloader ?= grub
 boot_spec ?= bios
 
+## Set up configuration based on the chosen bootloader specification (boot_spec).
+export override FEATURES+=--features nano_core/$(boot_spec)
+
 ifeq ($(boot_spec), bios)
 	ISO_EXTENSION := iso
 else ifeq ($(boot_spec), uefi)
@@ -289,7 +292,6 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo : export override FEATURES+=--features nano_core/$(boot_spec)
 cargo:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
