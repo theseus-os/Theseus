@@ -1,8 +1,11 @@
 ENTRY(_start)
 OUTPUT_FORMAT(elf64-littleaarch64)
 
-/* the last 2GiB of mappable memory */
-KERNEL_OFFSET = 0xFFFF80000000;
+/*
+ * The upper-most 2GiB of accessible virtual addresses on aarch64,
+ * because Theseus uses 48-bit virtual addresses with an ASID of 0.
+ */
+KERNEL_OFFSET = 0x0000_FFFF_8000_0000;
 
 SECTIONS {
 
