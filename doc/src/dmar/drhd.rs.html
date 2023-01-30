@@ -141,8 +141,8 @@
     <span class="comment">// Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 </span>}
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Drhd&gt;(), <span class="number">16</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;Drhd&gt;(), <span class="number">1</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;Drhd&gt;() == <span class="number">16</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;Drhd&gt;() == <span class="number">1</span>);
 
 
 <span class="doccomment">/// DRHD: DMAR Hardware Unit Definition Structure.

@@ -90,22 +90,11 @@
 <a href="#90" id="90">90</a>
 <a href="#91" id="91">91</a>
 <a href="#92" id="92">92</a>
-<a href="#93" id="93">93</a>
-<a href="#94" id="94">94</a>
-<a href="#95" id="95">95</a>
-<a href="#96" id="96">96</a>
-<a href="#97" id="97">97</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Definitions for FADT, the Fixed ACPI Description Table.
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>sdt;
-<span class="kw">extern crate </span>acpi_table;
-<span class="kw">extern crate </span>zerocopy;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
-
-<span class="kw">use </span>memory::PhysicalAddress;
+</span><span class="kw">use </span>memory::PhysicalAddress;
 <span class="kw">use </span>sdt::{Sdt, GenericAddressStructure};
 <span class="kw">use </span>acpi_table::{AcpiSignature, AcpiTables};
 <span class="kw">use </span>zerocopy::FromBytes;
@@ -184,7 +173,8 @@
     <span class="kw">pub </span>x_gpe0_block: GenericAddressStructure,
     <span class="kw">pub </span>x_gpe1_block: GenericAddressStructure,
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Fadt&gt;(), <span class="number">244</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;Fadt&gt;() == <span class="number">244</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;Fadt&gt;() == <span class="number">1</span>);
 
 <span class="kw">impl </span>Fadt {
     <span class="doccomment">/// Finds the FADT in the given `AcpiTables` and returns a reference to it.

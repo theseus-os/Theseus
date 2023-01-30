@@ -199,7 +199,6 @@
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
 <a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for the HPET: High Precision Event Timer.
 
 </span><span class="attr">#![no_std]
@@ -211,7 +210,6 @@
 <span class="kw">use </span>memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, PteFlags, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>sdt::{Sdt, GenericAddressStructure};
 <span class="kw">use </span>acpi_table::{AcpiTables, AcpiSignature};
-<span class="kw">use </span>static_assertions::const_assert_eq;
 <span class="kw">use </span>time::Instant;
 
 <span class="doccomment">/// The static instance of the HPET&#39;s ACPI memory region, which derefs to an Hpet instance.
@@ -261,7 +259,7 @@
     /// Call [`num_timers`](#method.num_timers) to get the actual number of HPET timers.
     </span><span class="kw">pub </span>timers:                      [HpetTimer; <span class="number">32</span>],
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Hpet&gt;(), <span class="number">1280</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;Hpet&gt;() == <span class="number">1280</span>);
 
 <span class="kw">impl </span>Hpet {
     <span class="doccomment">/// Returns the HPET&#39;s main counter value
@@ -332,7 +330,7 @@
     </span><span class="kw">pub </span>fsb_interrupt_route:          Volatile&lt;u64&gt;,
     _padding:                         u64,
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;HpetTimer&gt;(), <span class="number">32</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;HpetTimer&gt;() == <span class="number">32</span>);
 
 
 <span class="kw">pub const </span>HPET_SIGNATURE: <span class="kw-2">&amp;</span>[u8; <span class="number">4</span>] = <span class="string">b&quot;HPET&quot;</span>;
@@ -361,7 +359,7 @@
     <span class="doccomment">/// also called &#39;page_protection&#39;
     </span>_oem_attribute: u8,
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;HpetAcpiTable&gt;(), <span class="number">56</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;HpetAcpiTable&gt;() == <span class="number">56</span>);
 
 <span class="kw">impl </span>HpetAcpiTable {
     <span class="doccomment">/// Finds the HPET in the given `AcpiTables` and returns a reference to it.

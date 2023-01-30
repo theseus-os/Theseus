@@ -134,8 +134,8 @@
     // It would look something like:
     // path: [u16],
 </span>}
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DeviceScope&gt;(), <span class="number">6</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DeviceScope&gt;(), <span class="number">1</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;DeviceScope&gt;() == <span class="number">6</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;DeviceScope&gt;() == <span class="number">1</span>);
 
 
 <span class="doccomment">/// DMAR Device Scope Structure.
@@ -228,7 +228,7 @@
     <span class="kw">pub </span>device: u8,
     <span class="kw">pub </span>function: u8,
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DeviceScopePath&gt;(), <span class="number">2</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DeviceScopePath&gt;(), <span class="number">1</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;DeviceScopePath&gt;() == <span class="number">2</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;DeviceScopePath&gt;() == <span class="number">1</span>);
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="dmar" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

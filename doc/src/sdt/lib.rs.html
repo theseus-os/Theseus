@@ -37,18 +37,10 @@
 <a href="#37" id="37">37</a>
 <a href="#38" id="38">38</a>
 <a href="#39" id="39">39</a>
-<a href="#40" id="40">40</a>
-<a href="#41" id="41">41</a>
-<a href="#42" id="42">42</a>
-<a href="#43" id="43">43</a>
 </pre><pre class="rust"><code><span class="doccomment">//! ACPI table definitions and basic SDT structures.
-
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">extern crate </span>zerocopy;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
-
-<span class="kw">use </span>zerocopy::FromBytes;
+</span><span class="kw">use </span>zerocopy::FromBytes;
 
 <span class="doccomment">/// The size in bytes of the ACPI SDT Header (`Sdt` struct).
 </span><span class="kw">pub const </span>SDT_SIZE_IN_BYTES: usize = core::mem::size_of::&lt;Sdt&gt;();
@@ -68,8 +60,8 @@
   <span class="kw">pub </span>creator_id: u32,
   <span class="kw">pub </span>creator_revision: u32
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Sdt&gt;(), <span class="number">36</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;Sdt&gt;(), <span class="number">1</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;Sdt&gt;() == <span class="number">36</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;Sdt&gt;() == <span class="number">1</span>);
 
 <span class="doccomment">/// A struct used to describe the position and layout of registers
 /// related to ACPI tables.
@@ -82,7 +74,7 @@
     <span class="kw">pub </span>access_size: u8,
     <span class="kw">pub </span>phys_addr: u64,
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;GenericAddressStructure&gt;(), <span class="number">12</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;GenericAddressStructure&gt;(), <span class="number">1</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;GenericAddressStructure&gt;() == <span class="number">12</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;GenericAddressStructure&gt;() == <span class="number">1</span>);
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="sdt" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

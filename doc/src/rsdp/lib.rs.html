@@ -94,18 +94,12 @@
 <a href="#94" id="94">94</a>
 <a href="#95" id="95">95</a>
 <a href="#96" id="96">96</a>
-<a href="#97" id="97">97</a>
-<a href="#98" id="98">98</a>
-<a href="#99" id="99">99</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for ACPI RSDP (Root System Descriptor Pointer).
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>zerocopy;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
-<span class="kw">use </span>core::mem;
+</span><span class="kw">use </span>core::mem;
 <span class="kw">use </span>memory::{
     allocate_frames_by_bytes_at, allocate_pages_by_bytes, BorrowedMappedPages, MappedPages,
     PageTable, PhysicalAddress, PteFlags,
@@ -138,8 +132,8 @@
     extended_checksum: u8,
     reserved: [u8; <span class="number">3</span>],
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;Rsdp&gt;(), <span class="number">36</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;Rsdp&gt;(), <span class="number">1</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;Rsdp&gt;() == <span class="number">36</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;Rsdp&gt;() == <span class="number">1</span>);
 
 <span class="kw">impl </span>Rsdp {
     <span class="doccomment">/// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.

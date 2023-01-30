@@ -122,41 +122,13 @@
 <a href="#122" id="122">122</a>
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a>
-<a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. 
 </span><span class="attr">#![no_std]
 
-#![allow(dead_code)] </span><span class="comment">//  to suppress warnings for unused functions/methods
-
-</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>hpet;
-<span class="kw">extern crate </span>acpi_table;
-<span class="kw">extern crate </span>acpi_table_handler;
-<span class="kw">extern crate </span>rsdp;
-<span class="kw">extern crate </span>rsdt;
-<span class="kw">extern crate </span>fadt;
-<span class="kw">extern crate </span>madt;
-<span class="kw">extern crate </span>dmar;
-<span class="kw">extern crate </span>iommu;
-
+</span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>alloc::vec::Vec;
+<span class="kw">use </span>log::{debug, warn, info, error};
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>memory::{PageTable, PhysicalAddress};
 <span class="kw">use </span>rsdp::Rsdp;
@@ -184,7 +156,7 @@
         .and_then(|rsdp_address| Rsdp::from_address(rsdp_address, page_table))
         .or_else(|<span class="kw">_</span>| Rsdp::get_rsdp(page_table))<span class="question-mark">?</span>;
     <span class="kw">let </span>rsdt_phys_addr = rsdp.sdt_address();
-    <span class="macro">debug!</span>(<span class="string">&quot;RXSDT is located in Frame {:#X}&quot;</span>, rsdt_phys_addr);
+    <span class="macro">debug!</span>(<span class="string">&quot;RXSDT is located in Frame {rsdt_phys_addr:#X}&quot;</span>);
 
     <span class="comment">// Now, we get the actual RSDT/XSDT
     </span>{
