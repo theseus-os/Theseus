@@ -10,26 +10,37 @@ use uefi_bootloader_api::BootInformation;
 #[no_mangle]
 #[link_section = ".init.text"]
 pub extern "C" fn _start(boot_info: &'static BootInformation) {
+    // Upon entering this function:
+    // * first argument is a reference to the boot info.
+    //
+    //    --+-----------+--
+    //      | boot_info |
+    //    --+-----------+--
+    //      ^             
+    //      |             
+    //  1st argument
+    //
+    // * second argument is the top vaddr of the double fault handler stack.
+    // * the stack pointer points to the top of the double fault stack:
+    //
+    //    --+------------+------------------------------+--------------------+--
+    //      | guard page | kernel stack (several pages) | double fault stack |
+    //    --+------------+------------------------------+--------------------+--
+    //      ^                                           ^                    ^
+    //      |                                           |                    |
+    //  kernel_stack_start                       sp (top of stack)      2nd argument
+    //
+    // The guard page and double fault stack are both one page in size;
+    // the kernel stack is `KERNEL_STACK_SIZE_IN_PAGES` pages long.
+    //
+    // `kernel_stack_start` is a variable of the `rust_entry` function.
+    //
+    // Stacks grow downwards on both x86 & aarch64, meaning that the stack pointer
+    // will grow towards the guard page.
+    // That's why we start it at the top (the highest vaddr).
     unsafe {
         #[cfg(target_arch = "x86_64")]
         asm!(
-            // Upon entering this function:
-            // * rdi contains the first argument, a reference to the boot info.
-            // * the stack pointer (rsp) points to the top of the double fault stack:
-            //
-            // +------------+------------------------------+--------------------+
-            // | guard page | kernel stack (several pages) | double fault stack |
-            // +------------+------------------------------+--------------------+
-            // ^                                           ^                    ^
-            // |                                           |                   rsi
-            // kernel_stack_start                  rsp (top of stack)
-            //
-            // The guard page and double fault stack are both one page in size;
-            // the kernel stack is `KERNEL_STACK_SIZE_IN_PAGES` pages.
-            //
-            // Stacks grow downwards on x86, meaning that the stack pointer will grow
-            // towards the guard page. That's why we start it at the top (the highest vaddr).
-
             // Before invoking `rust_entry`, we need to set up:
             // 1. First arg  (in rdi): a reference to the boot info (just pass it through).
             // 2. Second arg (in rsi): the top vaddr of the double fault handler stack.
@@ -38,33 +49,19 @@ pub extern "C" fn _start(boot_info: &'static BootInformation) {
             // Now, adjust the stack pointer to the page before the double fault stack,
             // which is the top of the initial kernel stack that was allocated for us.
             "sub rsp, 4096",
+
             // Now invoke the `rust_entry` function.
             "call {}",
+
             // Execution should never return to this point. If it does, halt the CPU and loop.
             "jmp KEXIT",
+
             sym rust_entry,
             options(noreturn),
         );
 
         #[cfg(target_arch = "aarch64")]
         asm!(
-            // Upon entering this function:
-            // * x0 contains the first argument, a reference to the boot info.
-            // * the stack pointer (sp) points to the top of the double fault stack:
-            //
-            // +------------+------------------------------+--------------------+
-            // | guard page | kernel stack (several pages) | double fault stack |
-            // +------------+------------------------------+--------------------+
-            // ^                                           ^                    ^
-            // |                                           |                   x1
-            // kernel_stack_start                   sp (top of stack)
-            //
-            // The guard page and double fault stack are both one page in size;
-            // the kernel stack is `KERNEL_STACK_SIZE_IN_PAGES` pages.
-            //
-            // Stacks grow downwards on aarch64, meaning that the stack pointer will grow
-            // towards the guard page. That's why we start it at the top (the highest vaddr).
-
             // Before invoking `rust_entry`, we need to set up:
             // 1. First arg  (in x0): a reference to the boot info (just pass it through).
             // 2. Second arg (in x1): the top vaddr of the double fault handler stack.
@@ -73,8 +70,10 @@ pub extern "C" fn _start(boot_info: &'static BootInformation) {
             // Now, adjust the stack pointer to the page before the double fault stack,
             // which is the top of the initial kernel stack that was allocated for us.
             "sub sp, sp, 4096",
+
             // Now invoke the `rust_entry` function.
             "b {}",
+
             // Execution can never return to this point.
             sym rust_entry,
             options(noreturn),
