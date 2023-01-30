@@ -5,7 +5,7 @@ OUTPUT_FORMAT(elf64-littleaarch64)
  * The upper-most 2GiB of accessible virtual addresses on aarch64,
  * because Theseus uses 48-bit virtual addresses with an ASID of 0.
  */
-KERNEL_OFFSET = 0x0000_FFFF_8000_0000;
+KERNEL_OFFSET = 0x0000FFFF80000000;
 
 SECTIONS {
 
