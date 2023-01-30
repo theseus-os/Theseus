@@ -613,7 +613,7 @@ if #[cfg(unsafe_large_allocations)] {
             let ptr = mp.start_address().value();
             let link = Box::new(LargeAllocation {
                 link: RBTreeLink::new(),
-                mp: mp
+                mp
             });
             map.insert(link);
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);

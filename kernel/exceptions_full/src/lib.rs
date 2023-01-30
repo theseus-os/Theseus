@@ -124,7 +124,7 @@ fn kill_and_halt(
             let krate = app_crate.lock_as_ref();
             trace!("============== Crate {} =================", krate.crate_name);
             for s in krate.sections.values() {
-                trace!("   {:?}", &*s);
+                trace!("   {:?}", s);
             }
             krate.debug_symbols_file.clone()
         };
@@ -223,7 +223,7 @@ fn kill_and_halt(
             }
             kill_result
         });
-        if let Err(()) = res {
+        if res.is_err() {
             println_both!("BUG: kill_and_halt(): Couldn't get current task in order to kill it.");
         }
     }

@@ -213,7 +213,7 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
         Some(queues) => {
             if queues
                 .stdout
-                .write_all(format!("{}", fmt_args).as_bytes())
+                .write_all(format!("{fmt_args}").as_bytes())
                 .is_err()
             {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");

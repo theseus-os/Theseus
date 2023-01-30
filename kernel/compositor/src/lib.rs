@@ -1,6 +1,7 @@
 //! This crate defines a trait of `Compositor`  .
 //! A compositor composites a list of sources buffers to a single destination buffer.
 
+#![allow(clippy::range_plus_one)]
 #![no_std]
 
 extern crate framebuffer;

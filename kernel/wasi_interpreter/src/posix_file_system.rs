@@ -134,9 +134,9 @@ impl PosixNode {
     ) -> PosixNode {
         PosixNode {
             theseus_file_or_dir: file_or_dir,
-            fs_rights_base: fs_rights_base,
-            fs_rights_inheriting: fs_rights_inheriting,
-            fs_flags: fs_flags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            fs_flags,
             offset: 0,
         }
     }
@@ -335,7 +335,7 @@ impl FileDescriptorTable {
         fd_table.insert(wasi::FD_STDIN, PosixNodeOrStdio::Stdin);
         fd_table.insert(wasi::FD_STDOUT, PosixNodeOrStdio::Stdout);
         fd_table.insert(wasi::FD_STDERR, PosixNodeOrStdio::Stderr);
-        FileDescriptorTable { fd_table: fd_table }
+        FileDescriptorTable { fd_table }
     }
 
     /// Open file or directory at path in accordance to given open flags and insert in fd table.
@@ -412,7 +412,7 @@ impl FileDescriptorTable {
                     } else if truncate_file_to_size_zero {
                         // HACK: Truncate file by overwriting file.
                         let new_file: FileRef =
-                            MemFile::new(String::from(base_name), &parent_dir).unwrap();
+                            MemFile::create(String::from(base_name), &parent_dir).unwrap();
                         FileOrDir::File(new_file)
                     } else {
                         file_or_dir
@@ -423,7 +423,7 @@ impl FileDescriptorTable {
             None => {
                 if create_file_if_no_exist {
                     let new_file: FileRef =
-                        MemFile::new(String::from(base_name), &parent_dir).unwrap();
+                        MemFile::create(String::from(base_name), &parent_dir).unwrap();
                     FileOrDir::File(new_file)
                 } else {
                     return Err(wasi::ERRNO_NOENT);

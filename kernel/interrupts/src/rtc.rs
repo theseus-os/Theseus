@@ -120,7 +120,7 @@ const heartbeat_period_ms: u64 = 1000;
 
 /// changes the period of the RTC interrupt. 
 /// `rate` must be a power of 2, between 2 and 8192 inclusive.
-pub fn change_rtc_frequency(rate: usize){
+pub fn change_rtc_frequency(rate: usize) {
 
     let ispow2: bool = rate.is_power_of_two();
 
@@ -131,7 +131,7 @@ pub fn change_rtc_frequency(rate: usize){
     let _held_interrupts = hold_interrupts();
     
     // formula is "rate = 32768 Hz >> (dividor - 1)"
-    let dividor: u8 = util::log2(rate) as u8 + 2; 
+    let dividor: u8 = rate.ilog2() as u8 + 2; 
 
     //bottom 4 bits of register A are rate, setting them to rate we want without altering top 4 bits
     write_cmos(0x8A);

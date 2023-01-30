@@ -112,7 +112,7 @@ impl WindowManager {
         // if it is currently actived, just return
         let first_active = match self.active.upgrade() {
             Some(current_active) => {
-                if Arc::ptr_eq(&(current_active), inner_ref) {
+                if Arc::ptr_eq(&current_active, inner_ref) {
                     return Ok(true); // do nothing
                 } else {
                     // save this to show_list
@@ -123,19 +123,11 @@ impl WindowManager {
             None => true,
         };
         
-        match self.is_window_in_show_list(inner_ref) {
-            // remove item in current list
-            Some(i) => {
-                self.show_list.remove(i);
-            }
-            None => {}
+        if let Some(i) = self.is_window_in_show_list(inner_ref) {
+            self.show_list.remove(i);
         }
-        match self.is_window_in_hide_list(inner_ref) {
-            // remove item in current list
-            Some(i) => {
-                self.hide_list.remove(i);
-            }
-            None => {}
+        if let Some(i) = self.is_window_in_hide_list(inner_ref) {
+            self.hide_list.remove(i);
         }
         self.active = Arc::downgrade(inner_ref);
         let area = {
@@ -143,7 +135,7 @@ impl WindowManager {
             let top_left = window.get_position();
             let (width, height) = window.get_size();          
             Rectangle {
-                top_left: top_left,
+                top_left,
                 bottom_right: top_left + (width as isize, height as isize)
             }
         };
@@ -157,7 +149,7 @@ impl WindowManager {
     fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         for (i, item) in self.show_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
@@ -169,7 +161,7 @@ impl WindowManager {
     fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
         for (i, item) in self.hide_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
@@ -188,8 +180,8 @@ impl WindowManager {
         };
         let area = Some(
             Rectangle {
-                top_left: top_left,
-                bottom_right: bottom_right
+                top_left,
+                bottom_right
             }
         );
 
@@ -402,12 +394,9 @@ impl WindowManager {
         new_border: Rectangle,
     ) -> Result<(), &'static str> {
         // first clear old border if exists
-        match self.repositioned_border {
-            Some(border) => {
-                let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
-                self.refresh_bottom_windows(pixels.into_iter(), true)?;
-            },
-            None =>{}
+        if let Some(border) = self.repositioned_border {
+            let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
+            self.refresh_bottom_windows(pixels.into_iter(), true)?;
         }
 
         // then draw current border
@@ -802,7 +791,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 /// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     let wm = WINDOW_MANAGER.get().ok_or("The static window manager was not yet initialized")?.lock();
-    if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
+    if wm.pass_mouse_event_to_window(mouse_event).is_err() {
         // the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area
         // 2. the window is the top one (active window or show_list windows) under the mouse pointer

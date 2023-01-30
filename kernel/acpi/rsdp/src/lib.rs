@@ -18,7 +18,7 @@ const RSDP_SEARCH_START: usize = 0xE_0000;
 /// The ending physical address of the region of memory where the RSDP table exists.
 const RSDP_SEARCH_END:   usize = 0xF_FFFF;
 /// The byte-string signature of the RSDP in memory.
-const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
+const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
 /// The RSDP signature is always aligned on a 16-byte boundary.
 const RSDP_SIGNATURE_ALIGNMENT: usize = 16;
 

@@ -15,7 +15,7 @@ use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 use static_assertions::const_assert_eq;
 
-pub const MADT_SIGNATURE: &'static [u8; 4] = b"APIC";
+pub const MADT_SIGNATURE: &[u8; 4] = b"APIC";
 
 /// The handler for parsing the MADT table and adding it to the ACPI tables list.
 pub fn handle(
@@ -76,7 +76,7 @@ impl<'t> Madt<'t> {
         let dynamic_part_length = total_length - size_of::<MadtAcpiTable>();
         let loc = acpi_tables.table_location(MADT_SIGNATURE)?;
         Some(Madt {
-            table: table,
+            table,
             mapped_pages: acpi_tables.mapping(),
             dynamic_entries_starting_offset: loc.slice_offset_and_length?.0,
             dynamic_entries_total_size: dynamic_part_length,
@@ -149,19 +149,19 @@ impl<'t> Iterator for MadtIter<'t> {
             if (self.offset + entry_size) <= self.end_of_entries {
                 let entry: Option<MadtEntry> = match entry_type {
                     ENTRY_TYPE_LOCAL_APIC if entry_size == size_of::<MadtLocalApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::LocalApic(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::LocalApic)
                     },
                     ENTRY_TYPE_IO_APIC if entry_size == size_of::<MadtIoApic>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::IoApic(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::IoApic)
                     },
                     ENTRY_TYPE_INT_SRC_OVERRIDE if entry_size == size_of::<MadtIntSrcOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::IntSrcOverride(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::IntSrcOverride)
                     },
                     ENTRY_TYPE_NON_MASKABLE_INTERRUPT if entry_size == size_of::<MadtNonMaskableInterrupt>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::NonMaskableInterrupt(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::NonMaskableInterrupt)
                     },
                     ENTRY_TYPE_LOCAL_APIC_ADDRESS_OVERRIDE if entry_size == size_of::<MadtLocalApicAddressOverride>() => {
-                        self.mapped_pages.as_type(self.offset).ok().map(|ent| MadtEntry::LocalApicAddressOverride(ent))
+                        self.mapped_pages.as_type(self.offset).ok().map(MadtEntry::LocalApicAddressOverride)
                     },
                     _ => None,
                 };
@@ -324,7 +324,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
             ) {
                 // this `lapic_entry` wasn't for the BSP, try the next one.
                 Err(LapicInitError::NotBSP) => continue,
-                Err(other_err) => return Err(Box::leak(format!("{:?}", other_err).into_boxed_str())),
+                Err(other_err) => return Err(Box::leak(format!("{other_err:?}").into_boxed_str())),
                 Ok(()) => { } // fall through
             };
 
@@ -386,7 +386,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
 fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     for madt_entry in madt_iter {
         if let MadtEntry::IoApic(ioa) = madt_entry {
-            ioapic::IoApic::new(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
+            ioapic::IoApic::create(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
         }
     }
     Ok(())
@@ -398,15 +398,12 @@ fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Res
 /// If no entry exists, it returns the default NMI entry value: `(lint = 1, flags = 0)`.
 pub fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
     for madt_entry in madt_iter {
-        match madt_entry {
-            MadtEntry::NonMaskableInterrupt(nmi) => {
-                // NMI entries are based on the "processor" id, not the "apic_id"
-                // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
-                if nmi.processor == processor || nmi.processor == 0xFF  {
-                    return (nmi.lint, nmi.flags);
-                }
+        if let MadtEntry::NonMaskableInterrupt(nmi) = madt_entry {
+            // NMI entries are based on the "processor" id, not the "apic_id"
+            // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
+            if nmi.processor == processor || nmi.processor == 0xFF  {
+                return (nmi.lint, nmi.flags);
             }
-            _ => {  }
         }
     }
 

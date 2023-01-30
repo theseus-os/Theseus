@@ -191,7 +191,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
     new_task.runstate = RunState::Runnable; // ready to be scheduled in
     let new_task_id = new_task.id;
 
-    let task_ref = TaskRef::new(new_task);
+    let task_ref = TaskRef::create(new_task);
     let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
     // insert should return None, because that means there was no other 
     if old_task.is_some() {

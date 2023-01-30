@@ -116,12 +116,12 @@ const_assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is
 /// The Theseus Makefile appends prefixes onto bootloader module names,
 /// which are separated by the "#" character. 
 /// For example, "k#my_crate-hash.o".
-pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
+pub const MODULE_PREFIX_DELIMITER: &str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
-pub const CRATE_HASH_DELIMITER: &'static str = "-";
+pub const CRATE_HASH_DELIMITER: &str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
 /// e.g., `"my_crate::section_name::h<hash>"`.
-pub const SECTION_HASH_DELIMITER: &'static str = "::h";
+pub const SECTION_HASH_DELIMITER: &str = "::h";
 
 
 /// The type of a crate, based on its object file naming convention.
