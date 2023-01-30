@@ -57,6 +57,8 @@ THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES             := $(ROOT_DIR)/extra_files
 LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 
+## qemu binary to use
+QEMU_BIN = qemu-system-$(ARCH)
 
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
@@ -903,12 +905,12 @@ QEMU_FLAGS += $(QEMU_EXTRA)
 
 ### Old Run: runs the most recent build without rebuilding
 orun:
-	qemu-system-$(ARCH) $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 ### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
-	qemu-system-$(ARCH) $(QEMU_FLAGS) -S
+	$(QEMU_BIN) $(QEMU_FLAGS) -S
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -923,12 +925,12 @@ wasmtime: run
 
 ### builds and runs Theseus in QEMU
 run: $(iso)
-	qemu-system-$(ARCH) $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
-	qemu-system-$(ARCH) $(QEMU_FLAGS) -S
+	$(QEMU_BIN) $(QEMU_FLAGS) -S
 
 
 ### Runs a gdb instance on the host machine. 
