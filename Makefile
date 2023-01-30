@@ -389,9 +389,6 @@ limine:
 	@$(MAKE) -C $(LIMINE_DIR)
 	@$(LIMINE_DIR)/limine-deploy $(iso)
 
-bootloader-none:
-# On UEFI, no bootloader is required
-
 $(efi_firmware):
 	wget https://raw.githubusercontent.com/retrage/edk2-nightly/$(OVMF_COMMIT)/bin/$(OVMF_FILE) -O $(efi_firmware)
 
