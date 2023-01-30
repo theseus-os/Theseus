@@ -1,5 +1,4 @@
-//! This crate contains structures and routines for context switching 
-//! on AArch64.
+//! This crate contains structures and routines for context switching on aarch64.
 
 use zerocopy::{FromBytes, AsBytes};
 
