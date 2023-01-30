@@ -182,8 +182,12 @@ iso: $(iso)
 ### This target builds an .iso OS image from all of the compiled crates.
 $(iso): clean-old-build build extra_files copy_kernel $(iso)-$(boot_spec)
 
+## This target is a dependency of $(iso)
+## when boot_spec = bios
 $(iso)-bios: $(bootloader)
 
+## This target is a dependency of $(iso)
+## when boot_spec = uefi
 $(iso)-uefi: $(efi_firmware)
 	@cargo r \
 		--release \
@@ -389,9 +393,13 @@ limine:
 	@$(MAKE) -C $(LIMINE_DIR)
 	@$(LIMINE_DIR)/limine-deploy $(iso)
 
+## This downloads the OVMF EFI firmware, required by qemu
+## to boot a EFI apps.
+##
+## These binary files are built by Github user retrage at:
+## https://github.com/retrage/edk2-nightly.
 $(efi_firmware):
 	wget https://raw.githubusercontent.com/retrage/edk2-nightly/$(OVMF_COMMIT)/bin/$(OVMF_FILE) -O $(efi_firmware)
-
 
 ### This target copies all extra files into the `ISOFILES` directory,
 ### collapsing their directory structure into a single file name with `!` as the directory delimiter.
@@ -758,7 +766,6 @@ help:
 	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
 	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
 
-    
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
