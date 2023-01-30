@@ -5,12 +5,16 @@
   "features": "+strict-align,+neon,+fp-armv8",
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
-  "llvm-target": "aarch64-unknown-none",
+  "llvm-target": "aarch64-unknown-none-elf",
   "max-atomic-width": 128,
-  "panic-strategy": "abort",
+  "merge-functions": "disabled",
+  "os": "theseus",
+  "panic-strategy": "unwind",
   "relocation-model": "static",
+  "relro-level": "full",
   "supported-sanitizers": [
     "kcfi"
   ],
-  "target-pointer-width": "64"
+  "target-pointer-width": "64",
+  "tls-model": "local-exec"
 }

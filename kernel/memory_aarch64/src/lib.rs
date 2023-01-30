@@ -290,12 +290,13 @@ where
         // The linker script (linker_higher_half.ld) defines the following order of sections:
         // |------|-------------------|-------------------------------|
         // | Sec  |    Sec Name       |    Description / purpose      |
-        // | Num  |                   |                               |
+        // | Idx  |                   |                               |
         // |------|---------------------------------------------------|
-        // | (1)  | .init             | start of executable pages     |
-        // | (2)  | .text             | end of executable pages       |
-        // | (3)  | .rodata           | start of read-only pages      |
-        // | (4)  | .eh_frame         | end of read-only pages       |
+        // | (0)  | .init             | start of executable pages     |
+        // | (1)  | .text             | end of executable pages       |
+        // | (2)  | .rodata           | start of read-only pages      |
+        // | (3)  | .eh_frame         | part of read-only pages       |
+        // | (4)  | .gcc_except_table | end of read-only pages        |
         // | (5)  | .data             | start of read-write pages     | 
         // | (6)  | .bss              | end of read-write pages       |
         // |------|-------------------|-------------------------------|
@@ -319,9 +320,12 @@ where
                 "nano_core .rodata"
             }
             ".eh_frame" => {
+                "nano_core .eh_frame"
+            }
+            ".gcc_except_table" => {
                 rodata_end   = Some((end_virt_addr, end_phys_addr));
                 rodata_flags = Some(flags);
-                "nano_core .eh_frame"
+                "nano_core .gcc_except_table"
             }
             ".data" => {
                 data_start.get_or_insert((start_virt_addr, start_phys_addr));
