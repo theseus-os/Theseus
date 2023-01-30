@@ -128,7 +128,7 @@
     </span>db_blueflame_buffer3_odd_fast_path: Volatile&lt;[U32&lt;BigEndian&gt;; <span class="number">64</span>]&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;UserAccessRegion&gt;(), <span class="number">4096</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;UserAccessRegion&gt;() == <span class="number">4096</span>);
 
 <span class="kw">impl </span>UserAccessRegion {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>write_wqe_to_doorbell(<span class="kw-2">&amp;mut </span><span class="self">self</span>, current_doorbell: <span class="kw-2">&amp;</span>CurrentUARDoorbell, wqe_value: [U32&lt;BigEndian&gt;; <span class="number">64</span>]) {

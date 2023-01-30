@@ -24,8 +24,8 @@
 <span class="kw">use </span>log::error;
 
 <span class="kw">type </span>_AtomicFn = crossbeam_utils::atomic::AtomicCell&lt;<span class="kw">fn</span>()&gt;;
-<span class="macro">static_assertions::const_assert!</span>(_AtomicFn::is_lock_free());
-<span class="macro">static_assertions::const_assert_eq!</span>(core::mem::size_of::&lt;_AtomicFn&gt;(), <span class="number">8</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(_AtomicFn::is_lock_free());
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;_AtomicFn&gt;() == <span class="number">8</span>);
 
 <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>early_sleep(<span class="kw">_</span>: Duration) {
     <span class="macro">error!</span>(<span class="string">&quot;called early_sleep dummy function&quot;</span>);

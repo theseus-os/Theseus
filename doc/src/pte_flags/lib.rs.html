@@ -308,7 +308,6 @@
 <a href="#308" id="308">308</a>
 <a href="#309" id="309">309</a>
 <a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines the structure of page table entry (PTE) flags on x86_64 and aarch64.
 //! 
 //! This crate offers two main types:
@@ -341,7 +340,6 @@
 
 </span><span class="kw">use </span>cfg_if::cfg_if;
 <span class="kw">use </span>bitflags::bitflags;
-<span class="kw">use </span>static_assertions::const_assert_ne;
 
 <span class="macro">cfg_if!</span>{ <span class="kw">if </span><span class="attr">#[cfg(any(target_arch = <span class="string">&quot;x86_64&quot;</span>, doc))] </span>{
     <span class="kw">mod </span>pte_flags_x86_64;
@@ -470,9 +468,9 @@
 
 <span class="comment">// Due to the way that the `bitflags` crate works, we can only use
 // non-zero bit flag values for the above definitions.
-</span><span class="macro">const_assert_ne!</span>(DEVICE_MEMORY_BITS.bits(), <span class="number">0</span>);
-<span class="macro">const_assert_ne!</span>(WRITABLE_BIT.bits(), <span class="number">0</span>);
-<span class="macro">const_assert_ne!</span>(GLOBAL_BIT.bits(), <span class="number">0</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(DEVICE_MEMORY_BITS.bits() != <span class="number">0</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(WRITABLE_BIT.bits() != <span class="number">0</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(GLOBAL_BIT.bits() != <span class="number">0</span>);
 
 
 <span class="doccomment">/// See [`PteFlags::new()`] for what bits are set by default.

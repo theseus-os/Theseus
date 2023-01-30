@@ -270,7 +270,7 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) log_size:                    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowTableContext&gt;(), <span class="number">4</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;FlowTableContext&gt;() == <span class="number">4</span>);
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>FlowTableContext {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
@@ -327,7 +327,7 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) match_criteria_enable:           Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowGroupInput&gt;(), <span class="number">48</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;FlowGroupInput&gt;() == <span class="number">48</span>);
 
 <span class="kw">impl </span>FlowGroupInput {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(
@@ -377,7 +377,7 @@
     _padding2:                              [u8; <span class="number">28</span>]
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowEntryInput&gt;(), <span class="number">48</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;FlowEntryInput&gt;() == <span class="number">48</span>);
 
 <span class="kw">impl </span>FlowEntryInput {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(table_type: FlowTableType, table_id: u32, flow_index: u32) -&gt; FlowEntryInput {
@@ -423,7 +423,7 @@
     _padding3:                              [u8; <span class="number">20</span>] 
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;FlowContext&gt;(), <span class="number">40</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;FlowContext&gt;() == <span class="number">40</span>);
 
 <span class="kw">impl </span>Default <span class="kw">for </span>FlowContext {
     <span class="kw">fn </span>default() -&gt; FlowContext {
@@ -475,7 +475,7 @@
 
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DestinationEntry&gt;(), <span class="number">8</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;DestinationEntry&gt;() == <span class="number">8</span>);
 
 <span class="kw">impl </span>DestinationEntry {
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>init(dest_type: DestinationType, dest_id: u32) -&gt; DestinationEntry {

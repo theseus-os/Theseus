@@ -577,6 +577,12 @@
 <a href="#577" id="577">577</a>
 <a href="#578" id="578">578</a>
 <a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.
 //! 
 //! The registers are divided into multiple structs because we need to separate out the 
@@ -651,7 +657,7 @@
 
 </span>} <span class="comment">// 1 4KiB page
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters1&gt;(), <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters1&gt;() == <span class="number">4096</span>);
 
 <span class="doccomment">/// The layout in memory of the first set of receive queue registers of the 82599 device.
 </span><span class="attr">#[derive(FromBytes)]
@@ -662,7 +668,7 @@
 
 </span>} <span class="comment">// 1 4KiB page
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRxRegisters1&gt;(), <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeRxRegisters1&gt;() == <span class="number">4096</span>);
 
 <span class="doccomment">/// The layout in memory of the second set of general registers of the 82599 device.
 </span><span class="attr">#[derive(FromBytes)]
@@ -769,7 +775,7 @@
     </span>_padding21:                         [u8; <span class="number">3768</span>],             <span class="comment">// 0x5148 - 0x5FFF
 </span>} <span class="comment">// 4 4KiB page
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters2&gt;(), <span class="number">4 </span>* <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters2&gt;() == <span class="number">4 </span>* <span class="number">4096</span>);
 
 <span class="doccomment">/// The layout in memory of the transmit queue registers of the 82599 device.
 </span><span class="attr">#[derive(FromBytes)]
@@ -779,7 +785,7 @@
     </span><span class="kw">pub </span>tx_regs:                        [RegistersTx; <span class="number">128</span>],     <span class="comment">// 0x6000 - 0x7FFF
 </span>} <span class="comment">// 2 4KiB page
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeTxRegisters&gt;(), <span class="number">2 </span>* <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeTxRegisters&gt;() == <span class="number">2 </span>* <span class="number">4096</span>);
 
 <span class="doccomment">/// The layout in memory of the set of registers containing the MAC address of the 82599 device.
 </span><span class="attr">#[derive(FromBytes)]
@@ -802,7 +808,7 @@
     </span>_padding4:                          [u8; <span class="number">992</span>],              <span class="comment">// 0xCC20 - 0xCFFF
 </span>} <span class="comment">// 5 4KiB page
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeMacRegisters&gt;(), <span class="number">5 </span>* <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeMacRegisters&gt;() == <span class="number">5 </span>* <span class="number">4096</span>);
 
 <span class="doccomment">/// The layout in memory of the second set of receive queue registers of the 82599 device.
 </span><span class="attr">#[derive(FromBytes)]
@@ -812,7 +818,7 @@
     </span><span class="kw">pub </span>rx_regs2:                       [RegistersRx; <span class="number">64</span>],      <span class="comment">// 0xD000 - 0xDFFF, for 64 queues
 </span>} <span class="comment">// 1 4KiB page
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRxRegisters2&gt;(), <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeRxRegisters2&gt;() == <span class="number">4096</span>);
 
 <span class="doccomment">/// The layout in memory of the third set of general registers of the 82599 device.
 </span><span class="attr">#[derive(FromBytes)]
@@ -874,13 +880,19 @@
 
 </span>} <span class="comment">// 18 4KiB page (total NIC mem = 128 KB)
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters3&gt;(), <span class="number">18 </span>* <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters3&gt;() == <span class="number">18 </span>* <span class="number">4096</span>);
 
 <span class="comment">// check that the sum of all the register structs is equal to the memory of the ixgbe device (128 KiB).
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIxgbeRegisters1&gt;() + core::mem::size_of::&lt;IntelIxgbeRxRegisters1&gt;() +
-    core::mem::size_of::&lt;IntelIxgbeRegisters2&gt;() + core::mem::size_of::&lt;IntelIxgbeTxRegisters&gt;() + 
-    core::mem::size_of::&lt;IntelIxgbeMacRegisters&gt;() + core::mem::size_of::&lt;IntelIxgbeRxRegisters2&gt;() +
-    core::mem::size_of::&lt;IntelIxgbeRegisters3&gt;(), <span class="number">0x20000</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(
+    core::mem::size_of::&lt;IntelIxgbeRegisters1&gt;()
+    + core::mem::size_of::&lt;IntelIxgbeRxRegisters1&gt;()
+    + core::mem::size_of::&lt;IntelIxgbeRegisters2&gt;()
+    + core::mem::size_of::&lt;IntelIxgbeTxRegisters&gt;()
+    + core::mem::size_of::&lt;IntelIxgbeMacRegisters&gt;()
+    + core::mem::size_of::&lt;IntelIxgbeRxRegisters2&gt;()
+    + core::mem::size_of::&lt;IntelIxgbeRegisters3&gt;()
+    == <span class="number">0x20000
+</span>);
 
 <span class="doccomment">/// Set of registers associated with one transmit descriptor queue.
 </span><span class="attr">#[derive(FromBytes)]
@@ -917,7 +929,7 @@
     </span><span class="kw">pub </span>tdwbah:                         Volatile&lt;u32&gt;,          <span class="comment">// 0x603C
 </span>} <span class="comment">// 64B
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;RegistersTx&gt;(), <span class="number">64</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;RegistersTx&gt;() == <span class="number">64</span>);
 
 <span class="doccomment">/// Set of registers associated with one receive descriptor queue.
 </span><span class="attr">#[derive(FromBytes)]
@@ -950,7 +962,7 @@
     </span>_padding2:                          [u8;<span class="number">20</span>],                <span class="comment">// 0x102C - 0x103F                                            
 </span>} <span class="comment">// 64B
 
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;RegistersRx&gt;(), <span class="number">64</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;RegistersRx&gt;() == <span class="number">64</span>);
 
 <span class="doccomment">/// Offset where the RDT register starts for the first 64 rx queues
 </span><span class="kw">pub const </span>RDT_1:                        usize = <span class="number">0x1018</span>;
@@ -1155,5 +1167,6 @@
 <span class="doccomment">/// The bits in the lower address register that need to be cleared and set
 </span><span class="kw">pub const </span>MSIX_ADDRESS_BITS:        u32 = <span class="number">0xFFFF_FFF0</span>;
 <span class="doccomment">/// Clear the vector control field to unmask the interrupt
-</span><span class="kw">pub const </span>MSIX_UNMASK_INT:          u32 = <span class="number">0</span>;</code></pre></div>
+</span><span class="kw">pub const </span>MSIX_UNMASK_INT:          u32 = <span class="number">0</span>;
+</code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ixgbe" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

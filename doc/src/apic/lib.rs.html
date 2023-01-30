@@ -822,7 +822,6 @@
 <a href="#822" id="822">822</a>
 <a href="#823" id="823">823</a>
 <a href="#824" id="824">824</a>
-<a href="#825" id="825">825</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
@@ -839,7 +838,6 @@
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>pit_clock_basic::pit_wait;
 <span class="kw">use </span>bit_field::BitField;
-<span class="kw">use </span>static_assertions::{const_assert, const_assert_eq};
 <span class="kw">use </span>log::{error, info, debug, trace};
 
 <span class="doccomment">/// A unique identifier for a CPU core.
@@ -864,7 +862,7 @@
 }
 
 <span class="comment">// Ensure that `AtomicCell&lt;InterruptChip&gt;` is actually a lock-free atomic.
-</span><span class="macro">const_assert!</span>(AtomicCell::&lt;InterruptChip&gt;::is_lock_free());
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;InterruptChip&gt;::is_lock_free());
 
 <span class="doccomment">/// The set of system-wide `LocalApic`s, one per CPU core.
 </span><span class="kw">static </span>LOCAL_APICS: AtomicMap&lt;CpuId, RwLockIrqSafe&lt;LocalApic&gt;&gt; = AtomicMap::new();
@@ -1069,7 +1067,7 @@
     </span>_padding23:                       [u32; <span class="number">3 </span>+ <span class="number">4</span>],
     <span class="comment">// ends at 0x400
 </span>}
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;ApicRegisters&gt;(), <span class="number">0x400</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;ApicRegisters&gt;() == <span class="number">0x400</span>);
 
 
 <span class="attr">#[derive(FromBytes)]
@@ -1092,7 +1090,7 @@
     reg7:                             ReadOnly&lt;u32&gt;,
     _padding7:                        [u32; <span class="number">3</span>],
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;RegisterArray&gt;(), <span class="number">8 </span>* (<span class="number">4 </span>+ <span class="number">12</span>));
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;RegisterArray&gt;() == <span class="number">8 </span>* (<span class="number">4 </span>+ <span class="number">12</span>));
 
 <span class="doccomment">/// The Local APIC&#39;s vector table local interrupt pins.
 </span><span class="attr">#[doc(alias(<span class="string">&quot;lvt&quot;</span>, <span class="string">&quot;lint&quot;</span>, <span class="string">&quot;lint0&quot;</span>, <span class="string">&quot;lint1&quot;</span>))]

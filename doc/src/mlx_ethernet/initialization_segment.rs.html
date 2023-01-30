@@ -173,7 +173,7 @@
     _padding6:                  [u8; <span class="number">12228</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;InitializationSegment&gt;(), <span class="number">16396</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;InitializationSegment&gt;() == <span class="number">16396</span>);
 
 <span class="kw">impl </span>InitializationSegment {
     <span class="doccomment">/// Returns the maximum number of entries that can be in the command queue

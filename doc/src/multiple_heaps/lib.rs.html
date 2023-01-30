@@ -641,7 +641,6 @@
 <a href="#641" id="641">641</a>
 <a href="#642" id="642">642</a>
 <a href="#643" id="643">643</a>
-<a href="#644" id="644">644</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An implementation of an allocator that uses multiple heaps. The heap that will be used on each allocation is determined by a key.
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
@@ -1220,7 +1219,6 @@
 
 } <span class="kw">else </span>{
     <span class="kw">extern crate </span>intrusive_collections;
-    <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 
     <span class="kw">use </span>intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
 
@@ -1233,7 +1231,7 @@
 
     <span class="comment">// Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
     // Otherwise we will have a recursive loop of large allocations.
-    </span><span class="macro">const_assert!</span>(core::mem::size_of::&lt;LargeAllocation&gt;() &lt; ZoneAllocator::MAX_ALLOC_SIZE); 
+    </span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;LargeAllocation&gt;() &lt; ZoneAllocator::MAX_ALLOC_SIZE);
 
     <span class="macro">intrusive_adapter!</span>(LargeAllocationAdapter = Box&lt;LargeAllocation&gt;: LargeAllocation { link: RBTreeLink });
 

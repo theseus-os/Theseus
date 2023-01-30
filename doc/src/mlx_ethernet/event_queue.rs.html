@@ -198,7 +198,7 @@
     _padding4:          [u8;<span class="number">16</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;EventQueueContext&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;EventQueueContext&gt;() == <span class="number">64</span>);
 
 <span class="kw">impl </span>EventQueueContext {
     <span class="doccomment">/// Create and initialize the fields of the EQ context.
@@ -241,7 +241,7 @@
     </span>signature_owner: Volatile&lt;U32&lt;BigEndian&gt;&gt;
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;EventQueueEntry&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;EventQueueEntry&gt;() == <span class="number">64</span>);
 
 <span class="kw">impl </span>EventQueueEntry {
     <span class="kw">pub fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {

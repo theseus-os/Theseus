@@ -2365,7 +2365,7 @@
     </span>permanent_address_l: Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;NicVportContext&gt;(), <span class="number">252</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;NicVportContext&gt;() == <span class="number">252</span>);
 
 <span class="doccomment">/// A struct storing a 4KiB page that can be used as an input or output mailbox
 </span><span class="kw">struct </span>MailboxBuffer {
@@ -3408,7 +3408,7 @@
     </span>token_signature_status_own:     Volatile&lt;U32&lt;BigEndian&gt;&gt;
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CommandQueueEntry&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;CommandQueueEntry&gt;() == <span class="number">64</span>);
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>CommandQueueEntry {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
@@ -3596,7 +3596,7 @@
     /// Should have the same value in the command and the mailbox blocks.
     </span>token_ctrl_signature:   Volatile&lt;U32&lt;BigEndian&gt;&gt;
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CommandInterfaceMailbox&gt;(), MAILBOX_SIZE_IN_BYTES);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;CommandInterfaceMailbox&gt;() == MAILBOX_SIZE_IN_BYTES);
 
 <span class="kw">impl </span>CommandInterfaceMailbox {
     <span class="doccomment">/// Sets all fields of the mailbox to 0.
@@ -3708,7 +3708,7 @@
     match_definer:                  ReadOnly&lt;U32&lt;BigEndian&gt;&gt;, 
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;HCACapabilitiesLayout&gt;(), <span class="number">256</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;HCACapabilitiesLayout&gt;() == <span class="number">256</span>);
 
 <span class="doccomment">/// The HCA capabilities are stored in this struct after being extracted from [`HCACapabilitiesLayout`]
 </span><span class="attr">#[allow(dead_code)]

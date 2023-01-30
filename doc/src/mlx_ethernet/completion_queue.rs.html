@@ -367,7 +367,7 @@
     </span>dbr_addr_l:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CompletionQueueContext&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;CompletionQueueContext&gt;() == <span class="number">64</span>);
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>CompletionQueueContext {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
@@ -480,7 +480,7 @@
     </span>owner:                  Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CompletionQueueEntry&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;CompletionQueueEntry&gt;() == <span class="number">64</span>);
 
 <span class="attr">#[allow(unused)]
 </span><span class="kw">impl </span>CompletionQueueEntry {
@@ -547,7 +547,7 @@
     </span>arm_ci:             Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), <span class="number">8</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;() == <span class="number">8</span>);
 
 <span class="doccomment">/// A data structure that contains the CQ buffer 
 /// and is used to interact with the CQ once initialized.

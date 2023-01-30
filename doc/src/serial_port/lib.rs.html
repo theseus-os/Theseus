@@ -409,7 +409,6 @@
 
 #[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
 <span class="kw">extern crate </span>spin;
 <span class="kw">extern crate </span>irq_safety;
 <span class="kw">extern crate </span>interrupts;
@@ -748,8 +747,9 @@
     <span class="kw">pub </span>len: u8,
     <span class="kw">pub </span>data: [u8; (<span class="number">64 </span>- <span class="number">1</span>)],
 }
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DataChunk&gt;(), <span class="number">64</span>);
-<span class="macro">const_assert_eq!</span>(core::mem::align_of::&lt;DataChunk&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;DataChunk&gt;() == <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;DataChunk&gt;() == <span class="number">64</span>);
+
 <span class="kw">impl </span>DataChunk {
     <span class="doccomment">/// Returns a new `DataChunk` filled with zeroes that can be written into.
     </span><span class="kw">pub const fn </span>empty() -&gt; <span class="self">Self </span>{

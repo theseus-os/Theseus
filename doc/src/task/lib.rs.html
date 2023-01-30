@@ -2041,8 +2041,8 @@
 }
 
 <span class="comment">// Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
-</span><span class="macro">const_assert!</span>(AtomicCell::&lt;OptionU8&gt;::is_lock_free());
-<span class="macro">const_assert!</span>(AtomicCell::&lt;RunState&gt;::is_lock_free());
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;OptionU8&gt;::is_lock_free());
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;RunState&gt;::is_lock_free());
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Task {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {

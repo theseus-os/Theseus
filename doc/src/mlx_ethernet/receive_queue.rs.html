@@ -282,7 +282,7 @@
     _padding4:              [u8; <span class="number">20</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;TransportInterfaceReceiveContext&gt;(), <span class="number">92</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;TransportInterfaceReceiveContext&gt;() == <span class="number">92</span>);
 
 <span class="kw">impl </span>TransportInterfaceReceiveContext {
     <span class="doccomment">/// Initialize the TIR object
@@ -339,7 +339,7 @@
     _padding1:                          [u8; <span class="number">20</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;ReceiveQueueContext&gt;(), <span class="number">48</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;ReceiveQueueContext&gt;() == <span class="number">48</span>);
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>ReceiveQueueContext {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {

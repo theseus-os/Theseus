@@ -233,7 +233,7 @@
 <span class="comment">// TODO: Hardware may use more than 4kB, which means the registers may occupy
 //       more than one contiguous page.
 //       Currently we assume the IOMMU registers occupy only a single page.
-</span><span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;IntelIommuRegisters&gt;(), <span class="number">4096</span>);
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;IntelIommuRegisters&gt;() == <span class="number">4096</span>);
 
 <span class="doccomment">/// Helper struct for decoding and printing capability register
 </span><span class="kw">pub struct </span>Capability(<span class="kw">pub </span>u64);

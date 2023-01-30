@@ -442,20 +442,16 @@
 <a href="#442" id="442">442</a>
 <a href="#443" id="443">443</a>
 <a href="#444" id="444">444</a>
-<a href="#445" id="445">445</a>
-<a href="#446" id="446">446</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aarch64-specific definitions of PTE flags.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::PteFlags;
 <span class="kw">use </span>bitflags::bitflags;
-<span class="kw">use </span>static_assertions::const_assert_eq;
 
 <span class="doccomment">/// A mask for the bits of a page table entry that contain the physical frame address.
 </span><span class="kw">pub const </span>PTE_FRAME_MASK: u64 = <span class="number">0x0000_FFFF_FFFF_F000</span>;
 
 <span class="comment">// Ensure that we never expose reserved bits [12:47] as part of the `PteFlagsAarch64` interface.
-</span><span class="macro">const_assert_eq!</span>(PteFlagsAarch64::all().bits() &amp; PTE_FRAME_MASK, <span class="number">0</span>);
-
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(PteFlagsAarch64::all().bits() &amp; PTE_FRAME_MASK == <span class="number">0</span>);
 
 <span class="macro">bitflags! </span>{
     <span class="doccomment">/// Page table entry (PTE) flags on aarch64.

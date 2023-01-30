@@ -324,7 +324,7 @@
     _padding3:          [u32; <span class="number">28</span>]
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;TransportInterfaceSendContext&gt;(), <span class="number">160</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;TransportInterfaceSendContext&gt;() == <span class="number">160</span>);
 
 <span class="kw">impl </span>TransportInterfaceSendContext {
     <span class="doccomment">/// Create and initialize a TIS object
@@ -372,7 +372,7 @@
     </span>tis_num_0:                          Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;SendQueueContext&gt;(), <span class="number">48</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;SendQueueContext&gt;() == <span class="number">48</span>);
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>SendQueueContext {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {

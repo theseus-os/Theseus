@@ -438,7 +438,7 @@
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) send_counter:   Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;DoorbellRecord&gt;(), <span class="number">8</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;DoorbellRecord&gt;() == <span class="number">8</span>);
 
 <span class="doccomment">/// The possible formats for a WQ buffer.
 </span><span class="attr">#[derive(Debug, TryFromPrimitive)]
@@ -488,7 +488,7 @@
     _padding1:                          [u64; <span class="number">19</span>],
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;WorkQueue&gt;(), <span class="number">192</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;WorkQueue&gt;() == <span class="number">192</span>);
 
 <span class="kw">impl </span>WorkQueue {
     <span class="doccomment">/// Create and initialize the fields of the WQ for a SQ or RQ context.
@@ -586,7 +586,7 @@
     </span>data: MemoryPointerDataSegment
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;WorkQueueEntrySend&gt;(), <span class="number">64</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;WorkQueueEntrySend&gt;() == <span class="number">64</span>);
 
 <span class="kw">impl </span>WorkQueueEntrySend {
     <span class="doccomment">/// set a WQE to an initial state
@@ -639,7 +639,7 @@
     </span>data: MemoryPointerDataSegment
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;WorkQueueEntryReceive&gt;(), <span class="number">16</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;WorkQueueEntryReceive&gt;() == <span class="number">16</span>);
 
 <span class="kw">impl </span>WorkQueueEntryReceive {
     <span class="doccomment">/// set a WQE to an initial state
@@ -703,7 +703,7 @@
     </span>ctrl_general_id:                Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;ControlSegment&gt;(), <span class="number">16</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;ControlSegment&gt;() == <span class="number">16</span>);
 
 <span class="kw">impl </span>ControlSegment {
     <span class="doccomment">/// Initialize the fields of the control segment.
@@ -767,7 +767,7 @@
     </span>inline_headers_4:       Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;EthSegment&gt;(), <span class="number">32</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;EthSegment&gt;() == <span class="number">32</span>);
 
 <span class="kw">impl </span>EthSegment {
     <span class="doccomment">/// Initialize the fields of the eth segment to send a packet.
@@ -800,7 +800,7 @@
     </span>local_address_l:    Volatile&lt;U32&lt;BigEndian&gt;&gt;,
 }
 
-<span class="macro">const_assert_eq!</span>(core::mem::size_of::&lt;MemoryPointerDataSegment&gt;(), <span class="number">16</span>);
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;MemoryPointerDataSegment&gt;() == <span class="number">16</span>);
 
 <span class="kw">impl </span>MemoryPointerDataSegment {
     <span class="doccomment">/// Initialize the fields of the data segment to send or receive a packet.
