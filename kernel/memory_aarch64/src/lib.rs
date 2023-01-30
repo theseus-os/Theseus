@@ -96,6 +96,16 @@ pub fn enable_mmu() {
 }
 
 /// Configures paging for Theseus.
+///
+/// ## Resulting Configuration
+/// * MAIR slot 0 is for cacheable normal DRAM
+/// * MAIR slot 1 is for non-cacheable device memory
+/// * A physical address is 48-bits long
+/// * Only the first translation unit is used (TTBR0)
+/// * The Page Size is 4KiB
+/// * The ASID size is 8 bits.
+/// * The MMU is allowed to update the DIRTY and ACCESSED
+///   flags in a page table entry.
 pub fn configure_translation_registers() {
     unsafe {
         // The MAIR register holds up to 8 memory profiles;
@@ -189,7 +199,9 @@ pub fn configure_translation_registers() {
     }
 }
 
-/// Installs a page table in the TTBR CPU register
+/// Sets the given `page_table` as active by updating the TTBR0 register.
+///
+/// An ASID of all zeros is also configured.
 pub fn set_as_active_page_table_root(page_table: PhysicalAddress) {
     unsafe {
         let page_table_addr = page_table.value() as u64;
