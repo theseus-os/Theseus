@@ -894,7 +894,6 @@ dependencies = [
  "log",
  "memory",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1054,7 +1053,6 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1405,7 +1403,6 @@ dependencies = [
  "memory",
  "sdt",
  "spin 0.9.4",
- "static_assertions",
  "time",
  "volatile 0.2.7",
  "zerocopy",
@@ -1815,7 +1812,6 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -2949,7 +2945,6 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -3132,7 +3127,6 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
- "static_assertions",
  "zerocopy",
 ]
 

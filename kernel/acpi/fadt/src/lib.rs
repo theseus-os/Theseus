@@ -2,12 +2,6 @@
 
 #![no_std]
 
-extern crate memory;
-extern crate sdt;
-extern crate acpi_table;
-extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
-
 use memory::PhysicalAddress;
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiSignature, AcpiTables};
@@ -87,7 +81,8 @@ pub struct Fadt {
     pub x_gpe0_block: GenericAddressStructure,
     pub x_gpe1_block: GenericAddressStructure,
 }
-const_assert_eq!(core::mem::size_of::<Fadt>(), 244);
+const _: () = assert!(core::mem::size_of::<Fadt>() == 244);
+const _: () = assert!(core::mem::align_of::<Fadt>() == 1);
 
 impl Fadt {
     /// Finds the FADT in the given `AcpiTables` and returns a reference to it.

@@ -14,10 +14,6 @@
 
 #![no_std]
 
-extern crate memory;
-extern crate sdt;
-extern crate acpi_table;
-
 use core::mem::size_of;
 use memory::PhysicalAddress;
 use sdt::{Sdt, SDT_SIZE_IN_BYTES};
