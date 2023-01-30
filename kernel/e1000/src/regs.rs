@@ -86,8 +86,13 @@ pub struct E1000MacRegisters {
 const _: () = assert!(core::mem::size_of::<E1000MacRegisters>() == 28 * 4096);
 
 // check that the sum of all the register structs is equal to the memory of the e1000 device (128 KiB).
-const _: () = assert!(core::mem::size_of::<E1000Registers>() + core::mem::size_of::<E1000RxRegisters>() +   
-    core::mem::size_of::<E1000TxRegisters>() + core::mem::size_of::<E1000MacRegisters>() == 0x20000);
+const _: () = assert!(
+    core::mem::size_of::<E1000Registers>()
+    + core::mem::size_of::<E1000RxRegisters>()
+    + core::mem::size_of::<E1000TxRegisters>()
+    + core::mem::size_of::<E1000MacRegisters>()
+    == 0x20000
+);
 
 
 /// Struct that holds registers related to one receive queue.
