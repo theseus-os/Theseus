@@ -205,6 +205,7 @@ impl PteFlagsAarch64 {
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
     /// * `OUTER_SHAREABLE` is set.
     /// * `READ_ONLY` is set.
+    /// * `PAGE_DESCRIPTOR` is set.
     /// * `ACCESSED` is set.
     /// * `NOT_GLOBAL` is set.
     /// * the `NOT_EXECUTABLE` bits are set.
@@ -220,8 +221,8 @@ impl PteFlagsAarch64 {
         Self::from_bits_truncate(
             Self::NORMAL_MEMORY.bits
             | Self::OUTER_SHAREABLE.bits
-            | Self::PAGE_DESCRIPTOR.bits
             | Self::READ_ONLY.bits
+            | Self::PAGE_DESCRIPTOR.bits
             | Self::ACCESSED.bits
             | Self::_NOT_GLOBAL.bits
             | Self::NOT_EXECUTABLE.bits
