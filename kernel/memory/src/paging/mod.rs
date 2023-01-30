@@ -203,6 +203,8 @@ impl PageTable {
         #[cfg(target_arch = "aarch64")]
         set_as_active_page_table_root(new_table.physical_address());
 
+        // This is only required on aarch64
+        #[cfg(target_arch = "aarch64")]
         tlb_flush_all();
     }
 
