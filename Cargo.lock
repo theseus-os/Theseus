@@ -118,7 +118,6 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -155,7 +154,6 @@ dependencies = [
  "log",
  "mpmc",
  "spin 0.9.4",
- "static_assertions",
  "task",
  "wait_queue",
 ]
@@ -621,7 +619,6 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.4",
- "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -936,7 +933,6 @@ dependencies = [
  "nic_queues",
  "pci",
  "spin 0.9.4",
- "static_assertions",
  "task",
  "volatile 0.2.7",
  "x86_64",
@@ -1528,7 +1524,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1580,7 +1575,6 @@ dependencies = [
  "rand",
  "runqueue",
  "spin 0.9.4",
- "static_assertions",
  "virtual_nic",
  "volatile 0.2.7",
  "x86_64",
@@ -1987,7 +1981,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "num_enum",
- "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -2128,7 +2121,6 @@ dependencies = [
  "slabmalloc_safe",
  "slabmalloc_unsafe",
  "spin 0.9.4",
- "static_assertions",
 ]
 
 [[package]]
@@ -2716,7 +2708,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
- "static_assertions",
 ]
 
 [[package]]
@@ -3191,7 +3182,6 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.4",
- "static_assertions",
  "x86_64",
 ]
 
@@ -3966,9 +3956,6 @@ dependencies = [
 [[package]]
 name = "thread_local_macro"
 version = "0.1.0"
-dependencies = [
- "static_assertions",
-]
 
 [[package]]
 name = "time"
@@ -3976,7 +3963,6 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
  "log",
- "static_assertions",
 ]
 
 [[package]]

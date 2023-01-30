@@ -440,7 +440,7 @@ struct NicVportContext {
     permanent_address_l: Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<NicVportContext>(), 252);
+const _: () = assert!(core::mem::size_of::<NicVportContext>() == 252);
 
 /// A struct storing a 4KiB page that can be used as an input or output mailbox
 struct MailboxBuffer {
@@ -1483,7 +1483,7 @@ pub struct CommandQueueEntry {
     token_signature_status_own:     Volatile<U32<BigEndian>>
 }
 
-const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
+const _: () = assert!(core::mem::size_of::<CommandQueueEntry>() == 64);
 
 impl fmt::Debug for CommandQueueEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1671,7 +1671,7 @@ struct CommandInterfaceMailbox {
     /// Should have the same value in the command and the mailbox blocks.
     token_ctrl_signature:   Volatile<U32<BigEndian>>
 }
-const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), MAILBOX_SIZE_IN_BYTES);
+const _: () = assert!(core::mem::size_of::<CommandInterfaceMailbox>() == MAILBOX_SIZE_IN_BYTES);
 
 impl CommandInterfaceMailbox {
     /// Sets all fields of the mailbox to 0.
@@ -1783,7 +1783,7 @@ struct HCACapabilitiesLayout {
     match_definer:                  ReadOnly<U32<BigEndian>>, 
 }
 
-const_assert_eq!(core::mem::size_of::<HCACapabilitiesLayout>(), 256);
+const _: () = assert!(core::mem::size_of::<HCACapabilitiesLayout>() == 256);
 
 /// The HCA capabilities are stored in this struct after being extracted from [`HCACapabilitiesLayout`]
 #[allow(dead_code)]

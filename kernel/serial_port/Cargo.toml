@@ -9,7 +9,6 @@ log = "0.4.8"
 spin = "0.9.4"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 x86_64 = "0.14.8"
-static_assertions = "1.1.0"
 
 [dependencies.serial_port_basic]
 path = "../serial_port_basic"
