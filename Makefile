@@ -798,7 +798,7 @@ endif
 ifeq ($(boot_spec), bios)
 	QEMU_FLAGS += -cdrom $(iso) -boot d
 else ifeq ($(boot_spec), uefi)
-	QEMU_FLAGS += -pflash $(efi_firmware)
+	QEMU_FLAGS += -bios $(efi_firmware)
 	QEMU_FLAGS += -drive format=raw,file=$(iso)
 endif
 ## Don't reboot or shutdown upon failure or a triple reset
