@@ -526,7 +526,7 @@ simd_personality_sse: clean-old-build build_sse build
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 
@@ -543,7 +543,7 @@ simd_personality_avx: clean-old-build build_avx build
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 
