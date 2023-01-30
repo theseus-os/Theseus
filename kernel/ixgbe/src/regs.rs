@@ -298,10 +298,16 @@ pub struct IntelIxgbeRegisters3 {
 const _: () = assert!(core::mem::size_of::<IntelIxgbeRegisters3>() == 18 * 4096);
 
 // check that the sum of all the register structs is equal to the memory of the ixgbe device (128 KiB).
-const _: () = assert!(core::mem::size_of::<IntelIxgbeRegisters1>() + core::mem::size_of::<IntelIxgbeRxRegisters1>() +
-    core::mem::size_of::<IntelIxgbeRegisters2>() + core::mem::size_of::<IntelIxgbeTxRegisters>() + 
-    core::mem::size_of::<IntelIxgbeMacRegisters>() + core::mem::size_of::<IntelIxgbeRxRegisters2>() +
-    core::mem::size_of::<IntelIxgbeRegisters3>() == 0x20000);
+const _: () = assert!(
+    core::mem::size_of::<IntelIxgbeRegisters1>()
+    + core::mem::size_of::<IntelIxgbeRxRegisters1>()
+    + core::mem::size_of::<IntelIxgbeRegisters2>()
+    + core::mem::size_of::<IntelIxgbeTxRegisters>()
+    + core::mem::size_of::<IntelIxgbeMacRegisters>()
+    + core::mem::size_of::<IntelIxgbeRxRegisters2>()
+    + core::mem::size_of::<IntelIxgbeRegisters3>()
+    == 0x20000
+);
 
 /// Set of registers associated with one transmit descriptor queue.
 #[derive(FromBytes)]
