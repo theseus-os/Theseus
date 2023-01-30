@@ -86,7 +86,7 @@ impl crate::Module for Module {
                 .iter()
                 .find(|region| region.kind == MODULES_MEMORY_KIND)
                 .expect("no modules region")
-                .start as usize
+                .start
                 + self.inner.offset,
         )
     }
@@ -169,14 +169,14 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
                 .filter(|section| section.size > 0)
                 .map(|section| section.start + section.size)
                 .max()
-                .ok_or("couldn't find kernel end address")? as usize,
+                .ok_or("couldn't find kernel end address")?
         )
         .ok_or("kernel virtual end address was invalid")
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {
         self.rsdp_address
-            .map(|address| PhysicalAddress::new_canonical(address))
+            .map(PhysicalAddress::new_canonical)
     }
 
     fn stack_size(&self) -> Result<usize, &'static str> {

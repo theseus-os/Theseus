@@ -266,7 +266,7 @@ impl<'rwlock, T: ?Sized> Deref for RwLockSleepReadGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-       & *(self.guard) 
+       &self.guard
     }
 }
 
@@ -274,13 +274,13 @@ impl<'rwlock, T: ?Sized> Deref for RwLockSleepWriteGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-        & *(self.guard)
+        &self.guard
     }
 }
 
 impl<'rwlock, T: ?Sized> DerefMut for RwLockSleepWriteGuard<'rwlock, T> {
     fn deref_mut(&mut self) -> &mut T { 
-        &mut *(self.guard)
+        &mut self.guard
     }
 }
 

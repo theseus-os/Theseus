@@ -64,7 +64,7 @@ impl RoundRobinTaskRef {
     /// Creates a new `RoundRobinTaskRef` that wraps the given `TaskRef`.
     pub fn new(taskref: TaskRef) -> RoundRobinTaskRef {
         RoundRobinTaskRef {
-            taskref: taskref,
+            taskref,
             context_switches: 0,
         }
     }
@@ -127,11 +127,6 @@ impl RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
-
-        #[cfg(runqueue_spillful)] 
-        {
-            task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
-        }
 
         if RUNQUEUES.insert(which_core, new_rq).is_some() {
             error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
@@ -196,10 +191,6 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this RunQueue.
     fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
-        #[cfg(runqueue_spillful)] {
-            task.set_on_runqueue(Some(self.core));
-        }
-
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("Adding task to runqueue_round_robin {}, {:?}", self.core, task);
 
@@ -218,9 +209,8 @@ impl RunQueue {
         Ok(())
     }
 
-
-    /// The internal function that actually removes the task from the runqueue.
-    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    /// Removes a `TaskRef` from this RunQueue.
+    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         #[cfg(not(any(rq_eval, downtime_eval)))]
         debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
@@ -237,20 +227,6 @@ impl RunQueue {
     }
 
 
-    /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, _task: &TaskRef) -> Result<(), &'static str> {
-        #[cfg(runqueue_spillful)] {
-            // For the runqueue state spill evaluation, we disable this method because we 
-            // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
-            // trace!("skipping remove_task() on core {}, task {:?}", self.core, _task);
-            return Ok(());
-        }
-        #[cfg(not(runqueue_spillful))] {
-            self.remove_internal(_task)
-        }
-    }
-
-
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
@@ -259,23 +235,5 @@ impl RunQueue {
             rq.write().remove_task(task)?;
         }
         Ok(())
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
-    /// Note: This method is only used by the state spillful runqueue implementation.
-    pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
-        #[cfg(not(rq_eval))]
-        warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
-        task.set_on_runqueue(None);
-        RUNQUEUES.get(&core)
-            .ok_or("Couldn't get runqueue for specified core")
-            .and_then(|rq| {
-                // Instead of calling `remove_task`, we directly call `remove_internal`
-                // because we want to actually remove the task from the runqueue,
-                // as calling `remove_task` would do nothing due to it skipping the actual removal
-                // when the `runqueue_spillful` cfg is enabled.
-                rq.write().remove_internal(task)
-            })
     }
 }

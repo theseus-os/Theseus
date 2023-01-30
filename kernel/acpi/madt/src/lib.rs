@@ -385,7 +385,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
 fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Result<(), &'static str> {
     for madt_entry in madt_iter {
         if let MadtEntry::IoApic(ioa) = madt_entry {
-            ioapic::IoApic::new(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
+            ioapic::IoApic::create(page_table, ioa.id, PhysicalAddress::new_canonical(ioa.address as usize), ioa.gsi_base)?;
         }
     }
     Ok(())
@@ -398,11 +398,11 @@ fn handle_ioapic_entries(madt_iter: MadtIter, page_table: &mut PageTable) -> Res
 pub fn find_nmi_entry_for_processor(processor: u8, madt_iter: MadtIter) -> (u8, u16) {
     for madt_entry in madt_iter {
         if let MadtEntry::NonMaskableInterrupt(nmi) = madt_entry {
-                // NMI entries are based on the "processor" id, not the "apic_id"
-                // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
-                if nmi.processor == processor || nmi.processor == 0xFF  {
-                    return (nmi.lint, nmi.flags);
-                }
+            // NMI entries are based on the "processor" id, not the "apic_id"
+            // Return this Nmi entry if it's for the given lapic, or if it's for all lapics
+            if nmi.processor == processor || nmi.processor == 0xFF  {
+                return (nmi.lint, nmi.flags);
+            }
         }
     }
 

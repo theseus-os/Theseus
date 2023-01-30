@@ -171,7 +171,7 @@ impl SerialPort {
             interrupt_handler,
             serial_port_receive_deferred,
             serial_port,
-            Some(format!("serial_port_deferred_task_irq_{:#X}", interrupt_number)),
+            Some(format!("serial_port_deferred_task_irq_{interrupt_number:#X}")),
         );
 
         match registration_result {
@@ -226,9 +226,9 @@ impl SerialPort {
     pub fn set_data_sender(
         &mut self,
         sender: Sender<DataChunk>
-    ) -> Result<(), ()> {
+    ) -> Result<(), DataSenderAlreadyExists> {
         if self.data_sender.is_some() { 
-            Err(())
+            Err(DataSenderAlreadyExists)
         } else {
             self.data_sender = Some(sender);
             Ok(())
@@ -236,6 +236,11 @@ impl SerialPort {
     }
 
 }
+
+/// An empty error type indicating that a data sender could not be set
+/// for a serial port because a sender had already been set for it.
+#[derive(Debug)]
+pub struct DataSenderAlreadyExists;
 
 
 /// A non-blocking implementation of [`core2::io::Read`] that will read bytes into the given `buf`

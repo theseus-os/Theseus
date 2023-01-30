@@ -283,11 +283,6 @@ pub fn init(
         let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         let data_flags    = aggregated_section_memory_bounds.data.flags;
 
-        let init_identity_mapped_pages:    NoDrop<MappedPages>;
-        let text_identity_mapped_pages:    NoDrop<MappedPages>;
-        let rodata_identity_mapped_pages:  NoDrop<MappedPages>;
-        let data_identity_mapped_pages:    NoDrop<MappedPages>;
-        let additional_mapped_pages:       NoDrop<MappedPages>;
         let mut boot_info_mapped_pages:    Option<MappedPages> = None;
 
         let init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())?;
@@ -296,7 +291,7 @@ pub fn init(
             VirtualAddress::new_canonical(init_start_phys.value()),
             init_end_phys.value() - init_start_phys.value(),
         )?;
-        init_identity_mapped_pages = NoDrop::new( unsafe {
+        let init_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, &init_frames, init_flags)?
         });
         let mut init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)?;
@@ -307,7 +302,7 @@ pub fn init(
             VirtualAddress::new_canonical(text_start_phys.value()),
             text_end_phys.value() - text_start_phys.value(),
         )?;
-        text_identity_mapped_pages = NoDrop::new( unsafe {
+        let text_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         });
         init_mapped_pages.merge(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?).map_err(|(error, _)| error)?;
@@ -319,7 +314,7 @@ pub fn init(
             VirtualAddress::new_canonical(rodata_start_phys.value()),
             rodata_end_phys.value() - rodata_start_phys.value(),
         )?;
-        rodata_identity_mapped_pages = NoDrop::new( unsafe {
+        let rodata_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
         });
         let rodata_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?);
@@ -330,7 +325,7 @@ pub fn init(
             VirtualAddress::new_canonical(data_start_phys.value()),
             data_end_phys.value() - data_start_phys.value(),
         )?;
-        data_identity_mapped_pages = NoDrop::new( unsafe {
+        let data_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, &data_frames, data_flags)?
         });
         let data_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?);
@@ -368,7 +363,7 @@ pub fn init(
             vga_size_in_bytes,
         )?;
         let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
-        additional_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(
+        let additional_mapped_pages: NoDrop<MappedPages> = NoDrop::new(new_mapper.map_allocated_pages_to(
             vga_display_pages_identity, vga_display_frames, vga_flags,
         )?);
 

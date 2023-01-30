@@ -303,7 +303,6 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame)
 
     // Callback to the sleep API to unblock tasks whose waiting time is over
     // and alert to update the number of ticks elapsed
-    sleep::increment_tick_count();
     sleep::unblock_sleeping_tasks();
     
     // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return

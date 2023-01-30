@@ -94,10 +94,7 @@ impl<T: ?Sized> RwLockPreempt<T> {
     /// ```
     pub fn read(&self) -> RwLockPreemptReadGuard<T> {
         loop {
-            match self.try_read() {
-                Some(guard) => return guard,
-                _ => {}
-            }
+            if let Some(guard) = self.try_read() { return guard }
         }
     }
 
@@ -189,10 +186,7 @@ impl<T: ?Sized> RwLockPreempt<T> {
     /// ```
     pub fn write(&self) -> RwLockPreemptWriteGuard<T> {
         loop {
-            match self.try_write() {
-                Some(guard) => return guard,
-                _ => {}
-            }
+            if let Some(guard) = self.try_write() { return guard }
         }
     }
 
@@ -262,7 +256,7 @@ impl<'rwlock, T: ?Sized> Deref for RwLockPreemptReadGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-       & *(self.guard) 
+       &self.guard 
     }
 }
 
@@ -270,13 +264,13 @@ impl<'rwlock, T: ?Sized> Deref for RwLockPreemptWriteGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-        & *(self.guard)
+        &self.guard
     }
 }
 
 impl<'rwlock, T: ?Sized> DerefMut for RwLockPreemptWriteGuard<'rwlock, T> {
     fn deref_mut(&mut self) -> &mut T { 
-        &mut *(self.guard)
+        &mut self.guard
     }
 }
 

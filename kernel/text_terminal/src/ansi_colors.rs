@@ -237,5 +237,5 @@ impl From<Color> for UnderlinedColor {
 }
 
 
-const ANSI_ESCAPE_8_BIT_COLOR: &'static str = "5";
-const ANSI_ESCAPE_24_BIT_COLOR: &'static str = "2";
+const ANSI_ESCAPE_8_BIT_COLOR: &str = "5";
+const ANSI_ESCAPE_24_BIT_COLOR: &str = "2";

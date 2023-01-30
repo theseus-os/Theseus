@@ -4,6 +4,8 @@
 //! <https://github.com/tomaka/redshirt/blob/4df506f68821353a7fd67bb94c4223df6b683e1b/kernel/core/src/scheduler/vm.rs>
 //!
 
+#![allow(clippy::type_complexity)]
+
 use alloc::string::String;
 use core::{cell::RefCell, convert::TryFrom as _};
 
@@ -69,10 +71,9 @@ impl ProcessStateMachine {
                 let index = match closure(module_name, field_name, signature) {
                     Ok(i) => i,
                     Err(_) => {
-                        return Err(wasmi::Error::Instantiation(format!(
-                            "Couldn't resolve `{}`:`{}`",
-                            module_name, field_name
-                        )))
+                        return Err(wasmi::Error::Instantiation(
+                            format!("Couldn't resolve `{module_name}`:`{field_name}`")
+                        ))
                     }
                 };
 

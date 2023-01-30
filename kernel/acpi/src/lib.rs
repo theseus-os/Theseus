@@ -92,33 +92,29 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
             );
 
             for table in dmar_table.iter() {
-                #[allow(clippy::single_match)]
-                match table {
-                    dmar::DmarEntry::Drhd(drhd) => {
-                        debug!("Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}", 
-                            drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
-                        );
-                        if !drhd.include_pci_all() {
-                            info!("No IOMMU support when INCLUDE_PCI_ALL not set in DRHD");
-                        } else {
-                            let register_base_address = PhysicalAddress::new(drhd.register_base_address() as usize)
-                                .ok_or("IOMMU register_base_address was invalid")?;
-                            iommu::init(
-                                dmar_table.host_address_width(),
-                                drhd.segment_number(), 
-                                register_base_address,
-                                page_table
-                            )?;
-                        }
-                        debug!("DRHD table has Device Scope entries:");
-                        for (_idx, dev_scope) in drhd.iter().enumerate() {
-                            debug!("    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}", 
-                                _idx, dev_scope.device_type(), dev_scope.enumeration_id(), dev_scope.start_bus_number(),
-                            );
-                            debug!("                  path: {:?}", dev_scope.path());
-                        }
+                if let dmar::DmarEntry::Drhd(drhd) = table {
+                    debug!("Found DRHD table: INCLUDE_PCI_ALL: {:?}, segment_number: {:#X}, register_base_address: {:#X}", 
+                        drhd.include_pci_all(), drhd.segment_number(), drhd.register_base_address(),
+                    );
+                    if !drhd.include_pci_all() {
+                        info!("No IOMMU support when INCLUDE_PCI_ALL not set in DRHD");
+                    } else {
+                        let register_base_address = PhysicalAddress::new(drhd.register_base_address() as usize)
+                            .ok_or("IOMMU register_base_address was invalid")?;
+                        iommu::init(
+                            dmar_table.host_address_width(),
+                            drhd.segment_number(), 
+                            register_base_address,
+                            page_table
+                        )?;
                     }
-                    _ => {  }
+                    debug!("DRHD table has Device Scope entries:");
+                    for (_idx, dev_scope) in drhd.iter().enumerate() {
+                        debug!("    Device Scope [{}]: type: {}, enumeration_id: {}, start_bus_number: {}", 
+                            _idx, dev_scope.device_type(), dev_scope.enumeration_id(), dev_scope.start_bus_number(),
+                        );
+                        debug!("                  path: {:?}", dev_scope.path());
+                    }
                 }
             }
         }
