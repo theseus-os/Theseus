@@ -189,8 +189,6 @@ impl PageTable {
     pub fn switch(&mut self, new_table: &PageTable) {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
-        // perform the actual page table switch
-
         #[cfg(target_arch = "x86_64")]
         unsafe { 
             use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
@@ -200,12 +198,11 @@ impl PageTable {
             )
         };
 
-        #[cfg(target_arch = "aarch64")]
-        set_as_active_page_table_root(new_table.physical_address());
-
-        // This is only required on aarch64
-        #[cfg(target_arch = "aarch64")]
-        tlb_flush_all();
+        #[cfg(target_arch = "aarch64")] {
+            set_as_active_page_table_root(new_table.physical_address());
+            // This is only required on aarch64, as setting CR3 on x86_64 flushes the TLB.
+            tlb_flush_all();
+        }
     }
 
 
