@@ -2,7 +2,7 @@
   "arch": "aarch64",
   "data-layout": "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
   "disable-redzone": true,
-  "features": "+strict-align,+neon,+fp-armv8",
+  "features": "+strict-align,+neon,+soft-float",
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
   "llvm-target": "aarch64-unknown-none-elf",
