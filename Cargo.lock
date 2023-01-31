@@ -2777,8 +2777,9 @@ dependencies = [
 
 [[package]]
 name = "rangemap"
-version = "1.0.3"
-source = "git+https://github.com/jeffparsons/rangemap#8b290d474bae680531bfba42e545e4d0121b70fd"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b9283c6b06096b47afc7109834fdedab891175bb5241ee5d4f7d2546549f263"
 
 [[package]]
 name = "raw-cpuid"
