@@ -302,15 +302,15 @@ where
         // The linker script (linker_higher_half.ld) defines the following order of sections:
         // |------|-------------------|-------------------------------|
         // | Sec  |    Sec Name       |    Description / purpose      |
-        // | Idx  |                   |                               |
+        // | Num  |                   |                               |
         // |------|---------------------------------------------------|
-        // | (0)  | .init             | start of executable pages     |
-        // | (1)  | .text             | end of executable pages       |
-        // | (2)  | .rodata           | start of read-only pages      |
-        // | (3)  | .eh_frame         | part of read-only pages       |
-        // | (4)  | .gcc_except_table | end of read-only pages        |
-        // | (5)  | .data             | start of read-write pages     | 
-        // | (6)  | .bss              | end of read-write pages       |
+        // | (1)  | .init             | start of executable pages     |
+        // | (2)  | .text             | end of executable pages       |
+        // | (3)  | .rodata           | start of read-only pages      |
+        // | (4)  | .eh_frame         | part of read-only pages       |
+        // | (5)  | .gcc_except_table | end of read-only pages        |
+        // | (6)  | .data             | start of read-write pages     | 
+        // | (7)  | .bss              | end of read-write pages       |
         // |------|-------------------|-------------------------------|
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).

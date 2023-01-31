@@ -110,19 +110,19 @@ where
         // The linker script (linker_higher_half.ld) defines the following order of sections:
         // |------|-------------------|-------------------------------|
         // | Sec  |    Sec Name       |    Description / purpose      |
-        // | Idx  |                   |                               |
+        // | Num  |                   |                               |
         // |------|---------------------------------------------------|
-        // | (0)  | .init             | start of executable pages     |
-        // | (1)  | .text             | end of executable pages       |
-        // | (2)  | .rodata           | start of read-only pages      |
-        // | (3)  | .eh_frame         | part of read-only pages       |
-        // | (4)  | .gcc_except_table | part/end of read-only pages   |
-        // | (5)  | .tdata            | part/end of read-only pages   |
-        // | (6)  | .tbss             | part/end of read-only pages   |
-        // | (7)  | .data             | start of read-write pages     | 
-        // | (8)  | .bss              | end of read-write pages       |
-        // | (9)  | .page_table       | separate .data-like section   |
-        // | (10) | .stack            | separate .data-like section   |
+        // | (1)  | .init             | start of executable pages     |
+        // | (2)  | .text             | end of executable pages       |
+        // | (3)  | .rodata           | start of read-only pages      |
+        // | (4)  | .eh_frame         | part of read-only pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     | 
+        // | (9)  | .bss              | end of read-write pages       |
+        // | (10) | .page_table       | separate .data-like section   |
+        // | (11) | .stack            | separate .data-like section   |
         // |------|-------------------|-------------------------------|
         //
         // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
