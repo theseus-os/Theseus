@@ -680,7 +680,7 @@ dependencies = [
 [[package]]
 name = "uefi-bootloader"
 version = "0.1.0"
-source = "git+https://github.com/NathanRoyer/uefi-bootloader?branch=aarch64-fixes#81f90974d2c828eb92f73349c4dad258e3cc5072"
+source = "git+https://github.com/theseus-os/uefi-bootloader#53e5320deac6e04bf3496d6d0b047dc0fa812ba3"
 dependencies = [
  "bit_field",
  "cfg-if",
@@ -702,7 +702,7 @@ dependencies = [
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
-source = "git+https://github.com/NathanRoyer/uefi-bootloader?branch=aarch64-fixes#81f90974d2c828eb92f73349c4dad258e3cc5072"
+source = "git+https://github.com/theseus-os/uefi-bootloader#53e5320deac6e04bf3496d6d0b047dc0fa812ba3"
 
 [[package]]
 name = "uefi-macros"
