@@ -50,7 +50,7 @@ pub fn init() -> Result<(), &'static str> {
     set_max_level(STATIC_MAX_LEVEL);
 
     let kernel_mmi_ref = get_kernel_mmi_ref()
-        .ok_or("logger_aarch64: couldn't map the UART interface")?;
+        .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
 
     let mut locked = kernel_mmi_ref.lock();
     let page_table = &mut locked.deref_mut().page_table;
@@ -59,12 +59,15 @@ pub fn init() -> Result<(), &'static str> {
                    | PteFlags::NOT_EXECUTABLE
                    | PteFlags::WRITABLE;
 
-    let pages = allocate_pages(1).unwrap();
+    let pages = allocate_pages(1)
+        .ok_or("logger_aarch64: couldn't allocate pages for the UART interface")?;
 
     let qemu_uart_frame = PhysicalAddress::new_canonical(0x0900_0000);
-    let frames = allocate_frames_at(qemu_uart_frame, 1).unwrap();
+    let frames = allocate_frames_at(qemu_uart_frame, 1)
+        .map_err(|_| "logger_aarch64: couldn't allocate frames for the UART interface")?;
 
-    let mapped_pages = page_table.map_allocated_pages_to(pages, frames, mmio_flags).unwrap();
+    let mapped_pages = page_table.map_allocated_pages_to(pages, frames, mmio_flags)
+        .map_err(|_| "logger_aarch64: couldn't map the UART interface")?;
 
     let addr = mapped_pages.start_address().value();
     let logger = UartLogger {
@@ -77,5 +80,5 @@ pub fn init() -> Result<(), &'static str> {
         LOGGER.as_ref().unwrap()
     };
 
-    set_logger(logger_static).map_err(|_| "logger::init - couldn't set logger")
+    set_logger(logger_static).map_err(|_| "logger_aarch64: couldn't set logger")
 }
