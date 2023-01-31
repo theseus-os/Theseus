@@ -1,6 +1,7 @@
 #![no_std]
 
 use pl011_qemu::PL011;
+use spin::Once;
 use log::{Record, Metadata, Log, set_logger, set_max_level, STATIC_MAX_LEVEL};
 use core::fmt::Write;
 use core::ops::DerefMut;
@@ -34,10 +35,10 @@ impl Log for UartLogger {
 }
 
 // Global logger Singleton
-static mut LOGGER: Option<UartLogger> = None;
-
-// Mapped Pages for the UART MMIO
-static mut UART_MMIO: MappedPages = MappedPages::empty();
+// UartLogger stores the base address of the
+// MappedPages, so these are stored along the
+// logger to prevent them from being dropped.
+static LOGGER: Once<(UartLogger, MappedPages)> = Once::new();
 
 /// Initialize the internal global "LOGGER" singleton
 /// and sets it as the system-wide logger for the `log`
@@ -47,38 +48,37 @@ static mut UART_MMIO: MappedPages = MappedPages::empty();
 /// as possible for all log messages to show up
 /// on the UART output of Qemu.
 pub fn init() -> Result<(), &'static str> {
-    set_max_level(STATIC_MAX_LEVEL);
+    LOGGER.try_call_once(|| -> Result<(UartLogger, MappedPages), &'static str> {
+        set_max_level(STATIC_MAX_LEVEL);
 
-    let kernel_mmi_ref = get_kernel_mmi_ref()
-        .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
+        let kernel_mmi_ref = get_kernel_mmi_ref()
+            .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
 
-    let mut locked = kernel_mmi_ref.lock();
-    let page_table = &mut locked.deref_mut().page_table;
+        let mut locked = kernel_mmi_ref.lock();
+        let page_table = &mut locked.deref_mut().page_table;
 
-    let mmio_flags = PteFlags::DEVICE_MEMORY
-                   | PteFlags::NOT_EXECUTABLE
-                   | PteFlags::WRITABLE;
+        let mmio_flags = PteFlags::DEVICE_MEMORY
+                       | PteFlags::NOT_EXECUTABLE
+                       | PteFlags::WRITABLE;
 
-    let pages = allocate_pages(1)
-        .ok_or("logger_aarch64: couldn't allocate pages for the UART interface")?;
+        let pages = allocate_pages(1)
+            .ok_or("logger_aarch64: couldn't allocate pages for the UART interface")?;
 
-    let qemu_uart_frame = PhysicalAddress::new_canonical(0x0900_0000);
-    let frames = allocate_frames_at(qemu_uart_frame, 1)
-        .map_err(|_| "logger_aarch64: couldn't allocate frames for the UART interface")?;
+        let qemu_uart_frame = PhysicalAddress::new_canonical(0x0900_0000);
+        let frames = allocate_frames_at(qemu_uart_frame, 1)
+            .map_err(|_| "logger_aarch64: couldn't allocate frames for the UART interface")?;
 
-    let mapped_pages = page_table.map_allocated_pages_to(pages, frames, mmio_flags)
-        .map_err(|_| "logger_aarch64: couldn't map the UART interface")?;
+        let mapped_pages = page_table.map_allocated_pages_to(pages, frames, mmio_flags)
+            .map_err(|_| "logger_aarch64: couldn't map the UART interface")?;
 
-    let addr = mapped_pages.start_address().value();
-    let logger = UartLogger {
-        uart: MutexIrqSafe::new(PL011::new(addr as *mut _)),
-    };
+        let addr = mapped_pages.start_address().value();
+        let logger = UartLogger {
+            uart: MutexIrqSafe::new(PL011::new(addr as *mut _)),
+        };
 
-    let logger_static = unsafe {
-        UART_MMIO = mapped_pages;
-        LOGGER = Some(logger);
-        LOGGER.as_ref().unwrap()
-    };
+        Ok((logger, mapped_pages))
+    })?;
 
-    set_logger(logger_static).map_err(|_| "logger_aarch64: couldn't set logger")
+    let (logger, _) = LOGGER.get().ok_or("logger_aarch64: couldn't initialize logger")?;
+    set_logger(logger).map_err(|_| "logger_aarch64: couldn't set logger")
 }

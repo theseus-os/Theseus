@@ -1784,6 +1784,7 @@ dependencies = [
  "log",
  "memory",
  "pl011_qemu",
+ "spin 0.9.4",
 ]
 
 [[package]]
