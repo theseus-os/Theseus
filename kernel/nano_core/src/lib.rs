@@ -128,19 +128,23 @@ where
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core(): parsing nano_core crate, please wait ...");
-    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt) = match mod_mgmt::parse_nano_core::parse_nano_core(
+    let (
+        nano_core_crate_ref,
+        initial_tls_image,
+        ap_realmode_begin,
+        ap_realmode_end,
+        ap_gdt,
+    ) = match mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
         rodata_mapped_pages.into_inner(),
         data_mapped_pages.into_inner(),
         false,
     ) {
-        //
-        // TODO: FIXME: pass the `tls_data` item through to the captain such that
-        //              it can be dropped along with the identity_mapped_pages.
-        //
-        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, .. }) => {
-            // Get symbols from the boot assembly code that defines where the ap_start code are.
+        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols, tls_image }) => {
+            println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
+
+            // Get symbols from the boot assembly code that define where the ap_start code is.
             // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
             let ap_realmode_begin = init_symbol_values
                 .get("ap_start_realmode")
@@ -171,11 +175,10 @@ where
                 .ok_or("couldn't convert \"GDT_AP\" physical address to virtual")?
             };
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
-            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
+            (nano_core_crate_ref, tls_image, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
         Err((msg, _mapped_pages_array)) => return Err(msg),
     };
-    println_raw!("nano_core(): finished parsing the nano_core crate.");
 
     #[cfg(loadable)] {
         // This isn't currently necessary; we can always add it in back later if/when needed.
@@ -196,15 +199,19 @@ where
         let (_pw_crate, _num_pw_syms) = default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false)?;
     }
 
-
-    // at this point, we load and jump directly to the Captain, which will take it from here. 
+    // Now we load and jump directly to the Captain, which will take over from here.
     // That's it, the nano_core is done! That's really all it does! 
+    let drop_after_init = captain::DropAfterInit {
+        identity_mappings: identity_mapped_pages,
+        initial_tls_image,
+    };
     println_raw!("nano_core(): invoking the captain...");
     #[cfg(not(loadable))] {
-        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
+        captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
     #[cfg(loadable)] {
-        use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
+        use captain::DropAfterInit;
+        use memory::{MmiRef, PhysicalAddress};
         use no_drop::NoDrop;
         use stack::Stack;
 
@@ -214,10 +221,10 @@ where
             .ok_or("no single symbol matching \"captain::init\"")?;
         log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, NoDrop<EarlyIdentityMappedPages>, NoDrop<Stack>, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<Stack>, DropAfterInit, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
-        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
+        func(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
 
     // the captain shouldn't return ...

@@ -38,7 +38,7 @@ pub struct NanoCoreItems {
     /// of TLS variables (before tasking is initialized) do not cause exceptions.
     ///
     /// After the task management subsystem has been initialized, this can be dropped.
-    pub tls_data: NoDrop<TlsDataImage>,
+    pub tls_image: NoDrop<TlsDataImage>,
 }
 
 /// Parses and/or deserializes the file containing details about the already loaded
@@ -149,11 +149,11 @@ pub fn parse_nano_core(
 
     // Now that we've initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
-    let tls_data = namespace.get_tls_initializer_data();
+    let tls_image = namespace.get_tls_initializer_data();
     {
         #[cfg(target_arch = "x86_64")]
         x86_64::registers::model_specific::FsBase::write(
-            x86_64::VirtAddr::new(tls_data.pointer_value() as u64)
+            x86_64::VirtAddr::new(tls_image.pointer_value() as u64)
         );
 
         #[cfg(not(target_arch = "x86_64"))]
@@ -164,7 +164,7 @@ pub fn parse_nano_core(
         nano_core_crate_ref,
         init_symbol_values,
         num_new_symbols,
-        tls_data: NoDrop::new(tls_data),
+        tls_image: NoDrop::new(tls_image),
     })
 }
 
