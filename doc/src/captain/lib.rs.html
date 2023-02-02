@@ -190,73 +190,29 @@
 <a href="#190" id="190">190</a>
 <a href="#191" id="191">191</a>
 <a href="#192" id="192">192</a>
-<a href="#193" id="193">193</a>
-<a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-<a href="#205" id="205">205</a>
-<a href="#206" id="206">206</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
-//! 
+//!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
-//! for initializing all of the other crates in the proper order and with the proper flow of data between them.
-//! 
+//! for initializing all of the other crates in the proper order and with
+//! the proper flow of data between them.
+//!
 //! Currently, this is the default `captain` in Theseus, which does the following:
-//! 
+//!
 //! * Initializes ACPI and APIC to discover multicore and other hardware configuration,
 //! * Sets up interrupt and exception handlers,
 //! * Sets up basic device drivers,
 //! * Spawns event handling threads,
 //! * Initializes the window manager and graphics subsystem,
 //! * etc. 
-//! 
-//! At the end, the `captain` must enable interrupts to allow the system to schedule other Tasks. 
-//! It then falls into an idle loop that does nothing, and should never be scheduled in.
 //!
+//! At the end, the `captain` enables interrupts to allow the system to schedule in other tasks.
 
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-
-<span class="kw">extern crate </span>kernel_config; <span class="comment">// our configuration options, just a set of const definitions.
-</span><span class="kw">extern crate </span>irq_safety; <span class="comment">// for irq-safe locking and interrupt utilities
-</span><span class="kw">extern crate </span>dfqueue; <span class="comment">// decoupled, fault-tolerant queue
-
-</span><span class="kw">extern crate </span>logger;
-<span class="kw">extern crate </span>memory; <span class="comment">// the virtual memory subsystem 
-</span><span class="kw">extern crate </span>no_drop;
-<span class="kw">extern crate </span>stack;
-<span class="kw">extern crate </span>cpu; 
-<span class="kw">extern crate </span>mod_mgmt;
-<span class="kw">extern crate </span>spawn;
-<span class="kw">extern crate </span>tsc;
-<span class="kw">extern crate </span>task; 
-<span class="kw">extern crate </span>interrupts;
-<span class="kw">extern crate </span>acpi;
-<span class="kw">extern crate </span>device_manager;
-<span class="kw">extern crate </span>e1000;
-<span class="kw">extern crate </span>scheduler;
-<span class="attr">#[cfg(mirror_log_to_vga)] #[macro_use] </span><span class="kw">extern crate </span>app_io;
-<span class="kw">extern crate </span>first_application;
-<span class="kw">extern crate </span>exceptions_full;
-<span class="kw">extern crate </span>network_manager;
-<span class="kw">extern crate </span>window_manager;
-<span class="kw">extern crate </span>tlb_shootdown;
-<span class="kw">extern crate </span>multiple_heaps;
-<span class="kw">extern crate </span>console;
-<span class="attr">#[cfg(simd_personality)] </span><span class="kw">extern crate </span>simd_personality;
-
 
 <span class="kw">use </span>core::ops::DerefMut;
+<span class="kw">use </span>log::{error, info};
 <span class="kw">use </span>memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
 <span class="kw">use </span>kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 <span class="kw">use </span>irq_safety::enable_interrupts;
@@ -265,14 +221,21 @@
 
 
 <span class="attr">#[cfg(mirror_log_to_vga)]
-</span><span class="doccomment">/// the callback use in the logger crate for mirroring log functions to the terminal
-</span><span class="kw">pub fn </span>mirror_to_vga_cb(args: core::fmt::Arguments) {
-    <span class="macro">println!</span>(<span class="string">&quot;{}&quot;</span>, args);
+</span><span class="kw">mod </span>mirror_log_callbacks {
+    <span class="doccomment">/// The callback for use in the logger crate to mirror log functions to the early VGA screen.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mirror_to_early_vga(args: core::fmt::Arguments) {
+        <span class="macro">vga_buffer::println_raw!</span>(<span class="string">&quot;{}&quot;</span>, args);
+    }
+
+    <span class="doccomment">/// The callback for use in the logger crate to mirror log functions to the
+    /// fully-featured terminal-based display.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mirror_to_terminal(args: core::fmt::Arguments) {
+        <span class="macro">app_io::println!</span>(<span class="string">&quot;{}&quot;</span>, args);
+    }
 }
 
 
-
-<span class="doccomment">/// Initialize the Captain, which is the main module that steers the ship of Theseus. 
+<span class="doccomment">/// Initialize the Captain, which is the main crate that &quot;steers the ship&quot; of Theseus. 
 /// 
 /// This does the rest of the initialization procedures so that the OS 
 /// can continue running and do actual useful work.
@@ -285,6 +248,9 @@
 ///    which must not be dropped for the entire execution of the initial bootstrap task.
 /// * `ap_start_realmode_begin`: the start bound (inclusive) of the AP&#39;s realmode boot code.
 /// * `ap_start_realmode_end`: the end bound (exlusive) of the AP&#39;s realmode boot code.
+/// * `ap_gdt`: the virtual address of the GDT created for the AP&#39;s realmode boot code.
+/// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
+///    if available and provided by the bootloader.
 </span><span class="kw">pub fn </span>init(
     kernel_mmi_ref: MmiRef,
     identity_mapped_pages: NoDrop&lt;EarlyIdentityMappedPages&gt;,
@@ -294,10 +260,9 @@
     ap_gdt: VirtualAddress,
     rsdp_address: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="attr">#[cfg(mirror_log_to_vga)]
-    </span>{
-        <span class="comment">// enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        </span>logger::mirror_to_vga(mirror_to_vga_cb);
+    <span class="attr">#[cfg(mirror_log_to_vga)] </span>{
+        <span class="comment">// Enable early mirroring of logger output to VGA buffer (for real hardware)
+        </span>logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_early_vga);
     }
 
     <span class="comment">// calculate TSC period and initialize it
@@ -341,6 +306,13 @@
     <span class="kw">let </span>cpu_count = ap_count + <span class="number">1</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Finished handling and booting up all {} AP cores; {} total CPUs are running.&quot;</span>, ap_count, cpu_count);
 
+    <span class="attr">#[cfg(mirror_log_to_vga)] </span>{
+        <span class="comment">// Currently, handling the AP cores also siwtches the graphics mode
+        // (from text mode VGA to a graphical framebuffer).
+        // Thus, we can now use enable the function that mirrors logger output to the terminal.
+        </span>logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
+    }
+
     <span class="comment">// Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
     </span>tlb_shootdown::init();
@@ -378,7 +350,7 @@
         </span><span class="kw">let </span>simd_ext = task::SimdExt::SSE;
         <span class="attr">#[cfg(simd_personality_avx)]
         </span><span class="kw">let </span>simd_ext = task::SimdExt::AVX;
-        <span class="macro">warn!</span>(<span class="string">&quot;SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!&quot;</span>, simd_ext);
+        <span class="macro">log::warn!</span>(<span class="string">&quot;SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!&quot;</span>, simd_ext);
         spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
             .name(<span class="macro">alloc::format!</span>(<span class="string">&quot;setup_simd_personality_{:?}&quot;</span>, simd_ext))
             .spawn()<span class="question-mark">?</span>;

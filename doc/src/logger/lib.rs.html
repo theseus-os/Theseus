@@ -280,6 +280,18 @@
 <a href="#280" id="280">280</a>
 <a href="#281" id="281">281</a>
 <a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic logger implementation for system-wide logging in Theseus. 
 //!
 //! This enables Theseus crates to use the `log` crate&#39;s macros anywhere,
@@ -291,18 +303,20 @@
 </span><span class="attr">#![no_std]
 #![feature(trait_alias)]
 
-</span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>spin;
+</span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>crossbeam_utils;
+<span class="kw">extern crate </span>log;
 <span class="kw">extern crate </span>irq_safety;
 <span class="kw">extern crate </span>serial_port_basic;
 
 <span class="kw">use </span>log::{Record, Level, SetLoggerError, Metadata, Log};
 <span class="kw">use </span>core::{borrow::Borrow, fmt::{<span class="self">self</span>, Write}, ops::Deref};
-<span class="kw">use </span>spin::Once;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>serial_port_basic::SerialPort;
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
+
+<span class="attr">#[cfg(mirror_log_to_vga)]
+</span><span class="kw">pub use </span>mirror_log::set_log_mirror_function;
 
 
 <span class="doccomment">/// By default, Theseus will print all log levels, including `Trace` and above.
@@ -413,7 +427,8 @@
         <span class="comment">// If there was an error above, there&#39;s literally nothing we can do but ignore it,
         // because there is no other lower-level way to log errors than the serial port.
         
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = MIRROR_VGA_FUNC.get() {
+        </span><span class="attr">#[cfg(mirror_log_to_vga)]
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = mirror_log::get_log_mirror_function() {
             <span class="comment">// Currently printing to the VGA terminal doesn&#39;t support ANSI color escape sequences,
             // so we exclude the first and the last elements that set those colors.
             </span>func(<span class="macro">format_args!</span>(<span class="string">&quot;{}{}:{}: {}&quot;</span>,
@@ -551,16 +566,25 @@
     }
 }
 
+<span class="attr">#[cfg(mirror_log_to_vga)]
+</span><span class="kw">mod </span>mirror_log {
+    <span class="kw">use </span>core::fmt;
+    <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 
-<span class="doccomment">/// Call this to enable mirroring logging macros to the screen
-</span><span class="kw">pub fn </span>mirror_to_vga(func: LogOutputFunc) {
-    MIRROR_VGA_FUNC.call_once(|| func);
+    <span class="doccomment">/// Call this to enable mirroring of logger output (e.g., via logging macros)
+    /// to another output sink, such as the VGA screen.
+    </span><span class="kw">pub fn </span>set_log_mirror_function(func: <span class="kw">fn</span>(fmt::Arguments)) {
+        MIRROR_LOG_FUNC.store(<span class="prelude-val">Some</span>(func));
+    }
+
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>get_log_mirror_function() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw">fn</span>(fmt::Arguments)&gt; {
+        MIRROR_LOG_FUNC.load()
+    }
+
+    <span class="doccomment">/// The callback function that will optionally be invoked
+    /// on every log statement to be printed, which enables log mirroring.
+    </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">static </span>MIRROR_LOG_FUNC: AtomicCell&lt;<span class="prelude-ty">Option</span>&lt;<span class="kw">fn</span>(fmt::Arguments)&gt;&gt; = AtomicCell::new(<span class="prelude-val">None</span>);
+    <span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;<span class="kw">fn</span>(fmt::Arguments)&gt;::is_lock_free());
 }
-
-<span class="doccomment">/// The signature of a callback function that will optionally be invoked
-/// on every log statement to be printed, which enables log mirroring.
-/// See [`mirror_to_vga()`].
-</span><span class="kw">pub type </span>LogOutputFunc = <span class="kw">fn</span>(fmt::Arguments);
-<span class="kw">static </span>MIRROR_VGA_FUNC: Once&lt;LogOutputFunc&gt; = Once::new();
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="logger" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

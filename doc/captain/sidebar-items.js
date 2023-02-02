@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the Captain, which is the main module that steers the ship of Theseus. "]]};
+window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the Captain, which is the main crate that “steers the ship” of Theseus. "]]};
