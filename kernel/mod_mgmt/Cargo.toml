@@ -52,6 +52,9 @@ path = "../root"
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.no_drop]
+path = "../no_drop"
+
 [dependencies.hashbrown]
 version = "0.11.2"
 features = ["nightly"]
@@ -74,6 +77,9 @@ features = ["derive", "alloc"]
 version = "2.0.0-rc.1"
 default-features = false
 features = ["serde", "alloc"]
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"
 
 [lib]
 crate-type = ["rlib"]

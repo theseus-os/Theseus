@@ -5,7 +5,7 @@
 
 #![allow(clippy::type_complexity)]
 
-use crate::{CrateNamespace, mp_range};
+use crate::{CrateNamespace, mp_range, TlsDataImage};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 use fs_node::FileRef;
 use path::Path;
@@ -17,6 +17,7 @@ use memory::{VirtualAddress, MappedPages};
 use crate_metadata::*;
 use hashbrown::HashMap;
 use xmas_elf::{ElfFile, sections::{SectionData, ShType, SHF_ALLOC, SHF_WRITE, SHF_EXECINSTR, SHF_TLS}};
+use no_drop::NoDrop;
 
 
 /// The file name (without extension) that we expect to see in the namespace's kernel crate directory.
@@ -24,6 +25,21 @@ use xmas_elf::{ElfFile, sections::{SectionData, ShType, SHF_ALLOC, SHF_WRITE, SH
 const NANO_CORE_FILENAME_PREFIX: &str = "nano_core.";
 const NANO_CORE_CRATE_NAME: &str = "nano_core";
 
+/// The items returned from the [`parse_nano_core()`] routine.
+pub struct NanoCoreItems {
+    /// A reference to the newly-created nano_core crate.
+    pub nano_core_crate_ref: StrongCrateRef,
+    /// The symbols in the `.init` ELF section, which maps the symbol's name to its constant value.
+    /// This map contains assembler and linker constants.
+    pub init_symbol_values: BTreeMap<String, usize>,
+    /// The number of new symbols in the nano_core crate added to the symbol map.
+    pub num_new_symbols: usize,
+    /// The initial placeholder/dummy TLS data image, which exists to ensure that early accesses
+    /// of TLS variables (before tasking is initialized) do not cause exceptions.
+    ///
+    /// After the task management subsystem has been initialized, this can be dropped.
+    pub tls_data: NoDrop<TlsDataImage>,
+}
 
 /// Parses and/or deserializes the file containing details about the already loaded
 /// (and currently running) `nano_core` code.
@@ -33,26 +49,20 @@ const NANO_CORE_CRATE_NAME: &str = "nano_core";
 /// compiler builtins, such as memset, memcpy, etc, are symbols with weak linkage in newer versions of Rust (2021 and later).
 ///
 /// # Return
-/// If successful, this returns a tuple of the following:
-/// * `nano_core_crate_ref`: A reference to the newly-created nano_core crate.
-/// * `init_symbols`: a map of symbol name to its constant value, which contains assembler and linker constants.
-/// * The number of new symbols added to the symbol map (a `usize`).
-///
-/// If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`
-/// because those cannot be dropped, as they hold the currently-running code, and dropping them would cause endless exceptions.
+/// * If successful, this returns the set of important [`NanoCoreItems`].
+/// * If an error occurs, the returned `Result::Err` contains the passed-in `text_pages`, `rodata_pages`, and `data_pages`,
+///   wrapped in [`NoDrop`] in order to avoid prematurely/accidentally dropping them,
+///   which would cause endless exceptions.
 pub fn parse_nano_core(
     namespace: &Arc<CrateNamespace>,
     text_pages: MappedPages,
     rodata_pages: MappedPages,
     data_pages: MappedPages,
     verbose_log: bool,
-) -> Result<
-    (StrongCrateRef, BTreeMap<String, usize>, usize),
-    (&'static str, [Arc<Mutex<MappedPages>>; 3]),
-> {
-    let text_pages = Arc::new(Mutex::new(text_pages));
+) -> Result<NanoCoreItems, (&'static str, NoDrop<[Arc<Mutex<MappedPages>>; 3]>)> {
+    let text_pages   = Arc::new(Mutex::new(text_pages));
     let rodata_pages = Arc::new(Mutex::new(rodata_pages));
-    let data_pages = Arc::new(Mutex::new(data_pages));
+    let data_pages   = Arc::new(Mutex::new(data_pages));
 
     /// Just like Rust's `try!()` macro, but packages up the given error message in a tuple
     /// with an array of the above 3 MappedPages objects.
@@ -60,7 +70,10 @@ pub fn parse_nano_core(
         ($expr:expr) => {
             match $expr {
                 Ok(val) => val,
-                Err(err_msg) => return Err((err_msg, [text_pages, rodata_pages, data_pages])),
+                Err(err_msg) => return Err((
+                    err_msg,
+                    NoDrop::new([text_pages, rodata_pages, data_pages]),
+                )),
             }
         };
     }
@@ -74,7 +87,6 @@ pub fn parse_nano_core(
         "parse_nano_core(): trying to load and parse the nano_core file: {:?}",
         nano_core_file_path
     );
-
 
     let nano_core_file_locked = nano_core_file.lock();
     let size = nano_core_file_locked.len();
@@ -133,7 +145,27 @@ pub fn parse_nano_core(
         ),
     };
 
-    Ok(try_mp!(parse_result))
+    let (nano_core_crate_ref, init_symbol_values, num_new_symbols) = try_mp!(parse_result);
+
+    // Now that we've initialized the nano_core, i.e., set up its sections,
+    // we can obtain a new TLS data image and initialize the TLS register to point to it.
+    let tls_data = namespace.get_tls_initializer_data();
+    {
+        #[cfg(target_arch = "x86_64")]
+        x86_64::registers::model_specific::FsBase::write(
+            x86_64::VirtAddr::new(tls_data.pointer_value() as u64)
+        );
+
+        #[cfg(not(target_arch = "x86_64"))]
+        todo!("parse_nano_core(): setting the initial TLS data image is not yet implemented for this platform!");
+    }
+
+    Ok(NanoCoreItems {
+        nano_core_crate_ref,
+        init_symbol_values,
+        num_new_symbols,
+        tls_data: NoDrop::new(tls_data),
+    })
 }
 
 #[allow(clippy::too_many_arguments)]

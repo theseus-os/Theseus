@@ -24,6 +24,7 @@ extern crate panic_entry;
 use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
+use mod_mgmt::parse_nano_core::NanoCoreItems;
 use vga_buffer::println_raw;
 
 cfg_if::cfg_if! {
@@ -134,14 +135,18 @@ where
         data_mapped_pages.into_inner(),
         false,
     ) {
-        Ok((nano_core_crate_ref, init_symbols, _num_new_syms)) => {
+        //
+        // TODO: FIXME: pass the `tls_data` item through to the captain such that
+        //              it can be dropped along with the identity_mapped_pages.
+        //
+        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, .. }) => {
             // Get symbols from the boot assembly code that defines where the ap_start code are.
             // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
-            let ap_realmode_begin = init_symbols
+            let ap_realmode_begin = init_symbol_values
                 .get("ap_start_realmode")
                 .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
                 .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode\"")?;
-            let ap_realmode_end = init_symbols
+            let ap_realmode_end = init_symbol_values
                 .get("ap_start_realmode_end")
                 .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
                 .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
@@ -168,12 +173,7 @@ where
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
             (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
-        Err((msg, mapped_pages_array)) => {
-            // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
-            // we have to make sure these mapped_pages aren't dropped.
-            core::mem::forget(mapped_pages_array);
-            return Err(msg);
-        }
+        Err((msg, _mapped_pages_array)) => return Err(msg),
     };
     println_raw!("nano_core(): finished parsing the nano_core crate.");
 
