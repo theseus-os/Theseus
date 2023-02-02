@@ -4,8 +4,8 @@ name = "logger"
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.4"
 log = "0.4.8"
+crossbeam-utils = { version = "0.8.12", default-features = false }
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"

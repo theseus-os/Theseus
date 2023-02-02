@@ -4,7 +4,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use log::{debug, warn, info, error};
+use log::{debug, warn, info};
 use spin::Mutex;
 use memory::{PageTable, PhysicalAddress};
 use rsdp::Rsdp;

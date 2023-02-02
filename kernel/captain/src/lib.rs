@@ -1,56 +1,26 @@
 //! The main initialization routine and setup logic of the OS. 
-//! 
+//!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
-//! for initializing all of the other crates in the proper order and with the proper flow of data between them.
-//! 
+//! for initializing all of the other crates in the proper order and with
+//! the proper flow of data between them.
+//!
 //! Currently, this is the default `captain` in Theseus, which does the following:
-//! 
+//!
 //! * Initializes ACPI and APIC to discover multicore and other hardware configuration,
 //! * Sets up interrupt and exception handlers,
 //! * Sets up basic device drivers,
 //! * Spawns event handling threads,
 //! * Initializes the window manager and graphics subsystem,
 //! * etc. 
-//! 
-//! At the end, the `captain` must enable interrupts to allow the system to schedule other Tasks. 
-//! It then falls into an idle loop that does nothing, and should never be scheduled in.
 //!
+//! At the end, the `captain` enables interrupts to allow the system to schedule in other tasks.
 
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-
-extern crate kernel_config; // our configuration options, just a set of const definitions.
-extern crate irq_safety; // for irq-safe locking and interrupt utilities
-extern crate dfqueue; // decoupled, fault-tolerant queue
-
-extern crate logger;
-extern crate memory; // the virtual memory subsystem 
-extern crate no_drop;
-extern crate stack;
-extern crate cpu; 
-extern crate mod_mgmt;
-extern crate spawn;
-extern crate tsc;
-extern crate task; 
-extern crate interrupts;
-extern crate acpi;
-extern crate device_manager;
-extern crate e1000;
-extern crate scheduler;
-#[cfg(mirror_log_to_vga)] #[macro_use] extern crate app_io;
-extern crate first_application;
-extern crate exceptions_full;
-extern crate network_manager;
-extern crate window_manager;
-extern crate tlb_shootdown;
-extern crate multiple_heaps;
-extern crate console;
-#[cfg(simd_personality)] extern crate simd_personality;
-
 
 use core::ops::DerefMut;
+use log::{error, info};
 use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
@@ -59,14 +29,21 @@ use no_drop::NoDrop;
 
 
 #[cfg(mirror_log_to_vga)]
-/// the callback use in the logger crate for mirroring log functions to the terminal
-pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
-    println!("{}", args);
+mod mirror_log_callbacks {
+    /// The callback for use in the logger crate to mirror log functions to the early VGA screen.
+    pub(crate) fn mirror_to_early_vga(args: core::fmt::Arguments) {
+        vga_buffer::println_raw!("{}", args);
+    }
+
+    /// The callback for use in the logger crate to mirror log functions to the
+    /// fully-featured terminal-based display.
+    pub(crate) fn mirror_to_terminal(args: core::fmt::Arguments) {
+        app_io::println!("{}", args);
+    }
 }
 
 
-
-/// Initialize the Captain, which is the main module that steers the ship of Theseus. 
+/// Initialize the Captain, which is the main crate that "steers the ship" of Theseus. 
 /// 
 /// This does the rest of the initialization procedures so that the OS 
 /// can continue running and do actual useful work.
@@ -79,6 +56,9 @@ pub fn mirror_to_vga_cb(args: core::fmt::Arguments) {
 ///    which must not be dropped for the entire execution of the initial bootstrap task.
 /// * `ap_start_realmode_begin`: the start bound (inclusive) of the AP's realmode boot code.
 /// * `ap_start_realmode_end`: the end bound (exlusive) of the AP's realmode boot code.
+/// * `ap_gdt`: the virtual address of the GDT created for the AP's realmode boot code.
+/// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
+///    if available and provided by the bootloader.
 pub fn init(
     kernel_mmi_ref: MmiRef,
     identity_mapped_pages: NoDrop<EarlyIdentityMappedPages>,
@@ -88,10 +68,9 @@ pub fn init(
     ap_gdt: VirtualAddress,
     rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
-    #[cfg(mirror_log_to_vga)]
-    {
-        // enable mirroring of serial port logging outputs to VGA buffer (for real hardware)
-        logger::mirror_to_vga(mirror_to_vga_cb);
+    #[cfg(mirror_log_to_vga)] {
+        // Enable early mirroring of logger output to VGA buffer (for real hardware)
+        logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_early_vga);
     }
 
     // calculate TSC period and initialize it
@@ -135,6 +114,13 @@ pub fn init(
     let cpu_count = ap_count + 1;
     info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
+    #[cfg(mirror_log_to_vga)] {
+        // Currently, handling the AP cores also siwtches the graphics mode
+        // (from text mode VGA to a graphical framebuffer).
+        // Thus, we can now use enable the function that mirrors logger output to the terminal.
+        logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
+    }
+
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
     tlb_shootdown::init();
@@ -172,7 +158,7 @@ pub fn init(
         let simd_ext = task::SimdExt::SSE;
         #[cfg(simd_personality_avx)]
         let simd_ext = task::SimdExt::AVX;
-        warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
+        log::warn!("SIMD_PERSONALITY FEATURE ENABLED, creating a new personality with {:?}!", simd_ext);
         spawn::new_task_builder(simd_personality::setup_simd_personality, simd_ext)
             .name(alloc::format!("setup_simd_personality_{:?}", simd_ext))
             .spawn()?;

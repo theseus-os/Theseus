@@ -382,6 +382,7 @@ dependencies = [
  "task_fs",
  "tlb_shootdown",
  "tsc",
+ "vga_buffer",
  "window_manager",
 ]
 
@@ -1762,10 +1763,10 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.4",
 ]
 
 [[package]]

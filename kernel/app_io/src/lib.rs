@@ -219,7 +219,7 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
             }
         }
         None => {
-            let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
+            // let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
         }
     };
 }
