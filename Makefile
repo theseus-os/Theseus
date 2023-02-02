@@ -965,6 +965,7 @@ ifneq ($(IS_WSL), )
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
 ## building on Linux or macOS
+	@echo -e "\n\033[1;32mThe build finished successfully.\033[0m Writing Theseus OS ISO to /dev/$(drive)..."
 	@$(UNMOUNT) /dev/$(drive)* 2> /dev/null  |  true  ## force it to return true
 	@sudo dd bs=4194304 if=$(iso) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
