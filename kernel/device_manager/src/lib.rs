@@ -101,15 +101,9 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     init_serial_port(SerialPortAddress::COM1);
     init_serial_port(SerialPortAddress::COM2);
 
-    match ps2::init() {
-        Ok(ps2_controller) => {
-            keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
-            mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
-        },
-        Err(_) => {
-            trace!("ps2 controller not present");
-        }
-    }
+    let ps2_controller = ps2::init()?;
+    keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
+    mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
 
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {

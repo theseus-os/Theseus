@@ -17,8 +17,6 @@ use HostToKeyboardCommand::*;
 use HostToMouseCommand::*;
 use DeviceToHostResponse::*;
 
-#[macro_use]
-extern crate log;
 
 /// The system-wide singleton PS/2 Controller.
 static PS2_CONTROLLER: Once<PS2Controller> = Once::new();
@@ -43,8 +41,6 @@ pub fn init() -> Result<&'static PS2Controller, &'static str> {
     if let Some(fadt) = Fadt::get(&acpi_tables) {
         // If earlier than ACPI v2, the PS/2 controller is assumed to exist
         if fadt.header.revision > 1 {
-            let a = fadt.iapc_boot_architecture_flags;
-            trace!("FADT boot flags: {:#X}", a);
             let has_controller = fadt.iapc_boot_architecture_flags & 0b10 == 0b10;
             if !has_controller {
                 return Err("no PS/2 Controller present");
