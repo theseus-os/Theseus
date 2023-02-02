@@ -197,7 +197,7 @@ pub fn swap_crates(
         (
             SwapRequestList::with_capacity(swap_requests.len()),
             CrateNamespace::new(
-                format!("cached_crates--{:?}", swap_requests), 
+                format!("cached_crates--{swap_requests:?}"), 
                 this_namespace.dir().clone(),
                 None
             ),

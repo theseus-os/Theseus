@@ -36,7 +36,7 @@ pub(crate) struct TransportInterfaceReceiveContext {
     _padding4:              [u8; 20],
 }
 
-const_assert_eq!(core::mem::size_of::<TransportInterfaceReceiveContext>(), 92);
+const _: () = assert!(core::mem::size_of::<TransportInterfaceReceiveContext>() == 92);
 
 impl TransportInterfaceReceiveContext {
     /// Initialize the TIR object
@@ -93,7 +93,7 @@ pub(crate) struct ReceiveQueueContext {
     _padding1:                          [u8; 20],
 }
 
-const_assert_eq!(core::mem::size_of::<ReceiveQueueContext>(), 48);
+const _: () = assert!(core::mem::size_of::<ReceiveQueueContext>() == 48);
 
 impl fmt::Debug for ReceiveQueueContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

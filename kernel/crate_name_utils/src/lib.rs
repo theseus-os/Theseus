@@ -77,7 +77,7 @@ pub fn get_containing_crate_name(demangled_full_symbol: &str) -> Vec<&str> {
 pub fn get_containing_crate_name_ranges(demangled_full_symbol: &str) -> Vec<Range<usize>> {
     let mut ranges: Vec<Range<usize>> = Vec::new();
     // the separator between independent parts of the symbol string
-    const AS: &'static str = " as ";
+    const AS: &str = " as ";
     // the index at which we are starting our search for a crate name
     let mut beginning_bound = Some(0);
 

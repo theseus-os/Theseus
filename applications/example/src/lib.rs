@@ -41,5 +41,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: example [ARGS]
+const USAGE: &str = "Usage: example [ARGS]
 An example application that just echoes its arguments.";

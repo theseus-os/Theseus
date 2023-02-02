@@ -72,7 +72,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         info!("test_multiple(): Entered sender task!");
         for i in 0..iterations {
-            sender.send(format!("Message {:03}", i))?;
+            sender.send(format!("Message {i:03}"))?;
             info!("test_multiple(): Sender sent message {:03}", i);
         }
         Ok(())
@@ -112,5 +112,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: channel_eval [ARGS]
+const USAGE: &str = "Usage: channel_eval [ARGS]
 Used for evaluating live evolution between sync/async channels in Theseus.";

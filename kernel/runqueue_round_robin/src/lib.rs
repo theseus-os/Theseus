@@ -64,7 +64,7 @@ impl RoundRobinTaskRef {
     /// Creates a new `RoundRobinTaskRef` that wraps the given `TaskRef`.
     pub fn new(taskref: TaskRef) -> RoundRobinTaskRef {
         RoundRobinTaskRef {
-            taskref: taskref,
+            taskref,
             context_switches: 0,
         }
     }

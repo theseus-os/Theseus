@@ -27,10 +27,10 @@ use kernel_config::memory::KERNEL_OFFSET;
 use vga_buffer::println_raw;
 
 cfg_if::cfg_if! {
-    if #[cfg(feature = "bios")] {
-        mod bios;
-    } else if #[cfg(feature = "uefi")] {
+    if #[cfg(feature = "uefi")] {
         mod uefi;
+    } else if #[cfg(feature = "bios")] {
+        mod bios;
     } else {
         compile_error!("either the 'bios' or 'uefi' feature must be enabled");
     }

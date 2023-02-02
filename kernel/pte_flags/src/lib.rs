@@ -30,7 +30,6 @@
 
 use cfg_if::cfg_if;
 use bitflags::bitflags;
-use static_assertions::const_assert_ne;
 
 cfg_if!{ if #[cfg(any(target_arch = "x86_64", doc))] {
     mod pte_flags_x86_64;
@@ -159,9 +158,9 @@ cfg_if!{ if #[cfg(target_arch = "x86_64")] {
 
 // Due to the way that the `bitflags` crate works, we can only use
 // non-zero bit flag values for the above definitions.
-const_assert_ne!(DEVICE_MEMORY_BITS.bits(), 0);
-const_assert_ne!(WRITABLE_BIT.bits(), 0);
-const_assert_ne!(GLOBAL_BIT.bits(), 0);
+const _: () = assert!(DEVICE_MEMORY_BITS.bits() != 0);
+const _: () = assert!(WRITABLE_BIT.bits() != 0);
+const _: () = assert!(GLOBAL_BIT.bits() != 0);
 
 
 /// See [`PteFlags::new()`] for what bits are set by default.

@@ -66,7 +66,7 @@ impl PriorityTaskRef {
     /// next scheduling epoch
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
         PriorityTaskRef {
-            taskref: taskref,
+            taskref,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
             context_switches: 0,
@@ -74,7 +74,7 @@ impl PriorityTaskRef {
     }
 
     /// Increment the number of times the task is picked
-    pub fn increment_context_switches(&mut self) -> (){
+    pub fn increment_context_switches(&mut self) {
         self.context_switches = self.context_switches.saturating_add(1);
     }
 }
@@ -286,7 +286,7 @@ impl RunQueue {
                 None => continue,
             }
         }
-        return None;
+        None
     }
 
 }

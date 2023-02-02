@@ -28,9 +28,6 @@ features = ["elf64"]
 version = "0.11.2"
 features = ["nightly"]
 
-[dependencies.util]
-path = "../../libs/util"
-
 [dependencies.memory]
 path = "../memory"
 

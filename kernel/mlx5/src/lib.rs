@@ -631,7 +631,7 @@ impl ConnectX5Nic {
             max_capabilities,
             max_mtu,
             event_queue,
-            send_completion_queue: send_completion_queue,
+            send_completion_queue,
             send_queue,
             receive_queue
         };

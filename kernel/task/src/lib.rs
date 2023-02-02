@@ -98,7 +98,7 @@ impl fmt::Display for PanicInfoOwned {
 impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
     fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
-            .map(|m| format!("{}", m))
+            .map(|m| format!("{m}"))
             .unwrap_or_default();
         let (file, line, column) = if let Some(loc) = info.location() {
             (String::from(loc.file()), loc.line(), loc.column())
@@ -181,8 +181,8 @@ impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         match self {
             Self::Requested         => write!(f, "Requested"),
-            Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+            Self::Panic(panic_info) => write!(f, "Panicked at {panic_info}"),
+            Self::Exception(num)    => write!(f, "Exception {num:#X}({num})"),
         }
     }
 }
@@ -388,8 +388,8 @@ pub struct Task {
 }
 
 // Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
-const_assert!(AtomicCell::<OptionU8>::is_lock_free());
-const_assert!(AtomicCell::<RunState>::is_lock_free());
+const _: () = assert!(AtomicCell::<OptionU8>::is_lock_free());
+const _: () = assert!(AtomicCell::<RunState>::is_lock_free());
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -498,7 +498,7 @@ impl Task {
                 waker: None,
             }),
             id: task_id,
-            name: format!("task_{}", task_id),
+            name: format!("task_{task_id}"),
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
             suspended: AtomicBool::new(false),
@@ -1318,7 +1318,7 @@ impl TaskRef {
     /// ## Return
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
-    pub fn new(task: Task) -> JoinableTaskRef {
+    pub fn create(task: Task) -> JoinableTaskRef {
         let exit_value_mailbox = Mutex::new(None);
         let taskref = TaskRef(Arc::new(TaskRefInner { task, exit_value_mailbox }));
 
@@ -1463,12 +1463,12 @@ pub fn bootstrap_task(
         None,
         bootstrap_task_cleanup_failure,
     );
-    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
     bootstrap_task.runstate.store(RunState::Runnable);
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
-    let joinable_taskref = TaskRef::new(bootstrap_task);
+    let joinable_taskref = TaskRef::create(bootstrap_task);
 
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
@@ -1532,15 +1532,15 @@ mod tls_current_task {
     /// 
     /// This is useful to avoid cloning a reference to the current task.
     /// 
-    /// Returns an `Err` if the current task cannot be obtained.
-    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, CurrentTaskNotFound>
     where
         F: FnOnce(&TaskRef) -> R
     {
         if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
             Ok(function(t))
         } else {
-            Err(())
+            Err(CurrentTaskNotFound)
         }
     }
 
@@ -1597,22 +1597,22 @@ mod tls_current_task {
     /// * On success, an [`ExitableTaskRef`] for the current task,
     ///   which can only be obtained once at the very start of the task's execution,
     ///   and only from this one function. 
-    /// * Returns an `Err` if the current task has already been set.
+    /// * Returns an `Err` if the current task has already been initialized.
     #[doc(hidden)]
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, ()> {
+    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(());
+                return Err(CurrentTaskAlreadyInited);
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(())?
+                .ok_or(CurrentTaskAlreadyInited)?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
@@ -1621,7 +1621,7 @@ mod tls_current_task {
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(()),
+            _ => Err(CurrentTaskAlreadyInited),
         }
     }
 
@@ -1643,4 +1643,11 @@ mod tls_current_task {
             Err(value)
         }
     }
+
+    /// An error type indicating that the current task was already initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskAlreadyInited;
+    /// An error type indicating that the current task has not yet been initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskNotFound;
 }

@@ -127,7 +127,7 @@ pub fn init<F, R, P>(
             if let Some(mut current) = reserved_list[i].clone() {
                 for maybe_other in &mut reserved_list[i + 1..] {
                     if let Some(other) = maybe_other {
-                        if let Some(_) = current.overlap(other) {
+                        if current.overlap(other).is_some() {
                             current.frames = FrameRange::new(
                                 min(*current.start(), *other.start()),
                                 max(*current.end(), *other.end()),

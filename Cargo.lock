@@ -118,7 +118,6 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -155,7 +154,6 @@ dependencies = [
  "log",
  "mpmc",
  "spin 0.9.4",
- "static_assertions",
  "task",
  "wait_queue",
 ]
@@ -384,6 +382,7 @@ dependencies = [
  "task_fs",
  "tlb_shootdown",
  "tsc",
+ "vga_buffer",
  "window_manager",
 ]
 
@@ -621,7 +620,6 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.4",
- "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -739,7 +737,6 @@ dependencies = [
  "mod_mgmt",
  "owning_ref",
  "rustc-demangle",
- "util",
  "xmas-elf",
 ]
 
@@ -895,7 +892,6 @@ dependencies = [
  "log",
  "memory",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -938,7 +934,6 @@ dependencies = [
  "nic_queues",
  "pci",
  "spin 0.9.4",
- "static_assertions",
  "task",
  "volatile 0.2.7",
  "x86_64",
@@ -1055,7 +1050,6 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1406,7 +1400,6 @@ dependencies = [
  "memory",
  "sdt",
  "spin 0.9.4",
- "static_assertions",
  "time",
  "volatile 0.2.7",
  "zerocopy",
@@ -1532,7 +1525,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1584,7 +1576,6 @@ dependencies = [
  "rand",
  "runqueue",
  "spin 0.9.4",
- "static_assertions",
  "virtual_nic",
  "volatile 0.2.7",
  "x86_64",
@@ -1772,10 +1763,10 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -1816,7 +1807,6 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1992,7 +1982,6 @@ dependencies = [
  "nic_buffers",
  "nic_initialization",
  "num_enum",
- "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -2024,7 +2013,6 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "util",
  "vfs_node",
  "xmas-elf",
 ]
@@ -2134,7 +2122,6 @@ dependencies = [
  "slabmalloc_safe",
  "slabmalloc_unsafe",
  "spin 0.9.4",
- "static_assertions",
 ]
 
 [[package]]
@@ -2722,7 +2709,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
- "static_assertions",
 ]
 
 [[package]]
@@ -2792,8 +2778,9 @@ dependencies = [
 
 [[package]]
 name = "rangemap"
-version = "1.0.3"
-source = "git+https://github.com/jeffparsons/rangemap#8b290d474bae680531bfba42e545e4d0121b70fd"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b9283c6b06096b47afc7109834fdedab891175bb5241ee5d4f7d2546549f263"
 
 [[package]]
 name = "raw-cpuid"
@@ -2951,7 +2938,6 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -3134,7 +3120,6 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
- "static_assertions",
  "zerocopy",
 ]
 
@@ -3199,7 +3184,6 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.4",
- "static_assertions",
  "x86_64",
 ]
 
@@ -3869,7 +3853,6 @@ dependencies = [
  "event_types",
  "log",
  "unicode-width",
- "util",
  "vte",
 ]
 
@@ -3975,9 +3958,6 @@ dependencies = [
 [[package]]
 name = "thread_local_macro"
 version = "0.1.0"
-dependencies = [
- "static_assertions",
-]
 
 [[package]]
 name = "time"
@@ -3985,7 +3965,6 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
  "log",
- "static_assertions",
 ]
 
 [[package]]
@@ -4136,10 +4115,6 @@ name = "utf8parse"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
-
-[[package]]
-name = "util"
-version = "0.1.0"
 
 [[package]]
 name = "vcell"

@@ -139,7 +139,7 @@ pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     if let Some(name) = deferred_task_name {
         tb = tb.name(name.into());
     }
-    tb.spawn().map_err(|e| InterruptRegistrationError::SpawnError(e))
+    tb.spawn().map_err(InterruptRegistrationError::SpawnError)
 }
 
 

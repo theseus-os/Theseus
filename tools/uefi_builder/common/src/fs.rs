@@ -141,6 +141,7 @@ pub fn create_fat_filesystem(
     out_fat_path: &Path,
 ) -> anyhow::Result<()> {
     const MB: u64 = 1024 * 1024;
+    const SECTOR: u64 = 512;
 
     // calculate needed size
     let mut needed_size = 0;
@@ -148,9 +149,11 @@ pub fn create_fat_filesystem(
         let file_size = fs::metadata(path)
             .with_context(|| format!("failed to read metadata of file `{}`", path.display()))?
             .len();
-        needed_size += file_size;
+        // round up to sector size
+        let sector_aligned_file_size = ((file_size + SECTOR)/SECTOR) * SECTOR;
+        needed_size += sector_aligned_file_size;
     }
-
+    
     // create new filesystem image file at the given path and set its length
     let fat_file = fs::OpenOptions::new()
         .read(true)
@@ -159,11 +162,12 @@ pub fn create_fat_filesystem(
         .truncate(true)
         .open(out_fat_path)
         .unwrap();
-    let fat_size_padded_and_rounded = ((needed_size + 1024 * 64 - 1) / MB + 1) * MB;
+    // Add an extra 2MB of size, which seems to be sufficient for our needs.
+    let fat_size_padded_and_rounded = ((needed_size + (2*MB))/MB) * MB;
     fat_file.set_len(fat_size_padded_and_rounded).unwrap();
 
     // choose a file system label
-    let mut label = *b"MY_RUST_OS!";
+    let mut label = *b"Theseus OS ";
     if let Some(path) = files.get(Path::new("kernel.elf")) {
         if let Some(name) = path.file_stem() {
             let converted = name.to_string_lossy();
@@ -202,13 +206,25 @@ pub fn create_fat_filesystem(
             .create_file(target_path.to_str().unwrap())
             .with_context(|| format!("failed to create file at `{}`", target_path.display()))?;
         new_file.truncate().unwrap();
-        io::copy(
-            &mut fs::File::open(file_path)
-                .with_context(|| format!("failed to open `{}` for copying", file_path.display()))?,
-            &mut new_file,
-        )
-        .with_context(|| format!("failed to copy `{}` to FAT filesystem", file_path.display()))?;
+
+        let res = copy_file_data(file_path, &mut new_file);
+        if res.is_err() {
+            let curr_len = fat_file.metadata().unwrap().len();
+            let new_len = curr_len + 2*fs::metadata(file_path).unwrap().len() + MB;
+            fat_file.set_len(new_len).unwrap();
+            // try again with the resized file.
+            copy_file_data(file_path, &mut new_file)?;
+        }
     }
 
     Ok(())
+}
+
+fn copy_file_data<T: fatfs::ReadWriteSeek>(file_path: &Path, new_file: &mut fatfs::File<T>) -> anyhow::Result<u64> {
+    io::copy(
+        &mut fs::File::open(file_path)
+            .with_context(|| format!("failed to open `{}` for copying", file_path.display()))?,
+        new_file,
+    )
+    .with_context(|| format!("failed to copy `{}` to FAT filesystem", file_path.display()))
 }

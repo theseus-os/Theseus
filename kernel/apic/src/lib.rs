@@ -14,7 +14,6 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
 use pit_clock_basic::pit_wait;
 use bit_field::BitField;
-use static_assertions::{const_assert, const_assert_eq};
 use log::{error, info, debug, trace};
 
 /// A unique identifier for a CPU core.
@@ -39,7 +38,7 @@ pub enum InterruptChip {
 }
 
 // Ensure that `AtomicCell<InterruptChip>` is actually a lock-free atomic.
-const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
+const _: () = assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
 /// The set of system-wide `LocalApic`s, one per CPU core.
 static LOCAL_APICS: AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
@@ -244,7 +243,7 @@ pub struct ApicRegisters {
     _padding23:                       [u32; 3 + 4],
     // ends at 0x400
 }
-const_assert_eq!(core::mem::size_of::<ApicRegisters>(), 0x400);
+const _: () = assert!(core::mem::size_of::<ApicRegisters>() == 0x400);
 
 
 #[derive(FromBytes)]
@@ -267,7 +266,7 @@ pub struct RegisterArray {
     reg7:                             ReadOnly<u32>,
     _padding7:                        [u32; 3],
 }
-const_assert_eq!(core::mem::size_of::<RegisterArray>(), 8 * (4 + 12));
+const _: () = assert!(core::mem::size_of::<RegisterArray>() == 8 * (4 + 12));
 
 /// The Local APIC's vector table local interrupt pins.
 #[doc(alias("lvt", "lint", "lint0", "lint1"))]
