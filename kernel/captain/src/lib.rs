@@ -102,7 +102,6 @@ pub fn init(
 
     // after we've initialized the task subsystem, we can use better exception handlers
     exceptions_full::init(idt);
-    
     // boot up the other cores (APs)
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
