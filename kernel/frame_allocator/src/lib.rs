@@ -949,26 +949,23 @@ pub fn allocate_frames_deferred(
     
     if let Some(paddr) = requested_paddr {
         let start_frame = Frame::containing_address(paddr);
-        let end_frame = start_frame + (num_frames - 1);
         // Try to allocate the frames at the specific address.
         let mut free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
         // First check if the frames are in the reserved list
         let (requested_start_frame, requested_num_frames) = match find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames) {
-            Ok(success) => {
-                return Ok(success);
-            },
+            Ok(success) => return Ok(success),
             Err(alloc_err) => {
                 match alloc_err {
-                    AllocationError::AddressNotFound(_, _) => {
+                    AllocationError::AddressNotFound(..) => {
                         // If allocation failed, then the requested `start_frame` may be found in the general-purpose list
                         match find_specific_chunk(&mut FREE_GENERAL_FRAMES_LIST.lock(), start_frame, num_frames) {
                             Ok(result) => return Ok(result),
                             Err(alloc_err_inner) => {
                                 match alloc_err_inner {
-                                    AllocationError::AddressNotFound(_, _) => {
+                                    AllocationError::AddressNotFound(..) => {
                                         (start_frame, num_frames)
                                     },
-                                    AllocationError::ContiguousChunkNotFound(f, nf) => {
+                                    AllocationError::ContiguousChunkNotFound(..) => {
                                         // because we are searching the general frames list, it doesn't matter if part of the chunk was found
                                         // since we only create new reserved frames.
                                         trace!("Only part of the requested allocation was found in the general frames list.");
@@ -993,14 +990,15 @@ pub fn allocate_frames_deferred(
             }
         };
 
+        let requested_end_frame = requested_start_frame + (requested_num_frames - 1);
         // If we failed to allocate the requested frames from the general list,
         // we can add a new reserved region containing them,
         // but ONLY if those frames are *NOT* in the general-purpose region.
         if {
             let g = GENERAL_REGIONS.lock();  
-            !frame_is_in_list(&g, &requested_start_frame) && !frame_is_in_list(&g, &(requested_start_frame + requested_num_frames - 1))
+            !frame_is_in_list(&g, &requested_start_frame) && !frame_is_in_list(&g, &(&requested_end_frame))
         } {
-            let frames = FrameRange::new(requested_start_frame, requested_start_frame + requested_num_frames - 1);
+            let frames = FrameRange::new(requested_start_frame, requested_end_frame);
             let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames)?;
             // If we successfully added a new reserved region,
             // then add those frames to the actual list of *available* reserved regions.
