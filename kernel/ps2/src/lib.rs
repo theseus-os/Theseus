@@ -431,9 +431,14 @@ impl<'c> PS2Keyboard<'c> {
     
     /// Reset the keyboard.
     pub fn reset(&self) -> Result<(), &'static str> {
-        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))?; 
-        if let Ok(SelfTestPassed) = self.controller.read_data().try_into() {
-            return Ok(())
+        self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))?;
+        // VirtualBox and presumably real hardware wants this. Qemu worked without this.
+        // Sadly self.controller.polling_receive doesn't work here, either.
+        const VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX;
+        for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
+            if let Ok(SelfTestPassed) = self.controller.read_data().try_into() {
+                return Ok(())
+            }
         }
         Err("failed to reset keyboard")
     }
