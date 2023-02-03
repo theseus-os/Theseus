@@ -634,7 +634,6 @@ fn find_specific_chunk(
     num_frames: usize
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
 
-    trace!("Requested Frame: {:?}, num_frames: {}", requested_frame, num_frames);
     // The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
     let requested_end_frame = requested_frame + (num_frames - 1);
 
