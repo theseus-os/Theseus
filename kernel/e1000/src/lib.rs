@@ -35,7 +35,7 @@ use spin::Once;
 use alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable};
-use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
+use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism, BaseAddress};
 use kernel_config::memory::PAGE_SIZE;
 use interrupts::eoi;
 use x86_64::structures::idt::InterruptStackFrame;
@@ -195,7 +195,11 @@ impl E1000Nic {
         }
   
         // memory mapped base address
-        let mem_base = e1000_pci_dev.determine_mem_base(0)?;
+        let mem_base = if let BaseAddress::Memory(base) = e1000_pci_dev.determine_mem_base(0)? {
+            base
+        } else {
+            return Err("Base Address should be memory-mapped.")
+        };
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         e1000_pci_dev.pci_set_command_bus_master_bit();

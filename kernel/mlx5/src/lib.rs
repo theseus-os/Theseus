@@ -30,7 +30,7 @@ use spin::Once;
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
-use pci::PciDevice;
+use pci::{PciDevice, BaseAddress};
 use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
 use mlx_ethernet::{
     command_queue::{AccessRegisterOpMod, CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, HCACapabilities, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
@@ -145,7 +145,11 @@ impl ConnectX5Nic {
         mlx5_pci_dev.pci_set_command_bus_master_bit();
 
         // retrieve the memory-mapped base address of the initialization segment
-        let mem_base = mlx5_pci_dev.determine_mem_base(0)?;
+        let mem_base = if let BaseAddress::Memory(base) = mlx5_pci_dev.determine_mem_base(0)? {
+            base
+        } else {
+            return Err("Base Address should be memory-mapped.")
+        };
         trace!("mlx5 mem base = {}", mem_base);
 
         let mem_size = mlx5_pci_dev.determine_mem_size(0);

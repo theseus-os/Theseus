@@ -55,7 +55,7 @@ use alloc::{
 };
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages};
-use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
+use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation, BaseAddress};
 use bit_field::BitField;
 use interrupts::register_msi_interrupt;
 use x86_64::structures::idt::HandlerFunc;
@@ -308,7 +308,11 @@ impl IxgbeNic {
         }
 
         // 16-byte aligned memory mapped base address
-        let mem_base =  ixgbe_pci_dev.determine_mem_base(0)?;
+        let mem_base = if let BaseAddress::Memory(base) = ixgbe_pci_dev.determine_mem_base(0)? {
+            base
+        } else {
+            return Err("Base Address should be memory-mapped.")
+        };
 
         // set the bus mastering bit for this PciDevice, which allows it to use DMA
         ixgbe_pci_dev.pci_set_command_bus_master_bit();

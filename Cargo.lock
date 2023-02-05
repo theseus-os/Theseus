@@ -2482,9 +2482,9 @@ version = "0.1.0"
 name = "pci"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0",
  "log",
  "memory",
+ "modular-bitfield",
  "port_io",
  "spin 0.9.4",
 ]
