@@ -11,7 +11,7 @@
 #[macro_use] extern crate alloc;
 extern crate task;
 extern crate hpet;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
@@ -1418,7 +1418,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	start_hpet_create = hpet.get_counter();
 	for filename in filenames {
 		// We first create a file and then write to resemble LMBench.
-		let file = HeapFile::new(filename, &cwd).expect("File cannot be created.");
+		let file = HeapFile::create(filename, &cwd).expect("File cannot be created.");
 		file.lock().write_at(wbuf, 0)?;
 	}
 	end_hpet_create = hpet.get_counter();
@@ -1494,7 +1494,7 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	// Non measuring loop for file create
 	for filename in &filenames {
 
-		let file = HeapFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		let file = HeapFile::create(filename.to_string(), &cwd).expect("File cannot be created.");
 		file.lock().write_at(wbuf, 0)?;
 		file_list.push(file);
 	}
@@ -1570,7 +1570,7 @@ fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 		}
 	}
 
-	let file = HeapFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
+	let file = HeapFile::create(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
 	file.lock().write_at(&WRITE_BUF[0..sz], 0)?;
 
 	Ok(())

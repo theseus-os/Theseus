@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 
 #[macro_use] extern crate alloc;
@@ -59,7 +59,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
         let path = Path::new(path_string.clone());
         let node_to_delete = match path.get(&working_dir) {
             Some(node) => node,
-            _ => return Err(format!("Couldn't find path {}", path)),
+            _ => return Err(format!("Couldn't find path {path}")),
         };
 
         // Only remove directories if the user specified "-r". 
@@ -90,5 +90,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: rm [PATH]
+const USAGE: &str = "Usage: rm [PATH]
 Remove files or directories from filesystem";

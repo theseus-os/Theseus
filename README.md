@@ -25,7 +25,7 @@ On Linux (Debian-like distros), do the following:
     ```
  3. Install dependencies:
     ```
-    sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm
+    sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
     ```
  4. Build and run (in QEMU):
     ```sh
@@ -61,16 +61,16 @@ curl https://sh.rustup.rs -sSf | sh
 ### Building on Linux or WSL (Windows Subsystem for Linux)
 Install the following dependencies using your package manager:
 ```bash
-sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm
+sudo apt-get install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
 ```
 
   * Or:
     ```bash
     # Arch Linux
-    sudo pacman -S make gcc nasm pkg-config grub mtools xorriso qemu
+    sudo pacman -S make gcc nasm pkg-config grub mtools xorriso qemu wget
 
     # Fedora
-    sudo dnf install make gcc nasm pkg-config grub2 mtools xorriso qemu
+    sudo dnf install make gcc nasm pkg-config grub2 mtools xorriso qemu wget
     ```
 
 If you're on WSL, also do the following steps:
@@ -136,7 +136,7 @@ Note: building and running Theseus within a Docker container may be slower than 
 
 Notes on Docker usage:    
   * The docker-based workflow should only require you to re-run the `run_docker.sh` script multiple times when re-building or running Theseus after modifying its code. You shouldn't need to re-run `build_docker.sh` multiple times, though it won't hurt.
-  * KVM doesn't currently work in docker. To run Theseus in QEMU using KVM, you can build Theseus within docker, exit the container (via `Ctrl+D`), and then run `make orun host=yes` on your host machine.
+  * KVM doesn't currently work in docker. To run Theseus in QEMU using KVM, you can build Theseus within docker, exit the container (via <kbd>Ctrl</kbd> + <kbd>D</kbd>`), and then run `make orun host=yes` on your host machine.
 
 
 ## Building and Running
@@ -145,7 +145,7 @@ Build the default Theseus OS image and run it in QEMU:
 make run
 ```
 
-Build a full Theseus OS image with all features and crates enabled:
+Or, build a full Theseus OS image with all features and crates enabled:
 ```sh
 make full   ## or `make all`
 ```
@@ -161,6 +161,17 @@ git -C limine-prebuilt reset --hard 3f6a330
 make run bootloader=limine
 ```
 Feel free to try newer versions, however they may not work.
+
+
+## Targeting ARMv8
+There is an ongoing effort to port Theseus to ARMv8 (AKA aarch64).
+To build and run for ARMv8:
+```sh
+# obtain the toolchain for aarch64 using your package manager (mine is pacman):
+sudo pacman -S aarch64-linux-gnu-gcc qemu-system-aarch64
+# build & run:
+make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run
+```
 
 
 ## Using QEMU
@@ -240,22 +251,7 @@ For VS Code, recommended plugins are:
  * **rust-analyzer**, by matklad
  * **Better TOML**, by bungcip
  * **x86 and x86_64 Assembly**, by 13xforever
-
-### Fixing Rustup, Rust Toolchain, or RLS Problems
-Sometimes things just don't want to behave, especially if there were issues with the currently-chosen Rust nightly version.
-In that case, try the following steps to fix it:
- * Set your default Rust toolchain to the one version in the `rust-toolchain` file, for example:
-    ```sh
-    rustup default $(cat rust-toolchain)
-    ```
- * With your newly-set default toolchain, add the necessary components:    
-    ```
-    rustup component add rust-src
-    ```
- * In VS Code (or whatever IDE you're using), uninstall and reinstall the Rust-related extension(s), restarting the IDE each time.
- * Check your IDE's settings to make sure that no weird Rust settings have been selected; building Theseus doesn't require any special settings. 
- * If you're still having issues, remove all other Rust toolchain versions besides the default one and try again. You can see other installed toolchains with `rustup toolchain list`.
-
+ 
 
 ## Acknowledgements
 We would like to express our thanks to the [OS Dev wiki](https://wiki.osdev.org/) and its community and to Philipp Oppermann's [blog_os](https://os.phil-opp.com/) for serving as excellent starting points for Theseus. The early days of Theseus's development progress are indebted to these resources. 

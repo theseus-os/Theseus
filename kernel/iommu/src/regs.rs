@@ -27,7 +27,7 @@ pub struct IntelIommuRegisters {
 // TODO: Hardware may use more than 4kB, which means the registers may occupy
 //       more than one contiguous page.
 //       Currently we assume the IOMMU registers occupy only a single page.
-const_assert_eq!(core::mem::size_of::<IntelIommuRegisters>(), 4096);
+const _: () = assert!(core::mem::size_of::<IntelIommuRegisters>() == 4096);
 
 /// Helper struct for decoding and printing capability register
 pub struct Capability(pub u64);
@@ -159,21 +159,21 @@ impl fmt::Debug for ExtendedCapability {
 #[repr(u32)]
 pub enum GlobalCommand {
     /// Compatibility Format Interrupt
-    CFI   = 1 << 23,
+    Cfi   = 1 << 23,
     /// Set Interrupt Remap Table Pointer
-    SIRTP = 1 << 24,
+    Sirtp = 1 << 24,
     /// Interrupt Remapping Enable
-    IRE   = 1 << 25,
+    Ire   = 1 << 25,
     /// Queued Invalidation Enable
-    QIE   = 1 << 26,
+    Qie   = 1 << 26,
     /// Write Buffer Flush
-    WBF   = 1 << 27,
+    Wbf   = 1 << 27,
     /// Enable Advanced Fault Logging
-    EAFL  = 1 << 28,
+    Eafl  = 1 << 28,
     /// Set Fault Log
-    SFL   = 1 << 29,
+    Sfl   = 1 << 29,
     /// Set Root Table Pointer
-    SRTP  = 1 << 30,
+    Srtp  = 1 << 30,
     /// Translation Enable
     TE    = 1 << 31,
 }

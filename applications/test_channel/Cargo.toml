@@ -8,8 +8,8 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 getopts = "0.2.21"
 spin = "0.9.4"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.log]
 version = "0.4.8"
@@ -20,8 +20,8 @@ path = "../../kernel/scheduler"
 [dependencies.task]
 path = "../../kernel/task"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[dependencies.cpu]
+path = "../../kernel/cpu"
 
 [dependencies.spawn]
 path = "../../kernel/spawn"

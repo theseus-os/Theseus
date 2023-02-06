@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "acpi"
 description = "ACPI (Advanced Configuration and Power Interface) support for Theseus"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
@@ -37,6 +38,9 @@ path = "dmar"
 
 [dependencies.iommu]
 path = "../iommu"
+
+[dependencies.time]
+path = "../time"
 
 [lib]
 crate-type = ["rlib"]

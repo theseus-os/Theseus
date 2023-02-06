@@ -33,8 +33,8 @@ path = "../serial_port"
 [dependencies.console]
 path = "../console"
 
-[dependencies.logger]
-path = "../logger"
+[dependencies.logger_x86_64]
+path = "../logger_x86_64"
 
 [dependencies.e1000]
 path = "../e1000"
@@ -45,8 +45,8 @@ path = "../acpi"
 [dependencies.pci]
 path = "../pci"
 
-[dependencies.ps2_controller]
-path = "../ps2_controller"
+[dependencies.ps2]
+path = "../ps2"
 
 [dependencies.keyboard]
 path = "../keyboard"

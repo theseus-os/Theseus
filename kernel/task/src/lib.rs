@@ -24,9 +24,12 @@
 //! }
 //! ```
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(thread_local)]
+#![feature(negative_impls)]
 
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate log;
@@ -53,7 +56,8 @@ use core::{
     hash::{Hash, Hasher},
     ops::Deref,
     panic::PanicInfo,
-    sync::atomic::{AtomicBool, AtomicUsize, Ordering},
+    sync::atomic::{AtomicBool, AtomicUsize, Ordering, fence},
+    task::Waker,
 };
 use alloc::{
     boxed::Box,
@@ -94,7 +98,7 @@ impl fmt::Display for PanicInfoOwned {
 impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
     fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
-            .map(|m| format!("{}", m))
+            .map(|m| format!("{m}"))
             .unwrap_or_default();
         let (file, line, column) = if let Some(loc) = info.location() {
             (String::from(loc.file()), loc.line(), loc.column())
@@ -175,10 +179,10 @@ pub enum KillReason {
 }
 impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match &self {
-            &Self::Requested         => write!(f, "Requested"),
-            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        match self {
+            Self::Requested         => write!(f, "Requested"),
+            Self::Panic(panic_info) => write!(f, "Panicked at {panic_info}"),
+            Self::Exception(num)    => write!(f, "Exception {num:#X}({num})"),
         }
     }
 }
@@ -218,12 +222,6 @@ pub enum RunState {
 }
 
 
-#[cfg(runqueue_spillful)]
-/// A callback that will be invoked to remove a specific task from a specific runqueue.
-/// Should be initialized by the runqueue crate.
-pub static RUNQUEUE_REMOVAL_FUNCTION: spin::Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = spin::Once::new();
-
-
 #[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -245,7 +243,7 @@ pub struct RestartInfo {
 }
 
 /// The signature of a Task's failure cleanup function.
-pub type FailureCleanupFunction = fn(TaskRef, KillReason) -> !;
+pub type FailureCleanupFunction = fn(ExitableTaskRef, KillReason) -> !;
 
 
 /// A wrapper around `Option<u8>` with a forced type alignment of 2 bytes,
@@ -259,9 +257,9 @@ impl From<Option<u8>> for OptionU8 {
         OptionU8(opt)
     }
 }
-impl Into<Option<u8>> for OptionU8 {
-    fn into(self) -> Option<u8> {
-        self.0
+impl From<OptionU8> for Option<u8> {
+    fn from(val: OptionU8) -> Self {
+        val.0
     }
 }
 impl fmt::Debug for OptionU8 {
@@ -284,8 +282,6 @@ impl fmt::Debug for OptionU8 {
 /// Currently, we only publicize the fields here that need to be modified externally,
 /// primarily by the `spawn` crate for creating and running new tasks. 
 pub struct TaskInner {
-    /// The status or value this Task exited with, if it has already exited.
-    exit_value: Option<ExitValue>,
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
     /// The preemption guard that was used for safely task switching to this task.
@@ -314,6 +310,8 @@ pub struct TaskInner {
     /// Stores the restartable information of the task. 
     /// `Some(RestartInfo)` indicates that the task is restartable.
     pub restart_info: Option<RestartInfo>,
+    /// The waker that is awoken when this task completes.
+    waker: Option<Waker>,
 }
 
 
@@ -347,6 +345,12 @@ pub struct Task {
     ///
     /// This is not public because it permits interior mutability.
     runstate: AtomicCell<RunState>,
+    /// Whether the task is suspended.
+    ///
+    /// This is only triggered by a Ctrl + Z in the terminal.
+    ///
+    /// This is not public because it permits interior mutability.
+    suspended: AtomicBool,
     /// Whether this Task is joinable.
     /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
     ///   by [`TaskRef::new()`], which indicates that that other task is able to
@@ -378,18 +382,14 @@ pub struct Task {
     /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
     tls_area: TlsDataImage,
     
-    #[cfg(runqueue_spillful)]
-    /// The runqueue that this Task is on.
-    on_runqueue: AtomicCell<OptionU8>,
-
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
 }
 
 // Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
-const_assert!(AtomicCell::<OptionU8>::is_lock_free());
-const_assert!(AtomicCell::<RunState>::is_lock_free());
+const _: () = assert!(AtomicCell::<OptionU8>::is_lock_free());
+const _: () = assert!(AtomicCell::<RunState>::is_lock_free());
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -441,7 +441,7 @@ impl Task {
     pub fn new(
         kstack: Option<Stack>,
         parent_task: Option<&TaskRef>,
-        failure_cleanup_function: FailureCleanupFunction
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Result<Task, &'static str> {
         let clone_inherited_items = |taskref: &TaskRef| {
             (
@@ -480,14 +480,13 @@ impl Task {
 
         // we should re-use old task IDs again, instead of simply blindly counting up
         // TODO FIXME: or use random values to avoid state spill
-        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Acquire);
+        let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         // Obtain a new copied instance of the TLS data image for this task.
         let tls_area = namespace.get_tls_initializer_data();
 
         Task {
             inner: MutexIrqSafe::new(TaskInner {
-                exit_value: None,
                 saved_sp: 0,
                 preemption_guard: None,
                 drop_after_task_switch: None,
@@ -496,11 +495,13 @@ impl Task {
                 kill_handler: None,
                 env,
                 restart_info: None,
+                waker: None,
             }),
             id: task_id,
-            name: format!("task_{}", task_id),
+            name: format!("task_{task_id}"),
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
+            suspended: AtomicBool::new(false),
             // Tasks are not considered "joinable" until passed to `TaskRef::new()`
             joinable: AtomicBool::new(false),
             mmi,
@@ -510,9 +511,6 @@ impl Task {
             failure_cleanup_function,
             tls_area,
 
-            #[cfg(runqueue_spillful)]
-            on_runqueue: AtomicCell::new(None.into()),
-            
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }
@@ -563,7 +561,7 @@ impl Task {
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
     /// or `None` if it is not pinned.
     pub fn pinned_core(&self) -> Option<u8> {
-        self.inner.lock().pinned_core.clone()
+        self.inner.lock().pinned_core
     }
 
     /// Returns the current [`RunState`] of this `Task`.
@@ -571,12 +569,20 @@ impl Task {
         self.runstate.load()
     }
 
-    /// Returns `true` if this `Task` is Runnable, i.e., able to be scheduled in.
+    /// Returns whether this `Task` is runnable, i.e., able to be scheduled in.
+    ///
+    /// For this to return `true`, this `Task`'s runstate must be [`Runnable`]
+    /// and it must not be [suspended].
     ///
     /// # Note
-    /// This does *NOT* mean that this `Task` is actually currently running, just that it is *able* to be run.
+    /// This does *NOT* mean that this `Task` is actually currently [running],
+    /// just that it is *able* to be run.
+    ///
+    /// [`Runnable`]: RunState::Runnable
+    /// [suspended]: Task::is_suspended
+    /// [running]: Task::is_running
     pub fn is_runnable(&self) -> bool {
-        self.runstate() == RunState::Runnable
+        self.runstate() == RunState::Runnable && !self.is_suspended()
     }
 
     /// Returns the namespace in which this `Task` is loaded/linked into and runs within.
@@ -629,10 +635,7 @@ impl Task {
     /// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        match self.runstate() {
-            RunState::Exited | RunState::Reaped => true,
-            _ => false,
-        }
+        matches!(self.runstate(), RunState::Exited | RunState::Reaped)
     }
 
     /// Returns `true` if this is an application `Task`. 
@@ -655,42 +658,6 @@ impl Task {
     /// Obtains the lock on this `Task`'s inner state in order to access it.
     pub fn is_restartable(&self) -> bool {
         self.inner.lock().restart_info.is_some()
-    }
-
-    /// An internal function intended for use cleaning up exited tasks.
-    ///
-    /// Retrieves and removes the `ExitValue` from this `Task` and returns it,
-    /// if and only if this `Task` was in the `Exited` runstate.
-    ///
-    /// If this `Task` was in the `Exited` runstate, after invoking this,
-    /// this `Task`'s runstate will be set to `Reaped`
-    /// and this `Task` will be removed from the system task list.
-    ///
-    /// If this `Task` was **not** in the `Exited` runstate, 
-    /// nothing is done and `None` is returned.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state in order to mutate it.    
-    #[doc(hidden)]
-    pub fn retrieve_exit_value(&self) -> Option<ExitValue> {
-        if self.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
-            TASKLIST.lock().remove(&self.id);
-            self.inner.lock().exit_value.take()
-        } else {
-            None
-        }
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Returns the runqueue on which this `Task` is currently enqueued.
-    pub fn on_runqueue(&self) -> Option<u8> {
-        self.on_runqueue.load().into()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Marks this `Task` as enqueued on the given runqueue.
-    pub fn set_on_runqueue(&self, runqueue: Option<u8>) {
-        self.on_runqueue.store(runqueue.into());
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
@@ -745,7 +712,7 @@ impl Task {
             Err(self.runstate.load())
         }
     }
-
+    
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -759,6 +726,28 @@ impl Task {
         } else {
             Err(self.runstate.load())
         }
+    }
+
+    /// Suspends this `Task`.
+    pub fn suspend(&self) {
+        self.suspended.store(true, Ordering::Release);
+    }
+
+    /// Unsuspends this `Task`.
+    pub fn unsuspend(&self) {
+        self.suspended.store(false, Ordering::Release);
+    }
+
+    /// Returns `true` if this `Task` is suspended.
+    ///
+    /// Note that a task being suspended is independent from its [`RunState`].
+    pub fn is_suspended(&self) -> bool {
+        self.suspended.load(Ordering::Acquire)
+    }
+    
+    /// Sets the waker to be awoken when this task exits.
+    pub fn set_waker(&self, waker: Waker) {
+        self.inner.lock().waker = Some(waker);
     }
 
     /// Sets this `Task` as this CPU's current task.
@@ -775,8 +764,7 @@ impl Task {
     ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
     /// 2. Obtains the preemption guard such that preemption can be re-enabled
     ///    when it is appropriate to do so.
-    #[doc(hidden)]
-    pub fn post_context_switch_action(&self) -> PreemptionGuard {
+    fn post_context_switch_action(&self) -> PreemptionGuard {
         // Step 1: drop data from previously running task
         {
             let prev_task_data_to_drop = self.inner.lock().drop_after_task_switch.take();
@@ -797,7 +785,7 @@ impl Task {
 impl Drop for Task {
     fn drop(&mut self) {
         #[cfg(not(any(rq_eval, downtime_eval)))]
-        trace!("[CPU {}] Task::drop(): {}", apic::get_my_apic_id(), self);
+        trace!("[CPU {}] Task::drop(): {}", cpu::current_cpu(), self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.
         // This is because if an application task sets a kill handler that is a closure/function in the text section of the app crate itself,
@@ -867,7 +855,6 @@ pub fn task_switch(
         Ok(Err(early_retval)) => return early_retval,
         Err(preemption_guard) => {
             // Here, the closure returned an error, meaning we couldn't get the current task
-            error!("BUG: task_switch(): couldn't get current task.");
             return (false, preemption_guard); // keep running the same current task
         }
     };
@@ -1139,11 +1126,17 @@ fn task_switch_inner(
 // /// Note: this type is considered an internal implementation detail.
 // /// Instead, use the `TaskJoiner` type from the `spawn` crate, 
 // /// which is intended to be the public-facing interface for joining a task.
-#[derive(Debug)]
 pub struct JoinableTaskRef {
     task: TaskRef,
 }
 assert_not_impl_any!(JoinableTaskRef: Clone);
+impl fmt::Debug for JoinableTaskRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("JoinableTaskRef")
+            .field("task", &self.task)
+            .finish_non_exhaustive()
+    }
+}
 impl Deref for JoinableTaskRef {
     type Target = TaskRef;
     fn deref(&self) -> &Self::Target {
@@ -1152,6 +1145,8 @@ impl Deref for JoinableTaskRef {
 }
 impl JoinableTaskRef {
     /// Busy-waits (spins in a loop) until this task has exited or has been killed.
+    ///
+    /// Synchronizes memory with respect to the joined task.
     ///
     /// # Return
     /// * `Ok` containing this `Task`'s [`ExitValue`] once this task has exited.
@@ -1162,13 +1157,16 @@ impl JoinableTaskRef {
     #[doc(alias("reap", "exit"))]
     pub fn join(&self) -> Result<ExitValue, &'static str> {
         // First, wait for this Task to be marked as Exited (no longer runnable).
-        while !self.0.has_exited() { }
+        while !self.has_exited() { }
 
         // Then, wait for it to actually stop running on any CPU core.
-        while self.0.is_running() { }
+        while self.is_running() { }
 
-        self.task
-            .retrieve_exit_value()
+        // This synchronizes with the release fence from when this task first ran
+        // (in `spawn::task_wrapper()`).
+        fence(Ordering::Acquire);
+
+        self.reap_exit_value()
             .ok_or("BUG: `join()` could not retrieve `ExitValue` after task had exited.")
     }
 }
@@ -1181,6 +1179,112 @@ impl Drop for JoinableTaskRef {
 }
 
 
+/// A wrapper around `TaskRef` that allows this task to mark itself as exited.
+///
+/// This is only obtainable when a task is first switched to, specifically while
+/// it is executing the `spawn::task_wrapper()` function
+/// (before it proceeds to running its actual entry function).
+///
+/// ## Not `Clone`-able
+/// This type does not implement `Clone` because it assumes there is
+/// only ever one `ExitableTaskRef` per task.
+///
+/// However, this type auto-derefs into an inner [`TaskRef`],
+/// which *can* be cloned, so you can easily call `.clone()` on it.
+pub struct ExitableTaskRef {
+    task: TaskRef,
+}
+// Ensure that `ExitableTaskRef` cannot be moved to (Send) or shared with (Sync)
+// another task, as a task is the only one who should be able to mark itself as exited.
+impl !Send for ExitableTaskRef { }
+impl !Sync for ExitableTaskRef { }
+impl fmt::Debug for ExitableTaskRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("ExitableTaskRef")
+            .field("task", &self.task)
+            .finish_non_exhaustive()
+    }
+}
+impl Deref for ExitableTaskRef {
+    type Target = TaskRef;
+    fn deref(&self) -> &Self::Target {
+        &self.task
+    }
+}
+impl ExitableTaskRef {
+    /// Call this function to indicate that this task has successfully ran to completion,
+    /// and that it has returned the given `exit_value`.
+    /// 
+    /// This is only usable within task cleanup functions to indicate
+    /// that the current task has cleanly exited.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited;
+    ///   the existing exit status will not be overwritten.
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
+        self.internal_exit(ExitValue::Completed(exit_value))
+    }
+
+    /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
+    /// and it is ready to be marked as killed, i.e., it will never run again.
+    /// 
+    /// If you want to kill another task, use [`TaskRef::kill()`] instead.
+    /// 
+    /// This is only usable within task cleanup functions (e.g., after unwinding) to indicate
+    /// that the current task has crashed or failed and has been killed by the system.
+    /// 
+    /// # Return
+    /// * Returns `Ok` if the exit status was successfully set.     
+    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
+    ///  
+    /// # Note 
+    /// The `Task` will not be halted immediately -- 
+    /// it will finish running its current timeslice, and then never be run again.
+    pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
+        self.internal_exit(ExitValue::Killed(reason))
+    }
+
+    /// Reaps this task (if orphaned) by taking and dropping its exit value and removing it
+    /// from the system task list.
+    ///
+    /// If this task has *not* been orphaned, meaning it is still joinable,
+    /// then this function does nothing.
+    pub fn reap_if_orphaned(&self) {
+        if !self.is_joinable() {
+            // trace!("Reaping orphaned task... {:?}", self);
+            let _exit_value = self.task.reap_exit_value();
+            // trace!("Reaped orphaned task {:?}, {:?}", self, _exit_value);
+        }
+    }
+
+    /// Perform any actions needed after a context switch.
+    /// 
+    /// Currently this only does two things:
+    /// 1. Drops any data that the original previous task (before the context switch)
+    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
+    /// 2. Obtains the preemption guard such that preemption can be re-enabled
+    ///    when it is appropriate to do so.
+    ///
+    /// Note: this publicly re-exports the private `TaskRef::post_context_switch_action()`
+    ///       function for use in the early `spawn::task_wrapper` functions,
+    ///       which is the only place where an `ExitableTaskRef` can be obtained. 
+    pub fn post_context_switch_action(&self) -> PreemptionGuard {
+        self.task.post_context_switch_action()
+    }
+
+    /// Allows the unwinder to obtain an `ExitableTaskRef` in order for it to
+    /// be able to invoke this task's [`FailureCleanupFunction`].
+    #[doc(hidden)]
+    pub fn obtain_for_unwinder(current_task: TaskRef) -> Self {
+        Self { task: current_task }
+    }
+}
+
 /// A shareable, cloneable reference to a `Task` that exposes more methods
 /// for task management and auto-derefs into an immutable `&Task` reference.
 /// 
@@ -1191,8 +1295,19 @@ impl Drop for JoinableTaskRef {
 /// ## Equality comparisons
 /// `TaskRef` implements the [`PartialEq`] and [`Eq`] traits to ensure that
 /// two `TaskRef`s are considered equal if they point to the same underlying `Task`.
-#[derive(Debug, Clone)]
-pub struct TaskRef(Arc<Task>);
+#[derive(Clone)]
+pub struct TaskRef(Arc<TaskRefInner>);
+impl fmt::Debug for TaskRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("TaskRef")
+            .field("task", &self.0.task)
+            .finish_non_exhaustive()
+    }
+}
+struct TaskRefInner {
+    task: Task,
+    exit_value_mailbox: Mutex<Option<ExitValue>>,
+}
 
 impl TaskRef {
     /// Creates a new `TaskRef`, a shareable wrapper around the given `Task`.
@@ -1203,64 +1318,13 @@ impl TaskRef {
     /// ## Return
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
-    pub fn new(task: Task) -> JoinableTaskRef {
-        let taskref = TaskRef(Arc::new(task));
+    pub fn create(task: Task) -> JoinableTaskRef {
+        let exit_value_mailbox = Mutex::new(None);
+        let taskref = TaskRef(Arc::new(TaskRefInner { task, exit_value_mailbox }));
 
         // Mark this task as joinable, now that it has been wrapped in the proper type.
         taskref.joinable.store(true, Ordering::Relaxed);
         JoinableTaskRef { task: taskref }
-    }
-
-    /// Call this function to indicate that this task has successfully ran to completion,
-    /// and that it has returned the given `exit_value`.
-    /// 
-    /// This should only be used within task cleanup functions to indicate
-    /// that the current task has cleanly exited.
-    /// 
-    /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task's inner state.
-    /// 
-    /// # Return
-    /// * Returns `Ok` if the exit status was successfully set.     
-    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
-    ///  
-    /// # Note 
-    /// The `Task` will not be halted immediately -- 
-    /// it will finish running its current timeslice, and then never be run again.
-    #[doc(hidden)]
-    pub fn mark_as_exited(&self, exit_value: Box<dyn Any + Send>) -> Result<(), &'static str> {
-        self.internal_exit(ExitValue::Completed(exit_value))
-    }
-
-    /// Call this function to indicate that this task has been cleaned up (e.g., by unwinding)
-    /// and it is ready to be marked as killed, i.e., it will never run again.
-    /// This task (`self`) must be the currently executing task, 
-    /// you cannot invoke `mark_as_killed()` on a different task.
-    /// 
-    /// If you want to kill another task, use the [`kill()`](method.kill) method instead.
-    /// 
-    /// This should only be used within task cleanup functions (e.g., after unwinding) to indicate
-    /// that the current task has crashed or failed and has been killed by the system.
-    /// 
-    /// # Locking / Deadlock
-    /// This method obtains a writable lock on the underlying Task's inner state.
-    /// 
-    /// # Return
-    /// * Returns `Ok` if the exit status was successfully set.     
-    /// * Returns `Err` if this `Task` was already exited, and does not overwrite the existing exit status. 
-    ///  
-    /// # Note 
-    /// The `Task` will not be halted immediately -- 
-    /// it will finish running its current timeslice, and then never be run again.
-    #[doc(hidden)]
-    pub fn mark_as_killed(&self, reason: KillReason) -> Result<(), &'static str> {
-        if with_current_task(|t| t == self)
-            .unwrap_or(false)
-        {
-            self.internal_exit(ExitValue::Killed(reason))
-        } else {
-            Err("`mark_as_exited()` can only be invoked on the current task, not on another task.")
-        }
     }
 
     /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
@@ -1289,40 +1353,53 @@ impl TaskRef {
     }
 
     /// The internal routine that actually exits or kills a Task.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on this `Task`'s inner state in order to mutate it. 
     fn internal_exit(&self, val: ExitValue) -> Result<(), &'static str> {
-        if self.0.has_exited() {
+        if self.has_exited() {
             return Err("BUG: task was already exited! (did not overwrite its existing exit value)");
         }
         {
-            let mut inner = self.0.inner.lock();
-            inner.exit_value = Some(val);
-            self.0.runstate.store(RunState::Exited);
+            *self.0.exit_value_mailbox.lock() = Some(val);
+            self.runstate.store(RunState::Exited);
 
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
-            if !self.0.is_running() {
+            if !self.is_running() {
                 todo!("Unhandled scenario: internal_exit(): task {:?} wasn't running \
-                    but its current task TLS variable needs to be cleaned up!", self.0);
+                    but its current task TLS variable needs to be cleaned up!", &self.0.task);
                 // Note: we cannot call `deinit_current_task()` here because if this task
                 //       isn't running, then it's definitely not the current task.
                 //
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             }
-        }
-
-        #[cfg(runqueue_spillful)] {   
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = self.on_runqueue() {
-                    remove_from_runqueue(self, rq)?;
-                }
+            
+            if let Some(waker) = self.inner.lock().waker.take() {
+                waker.wake();
             }
         }
 
         Ok(())
+    }
+
+    /// Takes the `ExitValue` from this `Task` and returns it
+    /// if and only if this `Task` was in the `Exited` runstate.
+    ///
+    /// If this `Task` was in the `Exited` runstate, after invoking this,
+    /// this `Task`'s runstate will be set to `Reaped`
+    /// and this `Task` will be removed from the system task list.
+    ///
+    /// If this `Task` was **not** in the `Exited` runstate, 
+    /// nothing is done and `None` is returned.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on the system task list.
+    fn reap_exit_value(&self) -> Option<ExitValue> {
+        if self.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
+            TASKLIST.lock().remove(&self.id);
+            self.0.exit_value_mailbox.lock().take()
+        } else {
+            None
+        }
     }
 }
 
@@ -1342,7 +1419,7 @@ impl Hash for TaskRef {
 impl Deref for TaskRef {
     type Target = Task;
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        &self.0.task
     }
 }
 
@@ -1359,14 +1436,19 @@ impl Deref for TaskRef {
 
 
 /// Bootstrap a new task from the current thread of execution.
-/// 
-/// # Note
+///
+/// Returns a tuple of:
+/// 1. a [`JoinableTaskRef`], which allows another task to join this bootstrapped task,
+/// 2. an [`ExitableTaskRef`], which allows this bootstrapped task to mark itself
+///    as exited once it has completed running.
+///
+/// ## Note
 /// This function does not add the new task to any runqueue.
 pub fn bootstrap_task(
     apic_id: u8, 
     stack: NoDrop<Stack>,
     kernel_mmi_ref: MmiRef,
-) -> Result<JoinableTaskRef, &'static str> {
+) -> Result<(JoinableTaskRef, ExitableTaskRef), &'static str> {
     // Here, we cannot call `Task::new()` because tasking hasn't yet been set up for this core.
     // Instead, we generate all of the `Task` states manually, and create an initial task directly.
     let default_namespace = mod_mgmt::get_initial_kernel_namespace()
@@ -1381,26 +1463,28 @@ pub fn bootstrap_task(
         None,
         bootstrap_task_cleanup_failure,
     );
-    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
     bootstrap_task.runstate.store(RunState::Runnable);
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
-    let task_ref = TaskRef::new(bootstrap_task);
+    let joinable_taskref = TaskRef::create(bootstrap_task);
 
     // Set this task as this CPU's current task, as it's already running.
-    task_ref.set_as_current_task();
-    // Set this task as this CPU's current task, as it's already running.
-    if let Err(_) = init_current_task(bootstrap_task_id, Some(task_ref.clone())) {
+    joinable_taskref.set_as_current_task();
+    let Ok(exitable_taskref) = init_current_task(
+        bootstrap_task_id, 
+        Some(joinable_taskref.clone()),
+    ) else {
         error!("BUG: failed to set boostrapped task as current task on AP {}", apic_id);
         // Don't drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
-        let _task_ref = NoDrop::new(task_ref);
+        let _task_ref = NoDrop::new(joinable_taskref);
         return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
-    }
+    };
 
     // insert the new task into the task list
-    let old_task = TASKLIST.lock().insert(bootstrap_task_id, task_ref.clone());
+    let old_task = TASKLIST.lock().insert(bootstrap_task_id, joinable_taskref.clone());
     if let Some(ot) = old_task {
         error!("BUG: bootstrap_task(): TASKLIST already contained a task {:?} with the same id {} as bootstrap_task_core_{}!", 
             ot, bootstrap_task_id, apic_id
@@ -1408,7 +1492,7 @@ pub fn bootstrap_task(
         return Err("BUG: bootstrap_task(): TASKLIST already contained a task with the new bootstrap_task's ID");
     }
     
-    Ok(task_ref)
+    Ok((joinable_taskref, exitable_taskref))
 }
 
 
@@ -1419,8 +1503,12 @@ pub fn bootstrap_task(
 /// because it was invoked from assembly and may not even have one. 
 /// 
 /// Therefore there's not much we can actually do.
-fn bootstrap_task_cleanup_failure(current_task: TaskRef, kill_reason: KillReason) -> ! {
-    error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. There's nothing we can do here; looping indefinitely!", current_task, kill_reason);
+fn bootstrap_task_cleanup_failure(current_task: ExitableTaskRef, kill_reason: KillReason) -> ! {
+    error!("BUG: bootstrap_task_cleanup_failure: {:?} died with {:?}\n. \
+        There's nothing we can do here; looping indefinitely!",
+        current_task,
+        kill_reason,
+    );
     loop { }
 }
 
@@ -1430,7 +1518,7 @@ pub use tls_current_task::*;
 /// A private module to ensure the below TLS variables aren't modified directly.
 mod tls_current_task {
     use core::cell::{Cell, RefCell};
-    use super::{TASKLIST, TaskRef};
+    use super::{TASKLIST, TaskRef, ExitableTaskRef};
 
     /// The TLS area that holds the current task's ID.
     #[thread_local]
@@ -1444,15 +1532,15 @@ mod tls_current_task {
     /// 
     /// This is useful to avoid cloning a reference to the current task.
     /// 
-    /// Returns an `Err` if the current task cannot be obtained.
-    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, CurrentTaskNotFound>
     where
         F: FnOnce(&TaskRef) -> R
     {
         if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
             Ok(function(t))
         } else {
-            Err(())
+            Err(CurrentTaskNotFound)
         }
     }
 
@@ -1496,7 +1584,7 @@ mod tls_current_task {
         CURRENT_TASK_ID.get()
     }
 
-    /// Set the given task as the current task.
+    /// Initializes the TLS variable(s) used for tracking the "current" task.
     ///
     /// This function being public is completely safe, as it will only ever execute
     /// once per task, typically at the beginning of a task's first execution.
@@ -1505,31 +1593,35 @@ mod tls_current_task {
     /// If `current_task` is `None`, the task must have already been added to 
     /// the system-wide task list such that a reference to it can be retrieved.
     ///
-    /// Returns an `Err` if the current task has already been set.
+    /// # Return
+    /// * On success, an [`ExitableTaskRef`] for the current task,
+    ///   which can only be obtained once at the very start of the task's execution,
+    ///   and only from this one function. 
+    /// * Returns an `Err` if the current task has already been initialized.
     #[doc(hidden)]
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<TaskRef, ()> {
+    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(());
+                return Err(CurrentTaskAlreadyInited);
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(())?
+                .ok_or(CurrentTaskAlreadyInited)?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
             Ok(mut t_opt) if t_opt.is_none() => {
                 *t_opt = Some(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
-                Ok(taskref)
+                Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(()),
+            _ => Err(CurrentTaskAlreadyInited),
         }
     }
 
@@ -1551,4 +1643,11 @@ mod tls_current_task {
             Err(value)
         }
     }
+
+    /// An error type indicating that the current task was already initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskAlreadyInited;
+    /// An error type indicating that the current task has not yet been initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskNotFound;
 }

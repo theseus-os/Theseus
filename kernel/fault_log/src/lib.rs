@@ -7,12 +7,12 @@
 #![feature(drain_filter)]
 
 #[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate print; // for regular println!()
+#[macro_use] extern crate app_io; // for regular println!()
 #[macro_use] extern crate log;
 extern crate alloc;
 extern crate memory;
 extern crate task;
-extern crate apic;
+extern crate cpu;
 extern crate irq_safety;
 
 use alloc::{
@@ -20,7 +20,6 @@ use alloc::{
     vec::Vec,
 };
 use memory::VirtualAddress;
-use apic::get_my_apic_id;
 use irq_safety::MutexIrqSafe;
 use core::panic::PanicInfo;
 
@@ -111,7 +110,7 @@ impl FaultEntry {
         fault_type: FaultType
     ) -> FaultEntry {
         FaultEntry {
-            fault_type: fault_type,
+            fault_type,
             error_code: None,
             core: None,
             running_task: None,
@@ -142,7 +141,7 @@ fn update_and_insert_fault_entry_internal(
 ) {
 
     // Add the core the fault was detected
-    fe.core = Some(get_my_apic_id());
+    fe.core = Some(cpu::current_cpu());
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
@@ -169,7 +168,7 @@ fn update_and_insert_fault_entry_internal(
     if let Some(instruction_pointer) = instruction_pointer {
         let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
         fe.instruction_pointer = Some(instruction_pointer);
-        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer, false)
                                         .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 
@@ -191,7 +190,7 @@ pub fn log_exception (
 ) {
     let mut fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
-    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    fe.address_accessed  = address_accessed.map(VirtualAddress::new_canonical);
     update_and_insert_fault_entry_internal(fe, Some(instruction_pointer));
 }
 

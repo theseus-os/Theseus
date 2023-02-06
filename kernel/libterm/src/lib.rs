@@ -9,11 +9,10 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 extern crate dfqueue;
 extern crate environment;
-extern crate print;
 extern crate event_types;
 extern crate displayable;
 extern crate font;
@@ -89,13 +88,12 @@ impl Terminal {
     fn calc_start_idx(&self, end_idx: usize) -> (usize, usize) {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
         let mut start_idx = end_idx;
-        let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        if end_idx > buffer_width * buffer_height {
-            result = self.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx);
+        let result = if end_idx > buffer_width * buffer_height {
+            self.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx)
         } else {
-            result = self.scrollback_buffer.get(0..end_idx);
-        }
+            self.scrollback_buffer.get(0..end_idx)
+        };
 
         if let Some(slice) = result {
             let mut total_lines = 0;
@@ -163,10 +161,10 @@ impl Terminal {
             }
 
             // If the previous loop overcounted, this cuts off the excess string from string. Happens when there are many charcters between newlines at the beginning of the slice
-            return (start_idx, (total_lines - 1) * buffer_width + last_line_chars);
+            (start_idx, (total_lines - 1) * buffer_width + last_line_chars)
 
         } else {
-            return (0,0); /* WARNING: should change to Option<> rather than returning (0, 0) */
+            (0,0) /* WARNING: should change to Option<> rather than returning (0, 0) */
         }   
     }
 
@@ -177,13 +175,12 @@ impl Terminal {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
-        let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
-            result = self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1);
+        let result = if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
+            self.scrollback_buffer.get(start_idx..scrollback_buffer_len-1)
         } else {
-            result = self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height);
-        }
+            self.scrollback_buffer.get(start_idx..start_idx + buffer_width * buffer_height)
+        };
 
         // calculate the starting index for the slice
         if let Some(slice) = result {
@@ -191,10 +188,10 @@ impl Terminal {
             // Obtains a vector of the indices of the slice where newlines occur in ascending order
             let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
             // if there are no new lines in the slice
-            if new_line_indices.len() == 0 {
+            if new_line_indices.is_empty() {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
-                if end_idx <= self.scrollback_buffer.len() -1 {
+                if end_idx < self.scrollback_buffer.len() {
                     return Ok(end_idx); 
                 } else {
                     return Err(ScrollError::OffEndBound);
@@ -235,13 +232,13 @@ impl Terminal {
                 end_idx += last_line_chars;
             }
 
-            if end_idx <= self.scrollback_buffer.len() -1 {
-                return Ok(end_idx); 
+            if end_idx < self.scrollback_buffer.len() {
+                Ok(end_idx)
             } else {
-                return Err(ScrollError::OffEndBound);
+                Err(ScrollError::OffEndBound)
             }
         } else {
-            return Ok(self.scrollback_buffer.len() - 1) /* WARNING: maybe should return Error? */
+            Ok(self.scrollback_buffer.len() - 1) /* WARNING: maybe should return Error? */
         }
     }
 
@@ -284,12 +281,11 @@ impl Terminal {
     /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self) {
         let buffer_width = self.get_text_dimensions().0;
-        let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end {
             return;
         } 
-        prev_start_idx = self.scroll_start_idx;
+        let prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
@@ -387,7 +383,7 @@ impl Terminal {
         };
         let result  = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.text_display.set_text(&slice);
+            self.text_display.set_text(slice);
             self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -449,7 +445,7 @@ impl Terminal {
         };
         terminal.display_text()?;
 
-        terminal.print_to_terminal(format!("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"));
+        terminal.print_to_terminal("Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n".to_string());
         Ok(terminal)
     }
 

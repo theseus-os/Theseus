@@ -256,7 +256,7 @@ if #[cfg(unsafe_heap)] {
 /// other value e.g. task id
 #[inline(always)] 
 fn get_key() -> usize {
-    apic::get_my_apic_id() as usize
+    apic::current_cpu() as usize
 }
 
 // The LockedHeap struct definition changes depending on the slabmalloc version used.
@@ -527,7 +527,7 @@ unsafe impl GlobalAlloc for MultipleHeaps {
         // find the starting address of the object page this block belongs to
         let page_addr = (ptr as usize) & !(ObjectPage8k::SIZE - 1);
         // find the heap id
-        let id = *((page_addr as *mut u8).offset(ObjectPage8k::HEAP_ID_OFFSET as isize) as *mut usize);
+        let id = *((page_addr as *mut u8).add(ObjectPage8k::HEAP_ID_OFFSET) as *mut usize);
         let mut heap = self.heaps.get(&id).expect("Multiple Heaps: Heap not initialized").lock();
         heap.deallocate(NonNull::new_unchecked(ptr), layout).expect("Couldn't deallocate");
     }
@@ -576,7 +576,6 @@ if #[cfg(unsafe_large_allocations)] {
 
 } else {
     extern crate intrusive_collections;
-    #[macro_use] extern crate static_assertions;
 
     use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
 
@@ -589,7 +588,7 @@ if #[cfg(unsafe_large_allocations)] {
 
     // Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
     // Otherwise we will have a recursive loop of large allocations.
-    const_assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE); 
+    const _: () = assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE);
 
     intrusive_adapter!(LargeAllocationAdapter = Box<LargeAllocation>: LargeAllocation { link: RBTreeLink });
 
@@ -613,7 +612,7 @@ if #[cfg(unsafe_large_allocations)] {
             let ptr = mp.start_address().value();
             let link = Box::new(LargeAllocation {
                 link: RBTreeLink::new(),
-                mp: mp
+                mp
             });
             map.insert(link);
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);

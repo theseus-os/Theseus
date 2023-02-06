@@ -3,6 +3,7 @@ name = "acpi_table_handler"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Functions for handling specific types of ACPI tables"
+edition = "2021"
 
 [dependencies.log]
 version = "0.4.8"

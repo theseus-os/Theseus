@@ -15,8 +15,8 @@ path = "../../libs/atomic_linked_list"
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 
 [lib]

@@ -44,15 +44,12 @@ pub struct SectionMemoryBounds {
 ///   * The `rodata` section also includes thread-local storage (TLS) areas (.tdata, .tbss) if they exist,
 ///     because they can be mapped using the same page table flags.
 /// * The `data` section bounds cover those that are writable (.data, .bss).
-/// 
-/// It also contains:
-/// * The `stack` section bounds cover the initial stack, which are maintained separately.
 #[derive(Debug)]
 pub struct AggregatedSectionMemoryBounds {
+   pub init:        SectionMemoryBounds,
    pub text:        SectionMemoryBounds,
    pub rodata:      SectionMemoryBounds,
    pub data:        SectionMemoryBounds,
-   pub stack:       SectionMemoryBounds,
 }
 
 
@@ -63,17 +60,21 @@ pub struct AggregatedSectionMemoryBounds {
 ///    Each of the these section bounds is aggregated to cover the bounds and sizes of *all* sections 
 ///    that share the same page table mapping flags and can thus be logically combined.
 ///  * The list of all individual sections found. 
-pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str> {
+pub fn find_section_memory_bounds<F>(boot_info: &impl BootInformation, translate: F) -> Result<(AggregatedSectionMemoryBounds, [Option<SectionMemoryBounds>; 32]), &'static str>
+where
+    F: Fn(VirtualAddress) -> Option<PhysicalAddress>,
+{
     let mut index = 0;
+    let mut init_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
+    let mut init_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut text_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut text_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_start:      Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut rodata_end:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_start:        Option<(VirtualAddress, PhysicalAddress)> = None;
     let mut data_end:          Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_start:       Option<(VirtualAddress, PhysicalAddress)> = None;
-    let mut stack_end:         Option<(VirtualAddress, PhysicalAddress)> = None;
 
+    let mut init_flags:        Option<PteFlags> = None;
     let mut text_flags:        Option<PteFlags> = None;
     let mut rodata_flags:      Option<PteFlags> = None;
     let mut data_flags:        Option<PteFlags> = None;
@@ -93,24 +94,16 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         debug!("Looking at loaded section {} at {:#X}, size {:#X}", section.name(), section.start(), section.len());
         let flags = convert_to_pte_flags(&section);
 
-        // even though the linker stipulates that the kernel sections have a higher-half virtual address,
-        // they are still loaded at a lower physical address, in which phys_addr = virt_addr - KERNEL_OFFSET.
-        // thus, we must map the zeroeth kernel section from its low address to a higher-half address,
-        // and we must map all the other sections from their higher given virtual address to the proper lower phys addr
-        let mut start_phys_addr = section.start().value();
-        if start_phys_addr >= KERNEL_OFFSET {
-            // true for all sections but the first section (inittext)
-            start_phys_addr -= KERNEL_OFFSET;
-        }
+        let mut start_virt_addr = VirtualAddress::new(section.start().value())
+            .ok_or("section had invalid starting virtual address")?;
+        let start_phys_addr = translate(start_virt_addr)
+            .ok_or("couldn't translate section's starting virtual address")?;
 
-        let mut start_virt_addr = section.start().value();
-        if start_virt_addr < KERNEL_OFFSET {
+        if start_virt_addr.value() < KERNEL_OFFSET {
             // special case to handle the first section only
             start_virt_addr += KERNEL_OFFSET;
         }
 
-        let start_phys_addr = PhysicalAddress::new(start_phys_addr).ok_or("section had invalid starting physical address")?;
-        let start_virt_addr = VirtualAddress::new(start_virt_addr).ok_or("section had invalid ending physical address")?;
         let end_virt_addr = start_virt_addr + section.len();
         let end_phys_addr = start_phys_addr + section.len();
 
@@ -140,10 +133,13 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
             ".init" => {
-                text_start = Some((start_virt_addr, start_phys_addr));
+                init_start = Some((start_virt_addr, start_phys_addr));
+                init_end = Some((end_virt_addr, end_phys_addr));
+                init_flags = Some(flags);
                 "nano_core .init"
             } 
             ".text" => {
+                text_start = Some((start_virt_addr, start_phys_addr));
                 text_end = Some((end_virt_addr, end_phys_addr));
                 text_flags = Some(flags);
                 "nano_core .text"
@@ -182,14 +178,17 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
                 data_flags = Some(flags);
                 "nano_core .bss"
             }
-            ".page_table" => {
-                // We bootstrap the page table from the CR3 register.
+            // This appears when compiling for BIOS.
+            ".page_table" | ".stack" => {
+                debug!("     no need to map this section, it is mapped separately later");
                 continue;
             }
-            ".stack" => {
-                stack_start = Some((start_virt_addr, start_phys_addr));
-                stack_end   = Some((end_virt_addr, end_phys_addr));
-                "initial stack"
+            // This appears when compiling for UEFI.
+            ".bootloader-config" => {
+                // TODO: Ideally we'd mark .bootloader-config as not allocated
+                // so the bootloader doesn't load it.
+                debug!("     no need to map this section, it is only used by the bootloader for config.");
+                continue;
             }
             _ =>  {
                 error!("Section {} at {:#X}, size {:#X} was not an expected section", 
@@ -208,19 +207,25 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         index += 1;
     }
 
+    let init_start         = init_start       .ok_or("Couldn't find start of .init section")?;
+    let init_end           = init_end         .ok_or("Couldn't find end of .init section")?;
     let text_start         = text_start       .ok_or("Couldn't find start of .text section")?;
     let text_end           = text_end         .ok_or("Couldn't find end of .text section")?;
     let rodata_start       = rodata_start     .ok_or("Couldn't find start of .rodata section")?;
     let rodata_end         = rodata_end       .ok_or("Couldn't find end of .rodata section")?;
     let data_start         = data_start       .ok_or("Couldn't find start of .data section")?;
     let data_end           = data_end         .ok_or("Couldn't find start of .data section")?;
-    let stack_start        = stack_start      .ok_or("Couldn't find start of .stack section")?;
-    let stack_end          = stack_end        .ok_or("Couldn't find start of .stack section")?;
      
+    let init_flags    = init_flags  .ok_or("Couldn't find .init section flags")?;
     let text_flags    = text_flags  .ok_or("Couldn't find .text section flags")?;
     let rodata_flags  = rodata_flags.ok_or("Couldn't find .rodata section flags")?;
     let data_flags    = data_flags  .ok_or("Couldn't find .data section flags")?;
 
+    let init = SectionMemoryBounds {
+        start: init_start,
+        end: init_end,
+        flags: init_flags,
+    };
     let text = SectionMemoryBounds {
         start: text_start,
         end: text_end,
@@ -236,17 +241,12 @@ pub fn find_section_memory_bounds(boot_info: &impl BootInformation) -> Result<(A
         end: data_end,
         flags: data_flags,
     };
-    let stack = SectionMemoryBounds {
-        start: stack_start,
-        end: stack_end,
-        flags: data_flags, // same flags as data sections
-    };
 
     let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
+        init,
         text,
         rodata,
         data,
-        stack,
     };
     Ok((aggregated_sections_memory_bounds, sections_memory_bounds))
 }

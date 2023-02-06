@@ -46,7 +46,7 @@ pub(crate) struct EventQueueContext {
     _padding4:          [u8;16],
 }
 
-const_assert_eq!(core::mem::size_of::<EventQueueContext>(), 64);
+const _: () = assert!(core::mem::size_of::<EventQueueContext>() == 64);
 
 impl EventQueueContext {
     /// Create and initialize the fields of the EQ context.
@@ -89,7 +89,7 @@ pub struct EventQueueEntry {
     signature_owner: Volatile<U32<BigEndian>>
 }
 
-const_assert_eq!(core::mem::size_of::<EventQueueEntry>(), 64);
+const _: () = assert!(core::mem::size_of::<EventQueueEntry>() == 64);
 
 impl EventQueueEntry {
     pub fn init(&mut self) {

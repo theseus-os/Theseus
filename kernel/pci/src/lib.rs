@@ -77,7 +77,7 @@ static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
 pub fn get_pci_buses() -> &'static Vec<PciBus> {
     static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
-    PCI_BUSES.call_once( || scan_pci() )
+    PCI_BUSES.call_once(scan_pci)
 }
 
 
@@ -88,7 +88,7 @@ pub fn get_pci_device_bsf(bus: u16, slot: u16, func: u16) -> Option<&'static Pci
         if b.bus_number == bus {
             for d in &b.devices {
                 if d.slot == slot && d.func == func {
-                    return Some(&d);
+                    return Some(d);
                 }
             }
         }
@@ -147,7 +147,7 @@ fn scan_pci() -> Vec<PciBus> {
                 }
 
                 let device = PciDevice {
-                    vendor_id:        vendor_id,
+                    vendor_id,
                     device_id:        location.pci_read_16(PCI_DEVICE_ID), 
                     command:          location.pci_read_16(PCI_COMMAND),
                     status:           location.pci_read_16(PCI_STATUS),
@@ -169,7 +169,7 @@ fn scan_pci() -> Vec<PciBus> {
                                       ],
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
-                    location:              location,
+                    location,
                 };
 
                 device_list.push(device);
@@ -297,7 +297,7 @@ impl PciLocation {
             // iterate through the linked list of capabilities until the requested capability is found or the list reaches its end
             while cap_addr != final_capability {
                 // the capability header is a 16 bit value which contains the current capability ID and the pointer to the next capability
-                let cap_header = self.pci_read_16(cap_addr as u16);
+                let cap_header = self.pci_read_16(cap_addr);
 
                 // the id is the lower byte of the header
                 let cap_id = cap_header & 0xFF;
@@ -323,7 +323,7 @@ impl fmt::Display for PciLocation {
 
 impl fmt::Debug for PciLocation {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "{}", self)
+        write!(f, "{self}")
     }
 }
 

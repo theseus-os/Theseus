@@ -70,7 +70,7 @@ pub struct IoApic {
 impl IoApic {
     /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`,
     /// and then adds it to the system-wide list of all IOAPICs.
-    pub fn new(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
+    pub fn create(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
         let new_page = allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!")?;
         let frame = allocate_frames_at(phys_addr, 1).map_err(|_e| "Couldn't allocate physical frame for IOAPIC")?;
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
@@ -146,8 +146,6 @@ impl IoApic {
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
     pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
-        let vector = irq_vector as u8;
-
         let low_index: u32 = 0x10 + (ioapic_irq as u32) * 2;
         let high_index: u32 = 0x10 + (ioapic_irq as u32) * 2 + 1;
 
@@ -161,7 +159,7 @@ impl IoApic {
         low &= !(1<<11);
         low &= !0x700;
         low &= !0xff;
-        low |= vector as u32;
+        low |= irq_vector as u32;
         self.write_reg(low_index, low);
     }
 }

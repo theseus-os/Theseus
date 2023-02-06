@@ -54,7 +54,7 @@ fn args_or_env_sizes_get(
         .set(argv_buf_size_out, &argv_buf_size.to_le_bytes())
         .unwrap();
 
-    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+    Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
 }
 
 /// Helper function to support retrieving args/env data.
@@ -69,7 +69,7 @@ fn args_or_env_sizes_get(
 /// # Return
 /// A WASI errno.
 fn args_or_env_get(
-    list: &Vec<String>,
+    list: &[String],
     argv_pointers: u32,
     argv_data: u32,
     memory: &MemoryRef,
@@ -91,7 +91,7 @@ fn args_or_env_get(
 
         // Write content of current arg to argv_data buffer.
         memory
-            .set(argv_data.checked_add(argv_data_pos).unwrap(), &arg)
+            .set(argv_data.checked_add(argv_data_pos).unwrap(), arg)
             .unwrap();
         argv_data_pos = argv_data_pos
             .checked_add(u32::try_from(arg.len()).unwrap())
@@ -104,7 +104,7 @@ fn args_or_env_get(
         argv_data_pos = argv_data_pos.checked_add(1).unwrap();
     }
 
-    return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+    Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
 }
 
 /// Executes specified system calls by interacting with wasmi memory and Theseus I/O.
@@ -123,15 +123,15 @@ pub fn execute_system_call(
     wasmi_args: RuntimeArgs,
 ) -> Result<Option<RuntimeValue>, Trap> {
     // Handles to wasmi memory and Theseus I/O.
-    let ref mut memory = match h_ext.memory {
+    let memory = &mut match h_ext.memory {
         Some(ref mut mem) => mem,
         None => {
             return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOMEM))));
         }
     };
-    let ref mut fd_table = h_ext.fd_table;
-    let ref theseus_env_vars = h_ext.theseus_env_vars;
-    let ref theseus_args = h_ext.theseus_args;
+    let fd_table = &mut h_ext.fd_table;
+    let theseus_env_vars = &h_ext.theseus_env_vars;
+    let theseus_args = &h_ext.theseus_args;
 
     match system_call {
         // Terminate process with given exit code.
@@ -221,7 +221,7 @@ pub fn execute_system_call(
             // write bytes written to return pointer.
             let ret_ptr: u32 = wasmi_args.nth_checked(3).unwrap();
             memory.set(ret_ptr, &total_written.to_le_bytes()).unwrap();
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Move the offset of a file descriptor. This is similar to lseek in POSIX.
@@ -260,7 +260,7 @@ pub fn execute_system_call(
             // write new offset to return pointer.
             let ret_ptr: u32 = wasmi_args.nth_checked(3).unwrap();
             memory.set(ret_ptr, &new_offset.to_le_bytes()).unwrap();
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Read from a file descriptor. This is similar to readv in POSIX.
@@ -307,7 +307,7 @@ pub fn execute_system_call(
                 let ptr: u32 = ptr_and_len[0];
                 let len: wasi::Size = wasi::Size::try_from(ptr_and_len[1]).unwrap();
 
-                let ref mut read_buf = vec![0; len];
+                let read_buf = &mut vec![0; len];
 
                 // retrieve data to read.
                 let bytes_read: wasi::Size = match posix_node_or_stdio.read(read_buf) {
@@ -324,7 +324,7 @@ pub fn execute_system_call(
             // write bytes read to return pointer.
             let ret_ptr: u32 = wasmi_args.nth_checked(3).unwrap();
             memory.set(ret_ptr, &total_read.to_le_bytes()).unwrap();
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Get the attributes of a file descriptor.
@@ -388,7 +388,7 @@ pub fn execute_system_call(
                 )
                 .unwrap();
 
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Return environment variable data sizes.
@@ -462,7 +462,7 @@ pub fn execute_system_call(
                 .set(ret_ptr.checked_add(4).unwrap(), &pr_name_len.to_le_bytes())
                 .unwrap();
 
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Return the directory name of the given preopened file descriptor.
@@ -503,7 +503,7 @@ pub fn execute_system_call(
             // write directory name to path.
             memory.set(path, &name.as_bytes()[..path_out_len]).unwrap();
 
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Open file or directory. This is similar to openat in POSIX.
@@ -546,7 +546,7 @@ pub fn execute_system_call(
                 FileOrDir::File { .. } => {
                     return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_NOTDIR))));
                 }
-                FileOrDir::Dir(dir_ref) => dir_ref.clone(),
+                FileOrDir::Dir(dir_ref) => dir_ref,
             };
 
             let lookup_flags: wasi::Lookupflags = wasmi_args.nth_checked(1).unwrap();
@@ -592,7 +592,7 @@ pub fn execute_system_call(
             // write opened file descriptor to return pointer.
             let opened_fd_ptr: u32 = wasmi_args.nth_checked(8).unwrap();
             memory.set(opened_fd_ptr, &opened_fd.to_le_bytes()).unwrap();
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Adjust the flags associated with a file descriptor.
@@ -625,7 +625,7 @@ pub fn execute_system_call(
                 }
             };
 
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
 
         // Return argument data sizes.
@@ -687,7 +687,7 @@ pub fn execute_system_call(
             // write time to return pointer.
             let ret_ptr: u32 = wasmi_args.nth_checked(2).unwrap();
             memory.set(ret_ptr, &timestamp.to_le_bytes()).unwrap();
-            return Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))));
+            Ok(Some(RuntimeValue::I32(From::from(wasi::ERRNO_SUCCESS))))
         }
     }
 }

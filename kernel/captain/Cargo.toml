@@ -3,11 +3,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "captain"
 description = "The main driver of Theseus. Controls the loading and initialization of all subsystems and other crates."
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-
-[dependencies.log]
-version = "0.4.8"
+log = "0.4.8"
 
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety"
@@ -19,8 +18,8 @@ version = "0.1.0"
 [dependencies.kernel_config]
 path = "../kernel_config"
 
-[dependencies.logger]
-path = "../logger"
+[dependencies.logger_x86_64]
+path = "../logger_x86_64"
 
 [dependencies.window_manager]
 path = "../window_manager"
@@ -46,8 +45,8 @@ path = "../exceptions_full"
 [dependencies.tlb_shootdown]
 path = "../tlb_shootdown"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.spawn]
 path = "../spawn"
@@ -82,8 +81,11 @@ path = "../scheduler"
 [dependencies.console]
 path = "../console"
 
-[dependencies.print]
-path = "../print"
+[dependencies.app_io]
+path = "../app_io"
+
+[dependencies.vga_buffer]
+path = "../vga_buffer"
 
 [dependencies.network_manager]
 path = "../network_manager"
@@ -102,6 +104,10 @@ path = "../task_fs"
 
 [dependencies.multiple_heaps]
 path = "../multiple_heaps"
+
+[features]
+# TODO: Remove when UEFI is fully implemented
+uefi = []
 
 [lib]
 crate-type = ["rlib"]

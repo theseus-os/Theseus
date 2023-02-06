@@ -27,7 +27,7 @@ pub(crate) struct FlowTableContext {
     pub(crate) log_size:                    Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<FlowTableContext>(), 4);
+const _: () = assert!(core::mem::size_of::<FlowTableContext>() == 4);
 
 impl fmt::Debug for FlowTableContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -84,7 +84,7 @@ pub(crate) struct FlowGroupInput {
     pub(crate) match_criteria_enable:           Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<FlowGroupInput>(), 48);
+const _: () = assert!(core::mem::size_of::<FlowGroupInput>() == 48);
 
 impl FlowGroupInput {
     pub(crate) fn init(
@@ -134,7 +134,7 @@ pub(crate) struct FlowEntryInput {
     _padding2:                              [u8; 28]
 }
 
-const_assert_eq!(core::mem::size_of::<FlowEntryInput>(), 48);
+const _: () = assert!(core::mem::size_of::<FlowEntryInput>() == 48);
 
 impl FlowEntryInput {
     pub(crate) fn init(table_type: FlowTableType, table_id: u32, flow_index: u32) -> FlowEntryInput {
@@ -180,7 +180,7 @@ pub(crate) struct FlowContext {
     _padding3:                              [u8; 20] 
 }
 
-const_assert_eq!(core::mem::size_of::<FlowContext>(), 40);
+const _: () = assert!(core::mem::size_of::<FlowContext>() == 40);
 
 impl Default for FlowContext {
     fn default() -> FlowContext {
@@ -215,8 +215,8 @@ impl FlowContext {
 pub(crate) enum DestinationType {
     VPort           = 0x0,
     FlowTable       = 0x1,
-    TIR             = 0x2,
-    QP              = 0x3,
+    Tir             = 0x2,
+    Qp              = 0x3,
     FlowSampler     = 0x6,
 }
 
@@ -226,13 +226,13 @@ pub(crate) enum DestinationType {
 #[derive(FromBytes, Default)]
 #[repr(C, packed)]
 pub(crate) struct DestinationEntry {
-    /// currently we only set the type to [DestinationType::TIR] and the id is the TIR number for the RQ
+    /// currently we only set the type to [DestinationType::Tir] and the id is the TIR number for the RQ
     pub(crate) id_and_type:                Volatile<U32<BigEndian>>,
     pub(crate) packet_reformat:                 Volatile<U32<BigEndian>>,
 
 }
 
-const_assert_eq!(core::mem::size_of::<DestinationEntry>(), 8);
+const _: () = assert!(core::mem::size_of::<DestinationEntry>() == 8);
 
 impl DestinationEntry {
     pub(crate) fn init(dest_type: DestinationType, dest_id: u32) -> DestinationEntry {

@@ -98,9 +98,9 @@ pub struct UnwindingContext {
     /// A reference to the current task that is being unwound.
     current_task: TaskRef,
 }
-impl Into<(StackFrameIter, KillReason, TaskRef)> for UnwindingContext {
-    fn into(self) -> (StackFrameIter, KillReason, TaskRef) {
-        (self.stack_frame_iter, self.cause, self.current_task)
+impl From<UnwindingContext> for (StackFrameIter, KillReason, TaskRef) {
+    fn from(val: UnwindingContext) -> Self {
+        (val.stack_frame_iter, val.cause, val.current_task)
     }
 }
 
@@ -296,16 +296,14 @@ impl FallibleIterator for StackFrameIter {
                     //
                     // Thus, we want to skip the error code so we can get the instruction pointer, 
                     // i.e., the value at CFA + 0x08.
-                    if reg_num == X86_64::RA {
-                        if let Some(_) = prev_cfa_adjustment {
-                            let size_of_error_code = core::mem::size_of::<usize>();
-                            // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
-                            let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };
-                            #[cfg(not(downtime_eval))]
-                            trace!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
-                            newregs[X86_64::RA] = Some(value);
-                            continue;
-                        }
+                    if reg_num == X86_64::RA && prev_cfa_adjustment.is_some() {
+                        let size_of_error_code = core::mem::size_of::<usize>();
+                        // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
+                        let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };
+                        #[cfg(not(downtime_eval))]
+                        trace!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
+                        newregs[X86_64::RA] = Some(value);
+                        continue;
                     }
 
                     newregs[reg_num] = match *rule {
@@ -665,16 +663,7 @@ impl UnwindRowReference {
                 "gimli error while finding unwind info for address"
             })?;
             
-            // debug!("FDE: {:?} ", fde);
-            // let mut instructions = fde.instructions(&eh_frame, &self.base_addrs);
-            // while let Some(instr) = instructions.next().map_err(|_e| {
-            //     error!("FDE instructions gimli error: {:?}", _e);
-            //     "gimli error while iterating through eh_frame FDE instructions list"
-            // })? {
-            //     debug!("    FDE instr: {:?}", instr);
-            // }
-
-            f(&fde, &unwind_table_row)
+            f(&fde, unwind_table_row)
         };
 
         // The actual logic of this function that handles the `EhFrameReference` abstraction.
@@ -742,7 +731,7 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         Box::into_raw(Box::new(
             UnwindingContext {
                 stack_frame_iter: StackFrameIter::new(
-                    Arc::clone(&namespace),
+                    Arc::clone(namespace),
                     // we will set the real register values later, in the `invoke_with_current_registers()` closure.
                     Registers::default()
                 ), 
@@ -778,11 +767,11 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
         continue_unwinding(unwinding_context_ptr)
     });
 
-    match &res {
-        &Ok(()) => {
+    match res {
+        Ok(()) => {
             debug!("unwinding procedure has reached the end of the stack.");
         }
-        &Err(e) => {
+        Err(e) => {
             error!("BUG: unwinding the first stack frame returned unexpectedly. Error: {}", e);
         }
     }
@@ -952,5 +941,8 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     #[cfg(not(downtime_eval))]
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     
-    (current_task.failure_cleanup_function)(current_task, cause)
+    (current_task.failure_cleanup_function)(
+        task::ExitableTaskRef::obtain_for_unwinder(current_task),
+        cause,
+    )
 }

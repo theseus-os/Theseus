@@ -5,7 +5,7 @@
 
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate app_io;
 extern crate getopts;
@@ -71,14 +71,14 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
         )
     ).map_err(|_| String::from("failed to get current task"))?;
 
-    let path = matches.free.get(0).ok_or_else(|| format!("Missing path to ELF executable"))?;
+    let path = matches.free.get(0).ok_or_else(|| "Missing path to ELF executable".to_string())?;
     let path = Path::new(path.clone());
     let file_ref = path.get_file(&curr_wd)
-        .ok_or_else(|| format!("Failed to access file at {:?}", path))?;
+        .ok_or_else(|| format!("Failed to access file at {path:?}"))?;
     let file = file_ref.lock();
 
     // Parse the file as an ELF executable
-    let file_mp = file.as_mapping().map_err(|e| String::from(e))?;
+    let file_mp = file.as_mapping().map_err(String::from)?;
     let byte_slice: &[u8] = file_mp.as_slice(0, file.len())?;
 
     let (mut segments, entry_point, _vaddr_offset, elf_file) = parse_and_load_elf_executable(byte_slice)?;
@@ -194,9 +194,9 @@ impl Offset {
 ///    This is the difference between where the program is *actually* loaded in memory
 ///    and where the program *expected* to be loaded into memory.
 /// 4. A reference to the parsed `ElfFile`, whose lifetime is tied to the given `file_contents` parameter.
-fn parse_and_load_elf_executable<'f>(
-    file_contents: &'f [u8],
-) -> Result<(Vec<LoadedSegment>, VirtualAddress, Offset, ElfFile<'f>), String> {
+fn parse_and_load_elf_executable(
+    file_contents: &[u8],
+) -> Result<(Vec<LoadedSegment>, VirtualAddress, Offset, ElfFile), String> {
     debug!("Parsing Elf executable of size {}", file_contents.len());
 
     let elf_file = ElfFile::new(file_contents).map_err(String::from)?;
@@ -232,9 +232,9 @@ fn parse_and_load_elf_executable<'f>(
     // Allocate enough virtually-contiguous space for all the segments together.
     let total_size_in_bytes = end_vaddr - start_vaddr;
     let mut all_pages = memory::allocate_pages_by_bytes_at(
-        VirtualAddress::new(start_vaddr).ok_or_else(|| format!("Segment had invalid virtual address {:#X}", start_vaddr))?,
+        VirtualAddress::new(start_vaddr).ok_or_else(|| format!("Segment had invalid virtual address {start_vaddr:#X}"))?,
         total_size_in_bytes
-    ).map_err(|_| format!("Failed to allocate {} bytes at {}", total_size_in_bytes, start_vaddr))?;
+    ).map_err(|_| format!("Failed to allocate {total_size_in_bytes} bytes at {start_vaddr}"))?;
     let vaddr_adjustment = Offset::new(all_pages.start_address().value(), start_vaddr); 
 
     // Iterate through each segment again and map them into pages we just allocated above,
@@ -270,7 +270,7 @@ fn parse_and_load_elf_executable<'f>(
         // debug!("Splitting {:?} after end page {:?}", all_pages, end_page);
 
         let (this_ap, remaining_pages) = all_pages.split(end_page + 1).map_err(|_ap|
-            format!("Failed to split allocated pages {:?} at page {:#X}", _ap, start_vaddr)
+            format!("Failed to split allocated pages {_ap:?} at page {start_vaddr:#X}")
         )?;
         all_pages = remaining_pages;
         // debug!("Successfully split pages into {:?} and {:?}", this_ap, all_pages);
@@ -285,7 +285,7 @@ fn parse_and_load_elf_executable<'f>(
 
         // Copy data from this section into the correct offset into our newly-mapped pages
         let offset_into_mp = mp.offset_of_address(start_vaddr).ok_or_else(|| 
-            format!("BUG: destination address {:#X} wasn't within segment's {:?}", start_vaddr, mp)
+            format!("BUG: destination address {start_vaddr:#X} wasn't within segment's {mp:?}")
         )?;
         match prog_hdr.get_data(&elf_file).map_err(String::from)? {
             SegmentData::Undefined(segment_data) => {
@@ -326,7 +326,7 @@ fn parse_and_load_elf_executable<'f>(
 
     let entry_point = elf_file.header.pt2.entry_point() as usize;
     let mut entry_point_vaddr = VirtualAddress::new(entry_point)
-        .ok_or_else(|| format!("ELF entry point was invalid virtual address: {:#X}", entry_point))?;
+        .ok_or_else(|| format!("ELF entry point was invalid virtual address: {entry_point:#X}"))?;
     Offset::adjust_assign(&mut entry_point_vaddr, vaddr_adjustment);
     debug!("ELF had entry point {:#X}, adjusted to {:#X}", entry_point, entry_point_vaddr);
 
@@ -343,12 +343,12 @@ fn parse_and_load_elf_executable<'f>(
 /// rather than using the duplicate instance of those data sections in the executable itself. 
 fn overwrite_relocations(
     namespace: &Arc<CrateNamespace>,
-    segments: &mut Vec<LoadedSegment>,
+    segments: &mut [LoadedSegment],
     elf_file: &ElfFile,
     mmi: &memory::MmiRef,
     verbose_log: bool
 ) -> Result<(), String> {
-    let symtab = find_symbol_table(&elf_file)?;
+    let symtab = find_symbol_table(elf_file)?;
 
     // Fix up the sections that were just loaded, using proper relocation info.
     // Iterate over every non-zero relocation section in the file
@@ -356,11 +356,11 @@ fn overwrite_relocations(
         use xmas_elf::sections::SectionData::Rela64;
         if verbose_log { 
             trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
-                sec.get_name(&elf_file), sec.get_type(), sec.info()
+                sec.get_name(elf_file), sec.get_type(), sec.info()
             ); 
         }
 
-        let rela_sec_name = sec.get_name(&elf_file).unwrap();
+        let rela_sec_name = sec.get_name(elf_file).unwrap();
         // Skip debug special sections for now, those can be processed later. 
         if rela_sec_name.starts_with(".rela.debug")  { 
             continue;
@@ -371,10 +371,10 @@ fn overwrite_relocations(
             continue;
         }
 
-        let rela_array = match sec.get_data(&elf_file) {
+        let rela_array = match sec.get_data(elf_file) {
             Ok(Rela64(rela_arr)) => rela_arr,
             _ => {
-                let err = format!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
+                let err = format!("Found Rela section that wasn't able to be parsed as Rela64: {sec:?}");
                 error!("{}", err);
                 return Err(err);
             } 
@@ -390,7 +390,7 @@ fn overwrite_relocations(
         let target_segment = segments.iter_mut()
             .find(|seg| seg.section_ndxs.contains(&target_sec_shndx))
             .ok_or_else(|| {
-                let err = format!("ELF file error: couldn't find loaded segment that contained section for Rela section {:?}!", sec.get_name(&elf_file));
+                let err = format!("ELF file error: couldn't find loaded segment that contained section for Rela section {:?}!", sec.get_name(elf_file));
                 error!("{}", err);
                 err
             })?;
@@ -418,17 +418,17 @@ fn overwrite_relocations(
             }
 
             let source_sec_shndx = source_sec_entry.shndx() as usize; 
-            let source_sec_name = match source_sec_entry.get_name(&elf_file) {
+            let source_sec_name = match source_sec_entry.get_name(elf_file) {
                 Ok(name) => name,
                 _ => continue,
             };
 
             if verbose_log { 
-                let source_sec_header_name = source_sec_entry.get_section_header(&elf_file, rela_entry.get_symbol_table_index() as usize)
-                    .and_then(|s| s.get_name(&elf_file));
+                let source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() as usize)
+                    .and_then(|s| s.get_name(elf_file));
                 trace!("             --> Points to relevant section [{}]: {:?}", source_sec_shndx, source_sec_header_name);
                 trace!("                 Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
-                    source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                    source_sec_entry.name(), source_sec_entry.get_name(elf_file), 
                     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
                     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
             }
@@ -508,5 +508,5 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "Usage: loadc [ARGS] PATH
+const USAGE: &str = "Usage: loadc [ARGS] PATH
 Loads C language ELF executables on Theseus.";

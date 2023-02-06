@@ -6,8 +6,8 @@
 #![no_std]
 #![feature(slice_concat_ext)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 extern crate itertools;
 
 extern crate getopts;
@@ -100,7 +100,7 @@ pub fn main(args: Vec<String>) -> isize {
 fn rmain(matches: Matches) -> Result<(), String> {
     let mut remote_endpoint = if let Some(ip_str) = matches.opt_str("d") {
         IpEndpoint::from_str(&ip_str)
-            .map_err(|_e| format!("couldn't parse destination IP address/port"))?
+            .map_err(|_e| "couldn't parse destination IP address/port".to_string())?
     } else {
         ota_update_client::default_remote_endpoint()
     };
@@ -127,7 +127,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
             apply(&Path::new(base_dir_path.clone()))
         }
         other => {
-            Err(format!("unrecognized command {:?}", other))
+            Err(format!("unrecognized command {other:?}"))
         }
     }
 }
@@ -140,7 +140,7 @@ fn list(remote_endpoint: IpEndpoint, update_build: Option<&String>) -> Result<()
     let iface = get_default_iface()?;
 
     if let Some(ub) = update_build {
-        let listing = ota_update_client::download_listing(&iface, remote_endpoint, &*ub)
+        let listing = ota_update_client::download_listing(&iface, remote_endpoint, ub)
             .map_err(|e| e.to_string())?;
         println!("{}", listing.join("\n"));
     } else {
@@ -178,7 +178,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
         ota_update_client::download_crates(&iface, remote_endpoint, update_build, crate_set).map_err(|e| e.to_string())?
     } else {
         let diff_lines = ota_update_client::download_diff(&iface, remote_endpoint, update_build)
-            .map_err(|e| format!("failed to download diff file for {}, error: {}", update_build, e))?;
+            .map_err(|e| format!("failed to download diff file for {update_build}, error: {e}"))?;
         let diff = ota_update_client::parse_diff_lines(&diff_lines).map_err(|e| e.to_string())?;
 
         // download all of the new crates
@@ -205,7 +205,7 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 
     // if downloaded, save the diff file into the base directory
     if let Some(diffs) = diff_file_lines {
-        let cfile = MemFile::new(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
+        let cfile = MemFile::create(String::from(DIFF_FILE_NAME), &new_namespace_dir)?;
         cfile.lock().write_at(diffs.join("\n").as_bytes(), 0)?;
     }
 
@@ -217,20 +217,20 @@ fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<
 /// that must be in the given base directory.
 fn apply(base_dir_path: &Path) -> Result<(), String> {
     if cfg!(not(loadable)) {
-        return Err(format!("Evolutionary updates can only be applied when Theseus is built in loadable mode."));
+        return Err("Evolutionary updates can only be applied when Theseus is built in loadable mode.".to_string());
     }
 
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("couldn't get kernel MMI"))?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "couldn't get kernel MMI".to_string())?;
     let Ok(curr_dir) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
         return Err("failed to get current task's working directory".to_string());
     };
     let new_namespace_dir = match base_dir_path.get(&curr_dir) {
         Some(FileOrDir::Dir(d)) => NamespaceDir::new(d),
-        _ => return Err(format!("cannot find an update base directory at path {}", base_dir_path)),
+        _ => return Err(format!("cannot find an update base directory at path {base_dir_path}")),
     };
     let diff_file = match new_namespace_dir.lock().get(DIFF_FILE_NAME) { 
         Some(FileOrDir::File(f)) => f,
-        _ => return Err(format!("cannot find diff file expected at {}/{}", base_dir_path, DIFF_FILE_NAME)),
+        _ => return Err(format!("cannot find diff file expected at {base_dir_path}/{DIFF_FILE_NAME}")),
     };
     let mut diff_content: Vec<u8> = alloc::vec::from_elem(0, diff_file.lock().len()); 
     let _bytes_read = diff_file.lock().read_at(&mut diff_content, 0)?;
@@ -266,7 +266,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         };
         
         let new_crate_file = new_namespace_dir.get_crate_object_file(&new_crate_module_file_name).ok_or_else(|| 
-            format!("cannot find new crate file {:?} in new namespace dir {}", new_crate_module_file_name, base_dir_path)
+            format!("cannot find new crate file {new_crate_module_file_name:?} in new namespace dir {base_dir_path}")
         )?;
 
         let swap_req = SwapRequest::new(
@@ -275,7 +275,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
             IntoCrateObjectFile::File(new_crate_file),
             None, // all diff-based swaps occur within the same namespace
             false
-        ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
+        ).map_err(|invalid_req| format!("{invalid_req:#?}"))?;
         swap_requests.push(swap_req);
     }
 
@@ -288,7 +288,7 @@ fn apply(base_dir_path: &Path) -> Result<(), String> {
         kernel_mmi_ref,
         false, // verbose logging
         false, // enable_crate_cache
-    ).map_err(|e| format!("crate swapping failed, error: {}", e))?;
+    ).map_err(|e| format!("crate swapping failed, error: {e}"))?;
 
     Ok(())
 }
@@ -310,7 +310,7 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
         .iter()
         .next()
         .cloned()
-        .ok_or_else(|| format!("no network interfaces available"))
+        .ok_or_else(|| "no network interfaces available".to_string())
 }
 
 
@@ -319,12 +319,12 @@ fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
 /// it will create a directory "my_dir.2" if "my_dir" and "my_dir.1" already exist.
 fn make_unique_directory(base_name: &str, parent_dir: &DirRef) -> Result<DirRef, &'static str> {
     if parent_dir.lock().get(base_name).is_none() {
-        return VFSDirectory::new(base_name.to_string(), parent_dir);
+        return VFSDirectory::create(base_name.to_string(), parent_dir);
     }
     for i in 1.. {
-        let new_base_name = format!("{}.{}", base_name, i);
+        let new_base_name = format!("{base_name}.{i}");
         if parent_dir.lock().get(&new_base_name).is_none() {
-            return VFSDirectory::new(new_base_name, parent_dir);
+            return VFSDirectory::create(new_base_name, parent_dir);
         }   
     }
 
@@ -337,7 +337,7 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: upd [OPTIONS] COMMAND
+const USAGE: &str = "Usage: upd [OPTIONS] COMMAND
 Runs the given update-related COMMAND. Choices include:
     list
         Lists all available updates from the update server.

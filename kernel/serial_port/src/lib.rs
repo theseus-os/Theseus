@@ -17,7 +17,6 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate static_assertions;
 extern crate spin;
 extern crate irq_safety;
 extern crate interrupts;
@@ -171,7 +170,7 @@ impl SerialPort {
             interrupt_handler,
             serial_port_receive_deferred,
             serial_port,
-            Some(format!("serial_port_deferred_task_irq_{:#X}", interrupt_number)),
+            Some(format!("serial_port_deferred_task_irq_{interrupt_number:#X}")),
         );
 
         match registration_result {
@@ -204,7 +203,7 @@ impl SerialPort {
                 };                
             }
             Err(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) => {
-                if existing_handler_address != interrupt_handler as u64 {
+                if existing_handler_address != interrupt_handler as usize {
                     error!("Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
                         Existing interrupt handler was a different handler, at address {:#X}.",
                         irq, base_port, existing_handler_address,
@@ -226,9 +225,9 @@ impl SerialPort {
     pub fn set_data_sender(
         &mut self,
         sender: Sender<DataChunk>
-    ) -> Result<(), ()> {
+    ) -> Result<(), DataSenderAlreadyExists> {
         if self.data_sender.is_some() { 
-            Err(())
+            Err(DataSenderAlreadyExists)
         } else {
             self.data_sender = Some(sender);
             Ok(())
@@ -236,6 +235,11 @@ impl SerialPort {
     }
 
 }
+
+/// An empty error type indicating that a data sender could not be set
+/// for a serial port because a sender had already been set for it.
+#[derive(Debug)]
+pub struct DataSenderAlreadyExists;
 
 
 /// A non-blocking implementation of [`core2::io::Read`] that will read bytes into the given `buf`
@@ -351,8 +355,9 @@ pub struct DataChunk {
     pub len: u8,
     pub data: [u8; (64 - 1)],
 }
-const_assert_eq!(core::mem::size_of::<DataChunk>(), 64);
-const_assert_eq!(core::mem::align_of::<DataChunk>(), 64);
+const _: () = assert!(core::mem::size_of::<DataChunk>() == 64);
+const _: () = assert!(core::mem::align_of::<DataChunk>() == 64);
+
 impl DataChunk {
     /// Returns a new `DataChunk` filled with zeroes that can be written into.
     pub const fn empty() -> Self {

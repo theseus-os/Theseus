@@ -24,9 +24,22 @@ extern crate panic_entry;
 use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
+
+#[cfg(target_arch = "x86_64")]
 use vga_buffer::println_raw;
 
-mod bios;
+#[cfg(target_arch = "aarch64")]
+use log::info as println_raw;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "uefi")] {
+        mod uefi;
+    } else if #[cfg(feature = "bios")] {
+        mod bios;
+    } else {
+        compile_error!("either the 'bios' or 'uefi' feature must be enabled");
+    }
+}
 
 /// Used to obtain information about this build of Theseus.
 mod build_info {
@@ -63,34 +76,38 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// 1. Setting up logging
 /// 2. Dumping basic information about the Theseus build
 /// 3. Initialising early exceptions
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
-    irq_safety::disable_interrupts();
-    println_raw!("Entered early_setup(). Interrupts disabled.");
+    #[cfg(target_arch = "x86_64")] {
+        irq_safety::disable_interrupts();
+        println_raw!("Entered early_setup(). Interrupts disabled.");
 
-    let logger_ports = [serial_port_basic::take_serial_port(
-        serial_port_basic::SerialPortAddress::COM1,
-    )];
-    logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|_| "failed to initialise early logging")?;
-    log::info!("initialised early logging");
-    println_raw!("early_setup(): initialized logger.");
+        let logger_ports = [serial_port_basic::take_serial_port(
+            serial_port_basic::SerialPortAddress::COM1,
+        )];
+        logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
+            .map_err(|_| "failed to initialise early logging")?;
+        log::info!("initialised early logging");
+        println_raw!("early_setup(): initialized logger.");
 
-    // Dump basic information about this build of Theseus.
-    log::info!("\n    \
-        ===================== Theseus build info: =====================\n    \
-        CUSTOM CFGs: {} \n    \
-        ===============================================================",
-        build_info::CUSTOM_CFG_STR,
-    );
+        // Dump basic information about this build of Theseus.
+        log::info!("\n    \
+            ===================== Theseus build info: =====================\n    \
+            CUSTOM CFGs: {} \n    \
+            ===============================================================",
+            build_info::CUSTOM_CFG_STR,
+        );
 
-    exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
-    println_raw!("early_setup(): initialized early IDT with exception handlers.");
+        exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
+        println_raw!("early_setup(): initialized early IDT with exception handlers.");
+    }
 
     Ok(())
 }
 
 /// The nano core routine. See crate-level documentation for more information.
-fn nano_core<T>(boot_info: T) -> Result<(), &'static str>
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
+fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation
 {
@@ -106,7 +123,11 @@ where
         stack,
         bootloader_modules,
         identity_mapped_pages
-    ) = memory_initialization::init_memory_management(boot_info)?;
+    ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
+
+    #[cfg(target_arch = "aarch64")]
+    logger_aarch64::init().unwrap();
+
     println_raw!("nano_core(): initialized memory subsystem.");
 
     state_store::init();
@@ -119,7 +140,7 @@ where
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core(): parsing nano_core crate, please wait ...");
-    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end) = match mod_mgmt::parse_nano_core::parse_nano_core(
+    let (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt) = match mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
         rodata_mapped_pages.into_inner(),
@@ -137,8 +158,28 @@ where
                 .get("ap_start_realmode_end")
                 .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
                 .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
+
+            let ap_gdt = {
+                let mut ap_gdt_virtual_address = None;
+                for (_, section) in nano_core_crate_ref.lock_as_ref().sections.iter() {
+                    if section.name == "GDT_AP".into() {
+                        ap_gdt_virtual_address = Some(section.virt_addr);
+                        break;
+                    }
+                }
+
+                // The identity-mapped virtual address of GDT_AP.
+                VirtualAddress::new(
+                    memory::translate(ap_gdt_virtual_address.ok_or(
+                        "Missing/invalid symbol expected from data section \"GDT_AP\"",
+                    )?)
+                    .ok_or("Failed to translate \"GDT_AP\"")?
+                    .value(),
+                )
+                .ok_or("couldn't convert \"GDT_AP\" physical address to virtual")?
+            };
             // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
-            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end)
+            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
         Err((msg, mapped_pages_array)) => {
             // Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
@@ -172,15 +213,13 @@ where
     // at this point, we load and jump directly to the Captain, which will take it from here. 
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core(): invoking the captain...");
-    #[cfg(not(loadable))] {
-        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)?;
+    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
+        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
-    #[cfg(loadable)] {
-        extern crate alloc;
-
-        use alloc::vec::Vec;
-        use memory::{MmiRef, MappedPages, PhysicalAddress};
+    #[cfg(all(target_arch = "x86_64", loadable))] {
+        use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
         use no_drop::NoDrop;
+        use stack::Stack;
 
         let section = default_namespace
             .get_symbol_starting_with("captain::init::")
@@ -188,10 +227,10 @@ where
             .ok_or("no single symbol matching \"captain::init\"")?;
         log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, NoDrop<Vec<MappedPages>>, NoDrop<stack::Stack>, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<EarlyIdentityMappedPages>, NoDrop<Stack>, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
-        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, rsdp_address)?;
+        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
 
     // the captain shouldn't return ...

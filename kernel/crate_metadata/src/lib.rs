@@ -53,7 +53,10 @@ use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
     format,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     sync::{Arc, Weak},
     vec::Vec,
 };
@@ -62,7 +65,6 @@ use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
-use static_assertions::const_assert;
 
 pub use str_ref::StrRef;
 pub use crate_metadata_serde::{
@@ -105,20 +107,20 @@ pub const DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
 );
 
 // Double-check section flags were defined correctly.
-const_assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
-const_assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
-const_assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
+const _: () = assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
+const _: () = assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
+const _: () = assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
 
 
 /// The Theseus Makefile appends prefixes onto bootloader module names,
 /// which are separated by the "#" character. 
 /// For example, "k#my_crate-hash.o".
-pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
+pub const MODULE_PREFIX_DELIMITER: &str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
-pub const CRATE_HASH_DELIMITER: &'static str = "-";
+pub const CRATE_HASH_DELIMITER: &str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
 /// e.g., `"my_crate::section_name::h<hash>"`.
-pub const SECTION_HASH_DELIMITER: &'static str = "::h";
+pub const SECTION_HASH_DELIMITER: &str = "::h";
 
 
 /// The type of a crate, based on its object file naming convention.
@@ -168,7 +170,7 @@ impl CrateType {
     /// let result = CrateType::from_module_name("ksse#my_crate.o");
     /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
+    pub fn from_module_name(module_name: &str) -> Result<(CrateType, &str, &str), &'static str> {
         let mut iter = module_name.split(MODULE_PREFIX_DELIMITER);
         let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
         let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
@@ -275,7 +277,7 @@ impl fmt::Debug for LoadedCrate {
             .field("name", &self.crate_name)
             .field("object_file", &self.object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string())
             )
             .finish_non_exhaustive()
     }
@@ -689,6 +691,7 @@ pub struct LoadedSection {
 }
 impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         typ: SectionType, 
         name: StrRef, 
@@ -716,6 +719,7 @@ impl LoadedSection {
     }
 
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_dependencies(
         typ: SectionType, 
         name: StrRef, 
@@ -765,7 +769,7 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or(&sec_name)
+            .unwrap_or(sec_name)
     }
 
     /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list
@@ -989,11 +993,7 @@ impl RelocationEntry {
     /// does NOT depend on the target section's address itself in any way 
     /// (i.e., it only depends on the source section)
     pub fn is_absolute(&self) -> bool {
-        match self.typ {
-            R_X86_64_32 | 
-            R_X86_64_64 => true,
-            _ => false,
-        }
+        matches!(self.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 

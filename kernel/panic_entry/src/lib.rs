@@ -4,6 +4,8 @@
 //! They should never be directly invoked by developers, only by the compiler. 
 //! 
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]
@@ -11,11 +13,17 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-#[macro_use] extern crate vga_buffer;
 extern crate memory;
 extern crate mod_mgmt;
-#[cfg(not(loadable))] extern crate panic_wrapper;
+
+#[cfg(target_arch = "x86_64")]
 #[cfg(not(loadable))] extern crate unwind;
+
+#[cfg(target_arch = "x86_64")]
+#[macro_use] extern crate vga_buffer;
+
+#[cfg(target_arch = "x86_64")]
+#[cfg(not(loadable))] extern crate panic_wrapper;
 
 use core::panic::PanicInfo;
 
@@ -31,11 +39,15 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     // We can check that by seeing if the kernel mmi has been initialized.
     let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
     let res = if kernel_mmi_ref.is_some() {
+        #[cfg(target_arch = "aarch64")] {
+            Err("panic_wrapper unimplemented for aarch64") as Result<(), _>
+        }
+
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
-        #[cfg(not(loadable))] {
+        #[cfg(all(target_arch = "x86_64", not(loadable)))] {
             panic_wrapper::panic_wrapper(info)
         }
-        #[cfg(loadable)] {
+        #[cfg(all(target_arch = "x86_64", loadable))] {
             // An internal function for calling the panic_wrapper, but returning errors along the way.
             // We must make sure to not hold any locks when invoking the panic_wrapper function.
             fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
@@ -60,8 +72,10 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 
     if let Err(_e) = res {
         // basic early panic printing with no dependencies
-        println_raw!("\nPANIC: {}", info);
         error!("PANIC: {}", info);
+
+        #[cfg(target_arch = "x86_64")]
+        println_raw!("\nPANIC: {}", info);
     }
 
     // If we failed to handle the panic, there's not really much we can do about it,
@@ -93,11 +107,15 @@ extern "C" fn rust_eh_personality() -> ! {
 /// that invokes the real `unwind_resume()` function in the `unwind` crate, 
 /// but does so dynamically in loadable mode.
 #[no_mangle]
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 extern "C" fn _Unwind_Resume(arg: usize) -> ! {
-    #[cfg(not(loadable))] {
+    #[cfg(target_arch = "aarch64")]
+    loop { }
+
+    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
         unwind::unwind_resume(arg)
     }
-    #[cfg(loadable)] {
+    #[cfg(all(target_arch = "x86_64", loadable))] {
         // An internal function for calling the real unwind_resume function, but returning errors along the way.
         // We must make sure to not hold any locks when invoking the function.
         fn invoke_unwind_resume(arg: usize) -> Result<(), &'static str> {

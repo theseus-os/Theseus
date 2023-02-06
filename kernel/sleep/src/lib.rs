@@ -14,17 +14,48 @@ extern crate irq_safety;
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
 extern crate scheduler;
+extern crate time;
+extern crate crossbeam_utils;
 
-use core::sync::atomic::{Ordering, AtomicUsize};
+use core::task::Waker;
 use alloc::collections::binary_heap::BinaryHeap;
 use irq_safety::MutexIrqSafe;
 use task::{get_my_current_task, TaskRef, RunState};
+use crossbeam_utils::atomic::AtomicCell;
+use time::{now, Instant, Monotonic};
+
+pub use time::Duration;
 
 /// Contains the `TaskRef` and the associated wakeup time for an entry in DELAYED_TASKLIST.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 struct SleepingTaskNode {
-    resume_time: usize,
-    taskref: TaskRef,
+    resume_time: Instant,
+    action: Action,
+}
+
+#[derive(Clone)]
+enum Action {
+    Sync(TaskRef),
+    Async(Waker),
+}
+
+impl Action {
+    fn act(self) {
+        match self {
+            Action::Sync(task) => {
+                task.unblock().expect("failed to unblock sleeping task");
+            },
+            Action::Async(waker) => waker.wake(),
+        }
+    }
+}
+
+impl Eq for SleepingTaskNode {}
+
+impl PartialEq for SleepingTaskNode {
+    fn eq(&self, other: &Self) -> bool {
+        self.resume_time == other.resume_time
+    }
 }
 
 // The priority queue depends on `Ord`.
@@ -33,10 +64,7 @@ struct SleepingTaskNode {
 impl Ord for SleepingTaskNode {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         // Notice that the we flip the ordering on resume_time.
-        // In case of a tie we compare taskids - this step is necessary
-        // to make implementations of `PartialEq` and `Ord` consistent.
         other.resume_time.cmp(&self.resume_time)
-            .then_with(|| self.taskref.id.cmp(&other.taskref.id))
     }
 }
 
@@ -55,22 +83,7 @@ lazy_static! {
 }
 
 /// Keeps track of the next task that needs to unblock, by default, it is the maximum time
-static NEXT_DELAYED_TASK_UNBLOCK_TIME : AtomicUsize = AtomicUsize::new(usize::MAX);
-
-/// This variable will track the number of ticks elapsed on the system to keep track of time
-static TICK_COUNT: AtomicUsize = AtomicUsize::new(0);
-
-/// Returns the current time in ticks
-pub fn get_current_time_in_ticks() -> usize {
-    TICK_COUNT.load(Ordering::SeqCst)
-}
-
-/// Update the current tick count
-/// Used as a callback in the systick handler
-pub fn increment_tick_count() {
-    TICK_COUNT.fetch_add(1, Ordering::SeqCst);
-}
-
+static NEXT_DELAYED_TASK_UNBLOCK_TIME: AtomicCell<Instant> = AtomicCell::new(Instant::MAX);
 
 /// Helper function adds the id associated with a TaskRef to the list of delayed task.
 /// If the resume time is less than the current earliest resume time, then update it.
@@ -78,22 +91,22 @@ fn add_to_delayed_tasklist(new_node: SleepingTaskNode) {
     let SleepingTaskNode { resume_time, .. } = new_node;
     DELAYED_TASKLIST.lock().push(new_node);
     
-    let next_unblock_time = NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst);
+    let next_unblock_time = NEXT_DELAYED_TASK_UNBLOCK_TIME.load();
     if resume_time < next_unblock_time {
-        NEXT_DELAYED_TASK_UNBLOCK_TIME.store(resume_time, Ordering::SeqCst);
+        NEXT_DELAYED_TASK_UNBLOCK_TIME.store(resume_time);
     }
 }
 
 /// Remove the next task from the delayed task list and unblock that task
 fn remove_next_task_from_delayed_tasklist() {
     let mut delayed_tasklist = DELAYED_TASKLIST.lock();
-    if let Some(SleepingTaskNode { taskref, .. }) = delayed_tasklist.pop() {
-        taskref.unblock().expect("failed to unblock sleeping task");
+    if let Some(SleepingTaskNode { action, .. }) = delayed_tasklist.pop() {
+        action.act();
 
         match delayed_tasklist.peek() {
             Some(SleepingTaskNode { resume_time, .. }) => 
-                NEXT_DELAYED_TASK_UNBLOCK_TIME.store(*resume_time, Ordering::SeqCst),
-            None => NEXT_DELAYED_TASK_UNBLOCK_TIME.store(usize::MAX, Ordering::SeqCst),
+                NEXT_DELAYED_TASK_UNBLOCK_TIME.store(*resume_time),
+            None => NEXT_DELAYED_TASK_UNBLOCK_TIME.store(Instant::MAX),
         }
     }
 }
@@ -101,8 +114,8 @@ fn remove_next_task_from_delayed_tasklist() {
 /// Remove all tasks that have been delayed but are able to be unblocked now,
 /// the current tick count is provided by the system's interrupt tick count.
 pub fn unblock_sleeping_tasks() {
-    let ticks = TICK_COUNT.load(Ordering::SeqCst);
-    while ticks > NEXT_DELAYED_TASK_UNBLOCK_TIME.load(Ordering::SeqCst) {
+    let time = now::<Monotonic>();
+    while time > NEXT_DELAYED_TASK_UNBLOCK_TIME.load() {
         remove_next_task_from_delayed_tasklist();
     }
 }
@@ -110,13 +123,13 @@ pub fn unblock_sleeping_tasks() {
 /// Blocks the current task by putting it to sleep for `duration` ticks.
 ///
 /// Returns the current task's run state if it can't be blocked.
-pub fn sleep(duration: usize) -> Result<(), RunState> {
-    let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
-    let resume_time = current_tick_count + duration;
+pub fn sleep(duration: Duration) -> Result<(), RunState> {
+    let current_time = now::<Monotonic>();
+    let resume_time = current_time + duration;
 
     let current_task = get_my_current_task().unwrap();
     // Add the current task to the delayed tasklist and then block it.
-    add_to_delayed_tasklist(SleepingTaskNode{taskref: current_task.clone(), resume_time});
+    add_to_delayed_tasklist(SleepingTaskNode{action: Action::Sync(current_task.clone()), resume_time});
     current_task.block()?;
     scheduler::schedule();
     Ok(())
@@ -126,20 +139,43 @@ pub fn sleep(duration: usize) -> Result<(), RunState> {
 /// given by `resume_time`.
 ///
 /// Returns the current task's run state if it can't be blocked.
-pub fn sleep_until(resume_time: usize) -> Result<(), RunState> {
-    let current_tick_count = TICK_COUNT.load(Ordering::SeqCst);
+pub fn sleep_until(resume_time: Instant) -> Result<(), RunState> {
+    let current_time = now::<Monotonic>();
 
-    if resume_time > current_tick_count {
-        sleep(resume_time - current_tick_count)?;
+    if resume_time > current_time {
+        sleep(resume_time - current_time)?;
     }
     
     Ok(())
 }
 
-/// Blocks the current task for a fixed time `period`, which starts from the given `last_resume_time`.
-///
-/// Returns the current task's run state if it can't be blocked.
-pub fn sleep_periodic(last_resume_time: &AtomicUsize, period: usize) -> Result<(), RunState> {
-    let new_resume_time = last_resume_time.fetch_add(period, Ordering::SeqCst) + period;
-    sleep_until(new_resume_time)
+/// Asynchronous sleep methods that operate on wakers.
+pub mod future {
+    use core::task::Poll;
+    use super::*;
+
+    /// Wakes up the waker after the specified duration.
+    pub fn sleep(duration: Duration, waker: Waker) {
+        let current_time = now::<Monotonic>();
+        let resume_time = current_time + duration;
+
+        add_to_delayed_tasklist(
+            SleepingTaskNode {
+                action: Action::Async(waker),
+                resume_time,
+            }
+        );
+    }
+
+    /// Wakes up the waker at the specified time.
+    pub fn sleep_until(resume_time: Instant, waker: &Waker) -> Poll<()> {
+        let current_time = now::<Monotonic>();
+
+        if let Some(duration) = resume_time.checked_duration_since(current_time) {
+            sleep(duration, waker.clone());
+            Poll::Pending
+        } else {
+            Poll::Ready(())
+        }
+    }
 }

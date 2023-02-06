@@ -18,6 +18,7 @@
 //! We don't need to do so until we actually run out of address space or until 
 //! a requested address is in a chunk that needs to be merged.
 
+#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 
 extern crate alloc;
@@ -94,50 +95,61 @@ pub fn init<F, R, P>(
 
     let mut free_list: [Option<Chunk>; 32] = Default::default();
     let mut free_list_idx = 0;
-    let mut reserved_list: [Option<Chunk>; 32] = Default::default();
-    let mut reserved_list_idx = 0;
 
     // Populate the list of free regions for general-purpose usage.
     for area in free_physical_memory_areas.into_iter() {
         let area = area.borrow();
         // debug!("Frame Allocator: looking to add free physical memory area: {:?}", area);
         check_and_add_free_region(
-            &area,
+            area,
             &mut free_list,
             &mut free_list_idx,
             reserved_physical_memory_areas.clone(),
         );
     }
 
-    // Insert all of the reserved memory areas into the list of free reserved regions,
-    // while de-duplicating overlapping areas by merging them.
-    for reserved in reserved_physical_memory_areas.into_iter() {
-        let reserved = reserved.borrow();
-        let mut reserved_was_merged = false;
-        for existing in reserved_list[..reserved_list_idx].iter_mut().flatten() {
-            if let Some(_overlap) = existing.overlap(reserved) {
-                // merge the `reserved` range into the `existing` range
-                existing.frames = FrameRange::new(
-                    min(*existing.start(), *reserved.start()),
-                    max(*existing.end(),   *reserved.end()),
-                );
-                reserved_was_merged = true;
-                break;
+
+    let mut reserved_list: [Option<Chunk>; 32] = Default::default();
+    for (i, area) in reserved_physical_memory_areas.into_iter().enumerate() {
+        reserved_list[i] = Some(Chunk {
+            typ: MemoryRegionType::Reserved,
+            frames: area.borrow().frames.clone(),
+        });
+    }
+
+    let mut changed = true;
+    while changed {
+        let mut temp_reserved_list: [Option<Chunk>; 32] = Default::default();
+        changed = false;
+
+        let mut temp_reserved_list_idx = 0;
+        for i in 0..temp_reserved_list.len() {
+            if let Some(mut current) = reserved_list[i].clone() {
+                for maybe_other in &mut reserved_list[i + 1..] {
+                    if let Some(other) = maybe_other {
+                        if current.overlap(other).is_some() {
+                            current.frames = FrameRange::new(
+                                min(*current.start(), *other.start()),
+                                max(*current.end(), *other.end()),
+                            );
+
+                            changed = true;
+                            *maybe_other = None;
+                        }
+                    }
+                }
+                temp_reserved_list[temp_reserved_list_idx] = Some(current);
+                temp_reserved_list_idx += 1;
             }
         }
-        if !reserved_was_merged {
-            reserved_list[reserved_list_idx] = Some(Chunk {
-                typ:  MemoryRegionType::Reserved,
-                frames: reserved.frames.clone(),
-            });
-            reserved_list_idx += 1;
-        }
+
+        reserved_list = temp_reserved_list;
     }
 
 
     // Finally, one last sanity check -- ensure no two regions overlap. 
     let all_areas = free_list[..free_list_idx].iter().flatten()
-        .chain(reserved_list[..reserved_list_idx].iter().flatten());
+        .chain(reserved_list.iter().flatten());
     for (i, elem) in all_areas.clone().enumerate() {
         let next_idx = i + 1;
         for other in all_areas.clone().skip(next_idx) {
@@ -464,7 +476,7 @@ impl Drop for AllocatedFrames {
             frames: self.frames.clone(),
         });
         match res {
-            Ok(_inserted_free_chunk) => return,
+            Ok(_inserted_free_chunk) => (),
             Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free frame list", c),
         }
         
@@ -692,8 +704,8 @@ fn find_specific_chunk(
 
 
 /// Searches the given `list` for any chunk large enough to hold at least `num_frames`.
-fn find_any_chunk<'list>(
-    list: &'list mut StaticArrayRBTree<Chunk>,
+fn find_any_chunk(
+    list: &mut StaticArrayRBTree<Chunk>,
     num_frames: usize
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // During the first pass, we ignore designated regions.
@@ -823,11 +835,9 @@ fn frame_is_in_list(
 ) -> bool {
     match &list.0 {
         Inner::Array(ref arr) => {
-            for elem in arr.iter() {
-                if let Some(chunk) = elem {
-                    if chunk.contains(frame) { 
-                        return true;
-                    }
+            for chunk in arr.iter().flatten() {
+                if chunk.contains(frame) {
+                    return true;
                 }
             }
         }
@@ -861,14 +871,12 @@ fn add_reserved_region(
     // Check whether the reserved region overlaps any existing regions.
     match &mut list.0 {
         Inner::Array(ref mut arr) => {
-            for elem in arr.iter() {
-                if let Some(chunk) = elem {
-                    if let Some(_overlap) = chunk.overlap(&frames) {
-                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                        //     frames, _overlap, chunk
-                        // );
-                        return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
-                    }
+            for chunk in arr.iter().flatten() {
+                if let Some(_overlap) = chunk.overlap(&frames) {
+                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                    //     frames, _overlap, chunk
+                    // );
+                    return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
                 }
             }
         }

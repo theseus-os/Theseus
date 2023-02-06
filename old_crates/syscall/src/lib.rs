@@ -16,7 +16,7 @@
 extern crate memory;
 extern crate util;
 extern crate gdt;
-extern crate apic;
+extern crate cpu;
 extern crate alloc;
 extern crate x86_64;
 extern crate task;
@@ -25,7 +25,6 @@ extern crate dbus;
 use core::sync::atomic::{Ordering, compiler_fence};
 use util::c_str::{c_char, CStr, CString};
 use gdt::{AvailableSegmentSelector, get_segment_selector};
-use apic::get_my_apic_id;
 use memory::VirtualAddress;
 
 
@@ -60,7 +59,7 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
             let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
             use dbus::sysrecv;
 
-            let msg: &str = &(sysrecv(conn_name));
+            let msg: &str = &sysrecv(conn_name);
             result = CString::new(msg).unwrap().as_ptr() as u64;
             //let mut i = 1;
             /*result = 0;
@@ -132,7 +131,7 @@ unsafe extern "C" fn syscall_handler() {
     
     let curr_id = ::task::get_my_current_task_id();
     trace!("syscall_handler: (AP {}) task id={:?}  rax={:#x} rdi={:#x} rsi={:#x} rdx={:#x} r10={:#x} r8={:#x} r9={:#x}",
-           get_my_apic_id(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
+           cpu::current_cpu(), curr_id, rax, rdi, rsi, rdx, r10, r8, r9);
 
 
     // FYI, Rust's calling conventions is as follows:  RDI,  RSI,  RDX,  RCX,  R8,  R9,  R10,  others on stack

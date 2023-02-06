@@ -12,17 +12,14 @@ x86_64 = "0.14.8"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.util]
-path = "../../libs/util"
-
 [dependencies.gdt]
 path = "../gdt"
 
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.apic]
-path = "../apic"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.task]
 path = "../task"
