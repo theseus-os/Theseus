@@ -1,6 +1,3 @@
-//! Allows configuring the Generic Interrupt Controller
-#![no_std]
-
 use core::convert::AsMut;
 
 use memory::{PageTable, BorrowedMappedPages, Mutable,

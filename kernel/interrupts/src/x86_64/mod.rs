@@ -1,7 +1,3 @@
-#![feature(abi_x86_interrupt)]
-
-#![allow(dead_code)]
-
 pub use pic::IRQ_BASE_OFFSET;
 
 use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};

@@ -13,4 +13,7 @@ log = "0.4.17"
 
 memory = { path = "../memory" }
 
+[lib]
+path = "lib.rs"
+
 [features]
