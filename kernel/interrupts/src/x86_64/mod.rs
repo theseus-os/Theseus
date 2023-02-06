@@ -1,6 +1,3 @@
-//! Basic interrupt handling structures and simple handler routines.
-
-#![no_std]
 #![feature(abi_x86_interrupt)]
 
 #![allow(dead_code)]
