@@ -27,7 +27,7 @@ pub struct IntelIommuRegisters {
 // TODO: Hardware may use more than 4kB, which means the registers may occupy
 //       more than one contiguous page.
 //       Currently we assume the IOMMU registers occupy only a single page.
-const_assert_eq!(core::mem::size_of::<IntelIommuRegisters>(), 4096);
+const _: () = assert!(core::mem::size_of::<IntelIommuRegisters>() == 4096);
 
 /// Helper struct for decoding and printing capability register
 pub struct Capability(pub u64);

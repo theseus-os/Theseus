@@ -62,7 +62,7 @@ pub(crate) struct CompletionQueueContext {
     dbr_addr_l:             Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<CompletionQueueContext>(), 64);
+const _: () = assert!(core::mem::size_of::<CompletionQueueContext>() == 64);
 
 impl fmt::Debug for CompletionQueueContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -175,7 +175,7 @@ pub struct CompletionQueueEntry {
     owner:                  Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<CompletionQueueEntry>(), 64);
+const _: () = assert!(core::mem::size_of::<CompletionQueueEntry>() == 64);
 
 #[allow(unused)]
 impl CompletionQueueEntry {
@@ -242,7 +242,7 @@ pub struct CompletionQueueDoorbellRecord {
     arm_ci:             Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<CompletionQueueDoorbellRecord>(), 8);
+const _: () = assert!(core::mem::size_of::<CompletionQueueDoorbellRecord>() == 8);
 
 /// A data structure that contains the CQ buffer 
 /// and is used to interact with the CQ once initialized.

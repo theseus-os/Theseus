@@ -9,18 +9,20 @@
 #![no_std]
 #![feature(trait_alias)]
 
-extern crate log;
 extern crate alloc;
-extern crate spin;
+extern crate crossbeam_utils;
+extern crate log;
 extern crate irq_safety;
 extern crate serial_port_basic;
 
 use log::{Record, Level, SetLoggerError, Metadata, Log};
 use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
-use spin::Once;
 use irq_safety::MutexIrqSafe;
 use serial_port_basic::SerialPort;
 use alloc::{sync::Arc, vec::Vec};
+
+#[cfg(mirror_log_to_vga)]
+pub use mirror_log::set_log_mirror_function;
 
 /// By default, Theseus will print all log levels, including `Trace` and above.
 pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
@@ -130,7 +132,8 @@ impl Log for DummyLogger {
         // If there was an error above, there's literally nothing we can do but ignore it,
         // because there is no other lower-level way to log errors than the serial port.
         
-        if let Some(func) = MIRROR_VGA_FUNC.get() {
+        #[cfg(mirror_log_to_vga)]
+        if let Some(func) = mirror_log::get_log_mirror_function() {
             // Currently printing to the VGA terminal doesn't support ANSI color escape sequences,
             // so we exclude the first and the last elements that set those colors.
             func(format_args!("{}{}:{}: {}",
@@ -268,14 +271,23 @@ impl LogColor {
     }
 }
 
+#[cfg(mirror_log_to_vga)]
+mod mirror_log {
+    use core::fmt;
+    use crossbeam_utils::atomic::AtomicCell;
 
-/// Call this to enable mirroring logging macros to the screen
-pub fn mirror_to_vga(func: LogOutputFunc) {
-    MIRROR_VGA_FUNC.call_once(|| func);
+    /// Call this to enable mirroring of logger output (e.g., via logging macros)
+    /// to another output sink, such as the VGA screen.
+    pub fn set_log_mirror_function(func: fn(fmt::Arguments)) {
+        MIRROR_LOG_FUNC.store(Some(func));
+    }
+
+    pub(crate) fn get_log_mirror_function() -> Option<fn(fmt::Arguments)> {
+        MIRROR_LOG_FUNC.load()
+    }
+
+    /// The callback function that will optionally be invoked
+    /// on every log statement to be printed, which enables log mirroring.
+    pub(crate) static MIRROR_LOG_FUNC: AtomicCell<Option<fn(fmt::Arguments)>> = AtomicCell::new(None);
+    const _: () = assert!(AtomicCell::<fn(fmt::Arguments)>::is_lock_free());
 }
-
-/// The signature of a callback function that will optionally be invoked
-/// on every log statement to be printed, which enables log mirroring.
-/// See [`mirror_to_vga()`].
-pub type LogOutputFunc = fn(fmt::Arguments);
-static MIRROR_VGA_FUNC: Once<LogOutputFunc> = Once::new();

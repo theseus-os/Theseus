@@ -1,24 +1,10 @@
 //! Code to parse the ACPI tables, based off of Redox. 
 #![no_std]
 
-#![allow(dead_code)] //  to suppress warnings for unused functions/methods
-
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate spin;
-extern crate memory;
-extern crate hpet;
-extern crate acpi_table;
-extern crate acpi_table_handler;
-extern crate rsdp;
-extern crate rsdt;
-extern crate fadt;
-extern crate madt;
-extern crate dmar;
-extern crate iommu;
-
 
 use alloc::vec::Vec;
+use log::{debug, warn, info};
 use spin::Mutex;
 use memory::{PageTable, PhysicalAddress};
 use rsdp::Rsdp;
@@ -46,7 +32,7 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
         .and_then(|rsdp_address| Rsdp::from_address(rsdp_address, page_table))
         .or_else(|_| Rsdp::get_rsdp(page_table))?;
     let rsdt_phys_addr = rsdp.sdt_address();
-    debug!("RXSDT is located in Frame {:#X}", rsdt_phys_addr);
+    debug!("RXSDT is located in Frame {rsdt_phys_addr:#X}");
 
     // Now, we get the actual RSDT/XSDT
     {

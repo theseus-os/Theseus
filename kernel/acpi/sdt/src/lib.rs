@@ -1,9 +1,5 @@
 //! ACPI table definitions and basic SDT structures.
-
 #![no_std]
-
-extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
 
 use zerocopy::FromBytes;
 
@@ -25,8 +21,8 @@ pub struct Sdt {
   pub creator_id: u32,
   pub creator_revision: u32
 }
-const_assert_eq!(core::mem::size_of::<Sdt>(), 36);
-const_assert_eq!(core::mem::align_of::<Sdt>(), 1);
+const _: () = assert!(core::mem::size_of::<Sdt>() == 36);
+const _: () = assert!(core::mem::align_of::<Sdt>() == 1);
 
 /// A struct used to describe the position and layout of registers
 /// related to ACPI tables.
@@ -39,5 +35,5 @@ pub struct GenericAddressStructure {
     pub access_size: u8,
     pub phys_addr: u64,
 }
-const_assert_eq!(core::mem::size_of::<GenericAddressStructure>(), 12);
-const_assert_eq!(core::mem::align_of::<GenericAddressStructure>(), 1);
+const _: () = assert!(core::mem::size_of::<GenericAddressStructure>() == 12);
+const _: () = assert!(core::mem::align_of::<GenericAddressStructure>() == 1);

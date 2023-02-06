@@ -2,14 +2,12 @@
 
 use crate::PteFlags;
 use bitflags::bitflags;
-use static_assertions::const_assert_eq;
 
 /// A mask for the bits of a page table entry that contain the physical frame address.
 pub const PTE_FRAME_MASK: u64 = 0x0000_FFFF_FFFF_F000;
 
 // Ensure that we never expose reserved bits [12:47] as part of the `PteFlagsAarch64` interface.
-const_assert_eq!(PteFlagsAarch64::all().bits() & PTE_FRAME_MASK, 0);
-
+const _: () = assert!(PteFlagsAarch64::all().bits() & PTE_FRAME_MASK == 0);
 
 bitflags! {
     /// Page table entry (PTE) flags on aarch64.

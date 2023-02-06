@@ -12,7 +12,6 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate static_assertions;
 #[cfg(trace_channel)] #[macro_use] extern crate log;
 #[cfg(trace_channel)] #[macro_use] extern crate debugit;
 extern crate wait_queue;
@@ -114,7 +113,7 @@ struct Channel<T: Send> {
 }
 
 // Ensure that `AtomicCell<ChannelStatus>` is actually a lock-free atomic.
-const_assert!(AtomicCell::<ChannelStatus>::is_lock_free());
+const _: () = assert!(AtomicCell::<ChannelStatus>::is_lock_free());
 
 impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
