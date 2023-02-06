@@ -1,42 +1,32 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "interrupts"
 description = "Interrupt configuration and handlers for Theseus"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
+log = "0.4.17"
 spin = "0.9.4"
+memory = { path = "../memory" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+gic = { path = "../gic" }
+tock-registers = "0.7.0"
+cortex-a = "7.5.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+exceptions_early = { path = "../exceptions_early" }
+vga_buffer = { path = "../vga_buffer" }
+scheduler = { path = "../scheduler" }
+sleep = { path = "../sleep" }
+apic = { path = "../apic" }
+gdt = { path = "../gdt" }
+pic = { path = "../pic" }
+tss = { path = "../tss" }
 x86_64 = "0.14.8"
 locked_idt = { path = "../../libs/locked_idt" }
-log = "0.4.8"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.tss]
-path = "../tss"
-
-[dependencies.gdt]
-path = "../gdt"
-
-[dependencies.pic]
-path = "../pic"
-
-[dependencies.exceptions_early]
-path = "../exceptions_early"
-
-[dependencies.scheduler]
-path = "../scheduler"
-
-[dependencies.sleep]
-path = "../sleep"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
 
 [lib]
 crate-type = ["rlib"]
