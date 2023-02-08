@@ -199,7 +199,7 @@ where
         let (_pw_crate, _num_pw_syms) = default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false)?;
     }
 
-    // Now we load and jump directly to the Captain, which will take over from here.
+    // Now we invoke the Captain, which will take over from here.
     // That's it, the nano_core is done! That's really all it does! 
     let drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
