@@ -44,10 +44,10 @@ pub fn hold_preemption() -> PreemptionGuard {
         
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
-        // apic::get_my_apic()
-        //     .expect("BUG: hold_preemption() couldn't get local APIC")
-        //     .write()
-        //     .enable_lvt_timer(false);
+        apic::get_my_apic()
+            .expect("BUG: hold_preemption() couldn't get local APIC")
+            .write()
+            .enable_lvt_timer(false);
     } else if prev_val == u8::MAX {
         // Overflow occurred and the counter value wrapped around, which is a bug.
         panic!("BUG: Overflow occurred in the preemption counter for CPU {}", cpu_id);
@@ -120,10 +120,10 @@ impl Drop for PreemptionGuard {
             // If the previous counter value was 1, that means the current value is 1,
             // which indicates we are transitioning from preemption disabled to enabled on this CPU.
             // Thus, we re-enable the local APIC timer used for preemptive task switching.
-            // apic::get_my_apic()
-            //     .expect("BUG: PreemptionGuard::drop() couldn't get local APIC")
-            //     .write()
-            //     .enable_lvt_timer(true);
+            apic::get_my_apic()
+                .expect("BUG: PreemptionGuard::drop() couldn't get local APIC")
+                .write()
+                .enable_lvt_timer(true);
         } else if prev_val == 0 {
             // Underflow occurred and the counter value wrapped around, which is a bug.
             panic!("BUG: Underflow occurred in the preemption counter for CPU {}", cpu_id);
