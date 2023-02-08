@@ -249,6 +249,13 @@
 <a href="#249" id="249">249</a>
 <a href="#250" id="250">250</a>
 <a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -275,6 +282,7 @@
 <span class="kw">use </span>core::ops::DerefMut;
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
+<span class="kw">use </span>mod_mgmt::parse_nano_core::NanoCoreItems;
 <span class="kw">use </span>vga_buffer::println_raw;
 
 <span class="macro">cfg_if::cfg_if! </span>{
@@ -378,21 +386,29 @@
 
     <span class="comment">// Parse the nano_core crate (the code we&#39;re already running) since we need it to load and run applications.
     </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): parsing nano_core crate, please wait ...&quot;</span>);
-    <span class="kw">let </span>(nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt) = <span class="kw">match </span>mod_mgmt::parse_nano_core::parse_nano_core(
+    <span class="kw">let </span>(
+        nano_core_crate_ref,
+        initial_tls_image,
+        ap_realmode_begin,
+        ap_realmode_end,
+        ap_gdt,
+    ) = <span class="kw">match </span>mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
         rodata_mapped_pages.into_inner(),
         data_mapped_pages.into_inner(),
         <span class="bool-val">false</span>,
     ) {
-        <span class="prelude-val">Ok</span>((nano_core_crate_ref, init_symbols, _num_new_syms)) =&gt; {
-            <span class="comment">// Get symbols from the boot assembly code that defines where the ap_start code are.
+        <span class="prelude-val">Ok</span>(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols, tls_image }) =&gt; {
+            <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): finished parsing the nano_core crate, {} new symbols.&quot;</span>, num_new_symbols);
+
+            <span class="comment">// Get symbols from the boot assembly code that define where the ap_start code is.
             // They will be present in the &quot;.init&quot; sections, i.e., in the `init_symbols` list. 
-            </span><span class="kw">let </span>ap_realmode_begin = init_symbols
+            </span><span class="kw">let </span>ap_realmode_begin = init_symbol_values
                 .get(<span class="string">&quot;ap_start_realmode&quot;</span>)
                 .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
                 .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>ap_realmode_end = init_symbols
+            <span class="kw">let </span>ap_realmode_end = init_symbol_values
                 .get(<span class="string">&quot;ap_start_realmode_end&quot;</span>)
                 .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
                 .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)<span class="question-mark">?</span>;
@@ -417,16 +433,10 @@
                 .ok_or(<span class="string">&quot;couldn&#39;t convert \&quot;GDT_AP\&quot; physical address to virtual&quot;</span>)<span class="question-mark">?
             </span>};
             <span class="comment">// debug!(&quot;ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}&quot;, ap_realmode_begin, ap_realmode_end);
-            </span>(nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
+            </span>(nano_core_crate_ref, tls_image, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
-        <span class="prelude-val">Err</span>((msg, mapped_pages_array)) =&gt; {
-            <span class="comment">// Because this function takes ownership of the text/rodata/data mapped_pages that cover the currently-running code,
-            // we have to make sure these mapped_pages aren&#39;t dropped.
-            </span>core::mem::forget(mapped_pages_array);
-            <span class="kw">return </span><span class="prelude-val">Err</span>(msg);
-        }
+        <span class="prelude-val">Err</span>((msg, _mapped_pages_array)) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(msg),
     };
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): finished parsing the nano_core crate.&quot;</span>);
 
     <span class="attr">#[cfg(loadable)] </span>{
         <span class="comment">// This isn&#39;t currently necessary; we can always add it in back later if/when needed.
@@ -447,15 +457,19 @@
         <span class="kw">let </span>(_pw_crate, _num_pw_syms) = default_namespace.load_crate(<span class="kw-2">&amp;</span>panic_wrapper_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
     }
 
-
-    <span class="comment">// at this point, we load and jump directly to the Captain, which will take it from here. 
+    <span class="comment">// Now we invoke the Captain, which will take over from here.
     // That&#39;s it, the nano_core is done! That&#39;s really all it does! 
-    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): invoking the captain...&quot;</span>);
+    </span><span class="kw">let </span>drop_after_init = captain::DropAfterInit {
+        identity_mappings: identity_mapped_pages,
+        initial_tls_image,
+    };
+    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): invoking the captain...&quot;</span>);
     <span class="attr">#[cfg(not(loadable))] </span>{
-        captain::init(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)<span class="question-mark">?</span>;
+        captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)<span class="question-mark">?</span>;
     }
     <span class="attr">#[cfg(loadable)] </span>{
-        <span class="kw">use </span>memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
+        <span class="kw">use </span>captain::DropAfterInit;
+        <span class="kw">use </span>memory::{MmiRef, PhysicalAddress};
         <span class="kw">use </span>no_drop::NoDrop;
         <span class="kw">use </span>stack::Stack;
 
@@ -465,10 +479,10 @@
             .ok_or(<span class="string">&quot;no single symbol matching \&quot;captain::init\&quot;&quot;</span>)<span class="question-mark">?</span>;
         <span class="macro">log::info!</span>(<span class="string">&quot;The nano_core (in loadable mode) is invoking the captain init function: {:?}&quot;</span>, section.name);
 
-        <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;EarlyIdentityMappedPages&gt;, NoDrop&lt;Stack&gt;, VirtualAddress, VirtualAddress, VirtualAddress, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+        <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;Stack&gt;, DropAfterInit, VirtualAddress, VirtualAddress, VirtualAddress, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
         <span class="kw">let </span>func: <span class="kw-2">&amp;</span>CaptainInitFunc = <span class="kw">unsafe </span>{ section.as_func() }<span class="question-mark">?</span>;
 
-        func(kernel_mmi_ref, identity_mapped_pages, stack, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)<span class="question-mark">?</span>;
+        func(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)<span class="question-mark">?</span>;
     }
 
     <span class="comment">// the captain shouldn&#39;t return ...

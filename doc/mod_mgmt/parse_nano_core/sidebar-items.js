@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["parse_nano_core","Parses and/or deserializes the file containing details about the already loaded (and currently running) `nano_core` code."]]};
+window.SIDEBAR_ITEMS = {"fn":[["parse_nano_core","Parses and/or deserializes the file containing details about the already loaded (and currently running) `nano_core` code."]],"struct":[["NanoCoreItems","The items returned from the [`parse_nano_core()`] routine."]]};

@@ -1651,6 +1651,10 @@
 <a href="#1651" id="1651">1651</a>
 <a href="#1652" id="1652">1652</a>
 <a href="#1653" id="1653">1653</a>
+<a href="#1654" id="1654">1654</a>
+<a href="#1655" id="1655">1655</a>
+<a href="#1656" id="1656">1656</a>
+<a href="#1657" id="1657">1657</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -2407,7 +2411,11 @@
     /// 
     /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
     </span><span class="kw">fn </span>set_as_current_task(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        FsBase::write(x86_64::VirtAddr::new(<span class="self">self</span>.tls_area.pointer_value() <span class="kw">as </span>u64));
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span>FsBase::write(x86_64::VirtAddr::new(<span class="self">self</span>.tls_area.pointer_value() <span class="kw">as </span>u64));
+
+        <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
+        </span><span class="macro">todo!</span>(<span class="string">&quot;Task::set_as_current_task() is not yet implemented for this platform!&quot;</span>);
     }
 
     <span class="doccomment">/// Perform any actions needed after a context switch.
