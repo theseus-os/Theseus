@@ -611,7 +611,7 @@ enum AllocationError {
     /// The address space was full, or there was not a large-enough chunk 
     /// or enough remaining chunks that could satisfy the requested allocation size.
     OutOfAddressSpace(usize),
-    /// The starting address was found, but not all successive contiguous frames were availabe.
+    /// The starting address was found, but not all successive contiguous frames were available.
     ContiguousChunkNotFound(Frame, usize)
 }
 impl From<AllocationError> for &'static str {
