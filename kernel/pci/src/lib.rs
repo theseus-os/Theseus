@@ -56,12 +56,11 @@ pub const MSIX_CAPABILITY:          u8 = 0x11;
 /// If not, that BAR describes a 32-bit address.
 const BAR_ADDRESS_IS_64_BIT: u32 = 2;
 
-/// The maximum number of PCI buses is 256.
-const PCI_BUS_NUMBER_RANGE: core::ops::RangeInclusive<u8> = 0..=255;
-
-/// The maximum number of PCI slots on one PCI bus.
+/// There is a maximum of 256 PCI buses on one system.
+const MAX_PCI_BUSES: u16 = 256;
+/// There is a maximum of 32 slots on one PCI bus.
 const MAX_SLOTS_PER_BUS: u8 = 32;
-/// The maximum number of PCI functions (individual devices) on one PCI slot.
+/// There is a maximum of 32 functions (devices) on one PCI slot.
 const MAX_FUNCTIONS_PER_SLOT: u8 = 8;
 
 /// Addresses/offsets into the PCI configuration space should clear the least-significant 2 bits.
@@ -69,12 +68,12 @@ const PCI_CONFIG_ADDRESS_OFFSET_MASK: u8 = 0xFC;
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
 
-/// This port is used to specify an address in configuration space,
-/// to then be read/written by the data port.
+/// This port is used to specify the address in the PCI configuration space
+/// for the next read/write of the `PCI_CONFIG_DATA_PORT`.
 static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_ADDRESS));
 
-/// This port is used to transfer data to or from the register chosen by the address port.
-/// It will also generate the configuration access.
+/// This port is used to transfer data to or from the PCI configuration space
+/// specified by a previous write to the `PCI_CONFIG_ADDRESS_PORT`.
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA));
 
 
@@ -125,7 +124,8 @@ pub struct PciBus {
 fn scan_pci() -> Vec<PciBus> {
 	let mut buses: Vec<PciBus> = Vec::new();
 
-    for bus in PCI_BUS_NUMBER_RANGE {
+    for bus in 0..MAX_PCI_BUSES {
+        let bus = bus as u8;
         let mut device_list: Vec<PciDevice> = Vec::new();
 
         for slot in 0..MAX_SLOTS_PER_BUS {
@@ -225,7 +225,7 @@ impl PciLocation {
         unsafe { 
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
         }
-        Self::data_port_read() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
+        Self::read_data_port() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
@@ -240,19 +240,19 @@ impl PciLocation {
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
     pub fn pci_write(&self, offset: u8, value: u32) {
-        unsafe { 
+        unsafe {
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
-            Self::data_port_write((value) << ((offset & 2) * 8));
+            Self::write_data_port((value) << ((offset & 2) * 8));
         }
     }
 
-    fn data_port_write(value: u32) {
+    fn write_data_port(value: u32) {
         unsafe {
             PCI_CONFIG_DATA_PORT.lock().write(value);
         }
     }
 
-    fn data_port_read() -> u32 {
+    fn read_data_port() -> u32 {
         PCI_CONFIG_DATA_PORT.lock().read()
     }
 
@@ -261,12 +261,12 @@ impl PciLocation {
         unsafe { 
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(PCI_COMMAND));
         }
-        let inval = Self::data_port_read(); 
+        let inval = Self::read_data_port(); 
         trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}", self, inval);
-        Self::data_port_write(inval | (1 << 2));
+        Self::write_data_port(inval | (1 << 2));
         trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value AFTER WRITE CMD: {:#x}", 
             self,
-            Self::data_port_read()
+            Self::read_data_port()
         );
     }
 
@@ -275,12 +275,12 @@ impl PciLocation {
         unsafe { 
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(PCI_COMMAND));
         }
-        let command = Self::data_port_read(); 
+        let command = Self::read_data_port(); 
         trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
         const INTERRUPT_DISABLE: u32 = 1 << 10;
-        Self::data_port_write(command | INTERRUPT_DISABLE);
+        Self::write_data_port(command | INTERRUPT_DISABLE);
         trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
-            self, Self::data_port_read());
+            self, Self::read_data_port());
     }
 
     /// Explores the PCI config space and returns address of requested capability, if present. 
