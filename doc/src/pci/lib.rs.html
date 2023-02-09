@@ -510,6 +510,17 @@
 <a href="#510" id="510">510</a>
 <a href="#511" id="511">511</a>
 <a href="#512" id="512">512</a>
+<a href="#513" id="513">513</a>
+<a href="#514" id="514">514</a>
+<a href="#515" id="515">515</a>
+<a href="#516" id="516">516</a>
+<a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 #![allow(dead_code)]
@@ -531,57 +542,62 @@
 
 <span class="comment">// The below constants define the PCI configuration space. 
 // More info here: &lt;http://wiki.osdev.org/PCI#PCI_Device_Structure&gt;
-</span><span class="kw">pub const </span>PCI_VENDOR_ID:             u16 = <span class="number">0x0</span>;
-<span class="kw">pub const </span>PCI_DEVICE_ID:             u16 = <span class="number">0x2</span>;
-<span class="kw">pub const </span>PCI_COMMAND:               u16 = <span class="number">0x4</span>;
-<span class="kw">pub const </span>PCI_STATUS:                u16 = <span class="number">0x6</span>;
-<span class="kw">pub const </span>PCI_REVISION_ID:           u16 = <span class="number">0x8</span>;
-<span class="kw">pub const </span>PCI_PROG_IF:               u16 = <span class="number">0x9</span>;
-<span class="kw">pub const </span>PCI_SUBCLASS:              u16 = <span class="number">0xA</span>;
-<span class="kw">pub const </span>PCI_CLASS:                 u16 = <span class="number">0xB</span>;
-<span class="kw">pub const </span>PCI_CACHE_LINE_SIZE:       u16 = <span class="number">0xC</span>;
-<span class="kw">pub const </span>PCI_LATENCY_TIMER:         u16 = <span class="number">0xD</span>;
-<span class="kw">pub const </span>PCI_HEADER_TYPE:           u16 = <span class="number">0xE</span>;
-<span class="kw">pub const </span>PCI_BIST:                  u16 = <span class="number">0xF</span>;
-<span class="kw">pub const </span>PCI_BAR0:                  u16 = <span class="number">0x10</span>;
-<span class="kw">pub const </span>PCI_BAR1:                  u16 = <span class="number">0x14</span>;
-<span class="kw">pub const </span>PCI_BAR2:                  u16 = <span class="number">0x18</span>;
-<span class="kw">pub const </span>PCI_BAR3:                  u16 = <span class="number">0x1C</span>;
-<span class="kw">pub const </span>PCI_BAR4:                  u16 = <span class="number">0x20</span>;
-<span class="kw">pub const </span>PCI_BAR5:                  u16 = <span class="number">0x24</span>;
-<span class="kw">pub const </span>PCI_CARDBUS_CIS:           u16 = <span class="number">0x28</span>;
-<span class="kw">pub const </span>PCI_SUBSYSTEM_VENDOR_ID:   u16 = <span class="number">0x2C</span>;
-<span class="kw">pub const </span>PCI_SUBSYSTEM_ID:          u16 = <span class="number">0x2E</span>;
-<span class="kw">pub const </span>PCI_EXPANSION_ROM_BASE:    u16 = <span class="number">0x30</span>;
-<span class="kw">pub const </span>PCI_CAPABILITIES:          u16 = <span class="number">0x34</span>;
+</span><span class="kw">pub const </span>PCI_VENDOR_ID:             u8 = <span class="number">0x0</span>;
+<span class="kw">pub const </span>PCI_DEVICE_ID:             u8 = <span class="number">0x2</span>;
+<span class="kw">pub const </span>PCI_COMMAND:               u8 = <span class="number">0x4</span>;
+<span class="kw">pub const </span>PCI_STATUS:                u8 = <span class="number">0x6</span>;
+<span class="kw">pub const </span>PCI_REVISION_ID:           u8 = <span class="number">0x8</span>;
+<span class="kw">pub const </span>PCI_PROG_IF:               u8 = <span class="number">0x9</span>;
+<span class="kw">pub const </span>PCI_SUBCLASS:              u8 = <span class="number">0xA</span>;
+<span class="kw">pub const </span>PCI_CLASS:                 u8 = <span class="number">0xB</span>;
+<span class="kw">pub const </span>PCI_CACHE_LINE_SIZE:       u8 = <span class="number">0xC</span>;
+<span class="kw">pub const </span>PCI_LATENCY_TIMER:         u8 = <span class="number">0xD</span>;
+<span class="kw">pub const </span>PCI_HEADER_TYPE:           u8 = <span class="number">0xE</span>;
+<span class="kw">pub const </span>PCI_BIST:                  u8 = <span class="number">0xF</span>;
+<span class="kw">pub const </span>PCI_BAR0:                  u8 = <span class="number">0x10</span>;
+<span class="kw">pub const </span>PCI_BAR1:                  u8 = <span class="number">0x14</span>;
+<span class="kw">pub const </span>PCI_BAR2:                  u8 = <span class="number">0x18</span>;
+<span class="kw">pub const </span>PCI_BAR3:                  u8 = <span class="number">0x1C</span>;
+<span class="kw">pub const </span>PCI_BAR4:                  u8 = <span class="number">0x20</span>;
+<span class="kw">pub const </span>PCI_BAR5:                  u8 = <span class="number">0x24</span>;
+<span class="kw">pub const </span>PCI_CARDBUS_CIS:           u8 = <span class="number">0x28</span>;
+<span class="kw">pub const </span>PCI_SUBSYSTEM_VENDOR_ID:   u8 = <span class="number">0x2C</span>;
+<span class="kw">pub const </span>PCI_SUBSYSTEM_ID:          u8 = <span class="number">0x2E</span>;
+<span class="kw">pub const </span>PCI_EXPANSION_ROM_BASE:    u8 = <span class="number">0x30</span>;
+<span class="kw">pub const </span>PCI_CAPABILITIES:          u8 = <span class="number">0x34</span>;
 <span class="comment">// 0x35 through 0x3B are reserved
-</span><span class="kw">pub const </span>PCI_INTERRUPT_LINE:        u16 = <span class="number">0x3C</span>;
-<span class="kw">pub const </span>PCI_INTERRUPT_PIN:         u16 = <span class="number">0x3D</span>;
-<span class="kw">pub const </span>PCI_MIN_GRANT:             u16 = <span class="number">0x3E</span>;
-<span class="kw">pub const </span>PCI_MAX_LATENCY:           u16 = <span class="number">0x3F</span>;
+</span><span class="kw">pub const </span>PCI_INTERRUPT_LINE:        u8 = <span class="number">0x3C</span>;
+<span class="kw">pub const </span>PCI_INTERRUPT_PIN:         u8 = <span class="number">0x3D</span>;
+<span class="kw">pub const </span>PCI_MIN_GRANT:             u8 = <span class="number">0x3E</span>;
+<span class="kw">pub const </span>PCI_MAX_LATENCY:           u8 = <span class="number">0x3F</span>;
 
 <span class="comment">// PCI Capability IDs
-</span><span class="kw">pub const </span>MSI_CAPABILITY:           u16 = <span class="number">0x05</span>;
-<span class="kw">pub const </span>MSIX_CAPABILITY:          u16 = <span class="number">0x11</span>;
+</span><span class="kw">pub const </span>MSI_CAPABILITY:           u8 = <span class="number">0x05</span>;
+<span class="kw">pub const </span>MSIX_CAPABILITY:          u8 = <span class="number">0x11</span>;
 
 <span class="doccomment">/// If a BAR&#39;s bits [2:1] equal this value, that BAR describes a 64-bit address.
 /// If not, that BAR describes a 32-bit address.
 </span><span class="kw">const </span>BAR_ADDRESS_IS_64_BIT: u32 = <span class="number">2</span>;
 
-<span class="doccomment">/// The maximum number of PCI buses.
-</span><span class="kw">const </span>MAX_NUM_PCI_BUSES: u16 = <span class="number">256</span>;
-<span class="doccomment">/// The maximum number of PCI slots on one PCI bus.
-</span><span class="kw">const </span>MAX_SLOTS_PER_BUS: u16 = <span class="number">32</span>;
-<span class="doccomment">/// The maximum number of PCI functions (individual devices) on one PCI slot.
-</span><span class="kw">const </span>MAX_FUNCTIONS_PER_SLOT: u16 = <span class="number">8</span>;
+<span class="doccomment">/// There is a maximum of 256 PCI buses on one system.
+</span><span class="kw">const </span>MAX_PCI_BUSES: u16 = <span class="number">256</span>;
+<span class="doccomment">/// There is a maximum of 32 slots on one PCI bus.
+</span><span class="kw">const </span>MAX_SLOTS_PER_BUS: u8 = <span class="number">32</span>;
+<span class="doccomment">/// There is a maximum of 32 functions (devices) on one PCI slot.
+</span><span class="kw">const </span>MAX_FUNCTIONS_PER_SLOT: u8 = <span class="number">8</span>;
 
 <span class="doccomment">/// Addresses/offsets into the PCI configuration space should clear the least-significant 2 bits.
-</span><span class="kw">const </span>PCI_CONFIG_ADDRESS_OFFSET_MASK: u16 = <span class="number">0xFC</span>; 
+</span><span class="kw">const </span>PCI_CONFIG_ADDRESS_OFFSET_MASK: u8 = <span class="number">0xFC</span>; 
 <span class="kw">const </span>CONFIG_ADDRESS: u16 = <span class="number">0xCF8</span>;
 <span class="kw">const </span>CONFIG_DATA: u16 = <span class="number">0xCFC</span>;
 
-<span class="kw">static </span>PCI_CONFIG_ADDRESS_PORT: Mutex&lt;Port&lt;u32&gt;&gt; = Mutex::new(Port::new(CONFIG_ADDRESS));
-<span class="kw">static </span>PCI_CONFIG_DATA_PORT: Mutex&lt;Port&lt;u32&gt;&gt; = Mutex::new(Port::new(CONFIG_DATA));
+<span class="doccomment">/// This port is used to specify the address in the PCI configuration space
+/// for the next read/write of the `PCI_CONFIG_DATA_PORT`.
+</span><span class="kw">static </span>PCI_CONFIG_ADDRESS_PORT: Mutex&lt;Port&lt;u32&gt;&gt; = Mutex::new(Port::new(CONFIG_ADDRESS));
+
+<span class="doccomment">/// This port is used to transfer data to or from the PCI configuration space
+/// specified by a previous write to the `PCI_CONFIG_ADDRESS_PORT`.
+</span><span class="kw">static </span>PCI_CONFIG_DATA_PORT: Mutex&lt;Port&lt;u32&gt;&gt; = Mutex::new(Port::new(CONFIG_DATA));
 
 
 
@@ -595,7 +611,7 @@
 
 <span class="doccomment">/// Returns a reference to the `PciDevice` with the given bus, slot, func identifier.
 /// If the PCI bus hasn&#39;t been initialized, this initializes the PCI bus &amp; scans it to enumerates devices.
-</span><span class="kw">pub fn </span>get_pci_device_bsf(bus: u16, slot: u16, func: u16) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PciDevice&gt; {
+</span><span class="kw">pub fn </span>get_pci_device_bsf(bus: u8, slot: u8, func: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PciDevice&gt; {
     <span class="kw">for </span>b <span class="kw">in </span>get_pci_buses() {
         <span class="kw">if </span>b.bus_number == bus {
             <span class="kw">for </span>d <span class="kw">in </span><span class="kw-2">&amp;</span>b.devices {
@@ -620,7 +636,7 @@
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>PciBus {
     <span class="doccomment">/// The number identifier of this PCI bus.
-    </span><span class="kw">pub </span>bus_number: u16,
+    </span><span class="kw">pub </span>bus_number: u8,
     <span class="doccomment">/// The list of devices attached to this PCI bus.
     </span><span class="kw">pub </span>devices: Vec&lt;PciDevice&gt;,
 }
@@ -631,7 +647,8 @@
 </span><span class="kw">fn </span>scan_pci() -&gt; Vec&lt;PciBus&gt; {
 	<span class="kw">let </span><span class="kw-2">mut </span>buses: Vec&lt;PciBus&gt; = Vec::new();
 
-    <span class="kw">for </span>bus <span class="kw">in </span><span class="number">0</span>..MAX_NUM_PCI_BUSES {
+    <span class="kw">for </span>bus <span class="kw">in </span><span class="number">0</span>..MAX_PCI_BUSES {
+        <span class="kw">let </span>bus = bus <span class="kw">as </span>u8;
         <span class="kw">let </span><span class="kw-2">mut </span>device_list: Vec&lt;PciDevice&gt; = Vec::new();
 
         <span class="kw">for </span>slot <span class="kw">in </span><span class="number">0</span>..MAX_SLOTS_PER_BUS {
@@ -704,21 +721,21 @@
 /// This offers methods for reading and writing the PCI config space. 
 </span><span class="attr">#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 </span><span class="kw">pub struct </span>PciLocation {
-    bus:  u16,
-    slot: u16,
-    func: u16,
+    bus:  u8,
+    slot: u8,
+    func: u8,
 }
 
 <span class="kw">impl </span>PciLocation {
-    <span class="kw">pub fn </span>bus(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 { <span class="self">self</span>.bus }
-    <span class="kw">pub fn </span>slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 { <span class="self">self</span>.slot }
-    <span class="kw">pub fn </span>function(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 { <span class="self">self</span>.func }
+    <span class="kw">pub fn </span>bus(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 { <span class="self">self</span>.bus }
+    <span class="kw">pub fn </span>slot(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 { <span class="self">self</span>.slot }
+    <span class="kw">pub fn </span>function(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 { <span class="self">self</span>.func }
 
 
     <span class="doccomment">/// Computes a PCI address from bus, slot, func, and offset. 
     /// The least two significant bits of offset are masked, so it&#39;s 4-byte aligned addressing,
     /// which makes sense since we read PCI data (from the configuration space) in 32-bit chunks.
-    </span><span class="kw">fn </span>pci_address(<span class="self">self</span>, offset: u16) -&gt; u32 {
+    </span><span class="kw">fn </span>pci_address(<span class="self">self</span>, offset: u8) -&gt; u32 {
         ((<span class="self">self</span>.bus  <span class="kw">as </span>u32) &lt;&lt; <span class="number">16</span>) | 
         ((<span class="self">self</span>.slot <span class="kw">as </span>u32) &lt;&lt; <span class="number">11</span>) | 
         ((<span class="self">self</span>.func <span class="kw">as </span>u32) &lt;&lt;  <span class="number">8</span>) | 
@@ -727,29 +744,39 @@
     </span>}
 
     <span class="doccomment">/// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.
-    </span><span class="kw">pub fn </span>pci_read_32(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u16) -&gt; u32 {
+    </span><span class="kw">pub fn </span>pci_read_32(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u8) -&gt; u32 {
         <span class="kw">unsafe </span>{ 
             PCI_CONFIG_ADDRESS_PORT.lock().write(<span class="self">self</span>.pci_address(offset)); 
         }
-        PCI_CONFIG_DATA_PORT.lock().read() &gt;&gt; ((offset &amp; (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * <span class="number">8</span>)
+        <span class="self">Self</span>::read_data_port() &gt;&gt; ((offset &amp; (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * <span class="number">8</span>)
     }
 
     <span class="doccomment">/// Read 16-bit data at the specified `offset` from this PCI device.
-    </span><span class="kw">pub fn </span>pci_read_16(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u16) -&gt; u16 {
+    </span><span class="kw">pub fn </span>pci_read_16(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u8) -&gt; u16 {
         <span class="self">self</span>.pci_read_32(offset) <span class="kw">as </span>u16
     } 
 
     <span class="doccomment">/// Read 8-bit data at the specified `offset` from the PCI device.
-    </span><span class="kw">pub fn </span>pci_read_8(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u16) -&gt; u8 {
+    </span><span class="kw">pub fn </span>pci_read_8(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u8) -&gt; u8 {
         <span class="self">self</span>.pci_read_32(offset) <span class="kw">as </span>u8
     }
 
     <span class="doccomment">/// Write 32-bit data to the specified `offset` for the PCI device.
-    </span><span class="kw">pub fn </span>pci_write(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u16, value: u32) {
-        <span class="kw">unsafe </span>{ 
+    </span><span class="kw">pub fn </span>pci_write(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: u8, value: u32) {
+        <span class="kw">unsafe </span>{
             PCI_CONFIG_ADDRESS_PORT.lock().write(<span class="self">self</span>.pci_address(offset)); 
-            PCI_CONFIG_DATA_PORT.lock().write((value) &lt;&lt; ((offset &amp; <span class="number">2</span>) * <span class="number">8</span>));
+            <span class="self">Self</span>::write_data_port((value) &lt;&lt; ((offset &amp; <span class="number">2</span>) * <span class="number">8</span>));
         }
+    }
+
+    <span class="kw">fn </span>write_data_port(value: u32) {
+        <span class="kw">unsafe </span>{
+            PCI_CONFIG_DATA_PORT.lock().write(value);
+        }
+    }
+
+    <span class="kw">fn </span>read_data_port() -&gt; u32 {
+        PCI_CONFIG_DATA_PORT.lock().read()
     }
 
     <span class="doccomment">/// Sets the PCI device&#39;s bit 3 in the command portion, which is apparently needed to activate DMA (??)
@@ -757,14 +784,12 @@
         <span class="kw">unsafe </span>{ 
             PCI_CONFIG_ADDRESS_PORT.lock().write(<span class="self">self</span>.pci_address(PCI_COMMAND));
         }
-        <span class="kw">let </span>inval = PCI_CONFIG_DATA_PORT.lock().read(); 
+        <span class="kw">let </span>inval = <span class="self">Self</span>::read_data_port(); 
         <span class="macro">trace!</span>(<span class="string">&quot;pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}&quot;</span>, <span class="self">self</span>, inval);
-        <span class="kw">unsafe </span>{
-            PCI_CONFIG_DATA_PORT.lock().write(inval | (<span class="number">1 </span>&lt;&lt; <span class="number">2</span>));
-        }
+        <span class="self">Self</span>::write_data_port(inval | (<span class="number">1 </span>&lt;&lt; <span class="number">2</span>));
         <span class="macro">trace!</span>(<span class="string">&quot;pci_set_command_bus_master_bit: PciDevice: {}, read value AFTER WRITE CMD: {:#x}&quot;</span>, 
             <span class="self">self</span>,
-            PCI_CONFIG_DATA_PORT.lock().read()
+            <span class="self">Self</span>::read_data_port()
         );
     }
 
@@ -773,15 +798,12 @@
         <span class="kw">unsafe </span>{ 
             PCI_CONFIG_ADDRESS_PORT.lock().write(<span class="self">self</span>.pci_address(PCI_COMMAND));
         }
-        <span class="kw">let </span>command = PCI_CONFIG_DATA_PORT.lock().read(); 
+        <span class="kw">let </span>command = <span class="self">Self</span>::read_data_port(); 
         <span class="macro">trace!</span>(<span class="string">&quot;pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}&quot;</span>, <span class="self">self</span>, command);
-
         <span class="kw">const </span>INTERRUPT_DISABLE: u32 = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>;
-        <span class="kw">unsafe </span>{
-            PCI_CONFIG_DATA_PORT.lock().write(command | INTERRUPT_DISABLE);
-        }
+        <span class="self">Self</span>::write_data_port(command | INTERRUPT_DISABLE);
         <span class="macro">trace!</span>(<span class="string">&quot;pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}&quot;</span>, 
-            <span class="self">self</span>, PCI_CONFIG_DATA_PORT.lock().read());
+            <span class="self">self</span>, <span class="self">Self</span>::read_data_port());
     }
 
     <span class="doccomment">/// Explores the PCI config space and returns address of requested capability, if present. 
@@ -789,7 +811,7 @@
     /// with each capability storing the pointer to the next capability right after its ID.
     /// The function returns a None value if capabilities are not valid for this device 
     /// or if the requested capability is not present. 
-    </span><span class="kw">pub fn </span>find_pci_capability(<span class="kw-2">&amp;</span><span class="self">self</span>, pci_capability: u16) -&gt; <span class="prelude-ty">Option</span>&lt;u16&gt; {
+    </span><span class="kw">pub fn </span>find_pci_capability(<span class="kw-2">&amp;</span><span class="self">self</span>, pci_capability: u8) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
         <span class="kw">let </span>status = <span class="self">self</span>.pci_read_16(PCI_STATUS);
 
         <span class="comment">// capabilities are only valid if bit 4 of status register is set
@@ -801,7 +823,7 @@
             <span class="comment">// debug!(&quot;capabilities pointer: {:#X}&quot;, capabilities);
 
             // mask the bottom 2 bits of the capabilities pointer to find the address of the first capability
-            </span><span class="kw">let </span><span class="kw-2">mut </span>cap_addr = capabilities <span class="kw">as </span>u16 &amp; <span class="number">0xFFFC</span>;
+            </span><span class="kw">let </span><span class="kw-2">mut </span>cap_addr = capabilities &amp; <span class="number">0xFC</span>;
 
             <span class="comment">// the last capability will have its next pointer equal to zero
             </span><span class="kw">let </span>final_capability = <span class="number">0</span>;
@@ -812,15 +834,15 @@
                 </span><span class="kw">let </span>cap_header = <span class="self">self</span>.pci_read_16(cap_addr);
 
                 <span class="comment">// the id is the lower byte of the header
-                </span><span class="kw">let </span>cap_id = cap_header &amp; <span class="number">0xFF</span>;
+                </span><span class="kw">let </span>cap_id = (cap_header &amp; <span class="number">0xFF</span>) <span class="kw">as </span>u8;
                 
                 <span class="kw">if </span>cap_id == pci_capability {
-                        <span class="macro">debug!</span>(<span class="string">&quot;Found capability: {:#X} at {:#X}&quot;</span>, pci_capability, cap_addr);
-                        <span class="kw">return </span><span class="prelude-val">Some</span>(cap_addr);
+                    <span class="macro">debug!</span>(<span class="string">&quot;Found capability: {:#X} at {:#X}&quot;</span>, pci_capability, cap_addr);
+                    <span class="kw">return </span><span class="prelude-val">Some</span>(cap_addr);
                 }
 
                 <span class="comment">// find address of next capability which is the higher byte of the header
-                </span>cap_addr = (cap_header &gt;&gt; <span class="number">8</span>) &amp; <span class="number">0xFF</span>;            
+                </span>cap_addr = ((cap_header &gt;&gt; <span class="number">8</span>) &amp; <span class="number">0xFF</span>) <span class="kw">as </span>u8;            
             }
         }
         <span class="prelude-val">None
@@ -927,7 +949,7 @@
         // (4) Bitwise &quot;not&quot; (negate) that value, then add 1.
         //     The resulting value is the size of that BAR&#39;s memory region.
         // (5) Restore the original value to that BAR
-        </span><span class="kw">let </span>bar_offset = PCI_BAR0 + (bar_index <span class="kw">as </span>u16 * <span class="number">0x4</span>);
+        </span><span class="kw">let </span>bar_offset = PCI_BAR0 + (bar_index <span class="kw">as </span>u8 * <span class="number">4</span>);
         <span class="kw">let </span>original_value = <span class="self">self</span>.bars[bar_index];
 
         <span class="self">self</span>.pci_write(bar_offset, <span class="number">0xFFFF_FFFF</span>);          <span class="comment">// Step 1
@@ -953,7 +975,7 @@
         </span><span class="kw">let </span>cap_addr = <span class="self">self</span>.find_pci_capability(MSI_CAPABILITY).ok_or(<span class="string">&quot;Device not MSI capable&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// offset in the capability space where the message address register is located 
-        </span><span class="kw">const </span>MESSAGE_ADDRESS_REGISTER_OFFSET: u16 = <span class="number">4</span>;
+        </span><span class="kw">const </span>MESSAGE_ADDRESS_REGISTER_OFFSET: u8 = <span class="number">4</span>;
         <span class="comment">// the memory region is a constant defined for Intel cpus where MSI messages are written
         // it should be written to bit 20 of the message address register
         </span><span class="kw">const </span>MEMORY_REGION: u32 = <span class="number">0x0FEE </span>&lt;&lt; <span class="number">20</span>;
@@ -964,12 +986,12 @@
         </span><span class="self">self</span>.pci_write(cap_addr + MESSAGE_ADDRESS_REGISTER_OFFSET, MEMORY_REGION| core);
 
         <span class="comment">// offset in the capability space where the message data register is located 
-        </span><span class="kw">const </span>MESSAGE_DATA_REGISTER_OFFSET: u16 = <span class="number">12</span>;
+        </span><span class="kw">const </span>MESSAGE_DATA_REGISTER_OFFSET: u8 = <span class="number">12</span>;
         <span class="comment">// Set the interrupt number for the MSI in the Message Data Register
         </span><span class="self">self</span>.pci_write(cap_addr + MESSAGE_DATA_REGISTER_OFFSET, int_num <span class="kw">as </span>u32);
 
         <span class="comment">// offset in the capability space where the message control register is located 
-        </span><span class="kw">const </span>MESSAGE_CONTROL_REGISTER_OFFSET: u16 = <span class="number">2</span>;
+        </span><span class="kw">const </span>MESSAGE_CONTROL_REGISTER_OFFSET: u8 = <span class="number">2</span>;
         <span class="comment">// to enable the MSI capability, we need to set it bit 0 of the message control register
         </span><span class="kw">const </span>MSI_ENABLE: u32 = <span class="number">1</span>;
         <span class="kw">let </span>ctrl = <span class="self">self</span>.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) <span class="kw">as </span>u32;
@@ -988,7 +1010,7 @@
         </span><span class="kw">let </span>cap_addr = <span class="self">self</span>.find_pci_capability(MSIX_CAPABILITY).ok_or(<span class="string">&quot;Device not MSI-X capable&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// offset in the capability space where the message control register is located 
-        </span><span class="kw">const </span>MESSAGE_CONTROL_REGISTER_OFFSET: u16 = <span class="number">2</span>;
+        </span><span class="kw">const </span>MESSAGE_CONTROL_REGISTER_OFFSET: u8 = <span class="number">2</span>;
         <span class="kw">let </span>ctrl = <span class="self">self</span>.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) <span class="kw">as </span>u32;
 
         <span class="comment">// write to bit 15 of Message Control Register to enable MSI-X 
