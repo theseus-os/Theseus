@@ -62,8 +62,8 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 
     if let Err(_e) = res {
         // basic early panic printing with no dependencies
-        println_raw!("\nPANIC: {}", info);
-        error!("PANIC: {}", info);
+        println_raw!("\nHalting due to early panic: {}", info);
+        error!("Halting due to early panic: {}", info);
     }
 
     // If we failed to handle the panic, there's not really much we can do about it,
