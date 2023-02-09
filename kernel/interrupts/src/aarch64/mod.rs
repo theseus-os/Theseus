@@ -1,5 +1,6 @@
 use core::arch::global_asm;
 use core::cell::UnsafeCell;
+use core::ops::DerefMut;
 use core::fmt;
 
 use cortex_a::registers::*;
@@ -10,7 +11,7 @@ use tock_registers::registers::InMemoryRegister;
 
 use gic::{qemu_virt_addrs, ArmGic, IntNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
-use memory::{PageTable};
+use memory::get_kernel_mmi_ref;
 use log::{info, error};
 use spin::Once;
 
@@ -64,22 +65,36 @@ type HandlerFunc = extern "C" fn(&ExceptionContext) -> bool;
 
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
-    log::error!("Kernel Panic: Unhandled Exception ({})\r\n{}", origin, exc);
+    log::error!("Unhandled Exception ({})\r\n{}\r\n[looping forever now]", origin, exc);
     loop {}
 }
 
 // called for all unhandled interrupt requests
 extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
-    log::error!("Kernel Panic: Unhandled IRQ:\r\n{}", exc);
+    log::error!("Unhandled IRQ:\r\n{}\r\n[looping forever now]", exc);
     loop {}
 }
 
-/// Please call (once) this before using this crate.
+/// Please call this (only once) before using this crate.
 ///
 /// This initializes the Generic Interrupt Controller
 /// using the addresses which are valid on qemu's "virt" VM.
-pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
-    let mut gic = GIC.lock();
+pub fn init() -> Result<(), &'static str> {
+    extern "Rust" {
+        // in assembly file
+        static __exception_vector_start: UnsafeCell<()>;
+    }
+
+    // Set the exception handling vector, which
+    // is an array of grouped aarch64 instructions.
+    // see table.s for more info.
+    unsafe { VBAR_EL1.set(__exception_vector_start.get() as u64) };
+
+    let kernel_mmi_ref = get_kernel_mmi_ref()
+        .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
+
+    let mut mmi = kernel_mmi_ref.lock();
+    let page_table = &mut mmi.deref_mut().page_table;
 
     log::info!("Configuring the GIC");
     let inner = ArmGic::init(
@@ -90,6 +105,7 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
         },
     )?;
 
+    let mut gic = GIC.lock();
     let mut result = Err("The GIC has already been initialized!");
     gic.call_once(|| { result = Ok(()); inner });
 
@@ -103,24 +119,14 @@ pub fn init(page_table: &mut PageTable) -> Result<(), &'static str> {
 }
 
 pub fn enable_timer_interrupts() -> Result<(), &'static str> {
-        extern "Rust" {
-            // in assembly file
-            static __exception_vector_start: UnsafeCell<()>;
-        }
-
-        // Set the exception handling vector, which
-        // is an array of grouped aarch64 instructions.
-        // see table.s for more info.
-        unsafe { VBAR_EL1.set(__exception_vector_start.get() as u64) };
-
         // called everytime the timer ticks.
         extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
             info!("timer int!");
-            // loop {}
+            loop {}
 
             // return false if you haven't sent an EOI
             // so that the caller does it for you
-            false
+            // false
         }
 
         // register the handler for the timer IRQ.
