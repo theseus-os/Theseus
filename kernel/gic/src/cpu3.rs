@@ -6,6 +6,9 @@ use super::IntNumber;
 const SGIR_TARGET_ALL_OTHER_PE: usize = 1 << 40;
 const IGRPEN_ENABLED: usize = 1;
 
+/// Enables routing of group 1 interrupts
+/// in the for the current CPU and configures
+/// the end of interrupt mode
 pub fn init() {
     let mut icc_ctlr: usize;
 
@@ -29,13 +32,13 @@ pub fn init() {
 pub fn get_minimum_int_priority() -> Priority {
     let mut reg_value: usize;
     unsafe { asm!("mrs {}, ICC_PMR_EL1", out(reg) reg_value) };
-    255 - (reg_value as u8)
+    u8::MAX - (reg_value as u8)
 }
 
 /// Interrupts have a priority; if their priority
 /// is lower or equal to this one, they're discarded
 pub fn set_minimum_int_priority(priority: Priority) {
-    let reg_value = (255 - priority) as usize;
+    let reg_value = (u8::MAX - priority) as usize;
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
@@ -76,9 +79,7 @@ pub fn send_ipi(int_num: IntNumber, target: TargetCpu) {
             // aff0 as a GICv2-style target list
             let aff0 = cpu & 0xff;
             let target_list = if aff0 >= 16 {
-                log::error!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
-                // target_list = 0 -> this IPI will be discarded
-                0
+                panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
             } else {
                 1 << aff0
             };

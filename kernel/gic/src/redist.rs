@@ -14,11 +14,13 @@ mod offset {
 }
 
 const RD_WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
-// const RD_WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
+const RD_WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
 
 // const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
 
+/// Initializes the redistributor by waking
+/// it up and checking that it's awake
 pub fn init(registers: &mut MmioPageOfU32) {
     let mut reg;
     reg = registers[offset::RD_WAKER];
@@ -28,27 +30,12 @@ pub fn init(registers: &mut MmioPageOfU32) {
 
     // then poll ChildrenAsleep until it's cleared
 
-    /* TODO
-    // this could lock the entire kernel...
-    // but it's what we're supposed to do
-    // maybe we should put a loop run limit?
-
-    // Another problem with this: it loops forever
-    // I don't understand why yet, could this be the result
-    // of non-volatile access to mmio?
-
-    // The redist interface of core #0 is
-    // already enabled when is code is reached,
-    // so this has no implication for the moment
-
     let children_asleep = || {
-        registers[offset::RD_WAKER] & RD_WAKER_CHLIDREN_ASLEEP > 0
+        let ptr = &registers[offset::RD_WAKER] as *const u32;
+        let value = unsafe { ptr.read_volatile() };
+        value & RD_WAKER_CHLIDREN_ASLEEP > 0
     };
-    log::info!("before while(children_asleep)");
-    // while children_asleep() {}
-    log::info!("after while(children_asleep)");
-
-    */
+    while children_asleep() {}
 }
 
 /// Will that SGI or PPI be forwarded by the GIC?

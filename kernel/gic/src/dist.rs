@@ -45,7 +45,8 @@ fn assert_cpu_bounds(target: &TargetCpu) {
     }
 }
 
-/// Initializes the distributor
+/// Initializes the distributor by enabling forwarding
+/// of group 1 interrupts
 ///
 /// Return value: whether or not affinity routing is
 /// currently enabled for both secure and non-secure

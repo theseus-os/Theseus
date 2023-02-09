@@ -18,6 +18,8 @@ mod offset {
 // enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
 
+/// Enables routing of group 1 interrupts
+/// in the for the current CPU
 pub fn init(registers: &mut MmioPageOfU32) {
     let mut reg = registers[offset::CTLR];
     reg |= CTLR_ENGRP1;
@@ -27,13 +29,13 @@ pub fn init(registers: &mut MmioPageOfU32) {
 /// Interrupts have a priority; if their priority
 /// is lower or equal to this one, they're discarded
 pub fn get_minimum_int_priority(registers: &MmioPageOfU32) -> Priority {
-    255 - (registers[offset::PMR] as u8)
+    u8::MAX - (registers[offset::PMR] as u8)
 }
 
 /// Interrupts have a priority; if their priority
 /// is lower or equal to this one, they're discarded
 pub fn set_minimum_int_priority(registers: &mut MmioPageOfU32, priority: Priority) {
-    registers[offset::PMR] = (255 - priority) as u32;
+    registers[offset::PMR] = (u8::MAX - priority) as u32;
 }
 
 /// Performs priority drop for the specified interrupt
