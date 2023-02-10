@@ -273,6 +273,10 @@
 <a href="#273" id="273">273</a>
 <a href="#274" id="274">274</a>
 <a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -311,9 +315,10 @@
 };
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">use </span>memory_x86_64::{
-    find_section_memory_bounds, get_vga_mem_addr, tlb_flush_virt_addr, tlb_flush_all, get_p4,
-};
+</span><span class="kw">use </span>memory_x86_64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr };
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">use </span>memory_aarch64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds };
 
 <span class="kw">pub use </span>pte_flags::<span class="kw-2">*</span>;
 
@@ -456,12 +461,7 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;InitialMemoryMappings, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>low_memory_frames   = FrameRange::from_phys_addr(PhysicalAddress::zero(), <span class="number">0x10_0000</span>); <span class="comment">// suggested by most OS developers
     
-    // Add the VGA display&#39;s memory region to the list of reserved physical memory areas.
-    // Currently this is covered by the first 1MiB region, but it&#39;s okay to duplicate it here.
-    </span><span class="kw">let </span>(vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()<span class="question-mark">?</span>;
-    <span class="kw">let </span>vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
-    
-    <span class="comment">// Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
+    // Now set up the list of free regions and reserved regions so we can initialize the frame allocator.
     </span><span class="kw">let </span><span class="kw-2">mut </span>free_regions: [<span class="prelude-ty">Option</span>&lt;PhysicalMemoryRegion&gt;; <span class="number">32</span>] = Default::default();
     <span class="kw">let </span><span class="kw-2">mut </span>free_index = <span class="number">0</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>reserved_regions: [<span class="prelude-ty">Option</span>&lt;PhysicalMemoryRegion&gt;; <span class="number">32</span>] = Default::default();
@@ -469,8 +469,16 @@
 
     reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(low_memory_frames, MemoryRegionType::Reserved));
     reserved_index += <span class="number">1</span>;
-    reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
-    reserved_index += <span class="number">1</span>;
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span>{    
+        <span class="comment">// Add the VGA display&#39;s memory region to the list of reserved physical memory areas.
+        // Currently this is covered by the first 1MiB region, but it&#39;s okay to duplicate it here.
+        </span><span class="kw">let </span>(vga_start_paddr, vga_size, _vga_flags) = memory_x86_64::get_vga_mem_addr()<span class="question-mark">?</span>;
+        <span class="kw">let </span>vga_display_frames = FrameRange::from_phys_addr(vga_start_paddr, vga_size);
+        reserved_regions[reserved_index] = <span class="prelude-val">Some</span>(PhysicalMemoryRegion::new(vga_display_frames, MemoryRegionType::Reserved));
+        reserved_index += <span class="number">1</span>;
+    }
 
     <span class="kw">for </span>region <span class="kw">in </span>boot_info.memory_regions()<span class="question-mark">? </span>{
         <span class="kw">let </span>frames = FrameRange::from_phys_addr(region.start(), region.len());

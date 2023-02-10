@@ -423,6 +423,25 @@
 <a href="#423" id="423">423</a>
 <a href="#424" id="424">424</a>
 <a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
+<a href="#440" id="440">440</a>
+<a href="#441" id="441">441</a>
+<a href="#442" id="442">442</a>
+<a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -453,16 +472,22 @@
     fmt,
 };
 <span class="kw">use </span>log::debug;
-<span class="kw">use super</span>::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+<span class="kw">use super</span>::{
+    Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, InitialMemoryMappings
+    InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
+    get_p4, find_section_memory_bounds,
 };
 <span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>no_drop::NoDrop;
 <span class="kw">use </span>boot_info::BootInformation;
 <span class="kw">use </span>kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX};
 
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">use </span>memory_aarch64::set_as_active_page_table_root;
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span><span class="kw">super</span>::get_vga_mem_addr;
 
 <span class="doccomment">/// A top-level root (P4) page table.
 /// 
@@ -471,6 +496,7 @@
     mapper: Mapper,
     p4_table: AllocatedFrames,
 }
+
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>PageTable {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
         <span class="macro">write!</span>(f, <span class="string">&quot;PageTable(p4: {:#X})&quot;</span>, <span class="self">self</span>.p4_table.start_address()) 
@@ -525,9 +551,9 @@
         <span class="kw">let </span>p4_frame = <span class="kw-2">*</span>new_p4_frame.start();
 
         <span class="kw">let </span><span class="kw-2">mut </span>temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)<span class="question-mark">?</span>;
-        temporary_page.with_table_and_frame(|table, frame| {
-            table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(
+        temporary_page.with_table_and_frame(|new_table, frame| {
+            new_table.zero();
+            new_table[RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
             );
@@ -607,7 +633,7 @@
     </span><span class="kw">pub fn </span>switch(<span class="kw-2">&amp;mut </span><span class="self">self</span>, new_table: <span class="kw-2">&amp;</span>PageTable) {
         <span class="comment">// debug!(&quot;PageTable::switch() old table: {:?}, new table: {:?}&quot;, self, new_table);
 
-        // perform the actual page table switch
+        </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
         </span><span class="kw">unsafe </span>{ 
             <span class="kw">use </span>x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
             Cr3::write(
@@ -615,6 +641,12 @@
                 Cr3Flags::empty(),
             )
         };
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+            set_as_active_page_table_root(new_table.physical_address());
+            <span class="comment">// This is only required on aarch64, as setting CR3 on x86_64 flushes the TLB.
+            </span>tlb_flush_all();
+        }
     }
 
 
@@ -779,18 +811,24 @@
             NoDrop::new(stack_mapped_pages.ok_or(<span class="string">&quot;no pages were allocated for the stack&quot;</span>)<span class="question-mark">?</span>),
         );
 
-        <span class="comment">// Map the VGA display memory as writable. 
-        // We map this *only* using an identity mapping, as it is only used during early init
-        // by both the bootstrap CPU and secondary CPUs.
-        </span><span class="kw">let </span>(vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()<span class="question-mark">?</span>;
-        <span class="kw">let </span>vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
-            VirtualAddress::new_canonical(vga_phys_addr.value()),
-            vga_size_in_bytes,
-        )<span class="question-mark">?</span>;
-        <span class="kw">let </span>vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)<span class="question-mark">?</span>;
-        <span class="kw">let </span>additional_mapped_pages: NoDrop&lt;MappedPages&gt; = NoDrop::new(new_mapper.map_allocated_pages_to(
-            vga_display_pages_identity, vga_display_frames, vga_flags,
-        )<span class="question-mark">?</span>);
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span><span class="kw">let </span>additional_mapped_pages = {
+            <span class="comment">// Map the VGA display memory as writable. 
+            // We map this *only* using an identity mapping, as it is only used during early init
+            // by both the bootstrap CPU and secondary CPUs.
+            </span><span class="kw">let </span>(vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()<span class="question-mark">?</span>;
+            <span class="kw">let </span>vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+                VirtualAddress::new_canonical(vga_phys_addr.value()),
+                vga_size_in_bytes,
+            )<span class="question-mark">?</span>;
+            <span class="kw">let </span>vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)<span class="question-mark">?</span>;
+            NoDrop::new(new_mapper.map_allocated_pages_to(
+                vga_display_pages_identity, vga_display_frames, vga_flags,
+            )<span class="question-mark">?</span>)
+        };
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+        </span><span class="kw">let </span>additional_mapped_pages = NoDrop::new(MappedPages::empty());
 
         <span class="comment">// Map the bootloader info, a separate region of read-only memory, so that we can access it later.
         // This does not need to be identity mapped.

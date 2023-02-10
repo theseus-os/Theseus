@@ -1249,6 +1249,9 @@
 <a href="#1249" id="1249">1249</a>
 <a href="#1250" id="1250">1250</a>
 <a href="#1251" id="1251">1251</a>
+<a href="#1252" id="1252">1252</a>
+<a href="#1253" id="1253">1253</a>
+<a href="#1254" id="1254">1254</a>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -1277,11 +1280,14 @@
 };
 <span class="kw">use </span>pte_flags::PteFlagsArch;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+<span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
 <span class="kw">use </span><span class="kw">super</span>::tlb_flush_virt_addr;
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>page_table_entry::UnmapResult;
 <span class="kw">use </span>owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
 <span class="doccomment">/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
 /// 
@@ -1527,8 +1533,8 @@
         <span class="comment">// Only the lowest-level P1 entry can be considered exclusive, and only because
         // we are mapping it exclusively (to owned `AllocatedFrames`).
         </span><span class="kw">let </span>actual_flags = flags
-            .exclusive(<span class="bool-val">true</span>)
-            .valid(<span class="bool-val">true</span>);
+            .valid(<span class="bool-val">true</span>)
+            .exclusive(<span class="bool-val">true</span>);
 
         <span class="kw">for </span>page <span class="kw">in </span>pages.deref().clone() {
             <span class="kw">let </span>af = frame_allocator::allocate_frames(<span class="number">1</span>).ok_or(<span class="string">&quot;map_allocated_pages(): couldn&#39;t allocate new frame, out of memory&quot;</span>)<span class="question-mark">?</span>;

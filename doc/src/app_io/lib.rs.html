@@ -223,6 +223,7 @@
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
 <a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A simple library that handles stdio queues for applications invoked by a
 //! shell.
 //!
@@ -237,6 +238,7 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
+<span class="kw">extern crate </span>logger_x86_64 <span class="kw">as </span>logger;
 
 <span class="kw">use </span>alloc::{format, sync::Arc};
 <span class="kw">use </span>core2::io::{<span class="self">self</span>, Error, ErrorKind, Read, Write};

@@ -442,6 +442,14 @@
 <a href="#442" id="442">442</a>
 <a href="#443" id="443">443</a>
 <a href="#444" id="444">444</a>
+<a href="#445" id="445">445</a>
+<a href="#446" id="446">446</a>
+<a href="#447" id="447">447</a>
+<a href="#448" id="448">448</a>
+<a href="#449" id="449">449</a>
+<a href="#450" id="450">450</a>
+<a href="#451" id="451">451</a>
+<a href="#452" id="452">452</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aarch64-specific definitions of PTE flags.
 
 </span><span class="kw">use </span><span class="kw">crate</span>::PteFlags;
@@ -647,6 +655,7 @@
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
     /// * `OUTER_SHAREABLE` is set.
     /// * `READ_ONLY` is set.
+    /// * `PAGE_DESCRIPTOR` is set.
     /// * `ACCESSED` is set.
     /// * `NOT_GLOBAL` is set.
     /// * the `NOT_EXECUTABLE` bits are set.
@@ -663,6 +672,7 @@
             <span class="self">Self</span>::NORMAL_MEMORY.bits
             | <span class="self">Self</span>::OUTER_SHAREABLE.bits
             | <span class="self">Self</span>::READ_ONLY.bits
+            | <span class="self">Self</span>::PAGE_DESCRIPTOR.bits
             | <span class="self">Self</span>::ACCESSED.bits
             | <span class="self">Self</span>::_NOT_GLOBAL.bits
             | <span class="self">Self</span>::NOT_EXECUTABLE.bits
@@ -855,6 +865,9 @@
     /// 
     /// Currently, this includes:
     /// * `OUTER_SHAREABLE` will be set.
+    ///
+    /// This conversion also implicitly sets the `ACCESSED` and `PAGE_DESCRIPTOR` bits,
+    /// which are always required in valid descriptors based on our MMU configuration.
     </span><span class="kw">fn </span>from(general: PteFlags) -&gt; <span class="self">Self </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>specific = <span class="self">Self</span>::from_bits_truncate(general.bits());
         <span class="comment">// The writable and global bit values have inverse meanings on aarch64.
@@ -862,7 +875,8 @@
         <span class="comment">// Mask out the ranges of bits that can&#39;t simply be toggled; we must manually set them.
         </span>specific &amp;= !<span class="self">Self</span>::MASKED_BITS_FOR_CONVERSION;
         specific |= <span class="self">Self</span>::OUTER_SHAREABLE; <span class="comment">// OUTER_SHAREABLE is the default value
-        </span><span class="kw">if </span>general.contains(PteFlags::DEVICE_MEMORY) {
+        </span>specific |= <span class="self">Self</span>::PAGE_DESCRIPTOR | <span class="self">Self</span>::ACCESSED;
+        <span class="kw">if </span>general.contains(PteFlags::DEVICE_MEMORY) {
             specific |= <span class="self">Self</span>::DEVICE_MEMORY;
         } <span class="kw">else </span>{
             specific |= <span class="self">Self</span>::NORMAL_MEMORY;
@@ -872,9 +886,11 @@
 }
 
 <span class="kw">impl </span>From&lt;PteFlagsAarch64&gt; <span class="kw">for </span>PteFlags {
-    <span class="kw">fn </span>from(<span class="kw-2">mut </span>specific: PteFlagsAarch64) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// This conversion clears the `PAGE_DESCRIPTOR` bit, which is aarch64-specific.
+    </span><span class="kw">fn </span>from(<span class="kw-2">mut </span>specific: PteFlagsAarch64) -&gt; <span class="self">Self </span>{
         <span class="comment">// The writable and global bit values have inverse meanings on aarch64.
         </span>specific.toggle(<span class="kw">super</span>::WRITABLE_BIT | <span class="kw">super</span>::GLOBAL_BIT);
+        specific &amp;= !PteFlagsAarch64::PAGE_DESCRIPTOR;
         <span class="kw">let </span><span class="kw-2">mut </span>general = <span class="self">Self</span>::from_bits_truncate(specific.bits());
         <span class="comment">// Ensure that we are strict about which MAIR index is used by explicitly masking it.
         // Otherwise, `DEVICE_MEMORY` may accidentally be misinterpreted as enabled

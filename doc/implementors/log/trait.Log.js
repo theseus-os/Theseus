@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"logger_aarch64":[["impl <a class=\"trait\" href=\"https://docs.rs/log/0.4.17/log/trait.Log.html\" title=\"trait log::Log\">Log</a> for <a class=\"struct\" href=\"logger_aarch64/struct.UartLogger.html\" title=\"struct logger_aarch64::UartLogger\">UartLogger</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
