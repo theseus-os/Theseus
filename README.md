@@ -176,7 +176,7 @@ To build and run Theseus on aarch64, first install the required dependencies:
   sudo pacman -S aarch64-linux-gnu-gcc qemu-system-aarch64
   ```
 
-Then, build Thesues and run it in QEMU:
+Then, build Theseus and run it in QEMU:
 ```bash
 make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run
 ```

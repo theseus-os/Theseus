@@ -20,7 +20,7 @@ net ?= none
 merge_sections ?= yes
 bootloader ?= grub
 
-## aarch64 only support UEFI
+## aarch64 only supports booting via UEFI
 ifeq ($(ARCH),aarch64)
 	boot_spec = uefi
 else
@@ -902,7 +902,7 @@ ifeq ($(host),yes)
 	QEMU_FLAGS += -cpu host -accel kvm
 else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -machine virt
-	# QEMU_FLAGS += -device ramfb
+	QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
 else
 	QEMU_FLAGS += -cpu Broadwell
