@@ -20,8 +20,9 @@ net ?= none
 merge_sections ?= yes
 bootloader ?= grub
 
+## aarch64 only support UEFI
 ifeq ($(ARCH),aarch64)
-	boot_spec ?= uefi
+	boot_spec = uefi
 else
 	boot_spec ?= bios
 endif
@@ -62,8 +63,6 @@ THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES             := $(ROOT_DIR)/extra_files
 LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 
-## qemu binary to use
-QEMU_BIN = qemu-system-$(ARCH)
 
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
@@ -82,7 +81,7 @@ endif
 
 ### Handle multiple bootloader options and ensure the corresponding tools are installed.
 ifeq ($(boot_spec),uefi)
-	# a bootloader isn't required, with UEFI
+	## A bootloader isn't required with UEFI.
 else ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
@@ -189,18 +188,15 @@ iso: $(iso)
 ### This target builds an .iso OS image from all of the compiled crates.
 $(iso): clean-old-build build extra_files copy_kernel $(iso)-$(boot_spec)
 
-## This target is a dependency of $(iso)
-## when boot_spec = bios
+## This target is invoked by the '$(iso)' target when boot_spec = 'bios'.
 $(iso)-bios: $(bootloader)
 
-## This target is a dependency of $(iso)
-## when boot_spec = uefi
+## This target is invoked by the '$(iso)' target when boot_spec = 'uefi'.
 $(iso)-uefi: $(efi_firmware)
-	@cargo r \
+	@cargo run \
 		--release \
 		-Z bindeps \
-		--manifest-path \
-		$(ROOT_DIR)/tools/uefi_builder/$(ARCH)/Cargo.toml -- \
+		--manifest-path $(ROOT_DIR)/tools/uefi_builder/$(ARCH)/Cargo.toml -- \
 		--kernel $(nano_core_binary) \
 		--modules $(OBJECT_FILES_BUILD_DIR) \
 		--efi-image $(iso)
@@ -399,13 +395,15 @@ limine:
 	@$(MAKE) -C $(LIMINE_DIR)
 	@$(LIMINE_DIR)/limine-deploy $(iso)
 
-## This downloads the OVMF EFI firmware, required by qemu
-## to boot a EFI apps.
+
+## This downloads the OVMF EFI firmware, needed by QEMU to boot an EFI app.
 ##
 ## These binary files are built by Github user retrage at:
 ## https://github.com/retrage/edk2-nightly.
 $(efi_firmware):
-	wget https://raw.githubusercontent.com/retrage/edk2-nightly/$(OVMF_COMMIT)/bin/$(OVMF_FILE) -O $(efi_firmware)
+	@echo -e "\033[1;34m\nDownloading prebuilt EFI firmware from GitHub...\033[0m"
+	@wget -nv --show-progress https://raw.githubusercontent.com/retrage/edk2-nightly/$(OVMF_COMMIT)/bin/$(OVMF_FILE) -O $(efi_firmware)
+
 
 ### This target copies all extra files into the `ISOFILES` directory,
 ### collapsing their directory structure into a single file name with `!` as the directory delimiter.
@@ -854,9 +852,12 @@ QEMU_CPUS ?= 4
 QEMU_FLAGS += -smp $(QEMU_CPUS)
 
 ## Add a disk drive, a PATA drive over an IDE controller interface.
+## Currently this is only supported on x86_64.
 DISK_IMAGE ?= fat32.img
+ifeq ($(ARCH),x86_64)
 ifneq ($(wildcard $(DISK_IMAGE)),) 
 	QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+endif
 endif
 
 ## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
@@ -892,7 +893,7 @@ ifeq ($(host),yes)
 	QEMU_FLAGS += -cpu host -accel kvm
 else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -machine virt
-	QEMU_FLAGS += -device ramfb
+	# QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
 else
 	QEMU_FLAGS += -cpu Broadwell

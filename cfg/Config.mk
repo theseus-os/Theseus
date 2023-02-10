@@ -14,10 +14,15 @@ ARCH ?= x86_64
 ifeq ($(ARCH),x86_64)
 	OVMF_COMMIT = 7ca5064968a54d84831e5785aea87cb9c71d4a3d
 	OVMF_FILE ?= RELEASEX64_OVMF.fd
-else
+else ifeq ($(ARCH),aarch64)
 	OVMF_COMMIT = 7706abd0defa07249946e5908a5dc84c4c5a7d44
 	OVMF_FILE ?= RELEASEAARCH64_QEMU_EFI.fd
+else
+$(error 'ARCH' '$(ARCH)' is invalid; we only support 'x86_64' and 'aarch64')
 endif
+
+## The QEMU binary to run.
+QEMU_BIN = qemu-system-$(ARCH)
 
 ## The name of the target JSON file (without the ".json" suffix)
 TARGET ?= $(ARCH)-unknown-theseus
