@@ -15,9 +15,6 @@ struct Args {
     /// Path at which the EFI image should be placed.
     #[arg(long)]
     efi_image: PathBuf,
-    /// Path at which the EFI firmware should be placed.
-    #[arg(long)]
-    efi_firmware: Option<PathBuf>,
 }
 
 pub fn main(bootloader_host_path: &Path, bootloader_efi_path: &Path) {
@@ -25,7 +22,6 @@ pub fn main(bootloader_host_path: &Path, bootloader_efi_path: &Path) {
         kernel,
         modules,
         efi_image,
-        efi_firmware,
     } = Args::parse();
 
     let mut bootloader = UefiBoot::new(&kernel);
@@ -54,9 +50,4 @@ pub fn main(bootloader_host_path: &Path, bootloader_efi_path: &Path) {
     bootloader
         .create_disk_image(bootloader_host_path, bootloader_efi_path, &efi_image)
         .expect("failed to create uefi disk image");
-
-    if let Some(efi_firmware) = efi_firmware {
-        std::fs::copy(ovmf_prebuilt::ovmf_pure_efi(), efi_firmware)
-            .expect("couldn't copy efi firmware");
-    }
 }

@@ -24,7 +24,6 @@ use alloc::{sync::Arc, vec::Vec};
 #[cfg(mirror_log_to_vga)]
 pub use mirror_log::set_log_mirror_function;
 
-
 /// By default, Theseus will print all log levels, including `Trace` and above.
 pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
 

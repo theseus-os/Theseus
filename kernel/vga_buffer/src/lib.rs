@@ -6,7 +6,7 @@
 #![feature(ptr_internals)]
 
 extern crate kernel_config;
-extern crate logger;
+extern crate logger_x86_64 as logger;
 extern crate spin;
 extern crate volatile;
 

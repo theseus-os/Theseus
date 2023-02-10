@@ -1,10 +1,4 @@
-//! This crate contains structures and routines for context switching 
-//! when SSE/SIMD extensions are not active. 
-
-#![no_std]
-#![feature(naked_functions)]
-
-extern crate zerocopy;
+//! This crate contains structures and routines for context switching on aarch64.
 
 use zerocopy::{FromBytes, AsBytes};
 

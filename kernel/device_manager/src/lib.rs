@@ -10,7 +10,7 @@ extern crate apic;
 extern crate acpi;
 extern crate serial_port;
 extern crate console;
-extern crate logger;
+extern crate logger_x86_64 as logger;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;

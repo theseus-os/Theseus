@@ -130,7 +130,7 @@ dependencies = [
  "core2",
  "hashbrown",
  "lazy_static",
- "logger",
+ "logger_x86_64",
  "mutex_sleep",
  "stdio",
  "task",
@@ -365,7 +365,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "log",
- "logger",
+ "logger_x86_64",
  "memory",
  "mod_mgmt",
  "multicore_bringup",
@@ -553,6 +553,15 @@ dependencies = [
 name = "core_simd"
 version = "0.1.0"
 source = "git+https://github.com/rust-lang/stdsimd#0711e11593e7d3ce7cffdb7bd966553e4a4f858f"
+
+[[package]]
+name = "cortex-a"
+version = "7.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdecfbb28672ad3664e71ae05a398a52df430d86d660691501b28968cc4467e6"
+dependencies = [
+ "tock-registers",
+]
 
 [[package]]
 name = "cortex-m"
@@ -846,7 +855,7 @@ dependencies = [
  "ixgbe",
  "keyboard",
  "log",
- "logger",
+ "logger_x86_64",
  "memory",
  "mlx5",
  "mouse",
@@ -1760,7 +1769,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "logger"
+name = "logger_aarch64"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "log",
+ "memory",
+ "pl011_qemu",
+ "spin 0.9.4",
+]
+
+[[package]]
+name = "logger_x86_64"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
@@ -1871,6 +1891,7 @@ dependencies = [
  "kernel_config",
  "lazy_static",
  "log",
+ "memory_aarch64",
  "memory_structs",
  "memory_x86_64",
  "no_drop",
@@ -1882,6 +1903,19 @@ dependencies = [
  "x86_64",
  "xmas-elf",
  "zerocopy",
+]
+
+[[package]]
+name = "memory_aarch64"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "cortex-a",
+ "kernel_config",
+ "log",
+ "memory_structs",
+ "pte_flags",
+ "tock-registers",
 ]
 
 [[package]]
@@ -2158,7 +2192,8 @@ dependencies = [
  "kernel_config",
  "libm",
  "log",
- "logger",
+ "logger_aarch64",
+ "logger_x86_64",
  "memory",
  "memory_initialization",
  "mod_mgmt",
@@ -2568,6 +2603,17 @@ dependencies = [
  "log",
  "port_io",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "pl011_qemu"
+version = "0.2.0"
+source = "git+https://github.com/theseus-os/pl011/?branch=aarch64-qemu-virt-test#2c2cec84ca9653efa9e370460e7e0e1c94140080"
+dependencies = [
+ "cortex-m",
+ "embedded-hal",
+ "nb 1.0.0",
+ "volatile-register",
 ]
 
 [[package]]
@@ -3757,7 +3803,6 @@ name = "test_scheduler"
 version = "0.1.0"
 dependencies = [
  "log",
- "logger",
  "scheduler",
  "spawn",
  "task",
@@ -3992,6 +4037,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "tock-registers"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ee8fba06c1f4d0b396ef61a54530bb6b28f0dc61c38bc8bc5a5a48161e6282e"
+
+[[package]]
 name = "tsc"
 version = "0.1.0"
 dependencies = [
@@ -4029,7 +4080,7 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
-source = "git+https://github.com/theseus-os/uefi-bootloader#1aeb6f29bf2f3cc2cd2ab2dee893bef5caa1f96c"
+source = "git+https://github.com/theseus-os/uefi-bootloader#593fd590f55b4756ced5389146d987cebd491c4f"
 
 [[package]]
 name = "unicode-ident"
@@ -4145,7 +4196,7 @@ name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
  "kernel_config",
- "logger",
+ "logger_x86_64",
  "spin 0.9.4",
  "volatile 0.2.7",
 ]

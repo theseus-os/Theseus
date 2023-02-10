@@ -446,12 +446,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b7820b9daea5457c9f21c69448905d723fbd21136ccf521748f23fd49e723ee"
 
 [[package]]
-name = "ovmf-prebuilt"
-version = "0.1.0-alpha.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa50141d081512ab30fd9e7e7692476866df5098b028536ad6680212e717fa8d"
-
-[[package]]
 name = "paste"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -686,7 +680,7 @@ dependencies = [
 [[package]]
 name = "uefi-bootloader"
 version = "0.1.0"
-source = "git+https://github.com/theseus-os/uefi-bootloader#1aeb6f29bf2f3cc2cd2ab2dee893bef5caa1f96c"
+source = "git+https://github.com/theseus-os/uefi-bootloader#53e5320deac6e04bf3496d6d0b047dc0fa812ba3"
 dependencies = [
  "bit_field",
  "cfg-if",
@@ -708,7 +702,7 @@ dependencies = [
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
-source = "git+https://github.com/theseus-os/uefi-bootloader#1aeb6f29bf2f3cc2cd2ab2dee893bef5caa1f96c"
+source = "git+https://github.com/theseus-os/uefi-bootloader#53e5320deac6e04bf3496d6d0b047dc0fa812ba3"
 
 [[package]]
 name = "uefi-macros"
@@ -736,7 +730,6 @@ dependencies = [
  "clap",
  "fatfs",
  "gpt",
- "ovmf-prebuilt",
  "tempfile",
 ]
 

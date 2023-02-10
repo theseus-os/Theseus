@@ -10,8 +10,8 @@ spin = "0.9.4"
 [dependencies.volatile]
 version = "0.2.7"
 
-[dependencies.logger]
-path = "../logger"
+[dependencies.logger_x86_64]
+path = "../logger_x86_64"
 
 [dependencies.kernel_config]
 path = "../kernel_config"

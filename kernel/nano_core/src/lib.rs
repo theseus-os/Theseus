@@ -25,7 +25,11 @@ use core::ops::DerefMut;
 use memory::VirtualAddress;
 use kernel_config::memory::KERNEL_OFFSET;
 use mod_mgmt::parse_nano_core::NanoCoreItems;
+
+#[cfg(target_arch = "x86_64")]
 use vga_buffer::println_raw;
+#[cfg(target_arch = "aarch64")]
+use log::info as println_raw;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
@@ -72,6 +76,7 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// 1. Setting up logging
 /// 2. Dumping basic information about the Theseus build
 /// 3. Initialising early exceptions
+#[cfg(target_arch = "x86_64")]
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
     println_raw!("Entered early_setup(). Interrupts disabled.");
@@ -79,7 +84,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
     let logger_ports = [serial_port_basic::take_serial_port(
         serial_port_basic::SerialPortAddress::COM1,
     )];
-    logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
+    logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
         .map_err(|_| "failed to initialise early logging")?;
     log::info!("initialised early logging");
     println_raw!("early_setup(): initialized logger.");
@@ -98,7 +103,14 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
     Ok(())
 }
 
+/// aarch64 placeholder
+#[cfg(target_arch = "aarch64")]
+fn early_setup(_early_double_fault_stack_top: usize) -> Result<(), &'static str> {
+    Ok(())
+}
+
 /// The nano core routine. See crate-level documentation for more information.
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
 where
     T: boot_info::BootInformation
@@ -116,6 +128,10 @@ where
         bootloader_modules,
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
+
+    #[cfg(target_arch = "aarch64")]
+    logger_aarch64::init().unwrap();
+
     println_raw!("nano_core(): initialized memory subsystem.");
 
     state_store::init();
@@ -201,15 +217,16 @@ where
 
     // Now we invoke the Captain, which will take over from here.
     // That's it, the nano_core is done! That's really all it does! 
+    println_raw!("nano_core(): invoking the captain...");
+    #[cfg(target_arch = "x86_64")]
     let drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
         initial_tls_image,
     };
-    println_raw!("nano_core(): invoking the captain...");
-    #[cfg(not(loadable))] {
+    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
         captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
-    #[cfg(loadable)] {
+    #[cfg(all(target_arch = "x86_64", loadable))] {
         use captain::DropAfterInit;
         use memory::{MmiRef, PhysicalAddress};
         use no_drop::NoDrop;

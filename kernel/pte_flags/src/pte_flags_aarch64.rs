@@ -203,6 +203,7 @@ impl PteFlagsAarch64 {
     /// * `NORMAL_MEMORY` (not `DEVICE_MEMORY`) is set.
     /// * `OUTER_SHAREABLE` is set.
     /// * `READ_ONLY` is set.
+    /// * `PAGE_DESCRIPTOR` is set.
     /// * `ACCESSED` is set.
     /// * `NOT_GLOBAL` is set.
     /// * the `NOT_EXECUTABLE` bits are set.
@@ -219,6 +220,7 @@ impl PteFlagsAarch64 {
             Self::NORMAL_MEMORY.bits
             | Self::OUTER_SHAREABLE.bits
             | Self::READ_ONLY.bits
+            | Self::PAGE_DESCRIPTOR.bits
             | Self::ACCESSED.bits
             | Self::_NOT_GLOBAL.bits
             | Self::NOT_EXECUTABLE.bits
@@ -411,6 +413,9 @@ impl From<PteFlags> for PteFlagsAarch64 {
     /// 
     /// Currently, this includes:
     /// * `OUTER_SHAREABLE` will be set.
+    ///
+    /// This conversion also implicitly sets the `ACCESSED` and `PAGE_DESCRIPTOR` bits,
+    /// which are always required in valid descriptors based on our MMU configuration.
     fn from(general: PteFlags) -> Self {
         let mut specific = Self::from_bits_truncate(general.bits());
         // The writable and global bit values have inverse meanings on aarch64.
@@ -418,6 +423,7 @@ impl From<PteFlags> for PteFlagsAarch64 {
         // Mask out the ranges of bits that can't simply be toggled; we must manually set them.
         specific &= !Self::MASKED_BITS_FOR_CONVERSION;
         specific |= Self::OUTER_SHAREABLE; // OUTER_SHAREABLE is the default value
+        specific |= Self::PAGE_DESCRIPTOR | Self::ACCESSED;
         if general.contains(PteFlags::DEVICE_MEMORY) {
             specific |= Self::DEVICE_MEMORY;
         } else {
@@ -428,9 +434,11 @@ impl From<PteFlags> for PteFlagsAarch64 {
 }
 
 impl From<PteFlagsAarch64> for PteFlags {
+    /// This conversion clears the `PAGE_DESCRIPTOR` bit, which is aarch64-specific.
     fn from(mut specific: PteFlagsAarch64) -> Self {
         // The writable and global bit values have inverse meanings on aarch64.
         specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
+        specific &= !PteFlagsAarch64::PAGE_DESCRIPTOR;
         let mut general = Self::from_bits_truncate(specific.bits());
         // Ensure that we are strict about which MAIR index is used by explicitly masking it.
         // Otherwise, `DEVICE_MEMORY` may accidentally be misinterpreted as enabled

@@ -1,6 +1,6 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "logger"
+name = "logger_x86_64"
 version = "0.1.0"
 
 [dependencies]
