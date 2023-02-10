@@ -2,9 +2,6 @@
 
 #![no_std]
 
-extern crate memory;
-extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
 
 use core::mem;
 use memory::{
@@ -39,8 +36,8 @@ pub struct Rsdp {
     extended_checksum: u8,
     reserved: [u8; 3],
 }
-const_assert_eq!(core::mem::size_of::<Rsdp>(), 36);
-const_assert_eq!(core::mem::align_of::<Rsdp>(), 1);
+const _: () = assert!(core::mem::size_of::<Rsdp>() == 36);
+const _: () = assert!(core::mem::align_of::<Rsdp>() == 1);
 
 impl Rsdp {
     /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.

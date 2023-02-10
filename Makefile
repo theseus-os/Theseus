@@ -817,6 +817,15 @@ endif
 ifeq ($(boot_spec), bios)
 	QEMU_FLAGS += -cdrom $(iso) -boot d
 else ifeq ($(boot_spec), uefi)
+	## We could have used -pflash instead of -bios here
+	## but -pflash requires the file to be exactly 64MB
+	## long. On the other hand, using -pflash isn't
+	## particularly interesting to us, so we'll stick
+	## with -bios.
+	##
+	## Ref:
+	## - https://wiki.qemu.org/Features/PC_System_Flash
+	## - https://github.com/tianocore/edk2/blob/316e6df/OvmfPkg/README#L68
 	QEMU_FLAGS += -bios $(efi_firmware)
 	QEMU_FLAGS += -drive format=raw,file=$(iso)
 endif
@@ -992,6 +1001,7 @@ ifneq ($(IS_WSL), )
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
 ## building on Linux or macOS
+	@echo -e "\n\033[1;32mThe build finished successfully.\033[0m Writing Theseus OS ISO to /dev/$(drive)..."
 	@$(UNMOUNT) /dev/$(drive)* 2> /dev/null  |  true  ## force it to return true
 	@sudo dd bs=4194304 if=$(iso) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync
