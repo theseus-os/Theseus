@@ -29,7 +29,7 @@ use stack::Stack;
 use no_drop::NoDrop;
 
 
-#[cfg(mirror_log_to_vga)]
+#[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))]
 mod mirror_log_callbacks {
     /// The callback for use in the logger crate to mirror log functions to the early VGA screen.
     pub(crate) fn mirror_to_early_vga(args: core::fmt::Arguments) {
@@ -81,9 +81,9 @@ pub fn init(
     ap_gdt: VirtualAddress,
     rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
-    #[cfg(mirror_log_to_vga)] {
+    #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))] {
         // Enable early mirroring of logger output to VGA buffer (for real hardware)
-        logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_early_vga);
+        logger_x86_64::set_log_mirror_function(mirror_log_callbacks::mirror_to_early_vga);
     }
 
     // calculate TSC period and initialize it
@@ -131,7 +131,7 @@ pub fn init(
         // Currently, handling the AP cores also siwtches the graphics mode
         // (from text mode VGA to a graphical framebuffer).
         // Thus, we can now use enable the function that mirrors logger output to the terminal.
-        logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
+        logger_x86_64::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
     }
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
