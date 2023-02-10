@@ -817,13 +817,8 @@ endif
 ifeq ($(boot_spec), bios)
 	QEMU_FLAGS += -cdrom $(iso) -boot d
 else ifeq ($(boot_spec), uefi)
-	## We could have used -pflash instead of -bios here
-	## but -pflash requires the file to be exactly 64MB
-	## long. On the other hand, using -pflash isn't
-	## particularly interesting to us, so we'll stick
-	## with -bios.
-	##
-	## Ref:
+	## We use `-bios` instead of `-pflash` because `-pflash` requires the file to be exactly 64MB.
+	## See:
 	## - https://wiki.qemu.org/Features/PC_System_Flash
 	## - https://github.com/tianocore/edk2/blob/316e6df/OvmfPkg/README#L68
 	QEMU_FLAGS += -bios $(efi_firmware)
