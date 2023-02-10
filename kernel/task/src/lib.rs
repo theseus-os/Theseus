@@ -754,7 +754,11 @@ impl Task {
     /// 
     /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
     fn set_as_current_task(&self) {
+        #[cfg(target_arch = "x86_64")]
         FsBase::write(x86_64::VirtAddr::new(self.tls_area.pointer_value() as u64));
+
+        #[cfg(not(target_arch = "x86_64"))]
+        todo!("Task::set_as_current_task() is not yet implemented for this platform!");
     }
 
     /// Perform any actions needed after a context switch.

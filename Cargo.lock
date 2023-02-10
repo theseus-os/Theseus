@@ -2040,6 +2040,7 @@ dependencies = [
  "lz4_flex",
  "memfs",
  "memory",
+ "no_drop",
  "path",
  "qp-trie",
  "rangemap",
@@ -2048,6 +2049,7 @@ dependencies = [
  "serde",
  "spin 0.9.4",
  "vfs_node",
+ "x86_64",
  "xmas-elf",
 ]
 

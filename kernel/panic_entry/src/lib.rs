@@ -71,11 +71,10 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     };
 
     if let Err(_e) = res {
+        error!("Halting due to early panic: {}", info);
         // basic early panic printing with no dependencies
-        error!("PANIC: {}", info);
-
         #[cfg(target_arch = "x86_64")]
-        println_raw!("\nPANIC: {}", info);
+        println_raw!("\nHalting due to early panic: {}", info);
     }
 
     // If we failed to handle the panic, there's not really much we can do about it,

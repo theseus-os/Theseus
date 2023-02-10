@@ -24,6 +24,7 @@ use log::{error, info};
 use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
+use mod_mgmt::TlsDataImage;
 use stack::Stack;
 use no_drop::NoDrop;
 
@@ -39,6 +40,18 @@ mod mirror_log_callbacks {
     /// fully-featured terminal-based display.
     pub(crate) fn mirror_to_terminal(args: core::fmt::Arguments) {
         app_io::println!("{}", args);
+    }
+}
+
+/// Items that must be held until the end of [`init()`] and should be dropped after.
+pub struct DropAfterInit {
+    pub identity_mappings: NoDrop<EarlyIdentityMappedPages>,
+    pub initial_tls_image: NoDrop<TlsDataImage>,
+}
+impl DropAfterInit {
+    fn drop_all(self) {
+        drop(self.identity_mappings.into_inner());
+        drop(self.initial_tls_image.into_inner());
     }
 }
 
@@ -61,8 +74,8 @@ mod mirror_log_callbacks {
 ///    if available and provided by the bootloader.
 pub fn init(
     kernel_mmi_ref: MmiRef,
-    identity_mapped_pages: NoDrop<EarlyIdentityMappedPages>,
     bsp_initial_stack: NoDrop<Stack>,
+    drop_after_init: DropAfterInit,
     ap_start_realmode_begin: VirtualAddress,
     ap_start_realmode_end: VirtualAddress,
     ap_gdt: VirtualAddress,
@@ -147,11 +160,6 @@ pub fn init(
     device_manager::init(key_producer, mouse_producer)?;
     task_fs::init()?;
 
-
-    // We can drop and unmap the identity mappings after the initial bootstrap is complete.
-    // We could probably do this earlier, but we definitely can't do it until after the APs boot.
-    drop(identity_mapped_pages.into_inner());
-    
     // create a SIMD personality
     #[cfg(simd_personality)] {
         #[cfg(simd_personality_sse)]
@@ -164,8 +172,11 @@ pub fn init(
             .spawn()?;
     }
 
-    // Now that key subsystems are initialized, we can spawn various system tasks/daemons
-    // and then the first application(s).
+    // Now that key subsystems are initialized, we can:
+    // 1. Drop the items that needed to be held through initialization,
+    // 2. Spawn various system tasks/daemons,
+    // 3. Start the first application(s).
+    drop_after_init.drop_all();
     console::start_connection_detection()?;
     first_application::start()?;
 
