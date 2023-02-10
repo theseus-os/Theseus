@@ -76,32 +76,36 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
 /// 1. Setting up logging
 /// 2. Dumping basic information about the Theseus build
 /// 3. Initialising early exceptions
-#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
+#[cfg(target_arch = "x86_64")]
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
-    #[cfg(target_arch = "x86_64")] {
-        irq_safety::disable_interrupts();
-        println_raw!("Entered early_setup(). Interrupts disabled.");
+    irq_safety::disable_interrupts();
+    println_raw!("Entered early_setup(). Interrupts disabled.");
 
-        let logger_ports = [serial_port_basic::take_serial_port(
-            serial_port_basic::SerialPortAddress::COM1,
-        )];
-        logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-            .map_err(|_| "failed to initialise early logging")?;
-        log::info!("initialised early logging");
-        println_raw!("early_setup(): initialized logger.");
+    let logger_ports = [serial_port_basic::take_serial_port(
+        serial_port_basic::SerialPortAddress::COM1,
+    )];
+    logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
+        .map_err(|_| "failed to initialise early logging")?;
+    log::info!("initialised early logging");
+    println_raw!("early_setup(): initialized logger.");
 
-        // Dump basic information about this build of Theseus.
-        log::info!("\n    \
-            ===================== Theseus build info: =====================\n    \
-            CUSTOM CFGs: {} \n    \
-            ===============================================================",
-            build_info::CUSTOM_CFG_STR,
-        );
+    // Dump basic information about this build of Theseus.
+    log::info!("\n    \
+        ===================== Theseus build info: =====================\n    \
+        CUSTOM CFGs: {} \n    \
+        ===============================================================",
+        build_info::CUSTOM_CFG_STR,
+    );
 
-        exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
-        println_raw!("early_setup(): initialized early IDT with exception handlers.");
-    }
+    exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
+    println_raw!("early_setup(): initialized early IDT with exception handlers.");
 
+    Ok(())
+}
+
+/// aarch64 placeholder
+#[cfg(target_arch = "aarch64")]
+fn early_setup(_early_double_fault_stack_top: usize) -> Result<(), &'static str> {
     Ok(())
 }
 

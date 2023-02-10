@@ -414,26 +414,16 @@ impl From<PteFlags> for PteFlagsAarch64 {
     /// Currently, this includes:
     /// * `OUTER_SHAREABLE` will be set.
     ///
-    /// This conversion also implicitly sets bits
-    /// `ACCESSED` & `PAGE_DESCRIPTOR` as these
-    /// are always required in valid descriptors,
-    /// based on our MMU configuration.
+    /// This conversion also implicitly sets the `ACCESSED` and `PAGE_DESCRIPTOR` bits,
+    /// which are always required in valid descriptors based on our MMU configuration.
     fn from(general: PteFlags) -> Self {
         let mut specific = Self::from_bits_truncate(general.bits());
         // The writable and global bit values have inverse meanings on aarch64.
         specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
         // Mask out the ranges of bits that can't simply be toggled; we must manually set them.
         specific &= !Self::MASKED_BITS_FOR_CONVERSION;
-
-        // OUTER_SHAREABLE is the default value
-        // Also set PAGE_DESCRIPTOR & ACCESSED
-        // as these are currently always needed
-        // in all the kinds of descriptors we
-        // use in Theseus
-        specific |= Self::OUTER_SHAREABLE
-                 |  Self::PAGE_DESCRIPTOR
-                 |  Self::ACCESSED;
-
+        specific |= Self::OUTER_SHAREABLE; // OUTER_SHAREABLE is the default value
+        specific |= Self::PAGE_DESCRIPTOR | Self::ACCESSED;
         if general.contains(PteFlags::DEVICE_MEMORY) {
             specific |= Self::DEVICE_MEMORY;
         } else {
@@ -444,13 +434,10 @@ impl From<PteFlags> for PteFlagsAarch64 {
 }
 
 impl From<PteFlagsAarch64> for PteFlags {
-    /// This conversion implicitly clears bit
-    /// `PAGE_DESCRIPTOR` as it's an
-    /// aarch64-specific bit.
+    /// This conversion clears the `PAGE_DESCRIPTOR` bit, which is aarch64-specific.
     fn from(mut specific: PteFlagsAarch64) -> Self {
         // The writable and global bit values have inverse meanings on aarch64.
         specific.toggle(super::WRITABLE_BIT | super::GLOBAL_BIT);
-        // clear PAGE_DESCRIPTOR as it's aarch64-specific.
         specific &= !PteFlagsAarch64::PAGE_DESCRIPTOR;
         let mut general = Self::from_bits_truncate(specific.bits());
         // Ensure that we are strict about which MAIR index is used by explicitly masking it.

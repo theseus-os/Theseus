@@ -11,7 +11,7 @@ use uefi_bootloader_api::BootInformation;
 #[link_section = ".init.text"]
 pub extern "C" fn _start(boot_info: &'static BootInformation) {
     // Upon entering this function:
-    // * first argument is a reference to the boot info.
+    // * The first argument is a reference to the boot info.
     //
     //    --+-----------+--
     //      | boot_info |
@@ -20,8 +20,8 @@ pub extern "C" fn _start(boot_info: &'static BootInformation) {
     //      |             
     //  1st argument
     //
-    // * second argument is the top vaddr of the double fault handler stack.
-    // * the stack pointer points to the top of the double fault stack:
+    // * The second argument is the top vaddr of the double fault handler stack.
+    // * The stack pointer (sp) points to the top of the double fault stack:
     //
     //    --+------------+------------------------------+--------------------+--
     //      | guard page | kernel stack (several pages) | double fault stack |
@@ -35,8 +35,8 @@ pub extern "C" fn _start(boot_info: &'static BootInformation) {
     //
     // `kernel_stack_start` is a variable of the `rust_entry` function.
     //
-    // Stacks grow downwards on both x86 & aarch64, meaning that the stack pointer
-    // will grow towards the guard page.
+    // Stacks grow downwards on both x86_64 and aarch64,
+    // meaning that the stack pointer will grow towards the guard page.
     // That's why we start it at the top (the highest vaddr).
     unsafe {
         #[cfg(target_arch = "x86_64")]
@@ -92,8 +92,8 @@ fn rust_entry(boot_info: &'static BootInformation, double_fault_stack: usize) {
 #[no_mangle]
 #[link_section = ".init.text"]
 pub extern "C" fn _error() {
-    #[cfg(target_arch = "x86_64")]
     unsafe {
+        #[cfg(target_arch = "x86_64")]
         asm!(
             // "2:" is a label.
             // See <https://doc.rust-lang.org/nightly/rust-by-example/unsafe/asm.html#labels>
@@ -102,10 +102,8 @@ pub extern "C" fn _error() {
             "jmp 2b", // jump backwards ("b") to label "2:".
             options(noreturn)
         );
-    }
 
-    #[cfg(target_arch = "aarch64")]
-    unsafe {
+        #[cfg(target_arch = "aarch64")]
         asm!(
             "2:",
             "wfe",
