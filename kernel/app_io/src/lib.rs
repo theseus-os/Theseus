@@ -209,18 +209,15 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
 
     // Obtains the correct stdout stream and push the output bytes.
     let locked_streams = shared_maps::lock_stream_map();
-    match locked_streams.get(&task_id) {
-        Some(queues) => {
-            if queues
+    if let Some(queues) = locked_streams.get(&task_id) {
+        if queues
                 .stdout
                 .write_all(format!("{fmt_args}").as_bytes())
                 .is_err()
             {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
-        }
-        None => {
-            // let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
-        }
+    } else {
+        // let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
     };
 }
