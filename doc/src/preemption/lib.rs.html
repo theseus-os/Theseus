@@ -188,11 +188,11 @@
         
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
-        // apic::get_my_apic()
-        //     .expect(&quot;BUG: hold_preemption() couldn&#39;t get local APIC&quot;)
-        //     .write()
-        //     .enable_lvt_timer(false);
-    </span>} <span class="kw">else if </span>prev_val == u8::MAX {
+        </span>apic::get_my_apic()
+            .expect(<span class="string">&quot;BUG: hold_preemption() couldn&#39;t get local APIC&quot;</span>)
+            .write()
+            .enable_lvt_timer(<span class="bool-val">false</span>);
+    } <span class="kw">else if </span>prev_val == u8::MAX {
         <span class="comment">// Overflow occurred and the counter value wrapped around, which is a bug.
         </span><span class="macro">panic!</span>(<span class="string">&quot;BUG: Overflow occurred in the preemption counter for CPU {}&quot;</span>, cpu_id);
     }
@@ -264,11 +264,11 @@
             // If the previous counter value was 1, that means the current value is 1,
             // which indicates we are transitioning from preemption disabled to enabled on this CPU.
             // Thus, we re-enable the local APIC timer used for preemptive task switching.
-            // apic::get_my_apic()
-            //     .expect(&quot;BUG: PreemptionGuard::drop() couldn&#39;t get local APIC&quot;)
-            //     .write()
-            //     .enable_lvt_timer(true);
-        </span>} <span class="kw">else if </span>prev_val == <span class="number">0 </span>{
+            </span>apic::get_my_apic()
+                .expect(<span class="string">&quot;BUG: PreemptionGuard::drop() couldn&#39;t get local APIC&quot;</span>)
+                .write()
+                .enable_lvt_timer(<span class="bool-val">true</span>);
+        } <span class="kw">else if </span>prev_val == <span class="number">0 </span>{
             <span class="comment">// Underflow occurred and the counter value wrapped around, which is a bug.
             </span><span class="macro">panic!</span>(<span class="string">&quot;BUG: Underflow occurred in the preemption counter for CPU {}&quot;</span>, cpu_id);
         }
