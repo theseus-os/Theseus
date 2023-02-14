@@ -396,9 +396,9 @@ pub struct LocalApic {
     processor_id: u8,
     /// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
     is_bootstrap_cpu: bool,
-    /// The current count value from when this lapic's timer was last disabled.
-    /// This is written to the timer's initial count register when the timer is re-enabled.
-    last_timer_count: u32,
+    /// The value that should be written to the APIC timer's initial count register
+    /// when enabling the LVT timer.
+    initial_timer_count: u32,
 }
 impl fmt::Debug for LocalApic {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -496,7 +496,7 @@ impl LocalApic {
             processor_id,
             apic_id: CpuId::MAX, // placeholder, is replaced below.
             is_bootstrap_cpu,
-            last_timer_count: 0,
+            initial_timer_count: 0, // set in `calibrate_lapic_timer()`
         };
 
         // Now that the APIC hardware is enabled, we can safely obtain this Local APIC's ID.
@@ -639,7 +639,7 @@ impl LocalApic {
             self.calibrate_lapic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
         };
         trace!("LocalApic {}, timer period count: {} ({:#X})", self.apic_id, apic_period, apic_period);
-        self.last_timer_count = apic_period;
+        self.initial_timer_count = apic_period;
 
         match &mut self.inner {
             LapicType::X2Apic => unsafe {
@@ -677,29 +677,26 @@ impl LocalApic {
         //   by writing to the timer LVT entry does not start the timer.
         //   To start the timer, it is necessary to write to the initial-count register.
         //
-        // Thus, when disabling the timer, we save the current timer count in order to
-        // write it back to the timer's initial count the next time it's re-enabled.
+        // Thus, when enabling the timer, we must immeditely write the initial count again.
         if enable {
             let timer_enable = LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_MODE_PERIODIC;
             match &mut self.inner {
                 LapicType::X2Apic => unsafe {
                     wrmsr(IA32_X2APIC_LVT_TIMER, timer_enable as u64);
-                    wrmsr(IA32_X2APIC_INIT_COUNT, self.last_timer_count as u64);
+                    wrmsr(IA32_X2APIC_INIT_COUNT, self.initial_timer_count as u64);
                 }
                 LapicType::XApic(regs) => {
                     regs.lvt_timer.write(timer_enable);
-                    regs.timer_initial_count.write(self.last_timer_count);
+                    regs.timer_initial_count.write(self.initial_timer_count);
                 }
             }
         } else {
             let timer_disable = APIC_TIMER_DISABLE;
             match &mut self.inner {
                 LapicType::X2Apic => unsafe {
-                    self.last_timer_count = rdmsr(IA32_X2APIC_CUR_COUNT) as u32;
                     wrmsr(IA32_X2APIC_LVT_TIMER, timer_disable as u64);
                 }
                 LapicType::XApic(regs) => {
-                    self.last_timer_count = regs.timer_current_count.read();
                     regs.lvt_timer.write(timer_disable);
                 }
             }
