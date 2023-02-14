@@ -134,6 +134,11 @@ where
 
     println_raw!("nano_core(): initialized memory subsystem.");
 
+    #[cfg(target_arch = "aarch64")] {
+        interrupts::init()?;
+        interrupts::enable_timer_interrupts()?;
+    }
+
     state_store::init();
     log::trace!("state_store initialized.");
     println_raw!("nano_core(): initialized state store.");
