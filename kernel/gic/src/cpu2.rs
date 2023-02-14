@@ -38,13 +38,17 @@ pub fn set_minimum_int_priority(registers: &mut MmioPageOfU32, priority: Priorit
     registers[offset::PMR] = (u8::MAX - priority) as u32;
 }
 
-/// Performs priority drop for the specified interrupt
+/// Zeros the current priority level of this CPU,
+/// Meaning that the CPU is ready to process interrupts
+/// again.
 pub fn end_of_interrupt(registers: &mut MmioPageOfU32, int: IntNumber) {
     registers[offset::EOIR] = int as u32;
 }
 
 /// Acknowledge the currently serviced interrupt
-/// and fetches its number
+/// and fetches its number; this tells the GIC that
+/// the requested interrupt is being handled by
+/// this CPU.
 pub fn acknowledge_int(registers: &mut MmioPageOfU32) -> (IntNumber, Priority) {
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.

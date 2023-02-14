@@ -42,14 +42,18 @@ pub fn set_minimum_int_priority(priority: Priority) {
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
-/// Performs priority drop for the specified interrupt
+/// Zeros the current priority level of this CPU,
+/// Meaning that the CPU is ready to process interrupts
+/// again.
 pub fn end_of_interrupt(int: IntNumber) {
     let reg_value = int as usize;
     unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
 }
 
 /// Acknowledge the currently serviced interrupt
-/// and fetches its number
+/// and fetches its number; this tells the GIC that
+/// the requested interrupt is being handled by
+/// this CPU.
 pub fn acknowledge_int() -> (IntNumber, Priority) {
     let int_num: usize;
     let priority: usize;

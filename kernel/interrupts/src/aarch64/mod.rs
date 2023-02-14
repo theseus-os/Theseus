@@ -43,6 +43,10 @@ struct SpsrEL1(InMemoryRegister<u64, SPSR_EL1::Register>);
 struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
 
 /// The exception context as it is stored on the stack on exception entry.
+///
+/// Warning: the assembly file next to this one assumes this exact
+/// layout. If you modify this, make sure to adapt the assembly
+/// code accordingly.
 #[repr(C)]
 pub struct ExceptionContext {
     /// General Purpose Registers.
