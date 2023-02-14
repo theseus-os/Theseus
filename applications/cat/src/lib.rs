@@ -107,5 +107,5 @@ fn echo_from_stdin() -> Result<(), &'static str> {
     Ok(())
 }
 
-const USAGE: &'static str = "Usage: cat [file ...]
+const USAGE: &str = "Usage: cat [file ...]
 concatenate and print files";

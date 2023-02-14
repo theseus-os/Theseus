@@ -3,8 +3,8 @@ use core::time::Duration;
 use log::error;
 
 type _AtomicFn = crossbeam_utils::atomic::AtomicCell<fn()>;
-static_assertions::const_assert!(_AtomicFn::is_lock_free());
-static_assertions::const_assert_eq!(core::mem::size_of::<_AtomicFn>(), 8);
+const _: () = assert!(_AtomicFn::is_lock_free());
+const _: () = assert!(core::mem::size_of::<_AtomicFn>() == 8);
 
 pub(crate) fn early_sleep(_: Duration) {
     error!("called early_sleep dummy function");

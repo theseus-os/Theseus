@@ -171,7 +171,7 @@ pub fn new_task_builder<F, A, R>(
 
 
 /// Every executable application must have an entry function named "main".
-const ENTRY_POINT_SECTION_NAME: &'static str = "main";
+const ENTRY_POINT_SECTION_NAME: &str = "main";
 
 /// The argument type accepted by the `main` function entry point into each application.
 type MainFuncArg = Vec<String>;
@@ -1002,7 +1002,7 @@ pub fn create_idle_task(apic_id: u8) -> Result<TaskRef, &'static str> {
     debug!("Spawning a new idle task on core {}", apic_id);
 
     new_task_builder(idle_task_entry, apic_id)
-        .name(format!("idle_task_core_{}", apic_id))
+        .name(format!("idle_task_core_{apic_id}"))
         .idle(apic_id)
         .spawn_restartable(None)
         .map(|task| task.orphan())

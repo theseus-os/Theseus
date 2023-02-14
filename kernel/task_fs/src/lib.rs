@@ -126,7 +126,7 @@ impl Directory for TaskFs {
     fn list(&self) -> Vec<String> {
         let mut tasks_string = Vec::new();
         for (id, _taskref) in TASKLIST.lock().iter() {
-            tasks_string.push(format!("{}", id));
+            tasks_string.push(format!("{id}"));
         }
         tasks_string
     }
@@ -157,9 +157,9 @@ impl TaskDir {
     pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDir, &'static str> {
         let task_id = taskref.id;
         let directory = TaskDir {
-            name: name,
-            path: Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, task_id)),
-            taskref: taskref,
+            name,
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}")),
+            taskref,
             parent: Arc::clone(parent),
         };
         Ok(directory)
@@ -230,15 +230,15 @@ impl TaskFile {
         TaskFile {
             taskref,
             task_id,
-            path: Path::new(format!("{}/{}/task_info", TASKS_DIRECTORY_PATH, task_id)), 
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/task_info")), 
         }
     }
 
     /// Generates the task info string.
     fn generate(&self) -> String {
         // Print all tasks
-        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
-        let pinned = &self.taskref.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
+        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{cpu}")).unwrap_or_else(|| String::from("-"));
+        let pinned = &self.taskref.pinned_core().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
         let task_type = if self.taskref.is_an_idle_task {
             "I"
         } else if self.taskref.is_application() {
@@ -331,7 +331,7 @@ impl MmiDir {
         MmiDir {
             taskref,
             task_id,
-            path: Path::new(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, task_id)),
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi")),
         }
     }
 }
@@ -400,7 +400,7 @@ impl MmiFile {
         MmiFile {
             taskref,
             task_id,
-            path: Path::new(format!("{}/{}/mmi/MmiInfo", TASKS_DIRECTORY_PATH, task_id)), 
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo")), 
         }
     }
 

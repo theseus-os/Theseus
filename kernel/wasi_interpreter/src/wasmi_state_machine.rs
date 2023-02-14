@@ -71,10 +71,9 @@ impl ProcessStateMachine {
                 let index = match closure(module_name, field_name, signature) {
                     Ok(i) => i,
                     Err(_) => {
-                        return Err(wasmi::Error::Instantiation(format!(
-                            "Couldn't resolve `{}`:`{}`",
-                            module_name, field_name
-                        )))
+                        return Err(wasmi::Error::Instantiation(
+                            format!("Couldn't resolve `{module_name}`:`{field_name}`")
+                        ))
                     }
                 };
 

@@ -19,11 +19,22 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
-boot_spec ?= bios
+
+## aarch64 only supports booting via UEFI
+ifeq ($(ARCH),aarch64)
+	boot_spec = uefi
+else
+	boot_spec ?= bios
+endif
+
+## Set up configuration based on the chosen bootloader specification (boot_spec).
+export override FEATURES+=--features nano_core/$(boot_spec)
 
 ifeq ($(boot_spec), bios)
 	ISO_EXTENSION := iso
 else ifeq ($(boot_spec), uefi)
+	## Disable the default "bios" feature of the nano_core
+	export override FEATURES+=--no-default-features
 	ISO_EXTENSION := efi
 else
 $(error Error:unsupported option "boot_spec=$(boot_spec)". Options are 'bios' or 'uefi')
@@ -69,7 +80,9 @@ else
 endif
 
 ### Handle multiple bootloader options and ensure the corresponding tools are installed.
-ifeq ($(bootloader),grub)
+ifeq ($(boot_spec),uefi)
+	## A bootloader isn't required with UEFI.
+else ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
 	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
 		GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
@@ -85,8 +98,7 @@ else ifeq ($(bootloader),limine)
 	else
 $(error Error: missing '$(LIMINE_DIR)' directory! Please follow the limine instructions in the README)
 	endif
-# bootloader option isn't required for UEFI
-else ifneq ($(boot_spec), uefi)
+else
 $(error Error: unsupported option "bootloader=$(bootloader)". Options are 'grub' or 'limine')
 endif
 
@@ -102,10 +114,13 @@ nano_core_static_lib := $(ROOT_DIR)/target/$(TARGET)/$(BUILD_MODE)/libnano_core.
 ## The output file path of the fully-linked nano_core kernel binary.
 nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
-linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half.ld
-efi_firmware := $(BUILD_DIR)/ovmf.fd
+linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
+efi_firmware := $(BUILD_DIR)/$(OVMF_FILE)
+
+ifeq ($(ARCH),x86_64)
 ## The assembly files compiled by the nano_core build script.
 compiled_nano_core_asm := $(NANO_CORE_BUILD_DIR)/compiled_asm/$(boot_spec)/*.o
+endif
 
 ## Specify which crates should be considered as application-level libraries. 
 ## These crates can be instantiated multiply (per-task, per-namespace) rather than once (system-wide);
@@ -137,7 +152,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb \
-		doc docs view-doc view-docs book view-book
+		clippy doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -171,18 +186,20 @@ full: iso
 iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
-$(iso) $(efi_firmware): clean-old-build build extra_files copy_kernel $(bootloader)
-ifeq ($(boot_spec), uefi)
-	@cargo r \
+$(iso): clean-old-build build extra_files copy_kernel $(iso)-$(boot_spec)
+
+## This target is invoked by the '$(iso)' target when boot_spec = 'bios'.
+$(iso)-bios: $(bootloader)
+
+## This target is invoked by the '$(iso)' target when boot_spec = 'uefi'.
+$(iso)-uefi: $(efi_firmware)
+	@cargo run \
 		--release \
 		-Z bindeps \
-		--manifest-path \
-		$(ROOT_DIR)/tools/uefi_builder/x86_64/Cargo.toml -- \
+		--manifest-path $(ROOT_DIR)/tools/uefi_builder/$(ARCH)/Cargo.toml -- \
 		--kernel $(nano_core_binary) \
 		--modules $(OBJECT_FILES_BUILD_DIR) \
-		--efi-image $(iso) \
-		--efi-firmware $(efi_firmware)
-endif
+		--efi-image $(iso)
 
 ## Copy the kernel boot image into the proper ISOFILES directory.
 ## Should be invoked after building all Theseus kernel/application crates.
@@ -287,7 +304,6 @@ endif
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo : export override FEATURES+=--features nano_core/$(boot_spec)
 cargo:
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
@@ -333,7 +349,7 @@ endif
 
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
-	@$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
+	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -378,6 +394,15 @@ limine:
 		$(ISOFILES)/ -o $(iso)
 	@$(MAKE) -C $(LIMINE_DIR)
 	@$(LIMINE_DIR)/limine-deploy $(iso)
+
+
+## This downloads the OVMF EFI firmware, needed by QEMU to boot an EFI app.
+##
+## These binary files are built by Github user retrage at:
+## https://github.com/retrage/edk2-nightly.
+$(efi_firmware):
+	@echo -e "\033[1;34m\nDownloading prebuilt EFI firmware from GitHub...\033[0m"
+	@wget -nv --show-progress https://raw.githubusercontent.com/retrage/edk2-nightly/$(OVMF_COMMIT)/bin/$(OVMF_FILE) -O $(efi_firmware)
 
 
 ### This target copies all extra files into the `ISOFILES` directory,
@@ -503,7 +528,7 @@ simd_personality_sse: clean-old-build build_sse build
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 
@@ -520,7 +545,7 @@ simd_personality_avx: clean-old-build build_avx build
 	@echo -e "********* AT THE END OF SIMD_BUILD: TARGET = $(TARGET), KERNEL_PREFIX = $(KERNEL_PREFIX), APP_PREFIX = $(APP_PREFIX)"
 	$(MAKE) bootloader=$(bootloader) copy_kernel $(bootloader)
 ## run it in QEMU
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 
@@ -560,11 +585,23 @@ preserve_old_modules:
 	cargo clean
 
 
-
-
 ###################################################################################################
-############################ Targets for building documentation ###################################
+########################### Targets for clippy and documentation ##################################
 ###################################################################################################
+
+## Runs clippy on a full build of Theseus, with all crates included.
+## Note that this does not cover all combinations of features or cfg values.
+##
+## We allow building with THESEUS_CONFIG options, but not with any other RUSTFLAGS,
+## because the default RUSTFLAGS used to build Theseus aren't compatible with clippy.
+clippy : export override FEATURES += --features theseus_features/everything
+clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
+clippy:
+	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
+		cargo clippy \
+		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
+		--target $(TARGET)
+
 
 ## The output directory for source-level documentation.
 RUSTDOC_OUT      := $(BUILD_DIR)/doc
@@ -593,8 +630,7 @@ doc:
 		--package percent-encoding \
 		--package port_io \
 		--package stdio \
-		--package str_ref \
-		--package util
+		--package str_ref
 ## Now, build the docs for all of Theseus's main kernel crates.
 	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
@@ -745,7 +781,6 @@ help:
 	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
 	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
 
-    
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
 	@echo -e "\t Builds Theseus documentation from its Rust source code (rustdoc)."
@@ -782,6 +817,10 @@ endif
 ifeq ($(boot_spec), bios)
 	QEMU_FLAGS += -cdrom $(iso) -boot d
 else ifeq ($(boot_spec), uefi)
+	## We use `-bios` instead of `-pflash` because `-pflash` requires the file to be exactly 64MB.
+	## See:
+	## - https://wiki.qemu.org/Features/PC_System_Flash
+	## - https://github.com/tianocore/edk2/blob/316e6df/OvmfPkg/README#L68
 	QEMU_FLAGS += -bios $(efi_firmware)
 	QEMU_FLAGS += -drive format=raw,file=$(iso)
 endif
@@ -816,17 +855,20 @@ QEMU_FLAGS += -m $(QEMU_MEMORY)
 QEMU_CPUS ?= 4
 QEMU_FLAGS += -smp $(QEMU_CPUS)
 
-## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
-MAC_ADDR ?= 52:54:00:d1:55:01
-
 ## Add a disk drive, a PATA drive over an IDE controller interface.
+## Currently this is only supported on x86_64.
 DISK_IMAGE ?= fat32.img
+ifeq ($(ARCH),x86_64)
 ifneq ($(wildcard $(DISK_IMAGE)),) 
 	QEMU_FLAGS += -drive format=raw,file=fat32.img,if=ide
+endif
 endif
 
 ## We don't yet support SATA in Theseus, but this is how to add a SATA drive over the AHCI interface.
 # QEMU_FLAGS += -drive id=my_disk,file=$(DISK_IMAGE),if=none  -device ahci,id=ahci  -device ide-drive,drive=my_disk,bus=ahci.0
+
+## QEMU's OUI dictates that the MAC addr start with "52:54:00:"
+MAC_ADDR ?= 52:54:00:d1:55:01
 
 ## Read about QEMU networking options here: https://www.qemu.org/2018/05/31/nic-parameter/
 ifeq ($(net),user)
@@ -853,6 +895,10 @@ endif
 ifeq ($(host),yes)
 	## KVM acceleration is required when using the host cpu model
 	QEMU_FLAGS += -cpu host -accel kvm
+else ifeq ($(ARCH),aarch64)
+	QEMU_FLAGS += -machine virt
+	QEMU_FLAGS += -device ramfb
+	QEMU_FLAGS += -cpu cortex-a72
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
@@ -879,12 +925,12 @@ QEMU_FLAGS += $(QEMU_EXTRA)
 
 ### Old Run: runs the most recent build without rebuilding
 orun:
-	qemu-system-x86_64 $(QEMU_FLAGS)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 ### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
 orun_pause:
-	qemu-system-x86_64 $(QEMU_FLAGS) -S
+	$(QEMU_BIN) $(QEMU_FLAGS) -S
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -898,13 +944,13 @@ wasmtime: run
 
 
 ### builds and runs Theseus in QEMU
-run: $(iso) 
-	qemu-system-x86_64 $(QEMU_FLAGS)
+run: $(iso)
+	$(QEMU_BIN) $(QEMU_FLAGS)
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
-	qemu-system-x86_64 $(QEMU_FLAGS) -S
+	$(QEMU_BIN) $(QEMU_FLAGS) -S
 
 
 ### Runs a gdb instance on the host machine. 
@@ -950,6 +996,7 @@ ifneq ($(IS_WSL), )
 	@echo -e "The ISO file is available at \"$(iso)\"."
 else
 ## building on Linux or macOS
+	@echo -e "\n\033[1;32mThe build finished successfully.\033[0m Writing Theseus OS ISO to /dev/$(drive)..."
 	@$(UNMOUNT) /dev/$(drive)* 2> /dev/null  |  true  ## force it to return true
 	@sudo dd bs=4194304 if=$(iso) of=/dev/$(drive)    ## use 4194304 instead of 4M because macOS doesn't support 4M
 	@sync

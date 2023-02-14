@@ -134,9 +134,9 @@ impl PosixNode {
     ) -> PosixNode {
         PosixNode {
             theseus_file_or_dir: file_or_dir,
-            fs_rights_base: fs_rights_base,
-            fs_rights_inheriting: fs_rights_inheriting,
-            fs_flags: fs_flags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            fs_flags,
             offset: 0,
         }
     }
@@ -335,7 +335,7 @@ impl FileDescriptorTable {
         fd_table.insert(wasi::FD_STDIN, PosixNodeOrStdio::Stdin);
         fd_table.insert(wasi::FD_STDOUT, PosixNodeOrStdio::Stdout);
         fd_table.insert(wasi::FD_STDERR, PosixNodeOrStdio::Stderr);
-        FileDescriptorTable { fd_table: fd_table }
+        FileDescriptorTable { fd_table }
     }
 
     /// Open file or directory at path in accordance to given open flags and insert in fd table.

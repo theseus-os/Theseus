@@ -1,5 +1,6 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
+#![feature(int_roundings)]
 #![feature(let_chains)]
 
 #[macro_use] extern crate alloc;
@@ -14,7 +15,6 @@ use alloc::{
 };
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-use util::round_up_power_of_two;
 use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
@@ -34,10 +34,10 @@ pub mod replace_nano_core_crates;
 mod serde;
 
 /// The name of the directory that contains all of the CrateNamespace files.
-pub const NAMESPACES_DIRECTORY_NAME: &'static str = "namespaces";
+pub const NAMESPACES_DIRECTORY_NAME: &str = "namespaces";
 
 /// The name of the directory that contains all other "extra_files" contents.
-pub const EXTRA_FILES_DIRECTORY_NAME: &'static str = "extra_files";
+pub const EXTRA_FILES_DIRECTORY_NAME: &str = "extra_files";
 const EXTRA_FILES_DIRECTORY_DELIMITER: char = '!';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
@@ -626,7 +626,7 @@ impl CrateNamespace {
     /// [`CowArc::clone()`] function on the returned value.
     pub fn get_crate(&self, crate_name: &str) -> Option<StrongCrateRef> {
         self.crate_tree.lock().get(crate_name.as_bytes())
-            .map(|c| CowArc::clone_shallow(c))
+            .map(CowArc::clone_shallow)
             .or_else(|| self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_crate(crate_name)))
     }
 
@@ -1101,7 +1101,7 @@ impl CrateNamespace {
 
         // Create the new `LoadedCrate` now such that its sections can refer back to it.
         let new_crate = CowArc::new(LoadedCrate {
-            crate_name:              crate_name,
+            crate_name,
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
             object_file:             crate_object_file, 
             sections:                HashMap::new(),
@@ -1655,16 +1655,16 @@ impl CrateNamespace {
         // keeping track of the offset into each of their MappedPages as we go.
         let (mut rodata_offset, mut data_offset) = (0 , 0);
                     
-        const TEXT_PREFIX:             &'static str = ".text.";
-        const UNLIKELY_PREFIX:         &'static str = "unlikely."; // the full section prefix is ".text.unlikely."
-        const RODATA_PREFIX:           &'static str = ".rodata.";
-        const DATA_PREFIX:             &'static str = ".data.";
-        const BSS_PREFIX:              &'static str = ".bss.";
-        const TLS_DATA_PREFIX:         &'static str = ".tdata.";
-        const TLS_BSS_PREFIX:          &'static str = ".tbss.";
-        // const RELRO_PREFIX:            &'static str = "rel.ro.";
-        const GCC_EXCEPT_TABLE_PREFIX: &'static str = ".gcc_except_table.";
-        const EH_FRAME_NAME:           &'static str = ".eh_frame";
+        const TEXT_PREFIX:             &str = ".text.";
+        const UNLIKELY_PREFIX:         &str = "unlikely."; // the full section prefix is ".text.unlikely."
+        const RODATA_PREFIX:           &str = ".rodata.";
+        const DATA_PREFIX:             &str = ".data.";
+        const BSS_PREFIX:              &str = ".bss.";
+        const TLS_DATA_PREFIX:         &str = ".tdata.";
+        const TLS_BSS_PREFIX:          &str = ".tbss.";
+        // const RELRO_PREFIX:            &str = "rel.ro.";
+        const GCC_EXCEPT_TABLE_PREFIX: &str = ".gcc_except_table.";
+        const EH_FRAME_NAME:           &str = ".eh_frame";
 
         /// A convenient macro to obtain the rest of the symbol name after its prefix,
         /// i.e., the characters after '.text', '.rodata', '.data', etc.
@@ -1865,7 +1865,7 @@ impl CrateNamespace {
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling TLS section");
@@ -1920,7 +1920,7 @@ impl CrateNamespace {
                     );
                     data_sections.insert(shndx);
 
-                    data_offset += round_up_power_of_two(sec_size, sec_align);
+                    data_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no data_pages were allocated for .data/.bss section");
@@ -1960,7 +1960,7 @@ impl CrateNamespace {
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling .rodata section");
@@ -2005,7 +2005,7 @@ impl CrateNamespace {
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling .gcc_except_table");
@@ -2044,7 +2044,7 @@ impl CrateNamespace {
                         ))
                     );
 
-                    rodata_offset += round_up_power_of_two(sec_size, sec_align);
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
                 else {
                     return Err("no rodata_pages were allocated when handling .eh_frame");
@@ -2170,7 +2170,7 @@ impl CrateNamespace {
                         // At this point, there's no other way to search for the source section besides its name.
                         None => {
                             if let Ok(source_sec_name) = source_sec_entry.get_name(elf_file) {
-                                const DATARELRO: &'static str = ".data.rel.ro.";
+                                const DATARELRO: &str = ".data.rel.ro.";
                                 let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
                                     source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
                                 } else {
@@ -2698,7 +2698,7 @@ impl CrateNamespace {
     ) -> Option<WeakSectionRef> {
         // Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
         for potential_crate_name in get_containing_crate_name(demangled_full_symbol) {
-            let potential_crate_name = format!("{}-", potential_crate_name);
+            let potential_crate_name = format!("{potential_crate_name}-");
  
             // Try to find and load the missing crate object file from this namespace's directory or its recursive namespace's directory,
             // (or from the backup namespace's directory set).
@@ -2849,7 +2849,7 @@ impl CrateNamespace {
 
         if let Some(ref r_ns) = self.recursive_namespace {
             let syms_recursive = r_ns.dump_symbol_map_recursive();
-            syms = format!("{}\n{}", syms, syms_recursive);
+            syms = format!("{syms}\n{syms_recursive}");
         }
 
         syms
@@ -2919,7 +2919,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
 
             let size = sec.size() as usize;
             let align = sec.align() as usize;
-            let addend = round_up_power_of_two(size, align);
+            let addend = size.next_multiple_of(align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
             let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
@@ -2997,7 +2997,7 @@ fn dump_dependent_crates(krate: &LoadedCrate, prefix: String) {
 		let strong_crate_ref = weak_crate_ref.upgrade().unwrap();
         let strong_crate = strong_crate_ref.lock_as_ref();
 		debug!("{}{}", prefix, strong_crate.crate_name);
-		dump_dependent_crates(&strong_crate, format!("{}  ", prefix));
+		dump_dependent_crates(&strong_crate, format!("{prefix}  "));
 	}
 }
 
@@ -3009,7 +3009,7 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 		debug!("{}Section \"{}\": sections dependent on me (weak dependents):", prefix, sec.name);
 		for weak_dep in &sec_inner.sections_dependent_on_me {
 			if let Some(wds) = weak_dep.section.upgrade() {
-				let prefix = format!("{}  ", prefix); // add two spaces of indentation to the prefix
+				let prefix = format!("{prefix}  "); // add two spaces of indentation to the prefix
 				dump_weak_dependents(&wds, prefix);
 			}
 			else {
@@ -3163,7 +3163,7 @@ impl TlsInitializer {
         // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
         let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
         for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
-            let aligned_start = util::round_up(gap.start, alignment);
+            let aligned_start = gap.start.next_multiple_of(alignment);
             if aligned_start + section.size <= gap.end {
                 start_index = Some(aligned_start);
                 break;

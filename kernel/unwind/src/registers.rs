@@ -43,7 +43,7 @@ impl Debug for Registers {
         for (i, reg) in self.registers.iter().enumerate() {
             match *reg {
                 None => { } // write!(fmt, "[{}]: None, ", i)?,
-                Some(r) => write!(fmt, "[{}]: {:#X}, ", i, r)?,
+                Some(r) => write!(fmt, "[{i}]: {r:#X}, ")?,
             }
         }
         Ok(())

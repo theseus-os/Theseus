@@ -40,20 +40,25 @@ thread_local!{
 /// 
 /// # Return
 /// * `Ok` if the signal handler was registered successfully.
-/// * `Err` if the signal handler was registered successfully.
+/// * `Err` if a handler was already registered for the given `signal`.
 pub fn register_signal_handler(
     signal: Signal,
     handler: Box<dyn SignalHandler>,
-) -> Result<(), ()> {
+) -> Result<(), AlreadyRegistered> {
     SIGNAL_HANDLERS.with(|sig_handlers| {
         let handler_slot = &sig_handlers[signal as usize];
         if handler_slot.borrow().is_some() {
-            return Err(());
+            return Err(AlreadyRegistered);
         }
         *handler_slot.borrow_mut() = Some(handler);
         Ok(())
     })
 }
+
+/// An error type indicating a handler had already been registered
+/// for a particular [`Signal`].
+#[derive(Debug)]
+pub struct AlreadyRegistered;
 
 
 /// Take the [`SignalHandler`] registered for the given `signal` for the current task.

@@ -65,7 +65,6 @@ use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
-use static_assertions::const_assert;
 
 pub use str_ref::StrRef;
 pub use crate_metadata_serde::{
@@ -108,20 +107,20 @@ pub const DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
 );
 
 // Double-check section flags were defined correctly.
-const_assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
-const_assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
-const_assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
+const _: () = assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
+const _: () = assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
+const _: () = assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
 
 
 /// The Theseus Makefile appends prefixes onto bootloader module names,
 /// which are separated by the "#" character. 
 /// For example, "k#my_crate-hash.o".
-pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
+pub const MODULE_PREFIX_DELIMITER: &str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
-pub const CRATE_HASH_DELIMITER: &'static str = "-";
+pub const CRATE_HASH_DELIMITER: &str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
 /// e.g., `"my_crate::section_name::h<hash>"`.
-pub const SECTION_HASH_DELIMITER: &'static str = "::h";
+pub const SECTION_HASH_DELIMITER: &str = "::h";
 
 
 /// The type of a crate, based on its object file naming convention.

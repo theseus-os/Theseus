@@ -53,8 +53,8 @@ pub fn main(args: Vec<String>) -> isize {
         else {
             // All printed fields below must be strings to ensure the width formatting specifier below works properly.
             let runstate = format!("{:?}", task.runstate());
-            let cpu = task.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
-            let pinned = task.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
+            let cpu = task.running_on_cpu().map(|cpu| format!("{cpu}")).unwrap_or_else(|| String::from("-"));
+            let pinned = task.pinned_core().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
             let task_type = if task.is_an_idle_task {"I"}
                 else if task.is_application() {"A"}
                 else {" "} ;
@@ -83,7 +83,7 @@ fn print_usage(opts: Options) -> isize {
     0
 }
 
-const BRIEF: &'static str = "Usage: ps [options]\n
+const BRIEF: &str = "Usage: ps [options]\n
     TYPE:      'I' if an idle task, 'A' if an application task, '-' otherwise.
     CPU:       the cpu core the task is currently running on.
     PIN:       the core the task is pinned on, if any.

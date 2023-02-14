@@ -576,7 +576,6 @@ if #[cfg(unsafe_large_allocations)] {
 
 } else {
     extern crate intrusive_collections;
-    #[macro_use] extern crate static_assertions;
 
     use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
 
@@ -589,7 +588,7 @@ if #[cfg(unsafe_large_allocations)] {
 
     // Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
     // Otherwise we will have a recursive loop of large allocations.
-    const_assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE); 
+    const _: () = assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE);
 
     intrusive_adapter!(LargeAllocationAdapter = Box<LargeAllocation>: LargeAllocation { link: RBTreeLink });
 
@@ -613,7 +612,7 @@ if #[cfg(unsafe_large_allocations)] {
             let ptr = mp.start_address().value();
             let link = Box::new(LargeAllocation {
                 link: RBTreeLink::new(),
-                mp: mp
+                mp
             });
             map.insert(link);
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);

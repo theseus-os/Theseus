@@ -16,9 +16,6 @@ path = "../../kernel/task"
 [dependencies.stdio]
 path = "../../libs/stdio"
 
-[dependencies.logger]
-path = "../../kernel/logger"
-
 [dependencies.mutex_sleep]
 path = "../../kernel/mutex_sleep"
 
@@ -28,6 +25,9 @@ path = "../../kernel/tty"
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "1.4.0"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+logger_x86_64 = { path = "../logger_x86_64" }
 
 [lib]
 crate-type = ["rlib"]

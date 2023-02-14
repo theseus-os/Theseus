@@ -18,8 +18,8 @@ pub(crate) struct DeviceScope {
     // It would look something like:
     // path: [u16],
 }
-const_assert_eq!(core::mem::size_of::<DeviceScope>(), 6);
-const_assert_eq!(core::mem::align_of::<DeviceScope>(), 1);
+const _: () = assert!(core::mem::size_of::<DeviceScope>() == 6);
+const _: () = assert!(core::mem::align_of::<DeviceScope>() == 1);
 
 
 /// DMAR Device Scope Structure.
@@ -112,5 +112,5 @@ pub struct DeviceScopePath {
     pub device: u8,
     pub function: u8,
 }
-const_assert_eq!(core::mem::size_of::<DeviceScopePath>(), 2);
-const_assert_eq!(core::mem::align_of::<DeviceScopePath>(), 1);
+const _: () = assert!(core::mem::size_of::<DeviceScopePath>() == 2);
+const _: () = assert!(core::mem::align_of::<DeviceScopePath>() == 1);

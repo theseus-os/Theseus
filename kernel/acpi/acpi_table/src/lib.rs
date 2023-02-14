@@ -8,12 +8,9 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate sdt;
-extern crate zerocopy;
 
 use alloc::collections::BTreeMap;
+use log::{trace, error};
 use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange};
 use sdt::Sdt;
 use core::ops::Add;
@@ -39,7 +36,8 @@ pub struct TableLocation {
 /// All ACPI tables are covered by a single large MappedPages object, 
 /// which is necessary because they may span multiple pages/frames,
 /// and generally should not be multiply aliased/accessed due to potential race conditions.
-/// As more ACPI tables are discovered, the single MappedPages object is 
+/// As more ACPI tables are discovered, the single MappedPages object is
+/// extended to cover them.
 pub struct AcpiTables {
     /// The range of pages that cover all of the discovered ACPI tables.
     mapped_pages: MappedPages,
