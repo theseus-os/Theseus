@@ -822,6 +822,92 @@
 <a href="#822" id="822">822</a>
 <a href="#823" id="823">823</a>
 <a href="#824" id="824">824</a>
+<a href="#825" id="825">825</a>
+<a href="#826" id="826">826</a>
+<a href="#827" id="827">827</a>
+<a href="#828" id="828">828</a>
+<a href="#829" id="829">829</a>
+<a href="#830" id="830">830</a>
+<a href="#831" id="831">831</a>
+<a href="#832" id="832">832</a>
+<a href="#833" id="833">833</a>
+<a href="#834" id="834">834</a>
+<a href="#835" id="835">835</a>
+<a href="#836" id="836">836</a>
+<a href="#837" id="837">837</a>
+<a href="#838" id="838">838</a>
+<a href="#839" id="839">839</a>
+<a href="#840" id="840">840</a>
+<a href="#841" id="841">841</a>
+<a href="#842" id="842">842</a>
+<a href="#843" id="843">843</a>
+<a href="#844" id="844">844</a>
+<a href="#845" id="845">845</a>
+<a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a>
+<a href="#848" id="848">848</a>
+<a href="#849" id="849">849</a>
+<a href="#850" id="850">850</a>
+<a href="#851" id="851">851</a>
+<a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
+<a href="#860" id="860">860</a>
+<a href="#861" id="861">861</a>
+<a href="#862" id="862">862</a>
+<a href="#863" id="863">863</a>
+<a href="#864" id="864">864</a>
+<a href="#865" id="865">865</a>
+<a href="#866" id="866">866</a>
+<a href="#867" id="867">867</a>
+<a href="#868" id="868">868</a>
+<a href="#869" id="869">869</a>
+<a href="#870" id="870">870</a>
+<a href="#871" id="871">871</a>
+<a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
+<a href="#893" id="893">893</a>
+<a href="#894" id="894">894</a>
+<a href="#895" id="895">895</a>
+<a href="#896" id="896">896</a>
+<a href="#897" id="897">897</a>
+<a href="#898" id="898">898</a>
+<a href="#899" id="899">899</a>
+<a href="#900" id="900">900</a>
+<a href="#901" id="901">901</a>
+<a href="#902" id="902">902</a>
+<a href="#903" id="903">903</a>
+<a href="#904" id="904">904</a>
+<a href="#905" id="905">905</a>
+<a href="#906" id="906">906</a>
+<a href="#907" id="907">907</a>
+<a href="#908" id="908">908</a>
+<a href="#909" id="909">909</a>
+<a href="#910" id="910">910</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![feature(let_chains)]
 
@@ -843,10 +929,24 @@
 <span class="doccomment">/// A unique identifier for a CPU core.
 </span><span class="kw">pub type </span>CpuId = u8;
 
-<span class="doccomment">/// The IRQ number reserved for Local APIC timer interrupts in the IDT.
-</span><span class="kw">pub const </span>LOCAL_APIC_LVT_IRQ: u8 = <span class="number">0x22</span>;
+<span class="comment">// Values for the `IA32_APIC_BASE` MSR.
+</span><span class="kw">const </span>IA32_APIC_IS_BSP:                u64 = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>;
+<span class="kw">const </span>IA32_APIC_XAPIC_ENABLE:          u64 = <span class="number">1 </span>&lt;&lt; <span class="number">11</span>;
+<span class="kw">const </span>IA32_APIC_X2APIC_ENABLE:         u64 = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>;
+
+<span class="comment">// Value for the APIC spurious interrupt vector register.
+</span><span class="kw">const </span>APIC_SW_ENABLE:                  u32 = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>;
 <span class="doccomment">/// The IRQ number reserved for spurious APIC interrupts (as recommended by OS dev wiki).
-</span><span class="kw">pub const </span>APIC_SPURIOUS_INTERRUPT_IRQ: u8 = <span class="number">0xFF</span>;
+</span><span class="kw">pub const </span>APIC_SPURIOUS_INTERRUPT_IRQ: u8  = <span class="number">0xFF</span>;
+
+<span class="comment">// APIC timer register values.
+</span><span class="kw">const </span>APIC_TIMER_DISABLE:              u32 = <span class="number">1 </span>&lt;&lt; <span class="number">16</span>;
+<span class="kw">const </span>_APIC_TIMER_MODE_ONESHOT:        u32 = <span class="number">0b00 </span>&lt;&lt; <span class="number">17</span>;
+<span class="kw">const </span>APIC_TIMER_MODE_PERIODIC:        u32 = <span class="number">0b01 </span>&lt;&lt; <span class="number">17</span>;
+<span class="kw">const </span>_APIC_TIMER_MODE_TSC_DEADLINE:   u32 = <span class="number">0b10 </span>&lt;&lt; <span class="number">17</span>;
+<span class="doccomment">/// The IRQ number reserved for Local APIC timer interrupts in the IDT.
+</span><span class="kw">pub const </span>LOCAL_APIC_LVT_IRQ:          u8  = <span class="number">0x22</span>;
+
 
 <span class="doccomment">/// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
@@ -883,7 +983,7 @@
 <span class="doccomment">/// Returns true if the currently executing CPU is the bootstrap CPU, 
 /// i.e., the first procesor to run after system power-on.
 </span><span class="kw">pub fn </span>is_bootstrap_cpu() -&gt; bool {
-    rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
+    rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_IS_BSP == IA32_APIC_IS_BSP
 }
 
 <span class="doccomment">/// Returns true if the machine has support for x2apic
@@ -920,6 +1020,65 @@
     LOCAL_APICS.get(<span class="kw-2">&amp;</span>current_cpu())
 }
 
+<span class="doccomment">/// The delivery mode used when an interrupt is sent to a CPU core.
+///
+/// This value can be used in the following APIC registers:
+/// * timer
+/// * CMCI (corrected machine check error)
+/// * lint0
+/// * lint1
+/// * performance monitoring counters
+/// * thermal sensor
+</span><span class="attr">#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
+</span><span class="kw">pub enum </span>LapicDeliveryMode {
+    <span class="doccomment">/// Delivers the interrupt (as normal) to the IRQ specified in the vector field.
+    </span>Fixed  = <span class="number">0b000</span>,
+    <span class="doccomment">/// Delivers an SMI interrupt to the CPU; the vector field should be 0x00.
+    </span>Smi    = <span class="number">0b010</span>,
+    <span class="doccomment">/// Delivers an NMI interrupt to the CPU; the vector field is ignored.
+    </span>Nmi    = <span class="number">0b100</span>,
+    <span class="doccomment">/// Delivers an INIT request to the CPU; the vector field should be 0x00.
+    </span>Init   = <span class="number">0b101</span>,
+    <span class="doccomment">/// Causes the CPU to respond to the interrupts as if it originated from
+    /// an external interrupt controller (e.g., the PIC).
+    </span>ExtInt = <span class="number">0b111</span>,
+    <span class="comment">// all other values are reserved
+</span>}
+<span class="kw">impl </span>LapicDeliveryMode {
+    <span class="kw">fn </span>as_register_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        (<span class="kw-2">*</span><span class="self">self </span><span class="kw">as </span>u32) &lt;&lt; <span class="number">8
+    </span>}
+}
+
+<span class="doccomment">/// The possible values for the Local APIC Timer Divide Configuration Register.
+</span><span class="attr">#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
+</span><span class="kw">pub enum </span>LapicTimerDivide {
+    By1   = <span class="number">1</span>,
+    By2   = <span class="number">2</span>,
+    By4   = <span class="number">4</span>,
+    By8   = <span class="number">8</span>,
+    By16  = <span class="number">16</span>,
+    By32  = <span class="number">32</span>,
+    By64  = <span class="number">64</span>,
+    By128 = <span class="number">128</span>,
+}
+<span class="kw">impl </span>LapicTimerDivide {
+    <span class="kw">fn </span>as_register_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 {
+        <span class="comment">// Note: bit 2 is always 0.
+        </span><span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::By1   =&gt; <span class="number">0b1011</span>,
+            <span class="self">Self</span>::By2   =&gt; <span class="number">0b0000</span>,
+            <span class="self">Self</span>::By4   =&gt; <span class="number">0b0001</span>,
+            <span class="self">Self</span>::By8   =&gt; <span class="number">0b0010</span>,
+            <span class="self">Self</span>::By16  =&gt; <span class="number">0b0011</span>,
+            <span class="self">Self</span>::By32  =&gt; <span class="number">0b1000</span>,
+            <span class="self">Self</span>::By64  =&gt; <span class="number">0b1001</span>,
+            <span class="self">Self</span>::By128 =&gt; <span class="number">0b1010</span>,
+        }
+    }
+}
 
 <span class="doccomment">/// The possible destination shorthand values for IPI ICR.
 /// 
@@ -993,17 +1152,6 @@
         )
     }
 }
-
-
-
-<span class="kw">const </span>IA32_APIC_XAPIC_ENABLE: u64 = <span class="number">1 </span>&lt;&lt; <span class="number">11</span>; <span class="comment">// 0x800
-</span><span class="kw">const </span>IA32_APIC_X2APIC_ENABLE: u64 = <span class="number">1 </span>&lt;&lt; <span class="number">10</span>; <span class="comment">// 0x400
-</span><span class="kw">const </span>IA32_APIC_BASE_MSR_IS_BSP: u64 = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>; <span class="comment">// 0x100
-</span><span class="kw">const </span>APIC_SW_ENABLE: u32 = <span class="number">1 </span>&lt;&lt; <span class="number">8</span>;
-<span class="kw">const </span>APIC_TIMER_PERIODIC:  u32 = <span class="number">0x2_0000</span>;
-<span class="kw">const </span>APIC_DISABLE: u32 = <span class="number">0x1_0000</span>;
-<span class="kw">const </span>APIC_NMI: u32 = <span class="number">4 </span>&lt;&lt; <span class="number">8</span>;
-
 
 
 <span class="doccomment">/// A structure that offers access to APIC/xAPIC through its I/O registers.
@@ -1158,6 +1306,9 @@
     </span>processor_id: u8,
     <span class="doccomment">/// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
     </span>is_bootstrap_cpu: bool,
+    <span class="doccomment">/// The value that should be written to the APIC timer&#39;s initial count register
+    /// when enabling the LVT timer.
+    </span>initial_timer_count: u32,
 }
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>LocalApic {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
@@ -1166,7 +1317,7 @@
             .field(<span class="string">&quot;apic_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.apic_id)
             .field(<span class="string">&quot;processor_id&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.processor_id)
             .field(<span class="string">&quot;is_bootstrap_cpu&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.is_bootstrap_cpu)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 <span class="kw">impl </span>Drop <span class="kw">for </span>LocalApic {
@@ -1220,7 +1371,7 @@
         };
 
         <span class="comment">// Check whether the caller&#39;s expectations about BSP vs AP were met.
-        </span><span class="kw">let </span>is_bootstrap_cpu = rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
+        </span><span class="kw">let </span>is_bootstrap_cpu = rdmsr(IA32_APIC_BASE) &amp; IA32_APIC_IS_BSP == IA32_APIC_IS_BSP;
         <span class="kw">if </span>should_be_bsp &amp;&amp; !is_bootstrap_cpu {
             <span class="kw">return </span><span class="prelude-val">Err</span>(LapicInitError::NotBSP);
         }
@@ -1255,7 +1406,8 @@
             processor_id,
             apic_id: CpuId::MAX, <span class="comment">// placeholder, is replaced below.
             </span>is_bootstrap_cpu,
-        };
+            initial_timer_count: <span class="number">0</span>, <span class="comment">// set in `calibrate_lapic_timer()`
+        </span>};
 
         <span class="comment">// Now that the APIC hardware is enabled, we can safely obtain this Local APIC&#39;s ID.
         </span><span class="kw">let </span>actual_apic_id = lapic.read_apic_id();
@@ -1322,10 +1474,10 @@
                 <span class="comment">// NOTE: we&#39;re not yet using logical or cluster mode APIC addressing, only physical APIC addressing.
                 
                 </span><span class="kw">unsafe </span>{
-                    wrmsr(IA32_X2APIC_LVT_TIMER,  APIC_DISABLE <span class="kw">as </span>u64);
-                    wrmsr(IA32_X2APIC_LVT_PMI,    APIC_NMI <span class="kw">as </span>u64);
-                    wrmsr(IA32_X2APIC_LVT_LINT0,  APIC_DISABLE <span class="kw">as </span>u64);
-                    wrmsr(IA32_X2APIC_LVT_LINT1,  APIC_DISABLE <span class="kw">as </span>u64);
+                    wrmsr(IA32_X2APIC_LVT_TIMER,  APIC_TIMER_DISABLE <span class="kw">as </span>u64);
+                    wrmsr(IA32_X2APIC_LVT_PMI,    LapicDeliveryMode::Nmi.as_register_value() <span class="kw">as </span>u64);
+                    wrmsr(IA32_X2APIC_LVT_LINT0,  APIC_TIMER_DISABLE <span class="kw">as </span>u64);
+                    wrmsr(IA32_X2APIC_LVT_LINT1,  APIC_TIMER_DISABLE <span class="kw">as </span>u64);
                     wrmsr(IA32_X2APIC_TPR,        <span class="number">0</span>);
                     
                     <span class="comment">// set bit 8 to start receiving interrupts (still need to &quot;sti&quot;)
@@ -1341,10 +1493,10 @@
                 <span class="comment">// Init xAPIC to a clean known state.
                 // See &lt;http://wiki.osdev.org/APIC#Logical_Destination_Mode&gt;
                 </span>regs.destination_format.write(<span class="number">0xFFFF_FFFF</span>);
-                regs.lvt_timer.write(APIC_DISABLE);
-                regs.lvt_perf_monitor.write(APIC_NMI);
-                regs.lvt_lint0.write(APIC_DISABLE);
-                regs.lvt_lint1.write(APIC_DISABLE);
+                regs.lvt_timer.write(APIC_TIMER_DISABLE);
+                regs.lvt_perf_monitor.write(LapicDeliveryMode::Nmi.as_register_value());
+                regs.lvt_lint0.write(APIC_TIMER_DISABLE);
+                regs.lvt_lint1.write(APIC_TIMER_DISABLE);
                 regs.task_priority.write(<span class="number">0</span>);
 
                 <span class="comment">// set bit 8 to allow receiving interrupts (still need to &quot;sti&quot;)
@@ -1354,32 +1506,34 @@
     }
 
     <span class="doccomment">/// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
-    </span><span class="kw">fn </span>calibrate_lapic_timer(<span class="kw-2">&amp;mut </span><span class="self">self</span>, microseconds: u32) -&gt; u64 {
+    ///
+    /// The number of ticks must be a `u32` due to the size of the APIC timer count register.
+    </span><span class="kw">fn </span>calibrate_lapic_timer(<span class="kw-2">&amp;mut </span><span class="self">self</span>, microseconds: u32) -&gt; u32 {
         <span class="comment">// Start with the max counter value, since we&#39;re counting down
-        </span><span class="kw">const </span>INITIAL_COUNT: u64 = <span class="number">0xFFFF_FFFF</span>;
+        </span><span class="kw">const </span>INITIAL_COUNT: u32 = <span class="number">0xFFFF_FFFF</span>;
 
         <span class="kw">let </span>end_count = <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
             LapicType::X2Apic =&gt; {
                 <span class="kw">unsafe </span>{ 
-                    wrmsr(IA32_X2APIC_DIV_CONF, <span class="number">3</span>); <span class="comment">// set divide value to 16
-                    </span>wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT);
+                    wrmsr(IA32_X2APIC_DIV_CONF, LapicTimerDivide::By16.as_register_value() <span class="kw">as </span>u64);
+                    wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT <span class="kw">as </span>u64);
                 }
 
                 <span class="comment">// wait for the given period using the PIT clock
                 </span>pit_wait(microseconds).unwrap();
 
-                <span class="kw">unsafe </span>{ wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE <span class="kw">as </span>u64); } <span class="comment">// stop apic timer
-                </span>rdmsr(IA32_X2APIC_CUR_COUNT)
+                <span class="kw">unsafe </span>{ wrmsr(IA32_X2APIC_LVT_TIMER, APIC_TIMER_DISABLE <span class="kw">as </span>u64); } <span class="comment">// stop apic timer
+                </span>rdmsr(IA32_X2APIC_CUR_COUNT) <span class="kw">as </span>u32
             }
             LapicType::XApic(regs) =&gt; {
-                regs.timer_divide.write(<span class="number">3</span>); <span class="comment">// set divide value to 16
-                </span>regs.timer_initial_count.write(INITIAL_COUNT <span class="kw">as </span>u32);
+                regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
+                regs.timer_initial_count.write(INITIAL_COUNT <span class="kw">as </span>u32);
 
                 <span class="comment">// wait for the given period using the PIT clock
                 </span>pit_wait(microseconds).unwrap();
 
-                regs.lvt_timer.write(APIC_DISABLE); <span class="comment">// stop apic timer
-                </span>regs.timer_current_count.read() <span class="kw">as </span>u64
+                regs.lvt_timer.write(APIC_TIMER_DISABLE); <span class="comment">// stop apic timer
+                </span>regs.timer_current_count.read()
             }
         };
         
@@ -1395,50 +1549,67 @@
             <span class="self">self</span>.calibrate_lapic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
         };
         <span class="macro">trace!</span>(<span class="string">&quot;LocalApic {}, timer period count: {} ({:#X})&quot;</span>, <span class="self">self</span>.apic_id, apic_period, apic_period);
+        <span class="self">self</span>.initial_timer_count = apic_period;
 
         <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
             LapicType::X2Apic =&gt; <span class="kw">unsafe </span>{
-                wrmsr(IA32_X2APIC_DIV_CONF, <span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )
+                wrmsr(IA32_X2APIC_DIV_CONF, LapicTimerDivide::By16.as_register_value() <span class="kw">as </span>u64);
                 
-                // map X2APIC timer to the `LOCAL_APIC_LVT_IRQ` interrupt handler in the IDT
-                </span>wrmsr(IA32_X2APIC_LVT_TIMER, LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u64 | APIC_TIMER_PERIODIC <span class="kw">as </span>u64); 
-                wrmsr(IA32_X2APIC_INIT_COUNT, apic_period); 
+                <span class="comment">// map X2APIC timer to the `LOCAL_APIC_LVT_IRQ` interrupt handler in the IDT
+                </span>wrmsr(IA32_X2APIC_LVT_TIMER, LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u64 | APIC_TIMER_MODE_PERIODIC <span class="kw">as </span>u64); 
+                wrmsr(IA32_X2APIC_INIT_COUNT, apic_period <span class="kw">as </span>u64); 
     
                 wrmsr(IA32_X2APIC_LVT_THERMAL, <span class="number">0</span>);
                 wrmsr(IA32_X2APIC_ESR, <span class="number">0</span>);
     
                 <span class="comment">// os dev wiki guys say that setting this again as a last step helps on some strange hardware.
-                </span>wrmsr(IA32_X2APIC_DIV_CONF, <span class="number">3</span>);
+                </span>wrmsr(IA32_X2APIC_DIV_CONF, LapicTimerDivide::By16.as_register_value() <span class="kw">as </span>u64);
             }
             LapicType::XApic(regs) =&gt; {
-                regs.timer_divide.write(<span class="number">3</span>); <span class="comment">// set divide value to 16 ( ... how does 3 =&gt; 16 )
-                // map APIC timer to an interrupt handler in the IDT
-                </span>regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u32 | APIC_TIMER_PERIODIC); 
+                regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
+                <span class="comment">// map APIC timer to an interrupt handler in the IDT
+                </span>regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u32 | APIC_TIMER_MODE_PERIODIC); 
                 regs.timer_initial_count.write(apic_period <span class="kw">as </span>u32); 
 
                 regs.lvt_thermal.write(<span class="number">0</span>);
                 regs.lvt_error.write(<span class="number">0</span>);
 
                 <span class="comment">// os dev wiki guys say that setting this again as a last step helps on some strange hardware.
-                </span>regs.timer_divide.write(<span class="number">3</span>);
+                </span>regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
             }
         }
     }
 
     <span class="doccomment">/// Enable (unmask) or disable (mask) the LVT timer interrupt on this lapic.
-    /// 
-    /// This does **not** modify the timer&#39;s current count value.
     </span><span class="kw">pub fn </span>enable_lvt_timer(<span class="kw-2">&amp;mut </span><span class="self">self</span>, enable: bool) {
-        <span class="kw">let </span>value = <span class="kw">if </span>enable {
-            LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u32 | APIC_TIMER_PERIODIC
+        <span class="comment">// From section 10.5.4 of Intel SDM:
+        //   Changing the mode of the APIC timer (from one-shot to periodic or vice versa)
+        //   by writing to the timer LVT entry does not start the timer.
+        //   To start the timer, it is necessary to write to the initial-count register.
+        //
+        // Thus, when enabling the timer, we must immeditely write the initial count again.
+        </span><span class="kw">if </span>enable {
+            <span class="kw">let </span>timer_enable = LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u32 | APIC_TIMER_MODE_PERIODIC;
+            <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
+                LapicType::X2Apic =&gt; <span class="kw">unsafe </span>{
+                    wrmsr(IA32_X2APIC_LVT_TIMER, timer_enable <span class="kw">as </span>u64);
+                    wrmsr(IA32_X2APIC_INIT_COUNT, <span class="self">self</span>.initial_timer_count <span class="kw">as </span>u64);
+                }
+                LapicType::XApic(regs) =&gt; {
+                    regs.lvt_timer.write(timer_enable);
+                    regs.timer_initial_count.write(<span class="self">self</span>.initial_timer_count);
+                }
+            }
         } <span class="kw">else </span>{
-            APIC_DISABLE
-        };
-        <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
-            LapicType::X2Apic =&gt; <span class="kw">unsafe </span>{
-                wrmsr(IA32_X2APIC_LVT_TIMER, value <span class="kw">as </span>u64)
-            },
-            LapicType::XApic(regs) =&gt; regs.lvt_timer.write(value),
+            <span class="kw">let </span>timer_disable = APIC_TIMER_DISABLE;
+            <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
+                LapicType::X2Apic =&gt; <span class="kw">unsafe </span>{
+                    wrmsr(IA32_X2APIC_LVT_TIMER, timer_disable <span class="kw">as </span>u64);
+                }
+                LapicType::XApic(regs) =&gt; {
+                    regs.lvt_timer.write(timer_disable);
+                }
+            }
         }
     }
 
@@ -1548,11 +1719,12 @@
     }
 
     <span class="doccomment">/// Set the NonMaskableInterrupt redirect for this LocalApic.
+    ///
     /// Argument `lint` can be either 0 or 1, since each local APIC has two LVT LINTs
     /// (Local Vector Table Local INTerrupts)
     </span><span class="kw">pub fn </span>set_nmi(<span class="kw-2">&amp;mut </span><span class="self">self</span>, lint: LvtLint, flags: u16) {
-        <span class="kw">let </span>value = (flags &lt;&lt; <span class="number">12</span>) <span class="kw">as </span>u32 | APIC_NMI; <span class="comment">// or APIC_NMI | 0x2000 ??
-        </span><span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
+        <span class="kw">let </span>value = (flags &lt;&lt; <span class="number">12</span>) <span class="kw">as </span>u32 | LapicDeliveryMode::Nmi.as_register_value();
+        <span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.inner {
             LapicType::X2Apic =&gt; <span class="kw">unsafe </span>{ wrmsr(lint.msr(), value <span class="kw">as </span>u64) },
             LapicType::XApic(regs) =&gt; <span class="kw">match </span>lint {
                 LvtLint::Pin0 =&gt; regs.lvt_lint0.write(value),
