@@ -74,13 +74,21 @@ pub fn send_ipi(int_num: IntNumber, target: TargetCpu) {
     let mut value = match target {
         TargetCpu::Specific(cpu) => {
             let cpu = cpu as usize;
-            // aff3 in bits [48:55]
+
+            // level 3 affinity is expected in cpu[24:31]
+            // we want it in bits [48:55]
             let aff3 = (cpu & 0xff000000) << 24;
-            // aff2 in bits [32:39]
+
+            // level 2 affinity is expected in cpu[16:23]
+            // we want it in bits [32:39]
             let aff2 = cpu & 0xff0000 << 16;
-            // aff1 in bits [16:23]
+
+            // level 1 affinity is expected in cpu[8:15]
+            // we want it in bits [16:23]
             let aff1 = cpu & 0xff00 << 8;
-            // aff0 as a GICv2-style target list
+
+            // level 0 affinity is expected in cpu[0:7]
+            // we want it as a GICv2-style target list
             let aff0 = cpu & 0xff;
             let target_list = if aff0 >= 16 {
                 panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
