@@ -1020,6 +1020,11 @@
 <a href="#1020" id="1020">1020</a>
 <a href="#1021" id="1021">1021</a>
 <a href="#1022" id="1022">1022</a>
+<a href="#1023" id="1023">1023</a>
+<a href="#1024" id="1024">1024</a>
+<a href="#1025" id="1025">1025</a>
+<a href="#1026" id="1026">1026</a>
+<a href="#1027" id="1027">1027</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Driver for the PS/2 interface, which supports legacy keyboard and mouse devices.
 //!
 //! The [`init()`] function sets up the single system-wide [`PS2Controller`],
@@ -1453,9 +1458,14 @@
     
     <span class="doccomment">/// Reset the keyboard.
     </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))<span class="question-mark">?</span>; 
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = <span class="self">self</span>.controller.read_data().try_into() {
-            <span class="kw">return </span><span class="prelude-val">Ok</span>(())
+        <span class="self">self</span>.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(ResetAndStartSelfTest))<span class="question-mark">?</span>;
+        <span class="comment">// VirtualBox and presumably real hardware wants this. Qemu worked without this.
+        // Sadly self.controller.polling_receive doesn&#39;t work here, either.
+        </span><span class="kw">const </span>VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX;
+        <span class="kw">for _ in </span><span class="number">0</span>..VERY_ARBITRARY_TIMEOUT_VALUE {
+            <span class="kw">if let </span><span class="prelude-val">Ok</span>(SelfTestPassed) = <span class="self">self</span>.controller.read_data().try_into() {
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(())
+            }
         }
         <span class="prelude-val">Err</span>(<span class="string">&quot;failed to reset keyboard&quot;</span>)
     }
