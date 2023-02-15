@@ -202,15 +202,11 @@ impl Window {
         fg_color: Color,
         bg_color: Color,
     ) -> Result<(), &'static str> {
-        if self.title.is_some() {
-            let title = self
-                .title
-                .as_ref()
-                .ok_or("Couldn't clone Window Tittle")?
-                .clone();
+        if let Some(title) = self.title.take() {
             let slice = title.as_str();
             let title_pos = self.title_pos(&slice.len());
             self.print_string_line(&title_pos, slice, fg_color, bg_color)?;
+            self.title = Some(title);
         }
         Ok(())
     }
@@ -223,19 +219,21 @@ impl Window {
         self.rect.height
     }
 
+    /// Fill a rectangle on the window with a given color.
+    ///
+    /// # Arguments
+    ///
+    /// * `rect` - The rect we will fill inside the window with
+    /// * `color` - The `Color` to fill the rectangle inside the window with.
     pub fn fill_rectangle(&mut self, rect: &mut Rect, color: Color) {
-        let width = self.width();
         if rect.x <= (self.rect.width() as isize - CHARACTER_WIDTH as isize)
             && rect.y <= (self.rect.height as isize - CHARACTER_HEIGHT as isize)
             && self.rect.width == self.frame_buffer.width
             && self.rect.height == self.frame_buffer.height
         {
+            let width = self.width();
             let row_chunks = FramebufferRowChunks::new(&mut self.frame_buffer, rect, width);
-            for row in row_chunks {
-                for pixel in row {
-                    *pixel = color;
-                }
-            }
+            row_chunks.for_each(|row| row.iter_mut().for_each(|pixel| *pixel = color));
         }
     }
 
@@ -260,16 +258,16 @@ impl Window {
     }
 
     pub fn resize_window(&mut self, width: i32, height: i32) {
-        // We clamp the values so resizing is not so jumpy and multiply them by CHARACTER_WIDTH
-        // and CHARACTER_HEIGHT so the Window is almost always divisible by those values.
+        // We clamp the values so resizing is not too extreme, and multiply them by CHARACTER_WIDTH
+        // and CHARACTER_HEIGHT so the window is almost always divisible by those values.
         let width = width.clamp(-1, 1) * CHARACTER_WIDTH as i32;
         let height = height.clamp(-1, 1) * CHARACTER_HEIGHT as i32;
 
-        // We don't want any window to be smaller than 180 and bigger than screen itself
-        let mut new_width = core::cmp::max(self.width() + width as usize, 180);
-        new_width = core::cmp::min(SCREEN_WIDTH, new_width);
-        let mut new_height = core::cmp::max(self.height() + height as usize, 180);
-        new_height = core::cmp::min(SCREEN_HEIGHT, new_height);
+        // We don't want any window to be smaller than 180 and bigger than the screen itself.
+        let new_width =
+            (self.width() as i32 + width as i32).clamp(180, SCREEN_WIDTH as i32) as usize;
+        let new_height =
+            (self.height() as i32 + height as i32).clamp(180, SCREEN_HEIGHT as i32) as usize;
         self.rect.width = new_width;
         self.rect.height = new_height;
         self.resized = true;
@@ -299,7 +297,7 @@ impl Window {
         rect
     }
 
-    /// Return's drawable area
+    /// Returns the drawable area within the window
     pub fn drawable_area(&mut self) -> Rect {
         let border = self.title_border();
         let drawable_area = self.drawable_area.get_or_insert({
@@ -324,15 +322,13 @@ impl Window {
         *relative_pos
     }
 
+    /// Draws the border of the window's title area using the default border color.
     pub fn draw_title_border(&mut self) {
         let mut border = self.title_border();
         let stride = self.frame_buffer.width;
         let rows = FramebufferRowChunks::new(&mut self.frame_buffer, &mut border, stride);
-        for row in rows {
-            for pixel in row {
-                *pixel = DEFAULT_BORDER_COLOR;
-            }
-        }
+
+        rows.for_each(|row| row.iter_mut().for_each(|pixel| *pixel = DEFAULT_BORDER_COLOR));
     }
 
     /// Return's the window's `Rect`
@@ -362,6 +358,9 @@ impl Window {
 
     /// Fill the window with specified color
     pub fn fill(&mut self, color: Color) -> Result<(), &'static str> {
+        // We do this check here because we don't want to resize window's framebuffer
+        // as fast as possible, allocating and de-allocating that big of a memory sometimes causes system freezes/crashes
+        // so we do the resize check here. Plus to fill the window we need updated version of framebuffer's width and height.
         self.should_resize_framebuffer()?;
 
         for pixel in self.frame_buffer.buffer.iter_mut() {
@@ -377,22 +376,37 @@ impl Window {
         Ok(())
     }
 
-    /// Returns visible part of self's `rect` with relative bounds applied:
-    /// This is used for rendering a window when it's partially outside the screen,
-    /// because we don't change window's framebuffer width and height when its outside screen coordinates
-    /// we want to be able to render only parts of it:
-    /// e.g if `self.rect: { width: 400, height: 400, x: -103, y: 0 }`,
-    /// visible rect is `{ width: 297, height: 400, x: 0, y: 0 }`,
-    /// this function will return `{ width: 297, height: 400, x: 103, y: 0 }`
-    /// which will allow us to give the illusion of partially rendering the window.
+    /// Returns the visible part of this window's `rect`, relative to its bounds.
+    /// This is used when we render a window when it is partially outside the screen.
+    /// When a window is partially outside the screen, we do not change the framebuffer's
+    /// width and height, so we need to be able to render only parts of it.
+    ///
+    /// For example, if `self.rect` is `{ width: 400, height: 400, x: -103, y: 0 }`,
+    /// the visible rect is `{ width: 297, height: 400, x: 0, y: 0 }`.
+    ///
+    /// This function returns `{ width: 297, height: 400, x: 103, y: 0 }`, which allows us
+    /// to give the illusion of partially rendering the window.
     pub fn relative_visible_rect(&self) -> Rect {
-        let mut visible_window = self.rect.visible_rect();
-        visible_window.x = 0;
+        // Get the visible part of the window's rect.
+        let mut visible_rect = self.rect.visible_rect();
+
+        // Set the x-coordinate to 0, since we want to render only the visible part.
+        visible_rect.x = 0;
+
+        // If the left side of the window is out of bounds, we need to adjust the x-coordinate.
         if self.rect.left_side_out() {
-            visible_window.x = (self.rect.width - visible_window.width) as isize;
+            // The visible part of the window's rect is at most `self.rect.width` wide.
+            // Subtract the width of the visible part from the width of the window to get the
+            // distance between the left edge of the visible part and the left edge of the window.
+            let distance_from_left_edge = self.rect.width - visible_rect.width;
+            visible_rect.x = distance_from_left_edge as isize;
         }
-        visible_window.y = 0;
-        visible_window
+
+        // Set the y-coordinate to 0, since we want to render only the visible part.
+        visible_rect.y = 0;
+
+        // Return the visible part of the window's rect, relative to its bounds.
+        visible_rect
     }
 }
 

@@ -88,7 +88,8 @@ impl FpsCounter {
             self.reset_counters();
             if counter == 1{
                 counter = 0;
-                //self.draw()?;
+                self.handle_event();
+                self.draw()?;
                 continue;
             }else{
                 scheduler::schedule();
@@ -98,8 +99,15 @@ impl FpsCounter {
         Ok(())
     }
 
-    fn draw(&mut self) -> Result<(), &'static str> {
+    // Currently we don't need to handle any events
+    fn handle_event(&mut self){
+        self.window.lock().pop_event();
+    }
 
+    fn draw(&mut self) -> Result<(), &'static str> {
+        if self.window.lock().resized(){
+            self.window.lock().fill(DEFAULT_WINDOW_COLOR)?;
+        }
         self.window
             .lock()
             .display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;
@@ -162,20 +170,22 @@ pub fn main(_args: Vec<isize>) -> isize{
             Ok(task_ref) => { task_ref }
             Err(err) => {
                 log::error!("{}", err);
-                log::error!("failed to spawn shell");
+                log::error!("failed to spawn fps_counter");
                 return -1; 
             }
         };
     }
 
+     
     // block this task, because it never needs to actually run again
     task::with_current_task(|t| t.block())
-        .expect("shell::main(): failed to get current task")
-        .expect("shell:main(): failed to block the main shell task");
+        .expect("fps_counter::main(): failed to get current task")
+        .expect("fps_counter:main(): failed to block the maintask");
     scheduler::schedule();
+    
 
     loop {
- //      log:: warn!("BUG: blocked shell task was scheduled in unexpectedly");
+        //log:: warn!("BUG: blocked shell task was scheduled in unexpectedly");
     }
 }
 pub fn fps_counter_loop(mut _dummy: ()) -> Result<(), &'static str> {

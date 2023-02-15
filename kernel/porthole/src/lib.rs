@@ -216,13 +216,18 @@ impl WindowManager {
     /// Iterates through the `window_rendering_order`, gets the particular `Window` from `self.windows`
     /// and then locks it to hold the lock until we are done rendering that particular window into
     /// backbuffer/`v_framebuffer`.
-    fn draw_windows(&mut self) {
+    fn draw_windows(&mut self) -> Result<(),&'static str> {
         for order in self.window_rendering_order.iter() {
             if let Some(mut window) = self
                 .windows
                 .get(*order)
                 .and_then(|window| Some(window.lock()))
             {
+                // Extra safety measure: For applications that render fast as possible we sometimes can't `fill`
+                // which means we couldn't resize their framebuffers at correct time this extra checks handles that.
+                if window.resized() {
+                    window.fill(DEFAULT_WINDOW_COLOR)?;
+                }
                 let mut visible_window = window.rect().visible_rect();
                 let window_stride = window.frame_buffer.width;
                 let mut relative_visible_window = window.relative_visible_rect();
@@ -244,6 +249,7 @@ impl WindowManager {
                 }
             }
         }
+        Ok(())
     }
 
     /// Draws visible parts of the mouse
@@ -288,10 +294,11 @@ impl WindowManager {
     /// Updates `v_framebuffer` before the final render.
     /// Clears the whole buffer by calling `blank`
     /// Draws each window and then the mouse. 
-    fn update(&mut self) {
+    fn update(&mut self) -> Result<(),&'static str> {
         self.v_framebuffer.blank();
-        self.draw_windows();
+        self.draw_windows()?;
         self.draw_mouse();
+        Ok(())
     }
 
     fn calculate_next_mouse_pos(
@@ -416,9 +423,7 @@ impl WindowManager {
                     }
 
                     //handle top
-                    if new_pos.y < 0 {
-                        new_pos.y = 0
-                    }
+                    new_pos.y = core::cmp::max(new_pos.y, 0);
 
                     // handle bottom
                     if new_pos.y + WINDOW_VISIBLE_GAP > self.v_framebuffer.height as i32 {
@@ -460,7 +465,6 @@ fn port_loop(
     (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
     let window_manager = WINDOW_MANAGER.get().ok_or("Unable to get WindowManager")?;
-    //let window = window_manager.lock().new_window(&Rect::new(400, 400, 0, 0), None)?;
 
     loop {
         let event_opt = key_consumer
@@ -516,8 +520,7 @@ fn port_loop(
                 _ => (),
             }
         }
-        //window.lock().fill(0xFFF111)?;
-        window_manager.lock().update();
+        window_manager.lock().update()?;
         window_manager.lock().render();
     }
     Ok(())
