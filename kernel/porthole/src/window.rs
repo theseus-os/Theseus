@@ -328,7 +328,10 @@ impl Window {
         let stride = self.frame_buffer.width;
         let rows = FramebufferRowChunks::new(&mut self.frame_buffer, &mut border, stride);
 
-        rows.for_each(|row| row.iter_mut().for_each(|pixel| *pixel = DEFAULT_BORDER_COLOR));
+        rows.for_each(|row| {
+            row.iter_mut()
+                .for_each(|pixel| *pixel = DEFAULT_BORDER_COLOR)
+        });
     }
 
     /// Return's the window's `Rect`
