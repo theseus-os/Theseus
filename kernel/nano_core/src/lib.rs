@@ -135,8 +135,11 @@ where
     println_raw!("nano_core(): initialized memory subsystem.");
 
     #[cfg(target_arch = "aarch64")] {
+        // This is only here to demonstrate aarch64 timer interrupts
+        // It can be removed before merging the PR (727)
         interrupts::init()?;
         interrupts::enable_timer_interrupts()?;
+        irq_safety::enable_interrupts();
     }
 
     state_store::init();

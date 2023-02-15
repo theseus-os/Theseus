@@ -160,25 +160,12 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
 
         /* DEBUGGING CODE
 
-        log::info!("timer: {:?}", CNTPCT_EL0.get());
-        log::info!("ENABLE: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-        log::info!("IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-        log::info!("ISTATUS: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
+        log::info!("timer counter: {:?}", CNTPCT_EL0.get());
+        log::info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
+        log::info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
+        log::info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
 
         */
-
-        log::info!("Unmasking all exceptions types");
-        // unmask every kind of exception
-        DAIF.write(
-              DAIF::D::Unmasked
-            + DAIF::A::Unmasked
-
-            // regular IRQs
-            + DAIF::I::Unmasked
-
-            // fast IRQs (unimplemented atm)
-            + DAIF::F::Unmasked,
-        );
 
         Ok(())
 }
