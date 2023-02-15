@@ -252,8 +252,9 @@ impl WindowManager {
         Ok(())
     }
 
-    /// Draws visible parts of the mouse
+    /// Draws the mouse, if mouse is partially outside the screen it will only draw parts that are inside the screen.
     fn draw_mouse(&mut self) {
+        // Rectangle of visible parts of the mouse
         let mut visible_mouse = self.mouse.visible_rect();
 
         let screen_rows = FramebufferRowChunks::new(

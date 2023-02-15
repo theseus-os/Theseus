@@ -72,7 +72,7 @@ impl Window {
                 window_rect.y = position.y as isize;
                 window_rect.x = line_len as isize;
                 // We fill rest of the line with `bg_color` to clear the screen
-                self.fill_rectangle(&mut window_rect, 0x1FF333);
+                self.fill_rectangle(&mut window_rect, bg_color);
                 if position.y != self.height() as u32 {
                     position.y += CHARACTER_HEIGHT as u32;
                 }
@@ -81,10 +81,6 @@ impl Window {
                 let mut text_start = 0;
                 while let Some(shorter_line) = line.get(text_start..) {
                     text_start += max_text_width;
-                    if position.y >= 479 {
-                        log::info!("position is {position:?}");
-                        log::info!("shorter line is {shorter_line}");
-                    }
 
                     self.print_string_line(position, shorter_line, fg_color, bg_color)?;
 
@@ -135,8 +131,7 @@ impl Window {
             let min_width = core::cmp::min(self.rect.width(), slice.len() * CHARACTER_WIDTH);
             window_rect.width = min_width;
 
-            let mut row_of_pixels = FramebufferRowChunks::get_exact_row(
-                &mut self.frame_buffer,
+            let mut row_of_pixels = self.frame_buffer.get_exact_row(
                 window_rect,
                 start_y as usize,
             );
@@ -178,8 +173,7 @@ impl Window {
                     if x_index >= CHARACTER_WIDTH * slice.len()
                         && x_index % (CHARACTER_WIDTH * slice.len()) == 0
                     {
-                        row_of_pixels = FramebufferRowChunks::get_exact_row(
-                            &mut self.frame_buffer,
+                        row_of_pixels = self.frame_buffer.get_exact_row(
                             window_rect,
                             y as usize,
                         );

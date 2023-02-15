@@ -90,14 +90,15 @@ impl Terminal {
     fn calc_start_idx(&self, end_idx: usize) -> (usize, usize) {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
         let mut start_idx = end_idx;
+        let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        let result = if end_idx > buffer_width * buffer_height {
-            self
+        if end_idx > buffer_width * buffer_height {
+            result = self
                 .scrollback_buffer
-                .get(end_idx - buffer_width * buffer_height..end_idx)
+                .get(end_idx - buffer_width * buffer_height..end_idx);
         } else {
-            self.scrollback_buffer.get(0..end_idx)
-        };
+            result = self.scrollback_buffer.get(0..end_idx);
+        }
 
         if let Some(slice) = result {
             let mut total_lines = 0;
@@ -183,12 +184,17 @@ impl Terminal {
         let (buffer_width, buffer_height) = self.get_text_dimensions();
         let scrollback_buffer_len = self.scrollback_buffer.len();
         let mut end_idx = start_idx;
+        let result;
         // Grabs a max-size slice of the scrollback buffer (usually does not totally fit because of newlines)
-        let result = if end_idx > buffer_width * buffer_height {
-            self.scrollback_buffer.get(end_idx - buffer_width * buffer_height..end_idx)
+        if start_idx + buffer_width * buffer_height > scrollback_buffer_len {
+            result = self
+                .scrollback_buffer
+                .get(start_idx..scrollback_buffer_len - 1);
         } else {
-            self.scrollback_buffer.get(0..end_idx)
-        };
+            result = self
+                .scrollback_buffer
+                .get(start_idx..start_idx + buffer_width * buffer_height);
+        }
 
         // calculate the starting index for the slice
         if let Some(slice) = result {
@@ -196,7 +202,7 @@ impl Terminal {
             // Obtains a vector of the indices of the slice where newlines occur in ascending order
             let new_line_indices: Vec<(usize, &str)> = slice.match_indices('\n').collect();
             // if there are no new lines in the slice
-            if new_line_indices.is_empty() {
+            if new_line_indices.len() == 0 {
                 // indicates that the text is just one continuous string with no newlines and will therefore fill the buffer completely
                 end_idx += buffer_height * buffer_width;
                 if end_idx <= self.scrollback_buffer.len() - 1 {
@@ -243,7 +249,7 @@ impl Terminal {
             if end_idx <= self.scrollback_buffer.len() - 1 {
                 return Ok(end_idx);
             } else {
-                Err(ScrollError::OffEndBound)
+                return Err(ScrollError::OffEndBound);
             }
         } else {
             return Ok(self.scrollback_buffer.len() - 1); /* WARNING: maybe should return Error? */
@@ -292,11 +298,12 @@ impl Terminal {
     /// Scrolls the text display down one line
     fn scroll_down_one_line(&mut self) {
         let buffer_width = self.get_text_dimensions().0;
+        let prev_start_idx;
         // Prevents the user from scrolling down if already at the bottom of the page
         if self.is_scroll_end {
             return;
         }
-        let prev_start_idx = self.scroll_start_idx;
+        prev_start_idx = self.scroll_start_idx;
         let result = self.calc_end_idx(prev_start_idx);
         let mut end_idx = match result {
             Ok(end_idx) => end_idx,
@@ -400,7 +407,7 @@ impl Terminal {
         };
         let result = self.scrollback_buffer.get(start_idx..=end_idx); // =end_idx includes the end index in the slice
         if let Some(slice) = result {
-            self.text_display.set_text(slice);
+            self.text_display.set_text(&slice);
             self.display_text()?;
         } else {
             return Err("could not get slice of scrollback buffer string");
@@ -450,7 +457,7 @@ impl Terminal {
             wm.screen_size()
         };
 
-        let rect = Rect::new(450, 512, 0, 0);
+        let rect = Rect::new(450, 500, 0, 0);
 
         let window = wm_ref.lock().new_window(&rect, Some(format!("Terminal")))?;
 

@@ -40,6 +40,24 @@ impl VirtualFrameBuffer {
             *pixel = 0x000000;
         }
     }
+
+    /// Returns a single `IterMut<T>` from specified `row` of the framebuffer if no row found from given parameters
+    /// returns an empty `IterMut<T>`.
+    /// 
+    /// * `row`  - Specifies which row will be returned from this function
+    /// * `rect` - Specifies dimensions of row which will be returned as `IterMut<u32>
+    pub fn get_exact_row(&mut self, rect: Rect, row: usize) -> IterMut<u32> {
+        let stride = self.width;
+        if row >= rect.y as usize && row < rect.y_plus_height() as usize {
+            let start_of_row = (stride * row) + rect.x as usize;
+            let end_of_row = start_of_row + rect.width as usize;
+            let framebuffer_slice = &mut self.buffer;
+            if let Some(row_slice) = framebuffer_slice.get_mut(start_of_row..end_of_row) {
+                return row_slice.iter_mut();
+            }
+        }
+        [].iter_mut()
+    }
 }
 
 /// Physical framebuffer we use for final rendering to the screen.
@@ -173,27 +191,6 @@ impl<'a> FramebufferRowChunks<'a> {
         }
     }
 
-    /// Returns a single `IterMut<T>` from specified `row` of the framebuffer if no row found from given parameters
-    /// returns an empty `IterMut<T>`.
-    /// 
-    /// * `row`  - Specifies which row will be returned from this function
-    /// * `rect` - Specifies dimensions of the row, `rect.height` is always set to `1` because we want to get a single row.
-    pub fn get_exact_row(framebuffer: &'a mut VirtualFrameBuffer, rect: Rect, row: usize) -> IterMut<u32> {
-        let mut rect = rect;
-        rect.y = row as isize;
-        rect.height = 1;
-        let stride = framebuffer.width;
-        let mut rows = FramebufferRowChunks::new(framebuffer, &mut rect, stride);
-        let row_iterator = {
-            if let Some(next_row) = rows.next() {
-                next_row.iter_mut()
-            } else {
-                [].iter_mut()
-            }
-        };
-        row_iterator
-    }
-    
 }
 
 impl<'a> Iterator for FramebufferRowChunks<'a> {
