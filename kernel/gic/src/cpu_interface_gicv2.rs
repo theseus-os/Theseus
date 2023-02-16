@@ -1,3 +1,11 @@
+//! CPU Interface, GICv2 style
+//!
+//! Included functionnality:
+//! - Initializing the CPU interface
+//! - Setting and getting the minimum interrupt priority
+//! - Acknowledging interrupt requests
+//! - Sending End-Of-Interrupts signals
+
 use super::MmioPageOfU32;
 use super::U32BYTES;
 use super::Priority;

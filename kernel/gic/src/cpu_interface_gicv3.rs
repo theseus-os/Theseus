@@ -1,3 +1,12 @@
+//! CPU Interface, GICv3 style
+//!
+//! Included functionnality:
+//! - Initializing the CPU interface
+//! - Setting and getting the minimum interrupt priority
+//! - Acknowledging interrupt requests
+//! - Sending End-Of-Interrupts signals
+//! - Generating software interrupts
+
 use core::arch::asm;
 use super::TargetCpu;
 use super::Priority;

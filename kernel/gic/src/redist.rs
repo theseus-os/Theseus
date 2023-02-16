@@ -1,3 +1,9 @@
+//! Redistributor Interface
+//!
+//! Included functionnality:
+//! - Initializing the interface
+//! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
+
 use super::MmioPageOfU32;
 use super::U32BYTES;
 use super::IntNumber;

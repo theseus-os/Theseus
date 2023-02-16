@@ -68,8 +68,8 @@ const DIST_P6_OFFSET: usize = 0x6000;
 
 const_assert_eq!(core::mem::size_of::<MmioPageOfU32>(), 0x1000);
 
-mod cpu3;
-mod cpu2;
+mod cpu_interface_gicv3;
+mod cpu_interface_gicv2;
 mod dist;
 mod redist;
 
@@ -172,7 +172,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                cpu2::init(processor.as_mut());
+                cpu_interface_gicv2::init(processor.as_mut());
                 dist::init(distributor.as_mut());
 
                 Ok(Self::V2(ArmGicV2 { distributor, processor }))
@@ -202,7 +202,7 @@ impl ArmGic {
                 };
 
                 redist::init(redistributor.as_mut());
-                cpu3::init();
+                cpu_interface_gicv3::init();
                 let affinity_routing = dist::init(distributor.as_mut());
 
                 Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributor, redist_sgippi, affinity_routing }))
@@ -226,7 +226,7 @@ impl ArmGic {
 
         match self {
             Self::V2(v2) => dist::send_ipi_gicv2(&mut v2.distributor, int_num, target),
-            Self::V3( _) => cpu3::send_ipi(int_num, target),
+            Self::V3( _) => cpu_interface_gicv3::send_ipi(int_num, target),
         }
     }
 
@@ -238,16 +238,16 @@ impl ArmGic {
     /// readable and writable.
     pub fn acknowledge_int(&mut self) -> (IntNumber, Priority) {
         match self {
-            Self::V2(v2) => cpu2::acknowledge_int(&mut v2.processor),
-            Self::V3( _) => cpu3::acknowledge_int(),
+            Self::V2(v2) => cpu_interface_gicv2::acknowledge_int(&mut v2.processor),
+            Self::V3( _) => cpu_interface_gicv3::acknowledge_int(),
         }
     }
 
     /// Performs priority drop for the specified interrupt
     pub fn end_of_interrupt(&mut self, int: IntNumber) {
         match self {
-            Self::V2(v2) => cpu2::end_of_interrupt(&mut v2.processor, int),
-            Self::V3( _) => cpu3::end_of_interrupt(int),
+            Self::V2(v2) => cpu_interface_gicv2::end_of_interrupt(&mut v2.processor, int),
+            Self::V3( _) => cpu_interface_gicv3::end_of_interrupt(int),
         }
     }
 
@@ -278,8 +278,8 @@ impl ArmGic {
     /// is lower or equal to this one, they're discarded
     pub fn get_minimum_int_priority(&self) -> Priority {
         match self {
-            Self::V2(v2) => cpu2::get_minimum_int_priority(&v2.processor),
-            Self::V3( _) => cpu3::get_minimum_int_priority(),
+            Self::V2(v2) => cpu_interface_gicv2::get_minimum_int_priority(&v2.processor),
+            Self::V3( _) => cpu_interface_gicv3::get_minimum_int_priority(),
         }
     }
 
@@ -287,8 +287,8 @@ impl ArmGic {
     /// is lower or equal to this one, they're discarded
     pub fn set_minimum_int_priority(&mut self, priority: Priority) {
         match self {
-            Self::V2(v2) => cpu2::set_minimum_int_priority(&mut v2.processor, priority),
-            Self::V3( _) => cpu3::set_minimum_int_priority(priority),
+            Self::V2(v2) => cpu_interface_gicv2::set_minimum_int_priority(&mut v2.processor, priority),
+            Self::V3( _) => cpu_interface_gicv3::set_minimum_int_priority(priority),
         }
     }
 }

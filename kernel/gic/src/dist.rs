@@ -1,3 +1,11 @@
+//! Distributor Interface
+//!
+//! Included functionnality:
+//! - Initializing the interface
+//! - Enabling or disabling the forwarding of SPIs based on their numbers
+//! - Setting the target of SPIs based on their numbers
+//! - Generating software interrupts (GICv2 style)
+
 use super::MmioPageOfU32;
 use super::U32BYTES;
 use super::TargetCpu;
