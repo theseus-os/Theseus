@@ -37,16 +37,20 @@ pub fn init() {
 }
 
 /// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're discarded
-pub fn get_minimum_int_priority() -> Priority {
+/// is lower or equal to this one, they're queued
+/// until this CPU or another one is ready to handle
+/// them
+pub fn get_minimum_priority() -> Priority {
     let mut reg_value: usize;
     unsafe { asm!("mrs {}, ICC_PMR_EL1", out(reg) reg_value) };
     u8::MAX - (reg_value as u8)
 }
 
 /// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're discarded
-pub fn set_minimum_int_priority(priority: Priority) {
+/// is lower or equal to this one, they're queued
+/// until this CPU or another one is ready to handle
+/// them
+pub fn set_minimum_priority(priority: Priority) {
     let reg_value = (u8::MAX - priority) as usize;
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
@@ -63,7 +67,7 @@ pub fn end_of_interrupt(int: IntNumber) {
 /// and fetches its number; this tells the GIC that
 /// the requested interrupt is being handled by
 /// this CPU.
-pub fn acknowledge_int() -> (IntNumber, Priority) {
+pub fn acknowledge_interrupt() -> (IntNumber, Priority) {
     let int_num: usize;
     let priority: usize;
 

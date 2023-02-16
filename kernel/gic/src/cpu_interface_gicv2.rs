@@ -35,14 +35,18 @@ pub fn init(registers: &mut MmioPageOfU32) {
 }
 
 /// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're discarded
-pub fn get_minimum_int_priority(registers: &MmioPageOfU32) -> Priority {
+/// is lower or equal to this one, they're queued
+/// until this CPU or another one is ready to handle
+/// them
+pub fn get_minimum_priority(registers: &MmioPageOfU32) -> Priority {
     u8::MAX - (registers[offset::PMR] as u8)
 }
 
 /// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're discarded
-pub fn set_minimum_int_priority(registers: &mut MmioPageOfU32, priority: Priority) {
+/// is lower or equal to this one, they're queued
+/// until this CPU or another one is ready to handle
+/// them
+pub fn set_minimum_priority(registers: &mut MmioPageOfU32, priority: Priority) {
     registers[offset::PMR] = (u8::MAX - priority) as u32;
 }
 
@@ -57,7 +61,7 @@ pub fn end_of_interrupt(registers: &mut MmioPageOfU32, int: IntNumber) {
 /// and fetches its number; this tells the GIC that
 /// the requested interrupt is being handled by
 /// this CPU.
-pub fn acknowledge_int(registers: &mut MmioPageOfU32) -> (IntNumber, Priority) {
+pub fn acknowledge_interrupt(registers: &mut MmioPageOfU32) -> (IntNumber, Priority) {
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
     let int_num = registers[offset::IAR] as IntNumber;

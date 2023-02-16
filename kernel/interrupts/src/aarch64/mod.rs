@@ -115,7 +115,7 @@ pub fn init() -> Result<(), &'static str> {
 
     if result.is_ok() {
         let gic = gic.get_mut().unwrap();
-        gic.set_minimum_int_priority(0);
+        gic.set_minimum_priority(0);
         log::info!("Done Configuring the GIC");
     }
 
@@ -144,7 +144,7 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
             let gic = gic.get_mut().ok_or("GIC is uninitialized")?;
 
             // enable routing of this interrupt
-            gic.set_int_state(AARCH64_TIMER_IRQ, true);
+            gic.set_interrupt_state(AARCH64_TIMER_IRQ, true);
         }
 
         // read the frequency (useless atm)
@@ -332,7 +332,7 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
         let mut gic = GIC.lock();
         let gic = gic.get_mut().expect("GIC is uninitialized!");
-        gic.acknowledge_int()
+        gic.acknowledge_interrupt()
     };
     // important: GIC mutex is now implicitly unlocked
     let irq_num_usize = irq_num as usize;

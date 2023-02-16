@@ -236,10 +236,10 @@ impl ArmGic {
     /// Note: this constructor accesses the
     /// interfaces; their addresses have to be
     /// readable and writable.
-    pub fn acknowledge_int(&mut self) -> (IntNumber, Priority) {
+    pub fn acknowledge_interrupt(&mut self) -> (IntNumber, Priority) {
         match self {
-            Self::V2(v2) => cpu_interface_gicv2::acknowledge_int(&mut v2.processor),
-            Self::V3( _) => cpu_interface_gicv3::acknowledge_int(),
+            Self::V2(v2) => cpu_interface_gicv2::acknowledge_interrupt(&mut v2.processor),
+            Self::V3( _) => cpu_interface_gicv3::acknowledge_interrupt(),
         }
     }
 
@@ -252,7 +252,7 @@ impl ArmGic {
     }
 
     /// Will that interrupt be forwarded by the distributor?
-    pub fn get_int_state(&self, int: IntNumber) -> Enabled {
+    pub fn get_interrupt_state(&self, int: IntNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
                 redist_interface::get_sgippi_state(&v3.redist_sgippi, int)
@@ -265,7 +265,7 @@ impl ArmGic {
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
-    pub fn set_int_state(&mut self, int: IntNumber, enabled: Enabled) {
+    pub fn set_interrupt_state(&mut self, int: IntNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
                 redist_interface::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);
@@ -275,20 +275,24 @@ impl ArmGic {
     }
 
     /// Interrupts have a priority; if their priority
-    /// is lower or equal to this one, they're discarded
-    pub fn get_minimum_int_priority(&self) -> Priority {
+    /// is lower or equal to this one, they're queued
+    /// until this CPU or another one is ready to handle
+    /// them
+    pub fn get_minimum_priority(&self) -> Priority {
         match self {
-            Self::V2(v2) => cpu_interface_gicv2::get_minimum_int_priority(&v2.processor),
-            Self::V3( _) => cpu_interface_gicv3::get_minimum_int_priority(),
+            Self::V2(v2) => cpu_interface_gicv2::get_minimum_priority(&v2.processor),
+            Self::V3( _) => cpu_interface_gicv3::get_minimum_priority(),
         }
     }
 
     /// Interrupts have a priority; if their priority
-    /// is lower or equal to this one, they're discarded
-    pub fn set_minimum_int_priority(&mut self, priority: Priority) {
+    /// is lower or equal to this one, they're queued
+    /// until this CPU or another one is ready to handle
+    ///  them
+    pub fn set_minimum_priority(&mut self, priority: Priority) {
         match self {
-            Self::V2(v2) => cpu_interface_gicv2::set_minimum_int_priority(&mut v2.processor, priority),
-            Self::V3( _) => cpu_interface_gicv3::set_minimum_int_priority(priority),
+            Self::V2(v2) => cpu_interface_gicv2::set_minimum_priority(&mut v2.processor, priority),
+            Self::V3( _) => cpu_interface_gicv3::set_minimum_priority(priority),
         }
     }
 }
