@@ -3045,6 +3045,9 @@ dependencies = [
  "log",
  "mutex_preemption",
  "preemption",
+ "scheduler_priority",
+ "scheduler_realtime",
+ "scheduler_round_robin",
  "task",
 ]
 
@@ -3057,6 +3060,27 @@ dependencies = [
  "scheduler",
  "spawn",
  "time",
+]
+
+[[package]]
+name = "scheduler_priority"
+version = "0.1.0"
+dependencies = [
+ "task",
+]
+
+[[package]]
+name = "scheduler_realtime"
+version = "0.1.0"
+dependencies = [
+ "task",
+]
+
+[[package]]
+name = "scheduler_round_robin"
+version = "0.1.0"
+dependencies = [
+ "task",
 ]
 
 [[package]]

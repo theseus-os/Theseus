@@ -1,3 +1,7 @@
+#![no_std]
+
+extern crate alloc;
+
 use alloc::collections::VecDeque;
 use core::cmp::{max, min};
 use task::TaskRef;
@@ -7,7 +11,7 @@ const DEFAULT_PRIORITY: u8 = 20;
 const INITIAL_TOKENS: usize = 10;
 
 #[derive(Debug)]
-pub(crate) struct Queue {
+pub struct Queue {
     inner: VecDeque<PriorityTaskRef>,
 }
 
@@ -19,21 +23,21 @@ struct PriorityTaskRef {
 }
 
 impl Queue {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: VecDeque::new(),
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    pub(crate) fn add(&mut self, task: TaskRef) {
+    pub fn add(&mut self, task: TaskRef) {
         self.inner.push_back(PriorityTaskRef {
             inner: task,
             priority: DEFAULT_PRIORITY,
@@ -41,11 +45,11 @@ impl Queue {
         });
     }
 
-    pub(crate) fn remove(&mut self, task: &TaskRef) {
+    pub fn remove(&mut self, task: &TaskRef) {
         self.inner.retain(|other_task| other_task.inner != *task);
     }
 
-    pub(crate) fn next(&mut self) -> Option<TaskRef> {
+    pub fn next(&mut self) -> Option<TaskRef> {
         if let Some(task) = self.try_next() {
             Some(task)
         } else {
@@ -87,18 +91,18 @@ impl Queue {
         }
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+    pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
         self.inner.iter().map(|task| &task.inner)
     }
 
-    pub(crate) fn get_priority(&self, task: &TaskRef) -> Option<u8> {
+    pub fn get_priority(&self, task: &TaskRef) -> Option<u8> {
         self.inner
             .iter()
             .find(|other_task| other_task.inner == *task)
             .map(|task| task.priority)
     }
 
-    pub(crate) fn set_priority(
+    pub fn set_priority(
         &mut self,
         task: &TaskRef,
         priority: u8,
@@ -113,7 +117,7 @@ impl Queue {
         Ok(())
     }
 
-    pub(crate) fn set_periodicity(&mut self, _: &TaskRef, _: usize) -> Result<(), &'static str> {
+    pub fn set_periodicity(&mut self, _: &TaskRef, _: usize) -> Result<(), &'static str> {
         Err("cannot set periodicity using priority scheduler")
     }
 }

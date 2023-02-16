@@ -1,0 +1,9 @@
+[package]
+name = "scheduler_round_robin"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Provides round robin scheduling functionality and picks the next task"
+edition = "2021"
+
+[dependencies]
+task = { path = "../task" }

@@ -2,8 +2,18 @@
 
 extern crate alloc;
 
-mod imp;
 mod queue;
+mod imp {
+    cfg_if::cfg_if! {
+        if #[cfg(priority_scheduler)] {
+            pub(crate) use scheduler_priority::*;
+        } else if #[cfg(realtime_scheduler)] {
+            pub(crate) use scheduler_realtime::*;
+        } else {
+            pub(crate) use scheduler_round_robin::*;
+        }
+    }
+}
 
 use crate::queue::RunQueue;
 use atomic_linked_list::atomic_map::AtomicMap;

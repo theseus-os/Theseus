@@ -18,6 +18,15 @@ path = "../preemption"
 [dependencies.mutex_preemption]
 path = "../mutex_preemption"
 
+[dependencies.scheduler_round_robin]
+path = "../scheduler_round_robin"
+
+[dependencies.scheduler_priority]
+path = "../scheduler_priority"
+
+[dependencies.scheduler_realtime]
+path = "../scheduler_realtime"
+
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
 

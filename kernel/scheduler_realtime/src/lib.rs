@@ -1,8 +1,12 @@
+#![no_std]
+
+extern crate alloc;
+
 use alloc::collections::VecDeque;
 use task::TaskRef;
 
 #[derive(Debug)]
-pub(crate) struct Queue {
+pub struct Queue {
     inner: VecDeque<RealtimeTaskRef>,
 }
 
@@ -13,32 +17,32 @@ struct RealtimeTaskRef {
 }
 
 impl Queue {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             inner: VecDeque::new(),
         }
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.inner.len()
     }
 
-    pub(crate) fn add(&mut self, task: TaskRef) {
+    pub fn add(&mut self, task: TaskRef) {
         self.inner.push_back(RealtimeTaskRef {
             inner: task,
             period: None,
         });
     }
 
-    pub(crate) fn remove(&mut self, task: &TaskRef) {
+    pub fn remove(&mut self, task: &TaskRef) {
         self.inner.retain(|other_task| other_task.inner != *task);
     }
 
-    pub(crate) fn next(&mut self) -> Option<TaskRef> {
+    pub fn next(&mut self) -> Option<TaskRef> {
         let index = self
             .inner
             .iter()
@@ -52,19 +56,19 @@ impl Queue {
         Some(task_ref)
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &TaskRef> {
+    pub fn iter(&self) -> impl Iterator<Item = &TaskRef> {
         self.inner.iter().map(|task| &task.inner)
     }
 
-    pub(crate) fn get_priority(&self, _: &TaskRef) -> Option<u8> {
+    pub fn get_priority(&self, _: &TaskRef) -> Option<u8> {
         None
     }
 
-    pub(crate) fn set_priority(&mut self, _: &TaskRef, _: u8) -> Result<(), &'static str> {
+    pub fn set_priority(&mut self, _: &TaskRef, _: u8) -> Result<(), &'static str> {
         Err("cannot set priority using realtime scheduler")
     }
 
-    pub(crate) fn set_periodicity(
+    pub fn set_periodicity(
         &mut self,
         task: &TaskRef,
         periodicity: usize,

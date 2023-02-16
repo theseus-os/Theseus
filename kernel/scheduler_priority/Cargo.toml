@@ -1,0 +1,9 @@
+[package]
+name = "scheduler_priority"
+version = "0.1.0"
+authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+description = "Provides priority scheduling functionality and picks the next task"
+edition = "2021"
+
+[dependencies]
+task = { path = "../task" }
