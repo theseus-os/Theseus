@@ -70,7 +70,7 @@ pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
     reg & CTLR_ARE_NS > 0
 }
 
-/// Will that interrupt be forwarded by the distributor?
+/// Returns whether the given interrupt will be forwarded by the distributor
 pub fn get_spi_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
     // enabled?
     read_array::<32>(registers, offset::ISENABLER, int) > 0

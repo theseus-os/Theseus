@@ -44,7 +44,7 @@ pub fn init(registers: &mut MmioPageOfU32) {
     while children_asleep() {}
 }
 
-/// Will that SGI or PPI be forwarded by the GIC?
+/// Returns whether the given interrupt will be forwarded by the distributor
 pub fn get_sgippi_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
     read_array::<32>(registers, offset::SGI_ISENABLER, int) > 0
     &&

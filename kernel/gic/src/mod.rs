@@ -155,7 +155,7 @@ impl ArmGic {
                        | PteFlags::WRITABLE;
 
         let mut map_dist = |gicd_base| -> Result<BorrowedPage, &'static str>  {
-            let pages = allocate_pages(1).ok_or("couldn't allocate pages for GICC interface")?;
+            let pages = allocate_pages(1).ok_or("couldn't allocate pages for the distributor interface")?;
             let frames = allocate_frames_at(gicd_base, 1)?;
             let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
             mapped.into_borrowed_mut(0).map_err(|(_, e)| e)
@@ -166,7 +166,7 @@ impl ArmGic {
                 let mut distributor = map_dist(dist)?;
 
                 let mut processor: BorrowedPage = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for GICC interface")?;
+                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the CPU interface")?;
                     let frames = allocate_frames_at(cpu, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
@@ -181,21 +181,21 @@ impl ArmGic {
                 let mut distributor = map_dist(dist)?;
 
                 let dist_extended: BorrowedPage = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for GICC interface")?;
+                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended distributor interface")?;
                     let frames = allocate_frames_at(dist + DIST_P6_OFFSET, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
                 let mut redistributor: BorrowedPage = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for GICC interface")?;
+                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
                     let frames = allocate_frames_at(redist, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
                 let redist_sgippi = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for GICC interface")?;
+                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
                     let frames = allocate_frames_at(redist + REDIST_SGIPPI_OFFSET, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
@@ -288,7 +288,7 @@ impl ArmGic {
     /// Interrupts have a priority; if their priority
     /// is lower or equal to this one, they're queued
     /// until this CPU or another one is ready to handle
-    ///  them
+    /// them
     pub fn set_minimum_priority(&mut self, priority: Priority) {
         match self {
             Self::V2(v2) => cpu_interface_gicv2::set_minimum_priority(&mut v2.processor, priority),
