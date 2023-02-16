@@ -11,8 +11,10 @@ use super::U32BYTES;
 use super::TargetCpu;
 use super::IntNumber;
 use super::Enabled;
-use super::read_array;
-use super::write_array;
+use super::read_array_volatile;
+use super::write_array_volatile;
+use super::read_volatile;
+use super::write_volatile;
 use super::TargetList;
 
 mod offset {
@@ -60,9 +62,9 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 /// currently enabled for both secure and non-secure
 /// states.
 pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
-    let mut reg = registers[offset::CTLR];
+    let mut reg = read_volatile(&registers[offset::CTLR]);
     reg |= CTLR_ENGRP1;
-    registers[offset::CTLR] = reg;
+    write_volatile(&mut registers[offset::CTLR], reg);
 
     // Return value: whether or not affinity routing is
     // currently enabled for both secure and non-secure
@@ -73,10 +75,10 @@ pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
 /// Returns whether the given interrupt will be forwarded by the distributor
 pub fn get_spi_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
     // enabled?
-    read_array::<32>(registers, offset::ISENABLER, int) > 0
+    read_array_volatile::<32>(registers, offset::ISENABLER, int) > 0
     &&
     // part of group 1?
-    read_array::<32>(registers, offset::IGROUPR, int) == GROUP_1
+    read_array_volatile::<32>(registers, offset::IGROUPR, int) == GROUP_1
 }
 
 /// Enables or disables the forwarding of
@@ -86,11 +88,11 @@ pub fn set_spi_state(registers: &mut MmioPageOfU32, int: IntNumber, enabled: Ena
         true  => offset::ISENABLER,
         false => offset::ICENABLER,
     };
-    write_array::<32>(registers, reg_base, int, 1);
+    write_array_volatile::<32>(registers, reg_base, int, 1);
 
     // whether we're enabling or disabling,
     // set as part of group 1
-    write_array::<32>(registers, reg_base, int, GROUP_1);
+    write_array_volatile::<32>(registers, reg_base, int, GROUP_1);
 }
 
 /// Sends an Inter-Processor-Interrupt
@@ -107,7 +109,7 @@ pub fn send_ipi_gicv2(registers: &mut MmioPageOfU32, int_num: u32, target: Targe
     };
 
     let value: u32 = int_num | target_list | SGIR_NSATT_GRP0;
-    registers[offset::SGIR] = value;
+    write_volatile(&mut registers[offset::SGIR], value);
 }
 
 impl super::ArmGic {
@@ -133,7 +135,7 @@ impl super::ArmGic {
     pub fn get_spi_target(&self, int: IntNumber) -> TargetCpu {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
-            let flags = read_array::<4>(self.distributor(), offset::ITARGETSR, int);
+            let flags = read_array_volatile::<4>(self.distributor(), offset::ITARGETSR, int);
             if flags == 0xff {
                 return TargetCpu::AnyCpuAvailable;
             }
@@ -148,7 +150,7 @@ impl super::ArmGic {
             let list = TargetList::from_bits_truncate(flags as u8);
             TargetCpu::GICv2TargetList(list)
         } else if let Self::V3(v3) = self {
-            let reg = v3.dist_extended[offset::P6IROUTER];
+            let reg = read_volatile(&v3.dist_extended[offset::P6IROUTER]);
 
             // bit 31: Interrupt Routing Mode
             // value of 1 to target any available cpu
@@ -183,7 +185,7 @@ impl super::ArmGic {
                 TargetCpu::GICv2TargetList(list) => list.bits as u32,
             };
 
-            write_array::<4>(self.distributor_mut(), offset::ITARGETSR, int, value);
+            write_array_volatile::<4>(self.distributor_mut(), offset::ITARGETSR, int, value);
         } else if let Self::V3(v3) = self {
             let value = match target {
                 TargetCpu::Specific(cpu) => {
@@ -203,7 +205,7 @@ impl super::ArmGic {
                 },
             };
 
-            v3.dist_extended[offset::P6IROUTER] = value;
+            write_volatile(&mut v3.dist_extended[offset::P6IROUTER], value);
         }
 
         // If we're on gicv2 then affinity routing is off

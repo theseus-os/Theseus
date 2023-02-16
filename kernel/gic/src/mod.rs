@@ -73,13 +73,21 @@ mod cpu_interface_gicv2;
 mod dist_interface;
 mod redist_interface;
 
+fn read_volatile<T>(ptr: &T) -> T {
+    unsafe { (ptr as *const T).read_volatile() }
+}
+
+fn write_volatile<T>(ptr: &mut T, value: T) {
+    unsafe { (ptr as *mut T).write_volatile(value) }
+}
+
 // Reads one slot of an array spanning across
 // multiple u32s.
 //
 // - `int` is the index
 // - `offset` tells the beginning of the array
 // - `INTS_PER_U32` = how many array slots per u32 in this array
-fn read_array<const INTS_PER_U32: usize>(array: &[u32], offset: usize, int: IntNumber) -> u32 {
+fn read_array_volatile<const INTS_PER_U32: usize>(array: &[u32], offset: usize, int: IntNumber) -> u32 {
     let int = int as usize;
     let bits_per_int: usize = U32BITS / INTS_PER_U32;
     let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
@@ -88,7 +96,7 @@ fn read_array<const INTS_PER_U32: usize>(array: &[u32], offset: usize, int: IntN
     let reg_index = int & (INTS_PER_U32 - 1);
     let shift = reg_index * bits_per_int;
 
-    let reg = array[offset];
+    let reg = read_volatile(&array[offset]);
     (reg >> shift) & mask
 }
 
@@ -99,7 +107,7 @@ fn read_array<const INTS_PER_U32: usize>(array: &[u32], offset: usize, int: IntN
 // - `offset` tells the beginning of the array
 // - `INTS_PER_U32` = how many array slots per u32 in this array
 // - `value` is the value to write
-fn write_array<const INTS_PER_U32: usize>(array: &mut [u32], offset: usize, int: IntNumber, value: u32) {
+fn write_array_volatile<const INTS_PER_U32: usize>(array: &mut [u32], offset: usize, int: IntNumber, value: u32) {
     let int = int as usize;
     let bits_per_int: usize = U32BITS / INTS_PER_U32;
     let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
@@ -108,10 +116,10 @@ fn write_array<const INTS_PER_U32: usize>(array: &mut [u32], offset: usize, int:
     let reg_index = int & (INTS_PER_U32 - 1);
     let shift = reg_index * bits_per_int;
 
-    let mut reg = array[offset];
+    let mut reg = read_volatile(&array[offset]);
     reg &= !(mask << shift);
     reg |= (value & mask) << shift;
-    array[offset] = reg;
+    write_volatile(&mut array[offset], reg);
 }
 
 pub struct ArmGicV2 {

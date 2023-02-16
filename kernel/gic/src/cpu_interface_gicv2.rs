@@ -10,6 +10,8 @@ use super::MmioPageOfU32;
 use super::U32BYTES;
 use super::Priority;
 use super::IntNumber;
+use super::read_volatile;
+use super::write_volatile;
 
 mod offset {
     use super::U32BYTES;
@@ -29,9 +31,9 @@ const CTLR_ENGRP1: u32 = 0b10;
 /// Enables routing of group 1 interrupts
 /// in the for the current CPU
 pub fn init(registers: &mut MmioPageOfU32) {
-    let mut reg = registers[offset::CTLR];
+    let mut reg = read_volatile(&registers[offset::CTLR]);
     reg |= CTLR_ENGRP1;
-    registers[offset::CTLR] = reg;
+    write_volatile(&mut registers[offset::CTLR], reg);
 }
 
 /// Interrupts have a priority; if their priority
@@ -39,7 +41,7 @@ pub fn init(registers: &mut MmioPageOfU32) {
 /// until this CPU or another one is ready to handle
 /// them
 pub fn get_minimum_priority(registers: &MmioPageOfU32) -> Priority {
-    u8::MAX - (registers[offset::PMR] as u8)
+    u8::MAX - (read_volatile(&registers[offset::PMR]) as u8)
 }
 
 /// Interrupts have a priority; if their priority
@@ -47,14 +49,14 @@ pub fn get_minimum_priority(registers: &MmioPageOfU32) -> Priority {
 /// until this CPU or another one is ready to handle
 /// them
 pub fn set_minimum_priority(registers: &mut MmioPageOfU32, priority: Priority) {
-    registers[offset::PMR] = (u8::MAX - priority) as u32;
+    write_volatile(&mut registers[offset::PMR], (u8::MAX - priority) as u32);
 }
 
 /// Zeros the current priority level of this CPU,
 /// Meaning that the CPU is ready to process interrupts
 /// again.
 pub fn end_of_interrupt(registers: &mut MmioPageOfU32, int: IntNumber) {
-    registers[offset::EOIR] = int as u32;
+    write_volatile(&mut registers[offset::EOIR], int as u32);
 }
 
 /// Acknowledge the currently serviced interrupt
@@ -64,8 +66,8 @@ pub fn end_of_interrupt(registers: &mut MmioPageOfU32, int: IntNumber) {
 pub fn acknowledge_interrupt(registers: &mut MmioPageOfU32) -> (IntNumber, Priority) {
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
-    let int_num = registers[offset::IAR] as IntNumber;
-    let priority = registers[offset::RPR] as u8;
+    let int_num = read_volatile(&registers[offset::IAR]) as IntNumber;
+    let priority = read_volatile(&registers[offset::RPR]) as u8;
 
     (int_num, priority)
 }
