@@ -63,7 +63,7 @@ pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
 }
 
 /// Will that interrupt be forwarded by the distributor?
-pub fn get_int_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
+pub fn get_spi_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
     // enabled?
     read_array::<32>(registers, offset::ISENABLER, int) > 0
     &&
@@ -73,7 +73,7 @@ pub fn get_int_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
 
 /// Enables or disables the forwarding of
 /// a particular interrupt in the distributor
-pub fn set_int_state(registers: &mut MmioPageOfU32, int: IntNumber, enabled: Enabled) {
+pub fn set_spi_state(registers: &mut MmioPageOfU32, int: IntNumber, enabled: Enabled) {
     let reg_base = match enabled {
         true  => offset::ISENABLER,
         false => offset::ICENABLER,

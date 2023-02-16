@@ -259,7 +259,7 @@ impl ArmGic {
             } else {
                 true
             },
-            _ => dist::get_int_state(self.distributor(), int),
+            _ => dist::get_spi_state(self.distributor(), int),
         }
     }
 
@@ -270,7 +270,7 @@ impl ArmGic {
             0..=31 => if let Self::V3(v3) = self {
                 redist::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);
             },
-            _ => dist::set_int_state(self.distributor_mut(), int, enabled),
+            _ => dist::set_spi_state(self.distributor_mut(), int, enabled),
         };
     }
 
