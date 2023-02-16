@@ -70,8 +70,8 @@ const_assert_eq!(core::mem::size_of::<MmioPageOfU32>(), 0x1000);
 
 mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
-mod dist;
-mod redist;
+mod dist_interface;
+mod redist_interface;
 
 // Reads one slot of an array spanning across
 // multiple u32s.
@@ -173,7 +173,7 @@ impl ArmGic {
                 };
 
                 cpu_interface_gicv2::init(processor.as_mut());
-                dist::init(distributor.as_mut());
+                dist_interface::init(distributor.as_mut());
 
                 Ok(Self::V2(ArmGicV2 { distributor, processor }))
             },
@@ -201,9 +201,9 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                redist::init(redistributor.as_mut());
+                redist_interface::init(redistributor.as_mut());
                 cpu_interface_gicv3::init();
-                let affinity_routing = dist::init(distributor.as_mut());
+                let affinity_routing = dist_interface::init(distributor.as_mut());
 
                 Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributor, redist_sgippi, affinity_routing }))
             },
@@ -225,7 +225,7 @@ impl ArmGic {
         assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
 
         match self {
-            Self::V2(v2) => dist::send_ipi_gicv2(&mut v2.distributor, int_num, target),
+            Self::V2(v2) => dist_interface::send_ipi_gicv2(&mut v2.distributor, int_num, target),
             Self::V3( _) => cpu_interface_gicv3::send_ipi(int_num, target),
         }
     }
@@ -255,11 +255,11 @@ impl ArmGic {
     pub fn get_int_state(&self, int: IntNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist::get_sgippi_state(&v3.redist_sgippi, int)
+                redist_interface::get_sgippi_state(&v3.redist_sgippi, int)
             } else {
                 true
             },
-            _ => dist::get_spi_state(self.distributor(), int),
+            _ => dist_interface::get_spi_state(self.distributor(), int),
         }
     }
 
@@ -268,9 +268,9 @@ impl ArmGic {
     pub fn set_int_state(&mut self, int: IntNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);
+                redist_interface::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);
             },
-            _ => dist::set_spi_state(self.distributor_mut(), int, enabled),
+            _ => dist_interface::set_spi_state(self.distributor_mut(), int, enabled),
         };
     }
 
