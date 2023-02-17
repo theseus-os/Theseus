@@ -59,80 +59,84 @@ const U32BYTES: usize = core::mem::size_of::<u32>();
 // = 32
 const U32BITS: usize = U32BYTES * 8;
 
-pub type MmioPageOfU32 = [u32; 0x400];
+#[repr(C)]
+#[derive(zerocopy::FromBytes)]
+pub struct GicMappedPage {
+    inner: [u32; 0x400],
+}
 
-type BorrowedPage = BorrowedMappedPages<MmioPageOfU32, Mutable>;
+impl GicMappedPage {
+    fn read_volatile(&self, index: usize) -> u32 {
+        unsafe { (&self.inner[index] as *const u32).read_volatile() }
+    }
+
+    fn write_volatile(&mut self, index: usize, value: u32) {
+        unsafe { (&mut self.inner[index] as *mut u32).write_volatile(value) }
+    }
+
+    // Reads one slot of an array spanning across
+    // multiple u32s.
+    //
+    // - `int` is the index
+    // - `offset` tells the beginning of the array
+    // - `INTS_PER_U32` = how many array slots per u32 in this array
+    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: usize, int: IntNumber) -> u32 {
+        let int = int as usize;
+        let bits_per_int: usize = U32BITS / INTS_PER_U32;
+        let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
+
+        let offset = offset + (int / INTS_PER_U32);
+        let reg_index = int & (INTS_PER_U32 - 1);
+        let shift = reg_index * bits_per_int;
+
+        let reg = self.read_volatile(offset);
+        (reg >> shift) & mask
+    }
+
+    // Writes one slot of an array spanning across
+    // multiple u32s.
+    //
+    // - `int` is the index
+    // - `offset` tells the beginning of the array
+    // - `INTS_PER_U32` = how many array slots per u32 in this array
+    // - `value` is the value to write
+    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: usize, int: IntNumber, value: u32) {
+        let int = int as usize;
+        let bits_per_int: usize = U32BITS / INTS_PER_U32;
+        let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
+
+        let offset = offset + (int / INTS_PER_U32);
+        let reg_index = int & (INTS_PER_U32 - 1);
+        let shift = reg_index * bits_per_int;
+
+        let mut reg = self.read_volatile(offset);
+        reg &= !(mask << shift);
+        reg |= (value & mask) << shift;
+        self.write_volatile(offset, reg);
+    }
+}
+
+const_assert_eq!(core::mem::size_of::<GicMappedPage>(), 0x1000);
 
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
-
-const_assert_eq!(core::mem::size_of::<MmioPageOfU32>(), 0x1000);
 
 mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
 mod dist_interface;
 mod redist_interface;
 
-fn read_volatile<T>(ptr: &T) -> T {
-    unsafe { (ptr as *const T).read_volatile() }
-}
-
-fn write_volatile<T>(ptr: &mut T, value: T) {
-    unsafe { (ptr as *mut T).write_volatile(value) }
-}
-
-// Reads one slot of an array spanning across
-// multiple u32s.
-//
-// - `int` is the index
-// - `offset` tells the beginning of the array
-// - `INTS_PER_U32` = how many array slots per u32 in this array
-fn read_array_volatile<const INTS_PER_U32: usize>(array: &[u32], offset: usize, int: IntNumber) -> u32 {
-    let int = int as usize;
-    let bits_per_int: usize = U32BITS / INTS_PER_U32;
-    let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
-
-    let offset = offset + (int / INTS_PER_U32);
-    let reg_index = int & (INTS_PER_U32 - 1);
-    let shift = reg_index * bits_per_int;
-
-    let reg = read_volatile(&array[offset]);
-    (reg >> shift) & mask
-}
-
-// Writes one slot of an array spanning across
-// multiple u32s.
-//
-// - `int` is the index
-// - `offset` tells the beginning of the array
-// - `INTS_PER_U32` = how many array slots per u32 in this array
-// - `value` is the value to write
-fn write_array_volatile<const INTS_PER_U32: usize>(array: &mut [u32], offset: usize, int: IntNumber, value: u32) {
-    let int = int as usize;
-    let bits_per_int: usize = U32BITS / INTS_PER_U32;
-    let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
-
-    let offset = offset + (int / INTS_PER_U32);
-    let reg_index = int & (INTS_PER_U32 - 1);
-    let shift = reg_index * bits_per_int;
-
-    let mut reg = read_volatile(&array[offset]);
-    reg &= !(mask << shift);
-    reg |= (value & mask) << shift;
-    write_volatile(&mut array[offset], reg);
-}
-
 pub struct ArmGicV2 {
-    pub distributor: BorrowedPage,
-    pub processor: BorrowedPage,
+    pub distributor: BorrowedMappedPages<GicMappedPage, Mutable>,
+    pub processor: BorrowedMappedPages<GicMappedPage, Mutable>,
 }
 
 pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
-    pub distributor: BorrowedPage,
-    pub dist_extended: BorrowedPage,
-    pub redistributor: BorrowedPage,
-    pub redist_sgippi: BorrowedPage,
+    pub distributor: BorrowedMappedPages<GicMappedPage, Mutable>,
+    pub dist_extended: BorrowedMappedPages<GicMappedPage, Mutable>,
+    pub redistributor: BorrowedMappedPages<GicMappedPage, Mutable>,
+    pub redist_sgippi: BorrowedMappedPages<GicMappedPage, Mutable>,
 }
 
 /// Arm Generic Interrupt Controller
@@ -162,7 +166,7 @@ impl ArmGic {
                        | PteFlags::NOT_EXECUTABLE
                        | PteFlags::WRITABLE;
 
-        let mut map_dist = |gicd_base| -> Result<BorrowedPage, &'static str>  {
+        let mut map_dist = |gicd_base| -> Result<BorrowedMappedPages<GicMappedPage, Mutable>, &'static str>  {
             let pages = allocate_pages(1).ok_or("couldn't allocate pages for the distributor interface")?;
             let frames = allocate_frames_at(gicd_base, 1)?;
             let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
@@ -173,7 +177,7 @@ impl ArmGic {
             Version::InitV2 { dist, cpu } => {
                 let mut distributor = map_dist(dist)?;
 
-                let mut processor: BorrowedPage = {
+                let mut processor: BorrowedMappedPages<GicMappedPage, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the CPU interface")?;
                     let frames = allocate_frames_at(cpu, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
@@ -188,14 +192,14 @@ impl ArmGic {
             Version::InitV3 { dist, redist } => {
                 let mut distributor = map_dist(dist)?;
 
-                let dist_extended: BorrowedPage = {
+                let dist_extended: BorrowedMappedPages<GicMappedPage, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended distributor interface")?;
                     let frames = allocate_frames_at(dist + DIST_P6_OFFSET, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributor: BorrowedPage = {
+                let mut redistributor: BorrowedMappedPages<GicMappedPage, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
                     let frames = allocate_frames_at(redist, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;

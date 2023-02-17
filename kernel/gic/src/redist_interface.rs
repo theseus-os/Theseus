@@ -4,14 +4,10 @@
 //! - Initializing the interface
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
 
-use super::MmioPageOfU32;
+use super::GicMappedPage;
 use super::U32BYTES;
 use super::IntNumber;
 use super::Enabled;
-use super::read_array_volatile;
-use super::write_array_volatile;
-use super::read_volatile;
-use super::write_volatile;
 
 mod offset {
     use super::U32BYTES;
@@ -43,19 +39,19 @@ const TIMEOUT_ITERATIONS: usize = 0x10_000;
 
 /// Initializes the redistributor by waking
 /// it up and checking that it's awake
-pub fn init(registers: &mut MmioPageOfU32) -> Result<(), &'static str> {
+pub fn init(registers: &mut GicMappedPage) -> Result<(), &'static str> {
     let mut reg;
-    reg = read_volatile(&registers[offset::RD_WAKER]);
+    reg = registers.read_volatile(offset::RD_WAKER);
 
     // Wake the redistributor
     reg &= !RD_WAKER_PROCESSOR_SLEEP;
 
-    write_volatile(&mut registers[offset::RD_WAKER], reg);
+    registers.write_volatile(offset::RD_WAKER, reg);
 
     // then poll ChildrenAsleep until it's cleared
 
     let children_asleep = || {
-        read_volatile(&registers[offset::RD_WAKER]) & RD_WAKER_CHLIDREN_ASLEEP > 0
+        registers.read_volatile(offset::RD_WAKER) & RD_WAKER_CHLIDREN_ASLEEP > 0
     };
 
     let mut counter = 0;
@@ -75,23 +71,23 @@ pub fn init(registers: &mut MmioPageOfU32) -> Result<(), &'static str> {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_sgippi_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
-    read_array_volatile::<32>(registers, offset::SGI_ISENABLER, int) > 0
+pub fn get_sgippi_state(registers: &GicMappedPage, int: IntNumber) -> Enabled {
+    registers.read_array_volatile::<32>(offset::SGI_ISENABLER, int) > 0
     &&
     // part of group 1?
-    read_array_volatile::<32>(registers, offset::IGROUPR, int) == GROUP_1
+    registers.read_array_volatile::<32>(offset::IGROUPR, int) == GROUP_1
 }
 
 /// Enables or disables the forwarding of
 /// a particular SGI or PPI
-pub fn set_sgippi_state(registers: &mut MmioPageOfU32, int: IntNumber, enabled: Enabled) {
+pub fn set_sgippi_state(registers: &mut GicMappedPage, int: IntNumber, enabled: Enabled) {
     let reg = match enabled {
         true => offset::SGI_ISENABLER,
         false => offset::SGI_ICENABLER,
     };
-    write_array_volatile::<32>(registers, reg, int, 1);
+    registers.write_array_volatile::<32>(reg, int, 1);
 
     // whether we're enabling or disabling,
     // set as part of group 1
-    write_array_volatile::<32>(registers, offset::IGROUPR, int, GROUP_1);
+    registers.write_array_volatile::<32>(offset::IGROUPR, int, GROUP_1);
 }

@@ -6,15 +6,11 @@
 //! - Setting the target of SPIs based on their numbers
 //! - Generating software interrupts (GICv2 style)
 
-use super::MmioPageOfU32;
+use super::GicMappedPage;
 use super::U32BYTES;
 use super::TargetCpu;
 use super::IntNumber;
 use super::Enabled;
-use super::read_array_volatile;
-use super::write_array_volatile;
-use super::read_volatile;
-use super::write_volatile;
 use super::TargetList;
 
 mod offset {
@@ -61,10 +57,10 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 /// Return value: whether or not affinity routing is
 /// currently enabled for both secure and non-secure
 /// states.
-pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
-    let mut reg = read_volatile(&registers[offset::CTLR]);
+pub fn init(registers: &mut GicMappedPage) -> Enabled {
+    let mut reg = registers.read_volatile(offset::CTLR);
     reg |= CTLR_ENGRP1;
-    write_volatile(&mut registers[offset::CTLR], reg);
+    registers.write_volatile(offset::CTLR, reg);
 
     // Return value: whether or not affinity routing is
     // currently enabled for both secure and non-secure
@@ -73,33 +69,33 @@ pub fn init(registers: &mut MmioPageOfU32) -> Enabled {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_spi_state(registers: &MmioPageOfU32, int: IntNumber) -> Enabled {
+pub fn get_spi_state(registers: &GicMappedPage, int: IntNumber) -> Enabled {
     // enabled?
-    read_array_volatile::<32>(registers, offset::ISENABLER, int) > 0
+    registers.read_array_volatile::<32>(offset::ISENABLER, int) > 0
     &&
     // part of group 1?
-    read_array_volatile::<32>(registers, offset::IGROUPR, int) == GROUP_1
+    registers.read_array_volatile::<32>(offset::IGROUPR, int) == GROUP_1
 }
 
 /// Enables or disables the forwarding of
 /// a particular interrupt in the distributor
-pub fn set_spi_state(registers: &mut MmioPageOfU32, int: IntNumber, enabled: Enabled) {
+pub fn set_spi_state(registers: &mut GicMappedPage, int: IntNumber, enabled: Enabled) {
     let reg_base = match enabled {
         true  => offset::ISENABLER,
         false => offset::ICENABLER,
     };
-    write_array_volatile::<32>(registers, reg_base, int, 1);
+    registers.write_array_volatile::<32>(reg_base, int, 1);
 
     // whether we're enabling or disabling,
     // set as part of group 1
-    write_array_volatile::<32>(registers, reg_base, int, GROUP_1);
+    registers.write_array_volatile::<32>(reg_base, int, GROUP_1);
 }
 
 /// Sends an Inter-Processor-Interrupt
 ///
 /// legacy / GICv2 method
 /// int_num must be less than 16
-pub fn send_ipi_gicv2(registers: &mut MmioPageOfU32, int_num: u32, target: TargetCpu) {
+pub fn send_ipi_gicv2(registers: &mut GicMappedPage, int_num: u32, target: TargetCpu) {
     assert_cpu_bounds(&target);
 
     let target_list = match target {
@@ -109,18 +105,18 @@ pub fn send_ipi_gicv2(registers: &mut MmioPageOfU32, int_num: u32, target: Targe
     };
 
     let value: u32 = int_num | target_list | SGIR_NSATT_GRP0;
-    write_volatile(&mut registers[offset::SGIR], value);
+    registers.write_volatile(offset::SGIR, value);
 }
 
 impl super::ArmGic {
-    pub(crate) fn distributor(&self) -> &MmioPageOfU32 {
+    pub(crate) fn distributor(&self) -> &GicMappedPage {
         match self {
             Self::V2(v2) => &v2.distributor,
             Self::V3(v3) => &v3.distributor,
         }
     }
 
-    pub(crate) fn distributor_mut(&mut self) -> &mut MmioPageOfU32 {
+    pub(crate) fn distributor_mut(&mut self) -> &mut GicMappedPage {
         match self {
             Self::V2(v2) => &mut v2.distributor,
             Self::V3(v3) => &mut v3.distributor,
@@ -135,7 +131,7 @@ impl super::ArmGic {
     pub fn get_spi_target(&self, int: IntNumber) -> TargetCpu {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
-            let flags = read_array_volatile::<4>(self.distributor(), offset::ITARGETSR, int);
+            let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
             if flags == 0xff {
                 return TargetCpu::AnyCpuAvailable;
             }
@@ -150,7 +146,7 @@ impl super::ArmGic {
             let list = TargetList::from_bits_truncate(flags as u8);
             TargetCpu::GICv2TargetList(list)
         } else if let Self::V3(v3) = self {
-            let reg = read_volatile(&v3.dist_extended[offset::P6IROUTER]);
+            let reg = v3.dist_extended.read_volatile(offset::P6IROUTER);
 
             // bit 31: Interrupt Routing Mode
             // value of 1 to target any available cpu
@@ -185,7 +181,7 @@ impl super::ArmGic {
                 TargetCpu::GICv2TargetList(list) => list.bits as u32,
             };
 
-            write_array_volatile::<4>(self.distributor_mut(), offset::ITARGETSR, int, value);
+            self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
         } else if let Self::V3(v3) = self {
             let value = match target {
                 TargetCpu::Specific(cpu) => {
@@ -205,7 +201,7 @@ impl super::ArmGic {
                 },
             };
 
-            write_volatile(&mut v3.dist_extended[offset::P6IROUTER], value);
+            v3.dist_extended.write_volatile(offset::P6IROUTER, value);
         }
 
         // If we're on gicv2 then affinity routing is off

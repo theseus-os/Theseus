@@ -6,12 +6,10 @@
 //! - Acknowledging interrupt requests
 //! - Sending End-Of-Interrupts signals
 
-use super::MmioPageOfU32;
+use super::GicMappedPage;
 use super::U32BYTES;
 use super::Priority;
 use super::IntNumber;
-use super::read_volatile;
-use super::write_volatile;
 
 mod offset {
     use super::U32BYTES;
@@ -30,44 +28,44 @@ const CTLR_ENGRP1: u32 = 0b10;
 
 /// Enables routing of group 1 interrupts
 /// in the for the current CPU
-pub fn init(registers: &mut MmioPageOfU32) {
-    let mut reg = read_volatile(&registers[offset::CTLR]);
+pub fn init(registers: &mut GicMappedPage) {
+    let mut reg = registers.read_volatile(offset::CTLR);
     reg |= CTLR_ENGRP1;
-    write_volatile(&mut registers[offset::CTLR], reg);
+    registers.write_volatile(offset::CTLR, reg);
 }
 
 /// Interrupts have a priority; if their priority
 /// is lower or equal to this one, they're queued
 /// until this CPU or another one is ready to handle
 /// them
-pub fn get_minimum_priority(registers: &MmioPageOfU32) -> Priority {
-    u8::MAX - (read_volatile(&registers[offset::PMR]) as u8)
+pub fn get_minimum_priority(registers: &GicMappedPage) -> Priority {
+    u8::MAX - (registers.read_volatile(offset::PMR) as u8)
 }
 
 /// Interrupts have a priority; if their priority
 /// is lower or equal to this one, they're queued
 /// until this CPU or another one is ready to handle
 /// them
-pub fn set_minimum_priority(registers: &mut MmioPageOfU32, priority: Priority) {
-    write_volatile(&mut registers[offset::PMR], (u8::MAX - priority) as u32);
+pub fn set_minimum_priority(registers: &mut GicMappedPage, priority: Priority) {
+    registers.write_volatile(offset::PMR, (u8::MAX - priority) as u32);
 }
 
 /// Zeros the current priority level of this CPU,
 /// Meaning that the CPU is ready to process interrupts
 /// again.
-pub fn end_of_interrupt(registers: &mut MmioPageOfU32, int: IntNumber) {
-    write_volatile(&mut registers[offset::EOIR], int as u32);
+pub fn end_of_interrupt(registers: &mut GicMappedPage, int: IntNumber) {
+    registers.write_volatile(offset::EOIR, int as u32);
 }
 
 /// Acknowledge the currently serviced interrupt
 /// and fetches its number; this tells the GIC that
 /// the requested interrupt is being handled by
 /// this CPU.
-pub fn acknowledge_interrupt(registers: &mut MmioPageOfU32) -> (IntNumber, Priority) {
+pub fn acknowledge_interrupt(registers: &mut GicMappedPage) -> (IntNumber, Priority) {
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
-    let int_num = read_volatile(&registers[offset::IAR]) as IntNumber;
-    let priority = read_volatile(&registers[offset::RPR]) as u8;
+    let int_num = registers.read_volatile(offset::IAR) as IntNumber;
+    let priority = registers.read_volatile(offset::RPR) as u8;
 
     (int_num, priority)
 }
