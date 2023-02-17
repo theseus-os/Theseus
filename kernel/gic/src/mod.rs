@@ -209,7 +209,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                redist_interface::init(redistributor.as_mut());
+                redist_interface::init(redistributor.as_mut())?;
                 cpu_interface_gicv3::init();
                 let affinity_routing = dist_interface::init(distributor.as_mut());
 

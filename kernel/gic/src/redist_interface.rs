@@ -27,13 +27,29 @@ const RD_WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
 // const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
 
+// This timeout value works on some ARM SoCs:
+// - qemu's virt virtual machine
+//
+// (if the value works for your SoC, please add it to this list.)
+//
+// If the redistributor's initialization times out, it means either:
+// - that your ARM SoC is not GICv3 compliant (try initializing it as GICv2)
+// - that the timeout value is too low for your ARM SoC. Try increasing it
+// to see if the booting sequence continues.
+//
+// If it wasn't enough for your machine, reach out to the Theseus
+// developers (or directly submit a PR).
+const TIMEOUT_ITERATIONS: usize = 0x10_000;
+
 /// Initializes the redistributor by waking
 /// it up and checking that it's awake
-pub fn init(registers: &mut MmioPageOfU32) {
+pub fn init(registers: &mut MmioPageOfU32) -> Result<(), &'static str> {
     let mut reg;
     reg = read_volatile(&registers[offset::RD_WAKER]);
+
     // Wake the redistributor
     reg &= !RD_WAKER_PROCESSOR_SLEEP;
+
     write_volatile(&mut registers[offset::RD_WAKER], reg);
 
     // then poll ChildrenAsleep until it's cleared
@@ -41,7 +57,21 @@ pub fn init(registers: &mut MmioPageOfU32) {
     let children_asleep = || {
         read_volatile(&registers[offset::RD_WAKER]) & RD_WAKER_CHLIDREN_ASLEEP > 0
     };
-    while children_asleep() {}
+
+    let mut counter = 0;
+    let mut timed_out = || {
+        counter += 1;
+        counter >= TIMEOUT_ITERATIONS
+    };
+
+    while children_asleep() && !timed_out() { }
+
+    match timed_out() {
+        false => Ok(()),
+
+        // see definition of TIMEOUT_ITERATIONS
+        true => Err("gic: The redistributor didn't wake up in time."),
+    }
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
