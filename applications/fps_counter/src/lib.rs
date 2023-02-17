@@ -43,7 +43,7 @@ pub struct FpsCounter {
 
 impl FpsCounter {
     pub fn new() -> Result<Self, &'static str> {
-        let window = WINDOW_MANAGER.get().ok_or("Unable to get WINDOW_MANAGER")?.lock().new_window(&Rect::new(360,360,0,0), Some(format!("FpsCounter")))?;
+        let window = Window::new_window(&Rect::new(360,360,0,0), Some(format!("FpsCounter")),false)?;
         let hpet = get_hpet().ok_or("Unable to get hpet")?;
         let time_it_took_to_render = hpet.get_counter();
         let timer_freq = hpet.counter_period_femtoseconds() as u64;
@@ -88,7 +88,6 @@ impl FpsCounter {
             self.reset_counters();
             if counter == 1{
                 counter = 0;
-                self.handle_event();
                 self.draw()?;
                 continue;
             }else{

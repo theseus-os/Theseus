@@ -449,17 +449,10 @@ impl Terminal {
 impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
-        let wm_ref = porthole::WINDOW_MANAGER
-            .get()
-            .ok_or("The window manager is not initialized")?;
-        let (window_width, window_height) = {
-            let wm = wm_ref.lock();
-            wm.screen_size()
-        };
 
         let rect = Rect::new(450, 500, 0, 0);
 
-        let window = wm_ref.lock().new_window(&rect, Some(format!("Terminal")))?;
+        let window = Window::new_window(&rect, Some(format!("Terminal")),true)?;
 
         let relative_pos = window.lock().drawable_area().to_relative_pos();
         let text_display = TextDisplayInfo::new(

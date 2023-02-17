@@ -16,7 +16,8 @@ pub struct Window {
     title_border: Option<Rect>,
     title_pos: Option<RelativePos>,
     drawable_area: Option<Rect>,
-    pub event: Queue<Event>,
+    pub event_queue: Queue<Event>,
+    pub receive_events: bool,
     pub(crate) active: bool,
 }
 
@@ -25,6 +26,7 @@ impl Window {
         rect: Rect,
         frame_buffer: VirtualFrameBuffer,
         title: Option<String>,
+        receive_events: bool
     ) -> Window {
         let events = Queue::with_capacity(100);
         Window {
@@ -36,9 +38,33 @@ impl Window {
             title_border: None,
             title_pos: None,
             drawable_area: None,
-            event: events,
+            event_queue: events,
+            receive_events,
             active: false,
         }
+    }
+
+    /// Creates a new `Window`, with given dimensions and an optional title.
+    pub fn new_window(
+        rect: &Rect,
+        title: Option<String>,
+        receive_events: bool,
+    ) -> Result<Arc<Mutex<Window>>, &'static str> {
+        let mut window_manager = WINDOW_MANAGER.get().ok_or("Failed to get WindowManager while creating a window")?.lock();
+        let len = window_manager.windows.len();
+
+        window_manager.window_rendering_order.push(len);
+        let window = Window::new(
+            *rect,
+            VirtualFrameBuffer::new(rect.width, rect.height)?,
+            title,
+            receive_events,
+        );
+        let arc_window = Arc::new(Mutex::new(window));
+        arc_window.lock().active = true;
+        let returned_window = arc_window.clone();
+        window_manager.windows.push(arc_window);
+        Ok(returned_window)
     }
 
     pub fn active(&self) -> bool {
@@ -243,12 +269,12 @@ impl Window {
 
     /// Pushes an event into `self.event`
     pub fn push_event(&mut self, event: Event) -> Result<(), Event> {
-        self.event.push(event)
+        self.event_queue.push(event)
     }
 
     /// Pops event from `self.event` and returns it
     pub fn pop_event(&self) -> Option<Event> {
-        self.event.pop()
+        self.event_queue.pop()
     }
 
     pub fn resize_window(&mut self, width: i32, height: i32) {

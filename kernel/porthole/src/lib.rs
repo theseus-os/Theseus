@@ -1,4 +1,4 @@
-//! This crate creates and maintains rendering of the windows and the mouse. It defines a `WindowManager` structure and initializes instance of it.
+//! This crate maintains rendering of the windows and the mouse. It defines a `WindowManager` structure and initializes instance of it.
 //! 
 //! The `WindowManager` holds a vector of `Window`, which to be rendered to the front buffer, and their rendering order, it also hold information about the mouse.
 //! 'WindowManager' own's a `VirtualFrameBuffer` which acts like a back buffer and also owns a `PhysicalFrameBuffer` which acts like a front buffer.
@@ -192,27 +192,6 @@ impl WindowManager {
     }
 
     
-    /// Creates a new `Window`, with given dimensions and an optional title.
-    pub fn new_window(
-        &mut self,
-        rect: &Rect,
-        title: Option<String>,
-    ) -> Result<Arc<Mutex<Window>>, &'static str> {
-        let len = self.windows.len();
-
-        self.window_rendering_order.push(len);
-        let window = Window::new(
-            *rect,
-            VirtualFrameBuffer::new(rect.width, rect.height)?,
-            title,
-        );
-        let arc_window = Arc::new(Mutex::new(window));
-        arc_window.lock().active = true;
-        let returned_window = arc_window.clone();
-        self.windows.push(arc_window);
-        Ok(returned_window)
-    }
-
     /// Iterates through the `window_rendering_order`, gets the particular `Window` from `self.windows`
     /// and then locks it to hold the lock until we are done rendering that particular window into
     /// backbuffer/`v_framebuffer`.
@@ -285,7 +264,9 @@ impl WindowManager {
 
     pub fn set_window_event(&mut self, event: Event) -> Result<(),&'static str> {
         if let Some(window) = self.windows.get_mut(self.active_window_index) {
-            window.lock().push_event(event).map_err(|_| "Failed to enque event, window event queue was full")?;
+            if window.lock().receive_events{
+                window.lock().push_event(event).map_err(|_| "Failed to enque event, window event queue was full")?;
+            }
             Ok(())
         }else {
             Ok(()) 
