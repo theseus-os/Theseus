@@ -261,14 +261,11 @@ impl WindowManager {
         self.mouse.y = screen_positon.y as isize;
     }
 
-    pub fn set_window_event(&mut self, event: Event) -> Result<(),&'static str> {
+    pub fn set_window_event(&mut self, event: Event) {
         if let Some(window) = self.windows.get_mut(self.active_window_index) {
             if window.lock().receive_events{
                 window.lock().push_event(event);
             }
-            Ok(())
-        }else {
-            Ok(()) 
         }
     }
 
@@ -459,7 +456,7 @@ fn port_loop(
         if let Some(event) = event_opt {
             match event {
                 Event::MouseMovementEvent(ref mouse_event) => {
-                    window_manager.lock().set_window_event(Event::MouseMovementEvent(mouse_event.clone()))?;
+                    window_manager.lock().set_window_event(Event::MouseMovementEvent(mouse_event.clone()));
                     let movement = &mouse_event.movement;
                     let mut x = (movement.x_movement as i8) as isize;
                     let mut y = (movement.y_movement as i8) as isize;
@@ -495,8 +492,8 @@ fn port_loop(
                         .lock()
                         .handle_mouse_events_on_windows(ScreenPos::new(x as i32, -(y as i32)), &mouse_event);
                 }
-                Event::KeyboardEvent(ref input_event) => {
-                    window_manager.lock().set_window_event(event)?;
+                Event::KeyboardEvent(ref _input_event) => {
+                    window_manager.lock().set_window_event(event);
                 }
                 _ => (),
             }
