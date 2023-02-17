@@ -55,9 +55,9 @@ pub fn set_minimum_priority(priority: Priority) {
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
-/// Zeros the current priority level of this CPU,
-/// Meaning that the CPU is ready to process interrupts
-/// again.
+/// Signals to the controller that the currently processed interrupt has
+/// been fully handled, by zeroing the current priority level of this CPU.
+/// This implies that the CPU is ready to process interrupts again.
 pub fn end_of_interrupt(int: IntNumber) {
     let reg_value = int as usize;
     unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
