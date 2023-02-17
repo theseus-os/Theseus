@@ -50,9 +50,9 @@ pub fn set_minimum_priority(registers: &mut GicMappedPage, priority: Priority) {
     registers.write_volatile(offset::PMR, (u8::MAX - priority) as u32);
 }
 
-/// Zeros the current priority level of this CPU,
-/// Meaning that the CPU is ready to process interrupts
-/// again.
+/// Signals to the controller that the currently processed interrupt has
+/// been fully handled, by zeroing the current priority level of this CPU.
+/// This implies that the CPU is ready to process interrupts again.
 pub fn end_of_interrupt(registers: &mut GicMappedPage, int: IntNumber) {
     registers.write_volatile(offset::EOIR, int as u32);
 }
