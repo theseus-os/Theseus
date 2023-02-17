@@ -297,10 +297,6 @@ impl Window {
         self.drawable_area = None;
     }
 
-    pub fn stupid(&self) {
-        log::info!("len is {}", self.event_queue.len());
-    }
-
     pub fn reset_title_pos_and_border(&mut self) {
         self.title_border = None;
         self.title_pos = None;
