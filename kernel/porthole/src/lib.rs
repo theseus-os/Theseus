@@ -21,7 +21,6 @@ extern crate task;
 pub mod units;
 pub mod framebuffer;
 pub mod window;
-use alloc::format;
 use alloc::sync::Arc;
 use spin::{Mutex, Once};
 
@@ -265,7 +264,7 @@ impl WindowManager {
     pub fn set_window_event(&mut self, event: Event) -> Result<(),&'static str> {
         if let Some(window) = self.windows.get_mut(self.active_window_index) {
             if window.lock().receive_events{
-                window.lock().push_event(event).map_err(|_| "Failed to enque event, window event queue was full")?;
+                window.lock().push_event(event);
             }
             Ok(())
         }else {

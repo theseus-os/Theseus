@@ -1,5 +1,7 @@
 use crate::*;
 
+use ringbuffer::*;
+
 /// Controls amount of visible `Window` we see when we move a `Window` out of the screen
 pub static WINDOW_VISIBLE_GAP: i32 = 20;
 
@@ -16,7 +18,7 @@ pub struct Window {
     title_border: Option<Rect>,
     title_pos: Option<RelativePos>,
     drawable_area: Option<Rect>,
-    pub event_queue: Queue<Event>,
+    pub event_queue: ConstGenericRingBuffer<Event, 128>,
     pub receive_events: bool,
     pub(crate) active: bool,
 }
@@ -26,9 +28,8 @@ impl Window {
         rect: Rect,
         frame_buffer: VirtualFrameBuffer,
         title: Option<String>,
-        receive_events: bool
+        receive_events: bool,
     ) -> Window {
-        let events = Queue::with_capacity(100);
         Window {
             rect,
             frame_buffer,
@@ -38,7 +39,7 @@ impl Window {
             title_border: None,
             title_pos: None,
             drawable_area: None,
-            event_queue: events,
+            event_queue: ConstGenericRingBuffer::new(),
             receive_events,
             active: false,
         }
@@ -50,7 +51,10 @@ impl Window {
         title: Option<String>,
         receive_events: bool,
     ) -> Result<Arc<Mutex<Window>>, &'static str> {
-        let mut window_manager = WINDOW_MANAGER.get().ok_or("Failed to get WindowManager while creating a window")?.lock();
+        let mut window_manager = WINDOW_MANAGER
+            .get()
+            .ok_or("Failed to get WindowManager while creating a window")?
+            .lock();
         let len = window_manager.windows.len();
 
         window_manager.window_rendering_order.push(len);
@@ -157,10 +161,9 @@ impl Window {
             let min_width = core::cmp::min(self.rect.width(), slice.len() * CHARACTER_WIDTH);
             window_rect.width = min_width;
 
-            let mut row_of_pixels = self.frame_buffer.get_exact_row(
-                window_rect,
-                start_y as usize,
-            );
+            let mut row_of_pixels = self
+                .frame_buffer
+                .get_exact_row(window_rect, start_y as usize);
 
             loop {
                 let y = start_y + row_controller as u32;
@@ -199,10 +202,7 @@ impl Window {
                     if x_index >= CHARACTER_WIDTH * slice.len()
                         && x_index % (CHARACTER_WIDTH * slice.len()) == 0
                     {
-                        row_of_pixels = self.frame_buffer.get_exact_row(
-                            window_rect,
-                            y as usize,
-                        );
+                        row_of_pixels = self.frame_buffer.get_exact_row(window_rect, y as usize);
                         row_controller += 1;
                         char_index = 0;
                         x_index = 0;
@@ -268,13 +268,13 @@ impl Window {
     }
 
     /// Pushes an event into `self.event`
-    pub fn push_event(&mut self, event: Event) -> Result<(), Event> {
-        self.event_queue.push(event)
+    pub fn push_event(&mut self, event: Event) {
+        self.event_queue.enqueue(event);
     }
 
     /// Pops event from `self.event` and returns it
-    pub fn pop_event(&self) -> Option<Event> {
-        self.event_queue.pop()
+    pub fn pop_event(&mut self) -> Option<Event> {
+        self.event_queue.dequeue()
     }
 
     pub fn resize_window(&mut self, width: i32, height: i32) {
@@ -295,6 +295,10 @@ impl Window {
 
     pub fn reset_drawable_area(&mut self) {
         self.drawable_area = None;
+    }
+
+    pub fn stupid(&self) {
+        log::info!("len is {}", self.event_queue.len());
     }
 
     pub fn reset_title_pos_and_border(&mut self) {

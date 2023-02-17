@@ -2645,6 +2645,7 @@ dependencies = [
  "mpmc",
  "multicore_bringup",
  "page_attribute_table",
+ "ringbuffer",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -2886,6 +2887,12 @@ dependencies = [
  "task",
  "wait_queue",
 ]
+
+[[package]]
+name = "ringbuffer"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1973f95452ec56a4b2c683f5eabc15617e38f4faf2776ed4a0011d5070ecb37e"
 
 [[package]]
 name = "riscv"

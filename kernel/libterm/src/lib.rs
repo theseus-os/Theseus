@@ -11,7 +11,6 @@
 
 #[macro_use]
 extern crate alloc;
-#[macro_use]
 extern crate log;
 extern crate color;
 extern crate dfqueue;
@@ -26,7 +25,6 @@ use alloc::string::{String, ToString};
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use color::Color;
-use core::ops::DerefMut;
 use cursor::*;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};

@@ -1,17 +1,18 @@
-
 #![no_std]
-extern crate porthole;
-extern crate spin;
 extern crate alloc;
 extern crate font;
+extern crate porthole;
+extern crate spin;
 
+use alloc::format;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use porthole::units::Rect;
-use porthole::{window, DEFAULT_WINDOW_COLOR, DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR, WINDOW_MANAGER};
-use spin::{Mutex,RwLockReadGuard};
-use alloc::format;
-use alloc::sync::Arc;
+use porthole::{
+    window, DEFAULT_BORDER_COLOR, DEFAULT_TEXT_COLOR, DEFAULT_WINDOW_COLOR,
+};
+use spin::{Mutex, RwLockReadGuard};
 
 extern crate device_manager;
 extern crate hpet;
@@ -21,7 +22,6 @@ extern crate mouse_data;
 extern crate multicore_bringup;
 extern crate scheduler;
 extern crate task;
-
 
 use alloc::string::{String, ToString};
 use hpet::{get_hpet, Hpet};
@@ -43,7 +43,11 @@ pub struct FpsCounter {
 
 impl FpsCounter {
     pub fn new() -> Result<Self, &'static str> {
-        let window = Window::new_window(&Rect::new(360,360,0,0), Some(format!("FpsCounter")),false)?;
+        let window = Window::new_window(
+            &Rect::new(360, 360, 0, 0),
+            Some(format!("FpsCounter")),
+            false,
+        )?;
         let hpet = get_hpet().ok_or("Unable to get hpet")?;
         let time_it_took_to_render = hpet.get_counter();
         let timer_freq = hpet.counter_period_femtoseconds() as u64;
@@ -83,28 +87,23 @@ impl FpsCounter {
     pub fn run(&mut self) -> Result<(), &'static str> {
         let mut counter = 0;
         self.window.lock().fill(DEFAULT_WINDOW_COLOR)?;
-        loop{
+        loop {
             self.calculate_next_frame_time();
             self.reset_counters();
-            if counter == 1{
+            if counter == 1 {
                 counter = 0;
                 self.draw()?;
                 continue;
-            }else{
+            } else {
                 scheduler::schedule();
-                counter +=1;
+                counter += 1;
             }
         }
         Ok(())
     }
 
-    // Currently we don't need to handle any events
-    fn handle_event(&mut self){
-        self.window.lock().pop_event();
-    }
-
     fn draw(&mut self) -> Result<(), &'static str> {
-        if self.window.lock().resized(){
+        if self.window.lock().resized() {
             self.window.lock().fill(DEFAULT_WINDOW_COLOR)?;
         }
         self.window
@@ -161,27 +160,26 @@ impl FpsCounter {
     }
 }
 
-pub fn main(_args: Vec<isize>) -> isize{
+pub fn main(_args: Vec<isize>) -> isize {
     {
         let _task_ref = match spawn::new_task_builder(fps_counter_loop, ())
             .name("fps_counter_loop".to_string())
-            .spawn() {
-            Ok(task_ref) => { task_ref }
+            .spawn()
+        {
+            Ok(task_ref) => task_ref,
             Err(err) => {
                 log::error!("{}", err);
                 log::error!("failed to spawn fps_counter");
-                return -1; 
+                return -1;
             }
         };
     }
 
-     
     // block this task, because it never needs to actually run again
     task::with_current_task(|t| t.block())
         .expect("fps_counter::main(): failed to get current task")
         .expect("fps_counter:main(): failed to block the maintask");
     scheduler::schedule();
-    
 
     loop {
         //log:: warn!("BUG: blocked shell task was scheduled in unexpectedly");
