@@ -70,8 +70,8 @@ struct MouseImageRowIterator<'a> {
     /// Mouse image [`MOUSE_POINTER_IMAGE`]
     mouse_image: &'a [[u32; 18]; 11],
     /// Rect of our mouse
-    bounding_box: Rect,
-    /// Since image is column major we will iterate will use
+    visible_mouse_rect: Rect,
+    /// Since image we will iterate is column major we are going to use
     /// individual columns to create a row, think of it as y axis
     current_column: usize,
     /// Used to traverse image in x axis
@@ -79,10 +79,10 @@ struct MouseImageRowIterator<'a> {
 }
 
 impl<'a> MouseImageRowIterator<'a> {
-    fn new(mouse_image: &'a [[u32; 18]; 11], bounding_box: Rect) -> Self {
+    fn new(mouse_image: &'a [[u32; 18]; 11], visible_mouse_rect: Rect) -> Self {
         Self {
             mouse_image,
-            bounding_box,
+            visible_mouse_rect,
             current_column: 0,
             current_row: 0,
         }
@@ -95,11 +95,11 @@ impl<'a> Iterator for MouseImageRowIterator<'a> {
     fn next(&mut self) -> Option<Vec<u32>> {
         // We start from MOUSE_POINTER_IMAGE[0][0], get the color on that index push it to our `row`
         // then move to MOUSE_POINTER_IMAGE[1][0] do the same thing
-        // until we hit `bounding_box.width -1` then we reset our `current_column` to `0` and increase
+        // until we hit `bounding_box.width` then we reset our `current_column` to `0` and increase
         // our `current_row` by `1`
-        if self.current_row < self.bounding_box.height - 1 {
-            let mut row = Vec::with_capacity(self.bounding_box.width - 1);
-            while self.current_column < self.bounding_box.width {
+        if self.current_row < self.visible_mouse_rect.height {
+            let mut row = Vec::new();
+            while self.current_column < self.visible_mouse_rect.width {
                 let color = self
                     .mouse_image
                     .get(self.current_column)?
@@ -107,7 +107,7 @@ impl<'a> Iterator for MouseImageRowIterator<'a> {
 
                 row.push(*color);
                 self.current_column += 1;
-                if self.current_column == self.bounding_box.width - 1 {
+                if self.current_column == self.visible_mouse_rect.width {
                     self.current_column = 0;
                     break;
                 }
