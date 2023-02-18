@@ -1085,6 +1085,8 @@
 <a href="#1085" id="1085">1085</a>
 <a href="#1086" id="1086">1086</a>
 <a href="#1087" id="1087">1087</a>
+<a href="#1088" id="1088">1088</a>
+<a href="#1089" id="1089">1089</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.
 //! The minimum unit of allocation is a single frame. 
 //!
@@ -1549,7 +1551,7 @@
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">if </span><span class="self">self</span>.size_in_frames() == <span class="number">0 </span>{ <span class="kw">return</span>; }
 
-        <span class="kw">let </span>(list, typ) = <span class="kw">if </span>frame_is_in_list(<span class="kw-2">&amp;</span>RESERVED_REGIONS.lock(), <span class="self">self</span>.start()) {
+        <span class="kw">let </span>(list, typ) = <span class="kw">if </span>contains_any(<span class="kw-2">&amp;</span>RESERVED_REGIONS.lock(), <span class="kw-2">&amp;</span><span class="self">self</span>.frames) {
             (<span class="kw-2">&amp;</span>FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
         } <span class="kw">else </span>{
             (<span class="kw-2">&amp;</span>FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
@@ -1922,29 +1924,35 @@
 }
 
 
-<span class="doccomment">/// Returns whether the given `Frame` is contained within the given `list`.
-</span><span class="kw">fn </span>frame_is_in_list(
+<span class="doccomment">/// Returns `true` if the given list contains *any* of the given `frames`.
+</span><span class="kw">fn </span>contains_any(
     list: <span class="kw-2">&amp;</span>StaticArrayRBTree&lt;Chunk&gt;,
-    frame: <span class="kw-2">&amp;</span>Frame,
+    frames: <span class="kw-2">&amp;</span>FrameRange,
 ) -&gt; bool {
     <span class="kw">match </span><span class="kw-2">&amp;</span>list.<span class="number">0 </span>{
         Inner::Array(<span class="kw-2">ref </span>arr) =&gt; {
             <span class="kw">for </span>chunk <span class="kw">in </span>arr.iter().flatten() {
-                <span class="kw">if </span>chunk.contains(frame) {
+                <span class="kw">if </span>chunk.overlap(frames).is_some() {
                     <span class="kw">return </span><span class="bool-val">true</span>;
                 }
             }
         }
-        Inner::RBTree(<span class="kw-2">ref </span>tree) =&gt; {     
-            <span class="kw">let </span>cursor = tree.upper_bound(Bound::Included(frame));
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().map(|w| w.deref()) {
-                <span class="kw">if </span>chunk.contains(frame) {
+        Inner::RBTree(<span class="kw-2">ref </span>tree) =&gt; {
+            <span class="kw">let </span><span class="kw-2">mut </span>cursor = tree.upper_bound(Bound::Included(frames.start()));
+            <span class="kw">while let </span><span class="prelude-val">Some</span>(chunk) = cursor.get().as_deref() {
+                <span class="kw">if </span>chunk.start() &gt; frames.end() {
+                    <span class="comment">// We&#39;re iterating in ascending order over a sorted tree, so we can stop
+                    // looking for overlapping regions once we pass the end of `frames`.
+                    </span><span class="kw">break</span>;
+                }
+
+                <span class="kw">if </span>chunk.overlap(frames).is_some() {
                     <span class="kw">return </span><span class="bool-val">true</span>;
                 }
+                cursor.move_next();
             }
         }
     }
-
     <span class="bool-val">false
 </span>}
 
@@ -2035,10 +2043,10 @@
     
     <span class="kw">if let </span><span class="prelude-val">Some</span>(paddr) = requested_paddr {
         <span class="kw">let </span>start_frame = Frame::containing_address(paddr);
-        <span class="comment">// Try to allocate the frames at the specific address.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
-        <span class="comment">// First check if the frames are in the reserved list
-        </span><span class="kw">let </span>(requested_start_frame, requested_num_frames) = <span class="kw">match </span>find_specific_chunk(<span class="kw-2">&amp;mut </span>free_reserved_frames_list, start_frame, num_frames) {
+        <span class="kw">let </span><span class="kw-2">mut </span>free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
+        <span class="comment">// First, attempt to allocate the requested frames from the free reserved list.
+        </span><span class="kw">let </span>first_allocation_attempt = find_specific_chunk(<span class="kw-2">&amp;mut </span>free_reserved_frames_list, start_frame, num_frames);
+        <span class="kw">let </span>(requested_start_frame, requested_num_frames) = <span class="kw">match </span>first_allocation_attempt {
             <span class="prelude-val">Ok</span>(success) =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(success),
             <span class="prelude-val">Err</span>(alloc_err) =&gt; <span class="kw">match </span>alloc_err {
                 AllocationError::AddressNotFound(..) =&gt; {
@@ -2060,16 +2068,12 @@
             }
         };
 
-        <span class="kw">let </span>requested_end_frame = requested_start_frame + (requested_num_frames - <span class="number">1</span>);
         <span class="comment">// If we failed to allocate the requested frames from the general list,
         // we can add a new reserved region containing them,
         // but ONLY if those frames are *NOT* in the general-purpose region.
-        </span><span class="kw">if </span>{
-            <span class="kw">let </span>g = GENERAL_REGIONS.lock();  
-            !frame_is_in_list(<span class="kw-2">&amp;</span>g, <span class="kw-2">&amp;</span>requested_start_frame) &amp;&amp; !frame_is_in_list(<span class="kw-2">&amp;</span>g, <span class="kw-2">&amp;</span>requested_end_frame)
-        } {
-            <span class="kw">let </span>frames = FrameRange::new(requested_start_frame, requested_end_frame);
-            <span class="kw">let </span>new_reserved_frames = add_reserved_region(<span class="kw-2">&amp;mut </span>RESERVED_REGIONS.lock(), frames)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>requested_frames = FrameRange::new(requested_start_frame, requested_start_frame + (requested_num_frames - <span class="number">1</span>));
+        <span class="kw">if </span>!contains_any(<span class="kw-2">&amp;</span>GENERAL_REGIONS.lock(), <span class="kw-2">&amp;</span>requested_frames) {
+            <span class="kw">let </span>new_reserved_frames = add_reserved_region(<span class="kw-2">&amp;mut </span>RESERVED_REGIONS.lock(), requested_frames)<span class="question-mark">?</span>;
             <span class="comment">// If we successfully added a new reserved region,
             // then add those frames to the actual list of *available* reserved regions.
             </span><span class="kw">let </span>_new_free_reserved_frames = add_reserved_region(<span class="kw-2">&amp;mut </span>free_reserved_frames_list, new_reserved_frames.clone())<span class="question-mark">?</span>;
