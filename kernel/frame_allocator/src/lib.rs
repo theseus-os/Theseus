@@ -462,7 +462,7 @@ impl Drop for AllocatedFrames {
     fn drop(&mut self) {
         if self.size_in_frames() == 0 { return; }
 
-        let (list, typ) = if frame_is_in_list(&RESERVED_REGIONS.lock(), self.start()) {
+        let (list, typ) = if contains_any(&RESERVED_REGIONS.lock(), &self.frames) {
             (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
         } else {
             (&FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
@@ -835,29 +835,35 @@ fn split_chosen_chunk(
 }
 
 
-/// Returns whether the given `Frame` is contained within the given `list`.
-fn frame_is_in_list(
+/// Returns `true` if the given list contains *any* of the given `frames`.
+fn contains_any(
     list: &StaticArrayRBTree<Chunk>,
-    frame: &Frame,
+    frames: &FrameRange,
 ) -> bool {
     match &list.0 {
         Inner::Array(ref arr) => {
             for chunk in arr.iter().flatten() {
-                if chunk.contains(frame) {
+                if chunk.overlap(frames).is_some() {
                     return true;
                 }
             }
         }
-        Inner::RBTree(ref tree) => {     
-            let cursor = tree.upper_bound(Bound::Included(frame));
-            if let Some(chunk) = cursor.get().map(|w| w.deref()) {
-                if chunk.contains(frame) {
+        Inner::RBTree(ref tree) => {
+            let mut cursor = tree.upper_bound(Bound::Included(frames.start()));
+            while let Some(chunk) = cursor.get().as_deref() {
+                if chunk.start() > frames.end() {
+                    // We're iterating in ascending order over a sorted tree, so we can stop
+                    // looking for overlapping regions once we pass the end of `frames`.
+                    break;
+                }
+
+                if chunk.overlap(frames).is_some() {
                     return true;
                 }
+                cursor.move_next();
             }
         }
     }
-
     false
 }
 
@@ -948,10 +954,10 @@ pub fn allocate_frames_deferred(
     
     if let Some(paddr) = requested_paddr {
         let start_frame = Frame::containing_address(paddr);
-        // Try to allocate the frames at the specific address.
         let mut free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
-        // First check if the frames are in the reserved list
-        let (requested_start_frame, requested_num_frames) = match find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames) {
+        // First, attempt to allocate the requested frames from the free reserved list.
+        let first_allocation_attempt = find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames);
+        let (requested_start_frame, requested_num_frames) = match first_allocation_attempt {
             Ok(success) => return Ok(success),
             Err(alloc_err) => match alloc_err {
                 AllocationError::AddressNotFound(..) => {
@@ -973,16 +979,12 @@ pub fn allocate_frames_deferred(
             }
         };
 
-        let requested_end_frame = requested_start_frame + (requested_num_frames - 1);
         // If we failed to allocate the requested frames from the general list,
         // we can add a new reserved region containing them,
         // but ONLY if those frames are *NOT* in the general-purpose region.
-        if {
-            let g = GENERAL_REGIONS.lock();  
-            !frame_is_in_list(&g, &requested_start_frame) && !frame_is_in_list(&g, &requested_end_frame)
-        } {
-            let frames = FrameRange::new(requested_start_frame, requested_end_frame);
-            let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), frames)?;
+        let requested_frames = FrameRange::new(requested_start_frame, requested_start_frame + (requested_num_frames - 1));
+        if !contains_any(&GENERAL_REGIONS.lock(), &requested_frames) {
+            let new_reserved_frames = add_reserved_region(&mut RESERVED_REGIONS.lock(), requested_frames)?;
             // If we successfully added a new reserved region,
             // then add those frames to the actual list of *available* reserved regions.
             let _new_free_reserved_frames = add_reserved_region(&mut free_reserved_frames_list, new_reserved_frames.clone())?;
