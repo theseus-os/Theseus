@@ -847,7 +847,6 @@ fn contains_any(
                     return true;
                 }
             }
-            false
         }
         Inner::RBTree(ref tree) => {
             let mut cursor = tree.upper_bound(Bound::Included(frames.start()));
@@ -863,9 +862,9 @@ fn contains_any(
                 }
                 cursor.move_next();
             }
-            false
         }
     }
+    false
 }
 
 
