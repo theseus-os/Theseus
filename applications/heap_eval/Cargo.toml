@@ -5,7 +5,7 @@ description = "Benchmarks to evaluate Theseus's heap design"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
 
 [dependencies]
-qp-trie = "0.8.0"
+qp-trie = "0.8.1"
 getopts = "0.2.21"
 
 [dependencies.app_io]
