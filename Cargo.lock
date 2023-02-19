@@ -606,6 +606,7 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cfg-if 1.0.0",
 ]
 
 [[package]]

@@ -6,11 +6,5 @@
 
 #![no_std]
 
-#[cfg(target_arch = "x86_64")]
-pub use apic::{
-    CpuId,
-    cpu_count,
-    bootstrap_cpu,
-    is_bootstrap_cpu,
-    current_cpu,
-};
+mod arch;
+pub use arch::*;
