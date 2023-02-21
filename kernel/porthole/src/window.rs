@@ -300,7 +300,7 @@ impl Window {
     /// * `rect` - The rect we will fill inside the window with
     /// * `color` - The `Color` to fill the rectangle inside the window with.
     pub fn fill_rectangle(&mut self, rect: &mut Rect, color: Color) {
-        //self.fit_rect_to_window(rect);
+        self.fit_rect_to_window(rect);
         self.fill_rect_abs(rect, color);
     }
 
