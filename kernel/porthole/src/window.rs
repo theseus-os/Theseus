@@ -10,19 +10,44 @@ pub static MOUSE_VISIBLE_GAP: i32 = 3;
 /// Height of the Window's title bar
 pub static TITLE_BAR_HEIGHT: usize = 20;
 
+/// Size of the side border gap
 pub static SIDE_BORDER_GAP: usize = 4;
+/// Size of the bottom border gap
 pub static BOTTOM_BORDER_GAP: usize = 1;
+
+/// Represents a window that can be drawn to and interacted with
 pub struct Window {
+    /// The rectangle defining the position and size of the window.
     rect: Rect,
+
+    /// The virtual frame buffer for the window, which is used to draw its contents.
     pub frame_buffer: VirtualFrameBuffer,
+
+    /// Whether or not the window has been resized
     resized: bool,
+
+    /// Whether or not the window is currently being resized by the user.
     pub resizing: bool,
+
+    /// The title of the window, if it has one.
     title: Option<String>,
+
+    /// The rectangle defining the position and size of the title bar, if the window has a title.
     title_border: Option<Rect>,
+
+    /// The relative position of the title within the title bar, if the window has a title.
     title_pos: Option<RelativePos>,
+
+    /// The area within the window where drawing can occur, excluding the title bar and any borders.
     drawable_area: Option<Rect>,
+
+    /// A queue of events for the window.
     pub event_queue: ConstGenericRingBuffer<Event, 128>,
+
+    /// Whether or not the window should receive events.
     pub receive_events: bool,
+
+    /// Whether or not the window is currently active (focused).
     pub(crate) active: bool,
 }
 
@@ -74,6 +99,7 @@ impl Window {
         Ok(returned_window)
     }
 
+    /// Returns whether window is active or not
     pub fn active(&self) -> bool {
         self.active
     }
@@ -119,18 +145,27 @@ impl Window {
         Ok(())
     }
 
+    /// Fills the remaining width of the current line with a blank space of the specified color
+    ///
+    /// * `text_len` - The length of the text that has been printed on the line so far
+    /// * `color` - The background color to fill the remaining space with
+    /// * `y` - The vertical position of the line
     fn fill_rest_of_line_blank(&mut self, text_len: usize, color: Color, y: isize) {
-        let text_len_in_pixels = text_len * CHARACTER_WIDTH;
-        let mut drawable_area = self.drawable_area();
+        // Calculate the width of the text that has been printed so far
+        let text_width = text_len * CHARACTER_WIDTH;
 
-        drawable_area.height = CHARACTER_HEIGHT - 1;
-        let rest_of_the_line = drawable_area.width - text_len_in_pixels;
-        drawable_area.width = rest_of_the_line;
+        // Calculate the area of the current line that has not yet been printed on
+        let mut drawable_area = self.drawable_area();
         drawable_area.y = y;
-        drawable_area.x += text_len_in_pixels as isize;
+        drawable_area.height = CHARACTER_HEIGHT - 1;
+        drawable_area.x += text_width as isize;
+        drawable_area.width -= text_width;
+
+        // Fill the remaining space on the current line with the specified color
         self.fill_rectangle(&mut drawable_area, color);
     }
 
+    /// Prints a string on a new line at the specified absolute (x, y) coordinates.
     fn print_string_line_abs(
         &mut self,
         x: u32,
@@ -231,6 +266,9 @@ impl Window {
         self.print_string_line_abs(x, y, slice, fg_color, bg_color)
     }
 
+    /// Displays the window title on the screen.
+    ///
+    /// The title will be printed in the color specified by `fg_color`, with a background color of `bg_color`.
     pub fn display_window_title(
         &mut self,
         fg_color: Color,
@@ -245,11 +283,13 @@ impl Window {
         Ok(())
     }
 
-    pub fn width(&self) -> usize {
+    /// Return's width of the window
+    fn width(&self) -> usize {
         self.rect.width
     }
 
-    pub fn height(&self) -> usize {
+    /// Return's height of the window
+    fn height(&self) -> usize {
         self.rect.height
     }
 
@@ -260,10 +300,11 @@ impl Window {
     /// * `rect` - The rect we will fill inside the window with
     /// * `color` - The `Color` to fill the rectangle inside the window with.
     pub fn fill_rectangle(&mut self, rect: &mut Rect, color: Color) {
-        self.fit_rect_to_window(rect);
+        //self.fit_rect_to_window(rect);
         self.fill_rect_abs(rect, color);
     }
 
+    /// Fill a rectangle with absolute position on to the window.
     fn fill_rect_abs(&mut self, rect: &mut Rect, color: Color) {
         if rect.x <= (self.rect.width() as isize as isize)
             && rect.y <= (self.rect.height as isize as isize)
@@ -276,11 +317,13 @@ impl Window {
         }
     }
 
+    /// Returns ScreenPos of the window
     pub fn screen_pos(&self) -> ScreenPos {
         let screen_pos = ScreenPos::new(self.rect.x as i32, self.rect.y as i32);
         screen_pos
     }
 
+    /// Set's window position to screen_position
     pub fn set_screen_pos(&mut self, screen_position: &ScreenPos) {
         self.rect.x = screen_position.x as isize;
         self.rect.y = screen_position.y as isize;
@@ -296,26 +339,34 @@ impl Window {
         self.event_queue.dequeue()
     }
 
+    /// Resizes the window to the specified dimensions, clamping the values so that resizing is not too extreme
+    /// and ensuring that the resulting width and height are divisible by `CHARACTER_WIDTH` and `CHARACTER_HEIGHT`.
+    ///
+    /// The minimum window size is 180 and the maximum is the screen size.
     pub fn resize_window(&mut self, width: i32, height: i32) {
-        // We clamp the values so resizing is not too extreme, and multiply them by CHARACTER_WIDTH
-        // and CHARACTER_HEIGHT so the window is almost always divisible by those values.
+        // Clamp the values so resizing is not too extreme, and multiply by CHARACTER_WIDTH and CHARACTER_HEIGHT
+        // so the resulting width and height are almost always divisible by those values.
         let width = width.clamp(-1, 1) * CHARACTER_WIDTH as i32;
         let height = height.clamp(-1, 1) * CHARACTER_HEIGHT as i32;
 
-        // We don't want any window to be smaller than 180 and bigger than the screen itself.
+        // Ensure the resulting width and height are within the minimum and maximum limits
         let new_width =
             (self.width() as i32 + width as i32).clamp(180, SCREEN_WIDTH as i32) as usize;
         let new_height =
             (self.height() as i32 + height as i32).clamp(180, SCREEN_HEIGHT as i32) as usize;
+
+        // Update the window's dimensions and set the "resized" flag to true
         self.rect.width = new_width;
         self.rect.height = new_height;
         self.resized = true;
     }
 
+    /// Set's drawable area to None
     pub fn reset_drawable_area(&mut self) {
         self.drawable_area = None;
     }
 
+    /// Set's title_border and title_pos to None
     pub fn reset_title_pos_and_border(&mut self) {
         self.title_border = None;
         self.title_pos = None;
@@ -336,7 +387,7 @@ impl Window {
         rect
     }
 
-    /// Transforms a given relative position to an absolute position within the window
+    /// Transforms a given `relative_pos` to an absolute position within the window
     ///
     /// Takes in a `RelativePos` and returns a tuple containing the transformed
     /// x and y coordinates. The transformed position ensures that the user cannot modify the window
@@ -360,7 +411,7 @@ impl Window {
         let (abs_x, abs_y) = self.to_absolute_pos(&rect.to_relative_pos());
         rect.x = abs_x as isize;
         rect.y = abs_y as isize;
-        // If the rectangle extends beyond the right edge of the window, reduce its width to fit within
+        // If the rectangle extends beyond the right edge of the window, reduce rect's width to fit within
         // the drawable area.
         if rect.x_plus_width() >= self.width() as isize {
             let drawable_area_width = self.drawable_area().width();
@@ -440,6 +491,7 @@ impl Window {
         }
     }
 
+    /// Return's true if window is resized
     pub fn resized(&self) -> bool {
         self.resized
     }
@@ -460,8 +512,9 @@ impl Window {
         // so we do the resize check here. Plus to fill the window we need updated version of framebuffer's width and height.
         self.should_resize_framebuffer()?;
 
-        let mut drawable_area = self.rect();
-        self.fill_rect_abs(&mut drawable_area, color);
+        for pixel in self.frame_buffer.buffer.iter_mut() {
+            *pixel = color;
+        }
 
         self.draw_borders();
         Ok(())

@@ -106,7 +106,6 @@ impl FpsCounter {
         if self.window.lock().resized() {
             self.window.lock().fill(DEFAULT_WINDOW_COLOR)?;
         }
-        self.window.lock().print_string_line(&RelativePos::new(900, 900), "HELLO", DEFAULT_TEXT_COLOR, DEFAULT_WINDOW_COLOR)?;
         self.window
             .lock()
             .display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;
