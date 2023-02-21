@@ -400,7 +400,7 @@ impl Window {
         *relative_pos
     }
 
-    /// Draws the border of the window's title area using the default border color.
+    /// Draws the borders of the Window using the default border color.
     pub fn draw_borders(&mut self) {
         let mut border = self.title_border();
         self.fill_rect_abs(&mut border, DEFAULT_BORDER_COLOR);
