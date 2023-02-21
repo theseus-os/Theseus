@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.17"
-spin = "0.9.4"
 memory = { path = "../memory" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
@@ -26,6 +25,7 @@ gdt = { path = "../gdt" }
 pic = { path = "../pic" }
 tss = { path = "../tss" }
 x86_64 = "0.14.8"
+spin = "0.9.4"
 locked_idt = { path = "../../libs/locked_idt" }
 
 [lib]

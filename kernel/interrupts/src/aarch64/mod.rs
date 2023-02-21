@@ -13,14 +13,13 @@ use gic::{qemu_virt_addrs, ArmGic, IntNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
-use spin::Once;
 
 // Raw/Early exception handling is defined
 // in this assembly file.
 global_asm!(include_str!("table.s"));
 
 // The global interrupt controller singleton
-static GIC: MutexIrqSafe<Once<ArmGic>> = MutexIrqSafe::new(Once::new());
+static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
 // Default Timer IRQ number on AArch64 as
 // defined by Arm Manuals
@@ -89,37 +88,37 @@ pub fn init() -> Result<(), &'static str> {
         static __exception_vector_start: UnsafeCell<()>;
     }
 
-    // Set the exception handling vector, which
-    // is an array of grouped aarch64 instructions.
-    // see table.s for more info.
-    unsafe { VBAR_EL1.set(__exception_vector_start.get() as u64) };
-
-    let kernel_mmi_ref = get_kernel_mmi_ref()
-        .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
-
-    let mut mmi = kernel_mmi_ref.lock();
-    let page_table = &mut mmi.deref_mut().page_table;
-
-    log::info!("Configuring the GIC");
-    let inner = ArmGic::init(
-        page_table,
-        GicVersion::InitV3 {
-            dist: qemu_virt_addrs::GICD,
-            redist: qemu_virt_addrs::GICR,
-        },
-    )?;
-
     let mut gic = GIC.lock();
-    let mut result = Err("The GIC has already been initialized!");
-    gic.call_once(|| { result = Ok(()); inner });
+    if gic.is_some() {
+        Err("The GIC has already been initialized!")
+    } else {
+        // Set the exception handling vector, which
+        // is an array of grouped aarch64 instructions.
+        // see table.s for more info.
+        unsafe { VBAR_EL1.set(__exception_vector_start.get() as u64) };
 
-    if result.is_ok() {
-        let gic = gic.get_mut().unwrap();
-        gic.set_minimum_priority(0);
+        let kernel_mmi_ref = get_kernel_mmi_ref()
+            .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
+
+        let mut mmi = kernel_mmi_ref.lock();
+        let page_table = &mut mmi.deref_mut().page_table;
+
+        log::info!("Configuring the GIC");
+        let mut inner = ArmGic::init(
+            page_table,
+            GicVersion::InitV3 {
+                dist: qemu_virt_addrs::GICD,
+                redist: qemu_virt_addrs::GICR,
+            },
+        )?;
+
+        inner.set_minimum_priority(0);
+        *gic = Some(inner);
+
         log::info!("Done Configuring the GIC");
-    }
 
-    result
+        Ok(())
+    }
 }
 
 pub fn enable_timer_interrupts() -> Result<(), &'static str> {
@@ -141,7 +140,7 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
         // & Enable the interrupt.
         {
             let mut gic = GIC.lock();
-            let gic = gic.get_mut().ok_or("GIC is uninitialized")?;
+            let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
 
             // enable routing of this interrupt
             gic.set_interrupt_state(AARCH64_TIMER_IRQ, true);
@@ -226,7 +225,7 @@ pub fn deregister_interrupt(irq_num: IntNumber, func: HandlerFunc) -> Result<(),
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: IntNumber) {
     let mut gic = GIC.lock();
-    let gic = gic.get_mut().unwrap();
+    let gic = gic.as_mut().expect("GIC is uninitialized");
     gic.end_of_interrupt(irq_num);
 }
 
@@ -331,7 +330,7 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     // ackownledge IRQ to the GIC
     let (irq_num, _priority) = {
         let mut gic = GIC.lock();
-        let gic = gic.get_mut().expect("GIC is uninitialized!");
+        let gic = gic.as_mut().expect("GIC is uninitialized");
         gic.acknowledge_interrupt()
     };
     // important: GIC mutex is now implicitly unlocked
@@ -344,7 +343,7 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     if !handler(exc) {
         // handler has returned, we can lock again
         let mut gic = GIC.lock();
-        gic.get_mut().unwrap().end_of_interrupt(irq_num);
+        gic.as_mut().unwrap().end_of_interrupt(irq_num);
     }
 }
 
