@@ -3,7 +3,7 @@ use core::ops::{Add, Sub};
 
 pub static SCREEN_WIDTH: usize = 1024;
 pub static SCREEN_HEIGHT: usize = 768;
-/// Position that is relative to the screen.
+/// Position that is always within the screen coordinates
 #[derive(Debug, Clone, Copy)]
 pub struct RelativePos {
     pub x: u32,
@@ -22,7 +22,7 @@ impl RelativePos {
     }
 }
 
-/// Position that is relative to the screen
+/// Screen position, absolute coordinates.
 #[derive(Debug, Clone, Copy)]
 pub struct ScreenPos {
     pub x: i32,

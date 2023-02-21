@@ -8,7 +8,7 @@ use alloc::format;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
-use porthole::units::Rect;
+use porthole::units::{Rect, RelativePos};
 use porthole::{
     window, DEFAULT_BORDER_COLOR, DEFAULT_TEXT_COLOR, DEFAULT_WINDOW_COLOR,
 };
@@ -106,6 +106,7 @@ impl FpsCounter {
         if self.window.lock().resized() {
             self.window.lock().fill(DEFAULT_WINDOW_COLOR)?;
         }
+        self.window.lock().print_string_line(&RelativePos::new(900, 900), "HELLO", DEFAULT_TEXT_COLOR, DEFAULT_WINDOW_COLOR)?;
         self.window
             .lock()
             .display_window_title(DEFAULT_TEXT_COLOR, DEFAULT_BORDER_COLOR)?;

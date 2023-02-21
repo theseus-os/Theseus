@@ -180,7 +180,10 @@ impl<'a> FramebufferRowChunks<'a> {
         rect.width = core::cmp::min(rect.width, stride);
         let current_column = rect.y as usize;
         let start_of_row = (stride * current_column) + rect.x as usize;
-        let end_of_row = (stride * current_column) + rect.x_plus_width() as usize;
+        // In cases where `x_plus_width()` is bigger than framebuffer.width user would be able to write 
+        // more places than they should, this forces that to not happen.
+        let end_index = core::cmp::min(rect.x_plus_width(),framebuffer.width as isize); // Not sure about the variable name here ?
+        let end_of_row = (stride * current_column) + end_index as usize;
         Self {
             framebuffer: &mut framebuffer.buffer,
             rect: *rect,

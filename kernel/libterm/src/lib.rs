@@ -448,7 +448,7 @@ impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
 
-        let rect = Rect::new(450, 500, 0, 0);
+        let rect = Rect::new(460, 501, 0, 0);
 
         let window = Window::new_window(&rect, Some(format!("Terminal")),true)?;
 
@@ -474,7 +474,7 @@ impl Terminal {
         };
         terminal.window.lock().fill(0x3C3836)?;
         terminal.print_to_terminal(format!(
-            "Theseus Terminal Emulator\nPress Ctrl+C to quit a task\n"
+            "Theseus Terminal Emulator \n Press Ctrl+C to quit a task\n"
         ));
         terminal.display_text()?;
 
@@ -653,15 +653,15 @@ impl Terminal {
             .ok_or("Error trying to to get last line of `text_display`")?
             .len();
 
-        let x = last_line_len ;
+        let x = last_line_len;
         let mut y = line_count - 1;
         for (index, line) in self.text_display.text.lines().enumerate() {
             if index != line_count - 1 {
-                y += (line.len() * CHARACTER_WIDTH) / window.width();
+                y += ((line.len() * CHARACTER_WIDTH) + CHARACTER_WIDTH) / window.drawable_area().width();
             }
         }
         y = core::cmp::min(
-            (window.frame_buffer.height - CHARACTER_HEIGHT) / CHARACTER_HEIGHT,
+            (window.drawable_area().height() - CHARACTER_HEIGHT) / CHARACTER_HEIGHT,
             y,
         );
 

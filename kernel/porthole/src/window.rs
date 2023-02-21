@@ -9,6 +9,9 @@ pub static WINDOW_VISIBLE_GAP: i32 = 20;
 pub static MOUSE_VISIBLE_GAP: i32 = 3;
 /// Height of the Window's title bar
 pub static TITLE_BAR_HEIGHT: usize = 20;
+
+pub static SIDE_BORDER_GAP: usize = 4;
+pub static BOTTOM_BORDER_GAP: usize = 1;
 pub struct Window {
     rect: Rect,
     pub frame_buffer: VirtualFrameBuffer,
@@ -92,38 +95,22 @@ impl Window {
             // Number of characters that can fit in a line
             let line_len = line.len() * CHARACTER_WIDTH;
             // If text fits to a single line
-            if line_len < self.width() - CHARACTER_WIDTH {
+            if line_len < self.drawable_area().width() - CHARACTER_WIDTH {
                 self.print_string_line(position, line, fg_color, bg_color)?;
-
-                let mut window_rect = self.rect();
-                window_rect.height = CHARACTER_HEIGHT - 1;
-                let rest_of_the_line = window_rect.width - line_len;
-                window_rect.width = rest_of_the_line;
-                window_rect.y = position.y as isize;
-                window_rect.x = line_len as isize;
-                // We fill rest of the line with `bg_color` to clear the screen
-                self.fill_rectangle(&mut window_rect, bg_color);
-                if position.y != self.height() as u32 {
+                self.fill_rest_of_line_blank(line.len(), bg_color, position.y as isize);
+                if position.y <= ((self.drawable_area().height) - 0) as u32 {
                     position.y += CHARACTER_HEIGHT as u32;
                 }
             } else {
-                let max_text_width = self.width() / CHARACTER_WIDTH;
+                let max_text_width = self.drawable_area().width() / CHARACTER_WIDTH;
                 let mut text_start = 0;
                 while let Some(shorter_line) = line.get(text_start..) {
+                    let text_end = core::cmp::min(shorter_line.len(), max_text_width);
+                    let shorter_line = shorter_line.get(..text_end).unwrap();
                     text_start += max_text_width;
-
                     self.print_string_line(position, shorter_line, fg_color, bg_color)?;
-
-                    let mut window_rect = self.rect();
-                    window_rect.height = CHARACTER_HEIGHT - 1;
-                    let rest_of_the_line =
-                        window_rect.width - (shorter_line.len() * CHARACTER_WIDTH);
-                    window_rect.width = rest_of_the_line;
-                    window_rect.y = position.y as isize;
-                    window_rect.x = (shorter_line.len() * CHARACTER_WIDTH) as isize;
-                    self.fill_rectangle(&mut window_rect, bg_color);
-
-                    if position.y < self.height() as u32 {
+                    self.fill_rest_of_line_blank(shorter_line.len(), bg_color, position.y as isize);
+                    if position.y <= (self.drawable_area().height) as u32 {
                         position.y += CHARACTER_HEIGHT as u32;
                     }
                 }
@@ -132,33 +119,43 @@ impl Window {
         Ok(())
     }
 
-    /// Prints a line of string to the onto the window
-    ///  
-    /// * `position` - This indicates where line of text will be.
-    /// * `slice` - Text we are printing
-    /// * `fg_color` - Foreground color of the text
-    /// * `bg_color` - Background color of the text
-    pub fn print_string_line(
+    fn fill_rest_of_line_blank(&mut self, text_len: usize, color: Color, y: isize) {
+        let text_len_in_pixels = text_len * CHARACTER_WIDTH;
+        let mut drawable_area = self.drawable_area();
+
+        drawable_area.height = CHARACTER_HEIGHT - 1;
+        let rest_of_the_line = drawable_area.width - text_len_in_pixels;
+        drawable_area.width = rest_of_the_line;
+        drawable_area.y = y;
+        drawable_area.x += text_len_in_pixels as isize;
+        self.fill_rectangle(&mut drawable_area, color);
+    }
+
+    fn print_string_line_abs(
         &mut self,
-        position: &RelativePos,
+        x: u32,
+        y: u32,
         slice: &str,
         fg_color: Color,
         bg_color: Color,
     ) -> Result<(), &'static str> {
         if !slice.is_empty() {
             let slice = slice.as_bytes();
-            let start_x = position.x;
-            let start_y = position.y;
+            let start_x = x;
+            let start_y = y;
 
             let mut x_index = 0;
             let mut row_controller = 0;
             let mut char_index = 0;
             let mut char_color_on_x_axis = x_index;
 
-            let mut window_rect = self.rect();
+            let mut window_rect = self.drawable_area();
             window_rect.set_position(start_x, start_y);
             // We want to get smmallest iterator possible for given `str` and `Rect`
-            let min_width = core::cmp::min(self.rect.width(), slice.len() * CHARACTER_WIDTH);
+            let min_width = core::cmp::min(
+                self.drawable_area().width() - 1,
+                slice.len() * CHARACTER_WIDTH,
+            );
             window_rect.width = min_width;
 
             let mut row_of_pixels = self
@@ -205,7 +202,7 @@ impl Window {
                         row_of_pixels = self.frame_buffer.get_exact_row(window_rect, y as usize);
                         row_controller += 1;
                         char_index = 0;
-                        x_index = 0;
+                        x_index = 1;
                     }
 
                     if row_controller == CHARACTER_HEIGHT {
@@ -217,6 +214,23 @@ impl Window {
         Ok(())
     }
 
+    /// Prints a line of string to the onto the window
+    ///  
+    /// * `position` - This indicates where line of text will be.
+    /// * `slice` - Text we are printing
+    /// * `fg_color` - Foreground color of the text
+    /// * `bg_color` - Background color of the text
+    pub fn print_string_line(
+        &mut self,
+        position: &RelativePos,
+        slice: &str,
+        fg_color: Color,
+        bg_color: Color,
+    ) -> Result<(), &'static str> {
+        let (x, y) = self.to_absolute_pos(position);
+        self.print_string_line_abs(x, y, slice, fg_color, bg_color)
+    }
+
     pub fn display_window_title(
         &mut self,
         fg_color: Color,
@@ -225,7 +239,7 @@ impl Window {
         if let Some(title) = self.title.take() {
             let slice = title.as_str();
             let title_pos = self.title_pos(&slice.len());
-            self.print_string_line(&title_pos, slice, fg_color, bg_color)?;
+            self.print_string_line_abs(title_pos.x, title_pos.y, slice, fg_color, bg_color)?;
             self.title = Some(title);
         }
         Ok(())
@@ -246,8 +260,13 @@ impl Window {
     /// * `rect` - The rect we will fill inside the window with
     /// * `color` - The `Color` to fill the rectangle inside the window with.
     pub fn fill_rectangle(&mut self, rect: &mut Rect, color: Color) {
-        if rect.x <= (self.rect.width() as isize - CHARACTER_WIDTH as isize)
-            && rect.y <= (self.rect.height as isize - CHARACTER_HEIGHT as isize)
+        self.fit_rect_to_window(rect);
+        self.fill_rect_abs(rect, color);
+    }
+
+    fn fill_rect_abs(&mut self, rect: &mut Rect, color: Color) {
+        if rect.x <= (self.rect.width() as isize as isize)
+            && rect.y <= (self.rect.height as isize as isize)
             && self.rect.width == self.frame_buffer.width
             && self.rect.height == self.frame_buffer.height
         {
@@ -302,7 +321,7 @@ impl Window {
         self.title_pos = None;
     }
 
-    /// Returns Window's border area width and height with 0 as position
+    /// Returns Window's border area as a Rect
     pub fn title_border(&mut self) -> Rect {
         let border =
             self.title_border
@@ -317,17 +336,56 @@ impl Window {
         rect
     }
 
-    /// Returns the drawable area within the window
+    /// Transforms a given relative position to an absolute position within the window
+    ///
+    /// Takes in a `RelativePos` and returns a tuple containing the transformed
+    /// x and y coordinates. The transformed position ensures that the user cannot modify the window
+    /// borders by clamping the x and y coordinates so it falls between vertical and horizontal bounds
+    fn to_absolute_pos(&self, relative_pos: &RelativePos) -> (u32, u32) {
+        let mut x = relative_pos.x;
+        x = x.clamp(
+            SIDE_BORDER_GAP as u32,
+            (self.width() - SIDE_BORDER_GAP) as u32,
+        );
+        let mut y = relative_pos.y;
+        y = y.clamp(
+            TITLE_BAR_HEIGHT as u32,
+            (self.height() - BOTTOM_BORDER_GAP) as u32,
+        );
+        (x, y)
+    }
+
+    /// Modifies given rect to fit inside the window
+    fn fit_rect_to_window(&mut self, rect: &mut Rect) {
+        let (abs_x, abs_y) = self.to_absolute_pos(&rect.to_relative_pos());
+        rect.x = abs_x as isize;
+        rect.y = abs_y as isize;
+        // If the rectangle extends beyond the right edge of the window, reduce its width to fit within
+        // the drawable area.
+        if rect.x_plus_width() >= self.width() as isize {
+            let drawable_area_width = self.drawable_area().width();
+            rect.width = drawable_area_width - abs_x as usize;
+        }
+    }
+
+    /// Returns a `Rect` representing the drawable area within the window.
+    ///
+    /// The drawable area is the region within the window where things can be drawn.
+    /// This computes and returns the size and position of the drawable area based
+    /// on the size of the window and its borders.
     pub fn drawable_area(&mut self) -> Rect {
-        let border = self.title_border();
+        let title_bar_border = self.title_border();
+
+        // Compute the size and position of the drawable area.
         let drawable_area = self.drawable_area.get_or_insert({
-            let x = 0;
-            let y = border.height;
-            let width = border.width;
-            let height = self.rect.height - y;
-            let drawable_area = Rect::new(width, height, x, y as isize);
+            let x = SIDE_BORDER_GAP;
+            let y = title_bar_border.height;
+            let width = title_bar_border.width - SIDE_BORDER_GAP;
+            let height = (self.rect.height - y) - BOTTOM_BORDER_GAP;
+            let drawable_area = Rect::new(width, height, x as isize, y as isize);
             drawable_area
         });
+
         *drawable_area
     }
 
@@ -343,15 +401,31 @@ impl Window {
     }
 
     /// Draws the border of the window's title area using the default border color.
-    pub fn draw_title_border(&mut self) {
+    pub fn draw_borders(&mut self) {
         let mut border = self.title_border();
-        let stride = self.frame_buffer.width;
-        let rows = FramebufferRowChunks::new(&mut self.frame_buffer, &mut border, stride);
-
-        rows.for_each(|row| {
-            row.iter_mut()
-                .for_each(|pixel| *pixel = DEFAULT_BORDER_COLOR)
-        });
+        self.fill_rect_abs(&mut border, DEFAULT_BORDER_COLOR);
+        let rect = self.rect();
+        let drawable_area = self.drawable_area();
+        // Left border
+        self.fill_rect_abs(
+            &mut Rect::new(1, drawable_area.height, 0, drawable_area.y),
+            DEFAULT_BORDER_COLOR,
+        );
+        // Right border
+        self.fill_rect_abs(
+            &mut Rect::new(
+                1,
+                drawable_area.height,
+                (rect.width() - 1) as isize,
+                drawable_area.y,
+            ),
+            DEFAULT_BORDER_COLOR,
+        );
+        // Bottom border
+        self.fill_rect_abs(
+            &mut Rect::new(rect.width(), 1, 0, (rect.height() - 1) as isize),
+            DEFAULT_BORDER_COLOR,
+        );
     }
 
     /// Return's the window's `Rect`
@@ -386,10 +460,10 @@ impl Window {
         // so we do the resize check here. Plus to fill the window we need updated version of framebuffer's width and height.
         self.should_resize_framebuffer()?;
 
-        for pixel in self.frame_buffer.buffer.iter_mut() {
-            *pixel = color;
-        }
-        self.draw_title_border();
+        let mut drawable_area = self.rect();
+        self.fill_rect_abs(&mut drawable_area, color);
+
+        self.draw_borders();
         Ok(())
     }
 

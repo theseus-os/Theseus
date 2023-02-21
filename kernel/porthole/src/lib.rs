@@ -443,6 +443,7 @@ fn port_loop(
     (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
     let window_manager = WINDOW_MANAGER.get().ok_or("Unable to get WindowManager")?;
+    let window = Window::new_window(&Rect::new(400,400,0,0),None, false)?;
 
     loop {
         let event_opt = key_consumer
@@ -498,6 +499,8 @@ fn port_loop(
                 _ => (),
             }
         }
+        window.lock().fill(DEFAULT_WINDOW_COLOR)?;
+        window.lock().fill_rectangle(&mut Rect::new(20, 20, 0, 0), 0x123999);
         window_manager.lock().update()?;
         window_manager.lock().render();
     }
