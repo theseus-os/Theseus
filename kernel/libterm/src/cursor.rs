@@ -82,9 +82,13 @@ impl Cursor {
             relative_pos.x += (column * CHARACTER_WIDTH) as u32;
             relative_pos.y += (line * CHARACTER_HEIGHT) as u32;
             if self.show() {
-                let mut rect =
-                    Rect::new(CHARACTER_WIDTH -1, CHARACTER_HEIGHT - 1, relative_pos.x as isize, relative_pos.y as isize);
-                window.fill_rectangle(&mut rect, 0xF4F333);
+                let rect = Rect::new(
+                    CHARACTER_WIDTH - 1,
+                    CHARACTER_HEIGHT - 1,
+                    relative_pos.x as isize,
+                    relative_pos.y as isize,
+                );
+                window.fill_rectangle(rect, 0xF4F333);
             } else {
                 window.print_string_line(
                     &relative_pos,

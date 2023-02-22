@@ -1,8 +1,8 @@
 //! This crate maintains rendering of the windows and the mouse. It defines a `WindowManager` structure and initializes instance of it.
 //! 
 //! The `WindowManager` holds a vector of `Window`, which to be rendered to the front buffer, and their rendering order, it also hold information about the mouse.
-//! 'WindowManager' own's a `VirtualFrameBuffer` which acts like a back buffer and also owns a `PhysicalFrameBuffer` which acts like a front buffer.
-//! The window manager will iterate through the windows copying their content onto `VirtualFrameBuffer`, then it will render the mouse and then finally it will copy `VirtualFrameBuffer` onto `PhysicalFrameBuffer`, which will update the screen with a new frame.
+//! 'WindowManager' own's a `VirtualFramebuffer` which acts like a back buffer and also owns a `PhysicalFramebuffer` which acts like a front buffer.
+//! The window manager will iterate through the windows copying their content onto `VirtualFramebuffer`, then it will render the mouse and then finally it will copy `VirtualFramebuffer` onto `PhysicalFramebuffer`, which will update the screen with a new frame.
 
 
 #![no_std]
@@ -64,6 +64,12 @@ static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
         [T, T, T, T, T, T, T, T, T, T, B, T, T, T, T, T, T, T],
     ]
 };
+
+// Notes to @ouz:
+// * Why does this exist? Can't we re-use `FramebufferRowIter`?
+// * Hint: think about why I created a `Framebuffer` trait and where it's used...
+//
+//
 /// Our mouse image is [`MOUSE_POINTER_IMAGE`] column major 2D array
 /// This type returns us row major, 1D vec of that image
 struct MouseImageRowIterator<'a> {
@@ -146,9 +152,9 @@ pub struct WindowManager {
     /// Rendering order for the windows
     window_rendering_order: Vec<usize>,
     /// Backbuffer
-    v_framebuffer: VirtualFrameBuffer,
+    v_framebuffer: VirtualFramebuffer,
     /// Frontbuffer
-    p_framebuffer: PhysicalFrameBuffer,
+    p_framebuffer: PhysicalFramebuffer,
     /// Width, height and position of the mouse
     pub mouse: Rect,
     /// Previous position of the mouse
@@ -162,8 +168,8 @@ pub struct WindowManager {
 impl WindowManager {
     /// Initializes the window manager, returns keyboard and mouse producer for the I/O devices
     pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
-        let p_framebuffer = PhysicalFrameBuffer::init_front_buffer()?;
-        let v_framebuffer = VirtualFrameBuffer::new(p_framebuffer.width(), p_framebuffer.height())?;
+        let p_framebuffer = PhysicalFramebuffer::init_front_buffer()?;
+        let v_framebuffer = VirtualFramebuffer::new(p_framebuffer.width(), p_framebuffer.height())?;
         // FIXME: Don't use magic numbers,
         let mouse = Rect::new(11, 18, 200, 200);
 
@@ -204,22 +210,23 @@ impl WindowManager {
                 // Extra safety measure: For applications that render fast as possible we sometimes can't `fill`
                 // which means we couldn't resize their framebuffers at correct time this extra checks handles that.
                 if window.resized() {
+                    // Notes to @ouz:
+                    // * Why are we doing this here, instead of when the window is resized?
+                    // * In general, shouldn't the window manager *not* modify the content of the window?
+                    //   That seems to violate some sort of privacy/correctness-related invariant.
+                    //
                     window.fill(DEFAULT_WINDOW_COLOR)?;
                 }
-                let mut visible_window = window.rect().visible_rect();
-                let window_stride = window.frame_buffer.width;
-                let mut relative_visible_window = window.relative_visible_rect();
-                let stride = self.v_framebuffer.width;
-                let screen_rows = FramebufferRowChunks::new(
+                let visible_window = window.rect().visible_rect();
+                let relative_visible_window = window.relative_visible_rect();
+                let screen_rows = FramebufferRowIter::new(
                     &mut self.v_framebuffer,
-                    &mut visible_window,
-                    stride,
+                    visible_window,
                 );
                 // To handle rendering when the window is partially outside the screen we use relative version of visible rect
-                let window_rows = FramebufferRowChunks::new(
+                let window_rows = FramebufferRowIter::new(
                     &mut window.frame_buffer,
-                    &mut relative_visible_window,
-                    window_stride,
+                    relative_visible_window,
                 );
 
                 for (screen_row, window_row) in screen_rows.zip(window_rows) {
@@ -233,12 +240,11 @@ impl WindowManager {
     /// Draws the mouse, if mouse is partially outside the screen it will only draw parts that are inside the screen.
     fn draw_mouse(&mut self) {
         // Rectangle of visible parts of the mouse
-        let mut visible_mouse = self.mouse.visible_rect();
+        let visible_mouse = self.mouse.visible_rect();
 
-        let screen_rows = FramebufferRowChunks::new(
+        let screen_rows = FramebufferRowIter::new(
             &mut self.v_framebuffer,
-            &mut visible_mouse,
-            SCREEN_WIDTH,
+            visible_mouse,
         );
 
         let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, visible_mouse);
@@ -291,7 +297,7 @@ impl WindowManager {
         // handle right
         new_pos.x = core::cmp::min(
             new_pos.x,
-            self.v_framebuffer.width as i32 - MOUSE_VISIBLE_GAP,
+            self.v_framebuffer.width() as i32 - MOUSE_VISIBLE_GAP,
         );
 
         // handle top
@@ -299,7 +305,7 @@ impl WindowManager {
         // handle bottom
         new_pos.y = core::cmp::min(
             new_pos.y,
-            self.v_framebuffer.height as i32 - MOUSE_VISIBLE_GAP,
+            self.v_framebuffer.height() as i32 - MOUSE_VISIBLE_GAP,
         );
 
         new_pos
@@ -396,7 +402,7 @@ impl WindowManager {
                     }
 
                     //handle right
-                    if (new_pos.x + WINDOW_VISIBLE_GAP) > self.v_framebuffer.width as i32 {
+                    if (new_pos.x + WINDOW_VISIBLE_GAP) > self.v_framebuffer.width() as i32 {
                         new_pos.x = SCREEN_WIDTH as i32 - WINDOW_VISIBLE_GAP
                     }
 
@@ -404,7 +410,7 @@ impl WindowManager {
                     new_pos.y = core::cmp::max(new_pos.y, 0);
 
                     // handle bottom
-                    if new_pos.y + WINDOW_VISIBLE_GAP > self.v_framebuffer.height as i32 {
+                    if new_pos.y + WINDOW_VISIBLE_GAP > self.v_framebuffer.height() as i32 {
                         new_pos.y = (SCREEN_HEIGHT as i32 - WINDOW_VISIBLE_GAP) as i32;
                     }
 
@@ -431,11 +437,24 @@ impl WindowManager {
         }
     }
 
-    /// Does the final rendering by copying `v_framebuffer`.
+    // Notes to @ouz: bad comment, nobody knows what `v_framebuffer` is. See my change.
+    //
+    //
+    /// Performs the final blit of the intermediary virtual framebuffer to the physical framebuffer,
+    /// making its changes visible on screen.
+    ///
+    /// If and when we support double-buffering, this is where the buffers will be flipped/swapped.
     fn render(&mut self) {
+        // Notes to @ouz:
+        // * This violates the idea that the `stride` of a `VirtualFramebuffer` is the same as its width (no padding bytes).
+        //   If we're copying the entire slice directly, we must ensure that `v_framebuffer` has the exact same pixel layout
+        //   (stride and width) as the physical framebuffer.
+        // * We need to either change this method's logic or the definition of `VirtualFramebuffer` to ensure that
+        //   our assumptions match up. IMO, it's easier to change `VirtualFramebuffer` to support a specific stride value, i.e.,
+        //   that a `VirtualFramebuffer` may include padding bytes.
         self.p_framebuffer
-            .buffer
-            .copy_from_slice(&self.v_framebuffer.buffer);
+            .buffer_mut()
+            .copy_from_slice(&self.v_framebuffer.buffer());
     }
 }
 
@@ -500,7 +519,7 @@ fn port_loop(
             }
         }
         window.lock().fill(DEFAULT_WINDOW_COLOR)?;
-        window.lock().fill_rectangle(&mut Rect::new(20, 20, 0, 0), 0x123999);
+        window.lock().fill_rectangle(Rect::new(20, 20, 0, 0), 0x123999);
         window_manager.lock().update()?;
         window_manager.lock().render();
     }

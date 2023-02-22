@@ -7,13 +7,13 @@ Theseus display and window management are done by `Porthole` easy to use, a perf
 stateDiagram-v2
     Application --> AppRender
     AppRender --> Window
-    Window --> VirtualFrameBuffer
-    VirtualFrameBuffer --> WindowManager
+    Window --> VirtualFramebuffer
+    VirtualFramebuffer --> WindowManager
     Renderloop --> WindowManager
     WindowManager --> Renderloop
-    Renderloop --> BackBuffer(VirtualFrameBuffer)
-    BackBuffer(VirtualFrameBuffer) -->  
-    FrontBuffer(PhysicalFrameBuffer)
+    Renderloop --> BackBuffer(VirtualFramebuffer)
+    BackBuffer(VirtualFramebuffer) -->  
+    FrontBuffer(PhysicalFramebuffer)
 ```
 
 The core design principle of the `Porthole` is removing complexity from an end user while providing good performance.
@@ -22,11 +22,11 @@ Before moving on to details we should give a bit more detail about the diagram a
 
 ### Framebuffer
 
-In Porthole, there are two types of buffers that are crucial to the rendering process: the `VirtualFrameBuffer` and the `PhysicalBuffer`.
+In Porthole, there are two types of buffers that are crucial to the rendering process: the `VirtualFramebuffer` and the `PhysicalBuffer`.
 
-The `VirtualFrameBuffer` acts as a backbuffer for the `WindowManager` and for windows it acts as temporary buffer that is to be transferred to main backbuffer.The `PhysicalBuffer` is directly mapped to the pixels on the screen. 
+The `VirtualFramebuffer` acts as a backbuffer for the `WindowManager` and for windows it acts as temporary buffer that is to be transferred to main backbuffer.The `PhysicalBuffer` is directly mapped to the pixels on the screen. 
 
-Ideally the end user will not have to interact with the `VirtualFrameBuffer` or `PhysicalFrameBuffer` directly. The `Window` and `WindowManager` are responsible for managing these buffers. The goal is to provide a smooth and seamless experience for the user.
+Ideally the end user will not have to interact with the `VirtualFramebuffer` or `PhysicalFramebuffer` directly. The `Window` and `WindowManager` are responsible for managing these buffers. The goal is to provide a smooth and seamless experience for the user.
 
 
 ### Window
@@ -35,7 +35,7 @@ Ideally the end user will not have to interact with the `VirtualFrameBuffer` or 
 
 As expected from most window managers `Window` can be partially moved outside the screen, and resized, it has a title and title bar.
 
-Every `Window` has its own `VirtualFrameBuffer`, which has the same size as the window, when a window is resized window also changes `VirtualFrameBuffer`'s size to match the new size.
+Every `Window` has its own `VirtualFramebuffer`, which has the same size as the window, when a window is resized window also changes `VirtualFramebuffer`'s size to match the new size.
 Window's `VirtualFramebuffer` always sits at the top-left (x:0,y:0) of the screen.
 
 The window provides various methods to draw and print things, the window only provides these methods to write into its framebuffer which is not directly mapped to actual pixels on the physical screen, but is used by `WindowManager` to write into the backbuffer, the reason for this is quite simple, we want to avoid dealing with complex lifetime related issues that would arise from having multiple window's accessing different parts of a single backbuffer, which also adds lessens our chance of having deadlock.
@@ -44,7 +44,7 @@ The window provides various methods to draw and print things, the window only pr
 ### WindowManager
 
 The `WindowManager` is relatively straightforward it holds windows via `Vec<Arc<Mutex<Window>>`, it keep their rendering order via `window_rendering_order`.
-It has a `VirtualFrameBuffer` that acts as a backbuffer and `PhysicalFrameBuffer` that acts like frontbuffer. It also controls the mouse.
+It has a `VirtualFramebuffer` that acts as a backbuffer and `PhysicalFramebuffer` that acts like frontbuffer. It also controls the mouse.
 
 We hold `WindowManager` via `Once<Mutex<WindowManager>>` and it's initalized once by `captain`, after that whenever we need it we can get it by calling `WINDOW_MANAGER.get()`.
 
@@ -61,6 +61,6 @@ Rust, provides many safety mechanisms to prevent common programming pitfalls, su
 
 To address this issue, Rust provides the `Iterator` trait, which allows you to process a collection in a lazy, chunk-by-chunk manner. In the context of rendering, this can lead to significant performance improvements.
 
-Consider a case study where our window has a size of `width: 80, height: 80` and is located at `x: 0, y: 0`. Instead of accessing each pixel individually, we can create an iterator for the `VirtualFrameBuffer` that will allow us to access the data in larger chunks. For example, we can take a row of pixels starting from `0` to `80` from both the window's framebuffer and the backbuffer. Then, we can simply call `copy_from_slice` to copy the data, move to the next row, and repeat.
+Consider a case study where our window has a size of `width: 80, height: 80` and is located at `x: 0, y: 0`. Instead of accessing each pixel individually, we can create an iterator for the `VirtualFramebuffer` that will allow us to access the data in larger chunks. For example, we can take a row of pixels starting from `0` to `80` from both the window's framebuffer and the backbuffer. Then, we can simply call `copy_from_slice` to copy the data, move to the next row, and repeat.
 
 This approach significantly increased performance compared to accessing each pixel individually. It also makes the code more flexible and easier to maintain. This case study demonstrates the power of Iterators in Rust and how they are used to improve the performance of our rendering operations. For more information on the design and implementation of the Iterator-based rendering, please refer to the file framebuffer.rs.

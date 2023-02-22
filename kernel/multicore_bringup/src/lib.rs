@@ -150,6 +150,11 @@ impl GraphicInfo {
         self.bits_per_pixel
     }
 
+    /// The size in bytes of each pixel.
+    pub fn bytes_per_pixel(&self) -> u16 {
+        self.bits_per_pixel() as u16 / 8
+    }
+
     /// The size of a pixel's Red value, in number of bits.
     pub fn red_size(&self) -> u8 {
         self.red_mask_size

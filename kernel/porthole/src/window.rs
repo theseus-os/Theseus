@@ -21,7 +21,7 @@ pub struct Window {
     rect: Rect,
 
     /// The virtual frame buffer for the window, which is used to draw its contents.
-    pub frame_buffer: VirtualFrameBuffer,
+    pub frame_buffer: VirtualFramebuffer,
 
     /// Whether or not the window has been resized
     resized: bool,
@@ -54,7 +54,7 @@ pub struct Window {
 impl Window {
     pub(crate) fn new(
         rect: Rect,
-        frame_buffer: VirtualFrameBuffer,
+        frame_buffer: VirtualFramebuffer,
         title: Option<String>,
         receive_events: bool,
     ) -> Window {
@@ -88,7 +88,7 @@ impl Window {
         window_manager.window_rendering_order.push(len);
         let window = Window::new(
             *rect,
-            VirtualFrameBuffer::new(rect.width, rect.height)?,
+            VirtualFramebuffer::new(rect.width, rect.height)?,
             title,
             receive_events,
         );
@@ -162,7 +162,7 @@ impl Window {
         drawable_area.width -= text_width;
 
         // Fill the remaining space on the current line with the specified color
-        self.fill_rectangle(&mut drawable_area, color);
+        self.fill_rectangle(drawable_area, color);
     }
 
     /// Prints a string on a new line at the specified absolute (x, y) coordinates.
@@ -299,20 +299,20 @@ impl Window {
     ///
     /// * `rect` - The rect we will fill inside the window with
     /// * `color` - The `Color` to fill the rectangle inside the window with.
-    pub fn fill_rectangle(&mut self, rect: &mut Rect, color: Color) {
+    pub fn fill_rectangle(&mut self, rect: Rect, color: Color) {
         self.fit_rect_to_window(rect);
         self.fill_rect_abs(rect, color);
     }
 
     /// Fill a rectangle with absolute position on to the window.
-    fn fill_rect_abs(&mut self, rect: &mut Rect, color: Color) {
+    fn fill_rect_abs(&mut self, rect: Rect, color: Color) {
         if rect.x <= (self.rect.width() as isize as isize)
             && rect.y <= (self.rect.height as isize as isize)
-            && self.rect.width == self.frame_buffer.width
-            && self.rect.height == self.frame_buffer.height
+            && self.rect.width == self.frame_buffer.width()
+            && self.rect.height == self.frame_buffer.height()
         {
             let width = self.width();
-            let row_chunks = FramebufferRowChunks::new(&mut self.frame_buffer, rect, width);
+            let row_chunks = FramebufferRowIter::new(&mut self.frame_buffer, rect);
             row_chunks.for_each(|row| row.iter_mut().for_each(|pixel| *pixel = color));
         }
     }
@@ -406,17 +406,33 @@ impl Window {
         (x, y)
     }
 
-    /// Modifies given rect to fit inside the window
-    fn fit_rect_to_window(&mut self, rect: &mut Rect) {
+    // Notes to @ouz:
+    // * It's WAY better to make this a pure function that returns a new `Rect`
+    //   rather than a side effect of modifying the passed-in Rect.
+    // * This is especially relevant any time you're modifying all or most of the fields
+    //   of a struct, or whenever the struct is already cheap to copy/clone.
+    //
+    //
+    /// Returns a new instance of the given `rect` that is bounded to fit within this Window.
+    fn fit_rect_to_window(&mut self, rect: Rect) -> Rect {
         let (abs_x, abs_y) = self.to_absolute_pos(&rect.to_relative_pos());
-        rect.x = abs_x as isize;
-        rect.y = abs_y as isize;
-        // If the rectangle extends beyond the right edge of the window, reduce rect's width to fit within
-        // the drawable area.
-        if rect.x_plus_width() >= self.width() as isize {
+        let new_x = abs_x as isize;
+        let new_y = abs_y as isize;
+
+        // If the rectangle extends beyond the right edge of the window,
+        // reduce the rect's width to fit within the drawable area.
+        let new_width = if rect.x_plus_width() >= self.width() as isize {
             let drawable_area_width = self.drawable_area().width();
-            rect.width = drawable_area_width - abs_x as usize;
-        }
+            drawable_area_width - abs_x as usize
+        } else {
+            rect.width()
+        };
+
+        // Notes to @ouz: what about the drawable area's height?? 
+        //                I added this below to maintain your code's existing logic.
+        let new_height = rect.height();
+
+        Rect::new(new_width, new_height, new_x, new_y)
     }
 
     /// Returns a `Rect` representing the drawable area within the window.
@@ -453,18 +469,22 @@ impl Window {
 
     /// Draws the borders of the Window using the default border color.
     pub fn draw_borders(&mut self) {
-        let mut border = self.title_border();
-        self.fill_rect_abs(&mut border, DEFAULT_BORDER_COLOR);
+        // Notes to @ouz:
+        // * See, it's pointless here to have a `&mut Rect` here, since you don't even use
+        //   the potentially modified `rect` anywhere!
+        //
+        let border = self.title_border();
+        self.fill_rect_abs(border, DEFAULT_BORDER_COLOR);
         let rect = self.rect();
         let drawable_area = self.drawable_area();
         // Left border
         self.fill_rect_abs(
-            &mut Rect::new(1, drawable_area.height, 0, drawable_area.y),
+            Rect::new(1, drawable_area.height, 0, drawable_area.y),
             DEFAULT_BORDER_COLOR,
         );
         // Right border
         self.fill_rect_abs(
-            &mut Rect::new(
+            Rect::new(
                 1,
                 drawable_area.height,
                 (rect.width() - 1) as isize,
@@ -474,7 +494,7 @@ impl Window {
         );
         // Bottom border
         self.fill_rect_abs(
-            &mut Rect::new(rect.width(), 1, 0, (rect.height() - 1) as isize),
+            Rect::new(rect.width(), 1, 0, (rect.height() - 1) as isize),
             DEFAULT_BORDER_COLOR,
         );
     }
@@ -486,7 +506,7 @@ impl Window {
 
     /// Clears the window screen back to it's default color
     pub fn clear(&mut self) {
-        for pixel in self.frame_buffer.buffer.iter_mut() {
+        for pixel in self.frame_buffer.buffer_mut().iter_mut() {
             *pixel = DEFAULT_WINDOW_COLOR;
         }
     }
@@ -512,7 +532,13 @@ impl Window {
         // so we do the resize check here. Plus to fill the window we need updated version of framebuffer's width and height.
         self.should_resize_framebuffer()?;
 
-        for pixel in self.frame_buffer.buffer.iter_mut() {
+        // Notes to @ouz:
+        // * This is invalid because it doesn't consider stride/padding.
+        //   We should use the `FramebufferRowIter` instead,
+        //   otherwise why bother having that nice iterator abstraction?
+        //
+        //
+        for pixel in self.frame_buffer.buffer_mut().iter_mut() {
             *pixel = color;
         }
 
@@ -522,7 +548,7 @@ impl Window {
 
     /// Resizes framebuffer after to Window's width and height
     fn resize_framebuffer(&mut self) -> Result<(), &'static str> {
-        self.frame_buffer = VirtualFrameBuffer::new(self.rect.width, self.rect.height)?;
+        self.frame_buffer = VirtualFramebuffer::new(self.rect.width, self.rect.height)?;
         Ok(())
     }
 

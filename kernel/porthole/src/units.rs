@@ -1,4 +1,3 @@
-#![no_std]
 use core::ops::{Add, Sub};
 
 pub static SCREEN_WIDTH: usize = 1024;
@@ -72,6 +71,11 @@ impl Add<Rect> for ScreenPos {
     }
 }
 
+// Notes to @ouz:
+// * Most fields and methods of this Rect struct do not make sense.
+//   This needs to be redesigned completely, likely by splitting it into multiple types.
+//
+//
 /// Ubiquitous structure representing a rectangle.
 #[derive(Clone, Copy, Debug)]
 pub struct Rect {
