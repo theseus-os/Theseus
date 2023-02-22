@@ -35,7 +35,7 @@ static IRQ_HANDLERS: RwLockIrqSafe<[HandlerFunc; MAX_IRQ_NUM]> = RwLockIrqSafe::
 #[repr(transparent)]
 struct SpsrEL1(InMemoryRegister<u64, SPSR_EL1::Register>);
 
-/// The Esception Syndrome Register at the time of the exception.
+/// The Exception Syndrome Register at the time of the exception.
 #[repr(transparent)]
 struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
 
