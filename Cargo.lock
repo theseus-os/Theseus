@@ -2027,6 +2027,7 @@ dependencies = [
  "bincode",
  "bootloader_modules",
  "const_format",
+ "cortex-a",
  "cow_arc",
  "cpio_reader",
  "crate_metadata",
@@ -2048,6 +2049,7 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
+ "tock-registers",
  "vfs_node",
  "x86_64",
  "xmas-elf",
@@ -3625,7 +3627,6 @@ dependencies = [
  "stack",
  "static_assertions",
  "tss",
- "x86_64",
 ]
 
 [[package]]

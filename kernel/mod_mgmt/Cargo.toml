@@ -15,71 +15,38 @@ rangemap = { version = "1.3.0", features = [ "const_fn" ] }
 const_format = "0.2.2"
 lz4_flex = { version = "0.9.3", default-features = false, optional = true }
 cpio_reader = { version = "0.1.0", optional = true }
+hashbrown = { version = "0.11.2", features = ["nightly"] }
+log = { version = "0.4.8" }
+
+cow_arc = { path = "../../libs/cow_arc" }
+kernel_config = { path = "../kernel_config" }
+crate_name_utils = { path = "../crate_name_utils" }
+crate_metadata = { path = "../crate_metadata" }
+crate_metadata_serde = { path = "../crate_metadata_serde" }
+memory = { path = "../memory" }
+bootloader_modules = { path = "../bootloader_modules" }
+root = { path = "../root" }
+fs_node = { path = "../fs_node" }
+no_drop = { path = "../no_drop" }
+vfs_node = { path = "../vfs_node" }
+path = { path = "../path" }
+memfs = { path = "../memfs" }
+
+serde   = { version = "1.0.137",    default-features = false, features = ["alloc", "derive"] }
+bincode = { version = "2.0.0-rc.1", default-features = false, features = ["alloc", "serde"] }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+cortex-a = "7.5.0"
+tock-registers = "0.7.0"
 
 [features]
 # Enable this to support extracting/unarchiving bootloader modules
 # from a compressed "modules.cpio.lz4" module.
 # Currently this is enabled when building for the 'limine' bootloader.
 extract_boot_modules = ["lz4_flex", "cpio_reader"]
-
-[dependencies.cow_arc]
-path = "../../libs/cow_arc"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.crate_name_utils]
-path = "../crate_name_utils"
-
-[dependencies.crate_metadata]
-path = "../crate_metadata"
-
-[dependencies.crate_metadata_serde]
-path = "../crate_metadata_serde"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.bootloader_modules]
-path = "../bootloader_modules"
-
-[dependencies.root]
-path = "../root"
-
-[dependencies.fs_node]
-path = "../fs_node"
-
-[dependencies.no_drop]
-path = "../no_drop"
-
-[dependencies.hashbrown]
-version = "0.11.2"
-features = ["nightly"]
-
-[dependencies.vfs_node]
-path = "../vfs_node"
-
-[dependencies.path]
-path = "../path"
-
-[dependencies.memfs]
-path = "../memfs"
-
-[dependencies.serde]
-version = "1.0.137"
-default-features = false
-features = ["derive", "alloc"]
-
-[dependencies.bincode]
-version = "2.0.0-rc.1"
-default-features = false
-features = ["serde", "alloc"]
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-x86_64 = "0.14.8"
 
 [lib]
 crate-type = ["rlib"]
