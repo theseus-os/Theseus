@@ -29,6 +29,15 @@ use rangemap::RangeMap;
 pub use crate_name_utils::*;
 pub use crate_metadata::*;
 
+#[cfg(target_arch = "x86_64")]
+use x86_64::{registers::model_specific::FsBase, VirtAddr};
+
+#[cfg(target_arch = "aarch64")]
+use {
+    cortex_a::registers::TPIDR_EL1,
+    tock_registers::interfaces::Writeable,
+};
+
 pub mod parse_nano_core;
 pub mod replace_nano_core_crates;
 mod serde;
@@ -3297,15 +3306,19 @@ pub struct TlsDataImage {
     _data: Option<Box<[u8]>>,
     ptr:   usize,
 }
+
 impl TlsDataImage {
     /// Returns the value of the TLS self pointer for this TLS data image.
     /// If it has no TLS data sections, the returned value will be zero.
     #[inline(always)]
-    pub fn pointer_value(&self) -> usize {
-        self.ptr
+    pub fn set_as_current_tls_base(&self) {
+        #[cfg(target_arch = "x86_64")]
+        FsBase::write(VirtAddr::new(self.ptr as u64));
+
+        #[cfg(target_arch = "aarch64")]
+        TPIDR_EL1.set(self.ptr as u64);
     }
 }
-
 
 /// The status of a cached TLS area data image.
 #[derive(Debug, Clone, PartialEq, Eq)]

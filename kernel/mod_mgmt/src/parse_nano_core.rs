@@ -150,15 +150,7 @@ pub fn parse_nano_core(
     // Now that we've initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
     let tls_image = namespace.get_tls_initializer_data();
-    {
-        #[cfg(target_arch = "x86_64")]
-        x86_64::registers::model_specific::FsBase::write(
-            x86_64::VirtAddr::new(tls_image.pointer_value() as u64)
-        );
-
-        #[cfg(not(target_arch = "x86_64"))]
-        todo!("parse_nano_core(): setting the initial TLS data image is not yet implemented for this platform!");
-    }
+    tls_image.set_as_current_tls_base();
 
     Ok(NanoCoreItems {
         nano_core_crate_ref,
