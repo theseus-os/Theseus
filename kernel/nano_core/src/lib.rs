@@ -171,26 +171,20 @@ where
                 .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
                 .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
 
-            let ap_gdt = {
-                let mut ap_gdt_virtual_address = None;
-                for (_, section) in nano_core_crate_ref.lock_as_ref().sections.iter() {
-                    if section.name == "GDT_AP".into() {
-                        ap_gdt_virtual_address = Some(section.virt_addr);
-                        break;
-                    }
-                }
-
-                // The identity-mapped virtual address of GDT_AP.
-                VirtualAddress::new(
-                    memory::translate(ap_gdt_virtual_address.ok_or(
-                        "Missing/invalid symbol expected from data section \"GDT_AP\"",
-                    )?)
-                    .ok_or("Failed to translate \"GDT_AP\"")?
-                    .value(),
+            // Obtain the identity-mapped virtual address of GDT_AP.
+            let ap_gdt = nano_core_crate_ref.lock_as_ref()
+                .sections
+                .values()
+                .find(|sec| &*sec.name == "GDT_AP")
+                .map(|ap_gdt_sec| ap_gdt_sec.virt_addr)
+                .ok_or("Missing/invalid symbol expected from data section \"GDT_AP\"")
+                .and_then(|vaddr| memory::translate(vaddr)
+                    .ok_or("Failed to translate \"GDT_AP\"")
                 )
-                .ok_or("couldn't convert \"GDT_AP\" physical address to virtual")?
-            };
-            // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
+                .and_then(|paddr| VirtualAddress::new(paddr.value())
+                    .ok_or("\"GDT_AP\" physical address was not a valid identity virtual address")
+                )?;
+            // log::debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}", ap_realmode_begin, ap_realmode_end, ap_gdt);
             (nano_core_crate_ref, tls_image, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
         Err((msg, _mapped_pages_array)) => return Err(msg),
