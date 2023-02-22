@@ -14,38 +14,35 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
 
-// Raw/Early exception handling is defined
-// in this assembly file.
+// This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
 
-// The global interrupt controller singleton
+// The global Generic Interrupt Controller singleton
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
-// Default Timer IRQ number on AArch64 as
-// defined by Arm Manuals
+// Default Timer IRQ number on AArch64 as defined by Arm Manuals
 pub const AARCH64_TIMER_IRQ: IntNumber = 30;
 
 const MAX_IRQ_NUM: usize = 256;
 
-// Singleton which acts like an x86-style
-// Interrupt Descriptor Table: it's an
-// array of function pointers which are
-// meant to handle IRQs. Synchronous
-// Exceptions (syscalls) are not IRQs on
-// aarch64; this crate doesn't expose any
-// way to handle them at the moment.
-static IRQ_HANDLERS: RwLockIrqSafe<[HandlerFunc; 256]> = RwLockIrqSafe::new([default_irq_handler; 256]);
+// Singleton which acts like an x86-style Interrupt Descriptor Table:
+// it's an array of function pointers which are meant to handle IRQs.
+// Synchronous Exceptions (including syscalls) are not IRQs on aarch64;
+// this crate doesn't expose any way to handle them at the moment.
+static IRQ_HANDLERS: RwLockIrqSafe<[HandlerFunc; MAX_IRQ_NUM]> = RwLockIrqSafe::new([default_irq_handler; MAX_IRQ_NUM]);
 
-/// Wrapper structs for memory copies of registers.
+/// The Saved Program Status Register at the time of the exception.
 #[repr(transparent)]
 struct SpsrEL1(InMemoryRegister<u64, SPSR_EL1::Register>);
+
+/// The Esception Syndrome Register at the time of the exception.
+#[repr(transparent)]
 struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
 
 /// The exception context as it is stored on the stack on exception entry.
 ///
-/// Warning: the assembly file next to this one assumes this exact
-/// layout. If you modify this, make sure to adapt the assembly
-/// code accordingly.
+/// Warning: `table.s` assumes this exact layout. If you modify this,
+/// make sure to adapt the assembly code accordingly.
 #[repr(C)]
 pub struct ExceptionContext {
     /// General Purpose Registers.
@@ -122,51 +119,51 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 pub fn enable_timer_interrupts() -> Result<(), &'static str> {
-        // called everytime the timer ticks.
-        extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
-            info!("timer int!");
-            loop {}
+    // called everytime the timer ticks.
+    extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
+        info!("timer int!");
+        loop {}
 
-            // return false if you haven't sent an EOI
-            // so that the caller does it for you
-            // false
-        }
+        // return false if you haven't sent an EOI
+        // so that the caller does it for you
+        // false
+    }
 
-        // register the handler for the timer IRQ.
-        register_interrupt(AARCH64_TIMER_IRQ, timer_handler)
-            .map_err(|_| "An interrupt handler has already been setup for the timer IRQ number")?;
+    // register the handler for the timer IRQ.
+    register_interrupt(AARCH64_TIMER_IRQ, timer_handler)
+        .map_err(|_| "An interrupt handler has already been setup for the timer IRQ number")?;
 
-        // Route the IRQ to this core (implicit as IRQ < 32)
-        // & Enable the interrupt.
-        {
-            let mut gic = GIC.lock();
-            let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
+    // Route the IRQ to this core (implicit as IRQ < 32)
+    // & Enable the interrupt.
+    {
+        let mut gic = GIC.lock();
+        let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
 
-            // enable routing of this interrupt
-            gic.set_interrupt_state(AARCH64_TIMER_IRQ, true);
-        }
+        // enable routing of this interrupt
+        gic.set_interrupt_state(AARCH64_TIMER_IRQ, true);
+    }
 
-        // read the frequency (useless atm)
-        let counter_freq_hz = CNTFRQ_EL0.get();
-        log::info!("frq: {:?}", counter_freq_hz);
+    // read the frequency (useless atm)
+    let counter_freq_hz = CNTFRQ_EL0.get();
+    log::info!("frq: {:?}", counter_freq_hz);
 
-        // unmask the interrupt
-        // enable the timer
-        CNTP_CTL_EL0.write(
-              CNTP_CTL_EL0::IMASK.val(0)
-            + CNTP_CTL_EL0::ENABLE.val(1)
-        );
+    // unmask the interrupt
+    // enable the timer
+    CNTP_CTL_EL0.write(
+          CNTP_CTL_EL0::IMASK.val(0)
+        + CNTP_CTL_EL0::ENABLE.val(1)
+    );
 
-        /* DEBUGGING CODE
+    /* DEBUGGING CODE
 
-        log::info!("timer counter: {:?}", CNTPCT_EL0.get());
-        log::info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-        log::info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-        log::info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
+    log::info!("timer counter: {:?}", CNTPCT_EL0.get());
+    log::info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
+    log::info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
+    log::info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
 
-        */
+    */
 
-        Ok(())
+    Ok(())
 }
 
 /// Registers an interrupt handler at the given IRQ interrupt number.
@@ -305,17 +302,17 @@ impl fmt::Display for ExceptionContext {
 
 #[no_mangle]
 extern "C" fn current_el0_synchronous(_e: &mut ExceptionContext) {
-    panic!("Should not be here. Use of SP_EL0 in EL1 is not supported.")
+    panic!("BUG: Use of SP_EL0 in EL1 is not supported.")
 }
 
 #[no_mangle]
 extern "C" fn current_el0_irq(_e: &mut ExceptionContext) {
-    panic!("Should not be here. Use of SP_EL0 in EL1 is not supported.")
+    panic!("BUG: Use of SP_EL0 in EL1 is not supported.")
 }
 
 #[no_mangle]
 extern "C" fn current_el0_serror(_e: &mut ExceptionContext) {
-    panic!("Should not be here. Use of SP_EL0 in EL1 is not supported.")
+    panic!("BUG: Use of SP_EL0 in EL1 is not supported.")
 }
 
 #[no_mangle]
