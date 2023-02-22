@@ -3308,8 +3308,11 @@ pub struct TlsDataImage {
 }
 
 impl TlsDataImage {
-    /// Returns the value of the TLS self pointer for this TLS data image.
-    /// If it has no TLS data sections, the returned value will be zero.
+    /// Writes the pointer of this TLS data image to an architecture-specific
+    /// CPU register so that TLS-accessing code works as expected.
+    ///
+    /// On x86_64, this is `FsBase`.
+    /// On ARMv8, this is `TPIDR_EL0`.
     #[inline(always)]
     pub fn set_as_current_tls_base(&self) {
         #[cfg(target_arch = "x86_64")]
