@@ -6,6 +6,11 @@ PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
 
+mod cpu_interface_gicv3;
+mod cpu_interface_gicv2;
+mod dist_interface;
+mod redist_interface;
+
 /// Physical addresses of the CPU and Distributor
 /// interfaces as exposed by the qemu "virt" VM.
 pub mod qemu_virt_addrs {
@@ -19,10 +24,8 @@ pub mod qemu_virt_addrs {
 /// Boolean
 pub type Enabled = bool;
 
-/// 24-bit unsigned integer
-///
-/// An u32 is used because there is no u24.
-pub type IntNumber = u32;
+/// An Interrupt Number
+pub type InterruptNumber = u32;
 
 /// 8-bit unsigned integer
 pub type Priority = u8;
@@ -80,7 +83,7 @@ impl GicMappedPage {
     // - `int` is the index
     // - `offset` tells the beginning of the array
     // - `INTS_PER_U32` = how many array slots per u32 in this array
-    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: usize, int: IntNumber) -> u32 {
+    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: usize, int: InterruptNumber) -> u32 {
         let int = int as usize;
         let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
@@ -100,7 +103,7 @@ impl GicMappedPage {
     // - `offset` tells the beginning of the array
     // - `INTS_PER_U32` = how many array slots per u32 in this array
     // - `value` is the value to write
-    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: usize, int: IntNumber, value: u32) {
+    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: usize, int: InterruptNumber, value: u32) {
         let int = int as usize;
         let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
@@ -120,11 +123,6 @@ const_assert_eq!(core::mem::size_of::<GicMappedPage>(), 0x1000);
 
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
-
-mod cpu_interface_gicv3;
-mod cpu_interface_gicv2;
-mod dist_interface;
-mod redist_interface;
 
 pub struct ArmGicV2 {
     pub distributor: BorrowedMappedPages<GicMappedPage, Mutable>,
@@ -233,7 +231,7 @@ impl ArmGic {
     /// also called software generated interrupt (SGI).
     ///
     /// note: on Aarch64, IPIs must have a number below 16 on ARMv8
-    pub fn send_ipi(&mut self, int_num: IntNumber, target: TargetCpu) {
+    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: TargetCpu) {
         assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
 
         match self {
@@ -244,11 +242,7 @@ impl ArmGic {
 
     /// Acknowledge the currently serviced interrupt
     /// and fetches its number
-    /// 
-    /// Note: this constructor accesses the
-    /// interfaces; their addresses have to be
-    /// readable and writable.
-    pub fn acknowledge_interrupt(&mut self) -> (IntNumber, Priority) {
+    pub fn acknowledge_interrupt(&mut self) -> (InterruptNumber, Priority) {
         match self {
             Self::V2(v2) => cpu_interface_gicv2::acknowledge_interrupt(&mut v2.processor),
             Self::V3( _) => cpu_interface_gicv3::acknowledge_interrupt(),
@@ -256,7 +250,7 @@ impl ArmGic {
     }
 
     /// Performs priority drop for the specified interrupt
-    pub fn end_of_interrupt(&mut self, int: IntNumber) {
+    pub fn end_of_interrupt(&mut self, int: InterruptNumber) {
         match self {
             Self::V2(v2) => cpu_interface_gicv2::end_of_interrupt(&mut v2.processor, int),
             Self::V3( _) => cpu_interface_gicv3::end_of_interrupt(int),
@@ -264,7 +258,7 @@ impl ArmGic {
     }
 
     /// Will that interrupt be forwarded by the distributor?
-    pub fn get_interrupt_state(&self, int: IntNumber) -> Enabled {
+    pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
                 redist_interface::get_sgippi_state(&v3.redist_sgippi, int)
@@ -277,7 +271,7 @@ impl ArmGic {
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
-    pub fn set_interrupt_state(&mut self, int: IntNumber, enabled: Enabled) {
+    pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
                 redist_interface::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);

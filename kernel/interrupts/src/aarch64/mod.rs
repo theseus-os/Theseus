@@ -9,7 +9,7 @@ use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
-use gic::{qemu_virt_addrs, ArmGic, IntNumber, Version as GicVersion};
+use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
@@ -21,7 +21,7 @@ global_asm!(include_str!("table.s"));
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
 // Default Timer IRQ number on AArch64 as defined by Arm Manuals
-pub const AARCH64_TIMER_IRQ: IntNumber = 30;
+pub const AARCH64_TIMER_IRQ: InterruptNumber = 30;
 
 const MAX_IRQ_NUM: usize = 256;
 
@@ -177,7 +177,7 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `irq_num` was already in use.
-pub fn register_interrupt(irq_num: IntNumber, func: HandlerFunc) -> Result<(), *const HandlerFunc> {
+pub fn register_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Result<(), *const HandlerFunc> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = irq_num as usize;
 
@@ -202,7 +202,7 @@ pub fn register_interrupt(irq_num: IntNumber, func: HandlerFunc) -> Result<(), *
 /// # Arguments
 /// * `interrupt_num`: the IRQ that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
-pub fn deregister_interrupt(irq_num: IntNumber, func: HandlerFunc) -> Result<(), *const HandlerFunc> {
+pub fn deregister_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Result<(), *const HandlerFunc> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = irq_num as usize;
 
@@ -220,7 +220,7 @@ pub fn deregister_interrupt(irq_num: IntNumber, func: HandlerFunc) -> Result<(),
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced.
-pub fn eoi(irq_num: IntNumber) {
+pub fn eoi(irq_num: InterruptNumber) {
     let mut gic = GIC.lock();
     let gic = gic.as_mut().expect("GIC is uninitialized");
     gic.end_of_interrupt(irq_num);

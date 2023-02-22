@@ -1,6 +1,12 @@
 //! Distributor Interface
 //!
-//! Included functionnality:
+//! The Distributor forwards or discards SPIs (shared peripheral interrupts)
+//! to:
+//! - The redistributor, in GICv3,
+//! - The CPU core, in GICv2.
+//! There's one Distributor per GIC chip.
+//!
+//! Included functionality:
 //! - Initializing the interface
 //! - Enabling or disabling the forwarding of SPIs based on their numbers
 //! - Setting the target of SPIs based on their numbers
@@ -9,7 +15,7 @@
 use super::GicMappedPage;
 use super::U32BYTES;
 use super::TargetCpu;
-use super::IntNumber;
+use super::InterruptNumber;
 use super::Enabled;
 use super::TargetList;
 
@@ -69,7 +75,7 @@ pub fn init(registers: &mut GicMappedPage) -> Enabled {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_spi_state(registers: &GicMappedPage, int: IntNumber) -> Enabled {
+pub fn get_spi_state(registers: &GicMappedPage, int: InterruptNumber) -> Enabled {
     // enabled?
     registers.read_array_volatile::<32>(offset::ISENABLER, int) > 0
     &&
@@ -79,7 +85,7 @@ pub fn get_spi_state(registers: &GicMappedPage, int: IntNumber) -> Enabled {
 
 /// Enables or disables the forwarding of
 /// a particular interrupt in the distributor
-pub fn set_spi_state(registers: &mut GicMappedPage, int: IntNumber, enabled: Enabled) {
+pub fn set_spi_state(registers: &mut GicMappedPage, int: InterruptNumber, enabled: Enabled) {
     let reg_base = match enabled {
         true  => offset::ISENABLER,
         false => offset::ICENABLER,
@@ -128,7 +134,7 @@ impl super::ArmGic {
     /// to a specific CPU or to any PE that is ready
     /// to process them, i.e. not handling another
     /// higher-priority interrupt.
-    pub fn get_spi_target(&self, int: IntNumber) -> TargetCpu {
+    pub fn get_spi_target(&self, int: InterruptNumber) -> TargetCpu {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
             let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
@@ -170,7 +176,7 @@ impl super::ArmGic {
     /// to a specific CPU or to any PE that is ready
     /// to process them, i.e. not handling another
     /// higher-priority interrupt.
-    pub fn set_spi_target(&mut self, int: IntNumber, target: TargetCpu) {
+    pub fn set_spi_target(&mut self, int: InterruptNumber, target: TargetCpu) {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
             assert_cpu_bounds(&target);

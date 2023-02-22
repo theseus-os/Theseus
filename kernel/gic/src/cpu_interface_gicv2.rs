@@ -1,6 +1,6 @@
 //! CPU Interface, GICv2 style
 //!
-//! Included functionnality:
+//! Included functionality:
 //! - Initializing the CPU interface
 //! - Setting and getting the minimum interrupt priority
 //! - Acknowledging interrupt requests
@@ -9,7 +9,7 @@
 use super::GicMappedPage;
 use super::U32BYTES;
 use super::Priority;
-use super::IntNumber;
+use super::InterruptNumber;
 
 mod offset {
     use super::U32BYTES;
@@ -53,7 +53,7 @@ pub fn set_minimum_priority(registers: &mut GicMappedPage, priority: Priority) {
 /// Signals to the controller that the currently processed interrupt has
 /// been fully handled, by zeroing the current priority level of this CPU.
 /// This implies that the CPU is ready to process interrupts again.
-pub fn end_of_interrupt(registers: &mut GicMappedPage, int: IntNumber) {
+pub fn end_of_interrupt(registers: &mut GicMappedPage, int: InterruptNumber) {
     registers.write_volatile(offset::EOIR, int as u32);
 }
 
@@ -61,10 +61,10 @@ pub fn end_of_interrupt(registers: &mut GicMappedPage, int: IntNumber) {
 /// and fetches its number; this tells the GIC that
 /// the requested interrupt is being handled by
 /// this CPU.
-pub fn acknowledge_interrupt(registers: &mut GicMappedPage) -> (IntNumber, Priority) {
+pub fn acknowledge_interrupt(registers: &mut GicMappedPage) -> (InterruptNumber, Priority) {
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
-    let int_num = registers.read_volatile(offset::IAR) as IntNumber;
+    let int_num = registers.read_volatile(offset::IAR) as InterruptNumber;
     let priority = registers.read_volatile(offset::RPR) as u8;
 
     (int_num, priority)

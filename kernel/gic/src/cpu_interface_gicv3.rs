@@ -1,6 +1,6 @@
 //! CPU Interface, GICv3 style
 //!
-//! Included functionnality:
+//! Included functionality:
 //! - Initializing the CPU interface
 //! - Setting and getting the minimum interrupt priority
 //! - Acknowledging interrupt requests
@@ -10,7 +10,7 @@
 use core::arch::asm;
 use super::TargetCpu;
 use super::Priority;
-use super::IntNumber;
+use super::InterruptNumber;
 
 const SGIR_TARGET_ALL_OTHER_PE: usize = 1 << 40;
 const IGRPEN_ENABLED: usize = 1;
@@ -58,7 +58,7 @@ pub fn set_minimum_priority(priority: Priority) {
 /// Signals to the controller that the currently processed interrupt has
 /// been fully handled, by zeroing the current priority level of this CPU.
 /// This implies that the CPU is ready to process interrupts again.
-pub fn end_of_interrupt(int: IntNumber) {
+pub fn end_of_interrupt(int: InterruptNumber) {
     let reg_value = int as usize;
     unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
 }
@@ -67,7 +67,7 @@ pub fn end_of_interrupt(int: IntNumber) {
 /// and fetches its number; this tells the GIC that
 /// the requested interrupt is being handled by
 /// this CPU.
-pub fn acknowledge_interrupt() -> (IntNumber, Priority) {
+pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
     let int_num: usize;
     let priority: usize;
 
@@ -80,10 +80,10 @@ pub fn acknowledge_interrupt() -> (IntNumber, Priority) {
 
     let int_num = int_num & 0xffffff;
     let priority = priority & 0xff;
-    (int_num as IntNumber, priority as u8)
+    (int_num as InterruptNumber, priority as u8)
 }
 
-pub fn send_ipi(int_num: IntNumber, target: TargetCpu) {
+pub fn send_ipi(int_num: InterruptNumber, target: TargetCpu) {
     let mut value = match target {
         TargetCpu::Specific(cpu) => {
             let cpu = cpu as usize;

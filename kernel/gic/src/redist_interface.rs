@@ -1,12 +1,16 @@
 //! Redistributor Interface
 //!
-//! Included functionnality:
+//! The Redistributor forwards or discards PPIs (private peripheral interrupts)
+//! & SGIs (software generated interrupts) to the CPU core, in GICv3. There's
+//! one redistributor per CPU core.
+//!
+//! Included functionality:
 //! - Initializing the interface
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
 
 use super::GicMappedPage;
 use super::U32BYTES;
-use super::IntNumber;
+use super::InterruptNumber;
 use super::Enabled;
 
 mod offset {
@@ -35,7 +39,7 @@ const GROUP_1: u32 = 1;
 //
 // If it wasn't enough for your machine, reach out to the Theseus
 // developers (or directly submit a PR).
-const TIMEOUT_ITERATIONS: usize = 0x10_000;
+const TIMEOUT_ITERATIONS: usize = 0xffff;
 
 /// Initializes the redistributor by waking
 /// it up and checking that it's awake
@@ -71,7 +75,7 @@ pub fn init(registers: &mut GicMappedPage) -> Result<(), &'static str> {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_sgippi_state(registers: &GicMappedPage, int: IntNumber) -> Enabled {
+pub fn get_sgippi_state(registers: &GicMappedPage, int: InterruptNumber) -> Enabled {
     registers.read_array_volatile::<32>(offset::SGI_ISENABLER, int) > 0
     &&
     // part of group 1?
@@ -80,7 +84,7 @@ pub fn get_sgippi_state(registers: &GicMappedPage, int: IntNumber) -> Enabled {
 
 /// Enables or disables the forwarding of
 /// a particular SGI or PPI
-pub fn set_sgippi_state(registers: &mut GicMappedPage, int: IntNumber, enabled: Enabled) {
+pub fn set_sgippi_state(registers: &mut GicMappedPage, int: InterruptNumber, enabled: Enabled) {
     let reg = match enabled {
         true => offset::SGI_ISENABLER,
         false => offset::SGI_ICENABLER,
