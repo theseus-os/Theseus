@@ -3313,7 +3313,6 @@ impl TlsDataImage {
     ///
     /// On x86_64, this is `FsBase`.
     /// On ARMv8, this is `TPIDR_EL0`.
-    #[inline(always)]
     pub fn set_as_current_tls_base(&self) {
         #[cfg(target_arch = "x86_64")]
         FsBase::write(VirtAddr::new(self.ptr as u64));
