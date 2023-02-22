@@ -3316,7 +3316,7 @@ impl TlsDataImage {
         FsBase::write(VirtAddr::new(self.ptr as u64));
 
         #[cfg(target_arch = "aarch64")]
-        TPIDR_EL1.set(self.ptr as u64);
+        TPIDR_EL0.set(self.ptr as u64);
     }
 }
 
