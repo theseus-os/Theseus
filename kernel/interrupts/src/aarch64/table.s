@@ -51,6 +51,13 @@ __vector_\handler:
 .section .text
 
 // Align by 2^11 bytes, as demanded by ARMv8-A. Same as ALIGN(2048) in an ld script.
+//
+// This is required because upon taking an exception, the CPU adds an offset (based
+// on the context and type of exception) to the aligned vector address (which is
+// stored in VBAR_ELx) and jumps there. If the vector address wasn't aligned, a real
+// addition would be required, but as it is aligned, a simple and cheaper OR operation
+// is used.
+//
 .align 11
 
 // Export a symbol for the Rust code to use.
