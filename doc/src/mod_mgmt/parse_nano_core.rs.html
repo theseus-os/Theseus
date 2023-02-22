@@ -876,14 +876,6 @@
 <a href="#876" id="876">876</a>
 <a href="#877" id="877">877</a>
 <a href="#878" id="878">878</a>
-<a href="#879" id="879">879</a>
-<a href="#880" id="880">880</a>
-<a href="#881" id="881">881</a>
-<a href="#882" id="882">882</a>
-<a href="#883" id="883">883</a>
-<a href="#884" id="884">884</a>
-<a href="#885" id="885">885</a>
-<a href="#886" id="886">886</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,
 //! in other words, the code that is currently executing.
 //! As such, it performs no loading, but rather just creates metadata that represents
@@ -1036,15 +1028,7 @@
     <span class="comment">// Now that we&#39;ve initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
     </span><span class="kw">let </span>tls_image = namespace.get_tls_initializer_data();
-    {
-        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-        </span>x86_64::registers::model_specific::FsBase::write(
-            x86_64::VirtAddr::new(tls_image.pointer_value() <span class="kw">as </span>u64)
-        );
-
-        <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
-        </span><span class="macro">todo!</span>(<span class="string">&quot;parse_nano_core(): setting the initial TLS data image is not yet implemented for this platform!&quot;</span>);
-    }
+    tls_image.set_as_current_tls_base();
 
     <span class="prelude-val">Ok</span>(NanoCoreItems {
         nano_core_crate_ref,

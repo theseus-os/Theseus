@@ -3340,6 +3340,19 @@
 <a href="#3340" id="3340">3340</a>
 <a href="#3341" id="3341">3341</a>
 <a href="#3342" id="3342">3342</a>
+<a href="#3343" id="3343">3343</a>
+<a href="#3344" id="3344">3344</a>
+<a href="#3345" id="3345">3345</a>
+<a href="#3346" id="3346">3346</a>
+<a href="#3347" id="3347">3347</a>
+<a href="#3348" id="3348">3348</a>
+<a href="#3349" id="3349">3349</a>
+<a href="#3350" id="3350">3350</a>
+<a href="#3351" id="3351">3351</a>
+<a href="#3352" id="3352">3352</a>
+<a href="#3353" id="3353">3353</a>
+<a href="#3354" id="3354">3354</a>
+<a href="#3355" id="3355">3355</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(int_roundings)]
@@ -3370,6 +3383,15 @@
 <span class="kw">use </span>rangemap::RangeMap;
 <span class="kw">pub use </span>crate_name_utils::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>crate_metadata::<span class="kw-2">*</span>;
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>x86_64::{registers::model_specific::FsBase, VirtAddr};
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">use </span>{
+    cortex_a::registers::TPIDR_EL1,
+    tock_registers::interfaces::Writeable,
+};
 
 <span class="kw">pub mod </span>parse_nano_core;
 <span class="kw">pub mod </span>replace_nano_core_crates;
@@ -6640,14 +6662,18 @@
     ptr:   usize,
 }
 <span class="kw">impl </span>TlsDataImage {
-    <span class="doccomment">/// Returns the value of the TLS self pointer for this TLS data image.
-    /// If it has no TLS data sections, the returned value will be zero.
-    </span><span class="attr">#[inline(always)]
-    </span><span class="kw">pub fn </span>pointer_value(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="self">self</span>.ptr
+    <span class="doccomment">/// Sets the current CPU&#39;s TLS register to point to this TLS data image.
+    ///
+    /// On x86_64, this writes to the `FsBase` MSR.
+    /// On ARMv8, this writes to `TPIDR_EL0`.
+    </span><span class="kw">pub fn </span>set_as_current_tls_base(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span>FsBase::write(VirtAddr::new_truncate(<span class="self">self</span>.ptr <span class="kw">as </span>u64));
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+        </span>TPIDR_EL0.set(<span class="self">self</span>.ptr <span class="kw">as </span>u64);
     }
 }
-
 
 <span class="doccomment">/// The status of a cached TLS area data image.
 </span><span class="attr">#[derive(Debug, Clone, PartialEq, Eq)]

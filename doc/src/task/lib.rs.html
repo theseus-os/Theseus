@@ -1649,12 +1649,6 @@
 <a href="#1649" id="1649">1649</a>
 <a href="#1650" id="1650">1650</a>
 <a href="#1651" id="1651">1651</a>
-<a href="#1652" id="1652">1652</a>
-<a href="#1653" id="1653">1653</a>
-<a href="#1654" id="1654">1654</a>
-<a href="#1655" id="1655">1655</a>
-<a href="#1656" id="1656">1656</a>
-<a href="#1657" id="1657">1657</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `Task` structure for supporting multithreading, 
 //! and the associated code for dealing with tasks.
 //! 
@@ -1700,7 +1694,6 @@
 <span class="kw">extern crate </span>preemption;
 <span class="kw">extern crate </span>environment;
 <span class="kw">extern crate </span>root;
-<span class="kw">extern crate </span>x86_64;
 <span class="kw">extern crate </span>spin;
 <span class="kw">extern crate </span>kernel_config;
 <span class="kw">extern crate </span>crossbeam_utils;
@@ -1730,7 +1723,6 @@
 <span class="kw">use </span>mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 <span class="kw">use </span>environment::Environment;
 <span class="kw">use </span>spin::Mutex;
-<span class="kw">use </span>x86_64::registers::model_specific::FsBase;
 <span class="kw">use </span>preemption::PreemptionGuard;
 <span class="kw">use </span>no_drop::NoDrop;
 
@@ -2408,14 +2400,10 @@
     }
 
     <span class="doccomment">/// Sets this `Task` as this CPU&#39;s current task.
-    /// 
-    /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
+    ///
+    /// Currently, this only updates the current TLS area.
     </span><span class="kw">fn </span>set_as_current_task(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-        </span>FsBase::write(x86_64::VirtAddr::new(<span class="self">self</span>.tls_area.pointer_value() <span class="kw">as </span>u64));
-
-        <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
-        </span><span class="macro">todo!</span>(<span class="string">&quot;Task::set_as_current_task() is not yet implemented for this platform!&quot;</span>);
+        <span class="self">self</span>.tls_area.set_as_current_tls_base();
     }
 
     <span class="doccomment">/// Perform any actions needed after a context switch.
