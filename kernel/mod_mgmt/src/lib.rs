@@ -3306,16 +3306,14 @@ pub struct TlsDataImage {
     _data: Option<Box<[u8]>>,
     ptr:   usize,
 }
-
 impl TlsDataImage {
-    /// Writes the pointer of this TLS data image to an architecture-specific
-    /// CPU register so that TLS-accessing code works as expected.
+    /// Sets the current CPU's TLS register to point to this TLS data image.
     ///
-    /// On x86_64, this is `FsBase`.
-    /// On ARMv8, this is `TPIDR_EL0`.
+    /// On x86_64, this writes to the `FsBase` MSR.
+    /// On ARMv8, this writes to `TPIDR_EL0`.
     pub fn set_as_current_tls_base(&self) {
         #[cfg(target_arch = "x86_64")]
-        FsBase::write(VirtAddr::new(self.ptr as u64));
+        FsBase::write(VirtAddr::new_truncate(self.ptr as u64));
 
         #[cfg(target_arch = "aarch64")]
         TPIDR_EL0.set(self.ptr as u64);

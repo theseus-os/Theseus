@@ -749,8 +749,8 @@ impl Task {
     }
 
     /// Sets this `Task` as this CPU's current task.
-    /// 
-    /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
+    ///
+    /// Currently, this only updates the current TLS area.
     fn set_as_current_task(&self) {
         self.tls_area.set_as_current_tls_base();
     }
