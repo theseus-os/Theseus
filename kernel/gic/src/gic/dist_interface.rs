@@ -75,7 +75,10 @@ pub fn init(registers: &mut GicRegisters) -> Enabled {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_spi_state(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
+
+/// Returns whether the given SPI (shared peripheral interrupt) will be
+/// forwarded by the distributor
+pub fn is_spi_enabled(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
     // enabled?
     registers.read_array_volatile::<32>(offset::ISENABLER, int) > 0
     &&
@@ -83,9 +86,8 @@ pub fn get_spi_state(registers: &GicRegisters, int: InterruptNumber) -> Enabled 
     registers.read_array_volatile::<32>(offset::IGROUPR, int) == GROUP_1
 }
 
-/// Enables or disables the forwarding of
-/// a particular interrupt in the distributor
-pub fn set_spi_state(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
+/// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt)
+pub fn enable_spi(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
     let reg_base = match enabled {
         true  => offset::ISENABLER,
         false => offset::ICENABLER,

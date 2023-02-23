@@ -269,11 +269,11 @@ impl ArmGic {
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::get_sgippi_state(&v3.redist_sgippi, int)
+                redist_interface::is_sgippi_enabled(&v3.redist_sgippi, int)
             } else {
                 true
             },
-            _ => dist_interface::get_spi_state(self.distributor(), int),
+            _ => dist_interface::is_spi_enabled(self.distributor(), int),
         }
     }
 
@@ -282,9 +282,9 @@ impl ArmGic {
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::set_sgippi_state(&mut v3.redist_sgippi, int, enabled);
+                redist_interface::enable_sgippi(&mut v3.redist_sgippi, int, enabled);
             },
-            _ => dist_interface::set_spi_state(self.distributor_mut(), int, enabled),
+            _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
         };
     }
 

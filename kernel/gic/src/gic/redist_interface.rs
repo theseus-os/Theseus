@@ -17,8 +17,8 @@ mod offset {
     use super::U32BYTES;
     pub const RD_WAKER: usize = 0x14 / U32BYTES;
     pub const IGROUPR:  usize = 0x80 / U32BYTES;
-    pub const SGI_ISENABLER: usize = 0x100 / U32BYTES;
-    pub const SGI_ICENABLER: usize = 0x180 / U32BYTES;
+    pub const SGIPPI_ISENABLER: usize = 0x100 / U32BYTES;
+    pub const SGIPPI_ICENABLER: usize = 0x180 / U32BYTES;
 }
 
 const RD_WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
@@ -74,20 +74,22 @@ pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
     }
 }
 
-/// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_sgippi_state(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
-    registers.read_array_volatile::<32>(offset::SGI_ISENABLER, int) > 0
+/// Returns whether the given SGI (software generated interrupts) or
+/// PPI (private peripheral interrupts) will be forwarded by the redistributor
+pub fn is_sgippi_enabled(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
+    registers.read_array_volatile::<32>(offset::SGIPPI_ISENABLER, int) > 0
     &&
     // part of group 1?
     registers.read_array_volatile::<32>(offset::IGROUPR, int) == GROUP_1
 }
 
-/// Enables or disables the forwarding of
-/// a particular SGI or PPI
-pub fn set_sgippi_state(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
+/// Enables or disables the forwarding of a particular
+/// SGI (software generated interrupts) or PPI (private
+/// peripheral interrupts)
+pub fn enable_sgippi(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
     let reg = match enabled {
-        true => offset::SGI_ISENABLER,
-        false => offset::SGI_ICENABLER,
+        true => offset::SGIPPI_ISENABLER,
+        false => offset::SGIPPI_ICENABLER,
     };
     registers.write_array_volatile::<32>(reg, int, 1);
 
