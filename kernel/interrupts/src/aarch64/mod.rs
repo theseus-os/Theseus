@@ -65,13 +65,13 @@ type HandlerFunc = extern "C" fn(&ExceptionContext) -> bool;
 
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
-    log::error!("Unhandled Exception ({})\r\n{}\r\n[looping forever now]", origin, exc);
+    log::error!("Unhandled Exception ({})\r\n{:?}\r\n[looping forever now]", origin, exc);
     loop {}
 }
 
 // called for all unhandled interrupt requests
 extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
-    log::error!("Unhandled IRQ:\r\n{}\r\n[looping forever now]", exc);
+    log::error!("Unhandled IRQ:\r\n{:?}\r\n[looping forever now]", exc);
     loop {}
 }
 
@@ -227,7 +227,7 @@ pub fn eoi(irq_num: InterruptNumber) {
 }
 
 #[rustfmt::skip]
-impl fmt::Display for SpsrEL1 {
+impl fmt::Debug for SpsrEL1 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Raw value.
         writeln!(f, "\rSPSR_EL1: {:#010x}", self.0.get())?;
@@ -255,7 +255,7 @@ impl fmt::Display for SpsrEL1 {
 }
 
 #[rustfmt::skip]
-impl fmt::Display for EsrEL1 {
+impl fmt::Debug for EsrEL1 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Raw print of whole register.
         writeln!(f, "\nESR_EL1: {:#010x}", self.0.get())?;
@@ -275,15 +275,15 @@ impl fmt::Display for EsrEL1 {
     }
 }
 
-impl fmt::Display for ExceptionContext {
+impl fmt::Debug for ExceptionContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "\r{}", self.esr_el1)?;
+        writeln!(f, "\r{:?}", self.esr_el1)?;
 
         if self.fault_address_valid() {
             writeln!(f, "\rFAR_EL1: {:#018x}", FAR_EL1.get() as usize)?;
         }
 
-        writeln!(f, "\r{}", self.spsr_el1)?;
+        writeln!(f, "\r{:?}", self.spsr_el1)?;
         writeln!(f, "\rELR_EL1: {:#018x}", self.elr_el1)?;
         writeln!(f)?;
         writeln!(f, "\rGeneral purpose register:")?;
