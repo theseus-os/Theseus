@@ -58,7 +58,7 @@ __vector_\handler:
 // addition would be required, but as it is aligned, a simple and cheaper OR operation
 // is used.
 //
-.align 11
+.balign 2048
 
 // Export a symbol for the Rust code to use.
 __exception_vector_start:
