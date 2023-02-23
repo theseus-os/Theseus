@@ -632,6 +632,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
 /// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.
 #[derive(Default)]
+#[non_exhaustive]
 pub struct LoadedSectionInner {
     /// The list of sections in foreign crates that this section depends on, i.e., "my required dependencies".
     /// This is kept as a list of strong references because these sections must outlast this section,
@@ -653,6 +654,7 @@ pub struct LoadedSectionInner {
 
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
+#[non_exhaustive]
 pub struct LoadedSection {
     /// The full string name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.

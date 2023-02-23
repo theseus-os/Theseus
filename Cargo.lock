@@ -2027,7 +2027,6 @@ dependencies = [
  "bincode",
  "bootloader_modules",
  "const_format",
- "cortex-a",
  "cow_arc",
  "cpio_reader",
  "crate_metadata",
@@ -2044,14 +2043,12 @@ dependencies = [
  "no_drop",
  "path",
  "qp-trie",
- "rangemap",
  "root",
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "tock-registers",
+ "tls_initializer",
  "vfs_node",
- "x86_64",
  "xmas-elf",
 ]
 
@@ -4024,6 +4021,19 @@ dependencies = [
  "log",
  "memory",
  "pause",
+ "x86_64",
+]
+
+[[package]]
+name = "tls_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.4",
+ "tock-registers",
  "x86_64",
 ]
 
