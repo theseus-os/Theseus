@@ -8,7 +8,7 @@
 //! - Initializing the interface
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
 
-use super::GicMappedPage;
+use super::GicRegisters;
 use super::U32BYTES;
 use super::InterruptNumber;
 use super::Enabled;
@@ -43,7 +43,7 @@ const TIMEOUT_ITERATIONS: usize = 0xffff;
 
 /// Initializes the redistributor by waking
 /// it up and checking that it's awake
-pub fn init(registers: &mut GicMappedPage) -> Result<(), &'static str> {
+pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
     let mut reg;
     reg = registers.read_volatile(offset::RD_WAKER);
 
@@ -75,7 +75,7 @@ pub fn init(registers: &mut GicMappedPage) -> Result<(), &'static str> {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_sgippi_state(registers: &GicMappedPage, int: InterruptNumber) -> Enabled {
+pub fn get_sgippi_state(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
     registers.read_array_volatile::<32>(offset::SGI_ISENABLER, int) > 0
     &&
     // part of group 1?
@@ -84,7 +84,7 @@ pub fn get_sgippi_state(registers: &GicMappedPage, int: InterruptNumber) -> Enab
 
 /// Enables or disables the forwarding of
 /// a particular SGI or PPI
-pub fn set_sgippi_state(registers: &mut GicMappedPage, int: InterruptNumber, enabled: Enabled) {
+pub fn set_sgippi_state(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
     let reg = match enabled {
         true => offset::SGI_ISENABLER,
         false => offset::SGI_ICENABLER,

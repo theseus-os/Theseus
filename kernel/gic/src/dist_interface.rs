@@ -12,7 +12,7 @@
 //! - Setting the target of SPIs based on their numbers
 //! - Generating software interrupts (GICv2 style)
 
-use super::GicMappedPage;
+use super::GicRegisters;
 use super::U32BYTES;
 use super::TargetCpu;
 use super::InterruptNumber;
@@ -63,7 +63,7 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 /// Return value: whether or not affinity routing is
 /// currently enabled for both secure and non-secure
 /// states.
-pub fn init(registers: &mut GicMappedPage) -> Enabled {
+pub fn init(registers: &mut GicRegisters) -> Enabled {
     let mut reg = registers.read_volatile(offset::CTLR);
     reg |= CTLR_ENGRP1;
     registers.write_volatile(offset::CTLR, reg);
@@ -75,7 +75,7 @@ pub fn init(registers: &mut GicMappedPage) -> Enabled {
 }
 
 /// Returns whether the given interrupt will be forwarded by the distributor
-pub fn get_spi_state(registers: &GicMappedPage, int: InterruptNumber) -> Enabled {
+pub fn get_spi_state(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
     // enabled?
     registers.read_array_volatile::<32>(offset::ISENABLER, int) > 0
     &&
@@ -85,7 +85,7 @@ pub fn get_spi_state(registers: &GicMappedPage, int: InterruptNumber) -> Enabled
 
 /// Enables or disables the forwarding of
 /// a particular interrupt in the distributor
-pub fn set_spi_state(registers: &mut GicMappedPage, int: InterruptNumber, enabled: Enabled) {
+pub fn set_spi_state(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
     let reg_base = match enabled {
         true  => offset::ISENABLER,
         false => offset::ICENABLER,
@@ -101,7 +101,7 @@ pub fn set_spi_state(registers: &mut GicMappedPage, int: InterruptNumber, enable
 ///
 /// legacy / GICv2 method
 /// int_num must be less than 16
-pub fn send_ipi_gicv2(registers: &mut GicMappedPage, int_num: u32, target: TargetCpu) {
+pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: TargetCpu) {
     assert_cpu_bounds(&target);
 
     let target_list = match target {
@@ -115,14 +115,14 @@ pub fn send_ipi_gicv2(registers: &mut GicMappedPage, int_num: u32, target: Targe
 }
 
 impl super::ArmGic {
-    pub(crate) fn distributor(&self) -> &GicMappedPage {
+    pub(crate) fn distributor(&self) -> &GicRegisters {
         match self {
             Self::V2(v2) => &v2.distributor,
             Self::V3(v3) => &v3.distributor,
         }
     }
 
-    pub(crate) fn distributor_mut(&mut self) -> &mut GicMappedPage {
+    pub(crate) fn distributor_mut(&mut self) -> &mut GicRegisters {
         match self {
             Self::V2(v2) => &mut v2.distributor,
             Self::V3(v3) => &mut v3.distributor,

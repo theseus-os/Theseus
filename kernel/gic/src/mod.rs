@@ -64,11 +64,11 @@ const U32BITS: usize = U32BYTES * 8;
 
 #[repr(C)]
 #[derive(zerocopy::FromBytes)]
-pub struct GicMappedPage {
+pub struct GicRegisters {
     inner: [u32; 0x400],
 }
 
-impl GicMappedPage {
+impl GicRegisters {
     fn read_volatile(&self, index: usize) -> u32 {
         unsafe { (&self.inner[index] as *const u32).read_volatile() }
     }
@@ -119,22 +119,22 @@ impl GicMappedPage {
     }
 }
 
-const_assert_eq!(core::mem::size_of::<GicMappedPage>(), 0x1000);
+const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
 
 pub struct ArmGicV2 {
-    pub distributor: BorrowedMappedPages<GicMappedPage, Mutable>,
-    pub processor: BorrowedMappedPages<GicMappedPage, Mutable>,
+    pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub processor: BorrowedMappedPages<GicRegisters, Mutable>,
 }
 
 pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
-    pub distributor: BorrowedMappedPages<GicMappedPage, Mutable>,
-    pub dist_extended: BorrowedMappedPages<GicMappedPage, Mutable>,
-    pub redistributor: BorrowedMappedPages<GicMappedPage, Mutable>,
-    pub redist_sgippi: BorrowedMappedPages<GicMappedPage, Mutable>,
+    pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
 }
 
 /// Arm Generic Interrupt Controller
@@ -164,7 +164,7 @@ impl ArmGic {
                        | PteFlags::NOT_EXECUTABLE
                        | PteFlags::WRITABLE;
 
-        let mut map_dist = |gicd_base| -> Result<BorrowedMappedPages<GicMappedPage, Mutable>, &'static str>  {
+        let mut map_dist = |gicd_base| -> Result<BorrowedMappedPages<GicRegisters, Mutable>, &'static str>  {
             let pages = allocate_pages(1).ok_or("couldn't allocate pages for the distributor interface")?;
             let frames = allocate_frames_at(gicd_base, 1)?;
             let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
@@ -175,7 +175,7 @@ impl ArmGic {
             Version::InitV2 { dist, cpu } => {
                 let mut distributor = map_dist(dist)?;
 
-                let mut processor: BorrowedMappedPages<GicMappedPage, Mutable> = {
+                let mut processor: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the CPU interface")?;
                     let frames = allocate_frames_at(cpu, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
@@ -190,14 +190,14 @@ impl ArmGic {
             Version::InitV3 { dist, redist } => {
                 let mut distributor = map_dist(dist)?;
 
-                let dist_extended: BorrowedMappedPages<GicMappedPage, Mutable> = {
+                let dist_extended: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended distributor interface")?;
                     let frames = allocate_frames_at(dist + DIST_P6_OFFSET, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributor: BorrowedMappedPages<GicMappedPage, Mutable> = {
+                let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
                     let frames = allocate_frames_at(redist, 1)?;
                     let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
