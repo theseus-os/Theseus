@@ -18,6 +18,7 @@ kernel_config = { path = "../kernel_config" }
 state_store = { path = "../state_store" }
 memory = { path = "../memory" }
 no_drop = { path = "../no_drop" }
+early_tls = { path = "../early_tls" }
 stack = { path = "../stack" }
 mod_mgmt = { path = "../mod_mgmt" }
 panic_entry = { path = "../panic_entry" }

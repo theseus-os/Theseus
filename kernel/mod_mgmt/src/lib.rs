@@ -551,7 +551,7 @@ impl CrateNamespace {
     }
 
     /// Returns a new copy of this namespace's initial TLS area,
-    /// which can be used as the initial TLS area data for a new task.
+    /// which can be used as the initial TLS area data image for a new task.
     pub fn get_tls_initializer_data(&self) -> TlsDataImage {
         self.tls_initializer.lock().get_data()
     }

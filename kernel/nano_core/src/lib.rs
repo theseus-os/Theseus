@@ -146,7 +146,6 @@ where
     println_raw!("nano_core(): parsing nano_core crate, please wait ...");
     let (
         nano_core_crate_ref,
-        initial_tls_image,
         ap_realmode_begin,
         ap_realmode_end,
         ap_gdt,
@@ -157,7 +156,7 @@ where
         data_mapped_pages.into_inner(),
         false,
     ) {
-        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols, tls_image }) => {
+        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) => {
             println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
 
             // Get symbols from the boot assembly code that define where the ap_start code is.
@@ -171,27 +170,21 @@ where
                 .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
                 .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
 
-            let ap_gdt = {
-                let mut ap_gdt_virtual_address = None;
-                for (_, section) in nano_core_crate_ref.lock_as_ref().sections.iter() {
-                    if section.name == "GDT_AP".into() {
-                        ap_gdt_virtual_address = Some(section.virt_addr);
-                        break;
-                    }
-                }
-
-                // The identity-mapped virtual address of GDT_AP.
-                VirtualAddress::new(
-                    memory::translate(ap_gdt_virtual_address.ok_or(
-                        "Missing/invalid symbol expected from data section \"GDT_AP\"",
-                    )?)
-                    .ok_or("Failed to translate \"GDT_AP\"")?
-                    .value(),
+            // Obtain the identity-mapped virtual address of GDT_AP.
+            let ap_gdt = nano_core_crate_ref.lock_as_ref()
+                .sections
+                .values()
+                .find(|sec| &*sec.name == "GDT_AP")
+                .map(|ap_gdt_sec| ap_gdt_sec.virt_addr)
+                .ok_or("Missing/invalid symbol expected from data section \"GDT_AP\"")
+                .and_then(|vaddr| memory::translate(vaddr)
+                    .ok_or("Failed to translate \"GDT_AP\"")
                 )
-                .ok_or("couldn't convert \"GDT_AP\" physical address to virtual")?
-            };
-            // debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}", ap_realmode_begin, ap_realmode_end);
-            (nano_core_crate_ref, tls_image, ap_realmode_begin, ap_realmode_end, ap_gdt)
+                .and_then(|paddr| VirtualAddress::new(paddr.value())
+                    .ok_or("\"GDT_AP\" physical address was not a valid identity virtual address")
+                )?;
+            // log::debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}", ap_realmode_begin, ap_realmode_end, ap_gdt);
+            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
         Err((msg, _mapped_pages_array)) => return Err(msg),
     };
@@ -213,6 +206,10 @@ where
         println_raw!("nano_core(): loading the panic handling crate(s)...");
         let (panic_wrapper_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, "panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file")?;
         let (_pw_crate, _num_pw_syms) = default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false)?;
+
+        // After loading the captain and its dependencies, new TLS sections may have been added,
+        // so we need to instantiate a new TLS data image and reload it.
+        early_tls::insert(default_namespace.get_tls_initializer_data());
     }
 
     // Now we invoke the Captain, which will take over from here.
@@ -221,7 +218,6 @@ where
     #[cfg(target_arch = "x86_64")]
     let drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
-        initial_tls_image,
     };
     #[cfg(all(target_arch = "x86_64", not(loadable)))] {
         captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
