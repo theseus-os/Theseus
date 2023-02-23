@@ -1,4 +1,5 @@
 use crate::IdleState;
+use raw_cpuid::CpuId;
 
 pub(crate) enum Model {
     Broadwell,
@@ -6,12 +7,10 @@ pub(crate) enum Model {
 
 impl Model {
     pub(crate) fn current() -> Option<Self> {
-        let eax = unsafe { core::arch::x86_64::__cpuid(1).eax };
-        let model = (eax >> 4) & 0xf;
-        let extended_model = (eax >> 16) & 0xf;
+        let feature_info = CpuId::new().get_feature_info()?;
 
-        match (extended_model, model) {
-            (0x3, 0xd) => Some(Self::Broadwell),
+        match feature_info.model_id() {
+            0x3d => Some(Self::Broadwell),
             _ => None,
         }
     }

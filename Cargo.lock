@@ -361,7 +361,6 @@ dependencies = [
  "e1000",
  "exceptions_full",
  "first_application",
- "idle",
  "interrupts",
  "irq_safety",
  "kernel_config",
