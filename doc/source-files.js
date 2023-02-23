@@ -164,6 +164,7 @@ var sourcesIndex = JSON.parse('{\
 "thread_local_macro":["",[],["lib.rs"]],\
 "time":["",[],["dummy.rs","lib.rs"]],\
 "tlb_shootdown":["",[],["lib.rs"]],\
+"tls_initializer":["",[],["lib.rs"]],\
 "tsc":["",[],["lib.rs"]],\
 "tss":["",[],["lib.rs"]],\
 "tty":["",[],["channel.rs","discipline.rs","lib.rs"]],\

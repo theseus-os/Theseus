@@ -1105,6 +1105,8 @@
 <a href="#1105" id="1105">1105</a>
 <a href="#1106" id="1106">1106</a>
 <a href="#1107" id="1107">1107</a>
+<a href="#1108" id="1108">1108</a>
+<a href="#1109" id="1109">1109</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1739,6 +1741,7 @@
 <span class="doccomment">/// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.
 </span><span class="attr">#[derive(Default)]
+#[non_exhaustive]
 </span><span class="kw">pub struct </span>LoadedSectionInner {
     <span class="doccomment">/// The list of sections in foreign crates that this section depends on, i.e., &quot;my required dependencies&quot;.
     /// This is kept as a list of strong references because these sections must outlast this section,
@@ -1760,6 +1763,7 @@
 
 <span class="doccomment">/// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
+</span><span class="attr">#[non_exhaustive]
 </span><span class="kw">pub struct </span>LoadedSection {
     <span class="doccomment">/// The full string name of this section, a fully-qualified symbol, 
     /// with the format `&lt;crate&gt;::[&lt;module&gt;::][&lt;struct&gt;::]&lt;fn_name&gt;::&lt;hash&gt;`.

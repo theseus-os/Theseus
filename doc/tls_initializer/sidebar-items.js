@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["TlsDataImage","An initialized TLS area data image ready to be used by a new task."],["TlsInitializer","A Thread-Local Storage (TLS) area data “image” that is used to initialize a new `Task`’s TLS area."]]};
