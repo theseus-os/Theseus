@@ -62,7 +62,7 @@ var sourcesIndex = JSON.parse('{\
 "hpet":["",[],["lib.rs"]],\
 "http_client":["",[],["lib.rs"]],\
 "intel_ethernet":["",[],["descriptors.rs","lib.rs"]],\
-"interrupts":["",[],["lib.rs"]],\
+"interrupts":["",[],["mod.rs"]],\
 "io":["",[],["lib.rs"]],\
 "ioapic":["",[],["lib.rs"]],\
 "iommu":["",[],["lib.rs","regs.rs"]],\
