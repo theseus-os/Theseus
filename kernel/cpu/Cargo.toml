@@ -5,9 +5,6 @@ description = "An abstraction for querying about CPUs (cores) in an SMP multicor
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-cfg-if = "1.0"
-
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic" }
 

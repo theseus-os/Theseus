@@ -1,7 +1,5 @@
 mod intel;
 
-pub use apic::{bootstrap_cpu, cpu_count, current_cpu, is_bootstrap_cpu, CpuId};
-
 /// A CPU idle state.
 #[derive(Clone, Copy, Debug)]
 pub struct IdleState {
