@@ -77,8 +77,12 @@ impl GicRegisters {
         unsafe { (&mut self.inner[index] as *mut u32).write_volatile(value) }
     }
 
-    // Reads one slot of an array spanning across
+    // Reads one item of an array spanning across
     // multiple u32s.
+    //
+    // The maximum item size is 32 bits, and the items are always aligned to 2**N bits.
+    // The array spans multiple adjacent u32s but there is always a integer number of
+    // items in a single u32.
     //
     // - `int` is the index
     // - `offset` tells the beginning of the array
@@ -96,8 +100,12 @@ impl GicRegisters {
         (reg >> shift) & mask
     }
 
-    // Writes one slot of an array spanning across
+    // Writes one item of an array spanning across
     // multiple u32s.
+    //
+    // The maximum item size is 32 bits, and the items are always aligned to 2**N bits.
+    // The array spans multiple adjacent u32s but there is always a integer number of
+    // items in a single u32.
     //
     // - `int` is the index
     // - `offset` tells the beginning of the array
