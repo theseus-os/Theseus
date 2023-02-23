@@ -870,12 +870,6 @@
 <a href="#870" id="870">870</a>
 <a href="#871" id="871">871</a>
 <a href="#872" id="872">872</a>
-<a href="#873" id="873">873</a>
-<a href="#874" id="874">874</a>
-<a href="#875" id="875">875</a>
-<a href="#876" id="876">876</a>
-<a href="#877" id="877">877</a>
-<a href="#878" id="878">878</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,
 //! in other words, the code that is currently executing.
 //! As such, it performs no loading, but rather just creates metadata that represents
@@ -883,8 +877,8 @@
 
 </span><span class="attr">#![allow(clippy::type_complexity)]
 
-</span><span class="kw">use crate</span>::{CrateNamespace, mp_range, TlsDataImage};
-<span class="kw">use </span>alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
+</span><span class="kw">use </span>alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
+<span class="kw">use crate</span>::{CrateNamespace, mp_range};
 <span class="kw">use </span>fs_node::FileRef;
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>rustc_demangle::demangle;
@@ -912,12 +906,8 @@
     </span><span class="kw">pub </span>init_symbol_values: BTreeMap&lt;String, usize&gt;,
     <span class="doccomment">/// The number of new symbols in the nano_core crate added to the symbol map.
     </span><span class="kw">pub </span>num_new_symbols: usize,
-    <span class="doccomment">/// The initial placeholder/dummy TLS data image, which exists to ensure that early accesses
-    /// of TLS variables (before tasking is initialized) do not cause exceptions.
-    ///
-    /// After the task management subsystem has been initialized, this can be dropped.
-    </span><span class="kw">pub </span>tls_image: NoDrop&lt;TlsDataImage&gt;,
 }
+
 
 <span class="doccomment">/// Parses and/or deserializes the file containing details about the already loaded
 /// (and currently running) `nano_core` code.
@@ -1027,14 +1017,12 @@
 
     <span class="comment">// Now that we&#39;ve initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
-    </span><span class="kw">let </span>tls_image = namespace.get_tls_initializer_data();
-    tls_image.set_as_current_tls_base();
+    </span>early_tls::insert(namespace.get_tls_initializer_data());
 
     <span class="prelude-val">Ok</span>(NanoCoreItems {
         nano_core_crate_ref,
         init_symbol_values,
         num_new_symbols,
-        tls_image: NoDrop::new(tls_image),
     })
 }
 

@@ -1018,6 +1018,10 @@
 <a href="#1018" id="1018">1018</a>
 <a href="#1019" id="1019">1019</a>
 <a href="#1020" id="1020">1020</a>
+<a href="#1021" id="1021">1021</a>
+<a href="#1022" id="1022">1022</a>
+<a href="#1023" id="1023">1023</a>
+<a href="#1024" id="1024">1024</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1052,7 +1056,7 @@
 <span class="kw">use </span>memory::{get_kernel_mmi_ref, MmiRef};
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
-<span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
+<span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER, TlsDataImage};
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>fs_node::FileOrDir;
 <span class="kw">use </span>preemption::{hold_preemption, PreemptionGuard};
@@ -1090,11 +1094,11 @@
 
 <span class="doccomment">/// Spawns a dedicated task to cleanup all bootstrap tasks
 /// by reaping them, i.e., taking their exit value.
-/// 
+///
 /// This allows them to be fully dropped and cleaned up safely,
 /// as it would be invalid to reap and cleanup bootstrap tasks
 /// while the actual bootstrapped task was still running.
-/// 
+///
 /// ## Arguments
 /// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.
 </span><span class="kw">pub fn </span>cleanup_bootstrap_tasks(num_tasks: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -1114,7 +1118,11 @@
             }
             <span class="macro">info!</span>(<span class="string">&quot;Cleaned up all {} bootstrap tasks.&quot;</span>, total_tasks);
             <span class="kw-2">*</span>BOOTSTRAP_TASKS.lock() = Vec::new(); <span class="comment">// replace the Vec to drop it
-        </span>},
+            // Now that all bootstrap tasks are finished executing and have been cleaned up,
+            // we can safely deallocate the early TLS data image because it is guaranteed
+            // to no longer be in use on any CPU.
+            </span>early_tls::drop();
+        },
         num_tasks,
     )
     .name(String::from(<span class="string">&quot;bootstrap_task_cleanup&quot;</span>))

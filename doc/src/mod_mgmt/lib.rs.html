@@ -3600,7 +3600,7 @@
     }
 
     <span class="doccomment">/// Returns a new copy of this namespace&#39;s initial TLS area,
-    /// which can be used as the initial TLS area data for a new task.
+    /// which can be used as the initial TLS area data image for a new task.
     </span><span class="kw">pub fn </span>get_tls_initializer_data(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; TlsDataImage {
         <span class="self">self</span>.tls_initializer.lock().get_data()
     }

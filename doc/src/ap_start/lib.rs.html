@@ -115,6 +115,10 @@
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
 <a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -173,6 +177,10 @@
 
     <span class="comment">// set a flag telling the BSP that this AP has entered Rust code
     </span>AP_READY_FLAG.store(<span class="bool-val">true</span>, Ordering::SeqCst);
+
+    <span class="comment">// The early TLS image has already been initialized by the bootstrap CPU,
+    // so all we need to do here is to reload it on this CPU.
+    </span>early_tls::reload();
 
     <span class="comment">// get the stack that was allocated for us (this AP) by the BSP.
     </span><span class="kw">let </span>this_ap_stack = AP_STACKS.lock().remove(<span class="kw-2">&amp;</span>apic_id)
