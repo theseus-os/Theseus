@@ -1,0 +1,21 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "tls_initializer"
+description = "Generates data images for Thread-Local Storage (TLS) areas"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spin = "0.9.4"
+rangemap = { version = "1.3.0", features = [ "const_fn" ] }
+
+crate_metadata = { path = "../crate_metadata" }
+memory_structs = { path = "../memory_structs" }
+
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+cortex-a = "7.5.0"
+tock-registers = "0.7.0"

@@ -43,7 +43,6 @@ extern crate context_switch;
 extern crate preemption;
 extern crate environment;
 extern crate root;
-extern crate x86_64;
 extern crate spin;
 extern crate kernel_config;
 extern crate crossbeam_utils;
@@ -73,7 +72,6 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
 
@@ -751,14 +749,10 @@ impl Task {
     }
 
     /// Sets this `Task` as this CPU's current task.
-    /// 
-    /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
+    ///
+    /// Currently, this only updates the current TLS area.
     fn set_as_current_task(&self) {
-        #[cfg(target_arch = "x86_64")]
-        FsBase::write(x86_64::VirtAddr::new(self.tls_area.pointer_value() as u64));
-
-        #[cfg(not(target_arch = "x86_64"))]
-        todo!("Task::set_as_current_task() is not yet implemented for this platform!");
+        self.tls_area.set_as_current_tls_base();
     }
 
     /// Perform any actions needed after a context switch.

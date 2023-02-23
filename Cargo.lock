@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "early_tls",
  "interrupts",
  "irq_safety",
  "kernel_config",
@@ -947,6 +948,14 @@ dependencies = [
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
+]
+
+[[package]]
+name = "early_tls"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+ "tls_initializer",
 ]
 
 [[package]]
@@ -2048,6 +2057,7 @@ dependencies = [
  "crate_metadata_serde",
  "crate_name_utils",
  "cstr_core",
+ "early_tls",
  "fs_node",
  "hashbrown",
  "kernel_config",
@@ -2058,13 +2068,12 @@ dependencies = [
  "no_drop",
  "path",
  "qp-trie",
- "rangemap",
  "root",
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
+ "tls_initializer",
  "vfs_node",
- "x86_64",
  "xmas-elf",
 ]
 
@@ -2202,6 +2211,7 @@ dependencies = [
  "boot_info",
  "captain",
  "cfg-if 1.0.0",
+ "early_tls",
  "exceptions_early",
  "interrupts",
  "irq_safety",
@@ -2786,9 +2796,9 @@ dependencies = [
 
 [[package]]
 name = "qp-trie"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a075ecba64154fed5429568c9c6a0e0eccc3276209e93e6133206413ea6834b4"
+checksum = "9569328cda9b68120dbbf855bac541eeb40c475d96a9a380cf8b5547bfe0c165"
 dependencies = [
  "new_debug_unreachable",
  "unreachable",
@@ -3430,6 +3440,7 @@ dependencies = [
  "context_switch",
  "cpu",
  "debugit",
+ "early_tls",
  "fault_crate_swap",
  "fault_log",
  "fs_node",
@@ -3641,7 +3652,6 @@ dependencies = [
  "stack",
  "static_assertions",
  "tss",
- "x86_64",
 ]
 
 [[package]]
@@ -4039,6 +4049,19 @@ dependencies = [
  "log",
  "memory",
  "pause",
+ "x86_64",
+]
+
+[[package]]
+name = "tls_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.4",
+ "tock-registers",
  "x86_64",
 ]
 

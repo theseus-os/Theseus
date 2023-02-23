@@ -32,7 +32,7 @@ use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
-use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
+use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER, TlsDataImage};
 use path::Path;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
@@ -70,11 +70,11 @@ static BOOTSTRAP_TASKS: Mutex<Vec<JoinableTaskRef>> = Mutex::new(Vec::new());
 
 /// Spawns a dedicated task to cleanup all bootstrap tasks
 /// by reaping them, i.e., taking their exit value.
-/// 
+///
 /// This allows them to be fully dropped and cleaned up safely,
 /// as it would be invalid to reap and cleanup bootstrap tasks
 /// while the actual bootstrapped task was still running.
-/// 
+///
 /// ## Arguments
 /// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.
 pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
@@ -94,6 +94,10 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
             }
             info!("Cleaned up all {} bootstrap tasks.", total_tasks);
             *BOOTSTRAP_TASKS.lock() = Vec::new(); // replace the Vec to drop it
+            // Now that all bootstrap tasks are finished executing and have been cleaned up,
+            // we can safely deallocate the early TLS data image because it is guaranteed
+            // to no longer be in use on any CPU.
+            early_tls::drop();
         },
         num_tasks,
     )

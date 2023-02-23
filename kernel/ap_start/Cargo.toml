@@ -34,6 +34,9 @@ path = "../apic"
 [dependencies.no_drop]
 path = "../no_drop"
 
+[dependencies.early_tls]
+path = "../early_tls"
+
 [dependencies.page_attribute_table]
 path = "../page_attribute_table"
 

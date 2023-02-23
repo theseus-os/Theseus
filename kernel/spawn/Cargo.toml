@@ -71,5 +71,8 @@ path = "../preemption"
 [dependencies.no_drop]
 path = "../no_drop"
 
+[dependencies.early_tls]
+path = "../early_tls"
+
 [lib]
 crate-type = ["rlib"]

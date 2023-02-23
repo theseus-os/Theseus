@@ -1,0 +1,12 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "early_tls"
+description = "Handles initialization of TLS data images during early OS initialization"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+spin = "0.9.4"
+
+tls_initializer = { path = "../tls_initializer" }
+

@@ -5,8 +5,8 @@
 
 #![allow(clippy::type_complexity)]
 
-use crate::{CrateNamespace, mp_range, TlsDataImage};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
+use crate::{CrateNamespace, mp_range};
 use fs_node::FileRef;
 use path::Path;
 use rustc_demangle::demangle;
@@ -34,12 +34,8 @@ pub struct NanoCoreItems {
     pub init_symbol_values: BTreeMap<String, usize>,
     /// The number of new symbols in the nano_core crate added to the symbol map.
     pub num_new_symbols: usize,
-    /// The initial placeholder/dummy TLS data image, which exists to ensure that early accesses
-    /// of TLS variables (before tasking is initialized) do not cause exceptions.
-    ///
-    /// After the task management subsystem has been initialized, this can be dropped.
-    pub tls_image: NoDrop<TlsDataImage>,
 }
+
 
 /// Parses and/or deserializes the file containing details about the already loaded
 /// (and currently running) `nano_core` code.
@@ -149,22 +145,12 @@ pub fn parse_nano_core(
 
     // Now that we've initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
-    let tls_image = namespace.get_tls_initializer_data();
-    {
-        #[cfg(target_arch = "x86_64")]
-        x86_64::registers::model_specific::FsBase::write(
-            x86_64::VirtAddr::new(tls_image.pointer_value() as u64)
-        );
-
-        #[cfg(not(target_arch = "x86_64"))]
-        todo!("parse_nano_core(): setting the initial TLS data image is not yet implemented for this platform!");
-    }
+    early_tls::insert(namespace.get_tls_initializer_data());
 
     Ok(NanoCoreItems {
         nano_core_crate_ref,
         init_symbol_values,
         num_new_symbols,
-        tls_image: NoDrop::new(tls_image),
     })
 }
 
