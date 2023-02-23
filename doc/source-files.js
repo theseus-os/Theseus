@@ -61,6 +61,7 @@ var sourcesIndex = JSON.parse('{\
 "heapfile":["",[],["lib.rs"]],\
 "hpet":["",[],["lib.rs"]],\
 "http_client":["",[],["lib.rs"]],\
+"idle":["",[["arch",[["x86_64",[],["intel.rs","mod.rs"]]],["mod.rs"]]],["lib.rs"]],\
 "intel_ethernet":["",[],["descriptors.rs","lib.rs"]],\
 "interrupts":["",[],["mod.rs"]],\
 "io":["",[],["lib.rs"]],\

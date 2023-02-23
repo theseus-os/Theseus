@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["idle_states",""]],"struct":[["IdleState","A CPU idle state."]]};
