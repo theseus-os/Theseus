@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "early_tls",
  "interrupts",
  "irq_safety",
  "kernel_config",
@@ -947,6 +948,14 @@ dependencies = [
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
+]
+
+[[package]]
+name = "early_tls"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+ "tls_initializer",
 ]
 
 [[package]]
@@ -2033,6 +2042,7 @@ dependencies = [
  "crate_metadata_serde",
  "crate_name_utils",
  "cstr_core",
+ "early_tls",
  "fs_node",
  "hashbrown",
  "kernel_config",
@@ -2186,6 +2196,7 @@ dependencies = [
  "boot_info",
  "captain",
  "cfg-if 1.0.0",
+ "early_tls",
  "exceptions_early",
  "irq_safety",
  "kernel_config",
@@ -3413,6 +3424,7 @@ dependencies = [
  "context_switch",
  "cpu",
  "debugit",
+ "early_tls",
  "fault_crate_swap",
  "fault_log",
  "fs_node",

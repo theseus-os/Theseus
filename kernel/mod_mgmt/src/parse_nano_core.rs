@@ -5,10 +5,8 @@
 
 #![allow(clippy::type_complexity)]
 
-use core::ops::Deref;
-
-use crate::{CrateNamespace, mp_range, TlsDataImage};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
+use crate::{CrateNamespace, mp_range};
 use fs_node::FileRef;
 use path::Path;
 use rustc_demangle::demangle;
@@ -30,28 +28,14 @@ const NANO_CORE_CRATE_NAME: &str = "nano_core";
 /// The items returned from the [`parse_nano_core()`] routine.
 pub struct NanoCoreItems {
     /// A reference to the newly-created nano_core crate.
-    pub nano_core_crate_ref: EarlyNanoCoreCrateRef,
+    pub nano_core_crate_ref: StrongCrateRef,
     /// The symbols in the `.init` ELF section, which maps the symbol's name to its constant value.
     /// This map contains assembler and linker constants.
     pub init_symbol_values: BTreeMap<String, usize>,
     /// The number of new symbols in the nano_core crate added to the symbol map.
     pub num_new_symbols: usize,
-    /// The initial placeholder/dummy TLS data image, which exists to ensure that early accesses
-    /// of TLS variables (before tasking is initialized) do not cause exceptions.
-    ///
-    /// After the task management subsystem has been initialized, this can be dropped.
-    pub tls_image: NoDrop<TlsDataImage>,
 }
 
-/// A newtype wrapper around the nano_core crate reference when is first created
-/// during early OS initialization.
-pub struct EarlyNanoCoreCrateRef(StrongCrateRef);
-impl Deref for EarlyNanoCoreCrateRef {
-    type Target = StrongCrateRef;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 /// Parses and/or deserializes the file containing details about the already loaded
 /// (and currently running) `nano_core` code.
@@ -161,14 +145,12 @@ pub fn parse_nano_core(
 
     // Now that we've initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
-    let tls_image = namespace.get_tls_initializer_data();
-    tls_image.set_as_current_tls_base();
+    early_tls::insert(namespace.get_tls_initializer_data());
 
     Ok(NanoCoreItems {
-        nano_core_crate_ref: EarlyNanoCoreCrateRef(nano_core_crate_ref),
+        nano_core_crate_ref,
         init_symbol_values,
         num_new_symbols,
-        tls_image: NoDrop::new(tls_image),
     })
 }
 

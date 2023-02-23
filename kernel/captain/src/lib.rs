@@ -24,7 +24,6 @@ use log::{error, info};
 use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
-use mod_mgmt::TlsDataImage;
 use stack::Stack;
 use no_drop::NoDrop;
 
@@ -46,12 +45,10 @@ mod mirror_log_callbacks {
 /// Items that must be held until the end of [`init()`] and should be dropped after.
 pub struct DropAfterInit {
     pub identity_mappings: NoDrop<EarlyIdentityMappedPages>,
-    pub initial_tls_image: NoDrop<TlsDataImage>,
 }
 impl DropAfterInit {
     fn drop_all(self) {
         drop(self.identity_mappings.into_inner());
-        drop(self.initial_tls_image.into_inner());
     }
 }
 

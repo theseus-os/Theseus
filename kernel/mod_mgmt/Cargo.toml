@@ -27,6 +27,7 @@ bootloader_modules = { path = "../bootloader_modules" }
 root = { path = "../root" }
 fs_node = { path = "../fs_node" }
 no_drop = { path = "../no_drop" }
+early_tls = { path = "../early_tls" }
 vfs_node = { path = "../vfs_node" }
 tls_initializer = { path = "../tls_initializer" }
 path = { path = "../path" }

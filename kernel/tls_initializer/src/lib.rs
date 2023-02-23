@@ -26,8 +26,8 @@ use {
     tock_registers::interfaces::Writeable,
 };
 
-/// A Thread-Local Storage (TLS) area data "image" that is used
-/// to initialize a new `Task`'s TLS area.
+/// A "factory" that creates Thread-Local Storage (TLS) data images,
+/// which are used to initialize a new `Task`'s TLS area.
 #[derive(Debug, Clone)]
 pub struct TlsInitializer {
     /// The cached data image (with blank space for the TLS self pointer).
@@ -282,10 +282,15 @@ pub struct TlsDataImage {
     ptr:   usize,
 }
 impl TlsDataImage {
+    /// Creates an empty TLS data image with no TLS section content.
+    pub const fn empty() -> TlsDataImage {
+        Self { _data: None, ptr: 0 }
+    }
+
     /// Sets the current CPU's TLS register to point to this TLS data image.
     ///
-    /// On x86_64, this writes to the `FsBase` MSR.
-    /// On ARMv8, this writes to `TPIDR_EL0`.
+    /// * On x86_64, this writes to the `FsBase` MSR.
+    /// * On ARMv8, this writes to `TPIDR_EL0`.
     pub fn set_as_current_tls_base(&self) {
         #[cfg(target_arch = "x86_64")]
         FsBase::write(VirtAddr::new_truncate(self.ptr as u64));
