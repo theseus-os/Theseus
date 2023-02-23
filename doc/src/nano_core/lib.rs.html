@@ -357,8 +357,8 @@
     )];
     logger_x86_64::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten())
         .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialise early logging&quot;</span>)<span class="question-mark">?</span>;
-    <span class="macro">log::info!</span>(<span class="string">&quot;initialised early logging&quot;</span>);
-    <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized logger.&quot;</span>);
+    <span class="macro">log::info!</span>(<span class="string">&quot;initialized early logger&quot;</span>);
+    <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized early logger.&quot;</span>);
 
     <span class="comment">// Dump basic information about this build of Theseus.
     </span><span class="macro">log::info!</span>(<span class="string">&quot;\n    \
