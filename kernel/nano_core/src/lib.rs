@@ -146,7 +146,7 @@ where
     println_raw!("nano_core(): parsing nano_core crate, please wait ...");
     let (
         nano_core_crate_ref,
-        initial_tls_image,
+        mut initial_tls_image,
         ap_realmode_begin,
         ap_realmode_end,
         ap_gdt,
@@ -207,6 +207,13 @@ where
         println_raw!("nano_core(): loading the panic handling crate(s)...");
         let (panic_wrapper_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, "panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file")?;
         let (_pw_crate, _num_pw_syms) = default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false)?;
+
+        // After loading the captain and its dependencies, new TLS sections were likely added,
+        // so we need to instantiate a new TLS data image and load it.
+        let new_tls_image = no_drop::NoDrop::new(default_namespace.get_tls_initializer_data());
+        new_tls_image.set_as_current_tls_base();
+        let prev_tls_image = core::mem::replace(&mut initial_tls_image, new_tls_image);
+        drop(prev_tls_image.into_inner());
     }
 
     // Now we invoke the Captain, which will take over from here.
@@ -226,6 +233,7 @@ where
         use no_drop::NoDrop;
         use stack::Stack;
 
+        panic!("testing intentional panic before captain");
         let section = default_namespace
             .get_symbol_starting_with("captain::init::")
             .upgrade()

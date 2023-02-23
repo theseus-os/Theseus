@@ -5,6 +5,8 @@
 
 #![allow(clippy::type_complexity)]
 
+use core::ops::Deref;
+
 use crate::{CrateNamespace, mp_range, TlsDataImage};
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 use fs_node::FileRef;
@@ -28,7 +30,7 @@ const NANO_CORE_CRATE_NAME: &str = "nano_core";
 /// The items returned from the [`parse_nano_core()`] routine.
 pub struct NanoCoreItems {
     /// A reference to the newly-created nano_core crate.
-    pub nano_core_crate_ref: StrongCrateRef,
+    pub nano_core_crate_ref: EarlyNanoCoreCrateRef,
     /// The symbols in the `.init` ELF section, which maps the symbol's name to its constant value.
     /// This map contains assembler and linker constants.
     pub init_symbol_values: BTreeMap<String, usize>,
@@ -39,6 +41,16 @@ pub struct NanoCoreItems {
     ///
     /// After the task management subsystem has been initialized, this can be dropped.
     pub tls_image: NoDrop<TlsDataImage>,
+}
+
+/// A newtype wrapper around the nano_core crate reference when is first created
+/// during early OS initialization.
+pub struct EarlyNanoCoreCrateRef(StrongCrateRef);
+impl Deref for EarlyNanoCoreCrateRef {
+    type Target = StrongCrateRef;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 /// Parses and/or deserializes the file containing details about the already loaded
@@ -153,7 +165,7 @@ pub fn parse_nano_core(
     tls_image.set_as_current_tls_base();
 
     Ok(NanoCoreItems {
-        nano_core_crate_ref,
+        nano_core_crate_ref: EarlyNanoCoreCrateRef(nano_core_crate_ref),
         init_symbol_values,
         num_new_symbols,
         tls_image: NoDrop::new(tls_image),

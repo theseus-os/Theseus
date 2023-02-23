@@ -3206,7 +3206,7 @@ impl TlsInitializer {
         let total_section_size = self.end_of_static_sections + self.end_of_dynamic_sections;
         let required_capacity = if total_section_size > 0 { total_section_size + POINTER_SIZE } else { 0 };
         if required_capacity == 0 {
-            return TlsDataImage { _data: None, ptr: 0 };
+            return TlsDataImage::empty();
         }
 
         // An internal function that iterates over all TLS sections and copies their data into the new data image.
@@ -3307,6 +3307,14 @@ pub struct TlsDataImage {
     ptr:   usize,
 }
 impl TlsDataImage {
+    /// Returns an empty TLS image with no section content.
+    pub const fn empty() -> Self {
+        Self {
+            _data: None,
+            ptr: 0,
+        }
+    }
+
     /// Sets the current CPU's TLS register to point to this TLS data image.
     ///
     /// On x86_64, this writes to the `FsBase` MSR.
