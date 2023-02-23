@@ -39,4 +39,5 @@ path = "../sleep"
 path = "../vga_buffer"
 
 [lib]
+path = "src/x86_64/mod.rs"
 crate-type = ["rlib"]
