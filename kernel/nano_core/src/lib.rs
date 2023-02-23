@@ -86,8 +86,8 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
     )];
     logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
         .map_err(|_| "failed to initialise early logging")?;
-    log::info!("initialised early logging");
-    println_raw!("early_setup(): initialized logger.");
+    log::info!("initialized early logger");
+    println_raw!("early_setup(): initialized early logger.");
 
     // Dump basic information about this build of Theseus.
     log::info!("\n    \
