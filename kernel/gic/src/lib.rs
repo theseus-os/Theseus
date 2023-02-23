@@ -10,7 +10,7 @@
 #![feature(doc_cfg)]
 
 #[cfg(any(target_arch = "aarch64", doc))]
-mod src;
+mod gic;
 
 #[cfg(any(target_arch = "aarch64", doc))]
-pub use src::*;
+pub use gic::*;
