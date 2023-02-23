@@ -1461,6 +1461,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "idle"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "raw-cpuid",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
