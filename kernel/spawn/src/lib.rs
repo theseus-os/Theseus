@@ -32,7 +32,7 @@ use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
-use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER, TlsDataImage};
+use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
 use preemption::{hold_preemption, PreemptionGuard};
