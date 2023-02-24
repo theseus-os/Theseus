@@ -1,6 +1,8 @@
 [package]
 name = "cache_line"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Data types that are cache optimised"
 edition = "2021"
 
 [dependencies]

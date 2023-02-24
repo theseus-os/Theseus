@@ -10,10 +10,10 @@
 extern crate alloc;
 
 use core::sync::atomic::{AtomicU8, Ordering};
-use cache_line::CacheLineOptimisedArray;
+use cache_line::CacheLineDistributedArray;
 
 /// Theseus uses a `u8` to hold each CPU core's ID (apic ID),
-/// so the maximum number of cores it supports is `u8::MAX` (255).
+/// so the maximum number of cores it supports is `u8::MAX` (256).
 const MAX_CPU_CORES: usize = u8::MAX as usize;
 
 #[allow(clippy::declare_interior_mutable_const)]
@@ -23,8 +23,8 @@ const ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(0);
 /// 
 /// If a CPU's count is `0`, preemption is enabled.
 /// If a CPU's count is greater than `0`, preemption is disabled.
-static PREEMPTION_COUNT: CacheLineOptimisedArray<AtomicU8, MAX_CPU_CORES> =
-    CacheLineOptimisedArray::from([ATOMIC_U8_ZERO; MAX_CPU_CORES]);
+static PREEMPTION_COUNT: CacheLineDistributedArray<AtomicU8, MAX_CPU_CORES> =
+    CacheLineDistributedArray::from([ATOMIC_U8_ZERO; MAX_CPU_CORES]);
 
 
 /// Prevents preemption (preemptive task switching) from occurring
