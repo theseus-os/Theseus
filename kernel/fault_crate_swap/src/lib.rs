@@ -346,9 +346,9 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
         }
     };
 
-    for (_id, taskref) in task::TASKLIST.lock().iter() {
-        let (bottom, top) = taskref.with_kstack(|kstack| 
-            (kstack.bottom().value(), kstack.top_usable().value())
+    for taskref in task::all_tasks().into_iter().filter_map(|(_id, wtask)| wtask.upgrade()) {
+        let (bottom, top) = taskref.with_kstack(
+            |kstack| (kstack.bottom().value(), kstack.top_usable().value())
         ); 
         // debug!("Bottom and top of stack of task {} are {:X} {:X}", taskref.name, bottom, top);
 

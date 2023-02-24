@@ -274,7 +274,7 @@ pub struct TaskBuilder<F, A, R> {
     blocked: bool,
     idle: bool,
     post_build_function: Option<Box<
-        dyn FnOnce(&mut Task) -> Result<FailureCleanupFunction, &'static str>
+        dyn FnOnce(&mut Task) -> Result<Option<FailureCleanupFunction>, &'static str>
     >>,
 
     #[cfg(simd_personality)]
@@ -369,6 +369,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             self.stack,
             task::get_my_current_task()
                 .ok_or("spawn: couldn't get current task")?
+                .deref()
                 .into(),
         )?;
         // If a Task name wasn't provided, then just use the function's name.

@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "task_struct"
-description = "Basic task types and struct definitions for multi-threading"
+description = "Basic task types and struct definitions for multithreading"
 version = "0.1.0"
 
 [dependencies]

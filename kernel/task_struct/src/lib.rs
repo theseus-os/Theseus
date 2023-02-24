@@ -26,6 +26,7 @@ use core::{
     any::Any,
     fmt,
     hash::{Hash, Hasher},
+    ops::Deref,
     panic::PanicInfo,
     sync::atomic::{AtomicBool, AtomicUsize, Ordering},
     task::Waker,
@@ -174,7 +175,7 @@ pub struct RestartInfo {
 /// when using it inside of an atomic type like [`AtomicCell`].
 #[derive(Copy, Clone)]
 #[repr(align(2))]
-struct OptionU8(Option<u8>);
+pub struct OptionU8(Option<u8>);
 impl From<Option<u8>> for OptionU8 {
     fn from(opt: Option<u8>) -> Self {
         OptionU8(opt)
@@ -241,30 +242,6 @@ pub struct TaskInner {
     pub restart_info: Option<RestartInfo>,
     /// The waker that is awoken when this task completes.
     pub waker: Option<Waker>,
-}
-impl TaskInner {
-    /// Perform any actions needed after a context switch.
-    /// 
-    /// Currently this only does two things:
-    /// 1. Drops any data that the original previous task (before the context switch)
-    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
-    /// 2. Obtains the preemption guard such that preemption can be re-enabled
-    ///    when it is appropriate to do so.
-    pub fn post_context_switch_action(this: &MutexIrqSafe<Self>) -> PreemptionGuard {
-        // Step 1: drop data from previously running task
-        {
-            let prev_task_data_to_drop = this.lock().drop_after_task_switch.take();
-            drop(prev_task_data_to_drop);
-        }
-
-        // Step 2: retake ownership of preemption guard in order to re-enable preemption.
-        {
-            this.lock()
-                .preemption_guard
-                .take()
-                .expect("BUG: post_context_switch_action: no PreemptionGuard existed")
-        }
-    }
 }
 
 
@@ -345,7 +322,11 @@ impl fmt::Debug for Task {
         ds.finish()
     }
 }
-
+impl fmt::Display for Task {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{{{}}}", self.name, self.id)
+    }
+}
 impl Hash for Task {
     fn hash<H: Hasher>(&self, h: &mut H) {
         self.id.hash(h);
@@ -365,7 +346,7 @@ impl Task {
     ///      for this new `Task`.
     ///      Theseus doesn't have a true parent-child relationship between tasks;
     ///      the new `Task` merely inherits select states from it.
-    /// 
+    ///
     /// # Usage Notes
     /// * This does not run the task, schedule it in, or switch to it.
     /// * If you want to create a new task, you should use the `spawn` crate instead.
@@ -419,7 +400,7 @@ impl Task {
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state in order to mutate it.
-    pub fn set_env(&self, new_env:Arc<Mutex<Environment>>) {
+    pub fn set_env(&self, new_env: Arc<Mutex<Environment>>) {
         self.inner.lock().env = new_env;
     }
 
@@ -634,9 +615,51 @@ impl Drop for Task {
     }
 }
 
-impl fmt::Display for Task {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{{{}}}", self.name, self.id)
+
+/// A type wrapper that exposes public access to all inner fields of a task.
+///
+/// This is intended for use by the `task` crate, specifically within a `TaskRef`.
+/// This can only be obtained by consuming a fully-initialized [`Task`],
+/// which makes it completely safe to be public because there is nowhere else
+/// besides within the `TaskRef::create()` constructor that one can obtain access
+/// to an owned `Task` value that is already registered/spawned (actually usable).
+///
+/// If another crate instantiates a bare `Task` (not a `Taskref`) and then converts
+/// it into this `ExposedTask` type, then there's nothing they can do with that task
+/// because it cannot become a spawnable/schedulable/runnable task until it is
+/// passed into `TaskRef::create()`, so that'd be completely harmless.
+#[doc(hidden)]
+pub struct ExposedTask {
+    pub task: Task,
+}
+impl From<Task> for ExposedTask {
+    fn from(task: Task) -> Self {
+        Self { task }
+    }
+}
+impl Deref for ExposedTask {
+    type Target = Task;
+    fn deref(&self) -> &Self::Target {
+        &self.task
+    }
+}
+// Here we simply expose accessors for all private fields of `Task`.
+impl ExposedTask {
+    #[inline(always)]
+    pub fn inner(&self) -> &MutexIrqSafe<TaskInner> {
+        &self.inner
+    }
+    #[inline(always)]
+    pub fn tls_area(&self) -> &TlsDataImage {
+        &self.tls_area
+    }
+    #[inline(always)]
+    pub fn running_on_cpu(&self) -> &AtomicCell<OptionU8> {
+        &self.running_on_cpu
+    }
+    #[inline(always)]
+    pub fn runstate(&self) -> &AtomicCell<RunState> {
+        &self.runstate
     }
 }
 
@@ -682,22 +705,4 @@ impl<'t> InheritedStates<'t> {
             )
         }
     }
-}
-
-/// A workaround that allows only one foreign crate, `taskref`, to obtain a function
-/// that allows it to access the private `TaskInner` field within a `Task` struct.
-///
-/// This exists because Rust has no way to specify that a given field or function
-/// is publicly accessible by only one specific crate.
-#[doc(hidden)]
-pub fn take_task_inner_accessor_function() -> Option<fn(&Task) -> &MutexIrqSafe<TaskInner>> {
-    /// The private function itself that we will give out only once, to `taskref`.
-    fn access_task_inner(task: &Task) -> &MutexIrqSafe<TaskInner> {
-        &task.inner
-    }
-
-    static TASK_INNER_ACCESSOR_FN: Mutex<Option<fn(&Task) -> &MutexIrqSafe<TaskInner>>>
-        = Mutex::new(Some(access_task_inner));
-
-    TASK_INNER_ACCESSOR_FN.lock().take()
 }

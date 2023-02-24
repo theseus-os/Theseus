@@ -74,7 +74,7 @@ There are several reasons that we introduce a dedicated [`newtype`] instead of u
 
 ### The global task list
 Like all other OSes, Theseus maintains a global list of all tasks in the system.
-Currently, this [`TASKLIST`] is stored as a map from a numeric task ID to a `TaskRef`.
+Currently, this task list is stored as a map from a numeric task ID to a `TaskRef`.
 
 Tasks are added to the task list when they are initially spawned, and will remain in the task list for the entirety of their lifecycle.
 It is important to note that the presence of a task in the task list is not indicative of that task's runnability or execution status.
@@ -185,7 +185,6 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`Task`]: https://theseus-os.github.io/Theseus/doc/task/struct.Task.html
 [`TaskInner`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/task/src/lib.rs#L237
 [`TaskRef`]: https://theseus-os.github.io/Theseus/doc/task/struct.TaskRef.html
-[`TASKLIST`]: https://theseus-os.github.io/Theseus/doc/task/struct.TASKLIST.html
 [environment]: https://theseus-os.github.io/Theseus/doc/environment/struct.Environment.html
 [`schedule()`]: https://theseus-os.github.io/Theseus/doc/scheduler/fn.schedule.html
 [`LocalApic`]: https://theseus-os.github.io/Theseus/doc/apic/struct.LocalApic.html

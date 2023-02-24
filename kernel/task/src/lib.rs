@@ -12,7 +12,7 @@ use alloc::{
     boxed::Box,
     collections::BTreeMap,
     format,
-    sync::Arc,
+    sync::{Arc, Weak}, vec::Vec,
 };
 use core::{
     any::Any,
@@ -22,7 +22,6 @@ use core::{
     sync::atomic::{AtomicBool, fence, Ordering},
     task::Waker,
 };
-use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
 use environment::Environment;
@@ -31,7 +30,7 @@ use no_drop::NoDrop;
 use preemption::PreemptionGuard;
 use spin::Mutex;
 use stack::Stack;
-use task_struct::TaskInner;
+use task_struct::ExposedTask;
 
 // Re-export main types from `task_struct`.
 pub use task_struct::{
@@ -43,29 +42,22 @@ pub use task_struct::{
 /// The list of all Tasks in the system.
 static TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
 
-/// Returns a `TaskRef` (shared reference) to the `Task` specified by the given `task_id`.
-pub fn get_task(task_id: usize) -> Option<TaskRef> {
-    TASKLIST.lock().get(&task_id).cloned()
+/// Returns a `WeakTaskRef` (shared reference) to the `Task` specified by the given `task_id`.
+pub fn get_task(task_id: usize) -> Option<WeakTaskRef> {
+    TASKLIST.lock().get(&task_id).map(TaskRef::downgrade)
 }
 
-/// A function to access the private `TaskInner` field within a `Task`.
-/// This is only accessible to this one crate.
-static TASK_INNER_ACCESS_FN: AtomicCell<fn(&Task) -> &MutexIrqSafe<TaskInner>>
-    = AtomicCell::new(|_| panic!("Cannot access TaskInner before task init"));
-
-fn task_inner(task: &Task) -> &MutexIrqSafe<TaskInner> {
-    TASK_INNER_ACCESS_FN.load()(task)
-}
-
-/// Early initialization of the Task management subsystem, prior to calling `spawn::init()`.
+/// Returns a list containing a snapshot of all tasks that currently exist.
 ///
-/// This can and must be only called once, not once on each CPU.
-pub fn init() -> Result<(), &'static str> {
-    TASK_INNER_ACCESS_FN.store(
-        task_struct::take_task_inner_accessor_function()
-            .ok_or("BUG: couldn't take task inner access function")?
-    );
-    Ok(())
+/// # Usage Notes
+/// * This is an expensive and slow function, so it should be used rarely.
+/// * The existence of a task in the returned list does not mean the task will continue to exist
+///   at any point in the future, hence the return type of `WeakTaskRef` instead of `TaskRef`.
+pub fn all_tasks() -> Vec<(usize, WeakTaskRef)> {
+    let tasklist = TASKLIST.lock();
+    let mut v = Vec::with_capacity(tasklist.len());
+    v.extend(tasklist.iter().map(|(id, t)| (*id, t.downgrade())));
+    v
 }
 
 
@@ -88,12 +80,15 @@ pub struct TaskRef(Arc<TaskRefInner>);
 impl fmt::Debug for TaskRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TaskRef")
-            .field("task", &self.0.task)
+            .field("task", &self.0.task.task)
             .finish_non_exhaustive()
     }
 }
 struct TaskRefInner {
-    task: Task,
+    /// A wrapper around `Task` that allows us to access all of its internal state.
+    /// Note that the deref implementation of `TaskRef` bypasses this as to not expose
+    /// all internal states of a `Task`, rather only the ones made public in `Task` itself.
+    task: ExposedTask,
     /// The function that should be run as a last-ditch attempt to recover from this task's failure,
     /// e.g., this can be called when unwinding itself fails. 
     /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
@@ -127,12 +122,12 @@ impl TaskRef {
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
     pub fn create(
-        mut task: Task,
+        task: Task,
         failure_cleanup_function: FailureCleanupFunction,
     ) -> JoinableTaskRef {
         let exit_value_mailbox = Mutex::new(None);
         let taskref = TaskRef(Arc::new(TaskRefInner {
-            task,
+            task: task.into(),
             failure_cleanup_function,
             exit_value_mailbox,
             // A new task is joinable until its `JoinableTaskRef` is dropped.
@@ -144,6 +139,11 @@ impl TaskRef {
         assert!(_existing_task.is_none(), "BUG: TASKLIST contained a task with the same ID");
 
         JoinableTaskRef { task: taskref }
+    }
+
+    /// Creates a new weak reference to this `Task`, similar to [`Weak`].
+    pub fn downgrade(&self) -> WeakTaskRef {
+        WeakTaskRef(Arc::downgrade(&self.0))
     }
 
     /// Returns `true` if this task is joinable, `false` if not.
@@ -194,13 +194,13 @@ impl TaskRef {
         }
         {
             *self.0.exit_value_mailbox.lock() = Some(val);
-            self.runstate.store(RunState::Exited);
+            self.0.task.runstate().store(RunState::Exited);
 
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.is_running() {
                 todo!("Unhandled scenario: internal_exit(): task {:?} wasn't running \
-                    but its current task TLS variable needs to be cleaned up!", &self.0.task);
+                    but its current task TLS variable needs to be cleaned up!", &self.0.task.task);
                 // Note: we cannot call `deinit_current_task()` here because if this task
                 //       isn't running, then it's definitely not the current task.
                 //
@@ -208,7 +208,7 @@ impl TaskRef {
                 // drop(_taskref_in_tls);
             }
             
-            if let Some(waker) = self.inner.lock().waker.take() {
+            if let Some(waker) = self.0.task.inner().lock().waker.take() {
                 waker.wake();
             }
         }
@@ -229,7 +229,7 @@ impl TaskRef {
     /// # Locking / Deadlock
     /// Obtains the lock on the system task list.
     fn reap_exit_value(&self) -> Option<ExitValue> {
-        if self.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
+        if self.0.task.runstate().compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
             TASKLIST.lock().remove(&self.id);
             self.0.exit_value_mailbox.lock().take()
         } else {
@@ -242,7 +242,31 @@ impl TaskRef {
     /// Currently, this simply updates the current CPU's TLS base register
     /// to point to this task's TLS data image.
     fn set_as_current_task(&self) {
-        self.tls_area.set_as_current_tls_base();
+        self.0.task.tls_area().set_as_current_tls_base();
+    }
+
+    /// Perform any actions needed after a context switch.
+    /// 
+    /// Currently this only does two things:
+    /// 1. Drops any data that the original previous task (before the context switch)
+    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
+    /// 2. Obtains the preemption guard such that preemption can be re-enabled
+    ///    when it is appropriate to do so.
+    fn post_context_switch_action(&self) -> PreemptionGuard {
+        let inner = self.0.task.inner();
+        // Step 1: drop data from previously running task
+        {
+            let prev_task_data_to_drop = inner.lock().drop_after_task_switch.take();
+            drop(prev_task_data_to_drop);
+        }
+
+        // Step 2: retake ownership of preemption guard in order to re-enable preemption.
+        {
+            inner.lock()
+                .preemption_guard
+                .take()
+                .expect("BUG: post_context_switch_action: no PreemptionGuard existed")
+        }
     }
 }
 
@@ -262,7 +286,7 @@ impl Hash for TaskRef {
 impl Deref for TaskRef {
     type Target = Task;
     fn deref(&self) -> &Self::Target {
-        &self.0.task
+        &self.0.task.task
     }
 }
 
@@ -276,6 +300,30 @@ impl Deref for TaskRef {
 //         );
 //     }
 // }
+
+
+/// A weak reference to a shared Task reference (`TaskRef`).
+///
+/// `WeakTaskRef` and `TaskRef` behave analogously to [`Weak`] and [`Arc`];
+/// see the documentation of [`Weak`] for more detail.
+///
+/// This is created via [`TaskRef::downgrade()`].
+#[derive(Clone)]
+pub struct WeakTaskRef(Weak<TaskRefInner>);
+impl WeakTaskRef {
+    /// Attempts to upgrade this `WeakTaskRef` to a `TaskRef`; see [`Weak::upgrade()`].
+    ///
+    /// Returns `None` if the `TaskRef` has already been dropped, meaning that the
+    /// `Task` itself no longer exists has been exited, cleaned up, and fully dropped.
+    pub fn upgrade(&self) -> Option<TaskRef> {
+        self.0.upgrade().map(TaskRef)
+    }
+}
+impl fmt::Debug for WeakTaskRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "(WeakTaskRef)")
+    }
+}
 
 
 /// A reference to a `Task` that can be `join`ed; auto-derefs into [`TaskRef`].
@@ -322,7 +370,7 @@ impl Deref for JoinableTaskRef {
 impl JoinableTaskRef {
     /// Sets the waker to be awoken when this task exits.
     pub fn set_waker(&self, waker: Waker) {
-        self.inner.lock().waker = Some(waker);
+        self.task.0.task.inner().lock().waker = Some(waker);
     }
 
     /// Busy-waits (spins in a loop) until this task has exited or has been killed.
@@ -451,11 +499,11 @@ impl ExitableTaskRef {
     /// 2. Obtains the preemption guard such that preemption can be re-enabled
     ///    when it is appropriate to do so.
     ///
-    /// Note: this publicly re-exports the private `TaskInner::post_context_switch_action()`
+    /// Note: this publicly re-exports the private `TaskRef::post_context_switch_action()`
     ///       function for use in the early `spawn::task_wrapper` functions,
     ///       which is the only place where an `ExitableTaskRef` can be obtained. 
     pub fn post_context_switch_action(&self) -> PreemptionGuard {
-        self.task.inner.post_context_switch_action()
+        self.task.post_context_switch_action()
     }
 
     /// Allows the unwinder to use the current task to obtain its `ExitableTaskRef`
@@ -481,7 +529,7 @@ impl ExitableTaskRef {
 /// Obtains the lock on this `Task`'s inner state in order to mutate it.
 pub fn set_kill_handler(function: KillHandler) -> Result<(), &'static str> {
     with_current_task(|t| {
-        t.inner.lock().kill_handler = Some(function);
+        t.0.task.inner().lock().kill_handler = Some(function);
     })
     .map_err(|_| "couldn't get current task")
 }
@@ -497,7 +545,7 @@ pub fn set_kill_handler(function: KillHandler) -> Result<(), &'static str> {
 /// # Locking / Deadlock
 /// Obtains the lock on this `Task`'s inner state in order to mutate it.
 pub fn take_kill_handler() -> Option<KillHandler> {
-    with_current_task(|t| t.inner.lock().kill_handler.take())
+    with_current_task(|t| t.0.task.inner().lock().kill_handler.take())
         .ok()
         .flatten()
 }
@@ -648,7 +696,7 @@ pub fn task_switch(
     ///////////////////////////////////////////////////////////////////////////////////////////
 
     let recovered_preemption_guard = with_current_task(
-        |t| t.inner.post_context_switch_action()
+        |t| t.post_context_switch_action()
     ).expect("BUG: task_switch(): failed to get current task for post_context_switch_action");
 
     (true, recovered_preemption_guard)
@@ -707,7 +755,7 @@ fn task_switch_inner(
     // // i.e., when `next` is not a userspace task.
     // if next.is_userspace() {
     //     let (stack_bottom, stack_size) = {
-    //         let kstack = &next.inner.lock().kstack;
+    //         let kstack = &next.task.0.task.inner().lock().kstack;
     //         (kstack.bottom(), kstack.size_in_bytes())
     //     };
     //     let new_tss_rsp0 = stack_bottom + (stack_size / 2); // the middle half of the stack
@@ -741,16 +789,16 @@ fn task_switch_inner(
     // }
 
     let prev_task_saved_sp: *mut usize = {
-        let mut inner = curr.inner.lock(); // ensure the lock is released
+        let mut inner = curr.0.task.inner().lock(); // ensure the lock is released
         (&mut inner.saved_sp) as *mut usize
     };
     let next_task_saved_sp: usize = {
-        let inner = next.inner.lock(); // ensure the lock is released
+        let inner = next.0.task.inner().lock(); // ensure the lock is released
         inner.saved_sp
     };
 
     // Mark the current task as no longer running
-    curr.running_on_cpu.store(None.into());
+    curr.0.task.running_on_cpu().store(None.into());
 
     // After this point, we may need to mutate the `curr_task_tls_slot` (if curr has exited),
     // so we use local variables to store some necessary info about the curr task
@@ -768,7 +816,7 @@ fn task_switch_inner(
     if curr_task_has_exited {
         // trace!("task_switch(): deiniting current task TLS for: {:?}, next: {}", curr_task_tls_slot.as_deref(), next.deref());
         let _prev_taskref = curr_task_tls_slot.take();
-        next.inner.lock().drop_after_task_switch = _prev_taskref;
+        next.0.task.inner().lock().drop_after_task_switch = Some(Box::new(_prev_taskref));
     }
 
     // Now, set the next task as the current task: the task running on this CPU.
@@ -782,7 +830,7 @@ fn task_switch_inner(
     // in task runstates, e.g., when an interrupt handler accesses the current task context.
     {
         let _held_interrupts = hold_interrupts();
-        next.running_on_cpu.store(Some(apic_id).into());
+        next.0.task.running_on_cpu().store(Some(apic_id).into());
         next.set_as_current_task();
         drop(_held_interrupts);
     }
@@ -791,7 +839,7 @@ fn task_switch_inner(
     // after the actual context switch operation has completed.
     //
     // TODO: this should be moved into per-CPU storage areas rather than the task struct.
-    next.inner.lock().preemption_guard = Some(preemption_guard);
+    next.0.task.inner().lock().preemption_guard = Some(preemption_guard);
 
     #[cfg(not(simd_personality))]
     return Ok((prev_task_saved_sp, next_task_saved_sp));
@@ -970,15 +1018,15 @@ pub fn bootstrap_task(
         },
     )?;
     bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
-    bootstrap_task.runstate.store(RunState::Runnable);
-    bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
-    bootstrap_task.inner_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
     let joinable_taskref = TaskRef::create(
         bootstrap_task,
         bootstrap_task_cleanup_failure,
     );
-
+    // Update other relevant states for this new bootstrapped task.
+    joinable_taskref.0.task.runstate().store(RunState::Runnable);
+    joinable_taskref.0.task.running_on_cpu().store(Some(apic_id).into()); 
+    joinable_taskref.0.task.inner().lock().pinned_core = Some(apic_id); // can only run on this CPU core
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
     let Ok(exitable_taskref) = init_current_task(
@@ -991,15 +1039,6 @@ pub fn bootstrap_task(
         let _task_ref = NoDrop::new(joinable_taskref);
         return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
     };
-
-    // insert the new task into the task list
-    let old_task = TASKLIST.lock().insert(bootstrap_task_id, joinable_taskref.clone());
-    if let Some(ot) = old_task {
-        error!("BUG: bootstrap_task(): TASKLIST already contained a task {:?} with the same id {} as bootstrap_task_core_{}!", 
-            ot, bootstrap_task_id, apic_id
-        );
-        return Err("BUG: bootstrap_task(): TASKLIST already contained a task with the new bootstrap_task's ID");
-    }
     
     Ok((joinable_taskref, exitable_taskref))
 }

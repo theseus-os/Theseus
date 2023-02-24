@@ -72,9 +72,6 @@ path = "../device_manager"
 [dependencies.e1000]
 path = "../e1000"
 
-[dependencies.task]
-path = "../task"
-
 [dependencies.scheduler]
 path = "../scheduler"
 

@@ -144,11 +144,15 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let overhead = hpet_timing_overhead()?;
     let mut task = Task::new(
         None,
-        task::InheritedStates::FromTask(&task::get_my_current_task().unwrap()),
-        |_, _| loop { }, // dummy failure function
+        task::InheritedStates::FromTask(
+            &*task::get_my_current_task().ok_or("Failed to get current task")?
+        ),
     )?;
     task.name = String::from("rq_eval_single_task_unrunnable");
-    let taskref = TaskRef::create(task);
+    let taskref = TaskRef::create(
+        task,
+        |_, _| loop { }, // dummy failure function
+    );
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
