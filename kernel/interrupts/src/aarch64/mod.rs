@@ -60,6 +60,9 @@ pub struct ExceptionContext {
     esr_el1: EsrEL1,
 }
 
+/// Return value:
+/// - true if you sent an End Of Interrupt signal in the handler
+/// - false if you want the caller to do it for you after you return
 type HandlerFunc = extern "C" fn(&ExceptionContext) -> bool;
 
 // called for all exceptions other than interrupts
@@ -122,10 +125,6 @@ pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
     extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
         info!("timer int!");
         loop {}
-
-        // return false if you haven't sent an EOI
-        // so that the caller does it for you
-        // false
     }
 
     // register the handler for the timer IRQ.
