@@ -15,9 +15,8 @@ use super::InterruptNumber;
 const SGIR_TARGET_ALL_OTHER_PE: usize = 1 << 40;
 const IGRPEN_ENABLED: usize = 1;
 
-/// Enables routing of group 1 interrupts
-/// in the for the current CPU and configures
-/// the end of interrupt mode
+/// Enables routing of group 1 interrupts for the current CPU and configures
+/// the end-of-interrupt mode
 pub fn init() {
     let mut icc_ctlr: usize;
 

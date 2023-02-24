@@ -26,8 +26,7 @@ mod offset {
 // enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
 
-/// Enables routing of group 1 interrupts
-/// in the for the current CPU
+/// Enables routing of group 1 interrupts for the current CPU
 pub fn init(registers: &mut GicRegisters) {
     let mut reg = registers.read_volatile(offset::CTLR);
     reg |= CTLR_ENGRP1;
