@@ -40,10 +40,15 @@ const CTLR_ENGRP1: u32 = 0b10;
 // Affinity Routing Enable, Non-secure state.
 const CTLR_ARE_NS: u32 = 1 << 5;
 
-// bits [24:25]: target mode
+// bit 24: target mode
 //   1 = all other PEs
 //   0 = use target list
 const SGIR_TARGET_ALL_OTHER_PE: u32 = 1 << 24;
+
+// bit 31: SPI routing
+//   1 = any available PE
+//   0 = route to specific PE
+const P6IROUTER_ANY_AVAILABLE_PE: u32 = 1 << 31;
 
 // const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
@@ -159,7 +164,7 @@ impl super::ArmGic {
             // bit 31: Interrupt Routing Mode
             // value of 1 to target any available cpu
             // value of 0 to target a specific cpu
-            if reg & (1 << 31) > 0 {
+            if reg & P6IROUTER_ANY_AVAILABLE_PE > 0 {
                 TargetCpu::AnyCpuAvailable
             } else {
                 let aff3 = (reg >> 8) & 0xff000000;
@@ -203,7 +208,7 @@ impl super::ArmGic {
                 },
                 // bit 31: Interrupt Routing Mode
                 // value of 1 to target any available cpu
-                TargetCpu::AnyCpuAvailable => 1 << 31,
+                TargetCpu::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,
                 TargetCpu::GICv2TargetList(_) => {
                     panic!("Cannot use TargetCpu::GICv2TargetList with GICv3!");
                 },
