@@ -7,7 +7,7 @@ use alloc::sync::Arc;
 use mutex_sleep::MutexSleep as Mutex;
 use task::{get_my_current_task, TaskRef};
 
-/// Creates a new waker and blocker.
+/// Creates a new waker and blocker pair that are associated with each other.
 ///
 /// The blocker can be used to block the current task until the waker is woken.
 pub fn waker() -> (core::task::Waker, Blocker) {
@@ -22,28 +22,30 @@ pub fn waker() -> (core::task::Waker, Blocker) {
 }
 
 /// A blocker that blocks the current task until the associated waker is woken.
+///
+/// Call [`waker()`] to obtain a `Blocker` instance and its associated [`core::task::Waker`].
+///
+/// `Blocker` will block the current task; thus, it doesn't implement [`Send`] or [`Sync`]
+/// to ensure that it cannot be sent to other tasks.
+
 pub struct Blocker {
+    /// See the docs for the `activated` field in `Waker` for more details.
     inner: Arc<Mutex<bool>>,
 }
-
-// Blocker blocks the current thread and thus shouldn't be sent to other
-// threads.
-
 impl !Send for Blocker {}
 impl !Sync for Blocker {}
 
 impl Blocker {
-    /// Blocks the current thread until the associated waker is woken.
+    /// Blocks the current task until the associated waker is woken.
     ///
-    /// If the waker was woken prior to this function being called, it will
-    /// return immediately.
-    ///
-    /// Care must be taken not to introduce race conditions. After registering
-    /// the waker, the wake condition must be checked to ensure it did not
-    /// complete prior to registering the waker. Otherwise, the waker will never
-    /// be woken, and this function will block forever.
+    /// If the waker was already woken prior to this function being called,
+    /// it will return immediately.
     pub fn block(&self) {
         let task = get_my_current_task().expect("failed to get current task");
+        // Care must be taken not to introduce race conditions.
+        // After registering the waker, the wake condition must be checked to ensure
+        // that it did not complete prior to registering the waker;
+        // otherwise, the waker will never be woken, and this function will block forever.
         loop {
             let mut activated = self.inner.lock().expect("failed to lock waker mutex");
             if *activated {
@@ -58,15 +60,15 @@ impl Blocker {
     }
 }
 
-/// A waker that unblocks the given task when awoken.
+/// A waker that unblocks a specific `Task` when woken.
 #[derive(Debug)]
 struct Waker {
     /// Whether the waker has been activated.
     ///
-    /// This field ensures [`Blocker::block`] detects if the waker was activated
-    /// prior to [`Blocker::block`] blocking the task. The field cannot be
-    /// an atomic as the lock must be held while blocking or unblocking the
-    /// task.
+    /// This field ensures that [`Blocker::block`] can determine whether the associated waker
+    /// was activated *prior* to [`Blocker::block`] blocking the task.
+    /// Thus, this field cannot be an `AtomicBool`, because the lock must be held
+    /// while blocking or unblocking the task, serving as a critical section.
     activated: Arc<Mutex<bool>>,
     task: TaskRef,
 }
