@@ -743,6 +743,12 @@ impl Task {
         self.suspended.load(Ordering::Acquire)
     }
     
+    /// Returns the waker to be awoken when this task exits.
+    /// or `None` if it is not registered.
+    pub fn waker(&self) -> Option<Waker> {
+        self.inner.lock().waker
+    }
+    
     /// Sets the waker to be awoken when this task exits.
     pub fn set_waker(&self, waker: Waker) {
         self.inner.lock().waker = Some(waker);

@@ -65,7 +65,14 @@ where
     type Output = Result<T>;
 
     fn poll(self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
-        self.task.set_waker(context.waker().clone());
+        if !self
+            .task
+            .waker()
+            .map_or(false, |w| w.will_wake(context.waker()))
+        {
+            self.task.set_waker(context.waker().clone());
+        }
+
         if self.is_finished() {
             Poll::Ready(match self.task.join() {
                 Ok(exit_value) => match exit_value {
