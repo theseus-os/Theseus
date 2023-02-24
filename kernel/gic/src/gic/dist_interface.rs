@@ -147,7 +147,7 @@ impl super::ArmGic {
             for i in 0..8 {
                 let target = 1 << i;
                 if target & flags == target {
-                    return TargetCpu::Specific(target);
+                    return TargetCpu::Specific(i);
                 }
             }
 
