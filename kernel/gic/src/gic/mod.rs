@@ -62,10 +62,8 @@ pub enum TargetCpu {
     GICv2TargetList(TargetList),
 }
 
-// = 4
 const U32BYTES: usize = core::mem::size_of::<u32>();
-// = 32
-const U32BITS: usize = U32BYTES * 8;
+const U32BITS: usize = u32::BITS as usize;
 
 #[repr(C)]
 #[derive(zerocopy::FromBytes)]
