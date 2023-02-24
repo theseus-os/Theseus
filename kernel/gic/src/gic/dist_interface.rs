@@ -79,8 +79,6 @@ pub fn init(registers: &mut GicRegisters) -> Enabled {
     reg & CTLR_ARE_NS > 0
 }
 
-/// Returns whether the given interrupt will be forwarded by the distributor
-
 /// Returns whether the given SPI (shared peripheral interrupt) will be
 /// forwarded by the distributor
 pub fn is_spi_enabled(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
