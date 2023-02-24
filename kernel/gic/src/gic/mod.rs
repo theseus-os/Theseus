@@ -48,7 +48,12 @@ bitflags! {
 
 pub enum TargetCpu {
     /// That interrupt must be handled by
-    /// a specific PE in the system
+    /// a specific PE in the system.
+    ///
+    /// - level 3 affinity is expected in bits [24:31]
+    /// - level 2 affinity is expected in bits [16:23]
+    /// - level 1 affinity is expected in bits [8:15]
+    /// - level 0 affinity is expected in bits [0:7]
     Specific(u32),
     /// That interrupt can be handled by
     /// any PE that is not busy with another,
