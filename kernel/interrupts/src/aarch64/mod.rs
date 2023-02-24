@@ -117,7 +117,7 @@ pub fn init() -> Result<(), &'static str> {
     }
 }
 
-pub fn enable_timer_interrupts() -> Result<(), &'static str> {
+pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
     // called everytime the timer ticks.
     extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
         info!("timer int!");
@@ -129,28 +129,32 @@ pub fn enable_timer_interrupts() -> Result<(), &'static str> {
     }
 
     // register the handler for the timer IRQ.
-    register_interrupt(AARCH64_TIMER_IRQ, timer_handler)
-        .map_err(|_| "An interrupt handler has already been setup for the timer IRQ number")?;
+    if let Err(existing_handler) = register_interrupt(AARCH64_TIMER_IRQ, timer_handler) {
+        if timer_handler as *const HandlerFunc != existing_handler {
+            return Err("An interrupt handler has already been setup for the timer IRQ number");
+        }
+    }
 
-    // Route the IRQ to this core (implicit as IRQ < 32)
-    // & Enable the interrupt.
+    // Route the IRQ to this core (implicit as IRQ < 32) & Enable the interrupt.
     {
         let mut gic = GIC.lock();
         let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
 
         // enable routing of this interrupt
-        gic.set_interrupt_state(AARCH64_TIMER_IRQ, true);
+        gic.set_interrupt_state(AARCH64_TIMER_IRQ, enable);
     }
 
     // read the frequency (useless atm)
-    let counter_freq_hz = CNTFRQ_EL0.get();
-    log::info!("frq: {:?}", counter_freq_hz);
+    // let counter_freq_hz = CNTFRQ_EL0.get();
+    // log::info!("frq: {:?}", counter_freq_hz);
 
-    // unmask the interrupt
-    // enable the timer
+    // unmask the interrupt & enable the timer
     CNTP_CTL_EL0.write(
           CNTP_CTL_EL0::IMASK.val(0)
-        + CNTP_CTL_EL0::ENABLE.val(1)
+        + CNTP_CTL_EL0::ENABLE.val(match enable {
+            true => 1,
+            false => 0,
+        })
     );
 
     /* DEBUGGING CODE
