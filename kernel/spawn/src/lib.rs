@@ -31,7 +31,7 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
+use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -245,7 +245,7 @@ pub fn new_application_task_builder(
         move |new_task| {
             new_task.app_crate = Some(Arc::new(app_crate_ref));
             new_task.namespace = namespace;
-            Ok(())
+            Ok(None)
         }
     ));
     
@@ -273,7 +273,9 @@ pub struct TaskBuilder<F, A, R> {
     pin_on_core: Option<u8>,
     blocked: bool,
     idle: bool,
-    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
+    post_build_function: Option<Box<
+        dyn FnOnce(&mut Task) -> Result<FailureCleanupFunction, &'static str>
+    >>,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
@@ -365,8 +367,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
     pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
             self.stack,
-            self.parent.as_ref(),
-            task_cleanup_failure::<F, A, R>,
+            task::get_my_current_task()
+                .ok_or("spawn: couldn't get current task")?
+                .into(),
         )?;
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
@@ -397,9 +400,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // If there is a post-build function, invoke it now
         // before finalizing the task and adding it to runqueues.
-        if let Some(pb_func) = self.post_build_function {
-            pb_func(&mut new_task)?;
-        }
+        let failure_cleanup_function = match self.post_build_function {
+            Some(pb_func) => pb_func(&mut new_task)?,
+            None => None,
+        };
 
         // Now that it has been fully initialized, mark the task as no longer `Initing`.
         if self.blocked {
@@ -410,14 +414,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
                 .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
-        let task_ref = TaskRef::create(new_task);
-        let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
-        // insert should return None, because that means there was no existing task with the same ID 
-        if let Some(_existing_task) = _existing_task {
-            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
-            return Err("BUG: TASKLIST a contained a task with the new task's ID");
-        }
-
+        let task_ref = TaskRef::create(
+            new_task,
+            failure_cleanup_function.unwrap_or(task_cleanup_failure::<F, A, R>)
+        );
+        
         // This synchronizes with the acquire fence in this task's exit cleanup routine
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
@@ -494,13 +495,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         };
 
         // Once the new task is created, we set its restart info (func and arg),
-        // and tell it to use the restartable version of the final task cleanup function.
+        // and tell it to use the restartable version of the task entry and cleanup functions.
         self.post_build_function = Some(Box::new(
             move |new_task| {
                 new_task.inner_mut().restart_info = Some(restart_info);
-                new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
                 setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
-                Ok(())
+                Ok(Some(task_restartable_cleanup_failure::<F, A, R>))
             }
         ));
 

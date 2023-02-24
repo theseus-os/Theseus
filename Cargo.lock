@@ -3629,6 +3629,38 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
+ "crossbeam-utils",
+ "environment",
+ "irq_safety",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "no_drop",
+ "preemption",
+ "spin 0.9.4",
+ "stack",
+ "static_assertions",
+ "task_struct",
+]
+
+[[package]]
+name = "task_fs"
+version = "0.1.0"
+dependencies = [
+ "fs_node",
+ "io",
+ "log",
+ "memory",
+ "path",
+ "root",
+ "spin 0.9.4",
+ "task",
+]
+
+[[package]]
+name = "task_struct"
+version = "0.1.0"
+dependencies = [
  "cpu",
  "crossbeam-utils",
  "environment",
@@ -3644,20 +3676,6 @@ dependencies = [
  "stack",
  "static_assertions",
  "tss",
-]
-
-[[package]]
-name = "task_fs"
-version = "0.1.0"
-dependencies = [
- "fs_node",
- "io",
- "log",
- "memory",
- "path",
- "root",
- "spin 0.9.4",
- "task",
 ]
 
 [[package]]

@@ -22,7 +22,7 @@ use x86_64::{registers::model_specific::FsBase, VirtAddr};
 
 #[cfg(target_arch = "aarch64")]
 use {
-    cortex_a::registers::TPIDR_EL0,
+    cortex_a::registers::TPIDR_EL1,
     tock_registers::interfaces::Writeable,
 };
 

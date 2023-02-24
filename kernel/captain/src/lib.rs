@@ -106,7 +106,8 @@ pub fn init(
     // get BSP's apic id
     let bsp_apic_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
 
-    // create the initial `Task`, which is bootstrapped from this execution context.
+    // Create the initial `Task`, which is bootstrapped from this execution context.
+    task::init()?;
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 

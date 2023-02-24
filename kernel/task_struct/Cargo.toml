@@ -1,27 +1,29 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "task"
-description = "Types for shareable references to tasks that offer more functionality"
+name = "task_struct"
+description = "Basic task types and struct definitions for multi-threading"
 version = "0.1.0"
-edition = "2021"
 
 [dependencies]
-log = "0.4.8"
 spin = "0.9.4"
 static_assertions = "1.1.0"
 crossbeam-utils = { version = "0.8.12", default-features = false }
+log = "0.4.8"
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
-context_switch = { path = "../context_switch" }
-environment = { path = "../environment" }
+cpu = { path = "../cpu" }
+kernel_config = { path = "../kernel_config" }
 memory = { path = "../memory" }
+stack = { path = "../stack" }
 mod_mgmt = { path = "../mod_mgmt" }
+environment = { path = "../environment" }
+root = { path = "../root" }
 no_drop = { path = "../no_drop" }
 preemption = { path = "../preemption" }
-stack = { path = "../stack" }
-task_struct = { path = "../task_struct" }
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+tss = { path = "../tss" }
 
 [lib]
 crate-type = ["rlib"]

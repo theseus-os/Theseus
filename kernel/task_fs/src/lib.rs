@@ -77,8 +77,8 @@ impl TaskFs {
     }
 
     fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {
-        let id = node.parse::<usize>().map_err(|_e| "could not parse Task id as usize")?;
-        let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
+        let id = node.parse::<usize>().map_err(|_e| "could not parse Task ID as usize")?;
+        let task_ref = task::get_task(id).ok_or("No task existed for Task ID")?;
         let parent_dir = self.get_self_pointer().ok_or("BUG: tasks directory wasn't in root")?;
         let dir_name = task_ref.id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
