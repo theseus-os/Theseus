@@ -2221,7 +2221,6 @@ dependencies = [
  "cfg-if 1.0.0",
  "early_tls",
  "exceptions_early",
- "interrupts",
  "irq_safety",
  "kernel_config",
  "libm",
