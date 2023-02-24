@@ -54,7 +54,7 @@ const P6IROUTER_ANY_AVAILABLE_PE: u32 = 1 << 31;
 const GROUP_1: u32 = 1;
 
 // bit 15: which interrupt group to target
-const SGIR_NSATT_GRP0: u32 = 0 << 15;
+const SGIR_NSATT_GRP1: u32 = 1 << 15;
 
 fn assert_cpu_bounds(target: &TargetCpu) {
     if let TargetCpu::Specific(cpu) = target {
@@ -115,7 +115,7 @@ pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: Target
         TargetCpu::GICv2TargetList(list) => (list.bits as u32) << 16,
     };
 
-    let value: u32 = int_num | target_list | SGIR_NSATT_GRP0;
+    let value: u32 = int_num | target_list | SGIR_NSATT_GRP1;
     registers.write_volatile(offset::SGIR, value);
 }
 
