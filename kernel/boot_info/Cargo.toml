@@ -11,11 +11,10 @@ kernel_config = { path = "../kernel_config" }
 memory_structs = { path = "../memory_structs" }
 multiboot2 = { version = "0.14", optional = true }
 
-[dependencies.bootloader_api]
-git = "https://github.com/theseus-os/bootloader"
-branch = "theseus"
+[dependencies.uefi-bootloader-api]
+git = "https://github.com/theseus-os/uefi-bootloader"
 optional = true
 
 [features]
-uefi = ["dep:bootloader_api"]
+uefi = ["dep:uefi-bootloader-api"]
 multiboot2 = ["dep:multiboot2"]

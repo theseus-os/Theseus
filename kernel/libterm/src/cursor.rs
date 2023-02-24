@@ -43,7 +43,7 @@ impl Cursor {
     pub fn blink(&mut self) -> bool {
         if self.enabled {
             let time = tsc_ticks();
-            if let Some(duration) = time.sub(&(self.time)) {
+            if let Some(duration) = time.sub(&self.time) {
                 if let Some(ns) = duration.to_ns() {
                     if ns >= self.freq {
                         self.time = time;
@@ -109,7 +109,7 @@ impl Cursor {
                 (line * CHARACTER_HEIGHT) as isize,
             );
         let bounding_box = Rectangle {
-            top_left: top_left,
+            top_left,
             bottom_right: top_left + (CHARACTER_WIDTH as isize, CHARACTER_HEIGHT as isize),
         };
 

@@ -50,7 +50,7 @@ pub enum SerialPortAddress {
 }
 impl SerialPortAddress {
     /// Returns a reference to the static instance of this serial port.
-    fn to_static_port(&self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
+    fn to_static_port(self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
         match self {
             SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
             SerialPortAddress::COM2 => &COM2_SERIAL_PORT,

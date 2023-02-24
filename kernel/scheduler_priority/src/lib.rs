@@ -98,7 +98,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         if let Some(pinned) = t.pinned_core() {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, t);
                 return None;
             }
         }
@@ -129,7 +129,7 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
         .map(|taskref| NextTaskResult {
             taskref : Some(taskref),
-            idle_task  : idle_task, 
+            idle_task, 
         })
 }
 
@@ -168,7 +168,7 @@ fn assign_tokens(apic_id: u8) -> bool  {
         if let Some(pinned) = t.pinned_core() {
             if pinned != apic_id {
                 // with per-core runqueues, this should never happen!
-                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
+                error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, t);
                 return false;
             }
         }
@@ -193,7 +193,6 @@ fn assign_tokens(apic_id: u8) -> bool  {
     // We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
     for (_i, t) in runqueue_locked.iter_mut().enumerate() { 
-        let task_tokens;
 
         // we give zero tokens to the idle tasks
         if t.is_an_idle_task {
@@ -214,12 +213,12 @@ fn assign_tokens(apic_id: u8) -> bool  {
             }
         }
         // task_tokens = epoch * (taskref + 1) / total_priorities;
-        task_tokens = epoch.saturating_mul((t.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
+        let task_tokens = epoch.saturating_mul((t.priority as usize).saturating_add(1)).wrapping_div(total_priorities);
 
         t.tokens_remaining = task_tokens;
         // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, &*t);
         // break; 
     }
 
-    return true;
+    true
 }

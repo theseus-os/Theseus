@@ -68,7 +68,7 @@ pub enum InterruptRegistrationError {
     /// the interrupt handler at the given `existing_handler_address`.
     IrqInUse {
         irq: u8,
-        existing_handler_address: u64
+        existing_handler_address: usize
     },
     /// The given error occurred when spawning the deferred interrupt task.
     SpawnError(&'static str),
@@ -139,7 +139,7 @@ pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     if let Some(name) = deferred_task_name {
         tb = tb.name(name.into());
     }
-    tb.spawn().map_err(|e| InterruptRegistrationError::SpawnError(e))
+    tb.spawn().map_err(InterruptRegistrationError::SpawnError)
 }
 
 

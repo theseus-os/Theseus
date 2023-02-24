@@ -8,8 +8,14 @@ extern crate task;
 extern crate runqueue;
 
 use getopts::Options;
-use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::{
+    fmt::Write,
+    string::{
+        String,
+        ToString,
+    },
+    vec::Vec,
+};
 use apic::get_lapics;
 
 pub fn main(args: Vec<String>) -> isize {
@@ -40,11 +46,12 @@ pub fn main(args: Vec<String>) -> isize {
         if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
-                runqueue_contents.push_str(&format!("{} ({}) {}\n", 
+                writeln!(runqueue_contents, "{} ({}) {}", 
                     task.name, 
                     task.id,
-                    if task.is_running() { "*" } else { "" },
-                ));
+                    if task.is_running() { "*" } else { "" }
+                )
+                .expect("Failed to write to runqueue_contents");
             }
             println!("RunQueue:\n{}", runqueue_contents);
         }
@@ -59,7 +66,7 @@ pub fn main(args: Vec<String>) -> isize {
 }
 
 fn print_usage(opts: Options) -> isize {
-    let mut brief = format!("Usage: rq \n \n");
+    let mut brief = "Usage: rq \n \n".to_string();
 
     brief.push_str("Prints each CPU's ID, the tasks on its runqueue ('*' identifies the currently running task), and whether it is the boot CPU or not");
 

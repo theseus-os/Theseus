@@ -60,8 +60,8 @@ impl RealtimeTaskRef {
     /// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
     pub fn new(taskref: TaskRef, period: Option<usize>) -> RealtimeTaskRef {
         RealtimeTaskRef {
-            taskref: taskref,
-            period: period,
+            taskref,
+            period,
             context_switches: 0,
         }
     }
@@ -281,14 +281,11 @@ impl RunQueue {
         task: &TaskRef, 
         period: usize
     ) -> Result<(), &'static str> {
-        match self.iter().position(|rt| rt.taskref == *task ) {
-            Some(i) => {
-                if let Some(mut realtime_taskref) = self.remove(i) {
-                    realtime_taskref.period = Some(period);
-                    self.insert_realtime_taskref_at_proper_location(realtime_taskref);
-                }
-            },
-            None => {},
+        if let Some(i) = self.iter().position(|rt| &rt.taskref == task) {
+            if let Some(mut realtime_taskref) = self.remove(i) {
+                realtime_taskref.period = Some(period);
+                self.insert_realtime_taskref_at_proper_location(realtime_taskref);
+            }
         };
         Ok(())
     }

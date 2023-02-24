@@ -6,47 +6,25 @@ version = "0.1.0"
 
 [dependencies]
 spin = "0.9.4"
-x86_64 = "0.14.8"
 static_assertions = "1.1.0"
 crossbeam-utils = { version = "0.8.12", default-features = false }
 log = "0.4.8"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
-[dependencies.cpu]
-path = "../cpu"
+cpu = { path = "../cpu" }
+kernel_config = { path = "../kernel_config" }
+memory = { path = "../memory" }
+stack = { path = "../stack" }
+mod_mgmt = { path = "../mod_mgmt" }
+context_switch = { path = "../context_switch" }
+environment = { path = "../environment" }
+root = { path = "../root" }
+no_drop = { path = "../no_drop" }
+preemption = { path = "../preemption" }
 
-[dependencies.tss]
-path = "../tss"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.context_switch]
-path = "../context_switch"
-
-[dependencies.preemption]
-path = "../preemption"
-
-[dependencies.environment]
-path = "../environment"
-
-[dependencies.root]
-path = "../root"
-
-[dependencies.no_drop]
-path = "../no_drop"
-
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+tss = { path = "../tss" }
 
 [lib]
 crate-type = ["rlib"]

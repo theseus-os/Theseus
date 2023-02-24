@@ -9,6 +9,7 @@ edition = "2021"
 sleep = { path = "../sleep" }
 spawn = { path = "../spawn" }
 task = { path = "../task" }
+time = { path = "../time" }
 waker = { path = "../waker" }
 
 [dependencies.futures]

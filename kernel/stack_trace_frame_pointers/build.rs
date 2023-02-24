@@ -2,7 +2,7 @@
 //! if the corresponding rustflags value is set.
 
 /// The prefix that must come before each custom cfg option.
-const CFG_PREFIX: &'static str = "cargo:rustc-cfg=";
+const CFG_PREFIX: &str = "cargo:rustc-cfg=";
 
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
     if let Ok(rustflags) = std::env::var("CARGO_ENCODED_RUSTFLAGS") {
         if rustflags.contains("force-frame-pointers=yes")
         || rustflags.contains("force-frame-pointers=true") {
-            println!("{}{}", CFG_PREFIX, "frame_pointers");
+            println!("{CFG_PREFIX}frame pointers");
         }
     } else {
         eprintln!("Note: CARGO_ENCODED_RUSTFLAGS env var did not exist.");

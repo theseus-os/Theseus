@@ -24,6 +24,8 @@
 //! }
 //! ```
 
+// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
+#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(thread_local)]
@@ -41,7 +43,6 @@ extern crate context_switch;
 extern crate preemption;
 extern crate environment;
 extern crate root;
-extern crate x86_64;
 extern crate spin;
 extern crate kernel_config;
 extern crate crossbeam_utils;
@@ -71,7 +72,6 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use x86_64::registers::model_specific::FsBase;
 use preemption::PreemptionGuard;
 use no_drop::NoDrop;
 
@@ -96,7 +96,7 @@ impl fmt::Display for PanicInfoOwned {
 impl<'p> From<&PanicInfo<'p>> for PanicInfoOwned {
     fn from(info: &PanicInfo) -> PanicInfoOwned {
         let msg = info.message()
-            .map(|m| format!("{}", m))
+            .map(|m| format!("{m}"))
             .unwrap_or_default();
         let (file, line, column) = if let Some(loc) = info.location() {
             (String::from(loc.file()), loc.line(), loc.column())
@@ -177,10 +177,10 @@ pub enum KillReason {
 }
 impl fmt::Display for KillReason {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match &self {
-            &Self::Requested         => write!(f, "Requested"),
-            &Self::Panic(panic_info) => write!(f, "Panicked at {}", panic_info),
-            &Self::Exception(num)    => write!(f, "Exception {:#X}({})", num, num),
+        match self {
+            Self::Requested         => write!(f, "Requested"),
+            Self::Panic(panic_info) => write!(f, "Panicked at {panic_info}"),
+            Self::Exception(num)    => write!(f, "Exception {num:#X}({num})"),
         }
     }
 }
@@ -220,12 +220,6 @@ pub enum RunState {
 }
 
 
-#[cfg(runqueue_spillful)]
-/// A callback that will be invoked to remove a specific task from a specific runqueue.
-/// Should be initialized by the runqueue crate.
-pub static RUNQUEUE_REMOVAL_FUNCTION: spin::Once<fn(&TaskRef, u8) -> Result<(), &'static str>> = spin::Once::new();
-
-
 #[cfg(simd_personality)]
 /// The supported levels of SIMD extensions that a `Task` can use.
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -261,9 +255,9 @@ impl From<Option<u8>> for OptionU8 {
         OptionU8(opt)
     }
 }
-impl Into<Option<u8>> for OptionU8 {
-    fn into(self) -> Option<u8> {
-        self.0
+impl From<OptionU8> for Option<u8> {
+    fn from(val: OptionU8) -> Self {
+        val.0
     }
 }
 impl fmt::Debug for OptionU8 {
@@ -386,18 +380,14 @@ pub struct Task {
     /// (e.g., FS_BASE on x86_64) to the value of this TLS area's self pointer.
     tls_area: TlsDataImage,
     
-    #[cfg(runqueue_spillful)]
-    /// The runqueue that this Task is on.
-    on_runqueue: AtomicCell<OptionU8>,
-
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
 }
 
 // Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
-const_assert!(AtomicCell::<OptionU8>::is_lock_free());
-const_assert!(AtomicCell::<RunState>::is_lock_free());
+const _: () = assert!(AtomicCell::<OptionU8>::is_lock_free());
+const _: () = assert!(AtomicCell::<RunState>::is_lock_free());
 
 impl fmt::Debug for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -506,7 +496,7 @@ impl Task {
                 waker: None,
             }),
             id: task_id,
-            name: format!("task_{}", task_id),
+            name: format!("task_{task_id}"),
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
             suspended: AtomicBool::new(false),
@@ -519,9 +509,6 @@ impl Task {
             failure_cleanup_function,
             tls_area,
 
-            #[cfg(runqueue_spillful)]
-            on_runqueue: AtomicCell::new(None.into()),
-            
             #[cfg(simd_personality)]
             simd: SimdExt::None,
         }
@@ -572,7 +559,7 @@ impl Task {
     /// Returns the APIC ID of the CPU this `Task` is pinned on,
     /// or `None` if it is not pinned.
     pub fn pinned_core(&self) -> Option<u8> {
-        self.inner.lock().pinned_core.clone()
+        self.inner.lock().pinned_core
     }
 
     /// Returns the current [`RunState`] of this `Task`.
@@ -646,10 +633,7 @@ impl Task {
     /// Returns `true` if this `Task` has been exited, i.e.,
     /// if its RunState is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
-        match self.runstate() {
-            RunState::Exited | RunState::Reaped => true,
-            _ => false,
-        }
+        matches!(self.runstate(), RunState::Exited | RunState::Reaped)
     }
 
     /// Returns `true` if this is an application `Task`. 
@@ -672,18 +656,6 @@ impl Task {
     /// Obtains the lock on this `Task`'s inner state in order to access it.
     pub fn is_restartable(&self) -> bool {
         self.inner.lock().restart_info.is_some()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Returns the runqueue on which this `Task` is currently enqueued.
-    pub fn on_runqueue(&self) -> Option<u8> {
-        self.on_runqueue.load().into()
-    }
-
-    #[cfg(runqueue_spillful)]
-    /// Marks this `Task` as enqueued on the given runqueue.
-    pub fn set_on_runqueue(&self, runqueue: Option<u8>) {
-        self.on_runqueue.store(runqueue.into());
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
@@ -772,10 +744,10 @@ impl Task {
     }
     
     /// Sets this `Task` as this CPU's current task.
-    /// 
-    /// This updates the current TLS area, which is written to the `FS_BASE` MSR on x86_64.
+    ///
+    /// Currently, this only updates the current TLS area.
     fn set_as_current_task(&self) {
-        FsBase::write(x86_64::VirtAddr::new(self.tls_area.pointer_value() as u64));
+        self.tls_area.set_as_current_tls_base();
     }
 
     /// Perform any actions needed after a context switch.
@@ -1344,7 +1316,7 @@ impl TaskRef {
     /// ## Return
     /// Returns a [`JoinableTaskRef`], which derefs into the newly-created `TaskRef`
     /// and can be used to "join" this task (wait for it to exit) and obtain its exit value.
-    pub fn new(task: Task) -> JoinableTaskRef {
+    pub fn create(task: Task) -> JoinableTaskRef {
         let exit_value_mailbox = Mutex::new(None);
         let taskref = TaskRef(Arc::new(TaskRefInner { task, exit_value_mailbox }));
 
@@ -1401,14 +1373,6 @@ impl TaskRef {
             
             if let Some(waker) = self.inner.lock().waker.take() {
                 waker.wake();
-            }
-        }
-
-        #[cfg(runqueue_spillful)] {   
-            if let Some(remove_from_runqueue) = RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = self.on_runqueue() {
-                    remove_from_runqueue(self, rq)?;
-                }
             }
         }
 
@@ -1497,12 +1461,12 @@ pub fn bootstrap_task(
         None,
         bootstrap_task_cleanup_failure,
     );
-    bootstrap_task.name = format!("bootstrap_task_core_{}", apic_id);
+    bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
     bootstrap_task.runstate.store(RunState::Runnable);
     bootstrap_task.running_on_cpu.store(Some(apic_id).into()); 
     bootstrap_task.inner.get_mut().pinned_core = Some(apic_id); // can only run on this CPU core
     let bootstrap_task_id = bootstrap_task.id;
-    let joinable_taskref = TaskRef::new(bootstrap_task);
+    let joinable_taskref = TaskRef::create(bootstrap_task);
 
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
@@ -1566,15 +1530,15 @@ mod tls_current_task {
     /// 
     /// This is useful to avoid cloning a reference to the current task.
     /// 
-    /// Returns an `Err` if the current task cannot be obtained.
-    pub fn with_current_task<F, R>(function: F) -> Result<R, ()>
+    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    pub fn with_current_task<F, R>(function: F) -> Result<R, CurrentTaskNotFound>
     where
         F: FnOnce(&TaskRef) -> R
     {
         if let Ok(Some(ref t)) = CURRENT_TASK.try_borrow().as_deref() {
             Ok(function(t))
         } else {
-            Err(())
+            Err(CurrentTaskNotFound)
         }
     }
 
@@ -1631,22 +1595,22 @@ mod tls_current_task {
     /// * On success, an [`ExitableTaskRef`] for the current task,
     ///   which can only be obtained once at the very start of the task's execution,
     ///   and only from this one function. 
-    /// * Returns an `Err` if the current task has already been set.
+    /// * Returns an `Err` if the current task has already been initialized.
     #[doc(hidden)]
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, ()> {
+    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(());
+                return Err(CurrentTaskAlreadyInited);
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(())?
+                .ok_or(CurrentTaskAlreadyInited)?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
@@ -1655,7 +1619,7 @@ mod tls_current_task {
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(()),
+            _ => Err(CurrentTaskAlreadyInited),
         }
     }
 
@@ -1677,4 +1641,11 @@ mod tls_current_task {
             Err(value)
         }
     }
+
+    /// An error type indicating that the current task was already initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskAlreadyInited;
+    /// An error type indicating that the current task has not yet been initialized.
+    #[derive(Debug)]
+    pub struct CurrentTaskNotFound;
 }

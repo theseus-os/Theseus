@@ -123,14 +123,14 @@ impl<T: ?Sized + Default> Default for MutexSleep<T> {
 impl<'a, T: ?Sized> Deref for MutexSleepGuard<'a, T> {
     type Target = T;
 
-    fn deref<'b>(&'b self) -> &'b T { 
-        &*(self.guard) 
+    fn deref(&self) -> &T { 
+        &self.guard
     }
 }
 
 impl<'a, T: ?Sized> DerefMut for MutexSleepGuard<'a, T> {
-    fn deref_mut<'b>(&'b mut self) -> &'b mut T { 
-        &mut *(self.guard)
+    fn deref_mut(&mut self) -> &mut T { 
+        &mut self.guard
     }
 }
 

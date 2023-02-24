@@ -87,7 +87,7 @@ pub fn do_self_swap(
             into_new_crate_file,
             new_namespace,
             false, //reexport
-        ).map_err(|invalid_req| format!("{:#?}", invalid_req))?;
+        ).map_err(|invalid_req| format!("{invalid_req:#?}"))?;
 
         #[cfg(not(downtime_eval))]
         debug!("swap call {:?}", swap_req);
@@ -101,7 +101,7 @@ pub fn do_self_swap(
     let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, crate_name);
 
     // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 0 {
+    if matching_crates.is_empty() {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
 
@@ -142,7 +142,7 @@ pub fn do_self_swap(
     let mut matching_crates = CrateNamespace::get_crates_starting_with(namespace, ocn);
 
     // There can be only one matching crate for a given crate name
-    if matching_crates.len() == 0 {
+    if matching_crates.is_empty() {
         return Err("No crates currently loaded matches ".to_string() + crate_name);
     }
 
@@ -154,7 +154,7 @@ pub fn do_self_swap(
     debug!("We got a match");
 
     let (new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(0);
-    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(&real_new_namespace, &new_crate_full_name) {
+    let new_crate_ref = match CrateNamespace::get_crate_and_namespace(real_new_namespace, &new_crate_full_name) {
         Some((ocr, _ns)) => {
             ocr
         }
@@ -306,7 +306,7 @@ pub fn constant_offset_fix(
 pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
     let taskref = task::get_my_current_task()
-        .ok_or_else(|| format!("failed to get current task"))?;
+        .ok_or_else(|| "failed to get current task".to_string())?;
 
     #[cfg(not(downtime_eval))]
     debug!("The taskref is {:?}",taskref);
@@ -352,11 +352,8 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
         ); 
         // debug!("Bottom and top of stack of task {} are {:X} {:X}", taskref.name, bottom, top);
 
-        match constant_offset_fix(&swap_ranges, bottom, top) {
-            Err (e) => {
-                debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name, e.to_string()};
-            },
-            _ => {},
+        if let Err (e) = constant_offset_fix(&swap_ranges, bottom, top) {
+            debug! {"Failed to perform constant offset fix for the stack for task {} due to {}", taskref.name, e.to_string()};
         }
     }
 
@@ -390,7 +387,7 @@ fn null_swap_policy() -> Option<String> {
         }
         log_handled_fault(fe);
     }
-    return None
+    None
 }
 
 /// simple swap policy. 
@@ -535,7 +532,7 @@ pub fn get_crate_to_swap() -> Option<String> {
 
     #[cfg(not(use_crate_replacement))]
     {
-        return null_swap_policy();
+        null_swap_policy()
     }
 
 

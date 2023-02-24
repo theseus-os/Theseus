@@ -92,7 +92,7 @@ impl<T> CowArc<T> {
     pub fn downgrade(this: &CowArc<T>) -> CowWeak<T> {
         CowWeak {
             weak: InnerWeak {
-                inner_weak: Arc::downgrade(&(this.arc.inner_arc))
+                inner_weak: Arc::downgrade(&this.arc.inner_arc)
             },
         }
     }
@@ -122,7 +122,7 @@ impl<T> CowArc<T> {
     /// that will be used somewhere else temporarily, e.g., in the same context,
     /// without marking it as a totally separate shared instance. 
     /// 
-    /// The fact that this is different from the `clone` function 
+    /// The fact that this is different from the [`CowArc::clone`] function 
     /// is what differentiates the behavior of `CowArc` from regular `Arc`.
     pub fn clone_shallow(&self) -> CowArc<T> {
         CowArc {

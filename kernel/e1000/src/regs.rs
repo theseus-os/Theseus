@@ -40,7 +40,7 @@ pub struct E1000Registers {
     
 } // 2 4KiB pages
 
-const_assert_eq!(core::mem::size_of::<E1000Registers>(), 2 * 4096);
+const _: () = assert!(core::mem::size_of::<E1000Registers>() == 2 * 4096);
 
 /// The layout in memory of e1000 receive registers. 
 #[derive(FromBytes)]
@@ -52,7 +52,7 @@ pub struct E1000RxRegisters {
     _padding7:                      [u8; 2020],             // 0x281C - 0x2FFF
 } // 1 4KiB page
 
-const_assert_eq!(core::mem::size_of::<E1000RxRegisters>(), 4096);
+const _: () = assert!(core::mem::size_of::<E1000RxRegisters>() == 4096);
 
 
 /// The layout in memory of e1000 transmit registers. 
@@ -65,7 +65,7 @@ pub struct E1000TxRegisters {
     _padding9:                      [u8; 2020],             // 0x381C - 0x3FFF
 } // 1 4KiB page
 
-const_assert_eq!(core::mem::size_of::<E1000TxRegisters>(), 4096);
+const _: () = assert!(core::mem::size_of::<E1000TxRegisters>() == 4096);
 
 
 /// The layout in memory of e1000 MAC address registers. 
@@ -83,11 +83,16 @@ pub struct E1000MacRegisters {
 
 } // 28 4KiB pages
 
-const_assert_eq!(core::mem::size_of::<E1000MacRegisters>(), 28 * 4096);
+const _: () = assert!(core::mem::size_of::<E1000MacRegisters>() == 28 * 4096);
 
 // check that the sum of all the register structs is equal to the memory of the e1000 device (128 KiB).
-const_assert_eq!(core::mem::size_of::<E1000Registers>() + core::mem::size_of::<E1000RxRegisters>() +   
-    core::mem::size_of::<E1000TxRegisters>() + core::mem::size_of::<E1000MacRegisters>(), 0x20000);
+const _: () = assert!(
+    core::mem::size_of::<E1000Registers>()
+    + core::mem::size_of::<E1000RxRegisters>()
+    + core::mem::size_of::<E1000TxRegisters>()
+    + core::mem::size_of::<E1000MacRegisters>()
+    == 0x20000
+);
 
 
 /// Struct that holds registers related to one receive queue.

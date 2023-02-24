@@ -6,20 +6,19 @@
 #![feature(ptr_internals)]
 
 extern crate kernel_config;
-extern crate logger;
+extern crate logger_x86_64 as logger;
 extern crate spin;
 extern crate volatile;
 
 
-use core::fmt;
-use core::ptr::Unique;
+use core::{fmt::{self, Write}, ptr::Unique};
 use spin::Mutex;
 use volatile::Volatile;
-use kernel_config::memory::KERNEL_OFFSET;
 
 
-/// defined by x86's physical memory maps
-const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000 + KERNEL_OFFSET;
+/// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
+/// We must rely on the early bootstrap code to identity map this address.
+const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000;
 
 /// height of the VGA text window
 const BUFFER_HEIGHT: usize = 25;
@@ -68,8 +67,13 @@ macro_rules! println_raw {
 
 #[doc(hidden)]
 pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
-    use core::fmt::Write;
-    EARLY_VGA_WRITER.lock().write_fmt(args)
+    // Print the message directly to the logger;
+    // don't use log macros because that can introduce an infinite loop
+    // when `mirror_log_to_vga` is enabled.
+    let log_result = logger::write_fmt(format_args!("[*] {args}")); 
+    
+    let vga_result = EARLY_VGA_WRITER.lock().write_fmt(args);
+    vga_result.and(log_result)
 }
 
 
@@ -129,17 +133,12 @@ impl VgaBuffer {
         unsafe { self.buffer.as_mut() }
     }
 }
-impl fmt::Write for VgaBuffer {
-    fn write_str(&mut self, s: &str) -> ::core::fmt::Result {
-        
-        // mirror DIRECTLY to serial port, do not use the log statements
-        // because that can introduce an infinite loop when mirror_to_serial is enabled.
-        let ret = logger::write_str(s); 
-        
+impl Write for VgaBuffer {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.bytes() {
             self.write_byte(byte)
         }
-        ret
+        Ok(())
     }
 }
 

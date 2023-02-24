@@ -181,7 +181,7 @@ pub trait AllocablePage {
 
     /// Tries to find a free block within `data` that satisfies `alignment` requirement.
     fn first_fit(&self, layout: Layout) -> Option<(usize, usize)> {
-        let base_addr = (&*self as *const Self as *const u8) as usize;
+        let base_addr = (self as *const Self as *const u8) as usize;
         self.bitfield().first_fit(base_addr, layout, Self::SIZE, Self::METADATA_SIZE)
     }
 
@@ -429,7 +429,7 @@ impl<'a, T: AllocablePage> PageList<'a, T> {
     /// Does the list contain `s`?
     pub(crate) fn contains(&mut self, s: *const T) -> bool {
         for slab_page in self.iter_mut() {
-            if slab_page as *const T == s as *const T {
+            if core::ptr::eq(slab_page, s) {
                 return true;
             }
         }

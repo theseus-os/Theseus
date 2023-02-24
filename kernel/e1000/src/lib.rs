@@ -1,12 +1,12 @@
 #![no_std]
 
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(rustc_private)]
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-#[macro_use] extern crate static_assertions;
 extern crate volatile;
 extern crate zerocopy;
 extern crate alloc;
@@ -478,7 +478,7 @@ impl net::NetworkDevice for E1000Nic {
 }
 
 extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
-    if let Some(ref e1000_nic_ref) = E1000_NIC.get() {
+    if let Some(e1000_nic_ref) = E1000_NIC.get() {
         let mut e1000_nic = e1000_nic_ref.lock();
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);

@@ -110,7 +110,7 @@ impl FaultEntry {
         fault_type: FaultType
     ) -> FaultEntry {
         FaultEntry {
-            fault_type: fault_type,
+            fault_type,
             error_code: None,
             core: None,
             running_task: None,
@@ -168,7 +168,7 @@ fn update_and_insert_fault_entry_internal(
     if let Some(instruction_pointer) = instruction_pointer {
         let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
         fe.instruction_pointer = Some(instruction_pointer);
-        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer, false)
                                         .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 
@@ -190,7 +190,7 @@ pub fn log_exception (
 ) {
     let mut fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
-    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    fe.address_accessed  = address_accessed.map(VirtualAddress::new_canonical);
     update_and_insert_fault_entry_internal(fe, Some(instruction_pointer));
 }
 

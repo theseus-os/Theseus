@@ -16,14 +16,11 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+vga_buffer = { path = "../vga_buffer" }
+panic_wrapper = { path = "../panic_wrapper" }
+unwind = { path = "../unwind" }
 
-[dependencies.panic_wrapper]
-path = "../panic_wrapper"
-
-[dependencies.unwind]
-path = "../unwind"
 
 
 [lib]

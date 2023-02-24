@@ -7,7 +7,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 
 [dependencies]
 spin = "0.9.4"
-qp-trie = "0.8.0"
+qp-trie = "0.8.1"
 by_address = "1.0.4"
 
 

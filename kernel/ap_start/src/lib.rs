@@ -57,6 +57,10 @@ pub fn kstart_ap(
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst);
 
+    // The early TLS image has already been initialized by the bootstrap CPU,
+    // so all we need to do here is to reload it on this CPU.
+    early_tls::reload();
+
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = AP_STACKS.lock().remove(&apic_id)
         .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));

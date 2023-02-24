@@ -1,0 +1,14 @@
+[package]
+name = "rq_access_eval"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Run queue access benchmark"
+edition = "2021"
+
+[dependencies]
+app_io = { path = "../../kernel/app_io" }
+cpu = { path = "../../kernel/cpu" }
+getopts = "0.2"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+runqueue = { path = "../../kernel/runqueue" }
+time = { path = "../../kernel/time" }
