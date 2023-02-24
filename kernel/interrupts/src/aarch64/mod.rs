@@ -1,5 +1,4 @@
 use core::arch::global_asm;
-use core::cell::UnsafeCell;
 use core::ops::DerefMut;
 use core::fmt;
 
@@ -82,7 +81,7 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
 pub fn init() -> Result<(), &'static str> {
     extern "Rust" {
         // in assembly file
-        static __exception_vector_start: UnsafeCell<()>;
+        static __exception_vector_start: extern "C" fn();
     }
 
     let mut gic = GIC.lock();
@@ -92,7 +91,7 @@ pub fn init() -> Result<(), &'static str> {
         // Set the exception handling vector, which
         // is an array of grouped aarch64 instructions.
         // see table.s for more info.
-        unsafe { VBAR_EL1.set(__exception_vector_start.get() as u64) };
+        unsafe { VBAR_EL1.set(&__exception_vector_start as *const _ as u64) };
 
         let kernel_mmi_ref = get_kernel_mmi_ref()
             .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
