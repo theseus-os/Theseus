@@ -72,6 +72,9 @@ path = "../device_manager"
 [dependencies.e1000]
 path = "../e1000"
 
+[dependencies.task]
+path = "../task"
+
 [dependencies.scheduler]
 path = "../scheduler"
 
@@ -95,9 +98,6 @@ path = "../ota_update_client"
 ## Therefore, it has to be unconditionally included.
 [dependencies.simd_personality]
 path = "../simd_personality"
-
-[dependencies.task]
-path = "../task"
 
 [dependencies.task_fs]
 path = "../task_fs"
