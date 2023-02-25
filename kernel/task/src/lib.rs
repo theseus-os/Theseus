@@ -432,7 +432,7 @@ impl Drop for JoinableTaskRef {
 
 /// A wrapper around `TaskRef` that allows this task to mark itself as exited.
 ///
-/// This is primarily an internal implementation details, as it isonly obtainable
+/// This is primarily an internal implementation details, as it is only obtainable
 /// when a task is first switched to, specifically while it is executing the
 /// `spawn::task_wrapper()` (before it proceeds to running its actual entry function).
 ///
@@ -579,7 +579,7 @@ pub fn take_kill_handler() -> Option<KillHandler> {
 /// * `next`: the task to switch to.
 /// * `apic_id`: the ID of the current CPU.
 /// * `preemption_guard`: a guard that is used to ensure preemption is disabled
-///   for the duration of this task switch operation.
+///    for the duration of this task switch operation.
 ///
 /// ## Important Note about Control Flow
 /// If this is the first time that `next` task has been switched to,
@@ -642,14 +642,12 @@ pub fn task_switch(
     // Now it's time to perform the actual context switch.
     // If `simd_personality` is NOT enabled, then we proceed as normal 
     // using the singular context_switch routine that matches the actual build target. 
-    #[cfg(not(simd_personality))]
-    {
+    #[cfg(not(simd_personality))] {
         call_context_switch!(context_switch::context_switch);
     }
     // If `simd_personality` is enabled, all `context_switch*` routines are available,
     // which allows us to choose one based on whether the prev/next Tasks are SIMD-enabled.
-    #[cfg(simd_personality)]
-    {
+    #[cfg(simd_personality)] {
         let (curr_simd, next_simd) = (values_for_context_switch.2, values_for_context_switch.3);
         match (curr_simd, next_simd) {
             (SimdExt::None, SimdExt::None) => {
@@ -732,10 +730,10 @@ type TaskSwitchInnerRet = (*mut usize, usize, SimdExt, SimdExt);
 /// The inner part of the task switching routine that modifies task states.
 ///
 /// This accepts a mutably-borrowed reference to the current task's TLS variable
-/// in order to potentially deinit that TLS variable (if the current task has exited).
-/// Thus, it cannot perform the actual context switch operation,
-/// because we cannot context switch until all `TaskRef`s on the current stack are dropped.
-/// Hence, the th main [`task_switch()`] routine proceeds with the context switch
+/// in order to potentially deinit that TLS variable if the current task has exited.
+/// Thus, it cannot perform the actual context switch operation because we cannot
+/// context switch until all `TaskRef`s on the current stack are dropped.
+/// Hence, the the main [`task_switch()`] routine proceeds with the context switch
 /// after we return to it from this function.
 fn task_switch_inner(
     curr_task_tls_slot: &mut Option<TaskRef>,
@@ -841,7 +839,7 @@ fn task_switch_inner(
         next.0.task.inner().lock().drop_after_task_switch = Some(Box::new(_prev_taskref));
     }
 
-    // Now, set the next task as the current task: the task running on this CPU.
+    // Now, set the next task as the current task running on this CPU.
     //
     // Note that we cannot do this until we've done the above part that cleans up
     // TLS variables for the current task (if exited), since the below call to 
@@ -886,10 +884,10 @@ mod tls_current_task {
     static CURRENT_TASK: RefCell<Option<TaskRef>> = RefCell::new(None);
 
     /// Invokes the given `function` with a reference to the current task.
-    /// 
+    ///
     /// This is useful to avoid cloning a reference to the current task.
-    /// 
-    /// Returns a `CurrentTaskNotFound`error if the current task cannot be obtained.
+    ///
+    /// Returns a `CurrentTaskNotFound` error if the current task cannot be obtained.
     pub fn with_current_task<F, R>(function: F) -> Result<R, CurrentTaskNotFound>
     where
         F: FnOnce(&TaskRef) -> R
@@ -903,13 +901,13 @@ mod tls_current_task {
 
     /// Similar to [`with_current_task()`], but also accepts a value that is
     /// passed to the given `function` or returned in the case of an error.
-    /// 
+    ///
     /// This is useful for two reasons:
     /// 1. Like [`with_current_task()`], it avoids cloning a reference to the current task.
     /// 2. It allows the `value` to be returned upon an error, instead of the behavior
     ///    in [`with_current_task()`] that unconditionally takes ownership of the `value`
     ///    without any way to recover ownership of that `value`.
-    /// 
+    ///
     /// Returns an `Err` containing the `value` if the current task cannot be obtained.
     pub fn with_current_task_and_value<F, R, T>(function: F, value: T) -> Result<R, T>
     where
@@ -983,12 +981,12 @@ mod tls_current_task {
     }
 
     /// An internal routine that exposes mutable access to the current task's TLS variable.
-    /// 
+    ///
     /// This mutable access to the TLS variable is only needed for task switching,
     /// in which an exited task must clean up its current task TLS variable.
-    /// 
+    ///
     /// Otherwise, it is similar to [`with_current_task_and_value()`].
-    /// 
+    ///
     /// Returns an `Err` containing the `value` if the current task cannot be obtained.
     pub(crate) fn with_current_task_tls_slot_mut<F, R, T>(function: F, value: T) -> Result<R, T>
     where
@@ -1008,8 +1006,6 @@ mod tls_current_task {
     #[derive(Debug)]
     pub struct CurrentTaskNotFound;
 }
-
-
 
 
 /// Bootstrap a new task from the current thread of execution.
@@ -1061,7 +1057,7 @@ pub fn bootstrap_task(
         let _task_ref = NoDrop::new(joinable_taskref);
         return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
     };
-    
+
     Ok((joinable_taskref, exitable_taskref))
 }
 
@@ -1083,4 +1079,3 @@ fn bootstrap_task_cleanup_failure(current_task: ExitableTaskRef, kill_reason: Ki
     #[allow(clippy::empty_loop)]
     loop { }
 }
-
