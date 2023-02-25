@@ -1,6 +1,25 @@
-//! TODO: describe TaskRef and its related derivative types: JoinableTaskRef and ExitableTaskRef 
+//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
-//! To create new `Task`s, use the [`spawn`](../spawn/index.html) crate.
+//! The main types of interest are:
+//! 1. [`TaskRef`]: a shareable reference to a `Task` that can actually be used,
+//!    unlike the basic `Task` type that cannot be spawned, modified, or scheduled in.
+//! 2. [`JoinableTaskRef`]: a derivative of `TaskRef` that allows the owner
+//!    (a different task) to *join* that task, i.e., wait for it to exit,
+//!    and to retrieve its [`ExitValue`].
+//!
+//! The main standalone functions allow one to:
+//! 1. Obtain the current task:
+//!    * [`with_current_task()`] is the preferred way, which accepts a closure
+//!      that is invoked with access to the current task. This is preferred because
+//!      it doesn't need to clone the current task reference.
+//!    * [`get_my_current_task()`] returns a cloned reference to the current task
+//!      and is thus slightly more expensive [`with_current_task()`].
+//!    * [`get_my_current_task_id()`] is fastest if you just want the ID of the current task.
+//! 2. Register a kill handler for the current task -- [`set_kill_handler()`].
+//! 3. Switch from the current task to another "next" task -- [`task_switch()`].
+//!
+//! To create new task, use the [`spawn`](../spawn/index.html) crate rather than
+//! attempting to manually instantiate a `TaskRef`.
 
 #![no_std]
 #![feature(negative_impls)]
@@ -410,9 +429,9 @@ impl Drop for JoinableTaskRef {
 
 /// A wrapper around `TaskRef` that allows this task to mark itself as exited.
 ///
-/// This is only obtainable when a task is first switched to, specifically while
-/// it is executing the `spawn::task_wrapper()` function
-/// (before it proceeds to running its actual entry function).
+/// This is primarily an internal implementation details, as it isonly obtainable
+/// when a task is first switched to, specifically while it is executing the
+/// `spawn::task_wrapper()` (before it proceeds to running its actual entry function).
 ///
 /// ## Not `Clone`-able
 /// This type does not implement `Clone` because it assumes there is

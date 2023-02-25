@@ -1,4 +1,5 @@
-//! This crate contains the `Task` structure for supporting multithreading.
+//! This crate contains the basic [`Task`] structure, which holds contextual execution states
+//! needed to support safe multithreading.
 //! 
 //! To create new `Task`s, use the [`spawn`](../spawn/index.html) crate.
 //! For more advanced task-related types, see the [`task`](../task/index.html) crate.
@@ -46,8 +47,8 @@ use environment::Environment;
 use spin::Mutex;
 use preemption::PreemptionGuard;
 
-/// The function signature of the callback that will be invoked
-/// when a given Task panics or otherwise fails, e.g., a machine exception occurs.
+/// The function signature of the callback that will be invoked when a `Task`
+/// panics or otherwise fails, e.g., a machine exception occurs.
 pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
@@ -115,21 +116,20 @@ impl fmt::Display for KillReason {
 }
 
 
-/// The list of ways that a Task can exit, including possible return values and conditions.
+/// The two ways a `Task` can exit, including possible return values and conditions.
 #[derive(Debug)]
 pub enum ExitValue {
-    /// The Task ran to completion and returned the enclosed `Any` value.
+    /// The `Task` ran to completion and returned the enclosed [`Any`] value.
+    ///
     /// The caller of this type should know what type this Task returned,
     /// and should therefore be able to downcast it appropriately.
     Completed(Box<dyn Any + Send>),
-    /// The Task did NOT run to completion, and was instead killed.
-    /// The reason for it being killed is enclosed. 
+    /// The `Task` did NOT run to completion but was instead killed for the enclosed reason.
     Killed(KillReason),
 }
 
 
-/// The set of possible runstates that a task can be in, e.g.,
-/// runnable, blocked, exited, etc. 
+/// The set of possible runstates that a `Task` can have.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RunState {
     /// in the midst of setting up the task
@@ -204,7 +204,7 @@ impl fmt::Debug for OptionU8 {
 /// Therefore, it is safe to expose all members of this struct as public, 
 /// though not strictly necessary. 
 /// Currently, we only publicize the fields here that need to be modified externally,
-/// primarily by the `spawn` crate for creating and running new tasks. 
+/// primarily by the `spawn` and `task` crates for creating and running new tasks. 
 pub struct TaskInner {
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
@@ -334,11 +334,11 @@ impl Hash for Task {
 }
 
 impl Task {
-    /// Creates a new `Task` structure and initializes it to be non-`Runnable`.
+    /// Creates a new `Task` and initializes it to be non-`Runnable`.
     ///
     /// # Arguments
-    /// * `kstack`: the optional kernel `Stack` for this new `Task` to use.
-    ///    * If `None`, a kernel stack of the default size will be allocated and used.
+    /// * `stack`: the optional `Stack` for this new `Task` to use.
+    ///    * If `None`, a stack of the default size will be allocated and used.
     /// * `inherited states`: the set of states used to initialize this new `Task`.
     ///    * Typically, a caller will pass in [`InheritedStates::FromTask`] with the
     ///      enclosed task being a reference to the current task.
@@ -351,16 +351,16 @@ impl Task {
     /// * This does not run the task, schedule it in, or switch to it.
     /// * If you want to create a new task, you should use the `spawn` crate instead.
     pub fn new(
-        kstack: Option<Stack>,
+        stack: Option<Stack>,
         states_to_inherit: InheritedStates,
     ) -> Result<Task, &'static str> {
         /// The counter of task IDs
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
         let (mmi, namespace, env, app_crate) = states_to_inherit.into_tuple();
-        let kstack = kstack
+        let kstack = stack
             .or_else(|| stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut mmi.lock().page_table))
-            .ok_or("couldn't allocate kernel stack!")?;
+            .ok_or("couldn't allocate stack for new Task!")?;
 
         // TODO: re-use old task IDs again, instead of simply blindly counting up.
         let task_id = TASKID_COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -417,12 +417,12 @@ impl Task {
         self.running_on_cpu().is_some()
     }
 
-    /// Returns the APIC ID of the CPU this `Task` is currently running on.
+    /// Returns the ID of the CPU this `Task` is currently running on.
     pub fn running_on_cpu(&self) -> Option<u8> {
         self.running_on_cpu.load().into()
     }
 
-    /// Returns the APIC ID of the CPU this `Task` is pinned on,
+    /// Returns the ID of the CPU this `Task` is pinned on,
     /// or `None` if it is not pinned.
     pub fn pinned_core(&self) -> Option<u8> {
         self.inner.lock().pinned_core
@@ -449,7 +449,7 @@ impl Task {
         self.runstate() == RunState::Runnable && !self.is_suspended()
     }
 
-    /// Returns the namespace in which this `Task` is loaded/linked into and runs within.
+    /// Returns the namespace that this `Task` is loaded/linked into and runs within.
     pub fn get_namespace(&self) -> &Arc<CrateNamespace> {
         &self.namespace
     }
@@ -476,15 +476,13 @@ impl Task {
     /// This is because you can only obtain a mutable reference to a `Task`
     /// *before* you enclose it in a `TaskRef` wrapper type.
     ///
-    /// # Locking / Deadlock
     /// Because this function requires a mutable reference to this `Task`,
     /// no locks must be obtained. 
     pub fn inner_mut(&mut self) -> &mut TaskInner {
         self.inner.get_mut()
     }
 
-    /// Exposes read-only access to this `Task`'s [`RestartInfo`] by invoking
-    /// the given `func` with a reference to its `RestartInfo`.
+    /// Invokes `func` with immutable access to this `Task`'s [`RestartInfo`].
     ///
     /// # Locking / Deadlock
     /// Obtains the lock on this `Task`'s inner state for the duration of `func`
@@ -497,14 +495,15 @@ impl Task {
     }
 
     /// Returns `true` if this `Task` has been exited, i.e.,
-    /// if its RunState is either `Exited` or `Reaped`.
+    /// if its `RunState` is either `Exited` or `Reaped`.
     pub fn has_exited(&self) -> bool {
         matches!(self.runstate(), RunState::Exited | RunState::Reaped)
     }
 
-    /// Returns `true` if this is an application `Task`. 
+    /// Returns `true` if this is an application `Task`.
+    ///
     /// This will also return `true` if this task was spawned by an application task,
-    /// since a task inherits the "application crate" field from its "parent" who spawned it.
+    /// since a task inherits the "application crate" field from its "parent" that spawned it.
     pub fn is_application(&self) -> bool {
         self.app_crate.is_some()
     }
@@ -519,8 +518,8 @@ impl Task {
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
     ///
-    /// Returns the previous runstate on success, and the current runstate on
-    /// error. Will only suceed if the task is runnable or already blocked.
+    /// Returns the previous runstate on success, and the current runstate on error.
+    /// This will only succeed if the task is runnable or already blocked.
     pub fn block(&self) -> Result<RunState, RunState> {
         use RunState::{Blocked, Runnable};
 

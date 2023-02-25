@@ -622,6 +622,7 @@ doc:
 		--package debugit \
 		--package dereffer \
 		--package dfqueue \
+		--package irq_safety \
 		--package keycodes_ascii \
 		--package lockable \
 		--package locked_idt \

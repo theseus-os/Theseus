@@ -42,8 +42,8 @@ use no_drop::NoDrop;
 use task::SimdExt;
 
 
-/// Initializes tasking for the given AP core, including creating a runqueue for it
-/// and creating its initial task bootstrapped from the current execution context for that core. 
+/// Initializes tasking for this CPU, including creating a runqueue for it
+/// and creating its initial task bootstrapped from the current execution context.
 pub fn init(
     kernel_mmi_ref: MmiRef,
     apic_id: u8,
