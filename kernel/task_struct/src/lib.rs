@@ -8,20 +8,7 @@
 #![feature(panic_info_message)]
 #![feature(negative_impls)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
-extern crate irq_safety;
-extern crate memory;
-extern crate stack;
-extern crate tss;
-extern crate mod_mgmt;
-extern crate preemption;
-extern crate environment;
-extern crate root;
-extern crate spin;
-extern crate kernel_config;
-extern crate crossbeam_utils;
-extern crate no_drop;
+extern crate alloc;
 
 use core::{
     any::Any,
@@ -34,11 +21,13 @@ use core::{
 };
 use alloc::{
     boxed::Box,
+    format,
     string::String,
     sync::Arc,
 };
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::MutexIrqSafe;
+use log::{warn, trace};
 use memory::MmiRef;
 use stack::Stack;
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;

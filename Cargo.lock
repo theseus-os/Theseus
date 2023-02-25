@@ -379,6 +379,7 @@ dependencies = [
  "simd_personality",
  "spawn",
  "stack",
+ "task",
  "task_fs",
  "tlb_shootdown",
  "tsc",
@@ -3667,13 +3668,9 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "no_drop",
  "preemption",
- "root",
  "spin 0.9.4",
  "stack",
- "static_assertions",
- "tss",
 ]
 
 [[package]]

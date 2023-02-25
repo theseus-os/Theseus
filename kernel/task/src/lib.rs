@@ -51,11 +51,14 @@ use spin::Mutex;
 use stack::Stack;
 use task_struct::ExposedTask;
 
+
 // Re-export main types from `task_struct`.
 pub use task_struct::{
     ExitValue, InheritedStates, KillHandler, KillReason,
     PanicInfoOwned, RestartInfo, RunState, Task,
 };
+#[cfg(simd_personality)]
+pub use task_struct::SimdExt;
 
 
 /// The list of all Tasks in the system.
@@ -650,47 +653,47 @@ pub fn task_switch(
         let (curr_simd, next_simd) = (values_for_context_switch.2, values_for_context_switch.3);
         match (curr_simd, next_simd) {
             (SimdExt::None, SimdExt::None) => {
-                // warn!("SWITCHING from REGULAR to REGULAR task");
+                // log::warn!("SWITCHING from REGULAR to REGULAR task");
                 call_context_switch!(context_switch::context_switch_regular);
             }
 
             (SimdExt::None, SimdExt::SSE)  => {
-                // warn!("SWITCHING from REGULAR to SSE task");
+                // log::warn!("SWITCHING from REGULAR to SSE task");
                 call_context_switch!(context_switch::context_switch_regular_to_sse);
             }
             
             (SimdExt::None, SimdExt::AVX)  => {
-                // warn!("SWITCHING from REGULAR to AVX task");
+                // log::warn!("SWITCHING from REGULAR to AVX task");
                 call_context_switch!(context_switch::context_switch_regular_to_avx);
             }
 
             (SimdExt::SSE, SimdExt::None)  => {
-                // warn!("SWITCHING from SSE to REGULAR task");
+                // log::warn!("SWITCHING from SSE to REGULAR task");
                 call_context_switch!(context_switch::context_switch_sse_to_regular);
             }
 
             (SimdExt::SSE, SimdExt::SSE)   => {
-                // warn!("SWITCHING from SSE to SSE task");
+                // log::warn!("SWITCHING from SSE to SSE task");
                 call_context_switch!(context_switch::context_switch_sse);
             }
 
             (SimdExt::SSE, SimdExt::AVX) => {
-                // warn!("SWITCHING from SSE to AVX task");
+                // log::warn!("SWITCHING from SSE to AVX task");
                 call_context_switch!(context_switch::context_switch_sse_to_avx);
             }
 
             (SimdExt::AVX, SimdExt::None) => {
-                // warn!("SWITCHING from AVX to REGULAR task");
+                // log::warn!("SWITCHING from AVX to REGULAR task");
                 call_context_switch!(context_switch::context_switch_avx_to_regular);
             }
 
             (SimdExt::AVX, SimdExt::SSE) => {
-                warn!("SWITCHING from AVX to SSE task");
+                log::warn!("SWITCHING from AVX to SSE task");
                 call_context_switch!(context_switch::context_switch_avx_to_sse);
             }
 
             (SimdExt::AVX, SimdExt::AVX) => {
-                // warn!("SWITCHING from AVX to AVX task");
+                // log::warn!("SWITCHING from AVX to AVX task");
                 call_context_switch!(context_switch::context_switch_avx);
             }
         }
