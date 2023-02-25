@@ -463,6 +463,20 @@
 <a href="#463" id="463">463</a>
 <a href="#464" id="464">464</a>
 <a href="#465" id="465">465</a>
+<a href="#466" id="466">466</a>
+<a href="#467" id="467">467</a>
+<a href="#468" id="468">468</a>
+<a href="#469" id="469">469</a>
+<a href="#470" id="470">470</a>
+<a href="#471" id="471">471</a>
+<a href="#472" id="472">472</a>
+<a href="#473" id="473">473</a>
+<a href="#474" id="474">474</a>
+<a href="#475" id="475">475</a>
+<a href="#476" id="476">476</a>
+<a href="#477" id="477">477</a>
+<a href="#478" id="478">478</a>
+<a href="#479" id="479">479</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="doccomment">//! This crate contains the direcotires and files that comprise the taskfs, which is similar
@@ -506,7 +520,7 @@
 <span class="kw">use </span>alloc::sync::Arc;
 <span class="kw">use </span>fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 <span class="kw">use </span>memory::MappedPages;
-<span class="kw">use </span>task::{TaskRef, TASKLIST};
+<span class="kw">use </span>task::WeakTaskRef;
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>io::{ByteReader, ByteWriter, KnownLength, IoError};
 
@@ -542,12 +556,12 @@
     }
 
     <span class="kw">fn </span>get_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, node: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;FileOrDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>id = node.parse::&lt;usize&gt;().map_err(|_e| <span class="string">&quot;could not parse Task id as usize&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>task_ref = task::get_task(id).ok_or(<span class="string">&quot;could not get taskref from TASKLIST&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>id = node.parse::&lt;usize&gt;().map_err(|_e| <span class="string">&quot;could not parse Task ID as usize&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>task_ref = task::get_task(id).ok_or(<span class="string">&quot;No task existed for Task ID&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>parent_dir = <span class="self">self</span>.get_self_pointer().ok_or(<span class="string">&quot;BUG: tasks directory wasn&#39;t in root&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>dir_name = task_ref.id.to_string(); 
+        <span class="kw">let </span>dir_name = id.to_string(); 
         <span class="comment">// lazily compute a new TaskDir everytime the caller wants to get a TaskDir
-        </span><span class="kw">let </span>task_dir = TaskDir::new(dir_name, <span class="kw-2">&amp;</span>parent_dir, task_ref)<span class="question-mark">?</span>;        
+        </span><span class="kw">let </span>task_dir = TaskDir::new(dir_name, <span class="kw-2">&amp;</span>parent_dir, id, task_ref)<span class="question-mark">?</span>;        
         <span class="kw">let </span>boxed_task_dir = Arc::new(Mutex::new(task_dir)) <span class="kw">as </span>DirRef;
         <span class="prelude-val">Ok</span>(FileOrDir::Dir(boxed_task_dir))
     }
@@ -590,7 +604,7 @@
     <span class="doccomment">/// Returns a string listing all the children in the directory
     </span><span class="kw">fn </span>list(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;String&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>tasks_string = Vec::new();
-        <span class="kw">for </span>(id, _taskref) <span class="kw">in </span>TASKLIST.lock().iter() {
+        <span class="kw">for </span>(id, _taskref) <span class="kw">in </span>task::all_tasks() {
             tasks_string.push(<span class="macro">format!</span>(<span class="string">&quot;{id}&quot;</span>));
         }
         tasks_string
@@ -612,18 +626,24 @@
     </span><span class="kw">pub </span>name: String,
     <span class="doccomment">/// The absolute path of the TaskDir
     </span>path: Path,
-    taskref: TaskRef,
+    task_id: usize,
+    taskref: WeakTaskRef,
     <span class="doccomment">/// We can store the parent (TaskFs) because it is a persistent directory
     </span>parent: DirRef,
 }
 
 <span class="kw">impl </span>TaskDir {
     <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output
-    </span><span class="kw">pub fn </span>new(name: String, parent: <span class="kw-2">&amp;</span>DirRef, taskref: TaskRef)  -&gt; <span class="prelude-ty">Result</span>&lt;TaskDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span>task_id = taskref.id;
+    </span><span class="kw">pub fn </span>new(
+        name: String,
+        parent: <span class="kw-2">&amp;</span>DirRef,
+        task_id: usize,
+        taskref: WeakTaskRef,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>directory = TaskDir {
             name,
             path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}&quot;</span>)),
+            task_id,
             taskref,
             parent: Arc::clone(parent),
         };
@@ -638,12 +658,12 @@
 
     <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, child_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
         <span class="kw">if </span>child_name == <span class="string">&quot;taskInfo&quot; </span>{
-            <span class="kw">let </span>task_file = TaskFile::new(<span class="self">self</span>.taskref.clone());
+            <span class="kw">let </span>task_file = TaskFile::new(<span class="self">self</span>.task_id, <span class="self">self</span>.taskref.clone());
             <span class="kw">return </span><span class="prelude-val">Some</span>(FileOrDir::File(Arc::new(Mutex::new(task_file)) <span class="kw">as </span>FileRef));
         }
 
         <span class="kw">if </span>child_name == <span class="string">&quot;mmi&quot; </span>{
-            <span class="kw">let </span>mmi_dir = MmiDir::new(<span class="self">self</span>.taskref.clone());
+            <span class="kw">let </span>mmi_dir = MmiDir::new(<span class="self">self</span>.task_id, <span class="self">self</span>.taskref.clone());
             <span class="kw">return </span><span class="prelude-val">Some</span>(FileOrDir::Dir(Arc::new(Mutex::new(mmi_dir)) <span class="kw">as </span>DirRef));
         }
 
@@ -684,14 +704,13 @@
 <span class="doccomment">/// Lazily computed file that holds information about this task. This taskfile
 /// does not exist witin the actual filesystem. 
 </span><span class="kw">pub struct </span>TaskFile {
-    taskref: TaskRef,
+    taskref: WeakTaskRef,
     task_id: usize,
     path: Path, 
 }
 
 <span class="kw">impl </span>TaskFile {
-    <span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; TaskFile {
-        <span class="kw">let </span>task_id = taskref.id;
+    <span class="kw">pub fn </span>new(task_id: usize, taskref: WeakTaskRef) -&gt; TaskFile {
         TaskFile {
             taskref,
             task_id,
@@ -701,21 +720,25 @@
 
     <span class="doccomment">/// Generates the task info string.
     </span><span class="kw">fn </span>generate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
+        <span class="kw">let </span><span class="prelude-val">Some</span>(taskref) = <span class="self">self</span>.taskref.upgrade() <span class="kw">else </span>{
+            <span class="kw">return </span>String::from(<span class="string">&quot;Task Not Found&quot;</span>);
+        };
+
         <span class="comment">// Print all tasks
-        </span><span class="kw">let </span>cpu = <span class="self">self</span>.taskref.running_on_cpu().map(|cpu| <span class="macro">format!</span>(<span class="string">&quot;{cpu}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span><span class="self">self</span>.taskref.pinned_core().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{pin}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let </span>task_type = <span class="kw">if </span><span class="self">self</span>.taskref.is_an_idle_task {
+        </span><span class="kw">let </span>cpu = taskref.running_on_cpu().map(|cpu| <span class="macro">format!</span>(<span class="string">&quot;{cpu}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span>taskref.pinned_core().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{pin}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let </span>task_type = <span class="kw">if </span>taskref.is_an_idle_task {
             <span class="string">&quot;I&quot;
-        </span>} <span class="kw">else if </span><span class="self">self</span>.taskref.is_application() {
+        </span>} <span class="kw">else if </span>taskref.is_application() {
             <span class="string">&quot;A&quot;
         </span>} <span class="kw">else </span>{
             <span class="string">&quot; &quot;
         </span>};  
 
         <span class="macro">format!</span>(<span class="string">&quot;{0:&lt;10} {1}\n{2:&lt;10} {3}\n{4:&lt;10} {5:?}\n{6:&lt;10} {7}\n{8:&lt;10} {9}\n{10:&lt;10} {11:&lt;10}&quot;</span>, 
-            <span class="string">&quot;name&quot;</span>, <span class="self">self</span>.taskref.name,
-            <span class="string">&quot;task id&quot;</span>, <span class="self">self</span>.taskref.id,
-            <span class="string">&quot;runstate&quot;</span>, <span class="self">self</span>.taskref.runstate(),
+            <span class="string">&quot;name&quot;</span>, taskref.name,
+            <span class="string">&quot;task id&quot;</span>, taskref.id,
+            <span class="string">&quot;runstate&quot;</span>, taskref.runstate(),
             <span class="string">&quot;cpu&quot;</span>, cpu,
             <span class="string">&quot;pinned&quot;</span>, pinned,
             <span class="string">&quot;task type&quot;</span>, task_type
@@ -729,7 +752,10 @@
     }
 
     <span class="kw">fn </span>get_name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="self">self</span>.taskref.name.clone()
+        <span class="self">self</span>.taskref.upgrade().map_or_else(
+            || String::from(<span class="string">&quot;Task Not Found&quot;</span>),
+            |taskref| taskref.name.clone(),
+        )
     }
 
     <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
@@ -784,15 +810,14 @@
 <span class="doccomment">/// Lazily computed directory that contains subfiles and directories 
 /// relevant to the task&#39;s memory management information. 
 </span><span class="kw">pub struct </span>MmiDir {
-    taskref: TaskRef,
+    taskref: WeakTaskRef,
     task_id: usize,
     path: Path, 
 }
 
 <span class="kw">impl </span>MmiDir {
     <span class="doccomment">/// Creates a new directory and passes a pointer to the new directory created as output
-    </span><span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; MmiDir {
-        <span class="kw">let </span>task_id = taskref.id;
+    </span><span class="kw">pub fn </span>new(task_id: usize, taskref: WeakTaskRef) -&gt; MmiDir {
         MmiDir {
             taskref,
             task_id,
@@ -809,7 +834,7 @@
     <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, child_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;FileOrDir&gt; {
         <span class="kw">if </span>child_name == <span class="string">&quot;MmiInfo&quot; </span>{
             <span class="comment">// create the new mmi dir here on demand
-            </span><span class="kw">let </span>task_file = MmiFile::new(<span class="self">self</span>.taskref.clone());
+            </span><span class="kw">let </span>task_file = MmiFile::new(<span class="self">self</span>.task_id, <span class="self">self</span>.taskref.clone());
             <span class="prelude-val">Some</span>(FileOrDir::File(Arc::new(Mutex::new(task_file)) <span class="kw">as </span>FileRef))
         } <span class="kw">else </span>{
             <span class="prelude-val">None
@@ -854,14 +879,13 @@
 <span class="doccomment">/// Lazily computed file that contains information 
 /// about a task&#39;s memory management information. 
 </span><span class="kw">pub struct </span>MmiFile {
-    taskref: TaskRef,
+    taskref: WeakTaskRef,
     task_id: usize,
     path: Path, 
 }
 
 <span class="kw">impl </span>MmiFile {
-    <span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; MmiFile {
-        <span class="kw">let </span>task_id = taskref.id;
+    <span class="kw">pub fn </span>new(task_id: usize, taskref: WeakTaskRef) -&gt; MmiFile {
         MmiFile {
             taskref,
             task_id,
@@ -871,7 +895,11 @@
 
     <span class="doccomment">/// Generates the mmi info string.
     </span><span class="kw">fn </span>generate(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="macro">format!</span>(<span class="string">&quot;Page table: {:?}\n&quot;</span>, <span class="self">self</span>.taskref.mmi.lock().page_table)
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(taskref) = <span class="self">self</span>.taskref.upgrade() {
+            <span class="macro">format!</span>(<span class="string">&quot;Page table: {:?}\n&quot;</span>, taskref.mmi.lock().page_table)
+        } <span class="kw">else </span>{
+            String::from(<span class="string">&quot;Task Not Found&quot;</span>)
+        }
     }
 }
 

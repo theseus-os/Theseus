@@ -67,6 +67,7 @@ var sourcesIndex = JSON.parse('{\
 "io":["",[],["lib.rs"]],\
 "ioapic":["",[],["lib.rs"]],\
 "iommu":["",[],["lib.rs","regs.rs"]],\
+"irq_safety":["",[],["held_interrupts.rs","lib.rs","mutex_irqsafe.rs","rwlock_irqsafe.rs"]],\
 "ixgbe":["",[],["lib.rs","queue_registers.rs","regs.rs","test_packets.rs","virtual_function.rs"]],\
 "kernel_config":["",[],["display.rs","lib.rs","memory.rs","time.rs"]],\
 "keyboard":["",[],["lib.rs"]],\
@@ -160,6 +161,7 @@ var sourcesIndex = JSON.parse('{\
 "str_ref":["",[],["lib.rs"]],\
 "task":["",[],["lib.rs"]],\
 "task_fs":["",[],["lib.rs"]],\
+"task_struct":["",[],["lib.rs"]],\
 "text_display":["",[],["lib.rs"]],\
 "text_terminal":["",[],["ansi_colors.rs","ansi_style.rs","lib.rs"]],\
 "theseus_features":["",[],["lib.rs"]],\

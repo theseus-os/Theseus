@@ -1022,6 +1022,7 @@
 <a href="#1022" id="1022">1022</a>
 <a href="#1023" id="1023">1023</a>
 <a href="#1024" id="1024">1024</a>
+<a href="#1025" id="1025">1025</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1055,7 +1056,7 @@
 <span class="kw">use </span>irq_safety::enable_interrupts;
 <span class="kw">use </span>memory::{get_kernel_mmi_ref, MmiRef};
 <span class="kw">use </span>stack::Stack;
-<span class="kw">use </span>task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
+<span class="kw">use </span>task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
 <span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>fs_node::FileOrDir;
@@ -1066,8 +1067,8 @@
 </span><span class="kw">use </span>task::SimdExt;
 
 
-<span class="doccomment">/// Initializes tasking for the given AP core, including creating a runqueue for it
-/// and creating its initial task bootstrapped from the current execution context for that core. 
+<span class="doccomment">/// Initializes tasking for this CPU, including creating a runqueue for it
+/// and creating its initial task bootstrapped from the current execution context.
 </span><span class="kw">pub fn </span>init(
     kernel_mmi_ref: MmiRef,
     apic_id: u8,
@@ -1269,7 +1270,7 @@
         <span class="kw">move </span>|new_task| {
             new_task.app_crate = <span class="prelude-val">Some</span>(Arc::new(app_crate_ref));
             new_task.namespace = namespace;
-            <span class="prelude-val">Ok</span>(())
+            <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
         }
     ));
     
@@ -1297,7 +1298,9 @@
     pin_on_core: <span class="prelude-ty">Option</span>&lt;u8&gt;,
     blocked: bool,
     idle: bool,
-    post_build_function: <span class="prelude-ty">Option</span>&lt;Box&lt; <span class="kw">dyn </span>FnOnce(<span class="kw-2">&amp;mut </span>Task) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; &gt;&gt;,
+    post_build_function: <span class="prelude-ty">Option</span>&lt;Box&lt;
+        <span class="kw">dyn </span>FnOnce(<span class="kw-2">&amp;mut </span>Task) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;FailureCleanupFunction&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+    &gt;&gt;,
 
     <span class="attr">#[cfg(simd_personality)]
     </span>simd: SimdExt,
@@ -1389,8 +1392,10 @@
     </span><span class="kw">pub fn </span>spawn(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>new_task = Task::new(
             <span class="self">self</span>.stack,
-            <span class="self">self</span>.parent.as_ref(),
-            task_cleanup_failure::&lt;F, A, R&gt;,
+            task::get_my_current_task()
+                .ok_or(<span class="string">&quot;spawn: couldn&#39;t get current task&quot;</span>)<span class="question-mark">?
+                </span>.deref()
+                .into(),
         )<span class="question-mark">?</span>;
         <span class="comment">// If a Task name wasn&#39;t provided, then just use the function&#39;s name.
         </span>new_task.name = <span class="self">self</span>.name.unwrap_or_else(|| String::from(core::any::type_name::&lt;F&gt;()));
@@ -1421,9 +1426,10 @@
 
         <span class="comment">// If there is a post-build function, invoke it now
         // before finalizing the task and adding it to runqueues.
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pb_func) = <span class="self">self</span>.post_build_function {
-            pb_func(<span class="kw-2">&amp;mut </span>new_task)<span class="question-mark">?</span>;
-        }
+        </span><span class="kw">let </span>failure_cleanup_function = <span class="kw">match </span><span class="self">self</span>.post_build_function {
+            <span class="prelude-val">Some</span>(pb_func) =&gt; pb_func(<span class="kw-2">&amp;mut </span>new_task)<span class="question-mark">?</span>,
+            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">None</span>,
+        };
 
         <span class="comment">// Now that it has been fully initialized, mark the task as no longer `Initing`.
         </span><span class="kw">if </span><span class="self">self</span>.blocked {
@@ -1434,14 +1440,11 @@
                 .map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: newly-spawned task was not in the Initing runstate&quot;</span>)<span class="question-mark">?</span>;
         }
 
-        <span class="kw">let </span>task_ref = TaskRef::create(new_task);
-        <span class="kw">let </span>_existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
-        <span class="comment">// insert should return None, because that means there was no existing task with the same ID 
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(_existing_task) = _existing_task {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task&#39;s ID! {:?}&quot;</span>, _existing_task);
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: TASKLIST a contained a task with the new task&#39;s ID&quot;</span>);
-        }
-
+        <span class="kw">let </span>task_ref = TaskRef::create(
+            new_task,
+            failure_cleanup_function.unwrap_or(task_cleanup_failure::&lt;F, A, R&gt;)
+        );
+        
         <span class="comment">// This synchronizes with the acquire fence in this task&#39;s exit cleanup routine
         // (in `spawn::task_cleanup_final_internal()`).
         </span>fence(Ordering::Release);
@@ -1518,13 +1521,12 @@
         };
 
         <span class="comment">// Once the new task is created, we set its restart info (func and arg),
-        // and tell it to use the restartable version of the final task cleanup function.
+        // and tell it to use the restartable version of the task entry and cleanup functions.
         </span><span class="self">self</span>.post_build_function = <span class="prelude-val">Some</span>(Box::new(
             <span class="kw">move </span>|new_task| {
                 new_task.inner_mut().restart_info = <span class="prelude-val">Some</span>(restart_info);
-                new_task.failure_cleanup_function = task_restartable_cleanup_failure::&lt;F, A, R&gt;;
                 setup_context_trampoline(new_task, task_wrapper_restartable::&lt;F, A, R&gt;)<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(())
+                <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(task_restartable_cleanup_failure::&lt;F, A, R&gt;))
             }
         ));
 

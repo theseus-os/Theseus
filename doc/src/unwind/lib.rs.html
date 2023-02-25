@@ -945,7 +945,6 @@
 <a href="#945" id="945">945</a>
 <a href="#946" id="946">946</a>
 <a href="#947" id="947">947</a>
-<a href="#948" id="948">948</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.
 //! 
 //! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
@@ -1889,10 +1888,9 @@
     <span class="attr">#[cfg(not(downtime_eval))]
     </span><span class="macro">warn!</span>(<span class="string">&quot;cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}&quot;</span>, current_task);
     
-    (current_task.failure_cleanup_function)(
-        task::ExitableTaskRef::obtain_for_unwinder(current_task),
-        cause,
-    )
+    <span class="kw">let </span>(exitable_taskref, failure_cleanup_function) = 
+        task::ExitableTaskRef::obtain_for_unwinder(current_task);
+    failure_cleanup_function(exitable_taskref, cause)
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="unwind" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

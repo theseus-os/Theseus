@@ -893,9 +893,9 @@
         }
     };
 
-    <span class="kw">for </span>(_id, taskref) <span class="kw">in </span>task::TASKLIST.lock().iter() {
-        <span class="kw">let </span>(bottom, top) = taskref.with_kstack(|kstack| 
-            (kstack.bottom().value(), kstack.top_usable().value())
+    <span class="kw">for </span>taskref <span class="kw">in </span>task::all_tasks().into_iter().filter_map(|(_id, wtask)| wtask.upgrade()) {
+        <span class="kw">let </span>(bottom, top) = taskref.with_kstack(
+            |kstack| (kstack.bottom().value(), kstack.top_usable().value())
         ); 
         <span class="comment">// debug!(&quot;Bottom and top of stack of task {} are {:X} {:X}&quot;, taskref.name, bottom, top);
 

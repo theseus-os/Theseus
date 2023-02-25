@@ -1180,7 +1180,7 @@ There are several reasons that we introduce a dedicated <a href="https://doc.rus
 </blockquote>
 <h3 id="the-global-task-list"><a class="header" href="#the-global-task-list">The global task list</a></h3>
 <p>Like all other OSes, Theseus maintains a global list of all tasks in the system.
-Currently, this <a href="https://theseus-os.github.io/Theseus/doc/task/struct.TASKLIST.html"><code>TASKLIST</code></a> is stored as a map from a numeric task ID to a <code>TaskRef</code>.</p>
+Currently, this task list is stored as a map from a numeric task ID to a <code>TaskRef</code>.</p>
 <p>Tasks are added to the task list when they are initially spawned, and will remain in the task list for the entirety of their lifecycle.
 It is important to note that the presence of a task in the task list is not indicative of that task's runnability or execution status.
 A task is only removed from the task list once it has been <em>reaped</em>, i.e., it has completely exited and its exit value has been &quot;taken&quot; by another task; for example, a &quot;parent&quot; task may reap a &quot;child&quot; task that it has spawned.</p>
