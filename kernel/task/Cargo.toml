@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "task"
-description = "Types for shareable references to tasks that offer more functionality"
+description = "Shareable Task reference with more robust multithreading functionality"
 version = "0.1.0"
 edition = "2021"
 
@@ -20,7 +20,3 @@ no_drop = { path = "../no_drop" }
 preemption = { path = "../preemption" }
 stack = { path = "../stack" }
 task_struct = { path = "../task_struct" }
-
-
-[lib]
-crate-type = ["rlib"]
