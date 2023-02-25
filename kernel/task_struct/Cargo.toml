@@ -1,22 +1,21 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "task"
-description = "Shareable Task reference with more robust multithreading functionality"
+name = "task_struct"
+description = "Basic task struct definition for multithreading"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+crossbeam-utils = { version = "0.8.12", default-features = false }
 log = "0.4.8"
 spin = "0.9.4"
-static_assertions = "1.1.0"
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
-context_switch = { path = "../context_switch" }
+cpu = { path = "../cpu" }
 environment = { path = "../environment" }
+kernel_config = { path = "../kernel_config" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
-no_drop = { path = "../no_drop" }
 preemption = { path = "../preemption" }
 stack = { path = "../stack" }
-task_struct = { path = "../task_struct" }

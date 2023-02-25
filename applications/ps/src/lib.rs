@@ -10,7 +10,6 @@ use getopts::Options;
 use alloc::vec::Vec;
 use alloc::string::String;
 use core::fmt::Write;
-use task::TASKLIST;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -45,7 +44,8 @@ pub fn main(args: Vec<String>) -> isize {
     // Print all tasks
     let mut num_tasks = 0;
     let mut task_string = String::new();
-    for (id, task) in TASKLIST.lock().iter() {
+    for (id, wtask) in task::all_tasks() {
+        let Some(task) = wtask.upgrade() else { continue };
         num_tasks += 1;
         if matches.opt_present("b") {
             writeln!(task_string, "{0:<5}  {1}", id, task.name).expect("Failed to write to task_string.");

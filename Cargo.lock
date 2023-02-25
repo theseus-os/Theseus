@@ -3629,21 +3629,17 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
- "cpu",
- "crossbeam-utils",
  "environment",
  "irq_safety",
- "kernel_config",
  "log",
  "memory",
  "mod_mgmt",
  "no_drop",
  "preemption",
- "root",
  "spin 0.9.4",
  "stack",
  "static_assertions",
- "tss",
+ "task_struct",
 ]
 
 [[package]]
@@ -3658,6 +3654,23 @@ dependencies = [
  "root",
  "spin 0.9.4",
  "task",
+]
+
+[[package]]
+name = "task_struct"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "crossbeam-utils",
+ "environment",
+ "irq_safety",
+ "kernel_config",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "preemption",
+ "spin 0.9.4",
+ "stack",
 ]
 
 [[package]]
