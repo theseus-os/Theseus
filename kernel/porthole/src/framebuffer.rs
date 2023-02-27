@@ -1,9 +1,12 @@
 use crate::*;
 use memory::{BorrowedSliceMappedPages, Mutable, PhysicalAddress, PteFlags, PteFlagsArch};
 
-use core::{slice::{IterMut, ChunksExactMut}, cmp::min, ops::Range};
+use core::{
+    cmp::min,
+    ops::Range,
+    slice::{ChunksExactMut, IterMut},
+};
 use log::{debug, info};
-
 
 /// An abstraction of a framebuffer.
 pub trait Framebuffer {
@@ -23,13 +26,74 @@ pub trait Framebuffer {
     fn buffer_mut(&mut self) -> &mut [u32];
 }
 
+pub struct StagingFramenbuffer {
+    width: usize,
+    height: usize,
+    stride: usize,
+    buffer: BorrowedSliceMappedPages<u32, Mutable>,
+}
+
+impl StagingFramenbuffer {
+    pub(crate) fn new(
+        width: usize,
+        height: usize,
+        p_framebuffer_stride: usize,
+    ) -> Result<StagingFramenbuffer, &'static str> {
+        let kernel_mmi_ref =
+            memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
+        let size = width * height * core::mem::size_of::<u32>();
+        let pages = memory::allocate_pages_by_bytes(size)
+            .ok_or("could not allocate pages for a new framebuffer")?;
+        let mp = kernel_mmi_ref
+            .lock()
+            .page_table
+            .map_allocated_pages(pages, PteFlags::new().valid(true).writable(true))?;
+        let buffer = mp
+            .into_borrowed_slice_mut(0, (p_framebuffer_stride * height) as usize)
+            .map_err(|(_mp, s)| s)?;
+        Ok(StagingFramenbuffer {
+            width,
+            height,
+            stride: p_framebuffer_stride,
+            buffer,
+        })
+    }
+    pub fn blank(&mut self) {
+        for pixel in self.buffer.iter_mut() {
+            *pixel = 0x000000;
+        }
+    }
+}
+
+impl Framebuffer for StagingFramenbuffer {
+    fn width(&self) -> usize {
+        self.width
+    }
+
+    fn height(&self) -> usize {
+        self.height
+    }
+
+    fn stride(&self) -> usize {
+        self.stride
+    }
+
+    fn buffer(&self) -> &[u32] {
+        &self.buffer
+    }
+
+    fn buffer_mut(&mut self) -> &mut [u32] {
+        &mut self.buffer
+    }
+}
+
 /// A virtual framebuffer is an anonymous chunk of memory not mapped
 /// to actual screen pixels.
 pub struct VirtualFramebuffer {
     /// The width in pixels of this framebuffer.
+    /// This is the same as its stride; virtual framebuffers have no padding bytes.
     width: usize,
     /// The height in pixels of this framebuffer.
-    /// This is the same as its stride; virtual framebuffers have no padding bytes.
     height: usize,
     buffer: BorrowedSliceMappedPages<u32, Mutable>,
 }
@@ -45,7 +109,8 @@ impl VirtualFramebuffer {
             .lock()
             .page_table
             .map_allocated_pages(pages, PteFlags::new().valid(true).writable(true))?;
-        let buffer = mp.into_borrowed_slice_mut(0, width * height)
+        let buffer = mp
+            .into_borrowed_slice_mut(0, width * height)
             .map_err(|(_mp, s)| s)?;
         Ok(VirtualFramebuffer {
             width,
@@ -72,20 +137,27 @@ impl VirtualFramebuffer {
     ///
     /// If no row found from given parameters
     /// returns an empty `IterMut<T>`.
-    /// 
+    ///
     /// * `row`  - Specifies which row will be returned from this function
     /// * `rect` - Specifies dimensions of row which will be returned as `IterMut<u32>
     pub fn get_exact_row(&mut self, rect: Rect, row: usize) -> IterMut<u32> {
         let stride = self.width;
         if row >= rect.y as usize && row < rect.y_plus_height() as usize {
-            let start_of_row = (stride * row) + rect.x as usize;
+            let start_of_row = (stride * rect.y as usize) + rect.x as usize;
+            log::info!("start of row {}", start_of_row);
             let end_of_row = start_of_row + rect.width as usize;
+            log::info!("end of row {}", start_of_row + rect.width as usize);
             let framebuffer_slice = &mut self.buffer;
             if let Some(row_slice) = framebuffer_slice.get_mut(start_of_row..end_of_row) {
-                return row_slice.iter_mut();
+                //return row_slice.iter_mut();
             }
         }
-        [].iter_mut()
+
+        let it = FramebufferRowIter::new(self, rect)
+            .next()
+            .unwrap()
+            .iter_mut();
+        it
     }
 }
 
@@ -98,8 +170,6 @@ impl Framebuffer for VirtualFramebuffer {
         self.height
     }
 
-    /// The stride of a virtual framebuffer is the same as its width
-    /// because we use no padding bytes when allocating it ourselves.
     fn stride(&self) -> usize {
         self.width
     }
@@ -125,8 +195,8 @@ pub struct PhysicalFramebuffer {
 }
 impl PhysicalFramebuffer {
     pub(crate) fn init_front_buffer() -> Result<PhysicalFramebuffer, &'static str> {
-        let graphic_info = multicore_bringup::get_graphic_info()
-            .ok_or("Failed to get graphic info")?;
+        let graphic_info =
+            multicore_bringup::get_graphic_info().ok_or("Failed to get graphic info")?;
         let physical_address = PhysicalAddress::new(graphic_info.physical_address() as usize)
             .ok_or("Physical framebuffer's physical address was invalid")?;
         let buffer_width = graphic_info.width() as usize;
@@ -146,8 +216,8 @@ impl PhysicalFramebuffer {
         stride: usize,
         physical_address: PhysicalAddress,
     ) -> Result<PhysicalFramebuffer, &'static str> {
-        let kernel_mmi_ref = memory::get_kernel_mmi_ref()
-            .ok_or("KERNEL_MMI was not yet initialized!")?;
+        let kernel_mmi_ref =
+            memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
         let size = width * height * core::mem::size_of::<u32>();
         let pages = memory::allocate_pages_by_bytes(size)
             .ok_or("could not allocate pages for a new framebuffer")?;
@@ -155,7 +225,8 @@ impl PhysicalFramebuffer {
         let mapped_framebuffer = {
             let mut flags: PteFlagsArch = PteFlags::new().valid(true).writable(true).into();
 
-            #[cfg(target_arch = "x86_64")] {
+            #[cfg(target_arch = "x86_64")]
+            {
                 let use_pat = page_attribute_table::init().is_ok();
                 if use_pat {
                     flags = flags.pat_index(
@@ -167,7 +238,8 @@ impl PhysicalFramebuffer {
                     info!("Falling back to cache-disable mapping for real physical framebuffer memory");
                 }
             }
-            #[cfg(not(target_arch = "x86_64"))] {
+            #[cfg(not(target_arch = "x86_64"))]
+            {
                 flags = flags.device_memory(true);
             }
 
@@ -185,7 +257,6 @@ impl PhysicalFramebuffer {
             height,
             stride,
             buffer: mapped_framebuffer
-                // Notes to @ouz: you incorrectly used `width` here instead of `stride`.
                 .into_borrowed_slice_mut(0, stride * height)
                 .map_err(|(_mp, s)| s)?,
         })
@@ -218,7 +289,7 @@ impl Framebuffer for PhysicalFramebuffer {
 ///
 /// Each iteration returns a subset of a single framebuffer row based on the
 /// rectangle passed into the constructor, up to the width of the whole framebuffer.
-pub struct FramebufferRowIter<'a,> {
+pub struct FramebufferRowIter<'a> {
     /// An iterator over the framebuffer's rows.
     /// Each chunk is a slice containing the entire row's pixels.
     rows: ChunksExactMut<'a, u32>,
@@ -236,26 +307,32 @@ impl<'a> FramebufferRowIter<'a> {
     /// If the `rectangle`'s dimensions exceed the framebuffer's bounds (width and height),
     /// the iteration will be capped at the bounds of the framebuffer.
     pub fn new<F: Framebuffer>(framebuffer: &'a mut F, rect: Rect) -> Self {
-        let fb_width  = framebuffer.width();
+        let fb_width = framebuffer.width();
         let fb_height = framebuffer.height();
         let fb_stride = framebuffer.stride();
 
-        let start_row: usize = rect.y.try_into().expect("Rectangle's y coord was negative. FIXME");
+        let start_row: usize = rect
+            .y
+            .try_into()
+            .expect("Rectangle's y coord was negative. FIXME");
         assert!(start_row < fb_height); // FIXME: return result
         let end_row = min(start_row + rect.height(), fb_height);
 
-        let start_column: usize = rect.x.try_into().expect("Rectangle's x coord was negative. FIXME");
+        let start_column: usize = rect
+            .x
+            .try_into()
+            .expect("Rectangle's x coord was negative. FIXME");
         assert!(start_column < fb_width); // FIXME: return result
         let end_column = min(start_column + rect.width(), fb_width);
 
         let idx_of_start_row = start_row * fb_stride;
         let idx_of_end_row = end_row * fb_stride;
-        let rows = framebuffer.buffer_mut()[idx_of_start_row .. idx_of_end_row]
-            .chunks_exact_mut(fb_stride);
+        let rows =
+            framebuffer.buffer_mut()[idx_of_start_row..idx_of_end_row].chunks_exact_mut(fb_width);
 
         Self {
             rows,
-            column_range: start_column .. end_column,
+            column_range: start_column..end_column,
         }
     }
 }
@@ -282,7 +359,6 @@ impl<'a> Iterator for FramebufferRowIter<'a> {
     }
 }
 
-
 /// Notes to @ouz: old code of mine showing a simple index-based version of the iterator.
 mod index_based_framebuffer_row_iter {
     use super::{min, Framebuffer, Rect};
@@ -291,7 +367,7 @@ mod index_based_framebuffer_row_iter {
     ///
     /// Each iteration returns a subset of a single framebuffer row based on the
     /// rectangle passed into the constructor, up to the width of the whole framebuffer.
-    pub struct FramebufferRowIter<'a,> {
+    pub struct FramebufferRowIter<'a> {
         /// The underlying memory of the framebuffer whose rows we're iterating over.
         framebuffer: &'a mut [u32],
         /// The stride in pixels of the framebuffer.
@@ -335,21 +411,27 @@ mod index_based_framebuffer_row_iter {
         /// the iteration will be capped at the bounds of the framebuffer.
         #[allow(dead_code)]
         pub fn new<F: Framebuffer>(framebuffer: &'a mut F, rect: Rect) -> Self {
-            let fb_width  = framebuffer.width();
+            let fb_width = framebuffer.width();
             let fb_height = framebuffer.height();
             let fb_stride = framebuffer.stride();
 
-            let start_row: usize = rect.y.try_into().expect("Rectangle's y coord was negative. FIXME");
+            let start_row: usize = rect
+                .y
+                .try_into()
+                .expect("Rectangle's y coord was negative. FIXME");
             assert!(start_row < fb_height); // FIXME: return result
             let end_row = min(start_row + rect.height(), fb_height);
 
-            let start_column: usize = rect.x.try_into().expect("Rectangle's x coord was negative. FIXME");
+            let start_column: usize = rect
+                .x
+                .try_into()
+                .expect("Rectangle's x coord was negative. FIXME");
             assert!(start_column < fb_width); // FIXME: return result
             let end_column = min(start_column + rect.width(), fb_width);
 
             let idx_of_start_row = start_row * fb_stride;
             let idx_of_end_row = end_row * fb_stride;
-            let rows_subset = &mut framebuffer.buffer_mut()[idx_of_start_row .. idx_of_end_row];
+            let rows_subset = &mut framebuffer.buffer_mut()[idx_of_start_row..idx_of_end_row];
 
             Self {
                 framebuffer: rows_subset,
@@ -373,7 +455,7 @@ mod index_based_framebuffer_row_iter {
             self.current_column += self.stride;
 
             self.framebuffer
-                .get_mut(start_idx .. start_idx + self.subslice_width)
+                .get_mut(start_idx..start_idx + self.subslice_width)
                 // Notes to @ouz: hack to get around lifetime issues. Obviously we cannot do this in production.
                 .map(|sl| unsafe { core::mem::transmute(sl) })
         }

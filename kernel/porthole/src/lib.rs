@@ -46,85 +46,32 @@ pub static DEFAULT_BORDER_COLOR: Color = 0x141414;
 pub static DEFAULT_TEXT_COLOR: Color = 0xFBF1C7;
 pub static DEFAULT_WINDOW_COLOR: Color = 0x3C3836;
 
-static MOUSE_POINTER_IMAGE: [[u32; 18]; 11] = {
+static MOUSE_POINTER_IMAGE: [[u32; 11]; 18] = {
     const T: u32 = 0xFF0000;
     const C: u32 = 0x000000; // Cursor
     const B: u32 = 0xFFFFFF; // Border
     [
-        [B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, T, T],
-        [T, B, C, C, C, C, C, C, C, C, C, C, C, C, B, T, T, T],
-        [T, T, B, C, C, C, C, C, C, C, C, C, C, B, T, T, T, T],
-        [T, T, T, B, C, C, C, C, C, C, C, C, B, T, T, T, T, T],
-        [T, T, T, T, B, C, C, C, C, C, C, C, C, B, B, T, T, T],
-        [T, T, T, T, T, B, C, C, C, C, C, C, C, C, C, B, B, T],
-        [T, T, T, T, T, T, B, C, C, C, C, B, B, C, C, C, C, B],
-        [T, T, T, T, T, T, T, B, C, C, B, T, T, B, B, C, B, T],
-        [T, T, T, T, T, T, T, T, B, C, B, T, T, T, T, B, B, T],
-        [T, T, T, T, T, T, T, T, T, B, B, T, T, T, T, T, T, T],
-        [T, T, T, T, T, T, T, T, T, T, B, T, T, T, T, T, T, T],
+        [B, T, T, T, T, T, T, T, T, T, T],
+        [B, B, T, T, T, T, T, T, T, T, T],
+        [B, C, B, T, T, T, T, T, T, T, T],
+        [B, C, C, B, T, T, T, T, T, T, T],
+        [B, C, C, C, B, T, T, T, T, T, T],
+        [B, C, C, C, C, B, T, T, T, T, T],
+        [B, C, C, C, C, C, B, T, T, T, T],
+        [B, C, C, C, C, C, C, B, T, T, T],
+        [B, C, C, C, C, C, C, C, B, T, T],
+        [B, C, C, C, C, C, C, C, C, B, T],
+        [B, C, C, C, C, C, C, B, B, B, B],
+        [B, C, C, C, C, C, B, T, T, T, T],
+        [B, C, C, B, C, C, B, T, T, T, T],
+        [B, C, B, T, B, C, C, B, T, T, T],
+        [B, B, T, T, B, C, C, B, T, T, T],
+        [B, T, T, T, T, B, C, C, B, T, T],
+        [T, T, T, T, T, B, C, B, B, T, T],
+        [T, T, T, T, T, T, B, T, T, T, T],
     ]
 };
 
-// Notes to @ouz:
-// * Why does this exist? Can't we re-use `FramebufferRowIter`?
-// * Hint: think about why I created a `Framebuffer` trait and where it's used...
-//
-//
-/// Our mouse image is [`MOUSE_POINTER_IMAGE`] column major 2D array
-/// This type returns us row major, 1D vec of that image
-struct MouseImageRowIterator<'a> {
-    /// Mouse image [`MOUSE_POINTER_IMAGE`]
-    mouse_image: &'a [[u32; 18]; 11],
-    /// Rect of our mouse
-    visible_mouse_rect: Rect,
-    /// Since image we will iterate is column major we are going to use
-    /// individual columns to create a row, think of it as y axis
-    current_column: usize,
-    /// Used to traverse image in x axis
-    current_row: usize,
-}
-
-impl<'a> MouseImageRowIterator<'a> {
-    fn new(mouse_image: &'a [[u32; 18]; 11], visible_mouse_rect: Rect) -> Self {
-        Self {
-            mouse_image,
-            visible_mouse_rect,
-            current_column: 0,
-            current_row: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for MouseImageRowIterator<'a> {
-    type Item = Vec<u32>;
-
-    fn next(&mut self) -> Option<Vec<u32>> {
-        // We start from MOUSE_POINTER_IMAGE[0][0], get the color on that index push it to our `row`
-        // then move to MOUSE_POINTER_IMAGE[1][0] do the same thing
-        // until we hit `bounding_box.width` then we reset our `current_column` to `0` and increase
-        // our `current_row` by `1`
-        if self.current_row < self.visible_mouse_rect.height {
-            let mut row = Vec::new();
-            while self.current_column < self.visible_mouse_rect.width {
-                let color = self
-                    .mouse_image
-                    .get(self.current_column)?
-                    .get(self.current_row)?;
-
-                row.push(*color);
-                self.current_column += 1;
-                if self.current_column == self.visible_mouse_rect.width {
-                    self.current_column = 0;
-                    break;
-                }
-            }
-            self.current_row += 1;
-            Some(row)
-        } else {
-            None
-        }
-    }
-}
 #[derive(PartialEq, Eq)]
 pub enum Holding {
     Background,
@@ -151,12 +98,12 @@ pub struct WindowManager {
     windows: Vec<Arc<Mutex<Window>>>,
     /// Rendering order for the windows
     window_rendering_order: Vec<usize>,
-    /// Backbuffer
-    v_framebuffer: VirtualFramebuffer,
+    /// Staging framebuffer
+    staging_framebuffer: StagingFramenbuffer,
     /// Frontbuffer
     p_framebuffer: PhysicalFramebuffer,
     /// Width, height and position of the mouse
-    pub mouse: Rect,
+    mouse: Rect,
     /// Previous position of the mouse
     prev_mouse_pos: ScreenPos,
     /// What's currently held by the mouse
@@ -169,14 +116,14 @@ impl WindowManager {
     /// Initializes the window manager, returns keyboard and mouse producer for the I/O devices
     pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
         let p_framebuffer = PhysicalFramebuffer::init_front_buffer()?;
-        let v_framebuffer = VirtualFramebuffer::new(p_framebuffer.width(), p_framebuffer.height())?;
+        let staging_framebuffer = StagingFramenbuffer::new(p_framebuffer.width(), p_framebuffer.height(),p_framebuffer.stride())?;
         // FIXME: Don't use magic numbers,
         let mouse = Rect::new(11, 18, 200, 200);
 
         let window_manager = WindowManager {
             windows: Vec::new(),
             window_rendering_order: Vec::new(),
-            v_framebuffer,
+            staging_framebuffer,
             p_framebuffer,
             mouse,
             prev_mouse_pos: mouse.to_screen_pos(),
@@ -199,7 +146,7 @@ impl WindowManager {
     
     /// Iterates through the `window_rendering_order`, gets the particular `Window` from `self.windows`
     /// and then locks it to hold the lock until we are done rendering that particular window into
-    /// backbuffer/`v_framebuffer`.
+    /// backbuffer
     fn draw_windows(&mut self) -> Result<(),&'static str> {
         for order in self.window_rendering_order.iter() {
             if let Some(mut window) = self
@@ -220,7 +167,7 @@ impl WindowManager {
                 let visible_window = window.rect().visible_rect();
                 let relative_visible_window = window.relative_visible_rect();
                 let screen_rows = FramebufferRowIter::new(
-                    &mut self.v_framebuffer,
+                    &mut self.staging_framebuffer,
                     visible_window,
                 );
                 // To handle rendering when the window is partially outside the screen we use relative version of visible rect
@@ -243,12 +190,11 @@ impl WindowManager {
         let visible_mouse = self.mouse.visible_rect();
 
         let screen_rows = FramebufferRowIter::new(
-            &mut self.v_framebuffer,
+            &mut self.staging_framebuffer,
             visible_mouse,
         );
 
-        let mouse_image = MouseImageRowIterator::new(&MOUSE_POINTER_IMAGE, visible_mouse);
-        for (screen_row, mouse_image_row) in screen_rows.zip(mouse_image) {
+        for (screen_row, mouse_image_row) in screen_rows.zip(MOUSE_POINTER_IMAGE.iter()){
             for (screen_pixel, mouse_pixel) in screen_row.iter_mut().zip(mouse_image_row.iter()) {
                 if mouse_pixel != &0xFF0000 {
                     *screen_pixel = *mouse_pixel;
@@ -275,11 +221,11 @@ impl WindowManager {
         }
     }
 
-    /// Updates `v_framebuffer` before the final render.
-    /// Clears the whole buffer by calling `blank`
-    /// Draws each window and then the mouse. 
+    /// Updates backbuffer.
+    /// Clears the whole screen by calling `blank` then
+    /// draws each window and then the mouse. 
     fn update(&mut self) -> Result<(),&'static str> {
-        self.v_framebuffer.blank();
+        self.staging_framebuffer.blank();
         self.draw_windows()?;
         self.draw_mouse();
         Ok(())
@@ -297,7 +243,7 @@ impl WindowManager {
         // handle right
         new_pos.x = core::cmp::min(
             new_pos.x,
-            self.v_framebuffer.width() as i32 - MOUSE_VISIBLE_GAP,
+            self.staging_framebuffer.width() as i32 - MOUSE_VISIBLE_GAP,
         );
 
         // handle top
@@ -305,7 +251,7 @@ impl WindowManager {
         // handle bottom
         new_pos.y = core::cmp::min(
             new_pos.y,
-            self.v_framebuffer.height() as i32 - MOUSE_VISIBLE_GAP,
+            self.staging_framebuffer.height() as i32 - MOUSE_VISIBLE_GAP,
         );
 
         new_pos
@@ -402,7 +348,7 @@ impl WindowManager {
                     }
 
                     //handle right
-                    if (new_pos.x + WINDOW_VISIBLE_GAP) > self.v_framebuffer.width() as i32 {
+                    if (new_pos.x + WINDOW_VISIBLE_GAP) > self.staging_framebuffer.width() as i32 {
                         new_pos.x = SCREEN_WIDTH as i32 - WINDOW_VISIBLE_GAP
                     }
 
@@ -410,7 +356,7 @@ impl WindowManager {
                     new_pos.y = core::cmp::max(new_pos.y, 0);
 
                     // handle bottom
-                    if new_pos.y + WINDOW_VISIBLE_GAP > self.v_framebuffer.height() as i32 {
+                    if new_pos.y + WINDOW_VISIBLE_GAP > self.staging_framebuffer.height() as i32 {
                         new_pos.y = (SCREEN_HEIGHT as i32 - WINDOW_VISIBLE_GAP) as i32;
                     }
 
@@ -437,24 +383,14 @@ impl WindowManager {
         }
     }
 
-    // Notes to @ouz: bad comment, nobody knows what `v_framebuffer` is. See my change.
-    //
-    //
-    /// Performs the final blit of the intermediary virtual framebuffer to the physical framebuffer,
+    /// Performs the final blit of the staging framebuffer to the physical framebuffer,
     /// making its changes visible on screen.
     ///
     /// If and when we support double-buffering, this is where the buffers will be flipped/swapped.
     fn render(&mut self) {
-        // Notes to @ouz:
-        // * This violates the idea that the `stride` of a `VirtualFramebuffer` is the same as its width (no padding bytes).
-        //   If we're copying the entire slice directly, we must ensure that `v_framebuffer` has the exact same pixel layout
-        //   (stride and width) as the physical framebuffer.
-        // * We need to either change this method's logic or the definition of `VirtualFramebuffer` to ensure that
-        //   our assumptions match up. IMO, it's easier to change `VirtualFramebuffer` to support a specific stride value, i.e.,
-        //   that a `VirtualFramebuffer` may include padding bytes.
         self.p_framebuffer
             .buffer_mut()
-            .copy_from_slice(&self.v_framebuffer.buffer());
+            .copy_from_slice(&self.staging_framebuffer.buffer());
     }
 }
 
@@ -462,7 +398,6 @@ fn port_loop(
     (key_consumer, mouse_consumer): (Queue<Event>, Queue<Event>),
 ) -> Result<(), &'static str> {
     let window_manager = WINDOW_MANAGER.get().ok_or("Unable to get WindowManager")?;
-    let window = Window::new_window(&Rect::new(400,400,0,0),None, false)?;
 
     loop {
         let event_opt = key_consumer
@@ -518,8 +453,7 @@ fn port_loop(
                 _ => (),
             }
         }
-        window.lock().fill(DEFAULT_WINDOW_COLOR)?;
-        window.lock().fill_rectangle(Rect::new(20, 20, 0, 0), 0x123999);
+
         window_manager.lock().update()?;
         window_manager.lock().render();
     }

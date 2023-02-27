@@ -62,14 +62,12 @@ impl Cursor {
         self.enabled && self.show
     }
 
-    /// Display a cursor in a framebuffer
+    /// Display a cursor in a window
     /// # Arguments
-    /// * `coordinate`: the start point of a textarea in the framebuffer.
+    /// * `relative_pos`: the start point of a textarea in the framebuffer.
     /// * `column`: the column of the cursor in the textarea.
     /// * `line`: the line of the cursor in the textarea.
-    /// * `framebuffer`: the framebuffer to display the cursor in.
-    ///
-    /// Returns a bounding box which wraps the cursor.
+    /// * `window`: the window to display the cursor in.
     pub fn display(
         &mut self,
         relative_pos: RelativePos,

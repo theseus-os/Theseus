@@ -29,7 +29,7 @@ use cursor::*;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use spin::Mutex;
-use porthole::units::*; 
+use porthole::{units::*, DEFAULT_BORDER_COLOR}; 
 use porthole::window::*;
 
 use tsc::{tsc_ticks, TscTicks};
@@ -415,9 +415,9 @@ impl Terminal {
 
     /// Display the text displayable in the window and render it to the screen
     fn display_text(&mut self) -> Result<(), &'static str> {
-        let mut drawable_area = self.window.lock().drawable_area().to_relative_pos();
+        let drawable_area = self.window.lock().drawable_area().to_relative_pos();
         self.window.lock().print_string(
-            &mut drawable_area,
+            drawable_area,
             &mut self.text_display.text,
             self.text_display.fg_color,
             self.text_display.bg_color,
@@ -448,7 +448,7 @@ impl Terminal {
     /// Creates a new terminal and adds it to the window manager `wm_mutex`
     pub fn new() -> Result<Terminal, &'static str> {
 
-        let rect = Rect::new(460, 501, 0, 0);
+        let rect = Rect::new(550, 601, 0, 0);
 
         let window = Window::new_window(&rect, Some(format!("Terminal")),true)?;
 
@@ -501,9 +501,7 @@ impl Terminal {
 
         self.window
             .lock()
-            .display_window_title(self.text_display.fg_color, self.text_display.bg_color)?;
-        //self.display_text()?;
-        //self.display_cursor()?;
+            .display_window_title(self.text_display.fg_color, DEFAULT_BORDER_COLOR)?;
 
         Ok(())
     }
