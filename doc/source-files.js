@@ -57,13 +57,14 @@ var sourcesIndex = JSON.parse('{\
 "framebuffer_printer":["",[],["lib.rs"]],\
 "fs_node":["",[],["lib.rs"]],\
 "gdt":["",[],["lib.rs"]],\
+"gic":["",[["gic",[],["cpu_interface_gicv2.rs","cpu_interface_gicv3.rs","dist_interface.rs","mod.rs","redist_interface.rs"]]],["lib.rs"]],\
 "heap":["",[],["lib.rs"]],\
 "heapfile":["",[],["lib.rs"]],\
 "hpet":["",[],["lib.rs"]],\
 "http_client":["",[],["lib.rs"]],\
 "idle":["",[["arch",[["x86_64",[],["intel.rs","mod.rs"]]],["mod.rs"]]],["lib.rs"]],\
 "intel_ethernet":["",[],["descriptors.rs","lib.rs"]],\
-"interrupts":["",[],["mod.rs"]],\
+"interrupts":["",[["x86_64",[],["mod.rs"]]],["lib.rs"]],\
 "io":["",[],["lib.rs"]],\
 "ioapic":["",[],["lib.rs"]],\
 "iommu":["",[],["lib.rs","regs.rs"]],\
