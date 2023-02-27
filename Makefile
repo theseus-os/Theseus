@@ -622,6 +622,7 @@ doc:
 		--package debugit \
 		--package dereffer \
 		--package dfqueue \
+		--package irq_safety \
 		--package keycodes_ascii \
 		--package lockable \
 		--package locked_idt \
@@ -896,7 +897,7 @@ ifeq ($(host),yes)
 	## KVM acceleration is required when using the host cpu model
 	QEMU_FLAGS += -cpu host -accel kvm
 else ifeq ($(ARCH),aarch64)
-	QEMU_FLAGS += -machine virt
+	QEMU_FLAGS += -machine virt,gic-version=3
 	QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
 else
