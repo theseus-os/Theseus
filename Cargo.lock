@@ -1312,6 +1312,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "gic"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "log",
+ "memory",
+ "static_assertions",
+ "zerocopy",
+]
+
+[[package]]
 name = "gimli"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1495,8 +1506,11 @@ name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cortex-a",
  "exceptions_early",
  "gdt",
+ "gic",
+ "irq_safety",
  "locked_idt",
  "log",
  "memory",
@@ -1504,6 +1518,7 @@ dependencies = [
  "scheduler",
  "sleep",
  "spin 0.9.4",
+ "tock-registers",
  "tss",
  "vga_buffer",
  "x86_64",
