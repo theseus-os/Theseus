@@ -1,6 +1,8 @@
 use cortex_a::registers::MPIDR_EL1;
 use tock_registers::interfaces::Readable;
 
+use core::fmt;
+
 /// A unique identifier for a CPU core.
 #[derive(Copy, Clone, Debug)]
 #[repr(transparent)]
@@ -12,6 +14,7 @@ pub struct CpuId(u32);
 /// lock-free native atomic instructions when using it inside of an atomic
 /// type like [`AtomicCell`], as u32 is atomic when running on ARMv8.
 #[derive(Clone, Copy)]
+#[repr(transparent)]
 pub struct OptionalCpuId(u32);
 
 /// A unique identifier for a CPU core.
@@ -67,18 +70,18 @@ impl MpidrValue {
 impl From<CpuId> for MpidrValue {
     fn from(cpu_id: CpuId) -> Self {
         // move aff3 from bits [24:31] to [32:39]
-        let aff_3     = (self.0 & 0xff000000) as u64 << 8;
-        let aff_0_1_2 = (self.0 & 0x00ffffff) as u64;
+        let aff_3     = ((cpu_id.0 & 0xff000000) as u64) << 8;
+        let aff_0_1_2 =  (cpu_id.0 & 0x00ffffff) as u64;
 
         Self(aff_3 | aff_0_1_2)
     }
 }
 
 impl From<MpidrValue> for CpuId {
-    fn from(cpu_id: MpidrValue) -> Self {
+    fn from(mpidr: MpidrValue) -> Self {
         // move aff3 from bits [32:39] to [24:31]
-        let aff_3     = ((self.0 & 0xff00000000) >> 8) as u64;
-        let aff_0_1_2 =  (self.0 & 0x0000ffffff) as u64;
+        let aff_3     = ((mpidr.0 & 0xff00000000) >> 8) as u32;
+        let aff_0_1_2 =  (mpidr.0 & 0x0000ffffff) as u32;
 
         Self(aff_3 | aff_0_1_2)
     }
@@ -86,7 +89,7 @@ impl From<MpidrValue> for CpuId {
 
 impl From<Option<CpuId>> for OptionalCpuId {
     fn from(opt: Option<CpuId>) -> Self {
-        match opt.map(|v| v.into()) {
+        match opt.map(|v| v.0) {
             Some(u32::MAX) => panic!("CpuId is too big!"),
             Some(cpu_id) => OptionalCpuId(cpu_id),
             None => OptionalCpuId(u32::MAX),
@@ -98,7 +101,7 @@ impl From<OptionalCpuId> for Option<CpuId> {
     fn from(val: OptionalCpuId) -> Self {
         match val.0 {
             u32::MAX => None,
-            v => Some(v as CpuId),
+            v => Some(CpuId(v)),
         }
     }
 }

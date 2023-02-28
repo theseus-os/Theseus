@@ -1,3 +1,5 @@
+use core::fmt;
+
 pub use apic::{
     CpuId,
     cpu_count,
@@ -14,7 +16,7 @@ pub use apic::{
 pub struct OptionalCpuId(Option<CpuId>);
 impl From<Option<CpuId>> for OptionalCpuId {
     fn from(opt: Option<CpuId>) -> Self {
-        OptionU8(opt)
+        Self(opt)
     }
 }
 

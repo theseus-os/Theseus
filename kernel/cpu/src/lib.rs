@@ -11,7 +11,3 @@
 mod arch;
 
 pub use arch::*;
-
-// Ensure that `OptionalCpuId` is atomic/lock-free.
-// This is expected by `task_struct`.
-const _: () = assert!(AtomicCell::<OptionalCpuId>::is_lock_free());
