@@ -6,11 +6,12 @@
 
 #![no_std]
 
-#[cfg(target_arch = "x86_64")]
-pub use apic::{
-    CpuId,
-    cpu_count,
-    bootstrap_cpu,
-    is_bootstrap_cpu,
-    current_cpu,
-};
+#[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
+#[cfg_attr(target_arch = "aarch64", path = "aarch64.rs")]
+mod arch;
+
+pub use arch::*;
+
+// Ensure that `OptionalCpuId` is atomic/lock-free.
+// This is expected by `task_struct`.
+const _: () = assert!(AtomicCell::<OptionalCpuId>::is_lock_free());
