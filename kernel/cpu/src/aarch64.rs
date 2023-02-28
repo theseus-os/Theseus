@@ -8,7 +8,7 @@ use core::fmt;
 #[repr(transparent)]
 pub struct CpuId(u32);
 
-/// An equivalent top Option<CpuId>, which internally encodes None as
+/// An equivalent to Option<CpuId>, which internally encodes None as
 /// `u32::MAX`, which is an invalid CpuId (bits [4:7] of affinity level
 /// 0 must always be cleared). This guarantees that it compiles down to
 /// lock-free native atomic instructions when using it inside of an atomic
