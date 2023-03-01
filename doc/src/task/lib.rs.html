@@ -1079,6 +1079,78 @@
 <a href="#1079" id="1079">1079</a>
 <a href="#1080" id="1080">1080</a>
 <a href="#1081" id="1081">1081</a>
+<a href="#1082" id="1082">1082</a>
+<a href="#1083" id="1083">1083</a>
+<a href="#1084" id="1084">1084</a>
+<a href="#1085" id="1085">1085</a>
+<a href="#1086" id="1086">1086</a>
+<a href="#1087" id="1087">1087</a>
+<a href="#1088" id="1088">1088</a>
+<a href="#1089" id="1089">1089</a>
+<a href="#1090" id="1090">1090</a>
+<a href="#1091" id="1091">1091</a>
+<a href="#1092" id="1092">1092</a>
+<a href="#1093" id="1093">1093</a>
+<a href="#1094" id="1094">1094</a>
+<a href="#1095" id="1095">1095</a>
+<a href="#1096" id="1096">1096</a>
+<a href="#1097" id="1097">1097</a>
+<a href="#1098" id="1098">1098</a>
+<a href="#1099" id="1099">1099</a>
+<a href="#1100" id="1100">1100</a>
+<a href="#1101" id="1101">1101</a>
+<a href="#1102" id="1102">1102</a>
+<a href="#1103" id="1103">1103</a>
+<a href="#1104" id="1104">1104</a>
+<a href="#1105" id="1105">1105</a>
+<a href="#1106" id="1106">1106</a>
+<a href="#1107" id="1107">1107</a>
+<a href="#1108" id="1108">1108</a>
+<a href="#1109" id="1109">1109</a>
+<a href="#1110" id="1110">1110</a>
+<a href="#1111" id="1111">1111</a>
+<a href="#1112" id="1112">1112</a>
+<a href="#1113" id="1113">1113</a>
+<a href="#1114" id="1114">1114</a>
+<a href="#1115" id="1115">1115</a>
+<a href="#1116" id="1116">1116</a>
+<a href="#1117" id="1117">1117</a>
+<a href="#1118" id="1118">1118</a>
+<a href="#1119" id="1119">1119</a>
+<a href="#1120" id="1120">1120</a>
+<a href="#1121" id="1121">1121</a>
+<a href="#1122" id="1122">1122</a>
+<a href="#1123" id="1123">1123</a>
+<a href="#1124" id="1124">1124</a>
+<a href="#1125" id="1125">1125</a>
+<a href="#1126" id="1126">1126</a>
+<a href="#1127" id="1127">1127</a>
+<a href="#1128" id="1128">1128</a>
+<a href="#1129" id="1129">1129</a>
+<a href="#1130" id="1130">1130</a>
+<a href="#1131" id="1131">1131</a>
+<a href="#1132" id="1132">1132</a>
+<a href="#1133" id="1133">1133</a>
+<a href="#1134" id="1134">1134</a>
+<a href="#1135" id="1135">1135</a>
+<a href="#1136" id="1136">1136</a>
+<a href="#1137" id="1137">1137</a>
+<a href="#1138" id="1138">1138</a>
+<a href="#1139" id="1139">1139</a>
+<a href="#1140" id="1140">1140</a>
+<a href="#1141" id="1141">1141</a>
+<a href="#1142" id="1142">1142</a>
+<a href="#1143" id="1143">1143</a>
+<a href="#1144" id="1144">1144</a>
+<a href="#1145" id="1145">1145</a>
+<a href="#1146" id="1146">1146</a>
+<a href="#1147" id="1147">1147</a>
+<a href="#1148" id="1148">1148</a>
+<a href="#1149" id="1149">1149</a>
+<a href="#1150" id="1150">1150</a>
+<a href="#1151" id="1151">1151</a>
+<a href="#1152" id="1152">1152</a>
+<a href="#1153" id="1153">1153</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1092,15 +1164,17 @@
 //! 1. Obtain the current task:
 //!    * [`with_current_task()`] is the preferred way, which accepts a closure
 //!      that is invoked with access to the current task. This is preferred because
-//!      it doesn&#39;t need to clone the current task reference.
+//!      it doesn&#39;t need to clone the current task reference and is thus most efficient.
 //!    * [`get_my_current_task()`] returns a cloned reference to the current task
 //!      and is thus slightly more expensive [`with_current_task()`].
 //!    * [`get_my_current_task_id()`] is fastest if you just want the ID of the current task.
+//!      Note that it is fairly expensive to obtain a task reference from a task ID.
 //! 2. Register a kill handler for the current task -- [`set_kill_handler()`].
-//! 3. Switch from the current task to another &quot;next&quot; task -- [`task_switch()`].
+//! 3. Yield the current CPU and schedule in another task -- [`schedule()`].
+//! 4. Switch from the current task to another specific &quot;next&quot; task -- [`task_switch()`].
 //!
-//! To create new task, use the [`spawn`](../spawn/index.html) crate rather than
-//! attempting to manually instantiate a `TaskRef`.
+//! To create new task, use the task builder functions in [`spawn`](../spawn/index.html)
+//! rather than attempting to manually instantiate a `TaskRef`.
 
 </span><span class="attr">#![no_std]
 #![feature(negative_impls)]
@@ -1122,6 +1196,7 @@
     sync::atomic::{AtomicBool, fence, Ordering},
     task::Waker,
 };
+<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>irq_safety::{hold_interrupts, MutexIrqSafe};
 <span class="kw">use </span>log::error;
 <span class="kw">use </span>environment::Environment;
@@ -1654,6 +1729,74 @@
 }
 
 
+<span class="kw">pub use </span>scheduler::<span class="kw-2">*</span>;
+<span class="kw">mod </span>scheduler {
+    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+    <span class="doccomment">/// Yields the current CPU by selecting a new `Task` to run next,
+    /// and then switches to that new `Task`.
+    ///
+    /// The new &quot;next&quot; `Task` to run will be selected by the currently-active
+    /// scheduler policy.
+    ///
+    /// Preemption will be disabled while this function runs,
+    /// but interrupts are not disabled because it is not necessary.
+    ///
+    /// ## Return
+    /// * `true` if a new task was selected and switched to.
+    /// * `false` if no new task was selected,
+    ///    meaning the current task will continue running.
+    </span><span class="attr">#[doc(alias(<span class="string">&quot;yield&quot;</span>))]
+    </span><span class="kw">pub fn </span>schedule() -&gt; bool {
+        <span class="kw">let </span>preemption_guard = preemption::hold_preemption();
+        <span class="comment">// If preemption was not previously enabled (before we disabled it above),
+        // then we shouldn&#39;t perform a task switch here.
+        </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {
+            <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, current_cpu());
+            </span><span class="kw">return </span><span class="bool-val">false</span>;
+        }
+
+        <span class="kw">let </span>cpu_id = preemption_guard.cpu_id();
+
+        <span class="kw">let </span><span class="prelude-val">Some</span>(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) <span class="kw">else </span>{
+            <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// keep running the same current task
+        </span>};
+
+        <span class="kw">let </span>(did_switch, recovered_preemption_guard) = task_switch(
+            next_task,
+            cpu_id,
+            preemption_guard,
+        ); 
+
+        <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}&quot;, cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
+
+        </span>drop(recovered_preemption_guard);
+        did_switch
+    }
+
+    <span class="doccomment">/// The signature for the function that selects the next task for the given CPU.
+    ///
+    /// This is used when the [`schedule()`] function is invoked.
+    </span><span class="kw">pub type </span>SchedulerFunc = <span class="kw">fn</span>(u8) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt;;
+
+    <span class="doccomment">/// The function currently registered as the system-wide scheduler policy.
+    ///
+    /// This is initialized to a dummy function that returns no &quot;next&quot; task,
+    /// meaning that no scheduling will occur until it is initialized.
+    /// Currently, this is initialized from within `scheduler::init()`.
+    </span><span class="kw">static </span>SELECT_NEXT_TASK_FUNC: AtomicCell&lt;SchedulerFunc&gt; = AtomicCell::new(|<span class="kw">_</span>| <span class="prelude-val">None</span>);
+
+    <span class="doccomment">/// Sets the active scheduler policy used by [`schedule()`] to select the next task.
+    ///
+    /// Currently, we only support one scheduler policy for the whole system,
+    /// but supporting different policies on a per-CPU, per-namespace, or per-arbitrary domain basis
+    /// would be a relatively simple immprovement.
+    </span><span class="kw">pub fn </span>set_scheduler_policy(select_next_task_func: SchedulerFunc) {
+        SELECT_NEXT_TASK_FUNC.store(select_next_task_func);
+    }
+}
+
+
 <span class="doccomment">/// Switches from the current task to the given `next` task.
 ///
 /// ## Arguments
@@ -2089,7 +2232,7 @@
 }
 
 
-<span class="doccomment">/// Bootstrap a new task from the current thread of execution.
+<span class="doccomment">/// Bootstraps a new task from the current thread of execution.
 ///
 /// Returns a tuple of:
 /// 1. a [`JoinableTaskRef`], which allows another task to join this bootstrapped task,
@@ -2157,8 +2300,9 @@
         kill_reason,
     );
     <span class="comment">// If an initial bootstrap task fails, there&#39;s nothing else we can do.
-    </span><span class="attr">#[allow(clippy::empty_loop)]
-    </span><span class="kw">loop </span>{ }
+    </span><span class="kw">loop </span>{ 
+        core::hint::spin_loop();
+    }
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="task" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

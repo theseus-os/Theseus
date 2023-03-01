@@ -198,6 +198,8 @@
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -306,8 +308,10 @@
     <span class="comment">// get BSP&#39;s apic id
     </span><span class="kw">let </span>bsp_apic_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="comment">// create the initial `Task`, which is bootstrapped from this execution context.
-    </span><span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)<span class="question-mark">?</span>;
+    <span class="comment">// Initialize the scheduler and create the initial `Task`,
+    // which is bootstrapped from this current execution context.
+    </span>scheduler::init();
+    <span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Created initial bootstrap task: {:?}&quot;</span>, bootstrap_task);
 
     <span class="comment">// after we&#39;ve initialized the task subsystem, we can use better exception handlers

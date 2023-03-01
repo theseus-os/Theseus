@@ -66,21 +66,16 @@
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
-<a href="#69" id="69">69</a>
-<a href="#70" id="70">70</a>
-<a href="#71" id="71">71</a>
-<a href="#72" id="72">72</a>
-<a href="#73" id="73">73</a>
-<a href="#74" id="74">74</a>
-<a href="#75" id="75">75</a>
-<a href="#76" id="76">76</a>
-<a href="#77" id="77">77</a>
-<a href="#78" id="78">78</a>
-<a href="#79" id="79">79</a>
-<a href="#80" id="80">80</a>
-<a href="#81" id="81">81</a>
-<a href="#82" id="82">82</a>
-</pre><pre class="rust"><code><span class="attr">#![no_std]
+</pre><pre class="rust"><code><span class="doccomment">//! Offers the ability to control or configure the active task scheduling policy.
+//!
+//! Note that actual task switching and preemptive scheduling are implemented
+//! in the [`task`] crate.
+//! This crate re-exports that main [`schedule()`] function for convenience,
+//! legacy compatbility, and to act as an easy landing page for code search.
+//! That means that a caller need only depend on [`task`], not this crate,
+//! to invoke the scheduler (yield the CPU) to switch to another task.
+
+</span><span class="attr">#![no_std]
 
 </span><span class="macro">cfg_if::cfg_if! </span>{
     <span class="kw">if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
@@ -94,41 +89,18 @@
 
 <span class="kw">use </span>task::TaskRef;
 
-<span class="doccomment">/// Yields the current CPU by selecting a new `Task` to run 
-/// and then switching to that new `Task`.
+<span class="doccomment">/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
+</span><span class="kw">pub use </span>task::schedule;
+
+<span class="doccomment">/// Initializes the scheduler on this system using the policy set at compiler time.
 ///
-/// Preemption will be disabled while this function runs,
-/// but interrupts are not disabled because it is not necessary.
-///
-/// ## Return
-/// * `true` if a new task was selected and switched to.
-/// * `false` if no new task was selected,
-///    meaning the current task will continue running.
-</span><span class="kw">pub fn </span>schedule() -&gt; bool {
-    <span class="kw">let </span>preemption_guard = preemption::hold_preemption();
-    <span class="comment">// If preemption was not previously enabled (before we disabled it above),
-    // then we shouldn&#39;t perform a task switch here.
-    </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {
-        <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, current_cpu());
-        </span><span class="kw">return </span><span class="bool-val">false</span>;
-    }
-
-    <span class="kw">let </span>cpu_id = preemption_guard.cpu_id();
-
-    <span class="kw">let </span><span class="prelude-val">Some</span>(next_task) = scheduler::select_next_task(cpu_id) <span class="kw">else </span>{
-        <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// keep running the same current task
-    </span>};
-
-    <span class="kw">let </span>(did_switch, recovered_preemption_guard) = task::task_switch(
-        next_task,
-        cpu_id,
-        preemption_guard,
-    ); 
-
-    <span class="comment">// trace!(&quot;AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}&quot;, cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
-
-    </span>drop(recovered_preemption_guard);
-    did_switch
+/// Currently, there is a single scheduler policy for the whole system.
+/// The policy is selected by specifying a Rust `cfg` value at build time, like so:
+/// * `make THESEUS_CONFIG=priority_scheduler` --&gt; priority scheduler.
+/// * `make THESEUS_CONFIG=realtime_scheduler` --&gt; &quot;realtime&quot; (rate monotonic) scheduler.
+/// * `make` --&gt; basic round-robin scheduler, the default.
+</span><span class="kw">pub fn </span>init() {
+    task::set_scheduler_policy(scheduler::select_next_task);
 }
 
 <span class="doccomment">/// Changes the priority of the given task with the given priority level.
