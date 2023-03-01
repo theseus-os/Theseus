@@ -63,12 +63,7 @@ impl CpuId {
 
 impl MpidrValue {
     /// Obtain the inner raw u64 that was read from the MPIDR_EL1 register
-    ///
-    /// This is not dangerous, the unsafe modifier is simply there to
-    /// indicate that this value should only be used when interacting with
-    /// hardware/peripherals, in driver code for instance; it should not be
-    /// used to identify/reference a CPU core.
-    pub unsafe fn get(self) -> u64 {
+    pub fn get(self) -> u64 {
         self.0
     }
 }
