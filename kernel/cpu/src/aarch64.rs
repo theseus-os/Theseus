@@ -4,7 +4,7 @@ use tock_registers::interfaces::Readable;
 use core::fmt;
 
 /// A unique identifier for a CPU core.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct CpuId(u32);
 
@@ -13,7 +13,7 @@ pub struct CpuId(u32);
 /// 0 must always be cleared). This guarantees that it compiles down to
 /// lock-free native atomic instructions when using it inside of an atomic
 /// type like [`AtomicCell`], as u32 is atomic when running on ARMv8.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct OptionalCpuId(u32);
 
