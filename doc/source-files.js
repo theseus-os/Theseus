@@ -23,7 +23,7 @@ var sourcesIndex = JSON.parse('{\
 "context_switch_regular":["",[],["lib.rs","x86_64.rs"]],\
 "context_switch_sse":["",[],["lib.rs"]],\
 "cow_arc":["",[],["lib.rs"]],\
-"cpu":["",[],["lib.rs"]],\
+"cpu":["",[],["lib.rs","x86_64.rs"]],\
 "crate_metadata":["",[],["lib.rs"]],\
 "crate_metadata_serde":["",[],["lib.rs"]],\
 "crate_name_utils":["",[],["lib.rs"]],\
