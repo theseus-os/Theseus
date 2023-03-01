@@ -1,3 +1,12 @@
+//! Offers the ability to control or configure the active task scheduling policy.
+//!
+//! Note that actual task switching and preemptive scheduling are implemented
+//! in the [`task`] crate.
+//! This crate re-exports that main [`schedule()`] function for convenience,
+//! legacy compatbility, and to act as an easy landing page for code search.
+//! That means that a caller need only depend on [`task`], not this crate,
+//! to invoke the scheduler (yield the CPU) to switch to another task.
+
 #![no_std]
 
 cfg_if::cfg_if! {
@@ -12,41 +21,18 @@ cfg_if::cfg_if! {
 
 use task::TaskRef;
 
-/// Yields the current CPU by selecting a new `Task` to run 
-/// and then switching to that new `Task`.
+/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
+pub use task::schedule;
+
+/// Initializes the scheduler on this system using the policy set at compiler time.
 ///
-/// Preemption will be disabled while this function runs,
-/// but interrupts are not disabled because it is not necessary.
-///
-/// ## Return
-/// * `true` if a new task was selected and switched to.
-/// * `false` if no new task was selected,
-///    meaning the current task will continue running.
-pub fn schedule() -> bool {
-    let preemption_guard = preemption::hold_preemption();
-    // If preemption was not previously enabled (before we disabled it above),
-    // then we shouldn't perform a task switch here.
-    if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", current_cpu());
-        return false;
-    }
-
-    let cpu_id = preemption_guard.cpu_id();
-
-    let Some(next_task) = scheduler::select_next_task(cpu_id) else {
-        return false; // keep running the same current task
-    };
-
-    let (did_switch, recovered_preemption_guard) = task::task_switch(
-        next_task,
-        cpu_id,
-        preemption_guard,
-    ); 
-
-    // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
-
-    drop(recovered_preemption_guard);
-    did_switch
+/// Currently, there is a single scheduler policy for the whole system.
+/// The policy is selected by specifying a Rust `cfg` value at build time, like so:
+/// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
+/// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
+/// * `make` --> basic round-robin scheduler, the default.
+pub fn init() {
+    task::set_scheduler_policy(scheduler::select_next_task);
 }
 
 /// Changes the priority of the given task with the given priority level.

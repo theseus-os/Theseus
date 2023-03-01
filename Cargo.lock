@@ -3643,6 +3643,7 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
+ "crossbeam-utils",
  "environment",
  "irq_safety",
  "log",
