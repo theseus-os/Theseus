@@ -108,7 +108,7 @@ pub fn init(
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.
-    scheduler::init();
+    scheduler::init()?;
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
