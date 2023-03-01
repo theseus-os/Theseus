@@ -20,7 +20,7 @@
 //! 3. Yield the current CPU and schedule in another task -- [`schedule()`].
 //! 4. Switch from the current task to another specific "next" task -- [`task_switch()`].
 //!
-//! To create new task, use the task builder functions in the [`spawn`](../spawn/index.html) crate
+//! To create new task, use the task builder functions in [`spawn`](../spawn/index.html)
 //! rather than attempting to manually instantiate a `TaskRef`.
 
 #![no_std]
@@ -580,8 +580,8 @@ pub use scheduler::*;
 mod scheduler {
     use super::*;
 
-    /// Yields the current CPU by selecting a new `Task` to run next
-    /// and then switching to that new `Task`.
+    /// Yields the current CPU by selecting a new `Task` to run next,
+    /// and then switches to that new `Task`.
     ///
     /// The new "next" `Task` to run will be selected by the currently-active
     /// scheduler policy.
@@ -626,11 +626,11 @@ mod scheduler {
     /// This is used when the [`schedule()`] function is invoked.
     pub type SchedulerFunc = fn(u8) -> Option<TaskRef>;
 
-    /// The function currently registered system-wide scheduler policy.
+    /// The function currently registered as the system-wide scheduler policy.
     ///
     /// This is initialized to a dummy function that returns no "next" task,
     /// meaning that no scheduling will occur until it is initialized.
-    /// Currently this occurs in `scheduler::init()`.
+    /// Currently, this is initialized from within `scheduler::init()`.
     static SELECT_NEXT_TASK_FUNC: AtomicCell<SchedulerFunc> = AtomicCell::new(|_| None);
 
     /// Sets the active scheduler policy used by [`schedule()`] to select the next task.

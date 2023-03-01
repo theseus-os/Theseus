@@ -1,7 +1,7 @@
 //! Offers the ability to control or configure the active task scheduling policy.
 //!
-//! Note that actual task switching and preemptive scheduling are actually
-//! implemented in the [`task`] crate.
+//! Note that actual task switching and preemptive scheduling are implemented
+//! in the [`task`] crate.
 //! This crate re-exports that main [`schedule()`] function for convenience,
 //! legacy compatbility, and to act as an easy landing page for code search.
 //! That means that a caller need only depend on [`task`], not this crate,
