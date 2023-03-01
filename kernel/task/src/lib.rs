@@ -11,15 +11,17 @@
 //! 1. Obtain the current task:
 //!    * [`with_current_task()`] is the preferred way, which accepts a closure
 //!      that is invoked with access to the current task. This is preferred because
-//!      it doesn't need to clone the current task reference.
+//!      it doesn't need to clone the current task reference and is thus most efficient.
 //!    * [`get_my_current_task()`] returns a cloned reference to the current task
 //!      and is thus slightly more expensive [`with_current_task()`].
 //!    * [`get_my_current_task_id()`] is fastest if you just want the ID of the current task.
+//!      Note that it is fairly expensive to obtain a task reference from a task ID.
 //! 2. Register a kill handler for the current task -- [`set_kill_handler()`].
-//! 3. Switch from the current task to another "next" task -- [`task_switch()`].
+//! 3. Yield the current CPU and schedule in another task -- [`schedule()`].
+//! 4. Switch from the current task to another specific "next" task -- [`task_switch()`].
 //!
-//! To create new task, use the [`spawn`](../spawn/index.html) crate rather than
-//! attempting to manually instantiate a `TaskRef`.
+//! To create new task, use the task builder functions in [`spawn`](../spawn/index.html)
+//! rather than attempting to manually instantiate a `TaskRef`.
 
 #![no_std]
 #![feature(negative_impls)]
@@ -41,6 +43,7 @@ use core::{
     sync::atomic::{AtomicBool, fence, Ordering},
     task::Waker,
 };
+use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
 use environment::Environment;
@@ -573,6 +576,74 @@ pub fn take_kill_handler() -> Option<KillHandler> {
 }
 
 
+pub use scheduler::*;
+mod scheduler {
+    use super::*;
+
+    /// Yields the current CPU by selecting a new `Task` to run next,
+    /// and then switches to that new `Task`.
+    ///
+    /// The new "next" `Task` to run will be selected by the currently-active
+    /// scheduler policy.
+    ///
+    /// Preemption will be disabled while this function runs,
+    /// but interrupts are not disabled because it is not necessary.
+    ///
+    /// ## Return
+    /// * `true` if a new task was selected and switched to.
+    /// * `false` if no new task was selected,
+    ///    meaning the current task will continue running.
+    #[doc(alias("yield"))]
+    pub fn schedule() -> bool {
+        let preemption_guard = preemption::hold_preemption();
+        // If preemption was not previously enabled (before we disabled it above),
+        // then we shouldn't perform a task switch here.
+        if !preemption_guard.preemption_was_enabled() {
+            // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", current_cpu());
+            return false;
+        }
+
+        let cpu_id = preemption_guard.cpu_id();
+
+        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) else {
+            return false; // keep running the same current task
+        };
+
+        let (did_switch, recovered_preemption_guard) = task_switch(
+            next_task,
+            cpu_id,
+            preemption_guard,
+        ); 
+
+        // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
+
+        drop(recovered_preemption_guard);
+        did_switch
+    }
+
+    /// The signature for the function that selects the next task for the given CPU.
+    ///
+    /// This is used when the [`schedule()`] function is invoked.
+    pub type SchedulerFunc = fn(u8) -> Option<TaskRef>;
+
+    /// The function currently registered as the system-wide scheduler policy.
+    ///
+    /// This is initialized to a dummy function that returns no "next" task,
+    /// meaning that no scheduling will occur until it is initialized.
+    /// Currently, this is initialized from within `scheduler::init()`.
+    static SELECT_NEXT_TASK_FUNC: AtomicCell<SchedulerFunc> = AtomicCell::new(|_| None);
+
+    /// Sets the active scheduler policy used by [`schedule()`] to select the next task.
+    ///
+    /// Currently, we only support one scheduler policy for the whole system,
+    /// but supporting different policies on a per-CPU, per-namespace, or per-arbitrary domain basis
+    /// would be a relatively simple immprovement.
+    pub fn set_scheduler_policy(select_next_task_func: SchedulerFunc) {
+        SELECT_NEXT_TASK_FUNC.store(select_next_task_func);
+    }
+}
+
+
 /// Switches from the current task to the given `next` task.
 ///
 /// ## Arguments
@@ -1008,7 +1079,7 @@ mod tls_current_task {
 }
 
 
-/// Bootstrap a new task from the current thread of execution.
+/// Bootstraps a new task from the current thread of execution.
 ///
 /// Returns a tuple of:
 /// 1. a [`JoinableTaskRef`], which allows another task to join this bootstrapped task,
@@ -1076,6 +1147,7 @@ fn bootstrap_task_cleanup_failure(current_task: ExitableTaskRef, kill_reason: Ki
         kill_reason,
     );
     // If an initial bootstrap task fails, there's nothing else we can do.
-    #[allow(clippy::empty_loop)]
-    loop { }
+    loop { 
+        core::hint::spin_loop();
+    }
 }
