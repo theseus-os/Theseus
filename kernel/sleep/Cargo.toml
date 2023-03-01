@@ -16,9 +16,6 @@ path = "../task"
 [dependencies.irq_safety]
 git = "https://github.com/theseus-os/irq_safety" 
 
-[dependencies.scheduler]
-path = "../scheduler"
-
 [dependencies.time]
 path = "../time"
 

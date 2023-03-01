@@ -18,8 +18,6 @@ cortex-a = "7.5.0"
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
 vga_buffer = { path = "../vga_buffer" }
-scheduler = { path = "../scheduler" }
-sleep = { path = "../sleep" }
 apic = { path = "../apic" }
 gdt = { path = "../gdt" }
 pic = { path = "../pic" }

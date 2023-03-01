@@ -1515,8 +1515,6 @@ dependencies = [
  "log",
  "memory",
  "pic",
- "scheduler",
- "sleep",
  "spin 0.9.4",
  "tock-registers",
  "tss",
@@ -3127,17 +3125,17 @@ checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 1.0.0",
- "irq_safety",
+ "cpu",
+ "interrupts",
  "log",
  "preemption",
- "runqueue",
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
- "spin 0.9.4",
+ "sleep",
  "task",
+ "x86_64",
 ]
 
 [[package]]
@@ -3400,7 +3398,6 @@ dependencies = [
  "crossbeam-utils",
  "irq_safety",
  "lazy_static",
- "scheduler",
  "task",
  "time",
 ]
