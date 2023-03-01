@@ -66,16 +66,67 @@
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Offers the ability to control or configure the active task scheduling policy.
 //!
-//! Note that actual task switching and preemptive scheduling are implemented
-//! in the [`task`] crate.
+//! ## What is and isn&#39;t in this crate?
+//! This crate also defines the timer interrupt handler used for preemptive
+//! task switching on each CPU. In [`init()`], it registers that handler
+//! with the [`interrupts`] subsystem.
+//!
+//! The actual task switching logic is implemented in the [`task`] crate.
 //! This crate re-exports that main [`schedule()`] function for convenience,
 //! legacy compatbility, and to act as an easy landing page for code search.
 //! That means that a caller need only depend on [`task`], not this crate,
 //! to invoke the scheduler (yield the CPU) to switch to another task.
 
 </span><span class="attr">#![no_std]
+#![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(abi_x86_interrupt))]
 
 </span><span class="macro">cfg_if::cfg_if! </span>{
     <span class="kw">if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
@@ -87,20 +138,61 @@
     }
 }
 
-<span class="kw">use </span>task::TaskRef;
+<span class="kw">use </span>interrupts::{<span class="self">self</span>, CPU_LOCAL_TIMER_IRQ, eoi, register_interrupt};
+<span class="kw">use </span>task::{<span class="self">self</span>, TaskRef};
 
 <span class="doccomment">/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
 </span><span class="kw">pub use </span>task::schedule;
 
+
 <span class="doccomment">/// Initializes the scheduler on this system using the policy set at compiler time.
+///
+/// Also registers a timer interrupt handler for preemptive scheduling.
 ///
 /// Currently, there is a single scheduler policy for the whole system.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
 /// * `make THESEUS_CONFIG=priority_scheduler` --&gt; priority scheduler.
 /// * `make THESEUS_CONFIG=realtime_scheduler` --&gt; &quot;realtime&quot; (rate monotonic) scheduler.
 /// * `make` --&gt; basic round-robin scheduler, the default.
-</span><span class="kw">pub fn </span>init() {
+</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     task::set_scheduler_policy(scheduler::select_next_task);
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        register_interrupt(
+            CPU_LOCAL_TIMER_IRQ,
+            lapic_timer_handler,
+        ).map_err(|_handler| {
+            <span class="macro">log::error!</span>(<span class="string">&quot;BUG: interrupt {CPU_LOCAL_TIMER_IRQ} was already registered to handler {_handler:#X}&quot;</span>);
+            <span class="string">&quot;BUG: CPU-local timer interrupt was already registered to a handler&quot;
+        </span>})
+    }
+
+    <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
+        <span class="macro">log::error!</span>(<span class="string">&quot;TODO: scheduler::init() only supports registering a preemptive task switching timer interrupt on x86_64&quot;</span>);
+        <span class="prelude-val">Err</span>(<span class="string">&quot;TODO: scheduler::init() only supports registering a preemptive task switching timer interrupt on x86_64&quot;</span>)
+    }
+}
+
+<span class="doccomment">/// The handler for each CPU&#39;s local timer interrupt, used for preemptive task switching.
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>lapic_timer_handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
+    <span class="comment">// tick count, only used for debugging
+    </span><span class="attr">#[cfg(any())] </span>{ <span class="comment">// cfg(any()) is always false
+        </span><span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
+        <span class="kw">static </span>LAPIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
+        <span class="kw">let </span>_ticks = LAPIC_TIMER_TICKS.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
+        <span class="macro">log::info!</span>(<span class="string">&quot;(CPU {}) LAPIC TIMER HANDLER! TICKS = {}&quot;</span>, cpu::current_cpu(), _ticks);
+    }
+
+    <span class="comment">// Inform the `sleep` crate that it should update its inner tick count
+    // in order to unblock any tasks that are done sleeping.
+    </span>sleep::unblock_sleeping_tasks();
+
+    <span class="comment">// We must acknowledge the interrupt before the end of this handler
+    // because we switch tasks here, which doesn&#39;t return.
+    </span>eoi(<span class="prelude-val">None</span>); <span class="comment">// None, because IRQ 0x22 cannot possibly be a PIC interrupt
+
+    </span>schedule();
 }
 
 <span class="doccomment">/// Changes the priority of the given task with the given priority level.

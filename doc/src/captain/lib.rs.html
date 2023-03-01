@@ -310,7 +310,7 @@
 
     <span class="comment">// Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.
-    </span>scheduler::init();
+    </span>scheduler::init()<span class="question-mark">?</span>;
     <span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Created initial bootstrap task: {:?}&quot;</span>, bootstrap_task);
 

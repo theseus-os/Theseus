@@ -367,34 +367,20 @@
 <a href="#367" id="367">367</a>
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
-<a href="#370" id="370">370</a>
-<a href="#371" id="371">371</a>
-<a href="#372" id="372">372</a>
-<a href="#373" id="373">373</a>
-<a href="#374" id="374">374</a>
-<a href="#375" id="375">375</a>
-<a href="#376" id="376">376</a>
-<a href="#377" id="377">377</a>
-<a href="#378" id="378">378</a>
-<a href="#379" id="379">379</a>
-<a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a>
-<a href="#382" id="382">382</a>
-<a href="#383" id="383">383</a>
-<a href="#384" id="384">384</a>
-<a href="#385" id="385">385</a>
 </pre><pre class="rust"><code><span class="kw">pub use </span>pic::IRQ_BASE_OFFSET;
 
 <span class="kw">use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 <span class="kw">use </span>spin::Once;
 <span class="comment">// use rtc;
-</span><span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
-<span class="kw">use </span>memory::VirtualAddress;
+</span><span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>apic::{INTERRUPT_CHIP, InterruptChip};
 <span class="kw">use </span>locked_idt::LockedIdt;
 <span class="kw">use </span>log::{error, warn, info, debug};
 <span class="kw">use </span>vga_buffer::println_raw;
 
+<span class="doccomment">/// The IRQ number reserved for CPU-local timer interrupts,
+/// which Theseus currently uses for preemptive task switching.
+</span><span class="kw">pub const </span>CPU_LOCAL_TIMER_IRQ: u8 = apic::LOCAL_APIC_LVT_IRQ;
 
 <span class="doccomment">/// The single system-wide Interrupt Descriptor Table (IDT).
 ///
@@ -406,10 +392,10 @@
 
 <span class="doccomment">/// The list of IRQs reserved for Theseus-specific usage that cannot be
 /// used for general device interrupt handlers.
-/// These cannot be accessed by [`register_interrupt()`] or [`deregister_interrupt()`].
+/// These cannot be removed in [`deregister_interrupt()`].
 </span><span class="kw">static </span>RESERVED_IRQ_LIST: [u8; <span class="number">3</span>] = [
     pic::PIC_SPURIOUS_INTERRUPT_IRQ,
-    apic::LOCAL_APIC_LVT_IRQ,
+    CPU_LOCAL_TIMER_IRQ,
     apic::APIC_SPURIOUS_INTERRUPT_IRQ,
 ];
 
@@ -505,14 +491,12 @@
         }
         <span class="comment">// This crate has a fixed dependency on the `pic` and `apic` crates,
         // because they are required to implement certain functions, e.g., `eoi()`.
-        // Thus, we statically reserve the IDT entries used by the PIC &amp; APIC,
-        // instead of making it dynamically register that interrupt like other devices do.
+        // Thus, we statically reserve some non-registerable IDT entries that should only be used
+        // by the PIC &amp; APIC instead of dynamically registering them elsewhere.
         </span>new_idt[pic::PIC_SPURIOUS_INTERRUPT_IRQ <span class="kw">as </span>usize]
             .set_handler_fn(pic_spurious_interrupt_handler);
-        new_idt[apic::LOCAL_APIC_LVT_IRQ <span class="kw">as </span>usize]
-            .set_handler_fn(lapic_timer_handler);
         new_idt[apic::APIC_SPURIOUS_INTERRUPT_IRQ <span class="kw">as </span>usize]
-            .set_handler_fn(apic_spurious_interrupt_handler); 
+            .set_handler_fn(apic_spurious_interrupt_handler);
     }
 
     <span class="comment">// try to load our new IDT    
@@ -672,22 +656,6 @@
     }
 }
 
-
-<span class="kw">pub static </span>APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
-<span class="doccomment">/// 0x22
-</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>lapic_timer_handler(_stack_frame: InterruptStackFrame) {
-    <span class="kw">let </span>_ticks = APIC_TIMER_TICKS.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
-    <span class="comment">// info!(&quot; ({}) APIC TIMER HANDLER! TICKS = {}&quot;, apic::current_cpu(), _ticks);
-
-    // Callback to the sleep API to unblock tasks whose waiting time is over
-    // and alert to update the number of ticks elapsed
-    </span>sleep::unblock_sleeping_tasks();
-    
-    <span class="comment">// we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn&#39;t return
-    </span>eoi(<span class="prelude-val">None</span>); <span class="comment">// None, because 0x22 IRQ cannot possibly be a PIC interrupt
-    
-    </span>scheduler::schedule();
-}
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
     <span class="macro">warn!</span>(<span class="string">&quot;APIC SPURIOUS INTERRUPT HANDLER!&quot;</span>);
