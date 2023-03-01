@@ -1,7 +1,11 @@
 //! Offers the ability to control or configure the active task scheduling policy.
 //!
-//! Note that actual task switching and preemptive scheduling are implemented
-//! in the [`task`] crate.
+//! ## What is and isn't in this crate?
+//! This crate also defines the timer interrupt handler used for preemptive
+//! task switching on each CPU. In [`init()`], it registers that handler
+//! with the [`interrupts`] subsystem.
+//!
+//! The actual task switching logic is implemented in the [`task`] crate.
 //! This crate re-exports that main [`schedule()`] function for convenience,
 //! legacy compatbility, and to act as an easy landing page for code search.
 //! That means that a caller need only depend on [`task`], not this crate,
@@ -20,8 +24,8 @@ cfg_if::cfg_if! {
     }
 }
 
-use interrupts::{CPU_LOCAL_TIMER_IRQ, eoi, register_interrupt};
-use task::TaskRef;
+use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi, register_interrupt};
+use task::{self, TaskRef};
 
 /// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
 pub use task::schedule;
