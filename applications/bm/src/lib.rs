@@ -408,7 +408,7 @@ fn do_ctx() -> Result<(), &'static str> {
 /// This is measured by creating two tasks and pinning them to the same core.
 /// The tasks yield to each other repetitively.
 /// Overhead is measured by doing the above operation with two tasks that just return.
-fn do_ctx_inner(th: usize, nr: usize, child_core: cpu::CpuId) -> Result<u64, &'static str> {
+fn do_ctx_inner(th: usize, nr: usize, child_core: CpuId) -> Result<u64, &'static str> {
     let start_hpet: u64;
 	let end_hpet: u64;
 	let overhead_end_hpet: u64;

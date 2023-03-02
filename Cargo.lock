@@ -3157,6 +3157,7 @@ name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
  "app_io",
+ "cpu",
  "getopts",
  "scheduler",
  "spawn",

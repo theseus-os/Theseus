@@ -3,7 +3,7 @@
 
 use core::fmt;
 
-use super::CpuId;
+use crate::CpuId;
 use apic::ApicId;
 
 impl From<ApicId> for CpuId {
@@ -11,6 +11,15 @@ impl From<ApicId> for CpuId {
         CpuId(apic_id.value())
     }
 }
+
+impl TryFrom<u32> for CpuId {
+    type Error = u32;
+    fn try_from(raw_cpu_id: u32) -> Result<Self, Self::Error> {
+        ApicId::try_from(raw_cpu_id)
+            .map(Into::into)
+    }
+}
+
 
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.

@@ -42,9 +42,9 @@ pub fn current_cpu() -> CpuId {
 pub struct MpidrValue(u64);
 
 impl MpidrValue {
-    /// Reads an affinity level from this `MpidrValue`.
+    /// Reads an affinity `level` from this `MpidrValue`.
     ///
-    /// Panics if an affinity value Valid affinity levels are 0, 1, 2, 3. Panics i
+    /// Panics if the given affinity level is not 0, 1, 2, or 3.
     pub fn affinity(self, level: u8) -> u8 {
         assert!(level < 4, "Valid affinity levels are 0, 1, 2, 3");
         (self.0 >> (level * 8)) as u8

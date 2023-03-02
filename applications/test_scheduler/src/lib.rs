@@ -7,14 +7,15 @@ extern crate scheduler;
 extern crate task;
 extern crate cpu;
 
+use core::convert::TryFrom;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 use cpu::CpuId;
 
 
 pub fn main(_args: Vec<String>) -> isize {
-    // temp hack to get a fixed CpuId(1), which is unsafe.
-    let cpu_1: CpuId = unsafe { core::mem::transmute(1_u32) };
+    let cpu_1 = CpuId::try_from(1).expect("CPU ID 1 did not exist");
 
     let taskref1 = spawn::new_task_builder(worker, ())
         .name(String::from("test1"))

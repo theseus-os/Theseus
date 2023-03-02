@@ -395,7 +395,7 @@ pub fn main(args: Vec<String>) -> isize {
         
         let taskref1  = new_task_builder(fault_graphics_task, arg_val)
             .name(String::from("fault_graphics_task"))
-            .pin_on_cpu( unsafe { core::mem::transmute(2_u32) })
+            .pin_on_cpu(pick_child_core())
             .spawn_restartable(None)
             .expect("Couldn't start the fault_graphics_task");
 

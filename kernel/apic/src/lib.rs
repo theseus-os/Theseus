@@ -1,7 +1,7 @@
 #![no_std]
 #![feature(let_chains)]
 
-use core::{fmt, sync::atomic::{AtomicU32, Ordering}};
+use core::{fmt, sync::atomic::{AtomicU32, Ordering}, convert::TryFrom};
 use derive_more::*;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
@@ -46,6 +46,16 @@ impl ApicId {
     /// Returns the inner raw value read from the Local APIC ID register.
     pub fn value(self) -> u32 {
         self.0
+    }
+}
+impl TryFrom<u32> for ApicId {
+    type Error = u32;
+    fn try_from(raw_apic_id: u32) -> Result<Self, Self::Error> {
+        let apic_id = ApicId(raw_apic_id);
+        match get_lapics().get(&apic_id) {
+            Some(_) => Ok(apic_id),
+            None => Err(raw_apic_id),
+        }
     }
 }
 
