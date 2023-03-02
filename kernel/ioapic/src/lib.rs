@@ -140,9 +140,28 @@ impl IoApic {
     ///    which after remapping is from 0x20 to 0x2F 
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
-    pub fn set_irq(&mut self, ioapic_irq: u8, apic_id: ApicId, irq_vector: u8) {
-        let low_index: u32 = 0x10 + (ioapic_irq as u32) * 2;
-        let high_index: u32 = 0x10 + (ioapic_irq as u32) * 2 + 1;
+    ///
+    /// # Return
+    /// * Returns `Ok` upon success
+    /// * Returns `Err` if the given `ApicId` value exceeds the bounds of `u8`, i.e.,
+    ///   if it is larger than 255.
+    ///   This is because the IOAPIC only supports redirecting interrupts to APICs
+    ///   with IDs that fit within 8-bit values.
+    pub fn set_irq(
+        &mut self,
+        ioapic_irq: u8,
+        apic_id: ApicId,
+        irq_vector: u8,
+    ) -> Result<(), &'static str> {
+        if apic_id.value() > u8::MAX as u32 {
+            log::error!("Cannot set IOAPIC redirection table {} -> {} for APIC ID {} larger than 255",
+                ioapic_irq, irq_vector, apic_id.value(),
+            );
+            return Err("Cannot set IOAPIC redirection table entry for APIC ID larger than 255")
+        }
+
+        let low_index: u32 = 0x10 + ((ioapic_irq as u32) * 2);
+        let high_index: u32 = low_index + 1;
 
         let mut high = self.read_reg(high_index);
         high &= !0xff000000;
@@ -150,11 +169,17 @@ impl IoApic {
         self.write_reg(high_index, high);
 
         let mut low = self.read_reg(low_index);
+        // Clear mask, enabling this interrupt
         low &= !(1<<16);
+        // Use physical destination mode, not logical destination mode
         low &= !(1<<11);
+        // Set the delivery mode to Fixed
         low &= !0x700;
+        // Set the lowest 8 bits, which correspond to the IRQ vector.
         low &= !0xff;
         low |= irq_vector as u32;
         self.write_reg(low_index, low);
+
+        Ok(())
     }
 }
