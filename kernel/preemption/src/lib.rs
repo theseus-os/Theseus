@@ -16,7 +16,7 @@ use cpu::CpuId;
 ///
 /// In the future, we will use CPU-local storage for each CPU's preemption count,
 /// so we won't need to use a system-wide primitive array here.
-const MAX_CPU_CORES: usize = 2_usize.pow(u8::BITS);
+const MAX_CPU_CORES: usize = 256;
 
 #[allow(clippy::declare_interior_mutable_const)]
 const ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(0);
