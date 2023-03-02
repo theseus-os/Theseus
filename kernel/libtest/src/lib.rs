@@ -4,6 +4,7 @@ extern crate alloc;
 extern crate task;
 extern crate memory;
 extern crate apic;
+extern crate cpu;
 extern crate hpet;
 extern crate runqueue;
 extern crate pmu_x86;
@@ -17,6 +18,7 @@ use alloc::vec::Vec;
 use hashbrown::HashMap;
 use core::fmt;
 use apic::get_lapics;
+use cpu::CpuId;
 
 const MICRO_TO_FEMTO: u64 = 1_000_000_000;
 const NANO_TO_FEMTO: u64 = 1_000_000;
@@ -35,13 +37,13 @@ pub fn hpet_2_us(hpet: u64) -> u64 {
 
 #[macro_export]
 macro_rules! CPU_ID {
-	() => (apic::current_cpu())
+	() => (cpu::current_cpu())
 }
 
-/// Helper function return the tasks in a given core's runqueue
-pub fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
+/// Helper function return the tasks in a given `cpu`'s runqueue
+pub fn nr_tasks_in_rq(cpu: CpuId) -> Option<usize> {
+	match runqueue::get_runqueue(cpu.into_u8()).map(|rq| rq.read()) {
+		Some(rq) => { Some(rq.len()) }
 		_ => { None }
 	}
 }
@@ -58,18 +60,16 @@ pub fn check_myrq() -> bool {
 
 
 /// Helper function to pick a free child core if possible
-pub fn pick_free_core() -> Result<u8, &'static str> {
+pub fn pick_free_core() -> Result<CpuId, &'static str> {
 	// a free core will only have 1 task, the idle task, running on it.
 	const NUM_TASKS_ON_FREE_CORE: usize = 1;
 
-	// try with current core -1
-	let child_core: u8 = CPU_ID!() as u8 - 1;
-	if nr_tasks_in_rq(child_core) == Some(NUM_TASKS_ON_FREE_CORE) {return Ok(child_core);}
-
-	// if failed, iterate through all cores
+	// if failed, iterate through all CPUs
 	for lapic in get_lapics().iter() {
-		let child_core = lapic.0;
-		if nr_tasks_in_rq(*child_core) == Some(1) {return Ok(*child_core);}
+		let cpu: CpuId = (*lapic.0).into();
+		if nr_tasks_in_rq(cpu) == Some(NUM_TASKS_ON_FREE_CORE) {
+			return Ok(cpu);
+		}
 	}
 
 	warn!("Cannot pick a free core because cores are busy");

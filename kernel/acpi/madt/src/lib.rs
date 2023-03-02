@@ -327,13 +327,13 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 Ok(()) => { } // fall through
             };
 
-            assert!(current_cpu() == lapic_entry.apic_id);
-            let bsp_id = lapic_entry.apic_id;
+            let bsp_id = current_cpu();
+            assert!(bsp_id.value() == lapic_entry.apic_id as u32);
 
             // redirect every IoApic's interrupts to the one BSP
             // TODO FIXME: I'm unsure if this is actually correct!
-            for ioapic in ioapic::get_ioapics().iter() {
-                let mut ioapic_ref = ioapic.1.lock();
+            for (_ioapic_id, ioapic) in ioapic::get_ioapics().iter() {
+                let mut ioapic_ref = ioapic.lock();
 
                 // Set the BSP to receive regular PIC interrupts routed through the IoApic.
                 // Skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used.

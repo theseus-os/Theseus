@@ -6,6 +6,7 @@ extern crate alloc;
 extern crate getopts;
 extern crate spin;
 extern crate task;
+extern crate libtest;
 extern crate spawn;
 extern crate scheduler;
 extern crate rendezvous;
@@ -28,6 +29,7 @@ use alloc::{
 
 use getopts::Options;
 use color::Color;
+use cpu::CpuId;
 use shapes::Coord;
 use window::Window;
 use spin::Mutex;
@@ -40,10 +42,6 @@ const NANO_TO_FEMTO: u64 = 1_000_000;
 pub struct PassStruct {
     pub count : usize,
     pub user : usize,
-}
-
-macro_rules! CPU_ID {
-	() => (cpu::current_cpu())
 }
 
 // ------------------------- Window fault injection section -------------------------------------------
@@ -59,14 +57,14 @@ pub fn set_graphics_measuring_task() -> (){
     // setup a task to send coordinates
     let _taskref1  = new_task_builder(graphics_measuring_task, arg_val)
         .name(String::from("watch task"))
-        .pin_on_core(pick_child_core())
+        .pin_on_cpu(pick_child_core())
         .spawn_restartable(None)
         .expect("Couldn't start the watch task");
 
     // setup a task to receive responses
     let _taskref2  = new_task_builder(graphics_send_task, arg_val)
         .name(String::from("send task"))
-        .pin_on_core(pick_child_core())
+        .pin_on_cpu(pick_child_core())
         .spawn_restartable(None)
         .expect("Couldn't start the send task");
 
@@ -273,7 +271,7 @@ fn set_ipc_watch_task() -> (StringSender, StringReceiver){
     // Create the sending task
     let _taskref1  = new_task_builder(ipc_watch_task, (sender, receiver_reply))
         .name(String::from("watch task"))
-        .pin_on_core(pick_child_core())
+        .pin_on_cpu(pick_child_core())
         .spawn()
         .expect("Couldn't start the watch task");
 
@@ -354,28 +352,8 @@ fn ipc_watch_task((sender, receiver) : (StringSender, StringReceiver)) -> Result
 
 // -------------------------------------------------------------------------------------------------
 
-pub fn pick_child_core() -> u8 {
-	// try with current core -1
-	let child_core: u8 = (CPU_ID!() as u8).saturating_sub(1);
-	if nr_tasks_in_rq(child_core) == Some(1) {return child_core;}
-
-	// if failed, try from the last to the first
-    let last_core = cpu::cpu_count().max(u8::MAX as u32);
-	for child_core in (0..last_core).rev() {
-		if nr_tasks_in_rq(child_core as u8) == Some(1) {
-            return child_core as u8;
-        }
-	}
-	debug!("WARNING : Cannot pick a child core because cores are busy");
-	debug!("WARNING : Selecting current core");
-	return child_core;
-}
-
-fn nr_tasks_in_rq(core: u8) -> Option<usize> {
-	match runqueue::get_runqueue(core).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.iter().count()) }
-		_ => { None }
-	}
+fn pick_child_core() -> CpuId {
+    libtest::pick_free_core().unwrap()
 }
 
 fn hpet_2_ns(hpet: u64) -> u64 {
@@ -417,7 +395,7 @@ pub fn main(args: Vec<String>) -> isize {
         
         let taskref1  = new_task_builder(fault_graphics_task, arg_val)
             .name(String::from("fault_graphics_task"))
-            .pin_on_core(2)
+            .pin_on_cpu( unsafe { core::mem::transmute(2_u32) })
             .spawn_restartable(None)
             .expect("Couldn't start the fault_graphics_task");
 
@@ -435,7 +413,7 @@ pub fn main(args: Vec<String>) -> isize {
 
             let taskref1  = new_task_builder(ipc_fault_task, (sender_reply, receiver))
                 .name(String::from("fault_task"))
-                .pin_on_core(pick_child_core())
+                .pin_on_cpu(pick_child_core())
                 .spawn_restartable(None)
                 .expect("Couldn't start the restartable task"); 
 
@@ -457,7 +435,7 @@ pub fn main(args: Vec<String>) -> isize {
 
             let taskref1  = new_task_builder(ipc_fault_task, (sender_reply, receiver))
                 .name(String::from("fault_task"))
-                .pin_on_core(pick_child_core())
+                .pin_on_cpu(pick_child_core())
                 .spawn_restartable(None)
                 .expect("Couldn't start the restartable task"); 
 

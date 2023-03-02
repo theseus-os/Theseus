@@ -247,7 +247,7 @@ impl TaskFile {
 
         // Print all tasks
         let cpu = taskref.running_on_cpu().map(|cpu| format!("{cpu}")).unwrap_or_else(|| String::from("-"));
-        let pinned = &taskref.pinned_core().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
+        let pinned = &taskref.pinned_cpu().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
         let task_type = if taskref.is_an_idle_task {
             "I"
         } else if taskref.is_application() {

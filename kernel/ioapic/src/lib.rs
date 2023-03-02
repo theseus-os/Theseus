@@ -1,17 +1,12 @@
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate spin;
-extern crate memory;
-extern crate volatile;
-extern crate zerocopy;
-extern crate atomic_linked_list;
-
+use log::debug;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
 use memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
 use atomic_linked_list::atomic_map::AtomicMap;
+use apic::ApicId;
 
 
 /// The system-wide list of all `IoApic`s, of which there is usually one, 
@@ -140,18 +135,18 @@ impl IoApic {
     ///
     /// # Arguments
     /// * `ioapic_irq`: the IRQ number that this interrupt will trigger on this IoApic.
-    /// * `lapic_id`: the id of the LocalApic that should handle this interrupt.
+    /// * `apic_id`: the ID of the Local APIC, i.e., the CPU, that should handle this interrupt.
     /// * `irq_vector`: the system-wide IRQ vector number,
     ///    which after remapping is from 0x20 to 0x2F 
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
-    pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
+    pub fn set_irq(&mut self, ioapic_irq: u8, apic_id: ApicId, irq_vector: u8) {
         let low_index: u32 = 0x10 + (ioapic_irq as u32) * 2;
         let high_index: u32 = 0x10 + (ioapic_irq as u32) * 2 + 1;
 
         let mut high = self.read_reg(high_index);
         high &= !0xff000000;
-        high |= (lapic_id as u32) << 24;
+        high |= apic_id.value() << 24;
         self.write_reg(high_index, high);
 
         let mut low = self.read_reg(low_index);

@@ -65,7 +65,7 @@ fn rmain(_matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = cpu::current_cpu();
+    let this_cpu = cpu::current_cpu();
 
     let (sender, receiver) = unified_channel::new_string_channel(2);
 
@@ -79,7 +79,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     }, ())
         .name(String::from("sender_task"))
         .block()
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(this_cpu)
         .spawn()?;
 
     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
@@ -92,7 +92,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     }, ())
         .name(String::from("receiver_task"))
         .block()
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(this_cpu)
         .spawn()?;
 
     info!("test_multiple(): Finished spawning the sender and receiver tasks");

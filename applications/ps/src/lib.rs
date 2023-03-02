@@ -54,7 +54,7 @@ pub fn main(args: Vec<String>) -> isize {
             // All printed fields below must be strings to ensure the width formatting specifier below works properly.
             let runstate = format!("{:?}", task.runstate());
             let cpu = task.running_on_cpu().map(|cpu| format!("{cpu}")).unwrap_or_else(|| String::from("-"));
-            let pinned = task.pinned_core().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
+            let pinned = task.pinned_cpu().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
             let task_type = if task.is_an_idle_task {"I"}
                 else if task.is_application() {"A"}
                 else {" "} ;

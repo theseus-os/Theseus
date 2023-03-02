@@ -15,3 +15,31 @@
 mod arch;
 
 pub use arch::*;
+
+use derive_more::*;
+
+/// A unique identifier for a CPU core.
+///
+/// A `CpuId` is a known-valid value that is guaranteed to correspond
+/// to a single CPU that actually exists on the current system.
+#[derive(
+    Clone, Copy, Debug, Display, PartialEq, Eq, PartialOrd, Ord,
+    Hash, Binary, Octal, LowerHex, UpperHex,
+)]
+#[repr(transparent)]
+pub struct CpuId(u32);
+
+impl CpuId {
+    /// Returns the inner raw value of this `CpuId`.
+    pub fn value(&self) -> u32 {
+        self.0
+    }
+
+    /// A temporary function (will be removed later) that converts the given `CpuId`
+    /// into a `u8`, panicking if its inner `u32` value does not fit into a `u8`.
+    pub fn into_u8(self) -> u8 {
+        self.0
+            .try_into()
+            .unwrap_or_else(|_| panic!("couldn't convert CpuId {self} into a u8"))
+    }
+}

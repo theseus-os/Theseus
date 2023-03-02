@@ -1,26 +1,9 @@
+//! Implements functions for accessing CPU-specific information on aarch64.
+
 use cortex_a::registers::MPIDR_EL1;
 use tock_registers::interfaces::Readable;
 
 use core::fmt;
-
-/// A unique identifier for a CPU core.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct CpuId(u32);
-
-/// An equivalent to Option<CpuId>, which internally encodes None as
-/// `u32::MAX`, which is an invalid CpuId (bits [4:7] of affinity level
-/// 0 must always be cleared). This guarantees that it compiles down to
-/// lock-free native atomic instructions when using it inside of an atomic
-/// type like [`AtomicCell`], as u32 is atomic when running on ARMv8.
-#[derive(Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct OptionalCpuId(u32);
-
-/// A unique identifier for a CPU core.
-#[derive(Copy, Clone, Debug)]
-#[repr(transparent)]
-pub struct MpidrValue(u64);
 
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
@@ -31,14 +14,14 @@ pub fn cpu_count() -> u32 {
 
 /// Returns the ID of the bootstrap CPU (if known), which
 /// is the first CPU to run after system power-on.
-pub fn bootstrap_cpu() -> CpuId {
+pub fn bootstrap_cpu() -> Option<CpuId> {
     // The ARM port doesn't start secondary cores for the moment,
     // so the current CPU can only be the "bootstrap" CPU.
-    current_cpu()
+    Some(current_cpu())
 }
 
 /// Returns true if the currently executing CPU is the bootstrap
-/// CPU, i.e., the first procesor to run after system power-on.
+/// CPU, i.e., the first CPU to run after system power-on.
 pub fn is_bootstrap_cpu() -> bool {
     // The ARM port doesn't start secondary cores for the moment,
     // so the current CPU can only be the "bootstrap" CPU.
@@ -50,20 +33,25 @@ pub fn current_cpu() -> CpuId {
     MpidrValue(MPIDR_EL1.get() as u64).into()
 }
 
-impl CpuId {
-    /// Reads an affinity level from this CpuId
-    ///
-    /// Valid affinity levels are 0, 1, 2, 3
-    pub fn affinity(self, level: u8) -> u8 {
-        assert!(level < 4, "Valid affinity levels are 0, 1, 2, 3");
-
-        (self.0 >> (level * 8)) as u8
-    }
-}
+/// A unique identifier for a CPU core, read from the `MPIDR_EL1` register on aarch64.
+#[derive(
+    Clone, Copy, Debug, Display, PartialEq, Eq, PartialOrd, Ord,
+    Hash, Binary, Octal, LowerHex, UpperHex,
+)]
+#[repr(transparent)]
+pub struct MpidrValue(u64);
 
 impl MpidrValue {
-    /// Obtain the inner raw u64 that was read from the MPIDR_EL1 register
-    pub fn get(self) -> u64 {
+    /// Reads an affinity level from this `MpidrValue`.
+    ///
+    /// Panics if an affinity value Valid affinity levels are 0, 1, 2, 3. Panics i
+    pub fn affinity(self, level: u8) -> u8 {
+        assert!(level < 4, "Valid affinity levels are 0, 1, 2, 3");
+        (self.0 >> (level * 8)) as u8
+    }
+
+    /// Returns the inner raw value read from the `MPIDR_EL1` register.
+    pub fn value(self) -> u64 {
         self.0
     }
 }
@@ -87,6 +75,15 @@ impl From<MpidrValue> for CpuId {
         Self(aff_3 | aff_0_1_2)
     }
 }
+
+/// An equivalent to Option<CpuId>, which internally encodes None as
+/// `u32::MAX`, which is an invalid CpuId (bits [4:7] of affinity level
+/// 0 must always be cleared). This guarantees that it compiles down to
+/// lock-free native atomic instructions when using it inside of an atomic
+/// type like [`AtomicCell`], as u32 is atomic when running on ARMv8.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct OptionalCpuId(u32);
 
 impl From<Option<CpuId>> for OptionalCpuId {
     fn from(opt: Option<CpuId>) -> Self {

@@ -43,6 +43,7 @@ use core::{
     sync::atomic::{AtomicBool, fence, Ordering},
     task::Waker,
 };
+use cpu::CpuId;
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
@@ -605,7 +606,7 @@ mod scheduler {
 
         let cpu_id = preemption_guard.cpu_id();
 
-        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) else {
+        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
             return false; // keep running the same current task
         };
 
@@ -648,7 +649,7 @@ mod scheduler {
 ///
 /// ## Arguments
 /// * `next`: the task to switch to.
-/// * `apic_id`: the ID of the current CPU.
+/// * `cpu_id`: the ID of the current CPU.
 /// * `preemption_guard`: a guard that is used to ensure preemption is disabled
 ///    for the duration of this task switch operation.
 ///
@@ -675,7 +676,7 @@ mod scheduler {
 /// the given `next` `Task`'s inner state in order to mutate them.
 pub fn task_switch(
     next: TaskRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> (bool, PreemptionGuard) {
 
@@ -683,7 +684,7 @@ pub fn task_switch(
     // the borrowed reference to the current task is guaranteed to be dropped
     // *before* the actual context switch operation occurs.
     let result = with_current_task_tls_slot_mut(
-        |curr, p_guard| task_switch_inner(curr, next, apic_id, p_guard),
+        |curr, p_guard| task_switch_inner(curr, next, cpu_id, p_guard),
         preemption_guard,
     );
     
@@ -809,7 +810,7 @@ type TaskSwitchInnerRet = (*mut usize, usize, SimdExt, SimdExt);
 fn task_switch_inner(
     curr_task_tls_slot: &mut Option<TaskRef>,
     next: TaskRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> Result<TaskSwitchInnerRet, (bool, PreemptionGuard)> {
     let Some(ref curr) = curr_task_tls_slot else {
@@ -822,7 +823,7 @@ fn task_switch_inner(
         return Err((false, preemption_guard));
     }
 
-    // trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, curr, next, irq_safety::interrupts_enabled());
+    // trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", cpu_id, curr, next, irq_safety::interrupts_enabled());
 
     // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
     // if !next.is_runnable() {
@@ -830,12 +831,12 @@ fn task_switch_inner(
     //     return (false, preemption_guard);
     // }
     // if next.is_running() {
-    //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, curr, next);
+    //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", cpu_id, curr, next);
     //     return (false, preemption_guard);
     // }
-    // if let Some(pc) = next.pinned_core() {
-    //     if pc != apic_id {
-    //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, apic_id, curr, next);
+    // if let Some(pc) = next.pinned_cpu() {
+    //     if pc != cpu_id {
+    //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, cpu_id, curr, next);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -853,7 +854,7 @@ fn task_switch_inner(
     //     if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
     //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
     //     } else {
-    //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+    //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", cpu_id);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -921,7 +922,7 @@ fn task_switch_inner(
     // in task runstates, e.g., when an interrupt handler accesses the current task context.
     {
         let _held_interrupts = hold_interrupts();
-        next.0.task.running_on_cpu().store(Some(apic_id).into());
+        next.0.task.running_on_cpu().store(Some(cpu_id).into());
         next.set_as_current_task();
         drop(_held_interrupts);
     }
@@ -1089,7 +1090,7 @@ mod tls_current_task {
 /// ## Note
 /// This function does not add the new task to any runqueue.
 pub fn bootstrap_task(
-    apic_id: u8, 
+    cpu_id: CpuId, 
     stack: NoDrop<Stack>,
     kernel_mmi_ref: MmiRef,
 ) -> Result<(JoinableTaskRef, ExitableTaskRef), &'static str> {
@@ -1106,7 +1107,7 @@ pub fn bootstrap_task(
             app_crate: None,
         },
     )?;
-    bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
+    bootstrap_task.name = format!("bootstrap_task_cpu_{cpu_id}");
     let bootstrap_task_id = bootstrap_task.id;
     let joinable_taskref = TaskRef::create(
         bootstrap_task,
@@ -1114,15 +1115,15 @@ pub fn bootstrap_task(
     );
     // Update other relevant states for this new bootstrapped task.
     joinable_taskref.0.task.runstate().store(RunState::Runnable);
-    joinable_taskref.0.task.running_on_cpu().store(Some(apic_id).into()); 
-    joinable_taskref.0.task.inner().lock().pinned_core = Some(apic_id); // can only run on this CPU core
+    joinable_taskref.0.task.running_on_cpu().store(Some(cpu_id).into()); 
+    joinable_taskref.0.task.inner().lock().pinned_cpu = Some(cpu_id); // can only run on this CPU core
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
     let Ok(exitable_taskref) = init_current_task(
         bootstrap_task_id, 
         Some(joinable_taskref.clone()),
     ) else {
-        error!("BUG: failed to set boostrapped task as current task on AP {}", apic_id);
+        error!("BUG: failed to set boostrapped task as current task on AP {}", cpu_id);
         // Don't drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
         let _task_ref = NoDrop::new(joinable_taskref);

@@ -45,7 +45,7 @@ pub fn main(args: Vec<String>) -> isize {
                 // the benchmark doesn't incorporate work stealing, but the only reason we're having
                 // this problem in the first place is because work stealing isn't implemented so...
                 // TODO: Remove this when work stealing is implemented.
-                .pin_on_core(3)
+                .pin_on_cpu( unsafe { core::mem::transmute(3) })
                 .block()
                 .spawn()
                 .expect("failed to spawn task"),

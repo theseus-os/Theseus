@@ -7,6 +7,7 @@ edition = "2018"
 
 [dependencies]
 spin = "0.9.4"
+derive_more = "0.99.0"
 volatile = "0.2.7"
 x86_64 = "0.14.8"
 crossbeam-utils = { version = "0.8.12", default-features = false }
