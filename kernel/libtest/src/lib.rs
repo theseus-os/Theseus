@@ -64,7 +64,6 @@ pub fn pick_free_core() -> Result<CpuId, &'static str> {
 	// a free core will only have 1 task, the idle task, running on it.
 	const NUM_TASKS_ON_FREE_CORE: usize = 1;
 
-	// if failed, iterate through all CPUs
 	for lapic in get_lapics().iter() {
 		let cpu: CpuId = (*lapic.0).into();
 		if nr_tasks_in_rq(cpu) == Some(NUM_TASKS_ON_FREE_CORE) {
