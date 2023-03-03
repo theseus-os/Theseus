@@ -25,6 +25,7 @@ extern crate cpu;
 
 use core::{
     convert::TryInto,
+    mem::size_of,
     ops::DerefMut,
     sync::atomic::Ordering,
 };
@@ -382,6 +383,7 @@ struct ApTrampolineData {
     ap_gdt:            Volatile<u32>,
     _padding6:         [u8; 4],
 }
+const _: () = assert!(size_of::<ApTrampolineData>() == 12 * size_of::<u64>());
 
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
