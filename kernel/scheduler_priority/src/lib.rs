@@ -95,8 +95,8 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult>  {
         }
 
         // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core() {
-            if pinned != apic_id {
+        if let Some(pinned) = t.pinned_cpu() {
+            if pinned.into_u8() != apic_id {
                 // with per-core runqueues, this should never happen!
                 error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, t);
                 return None;
@@ -165,8 +165,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
 
         // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core() {
-            if pinned != apic_id {
+        if let Some(pinned) = t.pinned_cpu() {
+            if pinned.into_u8() != apic_id {
                 // with per-core runqueues, this should never happen!
                 error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, t);
                 return false;
@@ -205,8 +205,8 @@ fn assign_tokens(apic_id: u8) -> bool  {
         }
 
         // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_core() {
-            if pinned != apic_id {
+        if let Some(pinned) = t.pinned_cpu() {
+            if pinned.into_u8() != apic_id {
                 // with per-core runqueues, this should never happen!
                 error!("select_next_task() (AP {}) found a task pinned to a different core: {:?}", apic_id, &*t);
                 return false;

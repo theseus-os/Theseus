@@ -70,13 +70,14 @@ extern crate memory;
 extern crate irq_safety;
 extern crate alloc;
 extern crate apic;
+extern crate cpu;
 #[macro_use] extern crate log;
 extern crate mod_mgmt;
 extern crate bit_field;
 
 use msr::*;
 use x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::InterruptStackFrame};
-use raw_cpuid::*;
+use raw_cpuid::CpuId as X86CpuIdInstr;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
 use alloc::{
@@ -86,7 +87,7 @@ use alloc::{
 };
 use bit_field::BitField;
 use core::{
-    convert::TryFrom,
+    convert::{TryFrom, TryInto},
     sync::atomic::{
         Ordering, 
         AtomicU64, 
@@ -97,7 +98,8 @@ use core::{
 
 pub mod stat;
 
-/// The minimum version ID a PMU can have, as retrieved by cpuid. Anything lower than this means a PMU is not supported.
+/// The minimum version ID a PMU can have, as retrieved by the `CPUID` instruction.
+/// Anything lower than this means PMU is not supported.
 const MIN_PMU_VERSION: u8 = 1;
 /// Set bits in the global_ctrl MSR to enable the fixed counters.
 const ENABLE_FIXED_PERFORMANCE_COUNTERS: u64 = 0x7 << 32;
@@ -138,11 +140,11 @@ static RESULTS_READY: [AtomicU64; WORDS_IN_BITMAP] = [AtomicU64::new(0), AtomicU
 
 lazy_static! {
     /// PMU version supported by the current hardware. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref PMU_VERSION: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.version_id()).unwrap_or(0);
+    static ref PMU_VERSION: u8 = X86CpuIdInstr::new().get_performance_monitoring_info().map(|pmi| pmi.version_id()).unwrap_or(0);
     /// The number of general purpose PMCs that can be used. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_PMC: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.number_of_counters()).unwrap_or(0);
+    static ref NUM_PMC: u8 = X86CpuIdInstr::new().get_performance_monitoring_info().map(|pmi| pmi.number_of_counters()).unwrap_or(0);
     /// The number of fixed function counters. The default is zero since the performance monitoring information would not be retrieved only if there was no PMU available.
-    static ref NUM_FIXED_FUNC_COUNTERS: u8 = CpuId::new().get_performance_monitoring_info().map(|pmi| pmi.fixed_function_counters()).unwrap_or(0);
+    static ref NUM_FIXED_FUNC_COUNTERS: u8 = X86CpuIdInstr::new().get_performance_monitoring_info().map(|pmi| pmi.fixed_function_counters()).unwrap_or(0);
 }
 
 /// Set to store the cores that the PMU has already been initialized on
@@ -197,8 +199,14 @@ fn get_pmcs_available_for_core(core_id: u8) -> Result<&'static AtomicU8, &'stati
 /// Returns the maximum core id for this machine
 fn max_core_id() -> Result<u8, &'static str> {
     let lapics = apic::get_lapics();
-    let core = lapics.iter().max_by_key(|core| core.0).ok_or("pmu_x86: Could not find a maximum core id")?;
-    Ok(*core.0)
+    let apic_id = lapics.iter()
+        .max_by_key(|(apic_id, _)| apic_id.value())
+        .map(|(apic_id, _)| *apic_id)
+        .ok_or("pmu_x86: Could not find a maximum core id")?;
+    let core_id_as_u8 = apic_id.value()
+        .try_into()
+        .unwrap_or_else(|_| panic!("couldn't convert ApicId {apic_id} into a u8"));
+    Ok(core_id_as_u8)
 }
 
 /// Returns true if there are core ids that are larger than can be handled by the current PMU data structures
@@ -233,7 +241,7 @@ fn more_pmcs_than_expected(num_pmc: u8) -> Result<bool, &'static str> {
 /// This function should only be called after all the cores have been booted up.
 pub fn init() -> Result<(), &'static str> {
     let mut cores_initialized = CORES_INITIALIZED.lock();
-    let core_id = apic::current_cpu();
+    let core_id = cpu::current_cpu().into_u8();
 
     if cores_initialized.contains(&core_id) {
         warn!("PMU has already been intitialized on core {}", core_id);
@@ -566,7 +574,7 @@ fn create_general_counter(event_mask: u64) -> Result<Counter, &'static str> {
 
 /// Does the work of iterating through programmable counters and using whichever one is free. Returns Err if none free
 fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
-    let my_core = apic::current_cpu();
+    let my_core = cpu::current_cpu().into_u8();
     let num_pmc = num_general_purpose_counters();
 
     for pmc in 0..num_pmc {
@@ -593,7 +601,7 @@ fn programmable_start(event_mask: u64) -> Result<Counter, &'static str> {
 
 /// Creates a counter object for a fixed hardware counter
 fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
-    let my_core = apic::current_cpu();
+    let my_core = cpu::current_cpu().into_u8();
     let count = rdpmc(msr_mask);
     
     Ok(Counter {
@@ -607,7 +615,7 @@ fn create_fixed_counter(msr_mask: u32) -> Result<Counter, &'static str> {
 /// Checks that the PMU has been initialized. If it has been,
 /// the version ID tells whether the system has performance monitoring capabilities. 
 fn check_pmu_availability() -> Result<(), &'static str>  {
-    let core_id = apic::current_cpu();
+    let core_id = cpu::current_cpu().into_u8();
     if !CORES_INITIALIZED.lock().contains(&core_id) {
         if *PMU_VERSION >= MIN_PMU_VERSION {
             error!("PMU version {} is available. It still needs to be initialized on this core", *PMU_VERSION);
@@ -663,7 +671,7 @@ pub fn start_samples(event_type: EventType, event_per_sample: u32, task_id: Opti
     check_pmu_availability()?;
 
     // perform checks to ensure that counter is ready to use and that previous results are not being unintentionally discarded
-    let my_core_id = apic::current_cpu();
+    let my_core_id = cpu::current_cpu().into_u8();
 
     trace!("start_samples: the core id is : {}", my_core_id);
 
@@ -762,7 +770,7 @@ pub struct SampleResults {
 /// Returns the samples that were stored during sampling in the form of a SampleResults object. 
 /// If samples are not yet finished, forces them to stop.  
 pub fn retrieve_samples() -> Result<SampleResults, &'static str> {
-    let my_core_id = apic::current_cpu();
+    let my_core_id = cpu::current_cpu().into_u8();
 
     let mut sampling_info = SAMPLING_INFO.lock();
     let samples = sampling_info.get_mut(&my_core_id).ok_or("pmu_x86::retrieve_samples: could not retrieve sampling information for this core")?;
@@ -846,7 +854,7 @@ pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static
 
     unsafe { Msr::new(IA32_PERF_GLOBAL_OVF_CTRL).write(CLEAR_PERF_STATUS_MSR); }
 
-    let my_core_id = apic::current_cpu();
+    let my_core_id = cpu::current_cpu().into_u8();
 
     let mut sampling_info = SAMPLING_INFO.lock();
     let mut samples = sampling_info.get_mut(&my_core_id)

@@ -16,16 +16,18 @@
 #![feature(stmt_expr_attributes)]
 #![feature(naked_functions)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+extern crate alloc;
 
 use core::{marker::PhantomData, mem, ops::Deref, sync::atomic::{fence, Ordering}};
 use alloc::{
     boxed::Box,
+    format,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
+use log::{error, info, debug};
+use cpu::CpuId;
 use debugit::debugit;
 use spin::Mutex;
 use irq_safety::enable_interrupts;
@@ -46,20 +48,21 @@ use task::SimdExt;
 /// and creating its initial task bootstrapped from the current execution context.
 pub fn init(
     kernel_mmi_ref: MmiRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    runqueue::init(apic_id)?;
+    let cpu_id_as_u8: u8 = cpu_id.into_u8();
+    runqueue::init(cpu_id_as_u8)?;
     
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
-        task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+        task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     runqueue::add_task_to_specific_runqueue(
-        apic_id,
+        cpu_id_as_u8,
         exitable_bootstrap_task.clone(),
     )?;
     Ok(BootstrapTaskRef {
-        apic_id,
+        cpu_id,
         exitable_taskref: exitable_bootstrap_task,
     })
 }
@@ -118,7 +121,7 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 #[derive(Debug)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
-    apic_id: u8,
+    cpu_id: CpuId,
     exitable_taskref: ExitableTaskRef,
 }
 impl Deref for BootstrapTaskRef {
@@ -141,7 +144,7 @@ impl BootstrapTaskRef {
 impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
-        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
+        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.cpu_id, self.task_ref);
         remove_current_task_from_runqueue(&self.exitable_taskref);
         self.exitable_taskref.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
@@ -270,7 +273,7 @@ pub struct TaskBuilder<F, A, R> {
     name: Option<String>,
     stack: Option<Stack>,
     parent: Option<TaskRef>,
-    pin_on_core: Option<u8>,
+    pin_on_cpu: Option<CpuId>,
     blocked: bool,
     idle: bool,
     post_build_function: Option<Box<
@@ -296,7 +299,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             name: None,
             stack: None,
             parent: None,
-            pin_on_core: None,
+            pin_on_cpu: None,
             blocked: false,
             idle: false,
             post_build_function: None,
@@ -333,9 +336,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self
     }
 
-    /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> TaskBuilder<F, A, R> {
-        self.pin_on_core = Some(core_apic_id);
+    /// Pin the new Task to a specific CPU.
+    pub fn pin_on_cpu(mut self, cpu_id: CpuId) -> TaskBuilder<F, A, R> {
+        self.pin_on_cpu = Some(cpu_id);
         self
     }
 
@@ -424,8 +427,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        if let Some(core) = self.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
+        if let Some(cpu) = self.pin_on_cpu {
+            runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
         } else {
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
@@ -448,18 +451,18 @@ impl<F, A, R> TaskBuilder<F, A, R>
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    /// Sets this new Task to be the idle task for the given core. 
+    /// Sets this new Task to be the idle task for the given CPU. 
     /// 
     /// Idle tasks will not be scheduled unless there are no other tasks for the scheduler to choose. 
     /// 
     /// Idle tasks must be restartable, so it is only a possible option when spawning a restartable task.
-    /// Marking a task as idle is only needed to set up one for each core when that core is initialized,
+    /// Marking a task as idle is only needed to set up one for each CPU when that CPU is initialized,
     /// but or to restart an idle task that has exited or failed.
     /// 
-    /// There is no harm spawning multiple idle tasks on each core, but it's a waste of space. 
-    pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R> {
+    /// There is no harm spawning multiple idle tasks on each CPU, but it's a waste of space. 
+    pub fn idle(mut self, cpu_id: CpuId) -> TaskBuilder<F, A, R> {
         self.idle = true;
-        self.pin_on_core(core_id)
+        self.pin_on_cpu(cpu_id)
     }
 
     /// Like [`TaskBuilder::spawn()`], this finishes this `TaskBuilder` and spawns the new task.
@@ -958,8 +961,8 @@ where
         if let Some((func, arg)) = restartable_info {
             let mut new_task = new_task_builder(func, arg)
                 .name(current_task.name.clone());
-            if let Some(core) = current_task.pinned_core() {
-                new_task = new_task.pin_on_core(core);
+            if let Some(cpu) = current_task.pinned_cpu() {
+                new_task = new_task.pin_on_cpu(cpu);
             }
             new_task.spawn_restartable(None)
                 .expect("Failed to respawn the restartable task");
@@ -990,8 +993,8 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu())
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
+            .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
             error!("BUG: couldn't remove exited task from runqueue: {}", e);
@@ -1001,21 +1004,21 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
 pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let apic_id = cpu::current_cpu();
-    debug!("Spawning a new idle task on core {}", apic_id);
+    let cpu_id = cpu::current_cpu();
+    debug!("Spawning a new idle task on CPU {}", cpu_id);
 
-    new_task_builder(idle_task_entry, apic_id)
-        .name(format!("idle_task_core_{apic_id}"))
-        .idle(apic_id)
+    new_task_builder(idle_task_entry, cpu_id)
+        .name(format!("idle_task_cpu_{cpu_id}"))
+        .idle(cpu_id)
         .spawn_restartable(None)
 }
 
 /// A basic idle task that does nothing but loop endlessly.
-/// 
+///
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
 /// so we use `()` here instead. 
 #[inline(never)]
-fn idle_task_entry(_apic_id: u8) {
+fn idle_task_entry(_cpu_id: CpuId) {
     info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state

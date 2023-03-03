@@ -327,18 +327,18 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 Ok(()) => { } // fall through
             };
 
-            assert!(current_cpu() == lapic_entry.apic_id);
-            let bsp_id = lapic_entry.apic_id;
+            let bsp_id = current_cpu();
+            assert!(bsp_id.value() == lapic_entry.apic_id as u32);
 
-            // redirect every IoApic's interrupts to the one BSP
-            // TODO FIXME: I'm unsure if this is actually correct!
-            for ioapic in ioapic::get_ioapics().iter() {
-                let mut ioapic_ref = ioapic.1.lock();
+            // Redirect every IoApic's interrupts to the one BSP.
+            // TODO: long-term, we should distribute interrupts across CPUs more evenly.
+            for (_ioapic_id, ioapic) in ioapic::get_ioapics().iter() {
+                let mut ioapic_ref = ioapic.lock();
 
                 // Set the BSP to receive regular PIC interrupts routed through the IoApic.
                 // Skip irq 2, since in the PIC that's the chained one (cascade line from PIC2 to PIC1) that isn't used.
                 for irq in (0x0 ..= 0x1).chain(0x3 ..= 0xF) {
-                    ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
+                    ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq)?;
                 }
 
                 // ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
@@ -361,7 +361,7 @@ fn handle_bsp_lapic_entry(madt_iter: MadtIter, page_table: &mut PageTable) -> Re
                 let mut ioapic_ref = ioapic.lock();
                 if ioapic_ref.handles_irq(int_src.gsi) {
                     // using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                    ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + IRQ_BASE_OFFSET); 
+                    ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi as u8 + IRQ_BASE_OFFSET)?;
                     trace!("MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}",
                         int_src.bus_source, int_src.irq_source, &{ int_src.gsi }, &{ int_src.flags }, ioapic_ref.id
                     );

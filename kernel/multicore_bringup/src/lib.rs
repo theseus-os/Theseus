@@ -4,6 +4,7 @@
 //! (the BSP -- bootstrap core) in order to jumpstart other cores.
 
 #![no_std]
+#![feature(let_chains)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -20,9 +21,11 @@ extern crate madt;
 extern crate mod_mgmt;
 extern crate ap_start;
 extern crate pause;
+extern crate cpu;
 
 use core::{
     convert::TryInto,
+    mem::size_of,
     ops::DerefMut,
     sync::atomic::Ordering,
 };
@@ -236,7 +239,8 @@ pub fn handle_ap_cores(
     }
 
     let all_lapics = get_lapics();
-    let me = current_cpu();
+    let this_cpu = current_cpu();
+    let this_cpu_as_u8: Result<u8, _> = this_cpu.value().try_into();
 
     // Copy the AP startup code (from the kernel's text section pages) into the AP_STARTUP physical address entry point.
     {
@@ -272,7 +276,7 @@ pub fn handle_ap_cores(
 
     for madt_entry in madt_iter.clone() {
         if let MadtEntry::LocalApic(lapic_entry) = madt_entry { 
-            if lapic_entry.apic_id == me {
+            if let Ok(this_cpu_as_u8) = this_cpu_as_u8 && this_cpu_as_u8 == lapic_entry.apic_id {
                 // debug!("skipping BSP's local apic");
             }
             else {
@@ -350,9 +354,9 @@ struct ApTrampolineData {
     /// The processor ID of the new AP that is being brought up.
     ap_processor_id:   Volatile<u8>,
     _padding0:         [u8; 7],
-    /// The APIC ID of the new AP that is being brought up.
-    ap_apic_id:        Volatile<u8>,
-    _padding1:         [u8; 7],
+    /// The CPU ID of the new AP that is being brought up.
+    ap_cpu_id:         Volatile<u32>,
+    _padding1:         [u8; 4],
     /// The physical address of the top-level P4 page table root (value of CR3).
     ap_page_table:     Volatile<PhysicalAddress>,
     /// The starting virtual address (bottom) of the stack that was allocated for the new AP.
@@ -379,6 +383,7 @@ struct ApTrampolineData {
     ap_gdt:            Volatile<u32>,
     _padding6:         [u8; 4],
 }
+const _: () = assert!(size_of::<ApTrampolineData>() == 12 * size_of::<u64>());
 
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
@@ -391,9 +396,11 @@ fn bring_up_ap(
     nmi_lint: u8, 
     nmi_flags: u16
 ) {
+    let new_apic_id = new_lapic.apic_id as u32; 
+
     ap_trampoline_data.ap_ready.write(0);
     ap_trampoline_data.ap_processor_id.write(new_lapic.processor);
-    ap_trampoline_data.ap_apic_id.write(new_lapic.apic_id);
+    ap_trampoline_data.ap_cpu_id.write(new_apic_id);
     ap_trampoline_data.ap_page_table.write(page_table_paddr);
     ap_trampoline_data.ap_stack_start.write(ap_stack.bottom());
     ap_trampoline_data.ap_stack_end.write(ap_stack.top_unusable());
@@ -404,10 +411,9 @@ fn bring_up_ap(
 
     // Give ownership of the stack we created for this AP to the `ap_start` crate, 
     // in which the AP will take ownership of it once it boots up.
-    ap_start::insert_ap_stack(new_lapic.apic_id, ap_stack); 
+    ap_start::insert_ap_stack(new_apic_id, ap_stack); 
 
-    info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_lapic.apic_id);
-    let new_apic_id = new_lapic.apic_id; 
+    info!("Bringing up AP, proc: {} apic_id: {}", new_lapic.processor, new_apic_id);
     
     bsp_lapic.clear_error();
     let esr = bsp_lapic.error();

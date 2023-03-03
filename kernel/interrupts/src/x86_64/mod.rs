@@ -1,13 +1,14 @@
 pub use pic::IRQ_BASE_OFFSET;
 
-use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
-use spin::Once;
 // use rtc;
-use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
+use cpu::CpuId;
 use locked_idt::LockedIdt;
 use log::{error, warn, info, debug};
+use memory::VirtualAddress;
+use spin::Once;
 use vga_buffer::println_raw;
+use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -70,7 +71,7 @@ pub fn init(
     double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) -> Result<&'static LockedIdt, &'static str> {
-    let bsp_id = apic::bootstrap_cpu().ok_or("couldn't get BSP's id")?;
+    let bsp_id = cpu::bootstrap_cpu().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
@@ -144,17 +145,17 @@ pub fn init(
 
 /// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
 pub fn init_ap(
-    apic_id: u8, 
+    cpu_id: CpuId, 
     double_fault_stack_top_unusable: VirtualAddress, 
     privilege_stack_top_unusable: VirtualAddress,
 ) -> Result<&'static LockedIdt, &'static str> {
-    info!("Setting up TSS & GDT for AP {}", apic_id);
-    gdt::create_and_load_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    info!("Setting up TSS & GDT for CPU {}", cpu_id);
+    gdt::create_and_load_tss_gdt(cpu_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // We've already created the IDT initially (currently all CPUs share the initial IDT),
-    // so we only need to re-load it here for each AP.
+    // so we only need to re-load it here for each AP (each secondary CPU).
     IDT.load();
-    info!("loaded IDT for AP {}.", apic_id);
+    info!("loaded IDT for CPU {}.", cpu_id);
     Ok(&IDT)
 }
 

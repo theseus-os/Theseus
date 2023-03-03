@@ -31,6 +31,9 @@ path = "../acpi"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.cpu]
+path = "../cpu"
+
 [dependencies.ap_start]
 path = "../ap_start"
 

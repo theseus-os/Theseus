@@ -5,15 +5,21 @@ extern crate alloc;
 extern crate spawn;
 extern crate scheduler;
 extern crate task;
+extern crate cpu;
+
+use core::convert::TryFrom;
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use cpu::CpuId;
 
 
 pub fn main(_args: Vec<String>) -> isize {
+    let cpu_1 = CpuId::try_from(1).expect("CPU ID 1 did not exist");
+
     let taskref1 = spawn::new_task_builder(worker, ())
         .name(String::from("test1"))
-        .pin_on_core(1)
+        .pin_on_cpu(cpu_1)
         .spawn().expect("failed to initiate task");
 
     if let Err(e) = scheduler::set_priority(&taskref1, 30) {
@@ -24,7 +30,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     let taskref2 = spawn::new_task_builder(worker, ())
         .name(String::from("test2"))
-        .pin_on_core(1)
+        .pin_on_cpu(cpu_1)
         .spawn().expect("failed to initiate task");
 
     if let Err(e) = scheduler::set_priority(&taskref2, 20) {
@@ -35,7 +41,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     let taskref3 = spawn::new_task_builder(worker, ())
         .name(String::from("test3"))
-        .pin_on_core(1)
+        .pin_on_cpu(cpu_1)
         .spawn().expect("failed to initiate task");
 
     if let Err(e) = scheduler::set_priority(&taskref3, 10) {

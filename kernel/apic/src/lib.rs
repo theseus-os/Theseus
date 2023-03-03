@@ -1,7 +1,8 @@
 #![no_std]
 #![feature(let_chains)]
 
-use core::{fmt, sync::atomic::{AtomicU32, Ordering}};
+use core::{fmt, sync::atomic::{AtomicU32, Ordering}, convert::TryFrom};
+use derive_more::*;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 use spin::Once;
@@ -15,9 +16,6 @@ use crossbeam_utils::atomic::AtomicCell;
 use pit_clock_basic::pit_wait;
 use bit_field::BitField;
 use log::{error, info, debug, trace};
-
-/// A unique identifier for a CPU core.
-pub type CpuId = u8;
 
 // Values for the `IA32_APIC_BASE` MSR.
 const IA32_APIC_IS_BSP:                u64 = 1 << 8;
@@ -38,6 +36,30 @@ const _APIC_TIMER_MODE_TSC_DEADLINE:   u32 = 0b10 << 17;
 pub const LOCAL_APIC_LVT_IRQ:          u8  = 0x22;
 
 
+/// A unique identifier for a Local APIC, i.e., a CPU on x86_64.
+#[derive(
+    Clone, Copy, Debug, Display, PartialEq, Eq, PartialOrd, Ord,
+    Hash, Binary, Octal, LowerHex, UpperHex,
+)]
+pub struct ApicId(u32);
+impl ApicId {
+    /// Returns the inner raw value read from the Local APIC ID register.
+    pub fn value(self) -> u32 {
+        self.0
+    }
+}
+impl TryFrom<u32> for ApicId {
+    type Error = u32;
+    fn try_from(raw_apic_id: u32) -> Result<Self, Self::Error> {
+        let apic_id = ApicId(raw_apic_id);
+        match get_lapics().get(&apic_id) {
+            Some(_) => Ok(apic_id),
+            None => Err(raw_apic_id),
+        }
+    }
+}
+
+
 /// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
 /// which will be set once those chips have been initialized.
@@ -55,18 +77,18 @@ pub enum InterruptChip {
 const _: () = assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
 /// The set of system-wide `LocalApic`s, one per CPU core.
-static LOCAL_APICS: AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
+static LOCAL_APICS: AtomicMap<ApicId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 
 /// The number of CPUs currently initialized in the system.
 /// This must match the number of Local APICs initialized in the system.
 static CPU_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// The processor id (from the ACPI MADT table) of the bootstrap CPU.
-static BSP_PROCESSOR_ID: Once<CpuId> = Once::new(); 
+static BSP_PROCESSOR_ID: Once<ApicId> = Once::new(); 
 
-/// Returns the ID of the bootstrap CPU (if known),
+/// Returns the APIC ID of the bootstrap CPU (if known),
 /// which is the first CPU to run after system power-on.
-pub fn bootstrap_cpu() -> Option<CpuId> {
+pub fn bootstrap_cpu() -> Option<ApicId> {
     BSP_PROCESSOR_ID.get().cloned()
 }
 
@@ -89,7 +111,7 @@ pub fn has_x2apic() -> bool {
 }
 
 /// Returns a reference to the list of LocalApics, one per CPU core.
-pub fn get_lapics() -> &'static AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> {
+pub fn get_lapics() -> &'static AtomicMap<ApicId, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
 }
 
@@ -101,8 +123,8 @@ pub fn cpu_count() -> u32 {
 }
 
 /// Returns the ID of the currently executing CPU.
-pub fn current_cpu() -> CpuId {
-    rdmsr(IA32_TSC_AUX) as CpuId
+pub fn current_cpu() -> ApicId {
+    ApicId(rdmsr(IA32_TSC_AUX) as u32)
 }
 
 /// Returns a reference to the LocalApic for the currently executing CPU core.
@@ -175,7 +197,7 @@ impl LapicTimerDivide {
 /// See Intel manual Figure 10-28, Vol. 3A, 10-45. (PDF page 3079) 
 pub enum LapicIpiDestination {
     /// Send IPI to a specific APIC 
-    One(CpuId),
+    One(ApicId),
     /// Send IPI to my own (the current) APIC  
     Me,
     /// Send IPI to all APICs, including myself
@@ -189,9 +211,9 @@ impl LapicIpiDestination {
         match *self {
             LapicIpiDestination::One(apic_id) => { 
                 if has_x2apic() {
-                    (apic_id as u64) << 32
+                    (apic_id.0 as u64) << 32
                 } else {
-                    (apic_id as u64) << 56
+                    (apic_id.0 as u64) << 56
                 }
             }
             LapicIpiDestination::Me       => 0b01 << 18, // 0x4_0000
@@ -252,9 +274,13 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
 #[repr(C)]
 pub struct ApicRegisters {
     _padding0:                        [u32; 8],
-    /// This Lapic's ID. Some systems allow setting the ID, but it is typically read-only.
+    /// This Local APIC's ID.
+    ///
+    /// Some processors (e.g., Intel ones prior to Nehalem) allow writing to the ID register,
+    /// but we define it as read-only for wider compatibility and because we have no reason
+    /// to write to it. See section 10.4.6 of Intel SDM.
     /// Only the top 8 bits are relevant, so bit shift it to the right by 24 bits to get the actual ID.
-    pub lapic_id:                     Volatile<u32>,         // 0x20
+    pub lapic_id:                     ReadOnly<u32>,         // 0x20
     _padding1:                        [u32; 3],
     pub lapic_version:                ReadOnly<u32>,         // 0x30
     _padding2:                        [u32; 3 + 4*4],
@@ -373,14 +399,15 @@ pub enum LapicInitError {
     NotAP,
     /// Invalid NMI local interrupt pin value; given by the included `u8`.
     InvalidNmiLint(u8),
+    /// The actual APIC ID did not match the provided expected APIC ID.
     UnexpectedApicID {
-        expected: u8,
-        actual: u8,
+        expected: u32,
+        actual: ApicId,
     },
     /// An error occurred while mapping the Local APIC's MMIO registers into memory.
     MemoryMappingError(&'static str),
-    /// The Local APIC already existed (BUG), given by the included `u8` APIC ID.
-    AlreadyExisted(u8),
+    /// The Local APIC already existed (BUG), given by the included `ApicId`.
+    AlreadyExisted(ApicId),
 }
 
 
@@ -390,7 +417,7 @@ pub struct LocalApic {
     /// The inner lapic object that disambiguates between xapic and x2apic.
     inner: LapicType,
     /// The hardware-provided ID of this Local APIC.
-    apic_id: u8,
+    apic_id: ApicId,
     /// The processor ID of this APIC (from the `MADT` ACPI table entry).
     /// This is currently not used for anything in Theseus.
     processor_id: u8,
@@ -404,7 +431,7 @@ impl fmt::Debug for LocalApic {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("LocalApic")
             .field("type", &self.inner)
-            .field("apic_id", &self.apic_id)
+            .field("apic_id", &self.apic_id.0)
             .field("processor_id", &self.processor_id)
             .field("is_bootstrap_cpu", &self.is_bootstrap_cpu)
             .finish_non_exhaustive()
@@ -442,7 +469,7 @@ impl LocalApic {
     pub fn init(
         page_table: &mut PageTable,
         processor_id: u8,
-        expected_apic_id: Option<u8>,
+        expected_apic_id: Option<u32>,
         should_be_bsp: bool,
         nmi_lint: u8,
         nmi_flags: u16,
@@ -494,14 +521,14 @@ impl LocalApic {
 		let mut lapic = LocalApic {
             inner,
             processor_id,
-            apic_id: CpuId::MAX, // placeholder, is replaced below.
+            apic_id: ApicId(u32::MAX), // placeholder, is replaced below.
             is_bootstrap_cpu,
             initial_timer_count: 0, // set in `calibrate_lapic_timer()`
         };
 
         // Now that the APIC hardware is enabled, we can safely obtain this Local APIC's ID.
         let actual_apic_id = lapic.read_apic_id();
-        if let Some(expected) = expected_apic_id && expected != actual_apic_id {
+        if let Some(expected) = expected_apic_id && expected != actual_apic_id.0 {
             return Err(LapicInitError::UnexpectedApicID { expected, actual: actual_apic_id });
         }
 
@@ -512,7 +539,7 @@ impl LocalApic {
         info!("Initialized new CPU ({:?})", lapic);
 
         // Theseus uses this MSR to hold each CPU's ID (which is an OS-chosen value).
-        unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id as u64); }
+        unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id.0 as u64); }
         if is_bootstrap_cpu {
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
@@ -706,15 +733,17 @@ impl LocalApic {
     /// Returns the ID of this Local APIC (fast).
     /// 
     /// Unlike [`LocalApic::read_apic_id()`], this does not read any hardware registers.
-    pub fn apic_id(&self) -> u8 { self.apic_id }
+    pub fn apic_id(&self) -> ApicId { self.apic_id }
 
     /// Reads the hardware-provided ID of this Local APIC from its registers (slow).
-    pub fn read_apic_id(&self) -> u8 {
+    ///
+    /// The semantics of this are defined in section 10.4.6 of the Intel SDM.
+    pub fn read_apic_id(&self) -> ApicId {
         match &self.inner {
-            LapicType::X2Apic => rdmsr(IA32_X2APIC_APICID) as u32 as u8,
+            LapicType::X2Apic => ApicId(rdmsr(IA32_X2APIC_APICID) as u32),
             LapicType::XApic(regs) => {
                 let raw = regs.lapic_id.read();
-                (raw >> 24) as u8
+                ApicId(raw >> 24)
             }
         }
     }

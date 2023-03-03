@@ -20,6 +20,9 @@ path = "../../kernel/acpi/hpet"
 [dependencies.apic]
 path = "../../kernel/apic"
 
+[dependencies.cpu]
+path = "../../kernel/cpu"
+
 [dependencies.runqueue]
 path = "../../kernel/runqueue"
 

@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
  "early_tls",
  "interrupts",
  "irq_safety",
@@ -111,6 +112,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "crossbeam-utils",
+ "derive_more",
  "irq_safety",
  "kernel_config",
  "log",
@@ -301,6 +303,7 @@ dependencies = [
  "apic",
  "app_io",
  "async_channel",
+ "cpu",
  "fs_node",
  "getopts",
  "heapfile",
@@ -607,6 +610,9 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cortex-a",
+ "derive_more",
+ "tock-registers",
 ]
 
 [[package]]
@@ -1275,6 +1281,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",
@@ -1375,6 +1382,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
+ "cpu",
  "getopts",
  "hashbrown",
  "heap",
@@ -1507,6 +1515,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cortex-a",
+ "cpu",
  "exceptions_early",
  "gdt",
  "gic",
@@ -1547,6 +1556,7 @@ dependencies = [
 name = "ioapic"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "atomic_linked_list",
  "log",
  "memory",
@@ -1730,6 +1740,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
+ "cpu",
  "hashbrown",
  "hpet",
  "libm",
@@ -2157,6 +2168,7 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
+ "cpu",
  "kernel_config",
  "log",
  "madt",
@@ -2678,6 +2690,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
+ "cpu",
  "irq_safety",
  "lazy_static",
  "log",
@@ -2707,6 +2720,7 @@ name = "preemption"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
  "log",
 ]
 
@@ -3143,6 +3157,7 @@ name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
  "app_io",
+ "cpu",
  "getopts",
  "scheduler",
  "spawn",
@@ -3641,6 +3656,7 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3745,6 +3761,7 @@ dependencies = [
  "framebuffer_drawer",
  "getopts",
  "hpet",
+ "libtest",
  "log",
  "rendezvous",
  "runqueue",
@@ -3846,6 +3863,7 @@ dependencies = [
 name = "test_scheduler"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "log",
  "scheduler",
  "spawn",
