@@ -35,7 +35,7 @@ pub fn insert_ap_stack(cpu_id: u32 , stack: Stack) {
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
 pub fn kstart_ap(
-    processor_id: u8,
+    processor_id: u32,
     cpu_id: CpuId,
     _stack_start: VirtualAddress,
     _stack_end: VirtualAddress,
