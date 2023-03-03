@@ -831,12 +831,12 @@ fn task_switch_inner(
     //     return (false, preemption_guard);
     // }
     // if next.is_running() {
-    //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", cpu_id, curr, next);
+    //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on CPU {}!\nCurrent: {:?} Next: {:?}", cpu_id, curr, next);
     //     return (false, preemption_guard);
     // }
     // if let Some(pc) = next.pinned_cpu() {
     //     if pc != cpu_id {
-    //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, cpu_id, curr, next);
+    //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to CPU {:?} but scheduled on CPU {}!\n\tCurrent: {:?}, Next: {:?}", pc, cpu_id, curr, next);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -854,7 +854,7 @@ fn task_switch_inner(
     //     if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
     //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
     //     } else {
-    //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", cpu_id);
+    //         error!("task_switch(): failed to set CPU {} TSS RSP0, aborting task switch!", cpu_id);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -1123,7 +1123,7 @@ pub fn bootstrap_task(
         bootstrap_task_id, 
         Some(joinable_taskref.clone()),
     ) else {
-        error!("BUG: failed to set boostrapped task as current task on AP {}", cpu_id);
+        error!("BUG: failed to set boostrapped task as current task on CPU {}", cpu_id);
         // Don't drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
         let _task_ref = NoDrop::new(joinable_taskref);
