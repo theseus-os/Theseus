@@ -420,6 +420,23 @@
 <a href="#420" id="420">420</a>
 <a href="#421" id="421">421</a>
 <a href="#422" id="422">422</a>
+<a href="#423" id="423">423</a>
+<a href="#424" id="424">424</a>
+<a href="#425" id="425">425</a>
+<a href="#426" id="426">426</a>
+<a href="#427" id="427">427</a>
+<a href="#428" id="428">428</a>
+<a href="#429" id="429">429</a>
+<a href="#430" id="430">430</a>
+<a href="#431" id="431">431</a>
+<a href="#432" id="432">432</a>
+<a href="#433" id="433">433</a>
+<a href="#434" id="434">434</a>
+<a href="#435" id="435">435</a>
+<a href="#436" id="436">436</a>
+<a href="#437" id="437">437</a>
+<a href="#438" id="438">438</a>
+<a href="#439" id="439">439</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on aarch64.
 //! `memory` uses this crate to get the memory layout and do other arch-specific operations on aarch64.  
 //! 
@@ -730,10 +747,17 @@
         // | (2)  | .text             | end of executable pages       |
         // | (3)  | .rodata           | start of read-only pages      |
         // | (4)  | .eh_frame         | part of read-only pages       |
-        // | (5)  | .gcc_except_table | end of read-only pages        |
-        // | (6)  | .data             | start of read-write pages     | 
-        // | (7)  | .bss              | end of read-write pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     |
+        // | (9)  | .bss              | end of read-write pages       |
         // |------|-------------------|-------------------------------|
+        //
+        // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
+        // because they contain read-only initializer data &quot;images&quot; for each TLS area.
+        // In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,
+        // so there&#39;s no point in keeping it around.
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         </span><span class="kw">let </span>static_str_name = <span class="kw">match </span>section.name() {
@@ -761,6 +785,16 @@
                 rodata_flags = <span class="prelude-val">Some</span>(flags);
                 <span class="string">&quot;nano_core .gcc_except_table&quot;
             </span>}
+            <span class="comment">// The following four sections are optional: .tdata, .tbss, .data, .bss.
+            </span><span class="string">&quot;.tdata&quot; </span>=&gt; {
+                rodata_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                <span class="string">&quot;nano_core .tdata&quot;
+            </span>}
+            <span class="string">&quot;.tbss&quot; </span>=&gt; {
+                <span class="comment">// Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                </span><span class="macro">debug!</span>(<span class="string">&quot;     no need to map kernel section \&quot;.tbss\&quot;, it contains no content&quot;</span>);
+                <span class="kw">continue</span>;
+            }
             <span class="string">&quot;.data&quot; </span>=&gt; {
                 data_start.get_or_insert((start_virt_addr, start_phys_addr));
                 data_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
