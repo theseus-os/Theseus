@@ -420,7 +420,7 @@ pub struct LocalApic {
     apic_id: ApicId,
     /// The processor ID of this APIC (from the `MADT` ACPI table entry).
     /// This is currently not used for anything in Theseus.
-    processor_id: u8,
+    processor_id: u32,
     /// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
     is_bootstrap_cpu: bool,
     /// The value that should be written to the APIC timer's initial count register
@@ -468,7 +468,7 @@ impl LocalApic {
     /// the BSP cannot invoke this for other APs.
     pub fn init(
         page_table: &mut PageTable,
-        processor_id: u8,
+        processor_id: u32,
         expected_apic_id: Option<u32>,
         should_be_bsp: bool,
         nmi_lint: u8,
@@ -558,7 +558,7 @@ impl LocalApic {
     /// 
     /// This value comes from the `MADT` ACPI table entry that was used
     /// to boot up this CPU core.
-    pub fn processor_id(&self) -> u8 { self.processor_id }
+    pub fn processor_id(&self) -> u32 { self.processor_id }
 
     /// Returns `true` if this CPU core was the BootStrap Processor (BSP),
     /// i.e., the first CPU to boot and run the OS code.
@@ -644,7 +644,7 @@ impl LocalApic {
             }
             LapicType::XApic(regs) => {
                 regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
-                regs.timer_initial_count.write(INITIAL_COUNT as u32);
+                regs.timer_initial_count.write(INITIAL_COUNT);
 
                 // wait for the given period using the PIT clock
                 pit_wait(microseconds).unwrap();
@@ -686,7 +686,7 @@ impl LocalApic {
                 regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
                 // map APIC timer to an interrupt handler in the IDT
                 regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_MODE_PERIODIC); 
-                regs.timer_initial_count.write(apic_period as u32); 
+                regs.timer_initial_count.write(apic_period); 
 
                 regs.lvt_thermal.write(0);
                 regs.lvt_error.write(0);
