@@ -24,7 +24,7 @@ use spin::Mutex;
 /// The blocker can be used to block a task until the waker is woken.
 pub fn new_waker<W>(wake_action: W) -> (core::task::Waker, Blocker)
 where
-    W: Fn() + Send + Sync + 'static, // required by the bounds on core::task::Waker::from
+    W: Fn() + Send + Sync + 'static, // required by bounds on `core::task::Waker::from`
 {
     let woken = Arc::new(Mutex::new(false));
     (
@@ -53,6 +53,11 @@ impl Blocker {
     /// If the waker was already woken prior to this function being called,
     /// it will return immediately.
     ///
+    /// After this function returns, the inner state of the blocker+waker pair
+    /// will have been reset to its initial "unwoken" state, enabling them to be re-used.
+    /// In other words, this function can be called again, at which point it will
+    /// block until the waker is woken again.
+    ///
     /// # Arguments
     /// * `block_action`: a closure that is called in a loop until its woker is woken.
     ///    The return value `R` of the closure is any arbitrary value that will be held until
@@ -67,9 +72,10 @@ impl Blocker {
         // that it did not get woken prior to registering the waker;
         // otherwise, the waker will never be woken, and this function will loop forever.
         loop {
-            let woken = self.woken.lock();
+            let mut woken = self.woken.lock();
             if *woken {
-                // *woken = false;  // To @tsoutsman: why do this? there's no point, right?
+                // Setting woken back to false enables this blocker+waker to be re-used.
+                *woken = false;
                 return;
             } else {
                 let r = block_action();

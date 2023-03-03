@@ -221,6 +221,16 @@ impl TaskRef {
             *self.0.exit_value_mailbox.lock() = Some(val);
             self.0.task.runstate().store(RunState::Exited);
 
+            // Synchronize with the acquire fence in `JoinableTaskRef::join()`,
+            // as we have just stored the exit value that `join()` will load.
+            fence(Ordering::Release);
+
+            // Now that we have set the exit value and marked the task as exited,
+            // it is safe to wake any other tasks that are waiting for this task to exit.
+            if let Some(waker) = self.0.task.inner().lock().waker.take() {
+                waker.wake();
+            }
+
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.is_running() {
@@ -232,14 +242,7 @@ impl TaskRef {
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             }
-            
-            // Now that we have set the exit value and marked the task as exited,
-            // it is safe to wake any other tasks that are waiting for this task to exit.
-            if let Some(waker) = self.0.task.inner().lock().waker.take() {
-                waker.wake();
-            }
         }
-
         Ok(())
     }
 
@@ -429,14 +432,13 @@ impl JoinableTaskRef {
             blocker.block(block_action);
         }
         
-        // @tsoutsman: double-check my reasoning in the comments below.
-        //
-        // Note: previously, we waited for this task to actually stop running;
-        //       however, I don't think there's any need to actually do that.
+        // Note: previously, we waited for this task to actually stop running,
+        //       but this isn't actually necessary since we only care whether
+        //       the task has exited and its exit value has been written.
         // while self.is_running() { }
 
-        // Synchronize with the release fence from when this task first ran
-        // (in `spawn::task_wrapper()`).
+        // Synchronize with the release fence in`TaskRef::internal_exit`
+        // when the exit value for this task was stored.
         fence(Ordering::Acquire);
 
         self.reap_exit_value()
