@@ -270,6 +270,7 @@
 <a href="#270" id="270">270</a>
 <a href="#271" id="271">271</a>
 <a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate logs all the faults occuring within Theseus. 
 //! Maintains a list of exceptions and panics that has occured since booting up. 
 //! This crate does not hold reference to any task or app. 
@@ -291,6 +292,7 @@
     string::{String,ToString},
     vec::Vec,
 };
+<span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>core::panic::PanicInfo;
@@ -358,8 +360,8 @@
     </span><span class="kw">pub </span>fault_type: FaultType,
     <span class="doccomment">/// Error code returned with the exception
     </span><span class="kw">pub </span>error_code: <span class="prelude-ty">Option</span>&lt;u64&gt;,
-    <span class="doccomment">/// The core error occured
-    </span><span class="kw">pub </span>core: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    <span class="doccomment">/// The ID of the CPU on which the error occured.
+    </span><span class="kw">pub </span>cpu: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
     <span class="doccomment">/// Task runnning immediately before the Exception
     </span><span class="kw">pub </span>running_task: <span class="prelude-ty">Option</span>&lt;String&gt;,
     <span class="doccomment">/// If available the application crate that spawned the task
@@ -384,7 +386,7 @@
         FaultEntry {
             fault_type,
             error_code: <span class="prelude-val">None</span>,
-            core: <span class="prelude-val">None</span>,
+            cpu: <span class="prelude-val">None</span>,
             running_task: <span class="prelude-val">None</span>,
             running_app_crate: <span class="prelude-val">None</span>,
             address_accessed: <span class="prelude-val">None</span>,
@@ -413,7 +415,7 @@
 ) {
 
     <span class="comment">// Add the core the fault was detected
-    </span>fe.core = <span class="prelude-val">Some</span>(cpu::current_cpu());
+    </span>fe.cpu = <span class="prelude-val">Some</span>(cpu::current_cpu());
 
     <span class="comment">// If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.

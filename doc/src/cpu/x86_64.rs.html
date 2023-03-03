@@ -31,21 +31,93 @@
 <a href="#31" id="31">31</a>
 <a href="#32" id="32">32</a>
 <a href="#33" id="33">33</a>
-</pre><pre class="rust"><code><span class="kw">use </span>core::fmt;
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
+<a href="#39" id="39">39</a>
+<a href="#40" id="40">40</a>
+<a href="#41" id="41">41</a>
+<a href="#42" id="42">42</a>
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
+<a href="#46" id="46">46</a>
+<a href="#47" id="47">47</a>
+<a href="#48" id="48">48</a>
+<a href="#49" id="49">49</a>
+<a href="#50" id="50">50</a>
+<a href="#51" id="51">51</a>
+<a href="#52" id="52">52</a>
+<a href="#53" id="53">53</a>
+<a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+<a href="#65" id="65">65</a>
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+</pre><pre class="rust"><code><span class="doccomment">//! Implements functions for accessing CPU-specific information on x86_64,
+//! which is primarily a simple wrapper around [`apic`]-provided features.
 
-<span class="kw">pub use </span>apic::{
-    CpuId,
-    cpu_count,
-    bootstrap_cpu,
-    is_bootstrap_cpu,
-    current_cpu,
-};
+</span><span class="kw">use </span>core::fmt;
 
-<span class="doccomment">/// A wrapper around `Option&lt;CpuId&gt;` with a forced type alignment of 2 bytes,
+<span class="kw">use </span><span class="kw">crate</span>::CpuId;
+<span class="kw">use </span>apic::ApicId;
+
+<span class="kw">impl </span>From&lt;ApicId&gt; <span class="kw">for </span>CpuId {
+    <span class="kw">fn </span>from(apic_id: ApicId) -&gt; <span class="self">Self </span>{
+        CpuId(apic_id.value())
+    }
+}
+
+<span class="kw">impl </span>TryFrom&lt;u32&gt; <span class="kw">for </span>CpuId {
+    <span class="kw">type </span>Error = u32;
+    <span class="kw">fn </span>try_from(raw_cpu_id: u32) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
+        ApicId::try_from(raw_cpu_id)
+            .map(Into::into)
+    }
+}
+
+
+<span class="doccomment">/// Returns the number of CPUs (SMP cores) that exist and
+/// are currently initialized on this system.
+</span><span class="kw">pub fn </span>cpu_count() -&gt; u32 {
+    apic::cpu_count()
+}
+
+<span class="doccomment">/// Returns the ID of the bootstrap CPU (if known), which
+/// is the first CPU to run after system power-on.
+</span><span class="kw">pub fn </span>bootstrap_cpu() -&gt; <span class="prelude-ty">Option</span>&lt;CpuId&gt; {
+    apic::bootstrap_cpu().map(Into::into)
+}
+
+<span class="doccomment">/// Returns true if the currently executing CPU is the bootstrap
+/// CPU, i.e., the first CPU to run after system power-on.
+</span><span class="kw">pub fn </span>is_bootstrap_cpu() -&gt; bool {
+    apic::is_bootstrap_cpu()
+}
+
+<span class="doccomment">/// Returns the ID of the currently executing CPU.
+</span><span class="kw">pub fn </span>current_cpu() -&gt; CpuId {
+    apic::current_cpu().into()
+}
+
+<span class="doccomment">/// A wrapper around `Option&lt;CpuId&gt;` with a forced type alignment of 8 bytes,
 /// which guarantees that it compiles down to lock-free native atomic instructions
 /// when using it inside of an atomic type like [`AtomicCell`].
 </span><span class="attr">#[derive(Copy, Clone)]
-#[repr(align(<span class="number">2</span>))]
+#[repr(align(<span class="number">8</span>))]
 </span><span class="kw">pub struct </span>OptionalCpuId(<span class="prelude-ty">Option</span>&lt;CpuId&gt;);
 <span class="kw">impl </span>From&lt;<span class="prelude-ty">Option</span>&lt;CpuId&gt;&gt; <span class="kw">for </span>OptionalCpuId {
     <span class="kw">fn </span>from(opt: <span class="prelude-ty">Option</span>&lt;CpuId&gt;) -&gt; <span class="self">Self </span>{

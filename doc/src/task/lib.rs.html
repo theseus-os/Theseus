@@ -1151,6 +1151,7 @@
 <a href="#1151" id="1151">1151</a>
 <a href="#1152" id="1152">1152</a>
 <a href="#1153" id="1153">1153</a>
+<a href="#1154" id="1154">1154</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1196,6 +1197,7 @@
     sync::atomic::{AtomicBool, fence, Ordering},
     task::Waker,
 };
+<span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>irq_safety::{hold_interrupts, MutexIrqSafe};
 <span class="kw">use </span>log::error;
@@ -1758,7 +1760,7 @@
 
         <span class="kw">let </span>cpu_id = preemption_guard.cpu_id();
 
-        <span class="kw">let </span><span class="prelude-val">Some</span>(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) <span class="kw">else </span>{
+        <span class="kw">let </span><span class="prelude-val">Some</span>(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) <span class="kw">else </span>{
             <span class="kw">return </span><span class="bool-val">false</span>; <span class="comment">// keep running the same current task
         </span>};
 
@@ -1801,7 +1803,7 @@
 ///
 /// ## Arguments
 /// * `next`: the task to switch to.
-/// * `apic_id`: the ID of the current CPU.
+/// * `cpu_id`: the ID of the current CPU.
 /// * `preemption_guard`: a guard that is used to ensure preemption is disabled
 ///    for the duration of this task switch operation.
 ///
@@ -1828,7 +1830,7 @@
 /// the given `next` `Task`&#39;s inner state in order to mutate them.
 </span><span class="kw">pub fn </span>task_switch(
     next: TaskRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -&gt; (bool, PreemptionGuard) {
 
@@ -1836,7 +1838,7 @@
     // the borrowed reference to the current task is guaranteed to be dropped
     // *before* the actual context switch operation occurs.
     </span><span class="kw">let </span>result = with_current_task_tls_slot_mut(
-        |curr, p_guard| task_switch_inner(curr, next, apic_id, p_guard),
+        |curr, p_guard| task_switch_inner(curr, next, cpu_id, p_guard),
         preemption_guard,
     );
     
@@ -1962,7 +1964,7 @@
 </span><span class="kw">fn </span>task_switch_inner(
     curr_task_tls_slot: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
     next: TaskRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskSwitchInnerRet, (bool, PreemptionGuard)&gt; {
     <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>curr) = curr_task_tls_slot <span class="kw">else </span>{
@@ -1975,7 +1977,7 @@
         <span class="kw">return </span><span class="prelude-val">Err</span>((<span class="bool-val">false</span>, preemption_guard));
     }
 
-    <span class="comment">// trace!(&quot;task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}&quot;, apic_id, curr, next, irq_safety::interrupts_enabled());
+    <span class="comment">// trace!(&quot;task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}&quot;, cpu_id, curr, next, irq_safety::interrupts_enabled());
 
     // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
     // if !next.is_runnable() {
@@ -1983,12 +1985,12 @@
     //     return (false, preemption_guard);
     // }
     // if next.is_running() {
-    //     error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was already running on AP {}!\nCurrent: {:?} Next: {:?}&quot;, apic_id, curr, next);
+    //     error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was already running on CPU {}!\nCurrent: {:?} Next: {:?}&quot;, cpu_id, curr, next);
     //     return (false, preemption_guard);
     // }
-    // if let Some(pc) = next.pinned_core() {
-    //     if pc != apic_id {
-    //         error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}&quot;, pc, apic_id, curr, next);
+    // if let Some(pc) = next.pinned_cpu() {
+    //     if pc != cpu_id {
+    //         error!(&quot;BUG: Skipping task_switch due to scheduler bug: chosen &#39;next&#39; Task was pinned to CPU {:?} but scheduled on CPU {}!\n\tCurrent: {:?}, Next: {:?}&quot;, pc, cpu_id, curr, next);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -2006,7 +2008,7 @@
     //     if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
     //         // debug!(&quot;task_switch [2]: new_tss_rsp = {:#X}&quot;, new_tss_rsp0);
     //     } else {
-    //         error!(&quot;task_switch(): failed to set AP {} TSS RSP0, aborting task switch!&quot;, apic_id);
+    //         error!(&quot;task_switch(): failed to set CPU {} TSS RSP0, aborting task switch!&quot;, cpu_id);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -2074,7 +2076,7 @@
     // in task runstates, e.g., when an interrupt handler accesses the current task context.
     </span>{
         <span class="kw">let </span>_held_interrupts = hold_interrupts();
-        next.<span class="number">0</span>.task.running_on_cpu().store(<span class="prelude-val">Some</span>(apic_id).into());
+        next.<span class="number">0</span>.task.running_on_cpu().store(<span class="prelude-val">Some</span>(cpu_id).into());
         next.set_as_current_task();
         drop(_held_interrupts);
     }
@@ -2242,7 +2244,7 @@
 /// ## Note
 /// This function does not add the new task to any runqueue.
 </span><span class="kw">pub fn </span>bootstrap_task(
-    apic_id: u8, 
+    cpu_id: CpuId, 
     stack: NoDrop&lt;Stack&gt;,
     kernel_mmi_ref: MmiRef,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(JoinableTaskRef, ExitableTaskRef), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -2259,7 +2261,7 @@
             app_crate: <span class="prelude-val">None</span>,
         },
     )<span class="question-mark">?</span>;
-    bootstrap_task.name = <span class="macro">format!</span>(<span class="string">&quot;bootstrap_task_core_{apic_id}&quot;</span>);
+    bootstrap_task.name = <span class="macro">format!</span>(<span class="string">&quot;bootstrap_task_cpu_{cpu_id}&quot;</span>);
     <span class="kw">let </span>bootstrap_task_id = bootstrap_task.id;
     <span class="kw">let </span>joinable_taskref = TaskRef::create(
         bootstrap_task,
@@ -2267,15 +2269,15 @@
     );
     <span class="comment">// Update other relevant states for this new bootstrapped task.
     </span>joinable_taskref.<span class="number">0</span>.task.runstate().store(RunState::Runnable);
-    joinable_taskref.<span class="number">0</span>.task.running_on_cpu().store(<span class="prelude-val">Some</span>(apic_id).into()); 
-    joinable_taskref.<span class="number">0</span>.task.inner().lock().pinned_core = <span class="prelude-val">Some</span>(apic_id); <span class="comment">// can only run on this CPU core
+    joinable_taskref.<span class="number">0</span>.task.running_on_cpu().store(<span class="prelude-val">Some</span>(cpu_id).into()); 
+    joinable_taskref.<span class="number">0</span>.task.inner().lock().pinned_cpu = <span class="prelude-val">Some</span>(cpu_id); <span class="comment">// can only run on this CPU core
     // Set this task as this CPU&#39;s current task, as it&#39;s already running.
     </span>joinable_taskref.set_as_current_task();
     <span class="kw">let </span><span class="prelude-val">Ok</span>(exitable_taskref) = init_current_task(
         bootstrap_task_id, 
         <span class="prelude-val">Some</span>(joinable_taskref.clone()),
     ) <span class="kw">else </span>{
-        <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set boostrapped task as current task on AP {}&quot;</span>, apic_id);
+        <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set boostrapped task as current task on CPU {}&quot;</span>, cpu_id);
         <span class="comment">// Don&#39;t drop the bootstrap task upon error, because it contains the stack
         // used for the currently running code -- that would trigger an exception.
         </span><span class="kw">let </span>_task_ref = NoDrop::new(joinable_taskref);

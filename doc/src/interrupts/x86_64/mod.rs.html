@@ -367,16 +367,18 @@
 <a href="#367" id="367">367</a>
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
 </pre><pre class="rust"><code><span class="kw">pub use </span>pic::IRQ_BASE_OFFSET;
 
-<span class="kw">use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
-<span class="kw">use </span>spin::Once;
 <span class="comment">// use rtc;
-</span><span class="kw">use </span>memory::VirtualAddress;
-<span class="kw">use </span>apic::{INTERRUPT_CHIP, InterruptChip};
+</span><span class="kw">use </span>apic::{INTERRUPT_CHIP, InterruptChip};
+<span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>locked_idt::LockedIdt;
 <span class="kw">use </span>log::{error, warn, info, debug};
+<span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>spin::Once;
 <span class="kw">use </span>vga_buffer::println_raw;
+<span class="kw">use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 
 <span class="doccomment">/// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -439,7 +441,7 @@
     double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>LockedIdt, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>bsp_id = apic::bootstrap_cpu().ok_or(<span class="string">&quot;couldn&#39;t get BSP&#39;s id&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bsp_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;couldn&#39;t get BSP&#39;s id&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Setting up TSS &amp; GDT for BSP (id {})&quot;</span>, bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
@@ -513,17 +515,17 @@
 
 <span class="doccomment">/// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
 </span><span class="kw">pub fn </span>init_ap(
-    apic_id: u8, 
+    cpu_id: CpuId, 
     double_fault_stack_top_unusable: VirtualAddress, 
     privilege_stack_top_unusable: VirtualAddress,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>LockedIdt, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="macro">info!</span>(<span class="string">&quot;Setting up TSS &amp; GDT for AP {}&quot;</span>, apic_id);
-    gdt::create_and_load_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    <span class="macro">info!</span>(<span class="string">&quot;Setting up TSS &amp; GDT for CPU {}&quot;</span>, cpu_id);
+    gdt::create_and_load_tss_gdt(cpu_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     <span class="comment">// We&#39;ve already created the IDT initially (currently all CPUs share the initial IDT),
-    // so we only need to re-load it here for each AP.
+    // so we only need to re-load it here for each AP (each secondary CPU).
     </span>IDT.load();
-    <span class="macro">info!</span>(<span class="string">&quot;loaded IDT for AP {}.&quot;</span>, apic_id);
+    <span class="macro">info!</span>(<span class="string">&quot;loaded IDT for CPU {}.&quot;</span>, cpu_id);
     <span class="prelude-val">Ok</span>(<span class="kw-2">&amp;</span>IDT)
 }
 

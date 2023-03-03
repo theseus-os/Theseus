@@ -142,6 +142,12 @@
 <a href="#142" id="142">142</a>
 <a href="#143" id="143">143</a>
 <a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.
 //! 
 //! Supports enabling and disabling preemption for the purpose of 
@@ -153,26 +159,30 @@
 </span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>core::sync::atomic::{AtomicU8, Ordering};
+<span class="kw">use </span>cpu::CpuId;
 
-<span class="doccomment">/// Theseus uses a `u8` to hold each CPU core&#39;s ID (apic ID),
-/// so the maximum number of cores it supports is `u8::MAX` (256).
-</span><span class="kw">const </span>MAX_CPU_CORES: usize = u8::MAX <span class="kw">as </span>usize;
+<span class="doccomment">/// Theseus previously used a `u8` to hold each CPU core&#39;s ID
+/// so the maximum number of cores it supports is 256.
+///
+/// In the future, we will use CPU-local storage for each CPU&#39;s preemption count,
+/// so we won&#39;t need to use a system-wide primitive array here.
+</span><span class="kw">const </span>MAX_CPU_CORES: usize = <span class="number">256</span>;
 
 <span class="attr">#[allow(clippy::declare_interior_mutable_const)]
 </span><span class="kw">const </span>ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(<span class="number">0</span>);
 
 <span class="doccomment">/// The per-core preemption count, indexed by a CPU core&#39;s APIC ID.
-/// 
-/// If a CPU&#39;s count is `0`, preemption is enabled.
-/// If a CPU&#39;s count is greater than `0`, preemption is disabled.
+///
+/// If a CPU&#39;s preemption count is `0`, preemption is enabled.
+/// If a CPU&#39;s preemption count is greater than `0`, preemption is disabled.
 </span><span class="kw">static </span>PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CORES];
 
 
 <span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.
 </span><span class="kw">pub fn </span>hold_preemption() -&gt; PreemptionGuard {
-    <span class="kw">let </span>cpu_id = apic::current_cpu();
-    <span class="kw">let </span>prev_val = PREEMPTION_COUNT[cpu_id <span class="kw">as </span>usize].fetch_add(<span class="number">1</span>, Ordering::Relaxed);
+    <span class="kw">let </span>cpu_id = cpu::current_cpu();
+    <span class="kw">let </span>prev_val = PREEMPTION_COUNT[cpu_id.value() <span class="kw">as </span>usize].fetch_add(<span class="number">1</span>, Ordering::Relaxed);
     <span class="comment">// If the previous counter value was 0, that indicates we are transitioning
     // from preemption being enabled to disabled on this CPU.
     </span><span class="kw">let </span>preemption_was_enabled = prev_val == <span class="number">0</span>;
@@ -188,6 +198,7 @@
         
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
+        </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
         </span>apic::get_my_apic()
             .expect(<span class="string">&quot;BUG: hold_preemption() couldn&#39;t get local APIC&quot;</span>)
             .write()
@@ -202,21 +213,21 @@
 
 
 <span class="doccomment">/// A guard type that ensures preemption is disabled as long as it is held.
-/// 
+///
 /// Call [`hold_preemption()`] to obtain a `PreemptionGuard`.
-/// 
+///
 /// Preemption *may* be re-enabled when this guard is dropped,
 /// but not necessarily so, because other previous functions 
 /// in the call stack may have already acquired a `PreemptionGuard`.
-/// 
+///
 /// This type does not implement `Send` because it is invalid
 /// to move it across a &quot;thread&quot; boundary (into a different task).
 </span><span class="kw">pub struct </span>PreemptionGuard {
     <span class="doccomment">/// The ID of the CPU on which preemption was held.
-    /// 
+    ///
     /// This is mostly used for strict sanity checks to ensure that
     /// a guard isn&#39;t created on one CPU and then dropped on a different CPU.
-    </span>cpu_id: u8,
+    </span>cpu_id: CpuId,
     <span class="doccomment">/// Whether preemption was enabled when this guard was created.
     </span>preemption_was_enabled: bool,
 }
@@ -230,7 +241,7 @@
 
 </span><span class="kw">impl </span>PreemptionGuard {
     <span class="doccomment">/// Returns whether preemption was originally enabled when this guard was created.
-    /// 
+    ///
     /// # Return
     /// * `true`: indicates that the caller function/task holding this guard
     ///    was the one that caused the transition from preemption
@@ -243,27 +254,28 @@
     }
 
     <span class="doccomment">/// Returns the ID of the CPU on which this guard was created.
-    </span><span class="kw">pub fn </span>cpu_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 {
+    </span><span class="kw">pub fn </span>cpu_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; CpuId {
         <span class="self">self</span>.cpu_id
     }
 }
 
 <span class="kw">impl </span>Drop <span class="kw">for </span>PreemptionGuard {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="kw">let </span>cpu_id = apic::current_cpu();
+        <span class="kw">let </span>cpu_id = cpu::current_cpu();
         <span class="macro">assert!</span>(
             <span class="self">self</span>.cpu_id == cpu_id,
             <span class="string">&quot;PreemptionGuard::drop(): BUG: CPU IDs did not match! \
             This indicates an unexpected task migration across CPUs.&quot;
         </span>);
 
-        <span class="kw">let </span>prev_val = PREEMPTION_COUNT[cpu_id <span class="kw">as </span>usize].fetch_sub(<span class="number">1</span>, Ordering::Relaxed);
+        <span class="kw">let </span>prev_val = PREEMPTION_COUNT[cpu_id.value() <span class="kw">as </span>usize].fetch_sub(<span class="number">1</span>, Ordering::Relaxed);
         <span class="kw">if </span>prev_val == <span class="number">1 </span>{
             <span class="comment">// log::trace!(&quot;CPU {}: re-enabling preemption&quot;, cpu_id);
 
             // If the previous counter value was 1, that means the current value is 1,
             // which indicates we are transitioning from preemption disabled to enabled on this CPU.
             // Thus, we re-enable the local APIC timer used for preemptive task switching.
+            </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
             </span>apic::get_my_apic()
                 .expect(<span class="string">&quot;BUG: PreemptionGuard::drop() couldn&#39;t get local APIC&quot;</span>)
                 .write()
@@ -277,13 +289,13 @@
 
 
 <span class="doccomment">/// Returns `true` if preemption is currently enabled on this CPU.
-/// 
+///
 /// Note that this value can&#39;t be used as a lock indicator or property,
 /// as it is just a snapshot that offers no guarantee that preemption
 /// will continue to be enabled or disabled immediately after returning.
 </span><span class="kw">pub fn </span>preemption_enabled() -&gt; bool {
-    <span class="kw">let </span>cpu_id = apic::current_cpu();
-    <span class="kw">let </span>val = PREEMPTION_COUNT[cpu_id <span class="kw">as </span>usize].load(Ordering::Relaxed);
+    <span class="kw">let </span>cpu_id = cpu::current_cpu();
+    <span class="kw">let </span>val = PREEMPTION_COUNT[cpu_id.value() <span class="kw">as </span>usize].load(Ordering::Relaxed);
     val == <span class="number">0
 </span>}
 </code></pre></div>

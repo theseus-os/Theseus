@@ -319,8 +319,8 @@
         }
 
         <span class="comment">// if this task is pinned, it must not be pinned to a different core
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_core() {
-            <span class="kw">if </span>pinned != apic_id {
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
+            <span class="kw">if </span>pinned.into_u8() != apic_id {
                 <span class="comment">// with per-core runqueues, this should never happen!
                 </span><span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, apic_id, t);
                 <span class="kw">return </span><span class="prelude-val">None</span>;
@@ -389,8 +389,8 @@
         }
 
         <span class="comment">// if this task is pinned, it must not be pinned to a different core
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_core() {
-            <span class="kw">if </span>pinned != apic_id {
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
+            <span class="kw">if </span>pinned.into_u8() != apic_id {
                 <span class="comment">// with per-core runqueues, this should never happen!
                 </span><span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, apic_id, t);
                 <span class="kw">return </span><span class="bool-val">false</span>;
@@ -429,8 +429,8 @@
         }
 
         <span class="comment">// if this task is pinned, it must not be pinned to a different core
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_core() {
-            <span class="kw">if </span>pinned != apic_id {
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
+            <span class="kw">if </span>pinned.into_u8() != apic_id {
                 <span class="comment">// with per-core runqueues, this should never happen!
                 </span><span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, apic_id, <span class="kw-2">&amp;*</span>t);
                 <span class="kw">return </span><span class="bool-val">false</span>;

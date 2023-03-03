@@ -1023,6 +1023,9 @@
 <a href="#1023" id="1023">1023</a>
 <a href="#1024" id="1024">1024</a>
 <a href="#1025" id="1025">1025</a>
+<a href="#1026" id="1026">1026</a>
+<a href="#1027" id="1027">1027</a>
+<a href="#1028" id="1028">1028</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1041,16 +1044,18 @@
 #![feature(stmt_expr_attributes)]
 #![feature(naked_functions)]
 
-#[macro_use] </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
+</span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>core::{marker::PhantomData, mem, ops::Deref, sync::atomic::{fence, Ordering}};
 <span class="kw">use </span>alloc::{
     boxed::Box,
+    format,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
+<span class="kw">use </span>log::{error, info, debug};
+<span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>debugit::debugit;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>irq_safety::enable_interrupts;
@@ -1071,20 +1076,21 @@
 /// and creating its initial task bootstrapped from the current execution context.
 </span><span class="kw">pub fn </span>init(
     kernel_mmi_ref: MmiRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     stack: NoDrop&lt;Stack&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;BootstrapTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    runqueue::init(apic_id)<span class="question-mark">?</span>;
+    <span class="kw">let </span>cpu_id_as_u8: u8 = cpu_id.into_u8();
+    runqueue::init(cpu_id_as_u8)<span class="question-mark">?</span>;
     
     <span class="kw">let </span>(joinable_bootstrap_task, exitable_bootstrap_task) =
-        task::bootstrap_task(apic_id, stack, kernel_mmi_ref)<span class="question-mark">?</span>;
+        task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)<span class="question-mark">?</span>;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     runqueue::add_task_to_specific_runqueue(
-        apic_id,
+        cpu_id_as_u8,
         exitable_bootstrap_task.clone(),
     )<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>(BootstrapTaskRef {
-        apic_id,
+        cpu_id,
         exitable_taskref: exitable_bootstrap_task,
     })
 }
@@ -1143,7 +1149,7 @@
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>BootstrapTaskRef {
     <span class="attr">#[allow(dead_code)]
-    </span>apic_id: u8,
+    </span>cpu_id: CpuId,
     exitable_taskref: ExitableTaskRef,
 }
 <span class="kw">impl </span>Deref <span class="kw">for </span>BootstrapTaskRef {
@@ -1166,7 +1172,7 @@
 <span class="kw">impl </span>Drop <span class="kw">for </span>BootstrapTaskRef {
     <span class="comment">// See the documentation for `BootstrapTaskRef::finish()` for more details.
     </span><span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="comment">// trace!(&quot;Finishing Bootstrap Task on core {}: {:?}&quot;, self.apic_id, self.task_ref);
+        <span class="comment">// trace!(&quot;Finishing Bootstrap Task on core {}: {:?}&quot;, self.cpu_id, self.task_ref);
         </span>remove_current_task_from_runqueue(<span class="kw-2">&amp;</span><span class="self">self</span>.exitable_taskref);
         <span class="self">self</span>.exitable_taskref.mark_as_exited(Box::new(()))
             .expect(<span class="string">&quot;BUG: bootstrap task was unable to mark itself as exited&quot;</span>);
@@ -1295,7 +1301,7 @@
     name: <span class="prelude-ty">Option</span>&lt;String&gt;,
     stack: <span class="prelude-ty">Option</span>&lt;Stack&gt;,
     parent: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
-    pin_on_core: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    pin_on_cpu: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
     blocked: bool,
     idle: bool,
     post_build_function: <span class="prelude-ty">Option</span>&lt;Box&lt;
@@ -1321,7 +1327,7 @@
             name: <span class="prelude-val">None</span>,
             stack: <span class="prelude-val">None</span>,
             parent: <span class="prelude-val">None</span>,
-            pin_on_core: <span class="prelude-val">None</span>,
+            pin_on_cpu: <span class="prelude-val">None</span>,
             blocked: <span class="bool-val">false</span>,
             idle: <span class="bool-val">false</span>,
             post_build_function: <span class="prelude-val">None</span>,
@@ -1358,9 +1364,9 @@
         <span class="self">self
     </span>}
 
-    <span class="doccomment">/// Pin the new Task to a specific core.
-    </span><span class="kw">pub fn </span>pin_on_core(<span class="kw-2">mut </span><span class="self">self</span>, core_apic_id: u8) -&gt; TaskBuilder&lt;F, A, R&gt; {
-        <span class="self">self</span>.pin_on_core = <span class="prelude-val">Some</span>(core_apic_id);
+    <span class="doccomment">/// Pin the new Task to a specific CPU.
+    </span><span class="kw">pub fn </span>pin_on_cpu(<span class="kw-2">mut </span><span class="self">self</span>, cpu_id: CpuId) -&gt; TaskBuilder&lt;F, A, R&gt; {
+        <span class="self">self</span>.pin_on_cpu = <span class="prelude-val">Some</span>(cpu_id);
         <span class="self">self
     </span>}
 
@@ -1449,8 +1455,8 @@
         // (in `spawn::task_cleanup_final_internal()`).
         </span>fence(Ordering::Release);
         
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(core) = <span class="self">self</span>.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())<span class="question-mark">?</span>;
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(cpu) = <span class="self">self</span>.pin_on_cpu {
+            runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())<span class="question-mark">?</span>;
         } <span class="kw">else </span>{
             runqueue::add_task_to_any_runqueue(task_ref.clone())<span class="question-mark">?</span>;
         }
@@ -1473,18 +1479,18 @@
           R: Send + <span class="lifetime">&#39;static</span>,
           F: FnOnce(A) -&gt; R + Send + Clone +<span class="lifetime">&#39;static</span>,
 {
-    <span class="doccomment">/// Sets this new Task to be the idle task for the given core. 
+    <span class="doccomment">/// Sets this new Task to be the idle task for the given CPU. 
     /// 
     /// Idle tasks will not be scheduled unless there are no other tasks for the scheduler to choose. 
     /// 
     /// Idle tasks must be restartable, so it is only a possible option when spawning a restartable task.
-    /// Marking a task as idle is only needed to set up one for each core when that core is initialized,
+    /// Marking a task as idle is only needed to set up one for each CPU when that CPU is initialized,
     /// but or to restart an idle task that has exited or failed.
     /// 
-    /// There is no harm spawning multiple idle tasks on each core, but it&#39;s a waste of space. 
-    </span><span class="kw">pub fn </span>idle(<span class="kw-2">mut </span><span class="self">self</span>, core_id: u8) -&gt; TaskBuilder&lt;F, A, R&gt; {
+    /// There is no harm spawning multiple idle tasks on each CPU, but it&#39;s a waste of space. 
+    </span><span class="kw">pub fn </span>idle(<span class="kw-2">mut </span><span class="self">self</span>, cpu_id: CpuId) -&gt; TaskBuilder&lt;F, A, R&gt; {
         <span class="self">self</span>.idle = <span class="bool-val">true</span>;
-        <span class="self">self</span>.pin_on_core(core_id)
+        <span class="self">self</span>.pin_on_cpu(cpu_id)
     }
 
     <span class="doccomment">/// Like [`TaskBuilder::spawn()`], this finishes this `TaskBuilder` and spawns the new task.
@@ -1983,8 +1989,8 @@
         <span class="kw">if let </span><span class="prelude-val">Some</span>((func, arg)) = restartable_info {
             <span class="kw">let </span><span class="kw-2">mut </span>new_task = new_task_builder(func, arg)
                 .name(current_task.name.clone());
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(core) = current_task.pinned_core() {
-                new_task = new_task.pin_on_core(core);
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(cpu) = current_task.pinned_cpu() {
+                new_task = new_task.pin_on_cpu(cpu);
             }
             new_task.spawn_restartable(<span class="prelude-val">None</span>)
                 .expect(<span class="string">&quot;Failed to respawn the restartable task&quot;</span>);
@@ -2015,8 +2021,8 @@
     <span class="comment">// In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core&#39;s runqueue.
     </span><span class="attr">#[cfg(not(rq_eval))] </span>{
-        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = runqueue::get_runqueue(cpu::current_cpu())
-            .ok_or(<span class="string">&quot;couldn&#39;t get this core&#39;s ID or runqueue to remove exited task from it&quot;</span>)
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
+            .ok_or(<span class="string">&quot;couldn&#39;t get this CPU&#39;s ID or runqueue to remove exited task from it&quot;</span>)
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t remove exited task from runqueue: {}&quot;</span>, e);
@@ -2026,21 +2032,21 @@
 
 <span class="doccomment">/// Spawns an idle task on the current CPU and adds it to this CPU&#39;s runqueue.
 </span><span class="kw">pub fn </span>create_idle_task() -&gt; <span class="prelude-ty">Result</span>&lt;JoinableTaskRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>apic_id = cpu::current_cpu();
-    <span class="macro">debug!</span>(<span class="string">&quot;Spawning a new idle task on core {}&quot;</span>, apic_id);
+    <span class="kw">let </span>cpu_id = cpu::current_cpu();
+    <span class="macro">debug!</span>(<span class="string">&quot;Spawning a new idle task on CPU {}&quot;</span>, cpu_id);
 
-    new_task_builder(idle_task_entry, apic_id)
-        .name(<span class="macro">format!</span>(<span class="string">&quot;idle_task_core_{apic_id}&quot;</span>))
-        .idle(apic_id)
+    new_task_builder(idle_task_entry, cpu_id)
+        .name(<span class="macro">format!</span>(<span class="string">&quot;idle_task_cpu_{cpu_id}&quot;</span>))
+        .idle(cpu_id)
         .spawn_restartable(<span class="prelude-val">None</span>)
 }
 
 <span class="doccomment">/// A basic idle task that does nothing but loop endlessly.
-/// 
+///
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
 /// so we use `()` here instead. 
 </span><span class="attr">#[inline(never)]
-</span><span class="kw">fn </span>idle_task_entry(_apic_id: u8) {
+</span><span class="kw">fn </span>idle_task_entry(_cpu_id: CpuId) {
     <span class="macro">info!</span>(<span class="string">&quot;Entered idle task loop on core {}: {:?}&quot;</span>, cpu::current_cpu(), task::get_my_current_task());
     <span class="kw">loop </span>{
         <span class="comment">// TODO: put this core into a low-power state

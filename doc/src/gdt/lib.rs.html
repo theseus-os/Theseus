@@ -309,26 +309,9 @@
 <a href="#309" id="309">309</a>
 <a href="#310" id="310">310</a>
 <a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
-</span><span class="comment">// #[macro_use] extern crate log;
-</span><span class="attr">#[macro_use] </span><span class="kw">extern crate </span>bitflags;
-<span class="kw">extern crate </span>bit_field;
-<span class="kw">extern crate </span>atomic_linked_list;
-<span class="kw">extern crate </span>x86_64;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>tss;
-<span class="kw">extern crate </span>memory;
-
-<span class="kw">use </span>core::ops::Deref;
+</span><span class="kw">use </span>core::ops::Deref;
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 <span class="kw">use </span>x86_64::{
     instructions::{
@@ -344,10 +327,11 @@
 };
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>memory::VirtualAddress;
+<span class="kw">use </span>cpu::CpuId;
 
 
-<span class="doccomment">/// The GDT list, one per core, indexed by a key of apic_id
-</span><span class="kw">static </span>GDT: AtomicMap&lt;u8, Gdt&gt; = AtomicMap::new();
+<span class="doccomment">/// The GDT list, one per CPU core.
+</span><span class="kw">static </span>GDT: AtomicMap&lt;CpuId, Gdt&gt; = AtomicMap::new();
 
 
 <span class="kw">static </span>KERNEL_CODE_SELECTOR:  Once&lt;SegmentSelector&gt; = Once::new();
@@ -397,11 +381,11 @@
 /// such that the segment selectors are usable 
 /// Future invocations will not change those initial values and load the same GDT based on them.
 </span><span class="kw">pub fn </span>create_and_load_tss_gdt(
-    apic_id: u8, 
-    double_fault_stack_top_unusable: VirtualAddress, 
+    cpu_id: CpuId,
+    double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) { 
-    <span class="kw">let </span>tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    <span class="kw">let </span>tss_ref = tss::create_tss(cpu_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
     <span class="kw">let </span>(gdt, kernel_cs, kernel_ds, user_cs_32, user_ds_32, user_cs_64, user_ds_64, tss_segment) 
         = create_gdt(tss_ref.lock().deref());
 
@@ -413,10 +397,10 @@
     USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
     TSS_SELECTOR         .call_once(|| tss_segment);
 
-    GDT.insert(apic_id, gdt);
-    <span class="kw">let </span>gdt_ref = GDT.get(<span class="kw-2">&amp;</span>apic_id).unwrap(); <span class="comment">// safe to unwrap since we just added it to the list
+    GDT.insert(cpu_id, gdt);
+    <span class="kw">let </span>gdt_ref = GDT.get(<span class="kw-2">&amp;</span>cpu_id).unwrap(); <span class="comment">// safe to unwrap since we just added it to the list
     </span>gdt_ref.load();
-    <span class="comment">// debug!(&quot;Loaded GDT for apic {}: {}&quot;, apic_id, gdt_ref);
+    <span class="comment">// log::debug!(&quot;Loaded GDT for CPU {}: {}&quot;, cpu_id, gdt_ref);
 
     </span><span class="kw">unsafe </span>{
         CS::set_reg(kernel_cs);  <span class="comment">// reload code segment register
@@ -619,7 +603,7 @@
     }
 }
 
-<span class="macro">bitflags! </span>{
+<span class="macro">bitflags::bitflags! </span>{
     <span class="kw">struct </span>DescriptorFlags: u64 {
         <span class="kw">const </span>ACCESSED          = <span class="number">1 </span>&lt;&lt; <span class="number">40</span>; <span class="comment">// should always be zero, don&#39;t use this
         </span><span class="kw">const </span>READ_WRITE        = <span class="number">1 </span>&lt;&lt; <span class="number">41</span>; <span class="comment">// ignored by 64-bit CPU modes

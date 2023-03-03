@@ -739,18 +739,18 @@
                 <span class="prelude-val">Ok</span>(()) =&gt; { } <span class="comment">// fall through
             </span>};
 
-            <span class="macro">assert!</span>(current_cpu() == lapic_entry.apic_id);
-            <span class="kw">let </span>bsp_id = lapic_entry.apic_id;
+            <span class="kw">let </span>bsp_id = current_cpu();
+            <span class="macro">assert!</span>(bsp_id.value() == lapic_entry.apic_id <span class="kw">as </span>u32);
 
-            <span class="comment">// redirect every IoApic&#39;s interrupts to the one BSP
-            // TODO FIXME: I&#39;m unsure if this is actually correct!
-            </span><span class="kw">for </span>ioapic <span class="kw">in </span>ioapic::get_ioapics().iter() {
-                <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.<span class="number">1</span>.lock();
+            <span class="comment">// Redirect every IoApic&#39;s interrupts to the one BSP.
+            // TODO: long-term, we should distribute interrupts across CPUs more evenly.
+            </span><span class="kw">for </span>(_ioapic_id, ioapic) <span class="kw">in </span>ioapic::get_ioapics().iter() {
+                <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.lock();
 
                 <span class="comment">// Set the BSP to receive regular PIC interrupts routed through the IoApic.
                 // Skip irq 2, since in the PIC that&#39;s the chained one (cascade line from PIC2 to PIC1) that isn&#39;t used.
                 </span><span class="kw">for </span>irq <span class="kw">in </span>(<span class="number">0x0 </span>..= <span class="number">0x1</span>).chain(<span class="number">0x3 </span>..= <span class="number">0xF</span>) {
-                    ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq);
+                    ioapic_ref.set_irq(irq, bsp_id, IRQ_BASE_OFFSET + irq)<span class="question-mark">?</span>;
                 }
 
                 <span class="comment">// ioapic_ref.set_irq(0x1, 0xFF, IRQ_BASE_OFFSET + 0x1); 
@@ -773,7 +773,7 @@
                 <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.lock();
                 <span class="kw">if </span>ioapic_ref.handles_irq(int_src.gsi) {
                     <span class="comment">// using BSP for now, but later we could redirect the IRQ to more (or all) cores
-                    </span>ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi <span class="kw">as </span>u8 + IRQ_BASE_OFFSET); 
+                    </span>ioapic_ref.set_irq(int_src.irq_source, bsp_id, int_src.gsi <span class="kw">as </span>u8 + IRQ_BASE_OFFSET)<span class="question-mark">?</span>;
                     <span class="macro">trace!</span>(<span class="string">&quot;MadtIntSrcOverride (bus: {}, irq: {}, gsi: {}, flags {:#X}) handled by IoApic {}&quot;</span>,
                         int_src.bus_source, int_src.irq_source, <span class="kw-2">&amp;</span>{ int_src.gsi }, <span class="kw-2">&amp;</span>{ int_src.flags }, ioapic_ref.id
                     );

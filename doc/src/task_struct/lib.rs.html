@@ -673,27 +673,6 @@
 <a href="#673" id="673">673</a>
 <a href="#674" id="674">674</a>
 <a href="#675" id="675">675</a>
-<a href="#676" id="676">676</a>
-<a href="#677" id="677">677</a>
-<a href="#678" id="678">678</a>
-<a href="#679" id="679">679</a>
-<a href="#680" id="680">680</a>
-<a href="#681" id="681">681</a>
-<a href="#682" id="682">682</a>
-<a href="#683" id="683">683</a>
-<a href="#684" id="684">684</a>
-<a href="#685" id="685">685</a>
-<a href="#686" id="686">686</a>
-<a href="#687" id="687">687</a>
-<a href="#688" id="688">688</a>
-<a href="#689" id="689">689</a>
-<a href="#690" id="690">690</a>
-<a href="#691" id="691">691</a>
-<a href="#692" id="692">692</a>
-<a href="#693" id="693">693</a>
-<a href="#694" id="694">694</a>
-<a href="#695" id="695">695</a>
-<a href="#696" id="696">696</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the basic [`Task`] structure, which holds contextual execution states
 //! needed to support safe multithreading.
 //! 
@@ -721,6 +700,7 @@
     string::String,
     sync::Arc,
 };
+<span class="kw">use </span>cpu::{CpuId, OptionalCpuId};
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>log::{warn, trace};
@@ -855,28 +835,6 @@
 }
 
 
-<span class="doccomment">/// A wrapper around `Option&lt;u8&gt;` with a forced type alignment of 2 bytes,
-/// which guarantees that it compiles down to lock-free native atomic instructions
-/// when using it inside of an atomic type like [`AtomicCell`].
-</span><span class="attr">#[derive(Copy, Clone)]
-#[repr(align(<span class="number">2</span>))]
-</span><span class="kw">pub struct </span>OptionU8(<span class="prelude-ty">Option</span>&lt;u8&gt;);
-<span class="kw">impl </span>From&lt;<span class="prelude-ty">Option</span>&lt;u8&gt;&gt; <span class="kw">for </span>OptionU8 {
-    <span class="kw">fn </span>from(opt: <span class="prelude-ty">Option</span>&lt;u8&gt;) -&gt; <span class="self">Self </span>{
-        OptionU8(opt)
-    }
-}
-<span class="kw">impl </span>From&lt;OptionU8&gt; <span class="kw">for </span><span class="prelude-ty">Option</span>&lt;u8&gt; {
-    <span class="kw">fn </span>from(val: OptionU8) -&gt; <span class="self">Self </span>{
-        val.<span class="number">0
-    </span>}
-}
-<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>OptionU8 {
-    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
-        <span class="macro">write!</span>(f, <span class="string">&quot;{:?}&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
-    }
-}
-
 <span class="doccomment">/// The parts of a `Task` that may be modified after its creation.
 ///
 /// This includes only the parts that cannot be modified atomically.
@@ -913,9 +871,9 @@
     </span><span class="kw">pub </span>drop_after_task_switch: <span class="prelude-ty">Option</span>&lt;Box&lt;<span class="kw">dyn </span>Any + Send&gt;&gt;,
     <span class="doccomment">/// The kernel stack, which all `Task`s must have in order to execute.
     </span><span class="kw">pub </span>kstack: Stack,
-    <span class="doccomment">/// Whether or not this task is pinned to a certain core.
-    /// The idle tasks are always pinned to their respective cores.
-    </span><span class="kw">pub </span>pinned_core: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    <span class="doccomment">/// Whether or not this task is pinned to a certain CPU.
+    /// The idle tasks are always pinned to their respective CPU.
+    </span><span class="kw">pub </span>pinned_cpu: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
     <span class="doccomment">/// The function that will be called when this `Task` panics or fails due to a machine exception.
     /// It will be invoked before the task is cleaned up via stack unwinding.
     /// This is similar to Rust&#39;s built-in panic hook, but is also called upon a machine exception, not just a panic.
@@ -951,11 +909,11 @@
     </span><span class="kw">pub </span>name: String,
     <span class="doccomment">/// Which cpu core this Task is currently running on;
     /// `None` if not currently running.
-    /// We use `OptionU8` instead of `Option&lt;u8&gt;` to ensure that 
+    /// We use `OptionalCpuId` instead of `Option&lt;CpuId&gt;` to ensure that 
     /// this field is accessed using lock-free native atomic instructions.
     ///
     /// This is not public because it permits interior mutability.
-    </span>running_on_cpu: AtomicCell&lt;OptionU8&gt;,
+    </span>running_on_cpu: AtomicCell&lt;OptionalCpuId&gt;,
     <span class="doccomment">/// The runnability of this task, i.e., whether it&#39;s eligible to be scheduled in.
     ///
     /// This is not public because it permits interior mutability.
@@ -989,7 +947,7 @@
 }
 
 <span class="comment">// Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
-</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;OptionU8&gt;::is_lock_free());
+</span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;OptionalCpuId&gt;::is_lock_free());
 <span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;RunState&gt;::is_lock_free());
 
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Task {
@@ -1000,7 +958,7 @@
             .field(<span class="string">&quot;running_on&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.running_on_cpu())
             .field(<span class="string">&quot;runstate&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.runstate());
         <span class="kw">if let </span><span class="prelude-val">Some</span>(inner) = <span class="self">self</span>.inner.try_lock() {
-            ds.field(<span class="string">&quot;pinned&quot;</span>, <span class="kw-2">&amp;</span>inner.pinned_core);
+            ds.field(<span class="string">&quot;pinned&quot;</span>, <span class="kw-2">&amp;</span>inner.pinned_cpu);
         } <span class="kw">else </span>{
             ds.field(<span class="string">&quot;pinned&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;&lt;Locked&gt;&quot;</span>);
         }
@@ -1059,7 +1017,7 @@
                 preemption_guard: <span class="prelude-val">None</span>,
                 drop_after_task_switch: <span class="prelude-val">None</span>,
                 kstack,
-                pinned_core: <span class="prelude-val">None</span>,
+                pinned_cpu: <span class="prelude-val">None</span>,
                 kill_handler: <span class="prelude-val">None</span>,
                 env,
                 restart_info: <span class="prelude-val">None</span>,
@@ -1103,14 +1061,14 @@
     }
 
     <span class="doccomment">/// Returns the ID of the CPU this `Task` is currently running on.
-    </span><span class="kw">pub fn </span>running_on_cpu(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+    </span><span class="kw">pub fn </span>running_on_cpu(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;CpuId&gt; {
         <span class="self">self</span>.running_on_cpu.load().into()
     }
 
     <span class="doccomment">/// Returns the ID of the CPU this `Task` is pinned on,
     /// or `None` if it is not pinned.
-    </span><span class="kw">pub fn </span>pinned_core(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-        <span class="self">self</span>.inner.lock().pinned_core
+    </span><span class="kw">pub fn </span>pinned_cpu(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;CpuId&gt; {
+        <span class="self">self</span>.inner.lock().pinned_cpu
     }
 
     <span class="doccomment">/// Returns the current [`RunState`] of this `Task`.
@@ -1338,7 +1296,7 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.tls_area
     }
     <span class="attr">#[inline(always)]
-    </span><span class="kw">pub fn </span>running_on_cpu(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AtomicCell&lt;OptionU8&gt; {
+    </span><span class="kw">pub fn </span>running_on_cpu(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AtomicCell&lt;OptionalCpuId&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.running_on_cpu
     }
     <span class="attr">#[inline(always)]

@@ -111,14 +111,6 @@
 <a href="#111" id="111">111</a>
 <a href="#112" id="112">112</a>
 <a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -126,19 +118,11 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>irq_safety;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>stack;
-<span class="kw">extern crate </span>interrupts;
-<span class="kw">extern crate </span>spawn;
-<span class="kw">extern crate </span>scheduler;
-<span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>apic;
-<span class="kw">extern crate </span>no_drop;
 
 <span class="kw">use </span>alloc::collections::BTreeMap;
 <span class="kw">use </span>core::sync::atomic::{AtomicBool, Ordering};
+<span class="kw">use </span>log::{error, info};
+<span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>irq_safety::{enable_interrupts, MutexIrqSafe};
 <span class="kw">use </span>memory::{VirtualAddress, get_kernel_mmi_ref};
 <span class="kw">use </span>stack::Stack;
@@ -153,11 +137,11 @@
 
 <span class="doccomment">/// Temporary storage for transferring allocated `Stack`s from 
 /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-</span><span class="kw">static </span>AP_STACKS: MutexIrqSafe&lt;BTreeMap&lt;u8, NoDrop&lt;Stack&gt;&gt;&gt; = MutexIrqSafe::new(BTreeMap::new());
+</span><span class="kw">static </span>AP_STACKS: MutexIrqSafe&lt;BTreeMap&lt;u32, NoDrop&lt;Stack&gt;&gt;&gt; = MutexIrqSafe::new(BTreeMap::new());
 
-<span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `apic_id`.
-</span><span class="kw">pub fn </span>insert_ap_stack(apic_id: u8, stack: Stack) {
-    AP_STACKS.lock().insert(apic_id, NoDrop::new(stack));
+<span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `cpu_id`.
+</span><span class="kw">pub fn </span>insert_ap_stack(cpu_id: u32 , stack: Stack) {
+    AP_STACKS.lock().insert(cpu_id, NoDrop::new(stack));
 }
 
 
@@ -165,14 +149,14 @@
 /// The arguments must match the invocation order in &quot;ap_boot.asm&quot;
 </span><span class="kw">pub fn </span>kstart_ap(
     processor_id: u8,
-    apic_id: u8,
+    cpu_id: CpuId,
     _stack_start: VirtualAddress,
     _stack_end: VirtualAddress,
     nmi_lint: u8,
     nmi_flags: u16,
 ) -&gt; ! {
-    <span class="macro">info!</span>(<span class="string">&quot;Booting AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
-        processor_id, apic_id, _stack_start, _stack_end, nmi_lint, nmi_flags
+    <span class="macro">info!</span>(<span class="string">&quot;Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
+        processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
     <span class="comment">// set a flag telling the BSP that this AP has entered Rust code
@@ -183,8 +167,8 @@
     </span>early_tls::reload();
 
     <span class="comment">// get the stack that was allocated for us (this AP) by the BSP.
-    </span><span class="kw">let </span>this_ap_stack = AP_STACKS.lock().remove(<span class="kw-2">&amp;</span>apic_id)
-        .unwrap_or_else(|| <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for AP with apic_id: {}&quot;</span>, apic_id));
+    </span><span class="kw">let </span>this_ap_stack = AP_STACKS.lock().remove(<span class="kw-2">&amp;</span>cpu_id.value())
+        .unwrap_or_else(|| <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for CPU {}&quot;</span>, cpu_id));
 
     <span class="comment">// initialize interrupts (including TSS/GDT) for this AP
     </span><span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().expect(<span class="string">&quot;kstart_ap(): kernel_mmi ref was None&quot;</span>);
@@ -197,7 +181,7 @@
                 .expect(<span class="string">&quot;kstart_ap(): could not allocate privilege stack&quot;</span>),
         )
     };
-    <span class="kw">let </span>_idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
+    <span class="kw">let </span>_idt = interrupts::init_ap(cpu_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
 
     <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.
@@ -206,7 +190,7 @@
     </span>LocalApic::init(
         <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
         processor_id,
-        <span class="prelude-val">Some</span>(apic_id),
+        <span class="prelude-val">Some</span>(cpu_id.value()),
         <span class="bool-val">false</span>,
         nmi_lint,
         nmi_flags,
@@ -214,7 +198,7 @@
 
     <span class="comment">// Now that the Local APIC has been initialized for this CPU, we can initialize the
     // task management subsystem and create the idle task for this CPU.
-    </span><span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
+    </span><span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
     spawn::create_idle_task().unwrap();
 
     <span class="comment">// The PAT must be initialized explicitly on every CPU,
@@ -223,7 +207,7 @@
         <span class="macro">error!</span>(<span class="string">&quot;This CPU does not support the Page Attribute Table&quot;</span>);
     }
 
-    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on AP core {}. Enabling interrupts...&quot;</span>, apic_id);
+    <span class="macro">info!</span>(<span class="string">&quot;Initialization complete on CPU {}. Enabling interrupts...&quot;</span>, cpu_id);
     <span class="comment">// The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     // (currently nothing else needs to be dropped)
@@ -237,7 +221,7 @@
 
     </span>scheduler::schedule();
     <span class="kw">loop </span>{ 
-        <span class="macro">error!</span>(<span class="string">&quot;BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!&quot;</span>, apic_id);
+        <span class="macro">error!</span>(<span class="string">&quot;BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!&quot;</span>, cpu_id);
     }
 }</code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ap_start" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

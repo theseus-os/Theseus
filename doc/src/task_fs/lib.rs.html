@@ -726,7 +726,7 @@
 
         <span class="comment">// Print all tasks
         </span><span class="kw">let </span>cpu = taskref.running_on_cpu().map(|cpu| <span class="macro">format!</span>(<span class="string">&quot;{cpu}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
-        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span>taskref.pinned_core().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{pin}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
+        <span class="kw">let </span>pinned = <span class="kw-2">&amp;</span>taskref.pinned_cpu().map(|pin| <span class="macro">format!</span>(<span class="string">&quot;{pin}&quot;</span>)).unwrap_or_else(|| String::from(<span class="string">&quot;-&quot;</span>));
         <span class="kw">let </span>task_type = <span class="kw">if </span>taskref.is_an_idle_task {
             <span class="string">&quot;I&quot;
         </span>} <span class="kw">else if </span>taskref.is_application() {

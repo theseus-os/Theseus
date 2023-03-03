@@ -371,7 +371,7 @@ extern crate compiler_builtins as _compiler_builtins;
 	<span class="kw">let </span>func1: <span class="kw-2">&amp;</span>SimdTestFunc = <span class="kw">unsafe </span>{ section_ref1.as_func() }<span class="question-mark">?</span>;
 	<span class="kw">let </span>_task1 = spawn::new_task_builder(<span class="kw-2">*</span>func1, ())
 		.name(<span class="macro">format!</span>(<span class="string">&quot;simd_test_1-{}&quot;</span>, simd_app_namespace.name()))
-		.pin_on_core(this_core)
+		.pin_on_cpu(this_core)
 		.simd(simd_ext)
 		.spawn()<span class="question-mark">?</span>;
 	<span class="macro">debug!</span>(<span class="string">&quot;finished spawning simd_test::test1 task&quot;</span>);
@@ -383,7 +383,7 @@ extern crate compiler_builtins as _compiler_builtins;
 	<span class="kw">let </span>func2: <span class="kw-2">&amp;</span>SimdTestFunc = <span class="kw">unsafe </span>{ section_ref2.as_func() }<span class="question-mark">?</span>;
 	<span class="kw">let </span>_task2 = spawn::new_task_builder(<span class="kw-2">*</span>func2, ())
 		.name(<span class="macro">format!</span>(<span class="string">&quot;simd_test_2-{}&quot;</span>, simd_app_namespace.name()))
-		.pin_on_core(this_core)
+		.pin_on_cpu(this_core)
 		.simd(simd_ext)
 		.spawn()<span class="question-mark">?</span>;
 	<span class="macro">debug!</span>(<span class="string">&quot;finished spawning simd_test::test2 task&quot;</span>);
@@ -395,7 +395,7 @@ extern crate compiler_builtins as _compiler_builtins;
 	<span class="kw">let </span>func3: <span class="kw-2">&amp;</span>SimdTestFunc = <span class="kw">unsafe </span>{ section_ref3.as_func() }<span class="question-mark">?</span>;
 	<span class="kw">let </span>_task3 = spawn::new_task_builder(<span class="kw-2">*</span>func3, ())
 		.name(<span class="macro">format!</span>(<span class="string">&quot;simd_test_short-{}&quot;</span>, simd_app_namespace.name()))
-		.pin_on_core(this_core)
+		.pin_on_cpu(this_core)
 		.simd(simd_ext)
 		.spawn()<span class="question-mark">?</span>;
 	<span class="macro">debug!</span>(<span class="string">&quot;finished spawning simd_test::test_short task&quot;</span>);

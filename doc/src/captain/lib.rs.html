@@ -305,13 +305,13 @@
     };
     <span class="kw">let </span>idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())<span class="question-mark">?</span>;
     
-    <span class="comment">// get BSP&#39;s apic id
-    </span><span class="kw">let </span>bsp_apic_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="comment">// get BSP&#39;s CPU ID
+    </span><span class="kw">let </span>bsp_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.
     </span>scheduler::init()<span class="question-mark">?</span>;
-    <span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)<span class="question-mark">?</span>;
+    <span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_id, bsp_initial_stack)<span class="question-mark">?</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Created initial bootstrap task: {:?}&quot;</span>, bootstrap_task);
 
     <span class="comment">// after we&#39;ve initialized the task subsystem, we can use better exception handlers
@@ -381,7 +381,7 @@
     console::start_connection_detection()<span class="question-mark">?</span>;
     first_application::start()<span class="question-mark">?</span>;
 
-    <span class="macro">info!</span>(<span class="string">&quot;captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...&quot;</span>, bsp_apic_id);
+    <span class="macro">info!</span>(<span class="string">&quot;captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...&quot;</span>, bsp_id);
     <span class="comment">// The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     </span>drop(kernel_mmi_ref);

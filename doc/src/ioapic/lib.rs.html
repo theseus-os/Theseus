@@ -163,20 +163,35 @@
 <a href="#163" id="163">163</a>
 <a href="#164" id="164">164</a>
 <a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>volatile;
-<span class="kw">extern crate </span>zerocopy;
-<span class="kw">extern crate </span>atomic_linked_list;
-
+</span><span class="kw">use </span>log::debug;
 <span class="kw">use </span>spin::{Mutex, MutexGuard};
 <span class="kw">use </span>volatile::{Volatile, WriteOnly};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
+<span class="kw">use </span>apic::ApicId;
 
 
 <span class="doccomment">/// The system-wide list of all `IoApic`s, of which there is usually one, 
@@ -305,27 +320,53 @@
     ///
     /// # Arguments
     /// * `ioapic_irq`: the IRQ number that this interrupt will trigger on this IoApic.
-    /// * `lapic_id`: the id of the LocalApic that should handle this interrupt.
+    /// * `apic_id`: the ID of the Local APIC, i.e., the CPU, that should handle this interrupt.
     /// * `irq_vector`: the system-wide IRQ vector number,
     ///    which after remapping is from 0x20 to 0x2F 
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
-    </span><span class="kw">pub fn </span>set_irq(<span class="kw-2">&amp;mut </span><span class="self">self</span>, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
-        <span class="kw">let </span>low_index: u32 = <span class="number">0x10 </span>+ (ioapic_irq <span class="kw">as </span>u32) * <span class="number">2</span>;
-        <span class="kw">let </span>high_index: u32 = <span class="number">0x10 </span>+ (ioapic_irq <span class="kw">as </span>u32) * <span class="number">2 </span>+ <span class="number">1</span>;
+    ///
+    /// # Return
+    /// * Returns `Ok` upon success
+    /// * Returns `Err` if the given `ApicId` value exceeds the bounds of `u8`, i.e.,
+    ///   if it is larger than 255.
+    ///   This is because the IOAPIC only supports redirecting interrupts to APICs
+    ///   with IDs that fit within 8-bit values.
+    </span><span class="kw">pub fn </span>set_irq(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        ioapic_irq: u8,
+        apic_id: ApicId,
+        irq_vector: u8,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">if </span>apic_id.value() &gt; u8::MAX <span class="kw">as </span>u32 {
+            <span class="macro">log::error!</span>(<span class="string">&quot;Cannot set IOAPIC redirection table {} -&gt; {} for APIC ID {} larger than 255&quot;</span>,
+                ioapic_irq, irq_vector, apic_id.value(),
+            );
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Cannot set IOAPIC redirection table entry for APIC ID larger than 255&quot;</span>)
+        }
+
+        <span class="kw">let </span>low_index: u32 = <span class="number">0x10 </span>+ ((ioapic_irq <span class="kw">as </span>u32) * <span class="number">2</span>);
+        <span class="kw">let </span>high_index: u32 = low_index + <span class="number">1</span>;
 
         <span class="kw">let </span><span class="kw-2">mut </span>high = <span class="self">self</span>.read_reg(high_index);
         high &amp;= !<span class="number">0xff000000</span>;
-        high |= (lapic_id <span class="kw">as </span>u32) &lt;&lt; <span class="number">24</span>;
+        high |= apic_id.value() &lt;&lt; <span class="number">24</span>;
         <span class="self">self</span>.write_reg(high_index, high);
 
         <span class="kw">let </span><span class="kw-2">mut </span>low = <span class="self">self</span>.read_reg(low_index);
-        low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">16</span>);
-        low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">11</span>);
-        low &amp;= !<span class="number">0x700</span>;
-        low &amp;= !<span class="number">0xff</span>;
+        <span class="comment">// Clear mask, enabling this interrupt
+        </span>low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">16</span>);
+        <span class="comment">// Use physical destination mode, not logical destination mode
+        </span>low &amp;= !(<span class="number">1</span>&lt;&lt;<span class="number">11</span>);
+        <span class="comment">// Set the delivery mode to Fixed
+        </span>low &amp;= !<span class="number">0x700</span>;
+        <span class="comment">// Set the lowest 8 bits, which correspond to the IRQ vector.
+        </span>low &amp;= !<span class="number">0xff</span>;
         low |= irq_vector <span class="kw">as </span>u32;
         <span class="self">self</span>.write_reg(low_index, low);
+
+        <span class="prelude-val">Ok</span>(())
     }
-}</code></pre></div>
+}
+</code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ioapic" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
