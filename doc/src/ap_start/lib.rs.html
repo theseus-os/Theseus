@@ -148,7 +148,7 @@
 <span class="doccomment">/// Entry to rust for an AP.
 /// The arguments must match the invocation order in &quot;ap_boot.asm&quot;
 </span><span class="kw">pub fn </span>kstart_ap(
-    processor_id: u8,
+    processor_id: u32,
     cpu_id: CpuId,
     _stack_start: VirtualAddress,
     _stack_end: VirtualAddress,

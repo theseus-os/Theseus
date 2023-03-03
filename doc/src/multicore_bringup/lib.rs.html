@@ -490,6 +490,10 @@
 <a href="#490" id="490">490</a>
 <a href="#491" id="491">491</a>
 <a href="#492" id="492">492</a>
+<a href="#493" id="493">493</a>
+<a href="#494" id="494">494</a>
+<a href="#495" id="495">495</a>
+<a href="#496" id="496">496</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions for initializing and bringing up other CPU cores. 
 //! 
 //! These functions are intended to be invoked from the main core
@@ -528,7 +532,7 @@
 <span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
 <span class="kw">use </span>apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 <span class="kw">use </span>ap_start::{kstart_ap, AP_READY_FLAG};
-<span class="kw">use </span>madt::{Madt, MadtEntry, MadtLocalApic, find_nmi_entry_for_processor};
+<span class="kw">use </span>madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
 <span class="kw">use </span>pause::spin_loop_hint;
 
 
@@ -732,7 +736,6 @@
 
     <span class="kw">let </span>all_lapics = get_lapics();
     <span class="kw">let </span>this_cpu = current_cpu();
-    <span class="kw">let </span>this_cpu_as_u8: <span class="prelude-ty">Result</span>&lt;u8, <span class="kw">_</span>&gt; = this_cpu.value().try_into();
 
     <span class="comment">// Copy the AP startup code (from the kernel&#39;s text section pages) into the AP_STARTUP physical address entry point.
     </span>{
@@ -767,42 +770,47 @@
     <span class="kw">let </span>madt_iter = madt.iter();
 
     <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter.clone() {
-        <span class="kw">if let </span>MadtEntry::LocalApic(lapic_entry) = madt_entry { 
-            <span class="kw">if let </span><span class="prelude-val">Ok</span>(this_cpu_as_u8) = this_cpu_as_u8 &amp;&amp; this_cpu_as_u8 == lapic_entry.apic_id {
-                <span class="comment">// debug!(&quot;skipping BSP&#39;s local apic&quot;);
-            </span>}
-            <span class="kw">else </span>{
-                <span class="kw">if </span>lapic_entry.flags &amp; <span class="number">0x1 </span>!= <span class="number">0x1 </span>{
-                    <span class="macro">warn!</span>(<span class="string">&quot;Processor {} apic_id {} is disabled by the hardware, cannot initialize or use it.&quot;</span>, 
-                            lapic_entry.processor, lapic_entry.apic_id);
-                    <span class="kw">continue</span>;
-                }
+        <span class="kw">let </span>(processor_id, apic_id, flags) = <span class="kw">match </span>madt_entry {
+            MadtEntry::LocalApic(entry) =&gt; (entry.processor <span class="kw">as </span>u32, entry.apic_id <span class="kw">as </span>u32, entry.flags),
+            MadtEntry::LocalX2Apic(entry) =&gt; (entry.processor, entry.x2apic_id, entry.flags),
+            <span class="kw">_ </span>=&gt; <span class="kw">continue</span>,
+        };
 
-                <span class="comment">// start up this AP, and have it create a new LocalApic for itself. 
-                // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
-                </span><span class="kw">let </span>bsp_lapic_ref = bootstrap_cpu()
-                    .and_then(|bsp_id| all_lapics.get(<span class="kw-2">&amp;</span>bsp_id))
-                    .ok_or(<span class="string">&quot;Couldn&#39;t get BSP&#39;s LocalApic!&quot;</span>)<span class="question-mark">?</span>;
-                <span class="kw">let </span><span class="kw-2">mut </span>bsp_lapic = bsp_lapic_ref.write();
-                <span class="kw">let </span>ap_stack = stack::alloc_stack(
-                    KERNEL_STACK_SIZE_IN_PAGES,
-                    <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
-                ).ok_or(<span class="string">&quot;could not allocate AP stack!&quot;</span>)<span class="question-mark">?</span>;
-
-                <span class="kw">let </span>(nmi_lint, nmi_flags) = find_nmi_entry_for_processor(lapic_entry.processor, madt_iter.clone());
-
-                bring_up_ap(
-                    bsp_lapic.deref_mut(), 
-                    lapic_entry,
-                    ap_trampoline_data,
-                    page_table_phys_addr, 
-                    ap_stack, 
-                    nmi_lint,
-                    nmi_flags 
-                );
-                ap_count += <span class="number">1</span>;
-            }
+        <span class="comment">// we already handled the BSP in a different functions
+        </span><span class="kw">if </span>this_cpu.value() == apic_id {
+            <span class="kw">continue</span>;
         }
+
+        <span class="kw">if </span>flags &amp; <span class="number">0x1 </span>!= <span class="number">0x1 </span>{
+            <span class="macro">warn!</span>(<span class="string">&quot;Processor {} apic_id {} is disabled by the hardware, cannot initialize or use it.&quot;</span>, 
+                processor_id, apic_id);
+            <span class="kw">continue</span>;
+        }
+
+        <span class="comment">// start up this AP, and have it create a new LocalApic for itself. 
+        // This must be done by each core itself, and not called repeatedly by the BSP on behalf of other cores.
+        </span><span class="kw">let </span>bsp_lapic_ref = bootstrap_cpu()
+            .and_then(|bsp_id| all_lapics.get(<span class="kw-2">&amp;</span>bsp_id))
+            .ok_or(<span class="string">&quot;Couldn&#39;t get BSP&#39;s LocalApic!&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>bsp_lapic = bsp_lapic_ref.write();
+        <span class="kw">let </span>ap_stack = stack::alloc_stack(
+            KERNEL_STACK_SIZE_IN_PAGES,
+            <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
+        ).ok_or(<span class="string">&quot;could not allocate AP stack!&quot;</span>)<span class="question-mark">?</span>;
+
+        <span class="kw">let </span>(nmi_lint, nmi_flags) = find_nmi_entry_for_processor(processor_id, madt_iter.clone());
+
+        bring_up_ap(
+            bsp_lapic.deref_mut(), 
+            processor_id,
+            apic_id,
+            ap_trampoline_data,
+            page_table_phys_addr, 
+            ap_stack, 
+            nmi_lint,
+            nmi_flags 
+        );
+        ap_count += <span class="number">1</span>;
     }
 
     <span class="comment">// Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
@@ -844,8 +852,8 @@
     /// The Rust setup code sets it to 0, and the AP boot code sets it to 1.
     </span>ap_ready:          Volatile&lt;u64&gt;,
     <span class="doccomment">/// The processor ID of the new AP that is being brought up.
-    </span>ap_processor_id:   Volatile&lt;u8&gt;,
-    _padding0:         [u8; <span class="number">7</span>],
+    </span>ap_processor_id:   Volatile&lt;u32&gt;,
+    _padding0:         [u8; <span class="number">4</span>],
     <span class="doccomment">/// The CPU ID of the new AP that is being brought up.
     </span>ap_cpu_id:         Volatile&lt;u32&gt;,
     _padding1:         [u8; <span class="number">4</span>],
@@ -879,19 +887,19 @@
 
 
 <span class="doccomment">/// Called by the BSP to initialize the given `new_lapic` using IPIs.
+</span><span class="attr">#[allow(clippy::too_many_arguments)]
 </span><span class="kw">fn </span>bring_up_ap(
     bsp_lapic: <span class="kw-2">&amp;mut </span>LocalApic,
-    new_lapic: <span class="kw-2">&amp;</span>MadtLocalApic, 
+    new_apic_processor_id: u32,
+    new_apic_id: u32,
     ap_trampoline_data: <span class="kw-2">&amp;mut </span>ApTrampolineData,
     page_table_paddr: PhysicalAddress, 
     ap_stack: stack::Stack,
     nmi_lint: u8, 
     nmi_flags: u16
 ) {
-    <span class="kw">let </span>new_apic_id = new_lapic.apic_id <span class="kw">as </span>u32; 
-
     ap_trampoline_data.ap_ready.write(<span class="number">0</span>);
-    ap_trampoline_data.ap_processor_id.write(new_lapic.processor);
+    ap_trampoline_data.ap_processor_id.write(new_apic_processor_id);
     ap_trampoline_data.ap_cpu_id.write(new_apic_id);
     ap_trampoline_data.ap_page_table.write(page_table_paddr);
     ap_trampoline_data.ap_stack_start.write(ap_stack.bottom());
@@ -905,7 +913,7 @@
     // in which the AP will take ownership of it once it boots up.
     </span>ap_start::insert_ap_stack(new_apic_id, ap_stack); 
 
-    <span class="macro">info!</span>(<span class="string">&quot;Bringing up AP, proc: {} apic_id: {}&quot;</span>, new_lapic.processor, new_apic_id);
+    <span class="macro">info!</span>(<span class="string">&quot;Bringing up AP, proc: {} apic_id: {}&quot;</span>, new_apic_processor_id, new_apic_id);
     
     bsp_lapic.clear_error();
     <span class="kw">let </span>esr = bsp_lapic.error();

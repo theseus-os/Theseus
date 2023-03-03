@@ -1359,7 +1359,7 @@
     </span>apic_id: ApicId,
     <span class="doccomment">/// The processor ID of this APIC (from the `MADT` ACPI table entry).
     /// This is currently not used for anything in Theseus.
-    </span>processor_id: u8,
+    </span>processor_id: u32,
     <span class="doccomment">/// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
     </span>is_bootstrap_cpu: bool,
     <span class="doccomment">/// The value that should be written to the APIC timer&#39;s initial count register
@@ -1407,7 +1407,7 @@
     /// the BSP cannot invoke this for other APs.
     </span><span class="kw">pub fn </span>init(
         page_table: <span class="kw-2">&amp;mut </span>PageTable,
-        processor_id: u8,
+        processor_id: u32,
         expected_apic_id: <span class="prelude-ty">Option</span>&lt;u32&gt;,
         should_be_bsp: bool,
         nmi_lint: u8,
@@ -1497,7 +1497,7 @@
     /// 
     /// This value comes from the `MADT` ACPI table entry that was used
     /// to boot up this CPU core.
-    </span><span class="kw">pub fn </span>processor_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u8 { <span class="self">self</span>.processor_id }
+    </span><span class="kw">pub fn </span>processor_id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u32 { <span class="self">self</span>.processor_id }
 
     <span class="doccomment">/// Returns `true` if this CPU core was the BootStrap Processor (BSP),
     /// i.e., the first CPU to boot and run the OS code.
@@ -1583,7 +1583,7 @@
             }
             LapicType::XApic(regs) =&gt; {
                 regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
-                regs.timer_initial_count.write(INITIAL_COUNT <span class="kw">as </span>u32);
+                regs.timer_initial_count.write(INITIAL_COUNT);
 
                 <span class="comment">// wait for the given period using the PIT clock
                 </span>pit_wait(microseconds).unwrap();
@@ -1625,7 +1625,7 @@
                 regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
                 <span class="comment">// map APIC timer to an interrupt handler in the IDT
                 </span>regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ <span class="kw">as </span>u32 | APIC_TIMER_MODE_PERIODIC); 
-                regs.timer_initial_count.write(apic_period <span class="kw">as </span>u32); 
+                regs.timer_initial_count.write(apic_period); 
 
                 regs.lvt_thermal.write(<span class="number">0</span>);
                 regs.lvt_error.write(<span class="number">0</span>);
