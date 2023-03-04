@@ -5,9 +5,25 @@ which are used to initialize a new <code>Task</code>’s TLS area.</p>
 one that was specified in the statically-linked base kernel image.</p>
 <p>This function modifies the <code>tls_section</code>’s starting virtual address field
 to hold the proper value such that this <code>tls_section</code> can be correctly used
-as the source of a relocation calculation (e.g., when another section depends on it).
-That value will be a negative offset from the end of all the static TLS sections,
-i.e., where the TLS self pointer exists in memory.</p>
+as the source of a relocation calculation (e.g., when another section depends on it).</p>
+<ul>
+<li>On x86_64, that value will be the negative offset from the end of 
+all the static TLS sections, i.e., where the TLS self pointer exists in memory,
+to the start of this section in the TLS image.
+<ul>
+<li><code>VirtAddr = -1 * (total_static_tls_size - offset);</code></li>
+</ul>
+</li>
+<li>On aarch64, that value will be a positive offset from the beginning
+of all sections, i.e., the start of the TLS data image,
+to the start of this section in the TLS image,
+<em>plus</em> another value that is the max of 16 (0x10) and the alignment of
+this section’s containing TLS segment.
+<ul>
+<li><code>VirtAddr = max(16, TLS_segment_align) + offset;</code></li>
+</ul>
+</li>
+</ul>
 <h6 id="arguments"><a href="#arguments">Arguments</a></h6>
 <ul>
 <li><code>tls_section</code>: the TLS section present in base kernel image.</li>

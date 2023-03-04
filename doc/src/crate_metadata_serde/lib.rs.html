@@ -147,6 +147,11 @@
 <a href="#147" id="147">147</a>
 <a href="#148" id="148">148</a>
 <a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Standalone crate containing (de)serializable types for crate and section metadata.
 //! 
 //! The primary reason this exists is because `LoadedCrate` and `LoadedSection`
@@ -294,6 +299,11 @@
     <span class="doccomment">/// Returns `true` if `Data` or `Bss`, otherwise `false`.
     </span><span class="kw">pub fn </span>is_data_or_bss(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="macro">matches!</span>(<span class="self">self</span>, <span class="self">Self</span>::Data | <span class="self">Self</span>::Bss)
+    }
+
+    <span class="doccomment">/// Returns `true` if `TlsData` or `TlsBss`, otherwise `false`.
+    </span><span class="kw">pub fn </span>is_tls(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+        <span class="macro">matches!</span>(<span class="self">self</span>, <span class="self">Self</span>::TlsData | <span class="self">Self</span>::TlsBss)
     }
 }
 </code></pre></div>

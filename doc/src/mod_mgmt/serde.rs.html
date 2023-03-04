@@ -130,6 +130,11 @@
 <a href="#130" id="130">130</a>
 <a href="#131" id="131">131</a>
 <a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for converting serializable crate metadata types
 //! into the actual runtime `LoadedCrate` and `LoadedSection` types.
 //! 
@@ -172,14 +177,19 @@
         data_sections:       serialized_crate.data_sections,
         reexported_symbols:  BTreeSet::new(),
     });
+    <span class="kw">let </span>parent_crate_weak_ref = CowArc::downgrade(<span class="kw-2">&amp;</span>loaded_crate);
 
     <span class="kw">let </span><span class="kw-2">mut </span>sections = HashMap::with_capacity(serialized_crate.sections.len());
     <span class="kw">for </span>(shndx, section) <span class="kw">in </span>serialized_crate.sections {
+        <span class="comment">// Skip zero-sized TLS sections, which are just markers, not real sections.
+        </span><span class="kw">if </span>section.ty.is_tls() &amp;&amp; section.size == <span class="number">0 </span>{
+            <span class="kw">continue</span>;
+        }
         sections.insert(
             shndx,
             into_loaded_section(
                 section,
-                CowArc::downgrade(<span class="kw-2">&amp;</span>loaded_crate),
+                parent_crate_weak_ref.clone(),
                 namespace,
                 text_pages,
                 rodata_pages,
@@ -250,7 +260,7 @@
         parent_crate,
     );
 
-    <span class="kw">if let </span>SectionType::TlsData | SectionType::TlsBss = serialized_section.ty {
+    <span class="kw">if </span>serialized_section.ty.is_tls() {
         namespace.tls_initializer.lock().add_existing_static_tls_section(
             loaded_section,
             <span class="comment">// TLS sections encode their TLS offset in the virtual address field,

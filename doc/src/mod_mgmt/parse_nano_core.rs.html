@@ -870,6 +870,12 @@
 <a href="#870" id="870">870</a>
 <a href="#871" id="871">871</a>
 <a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,
 //! in other words, the code that is currently executing.
 //! As such, it performs no loading, but rather just creates metadata that represents
@@ -1668,6 +1674,9 @@
         )))
     }
     <span class="kw">else if </span>main_section_info.tls_data_info.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
+        <span class="comment">// Skip zero-sized TLS sections, which are just markers, not real sections.
+        </span><span class="kw">if </span>sec_size == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Ok</span>(()); }
+
         <span class="comment">// TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         </span><span class="kw">let </span>tls_offset = sec_vaddr;
@@ -1696,6 +1705,9 @@
         <span class="prelude-val">Some</span>(tls_section_ref)
     }
     <span class="kw">else if </span>main_section_info.tls_bss_info.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
+        <span class="comment">// Skip zero-sized TLS sections, which are just markers, not real sections.
+        </span><span class="kw">if </span>sec_size == <span class="number">0 </span>{ <span class="kw">return </span><span class="prelude-val">Ok</span>(()); }
+
         <span class="comment">// TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         </span><span class="kw">let </span>tls_offset = sec_vaddr;
