@@ -796,6 +796,9 @@ fn add_new_section(
         )))
     }
     else if main_section_info.tls_data_info.map_or(false, |(shndx, _)| sec_ndx == shndx) {
+        // Skip zero-sized TLS sections, which are just markers, not real sections.
+        if sec_size == 0 { return Ok(()); }
+
         // TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         let tls_offset = sec_vaddr;
@@ -824,6 +827,9 @@ fn add_new_section(
         Some(tls_section_ref)
     }
     else if main_section_info.tls_bss_info.map_or(false, |(shndx, _)| sec_ndx == shndx) {
+        // Skip zero-sized TLS sections, which are just markers, not real sections.
+        if sec_size == 0 { return Ok(()); }
+
         // TLS sections encode their TLS offset in the virtual address field,
         // which is necessary to properly calculate relocation entries that depend upon them.
         let tls_offset = sec_vaddr;

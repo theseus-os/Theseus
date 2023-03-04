@@ -39,11 +39,16 @@ pub struct TlsInitializer {
     cache_status: CacheStatus,
     /// The set of TLS data sections that are defined at link time
     /// and come from the statically-linked base kernel image (the nano_core).
-    /// According to the x86_64 TLS ABI, these exist at **negative** offsets
+    ///
+    /// On x86_64, the ELF TLS ABI specifies that static TLS sections exist at **negative** offsets
     /// from the TLS self pointer, i.e., they exist **before** the TLS self pointer in memory.
     /// Thus, their actual location in memory depends on the size of **all** static TLS data sections.
     /// For example, the last section in this set (with the highest offset) will be placed
-    /// right before the TLS self pointer in memory. 
+    /// right before the TLS self pointer in memory.
+    ///
+    /// On aarch64, the ELF TLS ABI specifies only positive offsets,
+    /// and there is no TLS self pointer.
+    /// * TODO: not sure about this claim. *
     static_section_offsets:  RangeMap<usize, StrongSectionRefWrapper>,
     /// The ending offset (an exclusive range end bound) of the last TLS section
     /// in the above set of `static_section_offsets`.
@@ -76,14 +81,23 @@ impl TlsInitializer {
         }
     }
 
+    
     /// Add a TLS section that has pre-determined offset, e.g.,
     /// one that was specified in the statically-linked base kernel image.
     ///
     /// This function modifies the `tls_section`'s starting virtual address field
     /// to hold the proper value such that this `tls_section` can be correctly used
     /// as the source of a relocation calculation (e.g., when another section depends on it).
-    /// That value will be a negative offset from the end of all the static TLS sections,
-    /// i.e., where the TLS self pointer exists in memory.
+    /// * On x86_64, that value will be the negative offset from the end of 
+    ///   all the static TLS sections, i.e., where the TLS self pointer exists in memory,
+    ///   to the start of this section in the TLS image.
+    ///   * `VirtAddr = -1 * (total_static_tls_size - offset);`
+    /// * On aarch64, that value will be a positive offset from the beginning
+    ///   of all sections, i.e., the start of the TLS data image,
+    ///   to the start of this section in the TLS image,
+    ///   _plus_ another value that is the max of 16 (0x10) and the alignment of
+    ///   this section's containing TLS segment.
+    ///   * `VirtAddr = max(16, TLS_segment_align) + offset;`
     ///
     /// ## Arguments
     /// * `tls_section`: the TLS section present in base kernel image.
@@ -112,7 +126,11 @@ impl TlsInitializer {
         }
 
         // Calculate the new value of this section's virtual address based on its offset.
+        #[cfg(target_arch = "x86_64")]
         let starting_offset = (total_static_tls_size - offset).wrapping_neg();
+        #[cfg(target_arch = "aarch64")]
+        let starting_offset = max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */) + offset;
+
         tls_section.virt_addr = VirtualAddress::new(starting_offset).ok_or(())?;
         self.end_of_static_sections = max(self.end_of_static_sections, range.end);
         let section_ref = Arc::new(tls_section);
