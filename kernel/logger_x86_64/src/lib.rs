@@ -120,11 +120,11 @@ impl Log for DummyLogger {
         let file_loc = record.file().unwrap_or("??");
         let line_loc = record.line().unwrap_or(0);
         let _result = self.write_fmt(
-            format_args!("{}{}{}:{}: {}{}",
+            format_args!("{}{}: {}{}",
                 color.as_terminal_string(),
                 level_str,
-                file_loc,
-                line_loc,
+                // file_loc,
+                // line_loc,
                 record.args(),
                 LogColor::Reset.as_terminal_string(),
             )
@@ -136,10 +136,10 @@ impl Log for DummyLogger {
         if let Some(func) = mirror_log::get_log_mirror_function() {
             // Currently printing to the VGA terminal doesn't support ANSI color escape sequences,
             // so we exclude the first and the last elements that set those colors.
-            func(format_args!("{}{}:{}: {}",
+            func(format_args!("{}: {}",
                 level_str,
-                file_loc,
-                line_loc,
+                // file_loc,
+                // line_loc,
                 record.args(),
             ));
         }

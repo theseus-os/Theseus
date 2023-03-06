@@ -602,33 +602,33 @@ impl WindowManager {
 
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
-    let final_fb: Framebuffer<AlphaPixel> = framebuffer::init()?;
-    let (width, height) = final_fb.get_size();
+    // let final_fb: Framebuffer<AlphaPixel> = framebuffer::init()?;
+    // let (width, height) = final_fb.get_size();
 
-    let mut bottom_fb = Framebuffer::new(width, height, None)?;
-    let mut top_fb = Framebuffer::new(width, height, None)?;
-    let (screen_width, screen_height) = bottom_fb.get_size();
-    bottom_fb.fill(color::LIGHT_GRAY.into());
-    top_fb.fill(color::TRANSPARENT.into()); 
+    // let mut bottom_fb = Framebuffer::new(width, height, None)?;
+    // let mut top_fb = Framebuffer::new(width, height, None)?;
+    // let (screen_width, screen_height) = bottom_fb.get_size();
+    // bottom_fb.fill(color::LIGHT_GRAY.into());
+    // top_fb.fill(color::TRANSPARENT.into()); 
 
-    // Initial position for the mouse
-    let mouse = Coord {
-        x: screen_width as isize / 2,
-        y: screen_height as isize / 2,
-    }; 
+    // // Initial position for the mouse
+    // let mouse = Coord {
+    //     x: screen_width as isize / 2,
+    //     y: screen_height as isize / 2,
+    // }; 
 
-    // Initialize static window manager
-    let window_manager = WindowManager {
-        hide_list: VecDeque::new(),
-        show_list: VecDeque::new(),
-        active: Weak::new(),
-        mouse,
-        repositioned_border: None,
-        bottom_fb,
-        top_fb,
-        final_fb,
-    };
-    WINDOW_MANAGER.call_once(|| Mutex::new(window_manager));
+    // // Initialize static window manager
+    // let window_manager = WindowManager {
+    //     hide_list: VecDeque::new(),
+    //     show_list: VecDeque::new(),
+    //     active: Weak::new(),
+    //     mouse,
+    //     repositioned_border: None,
+    //     bottom_fb,
+    //     top_fb,
+    //     final_fb,
+    // };
+    // WINDOW_MANAGER.call_once(|| Mutex::new(window_manager)); //everything above including this line
 
     // keyinput queue initialization
     let key_consumer: Queue<Event> = Queue::with_capacity(100);
@@ -638,9 +638,9 @@ pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     let mouse_consumer: Queue<Event> = Queue::with_capacity(100);
     let mouse_producer = mouse_consumer.clone();
 
-    spawn::new_task_builder(window_manager_loop, (key_consumer, mouse_consumer))
-        .name("window_manager_loop".to_string())
-        .spawn()?;
+    // spawn::new_task_builder(window_manager_loop, (key_consumer, mouse_consumer))
+    //     .name("window_manager_loop".to_string())
+    //     .spawn()?;
 
     Ok((key_producer, mouse_producer))
 }

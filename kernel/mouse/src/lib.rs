@@ -34,22 +34,23 @@ pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) ->
     // Set Mouse ID to 4.
     if let Err(e) = mouse.set_mouse_id(MouseId::Four) {
         error!("Failed to set the mouse id to four: {e}");
+        loop {}
         return Err("Failed to set the mouse id to four");
     }
     // Read it back to check that it worked.
-    match mouse.mouse_id() {
-        Ok(id) =>  {
-            debug!("The PS/2 mouse ID is: {id:?}");
-            if !matches!(id, MouseId::Four) {
-                error!("Failed to set the mouse id to four");
-                return Err("Failed to set the mouse id to four");
-            }
-        }
-        Err(e) => {
-            error!("Failed to read the PS/2 mouse ID: {e}");
-            return Err("Failed to read the PS/2 mouse ID");
-        }
-    }
+    // match mouse.mouse_id() {
+    //     Ok(id) =>  {
+    //         debug!("The PS/2 mouse ID is: {id:?}");
+    //         if !matches!(id, MouseId::Four) {
+    //             error!("Failed to set the mouse id to four");
+    //             return Err("Failed to set the mouse id to four");
+    //         }
+    //     }
+    //     Err(e) => {
+    //         error!("Failed to read the PS/2 mouse ID: {e}");
+    //         return Err("Failed to read the PS/2 mouse ID");
+    //     }
+    // }
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_MOUSE_IRQ, ps2_mouse_handler).map_err(|e| {
