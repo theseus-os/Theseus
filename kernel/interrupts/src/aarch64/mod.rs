@@ -66,6 +66,7 @@ pub struct ExceptionContext {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+#[repr(C)]
 pub enum EoiBehaviour {
     CallerMustSignalEoi,
     HandlerHasSignaledEoi,
@@ -122,7 +123,7 @@ pub fn init() -> Result<(), &'static str> {
         let mut mmi = kernel_mmi_ref.lock();
         let page_table = &mut mmi.deref_mut().page_table;
 
-        log::info!("Configuring the GIC");
+        info!("Configuring the GIC");
         let mut inner = ArmGic::init(
             page_table,
             GicVersion::InitV3 {
@@ -134,7 +135,7 @@ pub fn init() -> Result<(), &'static str> {
         inner.set_minimum_priority(0);
         *gic = Some(inner);
 
-        log::info!("Done Configuring the GIC");
+        info!("Done Configuring the GIC");
 
         Ok(())
     }
@@ -180,9 +181,9 @@ pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) ->
 
     /* DEBUGGING CODE
 
-    log::info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-    log::info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-    log::info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
+    info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
+    info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
+    info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
 
     */
 
