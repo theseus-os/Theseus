@@ -75,7 +75,7 @@ pub fn early_init(
 /// * The legacy PS2 controller and any connected devices: [`keyboard`] and [`mouse`],
 /// * All other devices discovered on the [`pci`] bus.
 pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
-
+    
     let serial_ports = logger::take_early_log_writers();
     let logger_writers = IntoIterator::into_iter(serial_ports)
         .flatten()
@@ -99,7 +99,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         }
     };
     init_serial_port(SerialPortAddress::COM1);
-    init_serial_port(SerialPortAddress::COM2);
+    init_serial_port(SerialPortAddress::COM2); //
 
     let ps2_controller = ps2::init()?;
     keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;

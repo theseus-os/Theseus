@@ -36,15 +36,15 @@ struct KeyboardInterruptParams {
 pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event>) -> Result<(), &'static str> {
     // Detect which kind of keyboard is connected.
     // TODO: actually do something with the keyboard type.
-    match keyboard.keyboard_detect() {
-        Ok(KeyboardType::AncientATKeyboard) => debug!("The PS/2 keyboard type is: Ancient AT Keyboard with translator enabled in the PS/2 Controller"),
-        Ok(KeyboardType::MF2Keyboard) => debug!("The PS/2 keyboard type is: MF2Keyboard"),
-        Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator) => debug!("The PS/2 keyboard type is: MF2 Keyboard with translator enabled in PS/2 Controller"),
-        Err(e) => {
-            error!("Failed to detect the PS/2 keyboard type: {e}");
-            return Err("Failed to detect the PS/2 keyboard type");
-        }
-    }
+    // match keyboard.keyboard_detect() {
+    //     Ok(KeyboardType::AncientATKeyboard) => debug!("The PS/2 keyboard type is: Ancient AT Keyboard with translator enabled in the PS/2 Controller"),
+    //     Ok(KeyboardType::MF2Keyboard) => debug!("The PS/2 keyboard type is: MF2Keyboard"),
+    //     Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator) => debug!("The PS/2 keyboard type is: MF2 Keyboard with translator enabled in PS/2 Controller"),
+    //     Err(e) => {
+    //         error!("Failed to detect the PS/2 keyboard type: {e}");
+    //         return Err("Failed to detect the PS/2 keyboard type");
+    //     }
+    // }
 
     // TODO: figure out what we should do, for now using set 1
     keyboard.keyboard_scancode_set(ScancodeSet::Set1)?;
@@ -63,6 +63,7 @@ pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event
 
 /// The interrupt handler for a PS/2-connected keyboard, registered at IRQ 0x21.
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame) {
+    debug!("ps2_keyboard_handler");
     // Some of the scancodes are "extended", which means they generate two different interrupts,
     // the first handling the E0 byte, the second handling their second byte.
     static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);

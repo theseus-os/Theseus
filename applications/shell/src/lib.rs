@@ -1464,6 +1464,7 @@ impl Shell {
 
 /// Start a new shell. Shell::start() is an infinite loop, so normally we do not return from this function.
 fn shell_loop(mut _dummy: ()) -> Result<(), &'static str> {
-    Shell::new()?.start()?;
+    // Shell::new()?.start()?;
+    loop {}
     Ok(())
 }

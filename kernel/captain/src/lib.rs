@@ -116,29 +116,29 @@ pub fn init(
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
-    let ap_count = multicore_bringup::handle_ap_cores(
-        &kernel_mmi_ref,
-        ap_start_realmode_begin,
-        ap_start_realmode_end,
-        ap_gdt,
-        Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
-    )?;
-    let cpu_count = ap_count + 1;
-    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
+    // let ap_count = multicore_bringup::handle_ap_cores(
+    //     &kernel_mmi_ref,
+    //     ap_start_realmode_begin,
+    //     ap_start_realmode_end,
+    //     ap_gdt,
+    //     Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
+    // )?; //
+    let cpu_count = 1; //ap_count + 1
+    // info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count); //
 
     #[cfg(mirror_log_to_vga)] {
         // Currently, handling the AP cores also siwtches the graphics mode
         // (from text mode VGA to a graphical framebuffer).
         // Thus, we can now use enable the function that mirrors logger output to the terminal.
-        logger_x86_64::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
+        // logger_x86_64::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal); //
     }
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
-    tlb_shootdown::init();
+    // tlb_shootdown::init(); //
     
     // Initialize the per-core heaps.
-    multiple_heaps::switch_to_multiple_heaps()?;
+    // multiple_heaps::switch_to_multiple_heaps()?; //
     info!("Initialized per-core heaps");
 
     #[cfg(feature = "uefi")] {
@@ -150,9 +150,9 @@ pub fn init(
     // The PAT supports write-combining caching of graphics video memory for better performance
     // and must be initialized explicitly on every CPU, 
     // but it is not a fatal error if it doesn't exist.
-    if page_attribute_table::init().is_err() {
-        error!("This CPU does not support the Page Attribute Table");
-    }
+    // if page_attribute_table::init().is_err() { //
+    //     error!("This CPU does not support the Page Attribute Table");
+    // }
     let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the rest of our drivers

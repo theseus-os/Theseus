@@ -186,6 +186,7 @@ full: iso
 iso: $(iso)
 
 ### This target builds an .iso OS image from all of the compiled crates.
+$(iso) : export override THESEUS_CONFIG += mirror_log_to_vga
 $(iso): clean-old-build build extra_files copy_kernel $(iso)-$(boot_spec)
 
 ## This target is invoked by the '$(iso)' target when boot_spec = 'bios'.
