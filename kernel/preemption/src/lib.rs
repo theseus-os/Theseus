@@ -50,8 +50,8 @@ pub fn hold_preemption_no_timer_disable() -> PreemptionGuard {
 
 /// The internal routine for disabling preemption.
 ///
-/// The const argument `DISABLE_TIMER` determines whether the local timer interrupt
-/// is disabled upon a transition from preemption being enabled to being disabled.
+/// If the const argument `DISABLE_TIMER` is `true`, the local timer interrupt
+/// will be disabled upon a transition from preemption being enabled to being disabled.
 fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     let cpu_id = apic::current_cpu();
     let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_add(1, Ordering::Relaxed);
