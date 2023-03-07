@@ -24,10 +24,10 @@ mod_mgmt = { path = "../mod_mgmt" }
 panic_entry = { path = "../panic_entry" }
 memory_initialization = { path = "../memory_initialization" }
 boot_info = { path = "../boot_info" }
+captain = { path = "../captain" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
-captain = { path = "../captain" }
 serial_port_basic = { path = "../serial_port_basic" }
 vga_buffer = { path = "../vga_buffer" }
 logger_x86_64 = { path = "../logger_x86_64" }

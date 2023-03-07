@@ -6,7 +6,10 @@
 #![no_std]
 #![feature(drain_filter)]
 
-#[macro_use] extern crate vga_buffer; // for println_raw!()
+#[cfg(target_arch = "x86_64")]
+#[macro_use]
+extern crate vga_buffer; // for println_raw!()
+
 #[macro_use] extern crate app_io; // for regular println!()
 #[macro_use] extern crate log;
 extern crate alloc;
@@ -221,11 +224,15 @@ pub fn remove_unhandled_exceptions() -> Vec<FaultEntry> {
 /// calls println!() and then println_raw!()
 macro_rules! println_both {
     ($fmt:expr) => {
+        #[cfg(target_arch = "x86_64")]
         print_raw!(concat!($fmt, "\n"));
+
         print!(concat!($fmt, "\n"));
     };
     ($fmt:expr, $($arg:tt)*) => {
+        #[cfg(target_arch = "x86_64")]
         print_raw!(concat!($fmt, "\n"), $($arg)*);
+
         print!(concat!($fmt, "\n"), $($arg)*);
     };
 }

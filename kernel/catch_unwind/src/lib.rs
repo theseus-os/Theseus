@@ -54,11 +54,16 @@ pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, KillReason>
 /// * a pointer to the arbitrary object passed around during the unwinding process,
 ///   which in Theseus is a pointer to the `UnwindingContext`. 
 fn panic_callback<F, A, R>(data_ptr: *mut u8, exception_object: *mut u8) where F: FnOnce(A) -> R {
-    let data = unsafe { &mut *(data_ptr as *mut TryIntrinsicArg<F, A, R>) };
-    let unwinding_context_boxed = unsafe { Box::from_raw(exception_object as *mut unwind::UnwindingContext) };
-    let unwinding_context = *unwinding_context_boxed;
-    let (_stack_frame_iter, cause, _taskref) = unwinding_context.into();
-    data.ret = ManuallyDrop::new(Err(cause));
+    #[cfg(not(target_arch = "x86_64"))]
+    loop {};
+
+    #[cfg(target_arch = "x86_64")] {
+        let data = unsafe { &mut *(data_ptr as *mut TryIntrinsicArg<F, A, R>) };
+        let unwinding_context_boxed = unsafe { Box::from_raw(exception_object as *mut unwind::UnwindingContext) };
+        let unwinding_context = *unwinding_context_boxed;
+        let (_stack_frame_iter, cause, _taskref) = unwinding_context.into();
+        data.ret = ManuallyDrop::new(Err(cause));
+    }
 }
 
 
@@ -107,7 +112,11 @@ fn try_intrinsic_trampoline<F, A, R>(try_intrinsic_arg: *mut u8) where F: FnOnce
 /// [`std::panic::resume_unwind()`]: https://doc.rust-lang.org/std/panic/fn.resume_unwind.html
 pub fn resume_unwind(caught_panic_reason: KillReason) -> ! {
     // We can skip up to 2 frames here: `unwind::start_unwinding` and `resume_unwind` (this function)
+    #[cfg(target_arch = "x86_64")]
     let result = unwind::start_unwinding(caught_panic_reason, 2);
+
+    #[cfg(not(target_arch = "x86_64"))]
+    let result = "[unimplemented on non-x86_64 platforms]";
 
     // `start_unwinding` should not return
     panic!("BUG: start_unwinding() returned {:?}. This is an unexpected failure, as no unwinding occurred. Task: {:?}.",
