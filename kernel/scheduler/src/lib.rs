@@ -53,15 +53,32 @@ pub fn init() -> Result<(), &'static str> {
         })
     }
 
-    #[cfg(not(target_arch = "x86_64"))] {
+    #[cfg(target_arch = "aarch64")] {
+        interrupts::enable_timer_interrupts(true, aarch64_timer_handler)
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))] {
         log::error!("TODO: scheduler::init() only supports registering a preemptive task switching timer interrupt on x86_64");
         Err("TODO: scheduler::init() only supports registering a preemptive task switching timer interrupt on x86_64")
     }
 }
 
 /// The handler for each CPU's local timer interrupt, used for preemptive task switching.
+#[cfg(target_arch = "aarch64")]
+extern "C" fn aarch64_timer_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
+    cpu_local_timer_tick_handler();
+
+    interrupts::EoiBehaviour::HandlerHasSignaledEoi
+}
+
+/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
 #[cfg(target_arch = "x86_64")]
 extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
+    cpu_local_timer_tick_handler()
+}
+
+// Cross platform scheduling code
+fn cpu_local_timer_tick_handler() {
     // tick count, only used for debugging
     #[cfg(any())] { // cfg(any()) is always false
         use core::sync::atomic::{AtomicUsize, Ordering};
@@ -76,7 +93,13 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::
 
     // We must acknowledge the interrupt before the end of this handler
     // because we switch tasks here, which doesn't return.
-    eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
+    {
+        #[cfg(target_arch = "x86_64")]
+        eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
+
+        #[cfg(target_arch = "aarch64")]
+        eoi(CPU_LOCAL_TIMER_IRQ);
+    }
 
     schedule();
 }

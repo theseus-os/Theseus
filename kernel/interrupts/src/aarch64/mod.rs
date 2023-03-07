@@ -63,10 +63,16 @@ pub struct ExceptionContext {
     esr_el1: EsrEL1,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum EoiBehaviour {
+    CallerMustSignalEoi,
+    HandlerHasSignaledEoi,
+}
+
 /// Return value:
 /// - true if you sent an End Of Interrupt signal in the handler
 /// - false if you want the caller to do it for you after you return
-type HandlerFunc = extern "C" fn(&ExceptionContext) -> bool;
+type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
 
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
@@ -75,7 +81,7 @@ fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
 }
 
 // called for all unhandled interrupt requests
-extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
+extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     log::error!("Unhandled IRQ:\r\n{:?}\r\n[looping forever now]", exc);
     loop {}
 }
@@ -123,17 +129,23 @@ pub fn init() -> Result<(), &'static str> {
     }
 }
 
-pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
-    // called everytime the timer ticks.
-    extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
-        info!("timer int!");
-        loop {}
-    }
-
-    // register the handler for the timer IRQ.
-    if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_handler) {
-        if timer_handler as *const HandlerFunc != existing_handler {
-            return Err("An interrupt handler has already been setup for the timer IRQ number");
+/// This function registers an interrupt handler for the CPU-local
+/// timer, enables the routing of this interrupt in the GIC, and
+/// turns the timer on, when `enable` is true.
+///
+/// When `enable` is false, the handler is deregistered, routing is
+/// disabled in the GIC, and the timer is turned off.
+pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
+    // register/deregister the handler for the timer IRQ.
+    if enable {
+        if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
+            if timer_tick_handler as *const HandlerFunc != existing_handler {
+                return Err("A different interrupt handler has already been setup for the timer IRQ number");
+            }
+        }
+    } else {
+        if let Err(_existing_handler) = deregister_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
+            return Err("A different interrupt handler was setup for the timer IRQ number");
         }
     }
 
@@ -342,7 +354,8 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
         true => IRQ_HANDLERS.read()[irq_num_usize],
         false => default_irq_handler,
     };
-    if !handler(exc) {
+
+    if handler(exc) == EoiBehaviour::CallerMustSignalEoi {
         // handler has returned, we can lock again
         let mut gic = GIC.lock();
         gic.as_mut().unwrap().end_of_interrupt(irq_num);
