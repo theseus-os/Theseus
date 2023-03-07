@@ -179,6 +179,7 @@ var sourcesIndex = JSON.parse('{\
 "virtual_nic":["",[],["lib.rs"]],\
 "wait_condition":["",[],["lib.rs"]],\
 "wait_queue":["",[],["lib.rs"]],\
+"waker_generic":["",[],["lib.rs"]],\
 "wasi_interpreter":["",[],["lib.rs","posix_file_system.rs","wasi_definitions.rs","wasi_syscalls.rs","wasmi_state_machine.rs"]],\
 "window":["",[],["lib.rs"]],\
 "window_inner":["",[],["lib.rs"]],\

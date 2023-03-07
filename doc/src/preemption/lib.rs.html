@@ -148,6 +148,31 @@
 <a href="#148" id="148">148</a>
 <a href="#149" id="149">149</a>
 <a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.
 //! 
 //! Supports enabling and disabling preemption for the purpose of 
@@ -180,7 +205,33 @@
 
 <span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.
+///
+/// If this results in a transition from preemption being enabled to being disabled
+/// on this CPU, the local timer interrupt used for preemptive task switches
+/// will also be disabled until preemption is re-enabled.
 </span><span class="kw">pub fn </span>hold_preemption() -&gt; PreemptionGuard {
+    hold_preemption_internal::&lt;<span class="bool-val">true</span>&gt;()
+}
+
+<span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring
+/// until the returned guard object is dropped.
+///
+/// ## Usage notes
+/// Callers should use [`hold_preemption()`] instead of this function.
+/// This is a &quot;lightweight&quot; version of that function that does not
+/// disable this CPU&#39;s local timer interrupt used for preemptive task switches.
+/// Thus, it is only for select contexts where we are very briefly
+/// disabling preemption.
+</span><span class="attr">#[doc(hidden)]
+</span><span class="kw">pub fn </span>hold_preemption_no_timer_disable() -&gt; PreemptionGuard {
+    hold_preemption_internal::&lt;<span class="bool-val">false</span>&gt;()
+}
+
+<span class="doccomment">/// The internal routine for disabling preemption.
+///
+/// If the const argument `DISABLE_TIMER` is `true`, the local timer interrupt
+/// will be disabled upon a transition from preemption being enabled to being disabled.
+</span><span class="kw">fn </span>hold_preemption_internal&lt;<span class="kw">const </span>DISABLE_TIMER: bool&gt;() -&gt; PreemptionGuard {
     <span class="kw">let </span>cpu_id = cpu::current_cpu();
     <span class="kw">let </span>prev_val = PREEMPTION_COUNT[cpu_id.value() <span class="kw">as </span>usize].fetch_add(<span class="number">1</span>, Ordering::Relaxed);
     <span class="comment">// If the previous counter value was 0, that indicates we are transitioning
@@ -193,8 +244,8 @@
         preemption_was_enabled,
     };
 
-    <span class="kw">if </span>preemption_was_enabled {
-        <span class="comment">// log::trace!(&quot; CPU {}:   disabling preemption&quot;, cpu_id);
+    <span class="kw">if </span>DISABLE_TIMER &amp;&amp; preemption_was_enabled {
+        <span class="comment">// log::trace!(&quot; CPU {}:   disabling local timer interrupt&quot;, cpu_id);
         
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
@@ -207,7 +258,6 @@
         <span class="comment">// Overflow occurred and the counter value wrapped around, which is a bug.
         </span><span class="macro">panic!</span>(<span class="string">&quot;BUG: Overflow occurred in the preemption counter for CPU {}&quot;</span>, cpu_id);
     }
-
     guard
 }
 
@@ -270,7 +320,7 @@
 
         <span class="kw">let </span>prev_val = PREEMPTION_COUNT[cpu_id.value() <span class="kw">as </span>usize].fetch_sub(<span class="number">1</span>, Ordering::Relaxed);
         <span class="kw">if </span>prev_val == <span class="number">1 </span>{
-            <span class="comment">// log::trace!(&quot;CPU {}: re-enabling preemption&quot;, cpu_id);
+            <span class="comment">// log::trace!(&quot;CPU {}: re-enabling local timer interrupt&quot;, cpu_id);
 
             // If the previous counter value was 1, that means the current value is 1,
             // which indicates we are transitioning from preemption disabled to enabled on this CPU.

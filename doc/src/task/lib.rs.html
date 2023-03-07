@@ -1180,6 +1180,35 @@
 <a href="#1180" id="1180">1180</a>
 <a href="#1181" id="1181">1181</a>
 <a href="#1182" id="1182">1182</a>
+<a href="#1183" id="1183">1183</a>
+<a href="#1184" id="1184">1184</a>
+<a href="#1185" id="1185">1185</a>
+<a href="#1186" id="1186">1186</a>
+<a href="#1187" id="1187">1187</a>
+<a href="#1188" id="1188">1188</a>
+<a href="#1189" id="1189">1189</a>
+<a href="#1190" id="1190">1190</a>
+<a href="#1191" id="1191">1191</a>
+<a href="#1192" id="1192">1192</a>
+<a href="#1193" id="1193">1193</a>
+<a href="#1194" id="1194">1194</a>
+<a href="#1195" id="1195">1195</a>
+<a href="#1196" id="1196">1196</a>
+<a href="#1197" id="1197">1197</a>
+<a href="#1198" id="1198">1198</a>
+<a href="#1199" id="1199">1199</a>
+<a href="#1200" id="1200">1200</a>
+<a href="#1201" id="1201">1201</a>
+<a href="#1202" id="1202">1202</a>
+<a href="#1203" id="1203">1203</a>
+<a href="#1204" id="1204">1204</a>
+<a href="#1205" id="1205">1205</a>
+<a href="#1206" id="1206">1206</a>
+<a href="#1207" id="1207">1207</a>
+<a href="#1208" id="1208">1208</a>
+<a href="#1209" id="1209">1209</a>
+<a href="#1210" id="1210">1210</a>
+<a href="#1211" id="1211">1211</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1404,6 +1433,16 @@
             <span class="kw-2">*</span><span class="self">self</span>.<span class="number">0</span>.exit_value_mailbox.lock() = <span class="prelude-val">Some</span>(val);
             <span class="self">self</span>.<span class="number">0</span>.task.runstate().store(RunState::Exited);
 
+            <span class="comment">// Synchronize with the acquire fence in `JoinableTaskRef::join()`,
+            // as we have just stored the exit value that `join()` will load.
+            </span>fence(Ordering::Release);
+
+            <span class="comment">// Now that we have set the exit value and marked the task as exited,
+            // it is safe to wake any other tasks that are waiting for this task to exit.
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(waker) = <span class="self">self</span>.<span class="number">0</span>.task.inner().lock().waker.take() {
+                waker.wake();
+            }
+
             <span class="comment">// Corner case: if the task isn&#39;t currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             </span><span class="kw">if </span>!<span class="self">self</span>.is_running() {
@@ -1415,12 +1454,7 @@
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             </span>}
-            
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(waker) = <span class="self">self</span>.<span class="number">0</span>.task.inner().lock().waker.take() {
-                waker.wake();
-            }
         }
-
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -1581,7 +1615,7 @@
         <span class="self">self</span>.task.<span class="number">0</span>.task.inner().lock().waker = <span class="prelude-val">Some</span>(waker);
     }
 
-    <span class="doccomment">/// Busy-waits (spins in a loop) until this task has exited or has been killed.
+    <span class="doccomment">/// Blocks the current task until this task has exited.
     ///
     /// Synchronizes memory with respect to the joined task.
     ///
@@ -1592,15 +1626,31 @@
     ///   * This does *not* include cases where this `Task` failed or was killed,
     ///     rather only cases where the `join` operation itself failed.
     </span><span class="attr">#[doc(alias(<span class="string">&quot;reap&quot;</span>, <span class="string">&quot;exit&quot;</span>))]
-    </span><span class="kw">pub fn </span>join(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ExitValue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// First, wait for this Task to be marked as Exited (no longer runnable).
-        </span><span class="kw">while </span>!<span class="self">self</span>.has_exited() { }
+    </span><span class="kw">pub fn </span>join(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;ExitValue, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {        
+        <span class="kw">if </span>!<span class="self">self</span>.has_exited() {
+            <span class="comment">// Create a waker+blocker pair that will block the current task
+            // and then wake it once this task (`self`) exits.
+            </span><span class="kw">let </span>curr_task = get_my_current_task().ok_or(<span class="string">&quot;join(): couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
+            <span class="kw">let </span>task_to_block = curr_task.clone();
+            <span class="kw">let </span>wake_action = <span class="kw">move </span>|| {
+                <span class="kw">let _ </span>= curr_task.unblock();
+            };
+            <span class="kw">let </span>(waker, blocker) = waker_generic::new_waker(wake_action);
+            <span class="self">self</span>.set_waker(waker);
+            <span class="kw">let </span>block_action = || {
+                <span class="kw">let _ </span>= task_to_block.block();
+                ScheduleOnDrop { }
+            };
+            blocker.block(block_action);
+        }
+        
+        <span class="comment">// Note: previously, we waited for this task to actually stop running,
+        //       but this isn&#39;t actually necessary since we only care whether
+        //       the task has exited and its exit value has been written.
+        // while self.is_running() { }
 
-        <span class="comment">// Then, wait for it to actually stop running on any CPU core.
-        </span><span class="kw">while </span><span class="self">self</span>.is_running() { }
-
-        <span class="comment">// This synchronizes with the release fence from when this task first ran
-        // (in `spawn::task_wrapper()`).
+        // Synchronize with the release fence in`TaskRef::internal_exit`
+        // when the exit value for this task was stored.
         </span>fence(Ordering::Acquire);
 
         <span class="self">self</span>.reap_exit_value()
@@ -1612,6 +1662,14 @@
     /// that will be auto-reaped after exiting.
     </span><span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.<span class="number">0</span>.joinable.store(<span class="bool-val">false</span>, Ordering::Relaxed);
+    }
+}
+
+<span class="doccomment">/// An empty struct that invokes [`schedule()`] when it is dropped.
+</span><span class="kw">struct </span>ScheduleOnDrop { }
+<span class="kw">impl </span>Drop <span class="kw">for </span>ScheduleOnDrop {
+    <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        schedule();
     }
 }
 
