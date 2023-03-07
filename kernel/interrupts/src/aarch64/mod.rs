@@ -72,9 +72,6 @@ pub enum EoiBehaviour {
     HandlerHasSignaledEoi,
 }
 
-/// Return value:
-/// - true if you sent an End Of Interrupt signal in the handler
-/// - false if you want the caller to do it for you after you return
 type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
 
 // called for all exceptions other than interrupts
