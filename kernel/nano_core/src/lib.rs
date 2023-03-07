@@ -23,11 +23,14 @@ extern crate panic_entry;
 
 use core::ops::DerefMut;
 use memory::VirtualAddress;
-use kernel_config::memory::KERNEL_OFFSET;
 use mod_mgmt::parse_nano_core::NanoCoreItems;
 
 #[cfg(target_arch = "x86_64")]
-use vga_buffer::println_raw;
+use {
+    vga_buffer::println_raw,
+    kernel_config::memory::KERNEL_OFFSET,
+};
+
 #[cfg(target_arch = "aarch64")]
 use log::info as println_raw;
 

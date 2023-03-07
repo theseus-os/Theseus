@@ -19,14 +19,17 @@
 
 extern crate alloc;
 
-use core::ops::DerefMut;
 use log::{error, info};
 use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
-use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
 use no_drop::NoDrop;
 
+#[cfg(target_arch = "x86_64")]
+use {
+    core::ops::DerefMut,
+    kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES,
+};
 
 #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))]
 mod mirror_log_callbacks {
@@ -69,6 +72,7 @@ impl DropAfterInit {
 /// * `ap_gdt`: the virtual address of the GDT created for the AP's realmode boot code.
 /// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
 ///    if available and provided by the bootloader.
+#[cfg_attr(target_arch = "aarch64", allow(unreachable_code, unused_variables))]
 pub fn init(
     kernel_mmi_ref: MmiRef,
     bsp_initial_stack: NoDrop<Stack>,

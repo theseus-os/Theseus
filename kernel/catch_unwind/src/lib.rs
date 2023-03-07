@@ -7,8 +7,9 @@ extern crate alloc;
 extern crate task;
 
 use core::mem::ManuallyDrop;
-use alloc::boxed::Box;
 use task::KillReason;
+#[cfg(target_arch = "x86_64")]
+use alloc::boxed::Box;
 
 /// Invokes the given closure `f`, catching a panic as it is unwinding the stack.
 /// 
@@ -52,7 +53,8 @@ pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, KillReason>
 /// # Arguments
 /// * a pointer to the 
 /// * a pointer to the arbitrary object passed around during the unwinding process,
-///   which in Theseus is a pointer to the `UnwindingContext`. 
+///   which in Theseus is a pointer to the `UnwindingContext`.
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 fn panic_callback<F, A, R>(data_ptr: *mut u8, exception_object: *mut u8) where F: FnOnce(A) -> R {
     #[cfg(not(target_arch = "x86_64"))]
     loop {};
@@ -110,6 +112,7 @@ fn try_intrinsic_trampoline<F, A, R>(try_intrinsic_arg: *mut u8) where F: FnOnce
 ///    represent the possibility of a non-panic failure, e.g., a machine exception.
 /// 
 /// [`std::panic::resume_unwind()`]: https://doc.rust-lang.org/std/panic/fn.resume_unwind.html
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 pub fn resume_unwind(caught_panic_reason: KillReason) -> ! {
     // We can skip up to 2 frames here: `unwind::start_unwinding` and `resume_unwind` (this function)
     #[cfg(target_arch = "x86_64")]
