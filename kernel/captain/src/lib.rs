@@ -161,7 +161,7 @@ pub fn init(
         info!("Initialized per-core heaps");
     }
 
-    #[cfg(feature = "uefi")] {
+    #[cfg(all(feature = "uefi", target_arch = "x86_64"))] {
         log::error!("uefi boot cannot proceed as it is not fully implemented");
         loop {}
     }
