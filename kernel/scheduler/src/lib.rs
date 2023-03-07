@@ -24,7 +24,7 @@ cfg_if::cfg_if! {
     }
 }
 
-use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi, register_interrupt};
+use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi};
 use task::{self, TaskRef};
 
 /// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
@@ -44,7 +44,7 @@ pub fn init() -> Result<(), &'static str> {
     task::set_scheduler_policy(scheduler::select_next_task);
 
     #[cfg(target_arch = "x86_64")] {
-        register_interrupt(
+        interrupts::register_interrupt(
             CPU_LOCAL_TIMER_IRQ,
             lapic_timer_handler,
         ).map_err(|_handler| {

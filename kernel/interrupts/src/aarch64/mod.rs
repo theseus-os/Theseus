@@ -11,7 +11,7 @@ use tock_registers::registers::InMemoryRegister;
 use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
-use log::{info, error};
+use log::error;
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
@@ -64,6 +64,7 @@ pub struct ExceptionContext {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+#[repr(C)]
 pub enum EoiBehaviour {
     CallerMustSignalEoi,
     HandlerHasSignaledEoi,
