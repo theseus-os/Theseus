@@ -12,7 +12,6 @@ extern crate spawn;
 extern crate task;
 extern crate runqueue;
 extern crate event_types; 
-extern crate window_manager;
 extern crate path;
 extern crate root;
 extern crate scheduler;
@@ -328,6 +327,7 @@ impl Shell {
     /// Update the position of cursor. `offset_from_end` specifies the position relative to the end of the text in number of characters.
     fn update_cursor_pos(&mut self, offset_from_end: usize) -> Result<(), &'static str> {
         let mut terminal = self.terminal.lock();
+        // This is here to eliminate visual bugs
         terminal.cursor.disable();
         terminal.display_cursor()?;
         if offset_from_end == 0 {
@@ -1246,7 +1246,7 @@ impl Shell {
         let mut need_prompt = false;
         self.redisplay_prompt();
         self.terminal.lock().refresh_display()?;
-
+    
         loop {
             // If there is anything from running applications to be printed, it printed on the screen and then
             // return true, so that the loop continues, otherwise nothing happens and we keep on going with the
@@ -1255,17 +1255,17 @@ impl Shell {
                 need_refresh = true;
                 continue;
             }
-
+    
             // Handles the cleanup of any application task that has finished running, returns whether we need
             // a new prompt or need to refresh the screen.
             let (need_refresh_on_task_event, need_prompt_on_task_event) = self.task_handler()?;
-
+    
             // Print prompt or refresh the screen based on needs.
             if need_prompt || need_prompt_on_task_event {
                 self.redisplay_prompt();
                 need_prompt = false;
             }
-
+    
             // Handle all available events from the terminal's (its window's) event queue.
             while let Some(ev) = {
                 // this weird syntax ensures the terminal lock is dropped before entering the loop body
@@ -1278,36 +1278,38 @@ impl Shell {
                         trace!("exited terminal");
                         return Ok(());
                     }
-
-                    Event::WindowResizeEvent(new_position) => {
-                        self.terminal.lock().resize(new_position)?;
-                        // the above function also refreshes the terminal display
-                    }
-
+    
                     // Handles ordinary keypresses
                     Event::KeyboardEvent(ref input_event) => {
-                        self.key_event_producer.write_one(input_event.key_event);
+                        if !self.terminal.lock().window.lock().resizing {
+                            self.key_event_producer.write_one(input_event.key_event);
+                        }
                     }
-
-                    _unhandled => { 
+    
+                    _unhandled => {
                         // trace!("Shell is ignoring unhandled event: {:?}", _unhandled);
                     }
                 };
-            }          
+            }
+            if self.terminal.lock().window.lock().resized() {
+                self.terminal
+                    .lock()
+                    .window
+                    .lock()
+                    .should_resize_framebuffer()?;
+                self.terminal.lock().resize()?;
+            }
             if need_refresh || need_refresh_on_task_event {
                 // update if there are outputs from applications
                 self.terminal.lock().refresh_display()?;
             }
-
-            let is_active = {
-                let term = self.terminal.lock();
-                term.window.is_active()
-            };
-            
-            if is_active {
+    
+            let is_active = { self.terminal.lock().window.lock().active() };
+    
+            if is_active && !self.terminal.lock().window.lock().resizing {
                 self.terminal.lock().display_cursor()?;
             }
-
+    
             // handle inputs
             need_refresh = false;
             loop {
@@ -1315,14 +1317,21 @@ impl Shell {
                 if let Some(ref key_event_consumer) = locked_consumer.deref() {
                     if let Some(key_event) = key_event_consumer.read_one() {
                         mem::drop(locked_consumer); // drop the lock so that we can invoke the method on the next line
-                        if let Err(e) = self.handle_key_event(key_event) {
-                            error!("{}", e);
+                        // We don't want user to be able to write to terminal while Window is in the process of resizing.
+                        if !self.terminal.lock().window.lock().resizing {
+                            if let Err(e) = self.handle_key_event(key_event) {
+                                error!("{}", e);
+                            }
                         }
-                        if key_event.action == KeyAction::Pressed { need_refresh = true; }
-                    } else { // currently the key event queue is empty, break the loop
+                        if key_event.action == KeyAction::Pressed {
+                            need_refresh = true;
+                        }
+                    } else {
+                        // currently the key event queue is empty, break the loop
                         break;
                     }
-                } else { // currently the key event queue is taken by an application
+                } else {
+                    // currently the key event queue is taken by an application
                     break;
                 }
             }
@@ -1334,6 +1343,7 @@ impl Shell {
             }
         }
     }
+    
 }
 
 /// Shell internal command related methods.
@@ -1372,7 +1382,7 @@ impl Shell {
     }
 
     fn execute_internal_clear(&mut self) -> Result<(), &'static str> {
-        self.terminal.lock().clear();
+        self.terminal.lock().clear()?;
         self.clear_cmdline(false)?;
         self.redisplay_prompt();
         Ok(())

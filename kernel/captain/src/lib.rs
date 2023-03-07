@@ -18,6 +18,35 @@
 #![no_std]
 
 extern crate alloc;
+#[macro_use] extern crate log;
+
+extern crate kernel_config; // our configuration options, just a set of const definitions.
+extern crate irq_safety; // for irq-safe locking and interrupt utilities
+extern crate dfqueue; // decoupled, fault-tolerant queue
+
+extern crate memory; // the virtual memory subsystem 
+extern crate no_drop;
+extern crate stack;
+extern crate cpu; 
+extern crate mod_mgmt;
+extern crate spawn;
+extern crate tsc;
+extern crate task; 
+extern crate interrupts;
+extern crate acpi;
+extern crate device_manager;
+extern crate e1000;
+extern crate scheduler;
+#[cfg(mirror_log_to_vga)] #[macro_use] extern crate app_io;
+extern crate first_application;
+extern crate exceptions_full;
+extern crate network_manager;
+extern crate porthole;
+extern crate tlb_shootdown;
+extern crate multiple_heaps;
+extern crate console;
+#[cfg(simd_personality)] extern crate simd_personality;
+
 
 use core::ops::DerefMut;
 use log::{error, info};
@@ -153,7 +182,7 @@ pub fn init(
     if page_attribute_table::init().is_err() {
         error!("This CPU does not support the Page Attribute Table");
     }
-    let (key_producer, mouse_producer) = window_manager::init()?;
+    let (key_producer, mouse_producer) = porthole::WindowManager::init()?;
 
     // initialize the rest of our drivers
     device_manager::init(key_producer, mouse_producer)?;

@@ -13,9 +13,6 @@ extern crate rendezvous;
 extern crate async_channel;
 extern crate cpu;
 extern crate runqueue;
-extern crate window;
-extern crate framebuffer;
-extern crate framebuffer_drawer;
 extern crate color;
 extern crate shapes;
 extern crate hpet;
@@ -162,6 +159,7 @@ fn graphics_print_stats(vec: Vec<u64>, aggregted_count: u64, aggregted_total :u6
     (count,total)
 }
 
+/* 
 /// The restartable task which runs into fault when it tries to draw a circle at (200,200) location. 
 /// This task is not suppose to exit (It fails due to the injected fault)
 fn fault_graphics_task(_arg_val: usize) -> Result<(), &'static str>{
@@ -237,6 +235,7 @@ fn fault_graphics_task(_arg_val: usize) -> Result<(), &'static str>{
         }
     }
 }
+*/
 
 // -------------------------------------------------------------------------------------------------
 // ------------------------- IPC fault injection section -------------------------------------------

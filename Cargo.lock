@@ -378,6 +378,7 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
+ "porthole",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -387,7 +388,6 @@ dependencies = [
  "tlb_shootdown",
  "tsc",
  "vga_buffer",
- "window_manager",
 ]
 
 [[package]]
@@ -460,14 +460,6 @@ dependencies = [
 [[package]]
 name = "color"
 version = "0.1.0"
-
-[[package]]
-name = "compositor"
-version = "0.1.0"
-dependencies = [
- "framebuffer",
- "shapes",
-]
 
 [[package]]
 name = "console"
@@ -891,16 +883,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "displayable"
-version = "0.1.0"
-dependencies = [
- "color",
- "framebuffer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "dmar"
 version = "0.1.0"
 dependencies = [
@@ -1138,6 +1120,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "fps_counter"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "device_manager",
+ "event_types",
+ "font",
+ "hpet",
+ "keycodes_ascii",
+ "log",
+ "memory",
+ "memory_structs",
+ "mouse",
+ "mouse_data",
+ "mpmc",
+ "multicore_bringup",
+ "page_attribute_table",
+ "porthole",
+ "scheduler",
+ "spawn",
+ "spin 0.9.4",
+ "stdio",
+ "task",
+ "zerocopy",
+]
+
+[[package]]
 name = "frame_allocator"
 version = "0.1.0"
 dependencies = [
@@ -1147,47 +1156,6 @@ dependencies = [
  "memory_structs",
  "spin 0.9.4",
  "static_assertions",
-]
-
-[[package]]
-name = "framebuffer"
-version = "0.1.0"
-dependencies = [
- "color",
- "log",
- "memory",
- "multicore_bringup",
- "page_attribute_table",
- "shapes",
- "zerocopy",
-]
-
-[[package]]
-name = "framebuffer_compositor"
-version = "0.1.0"
-dependencies = [
- "compositor",
- "framebuffer",
- "hashbrown",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "framebuffer_drawer"
-version = "0.1.0"
-dependencies = [
- "framebuffer",
- "shapes",
-]
-
-[[package]]
-name = "framebuffer_printer"
-version = "0.1.0"
-dependencies = [
- "font",
- "framebuffer",
- "shapes",
 ]
 
 [[package]]
@@ -1718,20 +1686,14 @@ version = "0.1.0"
 dependencies = [
  "color",
  "dfqueue",
- "displayable",
  "environment",
  "event_types",
  "font",
- "framebuffer",
- "framebuffer_drawer",
- "framebuffer_printer",
  "log",
+ "porthole",
  "root",
- "shapes",
- "text_display",
+ "spin 0.9.4",
  "tsc",
- "window",
- "window_manager",
 ]
 
 [[package]]
@@ -2710,6 +2672,33 @@ name = "port_io"
 version = "0.2.1"
 
 [[package]]
+name = "porthole"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "device_manager",
+ "event_types",
+ "font",
+ "hpet",
+ "keycodes_ascii",
+ "log",
+ "memory",
+ "memory_structs",
+ "mouse",
+ "mouse_data",
+ "mpmc",
+ "multicore_bringup",
+ "page_attribute_table",
+ "ringbuffer",
+ "scheduler",
+ "spawn",
+ "spin 0.9.4",
+ "stdio",
+ "task",
+ "zerocopy",
+]
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2943,6 +2932,12 @@ dependencies = [
  "task",
  "wait_queue",
 ]
+
+[[package]]
+name = "ringbuffer"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1973f95452ec56a4b2c683f5eabc15617e38f4faf2776ed4a0011d5070ecb37e"
 
 [[package]]
 name = "riscv"
@@ -3326,7 +3321,6 @@ dependencies = [
  "spin 0.9.4",
  "stdio",
  "task",
- "window_manager",
 ]
 
 [[package]]
@@ -3757,8 +3751,6 @@ dependencies = [
  "async_channel",
  "color",
  "cpu",
- "framebuffer",
- "framebuffer_drawer",
  "getopts",
  "hpet",
  "libtest",
@@ -3771,7 +3763,6 @@ dependencies = [
  "spin 0.9.4",
  "task",
  "unified_channel",
- "window",
 ]
 
 [[package]]
@@ -3937,19 +3928,6 @@ dependencies = [
  "path",
  "task",
  "wasmtime",
-]
-
-[[package]]
-name = "text_display"
-version = "0.1.0"
-dependencies = [
- "color",
- "displayable",
- "font",
- "framebuffer",
- "framebuffer_printer",
- "shapes",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -4575,61 +4553,6 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[package]]
-name = "window"
-version = "0.1.0"
-dependencies = [
- "color",
- "dereffer",
- "event_types",
- "framebuffer",
- "framebuffer_drawer",
- "log",
- "mouse",
- "mpmc",
- "path",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
- "window_manager",
-]
-
-[[package]]
-name = "window_inner"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "framebuffer",
- "mpmc",
- "shapes",
-]
-
-[[package]]
-name = "window_manager"
-version = "0.1.0"
-dependencies = [
- "color",
- "compositor",
- "event_types",
- "font",
- "framebuffer",
- "framebuffer_compositor",
- "framebuffer_drawer",
- "keycodes_ascii",
- "lazy_static",
- "log",
- "mod_mgmt",
- "mouse_data",
- "mpmc",
- "path",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
-]
 
 [[package]]
 name = "x86_64"
