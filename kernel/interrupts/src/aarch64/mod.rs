@@ -249,8 +249,11 @@ pub fn eoi(irq_num: InterruptNumber) {
     gic.end_of_interrupt(irq_num);
 }
 
+// A ClockSource for the time crate, implemented using
+// the System Counter of the Generic Arm Timer. The
+// period of this timer is computed in `init` above.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct PhysicalSystemCounter;
+struct PhysicalSystemCounter;
 
 impl ClockSource for PhysicalSystemCounter {
     type ClockType = Monotonic;
