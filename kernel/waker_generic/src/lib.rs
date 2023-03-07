@@ -10,9 +10,6 @@
 extern crate alloc;
 
 use alloc::sync::Arc;
-// @tsoutman: as I said before, I think we definitely do need a preemption-safe mutex here.
-//            It's not technically required, but it'd prevent task switch thrashing
-//            between the task that is being blocked and the task that is waking the waker.
 use spin::Mutex; 
 
 /// Creates a new waker and blocker pair that are associated with each other.
@@ -78,9 +75,17 @@ impl Blocker {
                 *woken = false;
                 return;
             } else {
-                let r = block_action();
-                drop(woken);
-                drop(r);
+                // Temporarily disable preemption to ensure that if/when `block_action()`
+                // disables this task, it keeps running long enough to return here and
+                // drop the lock on `woken`.
+                let result = {
+                    let guard = preemption::hold_preemption_no_timer_disable();
+                    let r = block_action();
+                    drop(woken);
+                    drop(guard);
+                    r
+                };
+                drop(result);
             }
         }
     }
@@ -114,7 +119,13 @@ where
     fn wake_by_ref(self: &Arc<Self>) {
         let mut woken = self.woken.lock();
         *woken = true;
+        // Temporarily disable preemption to ensure that the lock on `woken`
+        // is released expediently after `wake_action()` is done.
+        // This is not technically required, but it prevents this waker task
+        // from being scheduled out while still holding the `woken` lock.
+        let guard = preemption::hold_preemption_no_timer_disable();
         (self.wake_action)();
         drop(woken);
+        drop(guard);
     }
 }

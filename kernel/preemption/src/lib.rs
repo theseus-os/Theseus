@@ -26,7 +26,29 @@ static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CO
 
 /// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.
+///
+/// If this results in a transition from preemption being enabled to being disabled
+/// on this CPU, the local timer interrupt used for preemptive task switches
+/// will also be disabled until preemption is re-enabled.
 pub fn hold_preemption() -> PreemptionGuard {
+    hold_preemption_internal::<true>()
+}
+
+/// Prevents preemption (preemptive task switching) from occurring
+/// until the returned guard object is dropped.
+///
+/// ## Usage notes
+/// Callers should use [`hold_preemption()`] instead of this function.
+/// This is a "lightweight" version of that function that does not
+/// disable this CPU's local timer interrupt used for preemptive task switches.
+/// Thus, it is only for select contexts where we are very briefly
+/// disabling preemption.
+#[doc(hidden)]
+pub fn hold_preemption_no_timer_disable() -> PreemptionGuard {
+    hold_preemption_internal::<false>()
+}
+
+fn hold_preemption_internal<const TIMER_DISABLE: bool>() -> PreemptionGuard {
     let cpu_id = apic::current_cpu();
     let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_add(1, Ordering::Relaxed);
     // If the previous counter value was 0, that indicates we are transitioning
@@ -39,8 +61,8 @@ pub fn hold_preemption() -> PreemptionGuard {
         preemption_was_enabled,
     };
 
-    if preemption_was_enabled {
-        // log::trace!(" CPU {}:   disabling preemption", cpu_id);
+    if TIMER_DISABLE && preemption_was_enabled {
+        // log::trace!(" CPU {}:   disabling local timer interrupt", cpu_id);
         
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
@@ -52,7 +74,6 @@ pub fn hold_preemption() -> PreemptionGuard {
         // Overflow occurred and the counter value wrapped around, which is a bug.
         panic!("BUG: Overflow occurred in the preemption counter for CPU {}", cpu_id);
     }
-
     guard
 }
 
@@ -115,7 +136,7 @@ impl Drop for PreemptionGuard {
 
         let prev_val = PREEMPTION_COUNT[cpu_id as usize].fetch_sub(1, Ordering::Relaxed);
         if prev_val == 1 {
-            // log::trace!("CPU {}: re-enabling preemption", cpu_id);
+            // log::trace!("CPU {}: re-enabling local timer interrupt", cpu_id);
 
             // If the previous counter value was 1, that means the current value is 1,
             // which indicates we are transitioning from preemption disabled to enabled on this CPU.

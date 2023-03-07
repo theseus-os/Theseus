@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
+
+preemption = { path = "../preemption" }
