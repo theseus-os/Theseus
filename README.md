@@ -251,6 +251,24 @@ GDB has built-in support for QEMU, but it doesn't play nicely with OSes that run
     ```
     QEMU will be paused until we move the debugger forward, with standard GDB commands like `n` to step through the next instruction or `c` to continue execution. Any standard GDB commands will now work.
 
+### Connecting GDB to aarch64 Theseus on QEMU
+We don't yet have a patched version of GDB for aarch64 targets, but we can use the existing `gdb-multiarch` package to 
+
+1. Install the required package:
+    ```sh
+    sudo apt-get install gdb-multiarch
+    ```
+
+2. Build Theseus for aarch64 and run it in QEMU:
+    ```sh
+    make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run ## or use `run_pause`
+    ```
+3. In another terminal window, run the following to start GDB and attach it to the running QEMU instance:
+    ```sh
+    gdb-multiarch -ex "target remote :1234"
+    ```
+
+4. Within GDB, symbols aren't yet supported, but you can view assembly code with `layout asm` and set breakpoints on virtual addresses.
 
 ## IDE Setup  
 Our personal preference is to use VS Code, which has excellent cross-platform support for Rust. Other options are available [here](https://areweideyet.com/).
