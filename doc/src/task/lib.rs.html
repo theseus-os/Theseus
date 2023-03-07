@@ -1152,6 +1152,34 @@
 <a href="#1152" id="1152">1152</a>
 <a href="#1153" id="1153">1153</a>
 <a href="#1154" id="1154">1154</a>
+<a href="#1155" id="1155">1155</a>
+<a href="#1156" id="1156">1156</a>
+<a href="#1157" id="1157">1157</a>
+<a href="#1158" id="1158">1158</a>
+<a href="#1159" id="1159">1159</a>
+<a href="#1160" id="1160">1160</a>
+<a href="#1161" id="1161">1161</a>
+<a href="#1162" id="1162">1162</a>
+<a href="#1163" id="1163">1163</a>
+<a href="#1164" id="1164">1164</a>
+<a href="#1165" id="1165">1165</a>
+<a href="#1166" id="1166">1166</a>
+<a href="#1167" id="1167">1167</a>
+<a href="#1168" id="1168">1168</a>
+<a href="#1169" id="1169">1169</a>
+<a href="#1170" id="1170">1170</a>
+<a href="#1171" id="1171">1171</a>
+<a href="#1172" id="1172">1172</a>
+<a href="#1173" id="1173">1173</a>
+<a href="#1174" id="1174">1174</a>
+<a href="#1175" id="1175">1175</a>
+<a href="#1176" id="1176">1176</a>
+<a href="#1177" id="1177">1177</a>
+<a href="#1178" id="1178">1178</a>
+<a href="#1179" id="1179">1179</a>
+<a href="#1180" id="1180">1180</a>
+<a href="#1181" id="1181">1181</a>
+<a href="#1182" id="1182">1182</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -2098,7 +2126,7 @@
 
 <span class="doccomment">/// A private module to ensure the below TLS variables aren&#39;t modified directly.
 </span><span class="kw">mod </span>tls_current_task {
-    <span class="kw">use </span>core::cell::{Cell, RefCell};
+    <span class="kw">use </span>core::{cell::{Cell, RefCell}, ops::Deref};
     <span class="kw">use super</span>::{TASKLIST, TaskRef, ExitableTaskRef};
 
     <span class="doccomment">/// The TLS area that holds the current task&#39;s ID.
@@ -2183,26 +2211,39 @@
     </span><span class="kw">pub fn </span>init_current_task(
         current_task_id: usize,
         current_task: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;ExitableTaskRef, CurrentTaskAlreadyInited&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;ExitableTaskRef, InitCurrentTaskError&gt; {
         <span class="kw">let </span>taskref = <span class="kw">if let </span><span class="prelude-val">Some</span>(t) = current_task {
             <span class="kw">if </span>t.id != current_task_id {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(CurrentTaskAlreadyInited);
+                <span class="macro">log::error!</span>(<span class="string">&quot;BUG: `current_task` {:?} did not match `current_task_id` {}&quot;</span>,
+                    t, current_task_id
+                );
+                <span class="kw">return </span><span class="prelude-val">Err</span>(InitCurrentTaskError::MismatchedTaskIds(current_task_id, t.id));
             }
             t
         } <span class="kw">else </span>{
             TASKLIST.lock()
                 .get(<span class="kw-2">&amp;</span>current_task_id)
                 .cloned()
-                .ok_or(CurrentTaskAlreadyInited)<span class="question-mark">?
+                .ok_or_else(|| {
+                    <span class="macro">log::error!</span>(<span class="string">&quot;Couldn&#39;t find current_task_id {} in TASKLIST&quot;</span>, current_task_id);
+                    InitCurrentTaskError::NotInTasklist(current_task_id)
+                })<span class="question-mark">?
         </span>};
 
         <span class="kw">match </span>CURRENT_TASK.try_borrow_mut() {
-            <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>t_opt) <span class="kw">if </span>t_opt.is_none() =&gt; {
+            <span class="prelude-val">Ok</span>(<span class="kw-2">mut </span>t_opt) =&gt; <span class="kw">if let </span><span class="prelude-val">Some</span>(_existing_task) = t_opt.deref() {
+                <span class="macro">log::error!</span>(<span class="string">&quot;BUG: init_current_task(): CURRENT_TASK was already `Some()`&quot;</span>);
+                <span class="macro">log::error!</span>(<span class="string">&quot;  --&gt; attemping to dump existing task: {:?}&quot;</span>, _existing_task);
+                <span class="prelude-val">Err</span>(InitCurrentTaskError::AlreadyInited(_existing_task.id))
+            } <span class="kw">else </span>{
                 <span class="kw-2">*</span>t_opt = <span class="prelude-val">Some</span>(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
                 <span class="prelude-val">Ok</span>(ExitableTaskRef { task: taskref })
             }
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(CurrentTaskAlreadyInited),
+            <span class="prelude-val">Err</span>(_e) =&gt; {
+                <span class="macro">log::error!</span>(<span class="string">&quot;BUG: init_current_task() failed to mutably borrow CURRENT_TASK&quot;</span>);
+                <span class="prelude-val">Err</span>(InitCurrentTaskError::AlreadyBorrowed(current_task_id))
+            }
         }
     }
 
@@ -2227,7 +2268,18 @@
 
     <span class="doccomment">/// An error type indicating that the current task was already initialized.
     </span><span class="attr">#[derive(Debug)]
-    </span><span class="kw">pub struct </span>CurrentTaskAlreadyInited;
+    </span><span class="kw">pub enum </span>InitCurrentTaskError {
+        <span class="doccomment">/// The task IDs used as arguments to `init_current_task()` did not match.
+        </span>MismatchedTaskIds(usize, usize),
+        <span class="doccomment">/// The enclosed Task ID was not in the system-wide task list.
+        </span>NotInTasklist(usize),
+        <span class="doccomment">/// The current task was already initialized; its task ID is enclosed.
+        </span>AlreadyInited(usize),
+        <span class="doccomment">/// The current task reference was already borrowed, thus it could not be
+        /// mutably borrowed again. The ID of the task attempting to be initialized is enclosed.
+        </span>AlreadyBorrowed(usize),
+
+    }
     <span class="doccomment">/// An error type indicating that the current task has not yet been initialized.
     </span><span class="attr">#[derive(Debug)]
     </span><span class="kw">pub struct </span>CurrentTaskNotFound;
@@ -2273,17 +2325,21 @@
     joinable_taskref.<span class="number">0</span>.task.inner().lock().pinned_cpu = <span class="prelude-val">Some</span>(cpu_id); <span class="comment">// can only run on this CPU core
     // Set this task as this CPU&#39;s current task, as it&#39;s already running.
     </span>joinable_taskref.set_as_current_task();
-    <span class="kw">let </span><span class="prelude-val">Ok</span>(exitable_taskref) = init_current_task(
-        bootstrap_task_id, 
-        <span class="prelude-val">Some</span>(joinable_taskref.clone()),
-    ) <span class="kw">else </span>{
-        <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set boostrapped task as current task on CPU {}&quot;</span>, cpu_id);
-        <span class="comment">// Don&#39;t drop the bootstrap task upon error, because it contains the stack
-        // used for the currently running code -- that would trigger an exception.
-        </span><span class="kw">let </span>_task_ref = NoDrop::new(joinable_taskref);
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to set bootstrapped task as current task&quot;</span>);
+    <span class="kw">let </span>exitable_taskref = <span class="kw">match </span>init_current_task(
+        bootstrap_task_id,
+        <span class="prelude-val">Some</span>(joinable_taskref.clone())
+    ) {
+        <span class="prelude-val">Ok</span>(t) =&gt; t,
+        <span class="prelude-val">Err</span>(e) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;BUG: failed to set boostrapped task as current task on CPU {}, {:?}&quot;</span>,
+                cpu_id, e
+            );
+            <span class="comment">// Don&#39;t drop the bootstrap task upon error, because it contains the stack
+            // used for the currently running code -- that would trigger an exception.
+            </span><span class="kw">let </span>_task_ref = NoDrop::new(joinable_taskref);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootstrap_task(): failed to set bootstrapped task as current task&quot;</span>);
+        }
     };
-
     <span class="prelude-val">Ok</span>((joinable_taskref, exitable_taskref))
 }
 

@@ -14,13 +14,14 @@ to the start of this section in the TLS image.
 <li><code>VirtAddr = -1 * (total_static_tls_size - offset);</code></li>
 </ul>
 </li>
-<li>On aarch64, that value will be a positive offset from the beginning
-of all sections, i.e., the start of the TLS data image,
-to the start of this section in the TLS image,
-<em>plus</em> another value that is the max of 16 (0x10) and the alignment of
-this section’s containing TLS segment.
+<li>On aarch64, that value will simply be the given <code>offset</code>.
 <ul>
-<li><code>VirtAddr = max(16, TLS_segment_align) + offset;</code></li>
+<li><code>VirtAddr = offset;</code>.</li>
+<li>However, on aarch64, the actual <em>location</em> of this section in the TLS data image
+is given by <code>offset + max(16, TLS_segment_align)</code>.
+The ELF TLS ABI on aarch64 specifies that this augmented value is
+the real offset used to <em>access</em> this TLS variable from the TLS base address
+(from the beginning of all sections).</li>
 </ul>
 </li>
 </ul>
@@ -43,10 +44,8 @@ or a bug in the symbol parsing code that invokes this function.</li>
 </div></details><details class="rustdoc-toggle method-toggle" open><summary><section id="method.add_new_dynamic_tls_section" class="method has-srclink"><h4 class="code-header">pub fn <a href="#method.add_new_dynamic_tls_section" class="fn">add_new_dynamic_tls_section</a>(<br>&nbsp;&nbsp;&nbsp;&nbsp;&amp;mut self,<br>&nbsp;&nbsp;&nbsp;&nbsp;section: <a class="struct" href="struct.LoadedSection.html" title="struct mod_mgmt::LoadedSection">LoadedSection</a>,<br>&nbsp;&nbsp;&nbsp;&nbsp;alignment: <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.usize.html">usize</a><br>) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;(<a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.usize.html">usize</a>, <a class="struct" href="https://doc.rust-lang.org/nightly/alloc/sync/struct.Arc.html" title="struct alloc::sync::Arc">Arc</a>&lt;<a class="struct" href="struct.LoadedSection.html" title="struct mod_mgmt::LoadedSection">LoadedSection</a>&gt;), <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.unit.html">()</a>&gt;</h4></section></summary><div class="docblock"><p>Inserts the given <code>section</code> into this TLS area at the next index
 (i.e., offset into the TLS area) where the section will fit.</p>
 <p>This also modifies the virtual address field of the given <code>section</code>
-to hold the value of that offset, which is necessary for relocation entries
-that depend on this section.</p>
-<p>Note: this will never return an index/offset value less than <code>size_of::&lt;usize&gt;()</code>,
-(<code>8</code> on a 64-bit machine), as the first slot is reserved for the TLS self pointer.</p>
+to hold the proper value based on that offset, which is necessary
+for calculating relocation entries that depend on this section.</p>
 <p>Returns a tuple of:</p>
 <ol>
 <li>The index at which the new section was inserted, 
