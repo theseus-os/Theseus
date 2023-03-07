@@ -13,6 +13,8 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::error;
 
+use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
+
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
 
@@ -97,6 +99,15 @@ pub fn init() -> Result<(), &'static str> {
         static __exception_vector_start: extern "C" fn();
     }
 
+    let counter_freq_hz = CNTFRQ_EL0.get() as f64;
+    let fs_in_one_sec = 1_000_000_000_000_000.0;
+
+    // https://doc.rust-lang.org/reference/expressions/operator-expr.html
+    // "Casting from a float to an integer will round the float towards zero"
+    let period_femtoseconds = (fs_in_one_sec / counter_freq_hz) as u64;
+
+    register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
+
     let mut gic = GIC.lock();
     if gic.is_some() {
         Err("The GIC has already been initialized!")
@@ -159,10 +170,6 @@ pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) ->
         gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, enable);
     }
 
-    // read the frequency (useless atm)
-    // let counter_freq_hz = CNTFRQ_EL0.get();
-    // log::info!("frq: {:?}", counter_freq_hz);
-
     // unmask the interrupt & enable the timer
     CNTP_CTL_EL0.write(
           CNTP_CTL_EL0::IMASK.val(0)
@@ -174,7 +181,6 @@ pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) ->
 
     /* DEBUGGING CODE
 
-    log::info!("timer counter: {:?}", CNTPCT_EL0.get());
     log::info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
     log::info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
     log::info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
@@ -242,6 +248,17 @@ pub fn eoi(irq_num: InterruptNumber) {
     let mut gic = GIC.lock();
     let gic = gic.as_mut().expect("GIC is uninitialized");
     gic.end_of_interrupt(irq_num);
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct PhysicalSystemCounter;
+
+impl ClockSource for PhysicalSystemCounter {
+    type ClockType = Monotonic;
+
+    fn now() -> Instant {
+        Instant::new(CNTPCT_EL0.get())
+    }
 }
 
 #[rustfmt::skip]
