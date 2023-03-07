@@ -4,6 +4,8 @@ use cortex_a::registers::MPIDR_EL1;
 use tock_registers::interfaces::Readable;
 
 use core::fmt;
+use super::CpuId;
+use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
 
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
