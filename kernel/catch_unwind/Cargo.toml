@@ -4,14 +4,13 @@ name = "catch_unwind"
 description = "Support for catching unwinding after a panic, like `std::panic::catch_unwind`"
 version = "0.1.0"
 
-[dependencies.log]
-version = "0.4.8"
+[dependencies]
+log = "0.4.8"
 
-[dependencies.unwind]
-path = "../unwind"
+task = { path = "../task" }
 
-[dependencies.task]
-path = "../task"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+unwind = { path = "../unwind" }
 
 [lib]
 crate-type = ["rlib"]

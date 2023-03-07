@@ -106,6 +106,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
 /// aarch64 placeholder
 #[cfg(target_arch = "aarch64")]
 fn early_setup(_early_double_fault_stack_top: usize) -> Result<(), &'static str> {
+    irq_safety::disable_interrupts();
     Ok(())
 }
 
@@ -156,6 +157,7 @@ where
         data_mapped_pages.into_inner(),
         false,
     ) {
+        #[cfg(target_arch = "x86_64")]
         Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) => {
             println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
 
@@ -184,6 +186,14 @@ where
                     .ok_or("\"GDT_AP\" physical address was not a valid identity virtual address")
                 )?;
             // log::debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}", ap_realmode_begin, ap_realmode_end, ap_gdt);
+            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
+        }
+        #[cfg(target_arch = "aarch64")]
+        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) => {
+            println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
+            let ap_realmode_begin = VirtualAddress::new(0xCAFEBABE).unwrap();
+            let ap_realmode_end = VirtualAddress::new(0xCAFEBABE).unwrap();
+            let ap_gdt = VirtualAddress::new(0xCAFEBABE).unwrap();
             (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
         }
         Err((msg, _mapped_pages_array)) => return Err(msg),
@@ -215,14 +225,13 @@ where
     // Now we invoke the Captain, which will take over from here.
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core(): invoking the captain...");
-    #[cfg(target_arch = "x86_64")]
     let drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
     };
-    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
+    #[cfg(not(loadable))] {
         captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
     }
-    #[cfg(all(target_arch = "x86_64", loadable))] {
+    #[cfg(loadable)] {
         use captain::DropAfterInit;
         use memory::{MmiRef, PhysicalAddress};
         use no_drop::NoDrop;

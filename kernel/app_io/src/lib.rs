@@ -12,7 +12,8 @@
 #![no_std]
 
 extern crate alloc;
-extern crate logger_x86_64 as logger;
+#[cfg(target_arch = "x86_64")]
+extern crate logger_x86_64;
 
 use alloc::{format, sync::Arc};
 use core2::io::{self, Error, ErrorKind, Read, Write};
@@ -215,9 +216,10 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
                 .write_all(format!("{fmt_args}").as_bytes())
                 .is_err()
             {
-                let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
+                #[cfg(target_arch = "x86_64")]
+                let _ = logger_x86_64::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
     } else {
-        // let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
+        // let _ = logger_x86_64::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
     };
 }
