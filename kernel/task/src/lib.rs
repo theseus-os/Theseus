@@ -222,6 +222,16 @@ impl TaskRef {
             *self.0.exit_value_mailbox.lock() = Some(val);
             self.0.task.runstate().store(RunState::Exited);
 
+            // Synchronize with the acquire fence in `JoinableTaskRef::join()`,
+            // as we have just stored the exit value that `join()` will load.
+            fence(Ordering::Release);
+
+            // Now that we have set the exit value and marked the task as exited,
+            // it is safe to wake any other tasks that are waiting for this task to exit.
+            if let Some(waker) = self.0.task.inner().lock().waker.take() {
+                waker.wake();
+            }
+
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.is_running() {
@@ -233,12 +243,7 @@ impl TaskRef {
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             }
-            
-            if let Some(waker) = self.0.task.inner().lock().waker.take() {
-                waker.wake();
-            }
         }
-
         Ok(())
     }
 
@@ -399,7 +404,7 @@ impl JoinableTaskRef {
         self.task.0.task.inner().lock().waker = Some(waker);
     }
 
-    /// Busy-waits (spins in a loop) until this task has exited or has been killed.
+    /// Blocks the current task until this task has exited.
     ///
     /// Synchronizes memory with respect to the joined task.
     ///
@@ -410,15 +415,31 @@ impl JoinableTaskRef {
     ///   * This does *not* include cases where this `Task` failed or was killed,
     ///     rather only cases where the `join` operation itself failed.
     #[doc(alias("reap", "exit"))]
-    pub fn join(&self) -> Result<ExitValue, &'static str> {
-        // First, wait for this Task to be marked as Exited (no longer runnable).
-        while !self.has_exited() { }
+    pub fn join(&self) -> Result<ExitValue, &'static str> {        
+        if !self.has_exited() {
+            // Create a waker+blocker pair that will block the current task
+            // and then wake it once this task (`self`) exits.
+            let curr_task = get_my_current_task().ok_or("join(): couldn't get current task")?;
+            let task_to_block = curr_task.clone();
+            let wake_action = move || {
+                let _ = curr_task.unblock();
+            };
+            let (waker, blocker) = waker_generic::new_waker(wake_action);
+            self.set_waker(waker);
+            let block_action = || {
+                let _ = task_to_block.block();
+                ScheduleOnDrop { }
+            };
+            blocker.block(block_action);
+        }
+        
+        // Note: previously, we waited for this task to actually stop running,
+        //       but this isn't actually necessary since we only care whether
+        //       the task has exited and its exit value has been written.
+        // while self.is_running() { }
 
-        // Then, wait for it to actually stop running on any CPU core.
-        while self.is_running() { }
-
-        // This synchronizes with the release fence from when this task first ran
-        // (in `spawn::task_wrapper()`).
+        // Synchronize with the release fence in`TaskRef::internal_exit`
+        // when the exit value for this task was stored.
         fence(Ordering::Acquire);
 
         self.reap_exit_value()
@@ -430,6 +451,14 @@ impl Drop for JoinableTaskRef {
     /// that will be auto-reaped after exiting.
     fn drop(&mut self) {
         self.0.joinable.store(false, Ordering::Relaxed);
+    }
+}
+
+/// An empty struct that invokes [`schedule()`] when it is dropped.
+struct ScheduleOnDrop { }
+impl Drop for ScheduleOnDrop {
+    fn drop(&mut self) {
+        schedule();
     }
 }
 
