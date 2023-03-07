@@ -1525,6 +1525,7 @@ dependencies = [
  "memory",
  "pic",
  "spin 0.9.4",
+ "time",
  "tock-registers",
  "tss",
  "vga_buffer",
