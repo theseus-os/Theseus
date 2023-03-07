@@ -13,7 +13,6 @@ extern crate task;
 extern crate irq_safety;
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
-extern crate scheduler;
 extern crate time;
 extern crate crossbeam_utils;
 
@@ -131,7 +130,7 @@ pub fn sleep(duration: Duration) -> Result<(), RunState> {
     // Add the current task to the delayed tasklist and then block it.
     add_to_delayed_tasklist(SleepingTaskNode{action: Action::Sync(current_task.clone()), resume_time});
     current_task.block()?;
-    scheduler::schedule();
+    task::schedule();
     Ok(())
 }
 

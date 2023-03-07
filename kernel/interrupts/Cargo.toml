@@ -7,7 +7,9 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.8"
+
 memory = { path = "../memory" }
+cpu = { path = "../cpu" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
@@ -18,8 +20,6 @@ cortex-a = "7.5.0"
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
 vga_buffer = { path = "../vga_buffer" }
-scheduler = { path = "../scheduler" }
-sleep = { path = "../sleep" }
 apic = { path = "../apic" }
 gdt = { path = "../gdt" }
 pic = { path = "../pic" }
@@ -27,6 +27,3 @@ tss = { path = "../tss" }
 x86_64 = "0.14.8"
 spin = "0.9.4"
 locked_idt = { path = "../../libs/locked_idt" }
-
-[lib]
-crate-type = ["rlib"]

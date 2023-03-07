@@ -308,10 +308,17 @@ where
         // | (2)  | .text             | end of executable pages       |
         // | (3)  | .rodata           | start of read-only pages      |
         // | (4)  | .eh_frame         | part of read-only pages       |
-        // | (5)  | .gcc_except_table | end of read-only pages        |
-        // | (6)  | .data             | start of read-write pages     | 
-        // | (7)  | .bss              | end of read-write pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     |
+        // | (9)  | .bss              | end of read-write pages       |
         // |------|-------------------|-------------------------------|
+        //
+        // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
+        // because they contain read-only initializer data "images" for each TLS area.
+        // In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,
+        // so there's no point in keeping it around.
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
@@ -338,6 +345,16 @@ where
                 rodata_end   = Some((end_virt_addr, end_phys_addr));
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
+            }
+            // The following four sections are optional: .tdata, .tbss, .data, .bss.
+            ".tdata" => {
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .tdata"
+            }
+            ".tbss" => {
+                // Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                debug!("     no need to map kernel section \".tbss\", it contains no content");
+                continue;
             }
             ".data" => {
                 data_start.get_or_insert((start_virt_addr, start_phys_addr));

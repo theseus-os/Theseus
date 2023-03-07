@@ -187,7 +187,7 @@ start_high_ap:
 	; RDI,  RSI,  RDX,  RCX,  R8,  R9,  (R10??), others on stack
 	; This order below MUST MATCH the parameter order in kstart_ap()
 	mov rdi, [AP_PROCESSOR_ID]
-	mov rsi, [AP_APIC_ID]
+	mov rsi, [AP_CPU_ID]
 	mov rdx, [AP_STACK_START]
 	mov rcx, [AP_STACK_END]
 	mov r8,  [AP_NMI_LINT]

@@ -19,8 +19,11 @@ global_asm!(include_str!("table.s"));
 // The global Generic Interrupt Controller singleton
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
-// Default Timer IRQ number on AArch64 as defined by Arm Manuals
-pub const AARCH64_TIMER_IRQ: InterruptNumber = 30;
+/// The IRQ number reserved for CPU-local timer interrupts,
+/// which Theseus currently uses for preemptive task switching.
+//
+// aarch64 manuals define the default timer IRQ number to be 30.
+pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
 
 const MAX_IRQ_NUM: usize = 256;
 
@@ -128,7 +131,7 @@ pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
     }
 
     // register the handler for the timer IRQ.
-    if let Err(existing_handler) = register_interrupt(AARCH64_TIMER_IRQ, timer_handler) {
+    if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_handler) {
         if timer_handler as *const HandlerFunc != existing_handler {
             return Err("An interrupt handler has already been setup for the timer IRQ number");
         }
@@ -140,7 +143,7 @@ pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
         let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
 
         // enable routing of this interrupt
-        gic.set_interrupt_state(AARCH64_TIMER_IRQ, enable);
+        gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, enable);
     }
 
     // read the frequency (useless atm)

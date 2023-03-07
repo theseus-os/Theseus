@@ -5,19 +5,11 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate irq_safety;
-extern crate memory;
-extern crate stack;
-extern crate interrupts;
-extern crate spawn;
-extern crate scheduler;
-extern crate kernel_config;
-extern crate apic;
-extern crate no_drop;
 
 use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicBool, Ordering};
+use log::{error, info};
+use cpu::CpuId;
 use irq_safety::{enable_interrupts, MutexIrqSafe};
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use stack::Stack;
@@ -32,26 +24,26 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Temporary storage for transferring allocated `Stack`s from 
 /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-static AP_STACKS: MutexIrqSafe<BTreeMap<u8, NoDrop<Stack>>> = MutexIrqSafe::new(BTreeMap::new());
+static AP_STACKS: MutexIrqSafe<BTreeMap<u32, NoDrop<Stack>>> = MutexIrqSafe::new(BTreeMap::new());
 
-/// Insert a new stack that was allocated for the AP with the given `apic_id`.
-pub fn insert_ap_stack(apic_id: u8, stack: Stack) {
-    AP_STACKS.lock().insert(apic_id, NoDrop::new(stack));
+/// Insert a new stack that was allocated for the AP with the given `cpu_id`.
+pub fn insert_ap_stack(cpu_id: u32 , stack: Stack) {
+    AP_STACKS.lock().insert(cpu_id, NoDrop::new(stack));
 }
 
 
 /// Entry to rust for an AP.
 /// The arguments must match the invocation order in "ap_boot.asm"
 pub fn kstart_ap(
-    processor_id: u8,
-    apic_id: u8,
+    processor_id: u32,
+    cpu_id: CpuId,
     _stack_start: VirtualAddress,
     _stack_end: VirtualAddress,
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
-    info!("Booting AP: proc: {}, apic: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
-        processor_id, apic_id, _stack_start, _stack_end, nmi_lint, nmi_flags
+    info!("Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
+        processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
     // set a flag telling the BSP that this AP has entered Rust code
@@ -62,8 +54,8 @@ pub fn kstart_ap(
     early_tls::reload();
 
     // get the stack that was allocated for us (this AP) by the BSP.
-    let this_ap_stack = AP_STACKS.lock().remove(&apic_id)
-        .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for AP with apic_id: {}", apic_id));
+    let this_ap_stack = AP_STACKS.lock().remove(&cpu_id.value())
+        .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for CPU {}", cpu_id));
 
     // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
@@ -76,7 +68,7 @@ pub fn kstart_ap(
                 .expect("kstart_ap(): could not allocate privilege stack"),
         )
     };
-    let _idt = interrupts::init_ap(apic_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
+    let _idt = interrupts::init_ap(cpu_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
         .expect("kstart_ap(): failed to initialize interrupts!");
 
     // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
@@ -85,7 +77,7 @@ pub fn kstart_ap(
     LocalApic::init(
         &mut kernel_mmi_ref.lock().page_table,
         processor_id,
-        Some(apic_id),
+        Some(cpu_id.value()),
         false,
         nmi_lint,
         nmi_flags,
@@ -93,7 +85,7 @@ pub fn kstart_ap(
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // task management subsystem and create the idle task for this CPU.
-    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), apic_id, this_ap_stack).unwrap();
+    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
     spawn::create_idle_task().unwrap();
 
     // The PAT must be initialized explicitly on every CPU,
@@ -102,7 +94,7 @@ pub fn kstart_ap(
         error!("This CPU does not support the Page Attribute Table");
     }
 
-    info!("Initialization complete on AP core {}. Enabling interrupts...", apic_id);
+    info!("Initialization complete on CPU {}. Enabling interrupts...", cpu_id);
     // The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     // (currently nothing else needs to be dropped)
@@ -116,6 +108,6 @@ pub fn kstart_ap(
 
     scheduler::schedule();
     loop { 
-        error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", apic_id);
+        error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", cpu_id);
     }
 }

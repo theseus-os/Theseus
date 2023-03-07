@@ -103,13 +103,13 @@ pub fn init(
     };
     let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
     
-    // get BSP's apic id
-    let bsp_apic_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
+    // get BSP's CPU ID
+    let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.
-    scheduler::init();
-    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_apic_id, bsp_initial_stack)?;
+    scheduler::init()?;
+    let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_id, bsp_initial_stack)?;
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
     // after we've initialized the task subsystem, we can use better exception handlers
@@ -179,7 +179,7 @@ pub fn init(
     console::start_connection_detection()?;
     first_application::start()?;
 
-    info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_apic_id);
+    info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_id);
     // The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     drop(kernel_mmi_ref);
