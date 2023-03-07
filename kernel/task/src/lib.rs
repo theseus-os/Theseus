@@ -944,7 +944,7 @@ pub use tls_current_task::*;
 
 /// A private module to ensure the below TLS variables aren't modified directly.
 mod tls_current_task {
-    use core::cell::{Cell, RefCell};
+    use core::{cell::{Cell, RefCell}, ops::Deref};
     use super::{TASKLIST, TaskRef, ExitableTaskRef};
 
     /// The TLS area that holds the current task's ID.
@@ -1029,26 +1029,39 @@ mod tls_current_task {
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
+    ) -> Result<ExitableTaskRef, InitCurrentTaskError> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(CurrentTaskAlreadyInited);
+                log::error!("BUG: `current_task` {:?} did not match `current_task_id` {}",
+                    t, current_task_id
+                );
+                return Err(InitCurrentTaskError::MismatchedTaskIds(current_task_id, t.id));
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(CurrentTaskAlreadyInited)?
+                .ok_or_else(|| {
+                    log::error!("Couldn't find current_task_id {} in TASKLIST", current_task_id);
+                    InitCurrentTaskError::NotInTasklist(current_task_id)
+                })?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
-            Ok(mut t_opt) if t_opt.is_none() => {
+            Ok(mut t_opt) => if let Some(_existing_task) = t_opt.deref() {
+                log::error!("BUG: init_current_task(): CURRENT_TASK was already `Some()`");
+                log::error!("  --> attemping to dump existing task: {:?}", _existing_task);
+                Err(InitCurrentTaskError::AlreadyInited(_existing_task.id))
+            } else {
                 *t_opt = Some(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(CurrentTaskAlreadyInited),
+            Err(_e) => {
+                log::error!("BUG: init_current_task() failed to mutably borrow CURRENT_TASK");
+                Err(InitCurrentTaskError::AlreadyBorrowed(current_task_id))
+            }
         }
     }
 
@@ -1073,7 +1086,18 @@ mod tls_current_task {
 
     /// An error type indicating that the current task was already initialized.
     #[derive(Debug)]
-    pub struct CurrentTaskAlreadyInited;
+    pub enum InitCurrentTaskError {
+        /// The task IDs used as arguments to `init_current_task()` did not match.
+        MismatchedTaskIds(usize, usize),
+        /// The enclosed Task ID was not in the system-wide task list.
+        NotInTasklist(usize),
+        /// The current task was already initialized; its task ID is enclosed.
+        AlreadyInited(usize),
+        /// The current task reference was already borrowed, thus it could not be
+        /// mutably borrowed again. The ID of the task attempting to be initialized is enclosed.
+        AlreadyBorrowed(usize),
+
+    }
     /// An error type indicating that the current task has not yet been initialized.
     #[derive(Debug)]
     pub struct CurrentTaskNotFound;
@@ -1119,17 +1143,21 @@ pub fn bootstrap_task(
     joinable_taskref.0.task.inner().lock().pinned_cpu = Some(cpu_id); // can only run on this CPU core
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
-    let Ok(exitable_taskref) = init_current_task(
-        bootstrap_task_id, 
-        Some(joinable_taskref.clone()),
-    ) else {
-        error!("BUG: failed to set boostrapped task as current task on CPU {}", cpu_id);
-        // Don't drop the bootstrap task upon error, because it contains the stack
-        // used for the currently running code -- that would trigger an exception.
-        let _task_ref = NoDrop::new(joinable_taskref);
-        return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
+    let exitable_taskref = match init_current_task(
+        bootstrap_task_id,
+        Some(joinable_taskref.clone())
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            error!("BUG: failed to set boostrapped task as current task on CPU {}, {:?}",
+                cpu_id, e
+            );
+            // Don't drop the bootstrap task upon error, because it contains the stack
+            // used for the currently running code -- that would trigger an exception.
+            let _task_ref = NoDrop::new(joinable_taskref);
+            return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
+        }
     };
-
     Ok((joinable_taskref, exitable_taskref))
 }
 
