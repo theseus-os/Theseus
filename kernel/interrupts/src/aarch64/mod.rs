@@ -96,12 +96,9 @@ pub fn init() -> Result<(), &'static str> {
         static __exception_vector_start: extern "C" fn();
     }
 
-    let counter_freq_hz = CNTFRQ_EL0.get() as f64;
-    let fs_in_one_sec = 1_000_000_000_000_000.0;
-
-    // https://doc.rust-lang.org/reference/expressions/operator-expr.html
-    // "Casting from a float to an integer will round the float towards zero"
-    let period_femtoseconds = (fs_in_one_sec / counter_freq_hz) as u64;
+    let counter_freq_hz = CNTFRQ_EL0.get();
+    let fs_in_one_sec = 1_000_000_000_000_000;
+    let period_femtoseconds = fs_in_one_sec / counter_freq_hz;
 
     register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
 
