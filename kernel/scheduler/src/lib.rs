@@ -58,11 +58,6 @@ pub fn init() -> Result<(), &'static str> {
         interrupts::enable_timer(true);
         Ok(())
     }
-
-    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))] {
-        log::error!("TODO: scheduler::init() only supports registering a preemptive task switching timer interrupt on x86_64");
-        Err("TODO: scheduler::init() only supports registering a preemptive task switching timer interrupt on x86_64")
-    }
 }
 
 /// The handler for each CPU's local timer interrupt, used for preemptive task switching.
