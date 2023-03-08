@@ -136,22 +136,12 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 /// This function registers an interrupt handler for the CPU-local
-/// timer, enables the routing of this interrupt in the GIC, and
-/// turns the timer on, when `enable` is true.
-///
-/// When `enable` is false, the handler is deregistered, routing is
-/// disabled in the GIC, and the timer is turned off.
-pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
+/// timer and handles GIC configuration for the timer interrupt.
+pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
-    if enable {
-        if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
-            if timer_tick_handler as *const HandlerFunc != existing_handler {
-                return Err("A different interrupt handler has already been setup for the timer IRQ number");
-            }
-        }
-    } else {
-        if let Err(_existing_handler) = deregister_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
-            return Err("A different interrupt handler was setup for the timer IRQ number");
+    if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
+        if timer_tick_handler as *const HandlerFunc != existing_handler {
+            return Err("A different interrupt handler has already been setup for the timer IRQ number");
         }
     }
 
@@ -161,9 +151,14 @@ pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) ->
         let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
 
         // enable routing of this interrupt
-        gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, enable);
+        gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
     }
 
+    Ok(())
+}
+
+/// Enables/Disables the System Timer via the dedicated Arm System Registers
+pub fn enable_timer(enable: bool) {
     // unmask the interrupt & enable the timer
     CNTP_CTL_EL0.write(
           CNTP_CTL_EL0::IMASK.val(0)
@@ -180,8 +175,6 @@ pub fn enable_timer_interrupts(enable: bool, timer_tick_handler: HandlerFunc) ->
     info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
 
     */
-
-    Ok(())
 }
 
 /// Registers an interrupt handler at the given IRQ interrupt number.

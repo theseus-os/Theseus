@@ -54,7 +54,9 @@ pub fn init() -> Result<(), &'static str> {
     }
 
     #[cfg(target_arch = "aarch64")] {
-        interrupts::enable_timer_interrupts(true, aarch64_timer_handler)
+        interrupts::init_timer(aarch64_timer_handler)?;
+        interrupts::enable_timer(true);
+        Ok(())
     }
 
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))] {
