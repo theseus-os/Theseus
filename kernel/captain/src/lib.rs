@@ -21,7 +21,7 @@ extern crate alloc;
 
 use core::ops::DerefMut;
 use log::{error, info};
-use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
+use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
 use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
@@ -52,30 +52,35 @@ impl DropAfterInit {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+pub use multicore_bringup::MulticoreBringupInfo;
+
+/// TODO: in the future this could be defined here or re-exported from another aarch64 crate.
+#[cfg(target_arch = "aarch64")]
+pub struct MulticoreBringupInfo {
+    // nothing needed on aarch64 yet
+}
+
 
 /// Initialize the Captain, which is the main crate that "steers the ship" of Theseus. 
-/// 
+///
 /// This does the rest of the initialization procedures so that the OS 
 /// can continue running and do actual useful work.
-/// 
+///
 /// # Arguments
 /// * `kernel_mmi_ref`: a reference to the kernel's memory management info.
 /// * `identity_mapped_pages`: the memory containing the identity-mapped content,
 ///    which must not be dropped until all APs are finished booting.
 /// * `bsp_initial_stack`: the stack currently in use for running this code,
 ///    which must not be dropped for the entire execution of the initial bootstrap task.
-/// * `ap_start_realmode_begin`: the start bound (inclusive) of the AP's realmode boot code.
-/// * `ap_start_realmode_end`: the end bound (exlusive) of the AP's realmode boot code.
-/// * `ap_gdt`: the virtual address of the GDT created for the AP's realmode boot code.
+/// * `multicore_info`: information needed to bring up secondary CPUs.
 /// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
 ///    if available and provided by the bootloader.
 pub fn init(
     kernel_mmi_ref: MmiRef,
     bsp_initial_stack: NoDrop<Stack>,
     drop_after_init: DropAfterInit,
-    ap_start_realmode_begin: VirtualAddress,
-    ap_start_realmode_end: VirtualAddress,
-    ap_gdt: VirtualAddress,
+    multicore_info: MulticoreBringupInfo,
     rsdp_address: Option<PhysicalAddress>,
 ) -> Result<(), &'static str> {
     #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))] {
@@ -118,9 +123,7 @@ pub fn init(
     // boot up the other cores (APs)
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
-        ap_start_realmode_begin,
-        ap_start_realmode_end,
-        ap_gdt,
+        multicore_info,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
     let cpu_count = ap_count + 1;
