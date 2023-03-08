@@ -718,7 +718,7 @@ where
     #[cfg(target_arch = "x86_64")]
     let result = catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg);
 
-    // On platforms where unwind is implemented, simply call the entry point
+    // On platforms where unwinding is not implemented, simply call the entry point.
     #[cfg(not(target_arch = "x86_64"))]
     let result = Ok(task_entry_func(task_arg));
 
