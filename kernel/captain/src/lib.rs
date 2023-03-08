@@ -99,10 +99,13 @@ pub fn init(
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
+    // arch-gate: device_manager currently detects PCI & PS2 devices,
+    // which are unsupported on aarch64 at this point
     #[cfg(target_arch = "x86_64")]
     device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
+    // arch-gate: the IDT & special stacks are x86_64 specific
     #[cfg(target_arch = "x86_64")]
     let idt = {
         let (double_fault_stack, privilege_stack) = {
@@ -130,10 +133,13 @@ pub fn init(
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
     // after we've initialized the task subsystem, we can use better exception handlers
+    // arch-gate: aarch64 simply logs exceptions and crash; porting exceptions_full
+    // hasn't been done yet
     #[cfg(target_arch = "x86_64")]
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
+    // arch-gate: no multicore support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
@@ -146,6 +152,7 @@ pub fn init(
     let cpu_count = ap_count + 1;
     info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
+    // arch-gate: no framebuffer support on aarch64 at the moment
     #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))] {
         // Currently, handling the AP cores also siwtches the graphics mode
         // (from text mode VGA to a graphical framebuffer).
@@ -155,10 +162,12 @@ pub fn init(
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
+    // arch-gate: no multicore support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
     tlb_shootdown::init();
     
     // Initialize the per-core heaps.
+    // arch-gate: no multicore support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")] {
         multiple_heaps::switch_to_multiple_heaps()?;
         info!("Initialized per-core heaps");
@@ -177,10 +186,14 @@ pub fn init(
     if page_attribute_table::init().is_err() {
         error!("This CPU does not support the Page Attribute Table");
     }
+
+    // arch-gate: no windowing/input support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
     let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the rest of our drivers
+    // arch-gate: device_manager currently detects PCI & PS2 devices,
+    // which are unsupported on aarch64 at this point
     #[cfg(target_arch = "x86_64")]
     device_manager::init(key_producer, mouse_producer)?;
 
@@ -203,10 +216,15 @@ pub fn init(
     drop_after_init.drop_all();
 
     // 2. Spawn various system tasks/daemons,
+    // arch-gate: no windowing/input support on aarch64 at the moment,
+    // which prevent using any graphical apps such as the console
     #[cfg(target_arch = "x86_64")]
     console::start_connection_detection()?;
 
     // 3. Start the first application(s).
+    // arch-gate: many subsystems required by applications are missing
+    // on aarch64: windowing, user input, app loading (relocation code
+    // is x86_64-specific at the moment)
     #[cfg(target_arch = "x86_64")]
     first_application::start()?;
 
