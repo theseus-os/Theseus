@@ -269,6 +269,14 @@
 <a href="#269" id="269">269</a>
 <a href="#270" id="270">270</a>
 <a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -293,6 +301,7 @@
 </span><span class="kw">extern crate </span>panic_entry;
 
 <span class="kw">use </span>core::ops::DerefMut;
+<span class="kw">use </span>captain::MulticoreBringupInfo;
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>mod_mgmt::parse_nano_core::NanoCoreItems;
@@ -415,12 +424,7 @@
 
     <span class="comment">// Parse the nano_core crate (the code we&#39;re already running) since we need it to load and run applications.
     </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): parsing nano_core crate, please wait ...&quot;</span>);
-    <span class="kw">let </span>(
-        nano_core_crate_ref,
-        ap_realmode_begin,
-        ap_realmode_end,
-        ap_gdt,
-    ) = <span class="kw">match </span>mod_mgmt::parse_nano_core::parse_nano_core(
+    <span class="kw">let </span>(nano_core_crate_ref, multicore_info) = <span class="kw">match </span>mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
         rodata_mapped_pages.into_inner(),
@@ -430,32 +434,44 @@
         <span class="prelude-val">Ok</span>(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) =&gt; {
             <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): finished parsing the nano_core crate, {} new symbols.&quot;</span>, num_new_symbols);
 
-            <span class="comment">// Get symbols from the boot assembly code that define where the ap_start code is.
-            // They will be present in the &quot;.init&quot; sections, i.e., in the `init_symbols` list. 
-            </span><span class="kw">let </span>ap_realmode_begin = init_symbol_values
-                .get(<span class="string">&quot;ap_start_realmode&quot;</span>)
-                .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
-                .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>ap_realmode_end = init_symbol_values
-                .get(<span class="string">&quot;ap_start_realmode_end&quot;</span>)
-                .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
-                .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)<span class="question-mark">?</span>;
+            <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+            </span><span class="kw">let </span>multicore_info = {
+                <span class="comment">// Get symbols from the boot assembly code that define where the ap_start code is.
+                // They will be present in the &quot;.init&quot; sections, i.e., in the `init_symbols` list. 
+                </span><span class="kw">let </span>ap_realmode_begin = init_symbol_values
+                    .get(<span class="string">&quot;ap_start_realmode&quot;</span>)
+                    .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
+                    .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode\&quot;&quot;</span>)<span class="question-mark">?</span>;
+                <span class="kw">let </span>ap_realmode_end = init_symbol_values
+                    .get(<span class="string">&quot;ap_start_realmode_end&quot;</span>)
+                    .and_then(|v| VirtualAddress::new(<span class="kw-2">*</span>v + KERNEL_OFFSET))
+                    .ok_or(<span class="string">&quot;Missing/invalid symbol expected from assembly code \&quot;ap_start_realmode_end\&quot;&quot;</span>)<span class="question-mark">?</span>;
 
-            <span class="comment">// Obtain the identity-mapped virtual address of GDT_AP.
-            </span><span class="kw">let </span>ap_gdt = nano_core_crate_ref.lock_as_ref()
-                .sections
-                .values()
-                .find(|sec| <span class="kw-2">&amp;*</span>sec.name == <span class="string">&quot;GDT_AP&quot;</span>)
-                .map(|ap_gdt_sec| ap_gdt_sec.virt_addr)
-                .ok_or(<span class="string">&quot;Missing/invalid symbol expected from data section \&quot;GDT_AP\&quot;&quot;</span>)
-                .and_then(|vaddr| memory::translate(vaddr)
-                    .ok_or(<span class="string">&quot;Failed to translate \&quot;GDT_AP\&quot;&quot;</span>)
-                )
-                .and_then(|paddr| VirtualAddress::new(paddr.value())
-                    .ok_or(<span class="string">&quot;\&quot;GDT_AP\&quot; physical address was not a valid identity virtual address&quot;</span>)
-                )<span class="question-mark">?</span>;
-            <span class="comment">// log::debug!(&quot;ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}&quot;, ap_realmode_begin, ap_realmode_end, ap_gdt);
-            </span>(nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
+                <span class="comment">// Obtain the identity-mapped virtual address of GDT_AP.
+                </span><span class="kw">let </span>ap_gdt = nano_core_crate_ref.lock_as_ref()
+                    .sections
+                    .values()
+                    .find(|sec| <span class="kw-2">&amp;*</span>sec.name == <span class="string">&quot;GDT_AP&quot;</span>)
+                    .map(|ap_gdt_sec| ap_gdt_sec.virt_addr)
+                    .ok_or(<span class="string">&quot;Missing/invalid symbol expected from data section \&quot;GDT_AP\&quot;&quot;</span>)
+                    .and_then(|vaddr| memory::translate(vaddr)
+                        .ok_or(<span class="string">&quot;Failed to translate \&quot;GDT_AP\&quot;&quot;</span>)
+                    )
+                    .and_then(|paddr| VirtualAddress::new(paddr.value())
+                        .ok_or(<span class="string">&quot;\&quot;GDT_AP\&quot; physical address was not a valid identity virtual address&quot;</span>)
+                    )<span class="question-mark">?</span>;
+                <span class="comment">// log::debug!(&quot;ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}&quot;, ap_realmode_begin, ap_realmode_end, ap_gdt);
+                </span>MulticoreBringupInfo {
+                    ap_start_realmode_begin: ap_realmode_begin,
+                    ap_start_realmode_end: ap_realmode_end,
+                    ap_gdt,
+                }
+            };
+
+            <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+            </span><span class="kw">let </span>multicore_info = MulticoreBringupInfo { };
+
+            (nano_core_crate_ref, multicore_info)
         }
         <span class="prelude-val">Err</span>((msg, _mapped_pages_array)) =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(msg),
     };
@@ -491,7 +507,7 @@
         identity_mappings: identity_mapped_pages,
     };
     <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, not(loadable)))] </span>{
-        captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)<span class="question-mark">?</span>;
+        captain::init(kernel_mmi_ref, stack, drop_after_init, multicore_info, rsdp_address)<span class="question-mark">?</span>;
     }
     <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, loadable))] </span>{
         <span class="kw">use </span>captain::DropAfterInit;
@@ -505,10 +521,10 @@
             .ok_or(<span class="string">&quot;no single symbol matching \&quot;captain::init\&quot;&quot;</span>)<span class="question-mark">?</span>;
         <span class="macro">log::info!</span>(<span class="string">&quot;The nano_core (in loadable mode) is invoking the captain init function: {:?}&quot;</span>, section.name);
 
-        <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;Stack&gt;, DropAfterInit, VirtualAddress, VirtualAddress, VirtualAddress, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+        <span class="kw">type </span>CaptainInitFunc = <span class="kw">fn</span>(MmiRef, NoDrop&lt;Stack&gt;, DropAfterInit, MulticoreBringupInfo, <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
         <span class="kw">let </span>func: <span class="kw-2">&amp;</span>CaptainInitFunc = <span class="kw">unsafe </span>{ section.as_func() }<span class="question-mark">?</span>;
 
-        func(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)<span class="question-mark">?</span>;
+        func(kernel_mmi_ref, stack, drop_after_init, multicore_info, rsdp_address)<span class="question-mark">?</span>;
     }
 
     <span class="comment">// the captain shouldn&#39;t return ...

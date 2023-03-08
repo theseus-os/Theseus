@@ -200,6 +200,9 @@
 <a href="#200" id="200">200</a>
 <a href="#201" id="201">201</a>
 <a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -223,7 +226,7 @@
 
 <span class="kw">use </span>core::ops::DerefMut;
 <span class="kw">use </span>log::{error, info};
-<span class="kw">use </span>memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress, VirtualAddress};
+<span class="kw">use </span>memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
 <span class="kw">use </span>kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 <span class="kw">use </span>irq_safety::enable_interrupts;
 <span class="kw">use </span>stack::Stack;
@@ -254,30 +257,35 @@
     }
 }
 
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">pub use </span>multicore_bringup::MulticoreBringupInfo;
+
+<span class="doccomment">/// TODO: in the future this could be defined here or re-exported from another aarch64 crate.
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">pub struct </span>MulticoreBringupInfo {
+    <span class="comment">// nothing needed on aarch64 yet
+</span>}
+
 
 <span class="doccomment">/// Initialize the Captain, which is the main crate that &quot;steers the ship&quot; of Theseus. 
-/// 
+///
 /// This does the rest of the initialization procedures so that the OS 
 /// can continue running and do actual useful work.
-/// 
+///
 /// # Arguments
 /// * `kernel_mmi_ref`: a reference to the kernel&#39;s memory management info.
 /// * `identity_mapped_pages`: the memory containing the identity-mapped content,
 ///    which must not be dropped until all APs are finished booting.
 /// * `bsp_initial_stack`: the stack currently in use for running this code,
 ///    which must not be dropped for the entire execution of the initial bootstrap task.
-/// * `ap_start_realmode_begin`: the start bound (inclusive) of the AP&#39;s realmode boot code.
-/// * `ap_start_realmode_end`: the end bound (exlusive) of the AP&#39;s realmode boot code.
-/// * `ap_gdt`: the virtual address of the GDT created for the AP&#39;s realmode boot code.
+/// * `multicore_info`: information needed to bring up secondary CPUs.
 /// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
 ///    if available and provided by the bootloader.
 </span><span class="kw">pub fn </span>init(
     kernel_mmi_ref: MmiRef,
     bsp_initial_stack: NoDrop&lt;Stack&gt;,
     drop_after_init: DropAfterInit,
-    ap_start_realmode_begin: VirtualAddress,
-    ap_start_realmode_end: VirtualAddress,
-    ap_gdt: VirtualAddress,
+    multicore_info: MulticoreBringupInfo,
     rsdp_address: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="attr">#[cfg(all(mirror_log_to_vga, target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
@@ -320,9 +328,7 @@
     <span class="comment">// boot up the other cores (APs)
     </span><span class="kw">let </span>ap_count = multicore_bringup::handle_ap_cores(
         <span class="kw-2">&amp;</span>kernel_mmi_ref,
-        ap_start_realmode_begin,
-        ap_start_realmode_end,
-        ap_gdt,
+        multicore_info,
         <span class="prelude-val">Some</span>(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )<span class="question-mark">?</span>;
     <span class="kw">let </span>cpu_count = ap_count + <span class="number">1</span>;
