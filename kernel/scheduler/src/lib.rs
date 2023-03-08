@@ -79,9 +79,9 @@ fn cpu_local_timer_tick_handler() {
     // tick count, only used for debugging
     #[cfg(any())] { // cfg(any()) is always false
         use core::sync::atomic::{AtomicUsize, Ordering};
-        static LAPIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
-        let _ticks = LAPIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-        log::info!("(CPU {}) LAPIC TIMER HANDLER! TICKS = {}", cpu::current_cpu(), _ticks);
+        static CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
+        let _ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
+        log::info!("(CPU {}) CPU-LOCAL TIMER HANDLER! TICKS = {}", cpu::current_cpu(), _ticks);
     }
 
     // Inform the `sleep` crate that it should update its inner tick count
