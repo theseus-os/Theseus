@@ -7,9 +7,8 @@ extern crate alloc;
 extern crate task;
 
 use core::mem::ManuallyDrop;
-use task::KillReason;
-#[cfg(target_arch = "x86_64")]
 use alloc::boxed::Box;
+use task::KillReason;
 
 /// Invokes the given closure `f`, catching a panic as it is unwinding the stack.
 /// 
@@ -53,7 +52,7 @@ pub fn catch_unwind_with_arg<F, A, R>(f: F, arg: A) -> Result<R, KillReason>
 /// # Arguments
 /// * a pointer to the 
 /// * a pointer to the arbitrary object passed around during the unwinding process,
-///   which in Theseus is a pointer to the `UnwindingContext`.
+///   which in Theseus is a pointer to the `UnwindingContext`. 
 fn panic_callback<F, A, R>(data_ptr: *mut u8, exception_object: *mut u8) where F: FnOnce(A) -> R {
     let data = unsafe { &mut *(data_ptr as *mut TryIntrinsicArg<F, A, R>) };
     let unwinding_context_boxed = unsafe { Box::from_raw(exception_object as *mut unwind::UnwindingContext) };
