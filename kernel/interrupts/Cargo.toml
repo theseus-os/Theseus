@@ -16,6 +16,7 @@ irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 gic = { path = "../gic" }
 tock-registers = "0.7.0"
 cortex-a = "7.5.0"
+time = { path = "../time" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
