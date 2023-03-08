@@ -1666,7 +1666,7 @@
 }
 
 <span class="doccomment">/// An empty struct that invokes [`schedule()`] when it is dropped.
-</span><span class="kw">struct </span>ScheduleOnDrop { }
+</span><span class="kw">pub struct </span>ScheduleOnDrop { }
 <span class="kw">impl </span>Drop <span class="kw">for </span>ScheduleOnDrop {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         schedule();
