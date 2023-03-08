@@ -715,7 +715,13 @@ where
 
     // Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
+    #[cfg(target_arch = "x86_64")]
     let result = catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg);
+
+    // On platforms where unwind is implemented, simply call the entry point
+    #[cfg(not(target_arch = "x86_64"))]
+    let result = Ok(task_entry_func(task_arg));
+
     (result, exitable_taskref)
 }
 

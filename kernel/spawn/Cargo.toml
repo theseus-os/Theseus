@@ -19,7 +19,6 @@ memory = { path = "../memory" }
 stack = { path = "../stack" }
 cpu = { path = "../cpu" }
 task = { path = "../task" }
-catch_unwind = { path = "../catch_unwind" }
 runqueue = { path = "../runqueue" }
 scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }
@@ -34,6 +33,7 @@ early_tls = { path = "../early_tls" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 fault_crate_swap = { path = "../fault_crate_swap" }
+catch_unwind = { path = "../catch_unwind" }
 fault_log = { path = "../fault_log" }
 
 [lib]
