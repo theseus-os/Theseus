@@ -203,6 +203,52 @@
 <a href="#203" id="203">203</a>
 <a href="#204" id="204">204</a>
 <a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -224,14 +270,17 @@
 
 </span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>core::ops::DerefMut;
 <span class="kw">use </span>log::{error, info};
 <span class="kw">use </span>memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
-<span class="kw">use </span>kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 <span class="kw">use </span>irq_safety::enable_interrupts;
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>no_drop::NoDrop;
 
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>{
+    core::ops::DerefMut,
+    kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES,
+};
 
 <span class="attr">#[cfg(all(mirror_log_to_vga, target_arch = <span class="string">&quot;x86_64&quot;</span>))]
 </span><span class="kw">mod </span>mirror_log_callbacks {
@@ -281,6 +330,7 @@
 /// * `multicore_info`: information needed to bring up secondary CPUs.
 /// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
 ///    if available and provided by the bootloader.
+</span><span class="attr">#[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, allow(unreachable_code, unused_variables))]
 </span><span class="kw">pub fn </span>init(
     kernel_mmi_ref: MmiRef,
     bsp_initial_stack: NoDrop&lt;Stack&gt;,
@@ -295,23 +345,34 @@
 
     <span class="comment">// calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">let </span>_tsc_freq = tsc::get_tsc_frequency()<span class="question-mark">?</span>;
     <span class="comment">// info!(&quot;TSC frequency calculated: {}&quot;, _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
+    // arch-gate: device_manager currently detects PCI &amp; PS2 devices,
+    // which are unsupported on aarch64 at this point
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())<span class="question-mark">?</span>;
 
     <span class="comment">// initialize the rest of the BSP&#39;s interrupt stuff, including TSS &amp; GDT
-    </span><span class="kw">let </span>(double_fault_stack, privilege_stack) = {
-        <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
-        (
-            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
-                .ok_or(<span class="string">&quot;could not allocate double fault stack&quot;</span>)<span class="question-mark">?</span>,
-            stack::alloc_stack(<span class="number">1</span>, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
-                .ok_or(<span class="string">&quot;could not allocate privilege stack&quot;</span>)<span class="question-mark">?</span>,
-        )
-    };
-    <span class="kw">let </span>idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())<span class="question-mark">?</span>;
+    // arch-gate: the IDT &amp; special stacks are x86_64 specific
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span><span class="kw">let </span>idt = {
+        <span class="kw">let </span>(double_fault_stack, privilege_stack) = {
+            <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
+            (
+                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
+                    .ok_or(<span class="string">&quot;could not allocate double fault stack&quot;</span>)<span class="question-mark">?</span>,
+                stack::alloc_stack(<span class="number">1</span>, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
+                    .ok_or(<span class="string">&quot;could not allocate privilege stack&quot;</span>)<span class="question-mark">?</span>,
+            )
+        };
+        interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())<span class="question-mark">?
+    </span>};
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span>interrupts::init().unwrap();
     
     <span class="comment">// get BSP&#39;s CPU ID
     </span><span class="kw">let </span>bsp_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
@@ -323,18 +384,27 @@
     <span class="macro">info!</span>(<span class="string">&quot;Created initial bootstrap task: {:?}&quot;</span>, bootstrap_task);
 
     <span class="comment">// after we&#39;ve initialized the task subsystem, we can use better exception handlers
+    // arch-gate: aarch64 simply logs exceptions and crash; porting exceptions_full
+    // hasn&#39;t been done yet
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>exceptions_full::init(idt);
     
     <span class="comment">// boot up the other cores (APs)
+    // arch-gate: no multicore support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">let </span>ap_count = multicore_bringup::handle_ap_cores(
         <span class="kw-2">&amp;</span>kernel_mmi_ref,
         multicore_info,
         <span class="prelude-val">Some</span>(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )<span class="question-mark">?</span>;
+    <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
+    </span><span class="kw">let </span>ap_count = <span class="number">0</span>;
+
     <span class="kw">let </span>cpu_count = ap_count + <span class="number">1</span>;
     <span class="macro">info!</span>(<span class="string">&quot;Finished handling and booting up all {} AP cores; {} total CPUs are running.&quot;</span>, ap_count, cpu_count);
 
-    <span class="attr">#[cfg(mirror_log_to_vga)] </span>{
+    <span class="comment">// arch-gate: no framebuffer support on aarch64 at the moment
+    </span><span class="attr">#[cfg(all(mirror_log_to_vga, target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
         <span class="comment">// Currently, handling the AP cores also siwtches the graphics mode
         // (from text mode VGA to a graphical framebuffer).
         // Thus, we can now use enable the function that mirrors logger output to the terminal.
@@ -343,11 +413,16 @@
 
     <span class="comment">// Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
+    // arch-gate: no multicore support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>tlb_shootdown::init();
     
     <span class="comment">// Initialize the per-core heaps.
-    </span>multiple_heaps::switch_to_multiple_heaps()<span class="question-mark">?</span>;
-    <span class="macro">info!</span>(<span class="string">&quot;Initialized per-core heaps&quot;</span>);
+    // arch-gate: no multicore support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        multiple_heaps::switch_to_multiple_heaps()<span class="question-mark">?</span>;
+        <span class="macro">info!</span>(<span class="string">&quot;Initialized per-core heaps&quot;</span>);
+    }
 
     <span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)] </span>{
         <span class="macro">log::error!</span>(<span class="string">&quot;uefi boot cannot proceed as it is not fully implemented&quot;</span>);
@@ -358,13 +433,21 @@
     // The PAT supports write-combining caching of graphics video memory for better performance
     // and must be initialized explicitly on every CPU, 
     // but it is not a fatal error if it doesn&#39;t exist.
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">if </span>page_attribute_table::init().is_err() {
         <span class="macro">error!</span>(<span class="string">&quot;This CPU does not support the Page Attribute Table&quot;</span>);
     }
-    <span class="kw">let </span>(key_producer, mouse_producer) = window_manager::init()<span class="question-mark">?</span>;
+
+    <span class="comment">// arch-gate: no windowing/input support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span><span class="kw">let </span>(key_producer, mouse_producer) = window_manager::init()<span class="question-mark">?</span>;
 
     <span class="comment">// initialize the rest of our drivers
+    // arch-gate: device_manager currently detects PCI &amp; PS2 devices,
+    // which are unsupported on aarch64 at this point
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>device_manager::init(key_producer, mouse_producer)<span class="question-mark">?</span>;
+
     task_fs::init()<span class="question-mark">?</span>;
 
     <span class="comment">// create a SIMD personality
@@ -381,11 +464,20 @@
 
     <span class="comment">// Now that key subsystems are initialized, we can:
     // 1. Drop the items that needed to be held through initialization,
-    // 2. Spawn various system tasks/daemons,
-    // 3. Start the first application(s).
     </span>drop_after_init.drop_all();
-    console::start_connection_detection()<span class="question-mark">?</span>;
-    first_application::start()<span class="question-mark">?</span>;
+
+    <span class="comment">// 2. Spawn various system tasks/daemons,
+    // arch-gate: no windowing/input support on aarch64 at the moment,
+    // which prevent using any graphical apps such as the console
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span>console::start_connection_detection()<span class="question-mark">?</span>;
+
+    <span class="comment">// 3. Start the first application(s).
+    // arch-gate: many subsystems required by applications are missing
+    // on aarch64: windowing, user input, app loading (relocation code
+    // is x86_64-specific at the moment)
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span>first_application::start()<span class="question-mark">?</span>;
 
     <span class="macro">info!</span>(<span class="string">&quot;captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...&quot;</span>, bsp_id);
     <span class="comment">// The following final initialization steps are important, and order matters:

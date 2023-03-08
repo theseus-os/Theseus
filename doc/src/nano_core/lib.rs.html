@@ -277,6 +277,9 @@
 <a href="#277" id="277">277</a>
 <a href="#278" id="278">278</a>
 <a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //! 
 //! The `nano_core` is very simple, and only does the following things:
@@ -303,11 +306,14 @@
 <span class="kw">use </span>core::ops::DerefMut;
 <span class="kw">use </span>captain::MulticoreBringupInfo;
 <span class="kw">use </span>memory::VirtualAddress;
-<span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>mod_mgmt::parse_nano_core::NanoCoreItems;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">use </span>vga_buffer::println_raw;
+</span><span class="kw">use </span>{
+    vga_buffer::println_raw,
+    kernel_config::memory::KERNEL_OFFSET,
+};
+
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">use </span>log::info <span class="kw">as </span>println_raw;
 
@@ -386,6 +392,7 @@
 <span class="doccomment">/// aarch64 placeholder
 </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">fn </span>early_setup(_early_double_fault_stack_top: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    irq_safety::disable_interrupts();
     <span class="prelude-val">Ok</span>(())
 }
 
@@ -502,14 +509,13 @@
     <span class="comment">// Now we invoke the Captain, which will take over from here.
     // That&#39;s it, the nano_core is done! That&#39;s really all it does! 
     </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): invoking the captain...&quot;</span>);
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-    </span><span class="kw">let </span>drop_after_init = captain::DropAfterInit {
+    <span class="kw">let </span>drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
     };
-    <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, not(loadable)))] </span>{
+    <span class="attr">#[cfg(not(loadable))] </span>{
         captain::init(kernel_mmi_ref, stack, drop_after_init, multicore_info, rsdp_address)<span class="question-mark">?</span>;
     }
-    <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, loadable))] </span>{
+    <span class="attr">#[cfg(loadable)] </span>{
         <span class="kw">use </span>captain::DropAfterInit;
         <span class="kw">use </span>memory::{MmiRef, PhysicalAddress};
         <span class="kw">use </span>no_drop::NoDrop;

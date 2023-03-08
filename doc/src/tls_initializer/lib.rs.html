@@ -391,6 +391,10 @@
 <a href="#391" id="391">391</a>
 <a href="#392" id="392">392</a>
 <a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Logic for generating Thread-Local Storage (TLS) data image for TLS areas.
 //!
 //! The two key types are:
@@ -409,13 +413,16 @@
 </span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec, boxed::Box};
-<span class="kw">use </span>core::{mem::size_of, cmp::max, ops::Deref};
+<span class="kw">use </span>core::{cmp::max, ops::Deref};
 <span class="kw">use </span>crate_metadata::{LoadedSection, SectionType, StrongSectionRef};
 <span class="kw">use </span>memory_structs::VirtualAddress;
 <span class="kw">use </span>rangemap::RangeMap;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">use </span>x86_64::{registers::model_specific::FsBase, VirtAddr};
+</span><span class="kw">use </span>{
+    core::mem::size_of,
+    x86_64::{registers::model_specific::FsBase, VirtAddr},
+};
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">use </span>{
@@ -520,6 +527,7 @@
     ///   would overlap with an existing section. 
     ///   An error occurring here would indicate a link-time bug 
     ///   or a bug in the symbol parsing code that invokes this function.
+    </span><span class="attr">#[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, allow(unused_variables))]
     </span><span class="kw">pub fn </span>add_existing_static_tls_section(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         <span class="kw-2">mut </span>tls_section: LoadedSection,

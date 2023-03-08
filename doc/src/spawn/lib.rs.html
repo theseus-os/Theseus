@@ -1026,6 +1026,12 @@
 <a href="#1026" id="1026">1026</a>
 <a href="#1027" id="1027">1027</a>
 <a href="#1028" id="1028">1028</a>
+<a href="#1029" id="1029">1029</a>
+<a href="#1030" id="1030">1030</a>
+<a href="#1031" id="1031">1031</a>
+<a href="#1032" id="1032">1032</a>
+<a href="#1033" id="1033">1033</a>
+<a href="#1034" id="1034">1034</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1743,7 +1749,13 @@
 
     <span class="comment">// Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">let </span>result = catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg);
+
+    <span class="comment">// On platforms where unwinding is not implemented, simply call the entry point.
+    </span><span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
+    </span><span class="kw">let </span>result = <span class="prelude-val">Ok</span>(task_entry_func(task_arg));
+
     (result, exitable_taskref)
 }
 
