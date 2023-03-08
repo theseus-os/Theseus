@@ -455,7 +455,7 @@ impl Drop for JoinableTaskRef {
 }
 
 /// An empty struct that invokes [`schedule()`] when it is dropped.
-struct ScheduleOnDrop { }
+pub struct ScheduleOnDrop { }
 impl Drop for ScheduleOnDrop {
     fn drop(&mut self) {
         schedule();
