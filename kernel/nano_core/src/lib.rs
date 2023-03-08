@@ -22,6 +22,7 @@
 extern crate panic_entry;
 
 use core::ops::DerefMut;
+use captain::MulticoreBringupInfo;
 use memory::VirtualAddress;
 use mod_mgmt::parse_nano_core::NanoCoreItems;
 
@@ -148,56 +149,54 @@ where
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
     println_raw!("nano_core(): parsing nano_core crate, please wait ...");
-    let (
-        nano_core_crate_ref,
-        ap_realmode_begin,
-        ap_realmode_end,
-        ap_gdt,
-    ) = match mod_mgmt::parse_nano_core::parse_nano_core(
+    let (nano_core_crate_ref, multicore_info) = match mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
         rodata_mapped_pages.into_inner(),
         data_mapped_pages.into_inner(),
         false,
     ) {
-        #[cfg(target_arch = "x86_64")]
         Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) => {
             println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
 
-            // Get symbols from the boot assembly code that define where the ap_start code is.
-            // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
-            let ap_realmode_begin = init_symbol_values
-                .get("ap_start_realmode")
-                .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
-                .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode\"")?;
-            let ap_realmode_end = init_symbol_values
-                .get("ap_start_realmode_end")
-                .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
-                .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
+            #[cfg(target_arch = "x86_64")]
+            let multicore_info = {
+                // Get symbols from the boot assembly code that define where the ap_start code is.
+                // They will be present in the ".init" sections, i.e., in the `init_symbols` list. 
+                let ap_realmode_begin = init_symbol_values
+                    .get("ap_start_realmode")
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode\"")?;
+                let ap_realmode_end = init_symbol_values
+                    .get("ap_start_realmode_end")
+                    .and_then(|v| VirtualAddress::new(*v + KERNEL_OFFSET))
+                    .ok_or("Missing/invalid symbol expected from assembly code \"ap_start_realmode_end\"")?;
 
-            // Obtain the identity-mapped virtual address of GDT_AP.
-            let ap_gdt = nano_core_crate_ref.lock_as_ref()
-                .sections
-                .values()
-                .find(|sec| &*sec.name == "GDT_AP")
-                .map(|ap_gdt_sec| ap_gdt_sec.virt_addr)
-                .ok_or("Missing/invalid symbol expected from data section \"GDT_AP\"")
-                .and_then(|vaddr| memory::translate(vaddr)
-                    .ok_or("Failed to translate \"GDT_AP\"")
-                )
-                .and_then(|paddr| VirtualAddress::new(paddr.value())
-                    .ok_or("\"GDT_AP\" physical address was not a valid identity virtual address")
-                )?;
-            // log::debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}", ap_realmode_begin, ap_realmode_end, ap_gdt);
-            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
-        }
-        #[cfg(target_arch = "aarch64")]
-        Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) => {
-            println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
-            let ap_realmode_begin = VirtualAddress::new(0xCAFEBABE).unwrap();
-            let ap_realmode_end = VirtualAddress::new(0xCAFEBABE).unwrap();
-            let ap_gdt = VirtualAddress::new(0xCAFEBABE).unwrap();
-            (nano_core_crate_ref, ap_realmode_begin, ap_realmode_end, ap_gdt)
+                // Obtain the identity-mapped virtual address of GDT_AP.
+                let ap_gdt = nano_core_crate_ref.lock_as_ref()
+                    .sections
+                    .values()
+                    .find(|sec| &*sec.name == "GDT_AP")
+                    .map(|ap_gdt_sec| ap_gdt_sec.virt_addr)
+                    .ok_or("Missing/invalid symbol expected from data section \"GDT_AP\"")
+                    .and_then(|vaddr| memory::translate(vaddr)
+                        .ok_or("Failed to translate \"GDT_AP\"")
+                    )
+                    .and_then(|paddr| VirtualAddress::new(paddr.value())
+                        .ok_or("\"GDT_AP\" physical address was not a valid identity virtual address")
+                    )?;
+                // log::debug!("ap_realmode_begin: {:#X}, ap_realmode_end: {:#X}, ap_gdt: {:#X}", ap_realmode_begin, ap_realmode_end, ap_gdt);
+                MulticoreBringupInfo {
+                    ap_start_realmode_begin: ap_realmode_begin,
+                    ap_start_realmode_end: ap_realmode_end,
+                    ap_gdt,
+                }
+            };
+
+            #[cfg(target_arch = "aarch64")]
+            let multicore_info = MulticoreBringupInfo { };
+
+            (nano_core_crate_ref, multicore_info)
         }
         Err((msg, _mapped_pages_array)) => return Err(msg),
     };
@@ -232,7 +231,7 @@ where
         identity_mappings: identity_mapped_pages,
     };
     #[cfg(not(loadable))] {
-        captain::init(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
+        captain::init(kernel_mmi_ref, stack, drop_after_init, multicore_info, rsdp_address)?;
     }
     #[cfg(loadable)] {
         use captain::DropAfterInit;
@@ -246,10 +245,10 @@ where
             .ok_or("no single symbol matching \"captain::init\"")?;
         log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
 
-        type CaptainInitFunc = fn(MmiRef, NoDrop<Stack>, DropAfterInit, VirtualAddress, VirtualAddress, VirtualAddress, Option<PhysicalAddress>) -> Result<(), &'static str>;
+        type CaptainInitFunc = fn(MmiRef, NoDrop<Stack>, DropAfterInit, MulticoreBringupInfo, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
 
-        func(kernel_mmi_ref, stack, drop_after_init, ap_realmode_begin, ap_realmode_end, ap_gdt, rsdp_address)?;
+        func(kernel_mmi_ref, stack, drop_after_init, multicore_info, rsdp_address)?;
     }
 
     // the captain shouldn't return ...

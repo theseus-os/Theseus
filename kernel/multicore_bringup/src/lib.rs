@@ -1,7 +1,8 @@
-//! Functions for initializing and bringing up other CPU cores. 
-//! 
-//! These functions are intended to be invoked from the main core
-//! (the BSP -- bootstrap core) in order to jumpstart other cores.
+//! Initialization and bring-up of secondary CPUs on x86_64.
+//!
+//! These functions are intended to be invoked from the BSP
+//! (the Bootstrap Processor, the main CPU in x86 terms)
+//! in order to bring up secondary CPUs (APs in x86 terms).
 
 #![no_std]
 #![feature(let_chains)]
@@ -184,23 +185,34 @@ impl GraphicInfo {
     }
 }
 
+/// Information needed to bring up APs (secondary CPUs) on x86_64.
+pub struct MulticoreBringupInfo {
+    /// The starting virtual addresses of the `ap_start` realmode (16-bit) code.
+    pub ap_start_realmode_begin: VirtualAddress,
+    /// The ending virtual addresses (exclusive) of the `ap_start` realmode (16-bit) code.
+    pub ap_start_realmode_end: VirtualAddress,
+    /// The address of the GDT set up for each AP (secondary CPU)
+    pub ap_gdt: VirtualAddress,
+}
+
 /// Starts up and sets up AP cores based on system information from ACPI
 /// (specifically the MADT (APIC) table).
 /// 
 /// # Arguments: 
 /// * `kernel_mmi_ref`: A reference to the MMI structure with the kernel's page table.
-/// * `ap_start_realmode_begin`: the starting virtual address of where the ap_start realmode code is.
-/// * `ap_start_realmode_end`: the ending virtual address of where the ap_start realmode code is.
 /// * `max_framebuffer_resolution`: the maximum resolution `(width, height)` of the graphical framebuffer
 ///    that an AP should request from the BIOS when it boots up in 16-bit real mode.
 ///    If `None`, there will be no maximum.
 pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
-    ap_start_realmode_begin: VirtualAddress,
-    ap_start_realmode_end: VirtualAddress,
-    ap_gdt: VirtualAddress,
+    multicore_info: MulticoreBringupInfo,
     max_framebuffer_resolution: Option<(u16, u16)>,
 ) -> Result<u32, &'static str> {
+    let MulticoreBringupInfo {
+        ap_start_realmode_begin,
+        ap_start_realmode_end,
+        ap_gdt,
+    } = multicore_info;
     let ap_startup_size_in_bytes = ap_start_realmode_end.value() - ap_start_realmode_begin.value();
 
     let page_table_phys_addr: PhysicalAddress;

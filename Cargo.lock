@@ -3669,6 +3669,7 @@ dependencies = [
  "stack",
  "static_assertions",
  "task_struct",
+ "waker_generic",
 ]
 
 [[package]]
@@ -4360,6 +4361,23 @@ dependencies = [
  "log",
  "scheduler",
  "task",
+]
+
+[[package]]
+name = "waker"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+ "task",
+ "waker_generic",
+]
+
+[[package]]
+name = "waker_generic"
+version = "0.1.0"
+dependencies = [
+ "preemption",
+ "spin 0.9.4",
 ]
 
 [[package]]
