@@ -16,13 +16,16 @@
 extern crate alloc;
 
 use alloc::{sync::Arc, vec::Vec, boxed::Box};
-use core::{mem::size_of, cmp::max, ops::Deref};
+use core::{cmp::max, ops::Deref};
 use crate_metadata::{LoadedSection, SectionType, StrongSectionRef};
 use memory_structs::VirtualAddress;
 use rangemap::RangeMap;
 
 #[cfg(target_arch = "x86_64")]
-use x86_64::{registers::model_specific::FsBase, VirtAddr};
+use {
+    core::mem::size_of,
+    x86_64::{registers::model_specific::FsBase, VirtAddr},
+};
 
 #[cfg(target_arch = "aarch64")]
 use {
@@ -127,6 +130,7 @@ impl TlsInitializer {
     ///   would overlap with an existing section. 
     ///   An error occurring here would indicate a link-time bug 
     ///   or a bug in the symbol parsing code that invokes this function.
+    #[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
     pub fn add_existing_static_tls_section(
         &mut self,
         mut tls_section: LoadedSection,

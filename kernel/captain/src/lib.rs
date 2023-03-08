@@ -19,14 +19,17 @@
 
 extern crate alloc;
 
-use core::ops::DerefMut;
 use log::{error, info};
 use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
-use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use irq_safety::enable_interrupts;
 use stack::Stack;
 use no_drop::NoDrop;
 
+#[cfg(target_arch = "x86_64")]
+use {
+    core::ops::DerefMut,
+    kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES,
+};
 
 #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))]
 mod mirror_log_callbacks {
@@ -76,6 +79,7 @@ pub struct MulticoreBringupInfo {
 /// * `multicore_info`: information needed to bring up secondary CPUs.
 /// * `rsdp_address`: the physical address of the RSDP (an ACPI table pointer),
 ///    if available and provided by the bootloader.
+#[cfg_attr(target_arch = "aarch64", allow(unreachable_code, unused_variables))]
 pub fn init(
     kernel_mmi_ref: MmiRef,
     bsp_initial_stack: NoDrop<Stack>,
@@ -90,23 +94,34 @@ pub fn init(
 
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
+    #[cfg(target_arch = "x86_64")]
     let _tsc_freq = tsc::get_tsc_frequency()?;
     // info!("TSC frequency calculated: {}", _tsc_freq);
 
     // now we initialize early driver stuff, like APIC/ACPI
+    // arch-gate: device_manager currently detects PCI & PS2 devices,
+    // which are unsupported on aarch64 at this point
+    #[cfg(target_arch = "x86_64")]
     device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
     // initialize the rest of the BSP's interrupt stuff, including TSS & GDT
-    let (double_fault_stack, privilege_stack) = {
-        let mut kernel_mmi = kernel_mmi_ref.lock();
-        (
-            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table)
-                .ok_or("could not allocate double fault stack")?,
-            stack::alloc_stack(1, &mut kernel_mmi.page_table)
-                .ok_or("could not allocate privilege stack")?,
-        )
+    // arch-gate: the IDT & special stacks are x86_64 specific
+    #[cfg(target_arch = "x86_64")]
+    let idt = {
+        let (double_fault_stack, privilege_stack) = {
+            let mut kernel_mmi = kernel_mmi_ref.lock();
+            (
+                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, &mut kernel_mmi.page_table)
+                    .ok_or("could not allocate double fault stack")?,
+                stack::alloc_stack(1, &mut kernel_mmi.page_table)
+                    .ok_or("could not allocate privilege stack")?,
+            )
+        };
+        interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?
     };
-    let idt = interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?;
+
+    #[cfg(target_arch = "aarch64")]
+    interrupts::init().unwrap();
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
@@ -118,18 +133,27 @@ pub fn init(
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
     // after we've initialized the task subsystem, we can use better exception handlers
+    // arch-gate: aarch64 simply logs exceptions and crash; porting exceptions_full
+    // hasn't been done yet
+    #[cfg(target_arch = "x86_64")]
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
+    // arch-gate: no multicore support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")]
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
         multicore_info,
         Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
+    #[cfg(not(target_arch = "x86_64"))]
+    let ap_count = 0;
+
     let cpu_count = ap_count + 1;
     info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
 
-    #[cfg(mirror_log_to_vga)] {
+    // arch-gate: no framebuffer support on aarch64 at the moment
+    #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))] {
         // Currently, handling the AP cores also siwtches the graphics mode
         // (from text mode VGA to a graphical framebuffer).
         // Thus, we can now use enable the function that mirrors logger output to the terminal.
@@ -138,11 +162,16 @@ pub fn init(
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
+    // arch-gate: no multicore support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")]
     tlb_shootdown::init();
     
     // Initialize the per-core heaps.
-    multiple_heaps::switch_to_multiple_heaps()?;
-    info!("Initialized per-core heaps");
+    // arch-gate: no multicore support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")] {
+        multiple_heaps::switch_to_multiple_heaps()?;
+        info!("Initialized per-core heaps");
+    }
 
     #[cfg(feature = "uefi")] {
         log::error!("uefi boot cannot proceed as it is not fully implemented");
@@ -153,13 +182,21 @@ pub fn init(
     // The PAT supports write-combining caching of graphics video memory for better performance
     // and must be initialized explicitly on every CPU, 
     // but it is not a fatal error if it doesn't exist.
+    #[cfg(target_arch = "x86_64")]
     if page_attribute_table::init().is_err() {
         error!("This CPU does not support the Page Attribute Table");
     }
+
+    // arch-gate: no windowing/input support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")]
     let (key_producer, mouse_producer) = window_manager::init()?;
 
     // initialize the rest of our drivers
+    // arch-gate: device_manager currently detects PCI & PS2 devices,
+    // which are unsupported on aarch64 at this point
+    #[cfg(target_arch = "x86_64")]
     device_manager::init(key_producer, mouse_producer)?;
+
     task_fs::init()?;
 
     // create a SIMD personality
@@ -176,10 +213,19 @@ pub fn init(
 
     // Now that key subsystems are initialized, we can:
     // 1. Drop the items that needed to be held through initialization,
-    // 2. Spawn various system tasks/daemons,
-    // 3. Start the first application(s).
     drop_after_init.drop_all();
+
+    // 2. Spawn various system tasks/daemons,
+    // arch-gate: no windowing/input support on aarch64 at the moment,
+    // which prevent using any graphical apps such as the console
+    #[cfg(target_arch = "x86_64")]
     console::start_connection_detection()?;
+
+    // 3. Start the first application(s).
+    // arch-gate: many subsystems required by applications are missing
+    // on aarch64: windowing, user input, app loading (relocation code
+    // is x86_64-specific at the moment)
+    #[cfg(target_arch = "x86_64")]
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_id);

@@ -8,102 +8,43 @@ edition = "2021"
 [dependencies]
 log = "0.4.8"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+dfqueue = { path = "../../libs/dfqueue", version = "0.1.0" }
+kernel_config = { path = "../kernel_config" }
+interrupts = { path = "../interrupts" }
+scheduler = { path = "../scheduler" }
+mod_mgmt = { path = "../mod_mgmt" }
+no_drop = { path = "../no_drop" }
+task_fs = { path = "../task_fs" }
+memory = { path = "../memory" }
+spawn = { path = "../spawn" }
+stack = { path = "../stack" }
+task = { path = "../task" }
+cpu = { path = "../cpu" }
 
-[dependencies.dfqueue]
-path = "../../libs/dfqueue"
-version = "0.1.0"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.logger_x86_64]
-path = "../logger_x86_64"
-
-[dependencies.window_manager]
-path = "../window_manager"
-
-[dependencies.first_application]
-path = "../first_application"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.no_drop]
-path = "../no_drop"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.exceptions_full]
-path = "../exceptions_full"
-
-[dependencies.tlb_shootdown]
-path = "../tlb_shootdown"
-
-[dependencies.cpu]
-path = "../cpu"
-
-[dependencies.spawn]
-path = "../spawn"
-
-[dependencies.tsc]
-path = "../tsc"
-
-[dependencies.interrupts]
-path = "../interrupts"
-
-[dependencies.acpi]
-path = "../acpi"
-
-[dependencies.multicore_bringup]
-path = "../multicore_bringup"
-
-[dependencies.page_attribute_table]
-path = "../page_attribute_table"
-
-[dependencies.device_manager]
-path = "../device_manager"
-
-[dependencies.e1000]
-path = "../e1000"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.scheduler]
-path = "../scheduler"
-
-[dependencies.console]
-path = "../console"
-
-[dependencies.app_io]
-path = "../app_io"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
-[dependencies.network_manager]
-path = "../network_manager"
-
-[dependencies.ota_update_client]
-path = "../ota_update_client"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+logger_x86_64 = { path = "../logger_x86_64" }
+window_manager = { path = "../window_manager" }
+first_application = { path = "../first_application" }
+exceptions_full = { path = "../exceptions_full" }
+tlb_shootdown = { path = "../tlb_shootdown" }
+multiple_heaps = { path = "../multiple_heaps" }
+tsc = { path = "../tsc" }
+acpi = { path = "../acpi" }
+multicore_bringup = { path = "../multicore_bringup" }
+page_attribute_table = { path = "../page_attribute_table" }
+device_manager = { path = "../device_manager" }
+e1000 = { path = "../e1000" }
+console = { path = "../console" }
+app_io = { path = "../app_io" }
+vga_buffer = { path = "../vga_buffer" }
+network_manager = { path = "../network_manager" }
+ota_update_client = { path = "../ota_update_client" }
 
 ## This should be dependent upon 'cfg(simd_personality)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
 ## Therefore, it has to be unconditionally included.
-[dependencies.simd_personality]
-path = "../simd_personality"
-
-[dependencies.task_fs]
-path = "../task_fs"
-
-[dependencies.multiple_heaps]
-path = "../multiple_heaps"
+simd_personality = { path = "../simd_personality" }
 
 [features]
 # TODO: Remove when UEFI is fully implemented

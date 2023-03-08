@@ -24,11 +24,14 @@ extern crate panic_entry;
 use core::ops::DerefMut;
 use captain::MulticoreBringupInfo;
 use memory::VirtualAddress;
-use kernel_config::memory::KERNEL_OFFSET;
 use mod_mgmt::parse_nano_core::NanoCoreItems;
 
 #[cfg(target_arch = "x86_64")]
-use vga_buffer::println_raw;
+use {
+    vga_buffer::println_raw,
+    kernel_config::memory::KERNEL_OFFSET,
+};
+
 #[cfg(target_arch = "aarch64")]
 use log::info as println_raw;
 
@@ -107,6 +110,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
 /// aarch64 placeholder
 #[cfg(target_arch = "aarch64")]
 fn early_setup(_early_double_fault_stack_top: usize) -> Result<(), &'static str> {
+    irq_safety::disable_interrupts();
     Ok(())
 }
 
@@ -223,14 +227,13 @@ where
     // Now we invoke the Captain, which will take over from here.
     // That's it, the nano_core is done! That's really all it does! 
     println_raw!("nano_core(): invoking the captain...");
-    #[cfg(target_arch = "x86_64")]
     let drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
     };
-    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
+    #[cfg(not(loadable))] {
         captain::init(kernel_mmi_ref, stack, drop_after_init, multicore_info, rsdp_address)?;
     }
-    #[cfg(all(target_arch = "x86_64", loadable))] {
+    #[cfg(loadable)] {
         use captain::DropAfterInit;
         use memory::{MmiRef, PhysicalAddress};
         use no_drop::NoDrop;
