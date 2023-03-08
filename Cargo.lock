@@ -4364,6 +4364,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "waker"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+ "task",
+ "waker_generic",
+]
+
+[[package]]
 name = "waker_generic"
 version = "0.1.0"
 dependencies = [
