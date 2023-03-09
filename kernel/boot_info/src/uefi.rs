@@ -185,8 +185,8 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
     }
 
     fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
-        let uefi_fb = self.framebuffer.as_ref()?;
-        let uefi_fb_info = uefi_fb.info();
+        let uefi_fb = self.frame_buffer.as_ref()?;
+        let uefi_fb_info = uefi_fb.info;
         let format = match uefi_fb_info.pixel_format {
             info::PixelFormat::Rgb => FramebufferFormat::RgbPixel,
             info::PixelFormat::Bgr => FramebufferFormat::BgrPixel,
