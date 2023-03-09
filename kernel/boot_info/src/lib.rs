@@ -38,7 +38,8 @@ pub trait ElfSection {
     /// Returns the section's starting virtual address.
     fn start(&self) -> VirtualAddress;
 
-    /// Returns the section's length.
+    /// Returns the section's length in memory, as opposed to its length in the
+    /// ELF file.
     fn len(&self) -> usize;
 
     /// Returns whether the section is empty.
@@ -216,8 +217,8 @@ pub trait BootInformation: 'static {
         &self,
     ) -> Result<Self::AdditionalReservedMemoryRegions, &'static str>;
 
-    /// Returns the end of the kernel's image in physical memory.
-    fn kernel_end(&self) -> Result<PhysicalAddress, &'static str>;
+    /// Returns the end of the kernel's image in memory.
+    fn kernel_end(&self) -> Result<VirtualAddress, &'static str>;
 
     /// Returns the RSDP if it was provided by the bootloader.
     fn rsdp(&self) -> Option<PhysicalAddress>;

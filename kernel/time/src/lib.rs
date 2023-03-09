@@ -2,6 +2,7 @@
 
 #![no_std]
 
+use core::ops;
 use crossbeam_utils::atomic::AtomicCell;
 
 mod dummy;
@@ -29,7 +30,9 @@ pub struct Instant {
 }
 
 impl Instant {
-    const ZERO: Self = Self { counter: 0 };
+    pub const ZERO: Self = Self { counter: 0 };
+
+    pub const MAX: Self = Self { counter: u64::MAX };
 
     pub fn new(counter: u64) -> Self {
         Self { counter }
@@ -50,7 +53,13 @@ impl Instant {
     }
 }
 
-impl core::ops::Add<Duration> for Instant {
+impl Default for Instant {
+    fn default() -> Self {
+        Self::ZERO
+    }
+}
+
+impl ops::Add<Duration> for Instant {
     type Output = Self;
 
     fn add(self, rhs: Duration) -> Self::Output {
@@ -65,7 +74,13 @@ impl core::ops::Add<Duration> for Instant {
     }
 }
 
-impl core::ops::Sub<Duration> for Instant {
+impl ops::AddAssign<Duration> for Instant {
+    fn add_assign(&mut self, rhs: Duration) {
+        *self = *self + rhs;
+    }
+}
+
+impl ops::Sub<Duration> for Instant {
     type Output = Self;
 
     fn sub(self, rhs: Duration) -> Self::Output {
@@ -80,11 +95,17 @@ impl core::ops::Sub<Duration> for Instant {
     }
 }
 
-impl core::ops::Sub<Instant> for Instant {
+impl ops::Sub<Instant> for Instant {
     type Output = Duration;
 
     fn sub(self, rhs: Instant) -> Self::Output {
         self.duration_since(rhs)
+    }
+}
+
+impl ops::SubAssign<Duration> for Instant {
+    fn sub_assign(&mut self, rhs: Duration) {
+        *self = *self - rhs;
     }
 }
 

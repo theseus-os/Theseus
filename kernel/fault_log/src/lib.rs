@@ -19,6 +19,7 @@ use alloc::{
     string::{String,ToString},
     vec::Vec,
 };
+use cpu::CpuId;
 use memory::VirtualAddress;
 use irq_safety::MutexIrqSafe;
 use core::panic::PanicInfo;
@@ -86,8 +87,8 @@ pub struct FaultEntry {
     pub fault_type: FaultType,
     /// Error code returned with the exception
     pub error_code: Option<u64>,
-    /// The core error occured
-    pub core: Option<u8>,
+    /// The ID of the CPU on which the error occured.
+    pub cpu: Option<CpuId>,
     /// Task runnning immediately before the Exception
     pub running_task: Option<String>,
     /// If available the application crate that spawned the task
@@ -110,9 +111,9 @@ impl FaultEntry {
         fault_type: FaultType
     ) -> FaultEntry {
         FaultEntry {
-            fault_type: fault_type,
+            fault_type,
             error_code: None,
-            core: None,
+            cpu: None,
             running_task: None,
             running_app_crate: None,
             address_accessed: None,
@@ -141,7 +142,7 @@ fn update_and_insert_fault_entry_internal(
 ) {
 
     // Add the core the fault was detected
-    fe.core = Some(cpu::current_cpu());
+    fe.cpu = Some(cpu::current_cpu());
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
@@ -168,7 +169,7 @@ fn update_and_insert_fault_entry_internal(
     if let Some(instruction_pointer) = instruction_pointer {
         let instruction_pointer = VirtualAddress::new_canonical(instruction_pointer);
         fe.instruction_pointer = Some(instruction_pointer);
-        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer.clone(), false)
+        fe.crate_error_occured = namespace.get_crate_containing_address(instruction_pointer, false)
                                         .map(|x| x.lock_as_ref().crate_name.to_string());
     };
 
@@ -190,7 +191,7 @@ pub fn log_exception (
 ) {
     let mut fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
-    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    fe.address_accessed  = address_accessed.map(VirtualAddress::new_canonical);
     update_and_insert_fault_entry_internal(fe, Some(instruction_pointer));
 }
 

@@ -17,8 +17,5 @@ version = "0.4.8"
 [dependencies.event_types]
 path = "../event_types"
 
-[dependencies.util]
-path = "../../libs/util"
-
 [lib]
 crate-type = ["rlib"]

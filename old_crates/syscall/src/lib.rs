@@ -59,7 +59,7 @@ fn syscall_dispatcher(syscall_number: u64, arg1: u64, arg2: u64, arg3: u64, arg4
             let conn_name:  &CStr = unsafe { CStr::from_ptr(arg1 as *const c_char) }; 
             use dbus::sysrecv;
 
-            let msg: &str = &(sysrecv(conn_name));
+            let msg: &str = &sysrecv(conn_name);
             result = CString::new(msg).unwrap().as_ptr() as u64;
             //let mut i = 1;
             /*result = 0;

@@ -11,7 +11,7 @@
 
 extern crate spin;
 #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate mpmc;
 extern crate event_types;
 extern crate compositor;
@@ -112,7 +112,7 @@ impl WindowManager {
         // if it is currently actived, just return
         let first_active = match self.active.upgrade() {
             Some(current_active) => {
-                if Arc::ptr_eq(&(current_active), inner_ref) {
+                if Arc::ptr_eq(&current_active, inner_ref) {
                     return Ok(true); // do nothing
                 } else {
                     // save this to show_list
@@ -123,19 +123,11 @@ impl WindowManager {
             None => true,
         };
         
-        match self.is_window_in_show_list(&inner_ref) {
-            // remove item in current list
-            Some(i) => {
-                self.show_list.remove(i);
-            }
-            None => {}
+        if let Some(i) = self.is_window_in_show_list(inner_ref) {
+            self.show_list.remove(i);
         }
-        match self.is_window_in_hide_list(&inner_ref) {
-            // remove item in current list
-            Some(i) => {
-                self.hide_list.remove(i);
-            }
-            None => {}
+        if let Some(i) = self.is_window_in_hide_list(inner_ref) {
+            self.hide_list.remove(i);
         }
         self.active = Arc::downgrade(inner_ref);
         let area = {
@@ -143,7 +135,7 @@ impl WindowManager {
             let top_left = window.get_position();
             let (width, height) = window.get_size();          
             Rectangle {
-                top_left: top_left,
+                top_left,
                 bottom_right: top_left + (width as isize, height as isize)
             }
         };
@@ -155,28 +147,24 @@ impl WindowManager {
 
     /// Returns the index of a window if it is in the show list
     fn is_window_in_show_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
-        let mut i = 0_usize;
-        for item in self.show_list.iter() {
+        for (i, item) in self.show_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
-            i += 1;
         }
         None
     }
 
     /// Returns the index of a window if it is in the hide list
     fn is_window_in_hide_list(&mut self, window: &Arc<Mutex<WindowInner>>) -> Option<usize> {
-        let mut i = 0_usize;
-        for item in self.hide_list.iter() {
+        for (i, item) in self.hide_list.iter().enumerate() {
             if let Some(item_ptr) = item.upgrade() {
-                if Arc::ptr_eq(&(item_ptr), window) {
+                if Arc::ptr_eq(&item_ptr, window) {
                     return Some(i);
                 }
             }
-            i += 1;
         }
         None
     }
@@ -192,8 +180,8 @@ impl WindowManager {
         };
         let area = Some(
             Rectangle {
-                top_left: top_left,
-                bottom_right: bottom_right
+                top_left,
+                bottom_right
             }
         );
 
@@ -351,7 +339,7 @@ impl WindowManager {
         let coordinate = { &self.mouse };
         let mut event: MousePositionEvent = MousePositionEvent {
             coordinate: Coord::new(0, 0),
-            gcoordinate: coordinate.clone(),
+            gcoordinate: *coordinate,
             scrolling_up: mouse_event.movement.scroll_movement > 0, //TODO: might be more beneficial to save scroll_movement here
             scrolling_down: mouse_event.movement.scroll_movement < 0, //FIXME: also might be the wrong way around
             left_button_hold: mouse_event.buttons.left(),
@@ -368,10 +356,8 @@ impl WindowManager {
         if let Some(current_active) = self.active.upgrade() {
             let current_active_win = current_active.lock();
             let current_coordinate = current_active_win.get_position();
-            if current_active_win.contains(*coordinate - current_coordinate) || match current_active_win.moving {
-                WindowMovingStatus::Moving(_) => true,
-                _ => false,
-            }{
+            if current_active_win.contains(*coordinate - current_coordinate) || matches!(current_active_win.moving, WindowMovingStatus::Moving(_))
+            {
                 event.coordinate = *coordinate - current_coordinate;
                 // debug!("pass to active: {}, {}", event.x, event.y);
                 current_active_win.send_event(Event::MousePositionEvent(event))
@@ -408,12 +394,9 @@ impl WindowManager {
         new_border: Rectangle,
     ) -> Result<(), &'static str> {
         // first clear old border if exists
-        match self.repositioned_border {
-            Some(border) => {
-                let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
-                self.refresh_bottom_windows(pixels.into_iter(), true)?;
-            },
-            None =>{}
+        if let Some(border) = self.repositioned_border {
+            let pixels = self.draw_floating_border(&border, color::TRANSPARENT);
+            self.refresh_bottom_windows(pixels.into_iter(), true)?;
         }
 
         // then draw current border
@@ -437,7 +420,7 @@ impl WindowManager {
         for i in 0..(WINDOW_BORDER_SIZE) as isize {
             let width = (border.bottom_right.x - border.top_left.x) - 2 * i;
             let height = (border.bottom_right.y - border.top_left.y) - 2 * i;
-            let coordinate = border.top_left + (i as isize, i as isize);
+            let coordinate = border.top_left + (i, i);
             if width <= 0 || height <= 0 {
                 break;
             }
@@ -476,7 +459,7 @@ impl WindowManager {
                 let mut current_active_win = current_active.lock();
                 let (current_x, current_y) = {
                     let m = &self.mouse;
-                    (m.x as isize, m.y as isize)
+                    (m.x, m.y)
                 };
                 match current_active_win.moving {
                     WindowMovingStatus::Moving(base) => {
@@ -568,7 +551,7 @@ impl WindowManager {
     pub fn move_floating_border(&mut self) -> Result<(), &'static str> {
         let (new_x, new_y) = {
             let m = &self.mouse;
-            (m.x as isize, m.y as isize)
+            (m.x, m.y)
         };
         
         if let Some(current_active) = self.active.upgrade() {
@@ -716,7 +699,7 @@ fn window_manager_loop(
                             .ok_or("The static window manager was not yet initialized")?
                             .lock();
                         wm.move_mouse(
-                            Coord::new(x as isize, -(y as isize))
+                            Coord::new(x, -y)
                         )?;
                     }
                     cursor_handle_application(mouse_event.clone())?; // tell the event to application, or moving window
@@ -788,7 +771,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
             .ok_or("Couldn't find shell application file to run upon Ctrl+Alt+T")?;
         let path = Path::new(shell_objfile.lock().get_absolute_path());
         spawn::new_application_task_builder(path, Some(new_app_namespace))?
-            .name(format!("shell"))
+            .name("shell".to_string())
             .spawn()?;
 
         debug!("window_manager: spawned new shell app in new app namespace.");
@@ -808,7 +791,7 @@ fn keyboard_handle_application(key_input: KeyEvent) -> Result<(), &'static str> 
 /// handle mouse event, push it to related window or anyone asked for it
 fn cursor_handle_application(mouse_event: MouseEvent) -> Result<(), &'static str> {
     let wm = WINDOW_MANAGER.get().ok_or("The static window manager was not yet initialized")?.lock();
-    if let Err(_) = wm.pass_mouse_event_to_window(mouse_event) {
+    if wm.pass_mouse_event_to_window(mouse_event).is_err() {
         // the mouse event should be passed to the window that satisfies:
         // 1. the mouse position is currently in the window area
         // 2. the window is the top one (active window or show_list windows) under the mouse pointer

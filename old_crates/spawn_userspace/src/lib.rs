@@ -37,7 +37,7 @@ use alloc::{
 };
 use irq_safety::{MutexIrqSafe, hold_interrupts, enable_interrupts};
 use memory::{get_kernel_mmi_ref, MemoryManagementInfo, VirtualAddress};
-use task::{Task, TaskRef, get_my_current_task, RunState, TASKLIST};
+use task::{Task, TaskRef, get_my_current_task, RunState};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -191,13 +191,7 @@ pub fn spawn_userspace(path: Path, name: Option<String>) -> Result<TaskRef, &'st
     new_task.runstate = RunState::Runnable; // ready to be scheduled in
     let new_task_id = new_task.id;
 
-    let task_ref = TaskRef::new(new_task);
-    let old_task = TASKLIST.insert(new_task_id, task_ref.clone());
-    // insert should return None, because that means there was no other 
-    if old_task.is_some() {
-        error!("BUG: spawn_userspace(): TASKLIST already contained a task with the new task's ID!");
-        return Err("TASKLIST already contained a task with the new task's ID");
-    }
+    let task_ref = TaskRef::create(new_task);
     
     runqueue::add_task_to_any_runqueue(task_ref.clone())?;
 

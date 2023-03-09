@@ -62,22 +62,22 @@ const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
 /// The path of the update builds file, located at the root of the build server.
 /// This file contains the list of all update build instances available,
 /// listed in reverse chronological order (most recent builds first).
-const UPDATE_BUILDS_PATH: &'static str = "/updates.txt";
+const UPDATE_BUILDS_PATH: &str = "/updates.txt";
 
 /// The name (and relative path) of the listing file inside each update build directory,
 /// which contains the names of all crate object files that were built.  
-const LISTING_FILE_NAME: &'static str = "listing.txt";
+const LISTING_FILE_NAME: &str = "listing.txt";
 
 /// The name (and relative path) of the diff file inside each update build directory,
 /// which contains the mapping of old crates to new crates, indicating how a swap should take place. 
-pub const DIFF_FILE_NAME: &'static str = "diff.txt";
+pub const DIFF_FILE_NAME: &str = "diff.txt";
 
 /// The name of the directory containing the checksums of each crate object file
 /// inside of a given update build.
-const CHECKSUMS_DIR_NAME: &'static str = "checksums";
+const CHECKSUMS_DIR_NAME: &str = "checksums";
 
 /// The file extension that is appended onto each crate object file's checksum file.
-const CHECKSUM_FILE_EXTENSION: &'static str = ".sha512";
+const CHECKSUM_FILE_EXTENSION: &str = ".sha512";
 
 
 
@@ -126,7 +126,7 @@ pub fn download_listing(
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
-    download_string_file(iface, remote_endpoint, &format!("/{}/{}", update_build, LISTING_FILE_NAME))
+    download_string_file(iface, remote_endpoint, &format!("/{update_build}/{LISTING_FILE_NAME}"))
 }
 
 
@@ -138,7 +138,7 @@ pub fn download_diff(
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
-    download_string_file(iface, remote_endpoint, &format!("/{}/{}", update_build, DIFF_FILE_NAME))
+    download_string_file(iface, remote_endpoint, &format!("/{update_build}/{DIFF_FILE_NAME}"))
 }
 
 
@@ -159,7 +159,7 @@ fn download_string_file(
 pub fn as_lines(bytes: &[u8]) -> Result<Vec<String>, &'static str> {
     str::from_utf8(bytes)
         .map_err(|_e| "couldn't convert file into a UTF8 string")
-        .map(|files| files.lines().map(|s| String::from(s)).collect())
+        .map(|files| files.lines().map(String::from).collect())
 }
 
 
@@ -249,8 +249,8 @@ pub fn download_crates(
 
     let mut paths_to_download: Vec<String> = Vec::new();
     for file_name in crates.iter() {
-        let path = format!("/{}/{}", update_build, file_name);
-        let path_sha = format!("/{}/{}/{}{}", update_build, CHECKSUMS_DIR_NAME, file_name, CHECKSUM_FILE_EXTENSION);
+        let path = format!("/{update_build}/{file_name}");
+        let path_sha = format!("/{update_build}/{CHECKSUMS_DIR_NAME}/{file_name}{CHECKSUM_FILE_EXTENSION}");
         paths_to_download.push(path);
         paths_to_download.push(path_sha);
     }
@@ -374,7 +374,7 @@ fn download_files<S: AsRef<str>>(
                 socket.close(); 
                 socket.abort(); 
             }
-            let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
+            let _packet_io_occurred = poll_iface(iface, &mut sockets, startup_time)?;
             
             // second, create an entirely new socket and connect it
             local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
@@ -388,7 +388,7 @@ fn download_files<S: AsRef<str>>(
 
         // send the HTTP request and obtain a response
         let response = {
-            let mut connected_tcp_socket = ConnectedTcpSocket::new(&iface, &mut sockets, tcp_handle)?;
+            let mut connected_tcp_socket = ConnectedTcpSocket::new(iface, &mut sockets, tcp_handle)?;
             send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
         };
 
@@ -411,7 +411,7 @@ fn download_files<S: AsRef<str>>(
     loop {
         _loop_ctr += 1;
 
-        let _packet_io_occurred = poll_iface(&iface, &mut sockets, startup_time)?;
+        let _packet_io_occurred = poll_iface(iface, &mut sockets, startup_time)?;
 
         let mut socket = sockets.get::<TcpSocket>(tcp_handle);
         if !issued_close {
@@ -461,5 +461,5 @@ fn download_files<S: AsRef<str>>(
 /// The `hash` string must be 64 hexadecimal characters, otherwise `false` will be returned. 
 fn verify_hash(content: &[u8], hash: &str) -> bool {
     let result = Sha3_512::digest(content);
-    hash == format!("{:x}", result)
+    hash == format!("{result:x}")
 }

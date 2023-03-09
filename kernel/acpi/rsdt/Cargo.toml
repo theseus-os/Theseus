@@ -3,7 +3,7 @@ name = "rsdt"
 version = "0.1.0"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 description = "Support for ACPI RSDT and XSDT"
-
+edition = "2021"
 
 [dependencies.memory]
 path = "../../memory"
@@ -13,4 +13,3 @@ path = "../sdt"
 
 [dependencies.acpi_table]
 path = "../acpi_table"
-

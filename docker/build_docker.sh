@@ -17,12 +17,8 @@ THESEUS_BASE_DIR=$(readlink -f ${DOCKER_DIR}/.. )
 ### Always run this script with the `docker` directory as the working directory.
 cd ${DOCKER_DIR} 
 
-### Get the current required version of Rust from our rust-toolchain file
-RUSTC_VERSION=$(cat ${THESEUS_BASE_DIR}/rust-toolchain)
-
 ### Build the docker image
 docker build \
-    --build-arg RUSTC_VERSION=${RUSTC_VERSION} \
     --build-arg USER=$(id -un) \
     --build-arg UID=$(id -u) \
     --build-arg GID=$(id -g) \

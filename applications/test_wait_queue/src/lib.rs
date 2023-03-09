@@ -43,12 +43,12 @@ fn rmain() -> Result<(), &'static str> {
 
     let t1 = spawn::new_task_builder(wait_task, (wc, ready3))
         .name(String::from("wait_task"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .spawn()?;
 
     let t2 = spawn::new_task_builder(notify_task, (wc2, ready2))
         .name(String::from("notify_task"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
         
@@ -60,7 +60,7 @@ fn rmain() -> Result<(), &'static str> {
         t1.clone(),
         )
         .name(String::from("deeznutz"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 

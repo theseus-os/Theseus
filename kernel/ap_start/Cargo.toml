@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "ap_start"
 description = "High-level initialization code that runs on each AP (core) after it has booted up"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
@@ -31,8 +32,14 @@ path = "../kernel_config"
 [dependencies.apic]
 path = "../apic"
 
+[dependencies.cpu]
+path = "../cpu"
+
 [dependencies.no_drop]
 path = "../no_drop"
+
+[dependencies.early_tls]
+path = "../early_tls"
 
 [dependencies.page_attribute_table]
 path = "../page_attribute_table"

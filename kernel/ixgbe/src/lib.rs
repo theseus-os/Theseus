@@ -6,12 +6,12 @@
 //! We also disable interrupts when using virtualization, since we do not yet have support for allowing applications to register their own interrupt handlers.
 
 #![no_std]
+#![allow(clippy::type_complexity)]
 #![allow(dead_code)] //  to suppress warnings for unused functions/methods
 #![feature(abi_x86_interrupt)]
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate lazy_static;
-#[macro_use] extern crate static_assertions;
 extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
@@ -257,6 +257,7 @@ impl IxgbeNic {
     /// * `rx_buffer_size_kbytes`: The size of receive buffers. 
     /// * `num_rx_descriptors`: The number of descriptors in each receive queue.
     /// * `num_tx_descriptors`: The number of descriptors in each transmit queue.
+    #[allow(clippy::too_many_arguments)]
     pub fn init(
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
@@ -326,7 +327,7 @@ impl IxgbeNic {
         Self::clear_stats(&mapped_registers2);
 
         // store the mac address of this device
-        let mac_addr_hardware = Self::read_mac_address_from_nic(&mut mapped_registers_mac);
+        let mac_addr_hardware = Self::read_mac_address_from_nic(&mapped_registers_mac);
 
         // initialize the buffer pool
         init_rx_buf_pool(RX_BUFFER_POOL_SIZE, rx_buffer_size_kbytes as u16 * 1024, &RX_BUFFER_POOL)?;
@@ -364,7 +365,7 @@ impl IxgbeNic {
         let mut id = 0;
         while !tx_descs.is_empty() {
             let tx_queue = TxQueue {
-                id: id,
+                id,
                 regs: tx_mapped_registers.remove(0),
                 tx_descs: tx_descs.remove(0),
                 num_tx_descs: num_tx_descriptors,
@@ -663,7 +664,7 @@ impl IxgbeNic {
             let swsm = regs.swsm.read() & !(SWSM_SMBI) & !(SWSM_SWESMBI);
             regs.swsm.write(swsm);
 
-            return Ok(true);
+            Ok(true)
         }
 
         //resource is not available
@@ -808,7 +809,7 @@ impl IxgbeNic {
     fn rx_init(
         regs1: &mut IntelIxgbeRegisters1, 
         regs: &mut IntelIxgbeRegisters2, 
-        rx_regs: &mut Vec<IxgbeRxQueueRegisters>,
+        rx_regs: &mut [IxgbeRxQueueRegisters],
         num_rx_descs: u16,
         rx_buffer_size_kbytes: RxBufferSizeKiB
     ) -> Result<(
@@ -894,7 +895,7 @@ impl IxgbeNic {
     fn tx_init(
         regs: &mut IntelIxgbeRegisters2, 
         regs_mac: &mut IntelIxgbeMacRegisters, 
-        tx_regs: &mut Vec<IxgbeTxQueueRegisters>,
+        tx_regs: &mut [IxgbeTxQueueRegisters],
         num_tx_descs: u16
     ) -> Result<Vec<BorrowedSliceMappedPages<AdvancedTxDescriptor, Mutable>>, &'static str> {
         // disable transmission
@@ -1039,6 +1040,7 @@ impl IxgbeNic {
     /// * `protocol`: IP L4 protocol
     /// * `priority`: priority relative to other filters, can be from 0 (lowest) to 7 (highest)
     /// * `qid`: number of the queue to forward packet to
+    #[allow(clippy::too_many_arguments)]
     pub fn set_5_tuple_filter(
         &mut self, 
         source_ip: Option<[u8;4]>, 
@@ -1302,14 +1304,14 @@ pub enum FilterProtocol {
 pub fn rx_poll_mq(qid: usize, nic_id: PciLocation) -> Result<ReceivedFrame, &'static str> {
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();      
-    nic.rx_queues[qid as usize].poll_queue_and_store_received_packets()?;
-    let frame = nic.rx_queues[qid as usize].return_frame().ok_or("no frame")?;
+    nic.rx_queues[qid].poll_queue_and_store_received_packets()?;
+    let frame = nic.rx_queues[qid].return_frame().ok_or("no frame")?;
     Ok(frame)
 }
 
 /// A helper function to send a test packet on a nic transmit queue (only for testing purposes).
 pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer>) -> Result<(), &'static str> {
-    let packet = packet.map(Ok).unwrap_or_else(|| test_packets::create_dhcp_test_packet())?;
+    let packet = packet.map(Ok).unwrap_or_else(test_packets::create_dhcp_test_packet)?;
     let nic_ref = get_ixgbe_nic(nic_id)?;
     let mut nic = nic_ref.lock();  
 
@@ -1321,10 +1323,10 @@ pub fn tx_send_mq(qid: usize, nic_id: PciLocation, packet: Option<TransmitBuffer
 /// It returns the interrupt number for the rx queue 'qid'.
 fn rx_interrupt_handler(qid: u8, nic_id: PciLocation) -> Option<u8> {
     match get_ixgbe_nic(nic_id) {
-        Ok(ref ixgbe_nic_ref) => {
+        Ok(ixgbe_nic_ref) => {
             let mut ixgbe_nic = ixgbe_nic_ref.lock();
             let _ = ixgbe_nic.rx_queues[qid as usize].poll_queue_and_store_received_packets();
-            ixgbe_nic.interrupt_num.get(&qid).map(|int| *int)
+            ixgbe_nic.interrupt_num.get(&qid).cloned()
         }
         Err(e) => {
             error!("BUG: ixgbe_handler_{}(): {}", qid, e);

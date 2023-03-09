@@ -12,7 +12,7 @@ use boot_info::FramebufferInfo;
 static EARLY_FRAMEBUFFER: Mutex<Option<EarlyFramebuffer>> = Mutex::new(None);
 
 pub struct EarlyFramebuffer {
-    buffer: NonNull<[[u32]]>,
+    // buffer: NonNull<[[u32]]>,
     width: u32,
     height: u32,
     next_row: u32,
@@ -21,13 +21,16 @@ pub struct EarlyFramebuffer {
 impl EarlyFramebuffer {
     /// Create an `EarlyFramebuffer` based on the given `info` that describes it.
     pub fn init(info: &FramebufferInfo) -> Result<(), ()> {
-        if info.
-        EarlyFramebuffer {
-            width: info.
-        }
+        // if info.
+        // EarlyFramebuffer {
+        //     width: info.
+        // }
+
+    Err(())
     }
 }
 
+/*
 impl<'fb> EarlyFramebufferTextPrinter<'fb> {
     /// Prints a string in a framebuffer.
     /// Returns (column, line, rectangle), i.e. the position of the next symbol and an rectangle which covers the updated area.
@@ -208,6 +211,7 @@ impl<'fb> EarlyFramebufferTextPrinter<'fb> {
         }
     }
 }
+*/
 
 
 #[macro_export]
@@ -226,6 +230,6 @@ macro_rules! println_raw {
 #[doc(hidden)]
 pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
     use core::fmt::Write;
-    EARLY_VGA_WRITER.lock().write_fmt(args)
+    EARLY_FRAMEBUFFER.lock().write_fmt(args)
 }
 

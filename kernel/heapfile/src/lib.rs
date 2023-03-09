@@ -33,7 +33,7 @@ pub struct HeapFile {
 impl HeapFile {
     /// Creates a new file with empty content in the given `parent` directory. 
     /// No allocation is performed.
-    pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
+    pub fn create(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         Self::from_vec(Vec::new(), name, parent)
     }
 
@@ -41,8 +41,8 @@ impl HeapFile {
     /// No additional allocation or reallocation is performed.
     pub fn from_vec(vec: Vec<u8>, name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         let hf = HeapFile {
-            name: name, 
-            vec: vec, 
+            name, 
+            vec, 
             parent: Arc::downgrade(parent), 
         };
         let file_ref = Arc::new(Mutex::new(hf)) as FileRef;

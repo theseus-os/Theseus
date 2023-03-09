@@ -2,13 +2,16 @@
 /// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
 /// directories via the Path struct 
 // #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate spin;
 extern crate fs_node;
 extern crate root;
 
-use core::fmt;
-use core::ops::{Deref, DerefMut};
+use core::{
+    fmt,
+    fmt::Write,
+    ops::{Deref, DerefMut},
+};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -134,7 +137,7 @@ impl Path {
                 first_cmpnt = false;
             } 
             else {
-                new_path.push_str(&format!("/{component}"));
+                write!(new_path, "/{component}").expect("Failed to create new path from its components");
             }
         }
         Path::new(new_path)
@@ -177,7 +180,7 @@ impl Path {
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in comps.iter() {
-                new_path.push_str(&format!("{component}/"));
+            write!(new_path, "{component}/").expect("Failed to create new path from its components");
         }
         // Remove the trailing slash after the final path component
         new_path.pop();

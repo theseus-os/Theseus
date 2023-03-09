@@ -136,7 +136,7 @@ impl LineDiscipline {
         slave: &Channel,
     ) -> Result<()> {
         let mut canonical = self.canonical.lock().unwrap();
-        self.process_input_byte_internal(byte, master, slave, (&mut *canonical).as_mut())
+        self.process_input_byte_internal(byte, master, slave, (*canonical).as_mut())
     }
 
     fn process_input_byte_internal(
@@ -228,14 +228,14 @@ impl LineDiscipline {
     ) -> Result<()> {
         let mut canonical = self.canonical.lock().unwrap();
         for byte in buf {
-            self.process_input_byte_internal(*byte, master, slave, (&mut *canonical).as_mut())?;
+            self.process_input_byte_internal(*byte, master, slave, (*canonical).as_mut())?;
         }
         Ok(())
     }
 
     pub(crate) fn process_output_byte(&self, byte: u8, master: &Channel) -> Result<()> {
         if byte == b'\n' {
-            master.send_all(&[b'\r', b'\n'])
+            master.send_all([b'\r', b'\n'])
         } else {
             master.send(byte)
         }

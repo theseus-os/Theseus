@@ -7,7 +7,6 @@
 
 extern crate irq_safety;
 #[macro_use] extern crate log;
-#[macro_use] extern crate static_assertions;
 extern crate memory;
 extern crate spin;
 extern crate volatile;

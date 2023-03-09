@@ -52,7 +52,7 @@ pub struct InitializationSegment {
     _padding6:                  [u8; 12228],
 }
 
-const_assert_eq!(core::mem::size_of::<InitializationSegment>(), 16396);
+const _: () = assert!(core::mem::size_of::<InitializationSegment>() == 16396);
 
 impl InitializationSegment {
     /// Returns the maximum number of entries that can be in the command queue

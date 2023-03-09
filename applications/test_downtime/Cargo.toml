@@ -20,6 +20,9 @@ path = "../../kernel/scheduler"
 [dependencies.task]
 path = "../../kernel/task"
 
+[dependencies.libtest]
+path = "../../kernel/libtest"
+
 [dependencies.cpu]
 path = "../../kernel/cpu"
 
