@@ -63,8 +63,8 @@ pub fn init() -> Result<(), &'static str> {
 /// The handler for each CPU's local timer interrupt, used for preemptive task switching.
 #[cfg(target_arch = "aarch64")]
 extern "C" fn aarch64_timer_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
+    interrupts::schedule_next_timer_tick(time::Duration::from_micros(100));
     cpu_local_timer_tick_handler();
-
     interrupts::EoiBehaviour::HandlerHasSignaledEoi
 }
 

@@ -13,7 +13,7 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
 
-use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
+use time::{Duration, Monotonic, ClockSource, Instant, Period, register_clock_source};
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
@@ -86,6 +86,13 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     loop {}
 }
 
+#[inline(always)]
+fn read_timer_period_femtoseconds() -> u64 {
+    let counter_freq_hz = CNTFRQ_EL0.get();
+    let fs_in_one_sec = 1_000_000_000_000_000;
+    fs_in_one_sec / counter_freq_hz
+}
+
 /// Please call this (only once) before using this crate.
 ///
 /// This initializes the Generic Interrupt Controller
@@ -96,10 +103,7 @@ pub fn init() -> Result<(), &'static str> {
         static __exception_vector_start: extern "C" fn();
     }
 
-    let counter_freq_hz = CNTFRQ_EL0.get();
-    let fs_in_one_sec = 1_000_000_000_000_000;
-    let period_femtoseconds = fs_in_one_sec / counter_freq_hz;
-
+    let period_femtoseconds = read_timer_period_femtoseconds();
     register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
 
     let mut gic = GIC.lock();
@@ -155,6 +159,16 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
     }
 
     Ok(())
+}
+
+/// Disables the timer, schedules its next tick, and re-enables it
+pub fn schedule_next_timer_tick(delay: Duration) {
+    enable_timer(false);
+    let period_femtoseconds = read_timer_period_femtoseconds();
+    let period_nanoseconds = period_femtoseconds / 1_000_000;
+    let ticks = delay.as_nanos() / (period_nanoseconds as u128);
+    CNTP_TVAL_EL0.set(ticks.try_into().unwrap());
+    enable_timer(true);
 }
 
 /// Enables/Disables the System Timer via the dedicated Arm System Registers
