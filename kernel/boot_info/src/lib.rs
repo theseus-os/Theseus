@@ -139,6 +139,16 @@ pub struct FramebufferInfo {
     /// The format of the framebuffer and its pixels or characters.
     pub format: FramebufferFormat,
 }
+impl FramebufferInfo {
+    /// Returns `true` if the bootloader mapped the framebuffer and
+    /// can provide its virtual address.
+    ///
+    /// Returns `false` if the bootloader did not map the framebuffer and
+    /// can only provide its physical address.
+    pub fn is_mapped(&self) -> bool {
+        matches!(self.address, Address::Virtual(_))
+    }
+}
 
 /// The format of the framebuffer, in graphical pixels or text-mode characters.
 #[derive(Debug)]

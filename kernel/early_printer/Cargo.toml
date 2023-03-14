@@ -7,18 +7,11 @@ edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
+log = "0.4.8"
+volatile = "0.2.7"
 
-[dependencies.volatile]
-version = "0.2.7"
-
-[dependencies.logger_x86_64]
-path = "../logger_x86_64"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.boot_info]
-path = "../boot_info"
+boot_info = { path = "../boot_info" }
+memory = { path = "../memory" }
 
 [features]
 bios = []

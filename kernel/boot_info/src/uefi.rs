@@ -1,5 +1,5 @@
 use crate::{ElfSectionFlags, FramebufferFormat, Address};
-use bootloader_api::info;
+use uefi_bootloader_api::PixelFormat;
 use core::iter::{Iterator, Peekable};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
@@ -188,8 +188,10 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
         let uefi_fb = self.frame_buffer.as_ref()?;
         let uefi_fb_info = uefi_fb.info;
         let format = match uefi_fb_info.pixel_format {
-            info::PixelFormat::Rgb => FramebufferFormat::RgbPixel,
-            info::PixelFormat::Bgr => FramebufferFormat::BgrPixel,
+            PixelFormat::Rgb => FramebufferFormat::RgbPixel,
+            PixelFormat::Bgr => FramebufferFormat::BgrPixel,
+            // TODO: handle gop::PixelFormat::Bitmask and BltOnly in `uefi-bootloader` and `uefi-bootloader-api`
+            /*
             info::PixelFormat::U8  => FramebufferFormat::Grayscale,
             info::PixelFormat::Unknown {
                 red_position,
@@ -205,12 +207,14 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
                 blue_size_in_bits: 8,
             },
             _ => return None,
+            */
         };
         Some(crate::FramebufferInfo {
-            address: Address::Virtual(
-                VirtualAddress::new_canonical(uefi_fb.buffer().as_ptr() as usize)
+            // TODO FIXME: not sure about this, it seems to be a virtual address, not physical
+            address: Address::Physical(
+                PhysicalAddress::new_canonical(uefi_fb.start)
             ),
-            total_size_in_bytes: uefi_fb_info.byte_len as u64,
+            total_size_in_bytes: uefi_fb_info.size as u64,
             width: uefi_fb_info.width as u32,
             height: uefi_fb_info.height as u32,
             bits_per_pixel: (uefi_fb_info.bytes_per_pixel * 8) as u8,

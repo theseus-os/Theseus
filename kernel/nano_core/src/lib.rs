@@ -15,6 +15,7 @@
 
 #![no_std]
 #![no_main]
+#![feature(let_chains)]
 #![feature(naked_functions)]
 
 extern crate panic_entry;
@@ -122,18 +123,22 @@ where
 
     // Temp test: dump out framebuffer info from bootloader
     log::warn!("Framebuffer info: {:#X?}", boot_info.framebuffer_info());
-    unsafe {
-        let fb_info = boot_info.framebuffer_info().unwrap();
-        let addr = match fb_info.address {
-            boot_info::Address::Virtual(vaddr)   => vaddr.value(),
-            boot_info::Address::Physical(_paddr) => todo!("support framebuffer physical address via early Mapper"),
-        };
+
+    // If the bootloader already mapped the framebuffer for us, the we can use it now
+    // before initializing the memory mgmt subsystem.
+    let framebuffer_info = boot_info.framebuffer_info();
+    if let Some(ref fb_info) = framebuffer_info && fb_info.is_mapped() {
         let total_pixel_count = fb_info.total_size_in_bytes / (fb_info.bits_per_pixel / 8) as u64;
-        let addr = addr as *mut u32;
+        let boot_info::Address::Virtual(vaddr) = fb_info.address else { unreachable!() };
+        let addr = vaddr.value() as *mut u32;
         let first_half = (total_pixel_count*2/4) as isize;
         for offset in 0 .. first_half {
-            core::ptr::write(addr.offset(offset), 0xa742f5);
+            unsafe {
+                core::ptr::write(addr.offset(offset), 0xa742f5);
+            }
         }
+
+        early_printer::init(fb_info)?;
     }
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
@@ -147,10 +152,20 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    #[cfg(target_arch = "aarch64")]
-    logger_aarch64::init().unwrap();
+    // If the bootloader did not map the framebuffer for us, then we must map it ourselves,
+    // which we can do now after after initializing the memory mgmt subsystem.
+    if let Some(ref fb_info) = framebuffer_info && !fb_info.is_mapped() {
+        early_printer::init(fb_info)?;
+    }
+
+
+    #[cfg(target_arch = "aarch64")] {
+        logger_aarch64::init()?;
+        log::info!("Initialized logger_aarch64");
+    }
 
     println_raw!("nano_core(): initialized memory subsystem.");
+
 
     state_store::init();
     log::trace!("state_store initialized.");

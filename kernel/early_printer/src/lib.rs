@@ -4,30 +4,107 @@
 
 #![no_std]
 
-use core::fmt;
-use core::ptr::NonNull;
+use core::{fmt, slice, ops::{Deref, DerefMut}};
+use memory::{BorrowedSliceMappedPages, Mutable, PteFlags};
 use spin::Mutex;
-use boot_info::FramebufferInfo;
+use boot_info::{FramebufferInfo, Address};
 
 static EARLY_FRAMEBUFFER: Mutex<Option<EarlyFramebuffer>> = Mutex::new(None);
 
+/// Initializes a simple graphical framebuffer for early text printing.
+///
+/// # Usage
+/// There are two cases in which this function can be called:
+/// 1. If the given framebuffer info provides the framebuffer's virtual address,
+///    then the bootloader has already mapped the framebuffer for us.
+///    * In this case, this function can be called *before* the memory subsystem
+///      has been initialized.
+/// 2. If the given framebuffer info provides a framebuffer's physical address,
+///    then the bootloader has not mapped anything for us, and thus this function
+///    will attempt to allocate and map a new virtual address to that framebuffer.
+///    * In this case, this function can only be called *after* the memory subsystem
+///      has been initialized.
+pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
+    log::info!("EarlyFramebuffer::init(): {:?}", info);
+
+    if EARLY_FRAMEBUFFER.lock().is_some() {
+        return Err("The early framebuffer printer has already been initialized");
+    }
+
+    let fb_pixel_count = (info.stride * info.height) as usize;
+    let fb_byte_count  = info.bits_per_pixel as usize * fb_pixel_count;
+
+    let fb_memory = match info.address {
+        Address::Virtual(vaddr) => {
+            // SAFETY: we have no alternative but to trust the bootloader-provided address.
+            let slc = unsafe {
+                slice::from_raw_parts_mut(vaddr.value() as *mut _, fb_pixel_count)
+            };
+            FramebufferMemory::Slice(slc)
+        }
+        Address::Physical(paddr) => {
+            let kernel_mmi = memory::get_kernel_mmi_ref().ok_or(
+                "BUG: early framebuffer printer cannot map framebuffer's \
+                physical address before the memory subsystem is initialized."
+            )?;
+            let frames = memory::allocate_frames_by_bytes_at(paddr, fb_byte_count)
+                .map_err(|_| "couldn't allocate frames for early framebuffer printer")?;
+            let pages = memory::allocate_pages(frames.size_in_frames())
+                .ok_or("couldn't allocate pages for early framebuffer printer")?;
+            let mp = kernel_mmi.lock().page_table.map_allocated_pages_to(
+                pages,
+                frames,
+                PteFlags::new().valid(true).writable(true).device_memory(true)
+            )?;
+            FramebufferMemory::Mapping(
+                mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
+            )
+        }
+    };
+
+    let early_fb = EarlyFramebuffer {
+        fb: fb_memory,
+        width: info.width,
+        height: info.height,
+        stride: info.stride,
+        next_row: 0,
+        next_col: 0,
+    };
+
+    *EARLY_FRAMEBUFFER.lock() = Some(early_fb);
+
+    Ok(())
+}
+
+enum FramebufferMemory {
+    Slice(&'static mut [u32]),
+    Mapping(BorrowedSliceMappedPages<u32, Mutable>),
+}
+impl Deref for FramebufferMemory {
+    type Target = [u32];
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Slice(slc) => slc,
+            Self::Mapping(bmp) => bmp.deref(),
+        }
+    }
+}
+impl DerefMut for FramebufferMemory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            Self::Slice(slc) => slc,
+            Self::Mapping(bmp) => bmp.deref_mut(),
+        }
+    }
+}
+
 pub struct EarlyFramebuffer {
-    // buffer: NonNull<[[u32]]>,
+    fb: FramebufferMemory,
     width: u32,
     height: u32,
+    stride: u32,
     next_row: u32,
     next_col: u32,
-}
-impl EarlyFramebuffer {
-    /// Create an `EarlyFramebuffer` based on the given `info` that describes it.
-    pub fn init(info: &FramebufferInfo) -> Result<(), ()> {
-        // if info.
-        // EarlyFramebuffer {
-        //     width: info.
-        // }
-
-    Err(())
-    }
 }
 
 /*
@@ -229,7 +306,9 @@ macro_rules! println_raw {
 
 #[doc(hidden)]
 pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
-    use core::fmt::Write;
-    EARLY_FRAMEBUFFER.lock().write_fmt(args)
+    todo!("EarlyPrinter::print_args_raw!() is unimplemented");
+
+    // use core::fmt::Write;
+    // EARLY_FRAMEBUFFER.lock().write_fmt(args)
 }
 
