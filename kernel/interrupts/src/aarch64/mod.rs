@@ -8,12 +8,13 @@ use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
+use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
 
-use time::{Duration, Monotonic, ClockSource, Instant, Period, register_clock_source};
+use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
@@ -162,11 +163,11 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 }
 
 /// Disables the timer, schedules its next tick, and re-enables it
-pub fn schedule_next_timer_tick(delay: Duration) {
+pub fn schedule_next_timer_tick() {
     enable_timer(false);
     let period_femtoseconds = read_timer_period_femtoseconds();
-    let period_nanoseconds = period_femtoseconds / 1_000_000;
-    let ticks = delay.as_nanos() / (period_nanoseconds as u128);
+    let period_microseconds = period_femtoseconds / 1_000_000_000;
+    let ticks = CONFIG_TIMESLICE_PERIOD_MICROSECONDS / (period_microseconds as u32);
     CNTP_TVAL_EL0.set(ticks.try_into().unwrap());
     enable_timer(true);
 }

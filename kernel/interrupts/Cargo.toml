@@ -13,6 +13,7 @@ cpu = { path = "../cpu" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+kernel_config = { path = "../kernel_config" }
 gic = { path = "../gic" }
 tock-registers = "0.7.0"
 cortex-a = "7.5.0"
