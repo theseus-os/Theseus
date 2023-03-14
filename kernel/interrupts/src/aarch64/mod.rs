@@ -13,6 +13,7 @@ use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
+use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
@@ -21,6 +22,9 @@ global_asm!(include_str!("table.s"));
 
 // The global Generic Interrupt Controller singleton
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
+
+// The global Generic Interrupt Controller singleton
+static TICK_PERIOD_FEMTOSECS: Once<u64> = Once::new();
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -91,7 +95,9 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
 fn read_timer_period_femtoseconds() -> u64 {
     let counter_freq_hz = CNTFRQ_EL0.get();
     let fs_in_one_sec = 1_000_000_000_000_000;
-    fs_in_one_sec / counter_freq_hz
+    let period_femtoseconds = fs_in_one_sec / counter_freq_hz;
+    TICK_PERIOD_FEMTOSECS.call_once(|| period_femtoseconds);
+    period_femtoseconds
 }
 
 /// Please call this (only once) before using this crate.
@@ -165,10 +171,11 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 /// Disables the timer, schedules its next tick, and re-enables it
 pub fn schedule_next_timer_tick() {
     enable_timer(false);
-    let period_femtoseconds = read_timer_period_femtoseconds();
-    let period_microseconds = period_femtoseconds / 1_000_000_000;
-    let ticks = CONFIG_TIMESLICE_PERIOD_MICROSECONDS / (period_microseconds as u32);
-    CNTP_TVAL_EL0.set(ticks.try_into().unwrap());
+    let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
+    let tick_period_femtosecs = TICK_PERIOD_FEMTOSECS.get()
+        .expect("please call interrupts::init before enabling the timer!");
+    let ticks = timeslice_femtosecs / tick_period_femtosecs;
+    CNTP_TVAL_EL0.set(ticks);
     enable_timer(true);
 }
 
