@@ -23,7 +23,7 @@ global_asm!(include_str!("table.s"));
 // The global Generic Interrupt Controller singleton
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
-// The global Generic Interrupt Controller singleton
+// The number of femtoseconds between each internal timer tick
 static TICK_PERIOD_FEMTOSECS: Once<u64> = Once::new();
 
 /// The IRQ number reserved for CPU-local timer interrupts,
