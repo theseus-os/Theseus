@@ -121,23 +121,10 @@ where
     let rsdp_address = boot_info.rsdp();
     println_raw!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
-    // Temp test: dump out framebuffer info from bootloader
-    log::warn!("Framebuffer info: {:#X?}", boot_info.framebuffer_info());
-
     // If the bootloader already mapped the framebuffer for us, the we can use it now
     // before initializing the memory mgmt subsystem.
     let framebuffer_info = boot_info.framebuffer_info();
     if let Some(ref fb_info) = framebuffer_info && fb_info.is_mapped() {
-        let total_pixel_count = fb_info.total_size_in_bytes / (fb_info.bits_per_pixel / 8) as u64;
-        let boot_info::Address::Virtual(vaddr) = fb_info.address else { unreachable!() };
-        let addr = vaddr.value() as *mut u32;
-        let first_half = (total_pixel_count*2/4) as isize;
-        for offset in 0 .. first_half {
-            unsafe {
-                core::ptr::write(addr.offset(offset), 0xa742f5);
-            }
-        }
-
         early_printer::init(fb_info)?;
     }
 
