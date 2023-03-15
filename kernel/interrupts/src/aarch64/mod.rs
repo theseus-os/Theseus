@@ -92,12 +92,12 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
 }
 
 #[inline(always)]
-fn read_timer_period_femtoseconds() -> u64 {
-    let counter_freq_hz = CNTFRQ_EL0.get();
-    let fs_in_one_sec = 1_000_000_000_000_000;
-    let period_femtoseconds = fs_in_one_sec / counter_freq_hz;
-    TICK_PERIOD_FEMTOSECS.call_once(|| period_femtoseconds);
-    period_femtoseconds
+fn read_timer_period_femtoseconds() -> u64 { 
+    *TICK_PERIOD_FEMTOSECS.call_once(|| {
+        let counter_freq_hz = CNTFRQ_EL0.get();
+        let fs_in_one_sec = 1_000_000_000_000_000;
+        fs_in_one_sec / counter_freq_hz
+    })
 }
 
 /// Please call this (only once) before using this crate.
