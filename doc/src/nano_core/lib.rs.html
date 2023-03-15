@@ -280,25 +280,38 @@
 <a href="#280" id="280">280</a>
 <a href="#281" id="281">281</a>
 <a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
-//! 
+//!
 //! The `nano_core` is very simple, and only does the following things:
-//! 
 //! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
-//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
+//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`] as a final step.
 //! 4. That&#39;s it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
 //! In general, you shouldn&#39;t ever need to change `nano_core`. 
 //! That&#39;s because `nano_core` doesn&#39;t contain any specific program logic, 
 //! it just sets up an initial environment so that other subsystems can run.
-//! 
+//!
 //! If you want to change how the OS starts up and which systems it initializes, 
-//! you should change the code in the [`captain`](../captain/index.html) crate instead.
-//! 
+//! you should change the code in the [`captain`] crate instead.
 
 </span><span class="attr">#![no_std]
 #![no_main]
+#![feature(let_chains)]
 #![feature(naked_functions)]
 
 </span><span class="kw">extern crate </span>panic_entry;
@@ -356,13 +369,12 @@
     </span><span class="macro">panic!</span>(<span class="string">&quot;{}&quot;</span>, msg);
 }
 
-<span class="doccomment">/// Early setup that must be done prior to loading the boot information.
+<span class="doccomment">/// Early setup that should be done before bootloader information is available.
 ///
 /// This involves:
-/// 1. Setting up logging
-/// 2. Dumping basic information about the Theseus build
-/// 3. Initialising early exceptions
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+/// 1. Setting up an early logger.
+/// 2. Dumping basic information about the Theseus build.
+/// 3. Initializing early exception handlers.
 </span><span class="kw">fn </span>early_setup(early_double_fault_stack_top: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     irq_safety::disable_interrupts();
     <span class="macro">println_raw!</span>(<span class="string">&quot;Entered early_setup(). Interrupts disabled.&quot;</span>);
@@ -371,7 +383,7 @@
         serial_port_basic::SerialPortAddress::COM1,
     )];
     logger_x86_64::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialise early logging&quot;</span>)<span class="question-mark">?</span>;
+        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialize early logging&quot;</span>)<span class="question-mark">?</span>;
     <span class="macro">log::info!</span>(<span class="string">&quot;initialized early logger&quot;</span>);
     <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized early logger.&quot;</span>);
 
@@ -405,6 +417,13 @@
     <span class="kw">let </span>rsdp_address = boot_info.rsdp();
     <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
 
+    <span class="comment">// If the bootloader already mapped the framebuffer for us, the we can use it now
+    // before initializing the memory mgmt subsystem.
+    </span><span class="kw">let </span>framebuffer_info = boot_info.framebuffer_info();
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>fb_info) = framebuffer_info &amp;&amp; fb_info.is_mapped() {
+        early_printer::init(fb_info)<span class="question-mark">?</span>;
+    }
+
     <span class="comment">// init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     </span><span class="kw">let </span>(
         kernel_mmi_ref,
@@ -416,10 +435,19 @@
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)<span class="question-mark">?</span>;
 
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span>logger_aarch64::init().unwrap();
+    <span class="comment">// If the bootloader did not map the framebuffer for us, then we must map it ourselves,
+    // which we can do now after after initializing the memory mgmt subsystem.
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>fb_info) = framebuffer_info &amp;&amp; !fb_info.is_mapped() {
+        early_printer::init(fb_info)<span class="question-mark">?</span>;
+    }
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        logger_aarch64::init()<span class="question-mark">?</span>;
+        <span class="macro">log::info!</span>(<span class="string">&quot;Initialized logger_aarch64&quot;</span>);
+    }
 
     <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized memory subsystem.&quot;</span>);
+
 
     state_store::init();
     <span class="macro">log::trace!</span>(<span class="string">&quot;state_store initialized.&quot;</span>);

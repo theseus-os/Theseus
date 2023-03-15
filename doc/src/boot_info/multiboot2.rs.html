@@ -227,6 +227,11 @@
 <a href="#227" id="227">227</a>
 <a href="#228" id="228">228</a>
 <a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
 </pre><pre class="rust"><code><span class="kw">use crate</span>::{ElfSectionFlags, ReservedMemoryRegion};
 <span class="kw">use </span>core::{cmp, iter::Iterator};
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
@@ -455,6 +460,11 @@
             .next()
             .ok_or(<span class="string">&quot;no stack section&quot;</span>)
     }
+
+    <span class="kw">fn </span>framebuffer_info(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw">crate</span>::FramebufferInfo&gt; {
+        <span class="comment">// TODO
+        </span><span class="prelude-val">None
+    </span>}
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="boot_info" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

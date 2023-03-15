@@ -1034,30 +1034,6 @@
 <a href="#1034" id="1034">1034</a>
 <a href="#1035" id="1035">1035</a>
 <a href="#1036" id="1036">1036</a>
-<a href="#1037" id="1037">1037</a>
-<a href="#1038" id="1038">1038</a>
-<a href="#1039" id="1039">1039</a>
-<a href="#1040" id="1040">1040</a>
-<a href="#1041" id="1041">1041</a>
-<a href="#1042" id="1042">1042</a>
-<a href="#1043" id="1043">1043</a>
-<a href="#1044" id="1044">1044</a>
-<a href="#1045" id="1045">1045</a>
-<a href="#1046" id="1046">1046</a>
-<a href="#1047" id="1047">1047</a>
-<a href="#1048" id="1048">1048</a>
-<a href="#1049" id="1049">1049</a>
-<a href="#1050" id="1050">1050</a>
-<a href="#1051" id="1051">1051</a>
-<a href="#1052" id="1052">1052</a>
-<a href="#1053" id="1053">1053</a>
-<a href="#1054" id="1054">1054</a>
-<a href="#1055" id="1055">1055</a>
-<a href="#1056" id="1056">1056</a>
-<a href="#1057" id="1057">1057</a>
-<a href="#1058" id="1058">1058</a>
-<a href="#1059" id="1059">1059</a>
-<a href="#1060" id="1060">1060</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 </span><span class="kw">extern crate </span>spin;
 
@@ -2094,29 +2070,5 @@
         <span class="number">0x00</span>,
     ],
 ];
-
-<span class="comment">// /// The font mask array.
-// /// FONT_PIXEL[ascii][y][x] = 0xFFFFFFFF/0x00000000 in which `ascii` is the ASCII code of a character, and (x, y) represents its coordinate.
-// pub static FONT_PIXEL: Mutex&lt;[[[u32; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]&gt; =
-//     Mutex::new([[[0; CHARACTER_WIDTH]; CHARACTER_HEIGHT]; 256]);
-
-// /// Initializes the font bitmaps array.
-// pub fn init() -&gt; Result&lt;(), &amp;&#39;static str&gt; {
-//     let mut fonts_locked = FONT_PIXEL.lock();
-//     let fonts = fonts_locked.deref_mut();
-
-//     for index in 0..FONT_BASIC.len() {
-//         for y in 0..CHARACTER_HEIGHT {
-//             let char_font = FONT_BASIC[index][y] as u64;
-//             for x in 0..CHARACTER_WIDTH {
-//                 if char_font &amp; (0x80 &gt;&gt; x) != 0 {
-//                     fonts[index][y][x + 1] = 0xFFFFFFFF;
-//                 }
-//             }
-//         }
-//     }
-
-//     Ok(())
-// }
-</span></code></pre></div>
+</code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="font" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

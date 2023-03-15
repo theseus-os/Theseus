@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["init","Initializes a simple graphical framebuffer for early text printing."]],"macro":[["print",""],["println",""]],"struct":[["EarlyFramebufferPrinter","A text printer for writing characters to an early graphical framebuffer."]]};

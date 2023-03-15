@@ -23,12 +23,12 @@
 <span class="kw">use </span>memory::VirtualAddress;
 
 <span class="attr">#[no_mangle]
-</span><span class="kw">pub extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_entry(boot_info: usize, double_fault_stack: usize) {
+</span><span class="kw">pub extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_entry(boot_info_vaddr: usize, double_fault_stack: usize) {
     <span class="macro">try_exit!</span>(early_setup(double_fault_stack));
-    <span class="kw">if </span>VirtualAddress::new(boot_info).is_none() {
+    <span class="kw">if </span>VirtualAddress::new(boot_info_vaddr).is_none() {
         shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;multiboot2 info address invalid&quot;</span>));
     }
-    <span class="kw">let </span>boot_info = <span class="kw">match unsafe </span>{ multiboot2::load(boot_info) } {
+    <span class="kw">let </span>boot_info = <span class="kw">match unsafe </span>{ multiboot2::load(boot_info_vaddr) } {
         <span class="prelude-val">Ok</span>(i) =&gt; i,
         <span class="prelude-val">Err</span>(e) =&gt; shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;failed to load multiboot 2 info: {e:?}&quot;</span>)),
     };

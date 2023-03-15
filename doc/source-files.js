@@ -38,6 +38,7 @@ var sourcesIndex = JSON.parse('{\
 "dmar":["",[],["device_scope.rs","drhd.rs","lib.rs"]],\
 "dreadnought":["",[],["lib.rs","task.rs","time.rs"]],\
 "e1000":["",[],["lib.rs","regs.rs","test_e1000_driver.rs"]],\
+"early_printer":["",[],["lib.rs"]],\
 "early_tls":["",[],["lib.rs"]],\
 "environment":["",[],["lib.rs"]],\
 "ethernet_smoltcp_device":["",[],["lib.rs"]],\
