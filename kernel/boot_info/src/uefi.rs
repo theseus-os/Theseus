@@ -1,4 +1,5 @@
-use crate::ElfSectionFlags;
+use crate::{ElfSectionFlags, FramebufferFormat, Address};
+use uefi_bootloader_api::PixelFormat;
 use core::iter::{Iterator, Peekable};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
@@ -181,5 +182,44 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
 
     fn stack_size(&self) -> Result<usize, &'static str> {
         Ok(STACK_SIZE)
+    }
+
+    fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
+        let uefi_fb = self.frame_buffer.as_ref()?;
+        let uefi_fb_info = uefi_fb.info;
+        let format = match uefi_fb_info.pixel_format {
+            PixelFormat::Rgb => FramebufferFormat::RgbPixel,
+            PixelFormat::Bgr => FramebufferFormat::BgrPixel,
+            // TODO: handle gop::PixelFormat::Bitmask and BltOnly in `uefi-bootloader` and `uefi-bootloader-api`
+            /*
+            info::PixelFormat::U8  => FramebufferFormat::Grayscale,
+            info::PixelFormat::Unknown {
+                red_position,
+                green_position,
+                blue_position,
+            } => FramebufferFormat::CustomPixel {
+                // each pixel is 8 bits
+                red_bit_position: red_position,
+                red_size_in_bits: 8,
+                green_bit_position: green_position,
+                green_size_in_bits: 8,
+                blue_bit_position: blue_position,
+                blue_size_in_bits: 8,
+            },
+            _ => return None,
+            */
+        };
+        Some(crate::FramebufferInfo {
+            // TODO FIXME: not sure about this, it seems to be a virtual address, not physical
+            address: Address::Physical(
+                PhysicalAddress::new_canonical(uefi_fb.start)
+            ),
+            total_size_in_bytes: uefi_fb_info.size as u64,
+            width: uefi_fb_info.width as u32,
+            height: uefi_fb_info.height as u32,
+            bits_per_pixel: (uefi_fb_info.bytes_per_pixel * 8) as u8,
+            stride: uefi_fb_info.stride as u32,
+            format,
+        })
     }
 }

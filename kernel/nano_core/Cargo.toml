@@ -25,6 +25,7 @@ panic_entry = { path = "../panic_entry" }
 memory_initialization = { path = "../memory_initialization" }
 boot_info = { path = "../boot_info" }
 captain = { path = "../captain" }
+early_printer = { path = "../early_printer" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }

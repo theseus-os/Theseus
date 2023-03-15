@@ -1,22 +1,21 @@
 //! The aptly-named tiny crate containing the first OS code to run.
-//! 
+//!
 //! The `nano_core` is very simple, and only does the following things:
-//! 
 //! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
-//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`](../captain/fn.init.html) as a final step.
+//! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`] as a final step.
 //! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
 //! In general, you shouldn't ever need to change `nano_core`. 
 //! That's because `nano_core` doesn't contain any specific program logic, 
 //! it just sets up an initial environment so that other subsystems can run.
-//! 
+//!
 //! If you want to change how the OS starts up and which systems it initializes, 
-//! you should change the code in the [`captain`](../captain/index.html) crate instead.
-//! 
+//! you should change the code in the [`captain`] crate instead.
 
 #![no_std]
 #![no_main]
+#![feature(let_chains)]
 #![feature(naked_functions)]
 
 extern crate panic_entry;
@@ -74,13 +73,12 @@ fn shutdown(msg: core::fmt::Arguments) -> ! {
     panic!("{}", msg);
 }
 
-/// Early setup that must be done prior to loading the boot information.
+/// Early setup that should be done before bootloader information is available.
 ///
 /// This involves:
-/// 1. Setting up logging
-/// 2. Dumping basic information about the Theseus build
-/// 3. Initialising early exceptions
-#[cfg(target_arch = "x86_64")]
+/// 1. Setting up an early logger.
+/// 2. Dumping basic information about the Theseus build.
+/// 3. Initializing early exception handlers.
 fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
     irq_safety::disable_interrupts();
     println_raw!("Entered early_setup(). Interrupts disabled.");
@@ -89,7 +87,7 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
         serial_port_basic::SerialPortAddress::COM1,
     )];
     logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|_| "failed to initialise early logging")?;
+        .map_err(|_| "failed to initialize early logging")?;
     log::info!("initialized early logger");
     println_raw!("early_setup(): initialized early logger.");
 
@@ -123,6 +121,13 @@ where
     let rsdp_address = boot_info.rsdp();
     println_raw!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
+    // If the bootloader already mapped the framebuffer for us, the we can use it now
+    // before initializing the memory mgmt subsystem.
+    let framebuffer_info = boot_info.framebuffer_info();
+    if let Some(ref fb_info) = framebuffer_info && fb_info.is_mapped() {
+        early_printer::init(fb_info)?;
+    }
+
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
         kernel_mmi_ref,
@@ -134,10 +139,19 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    #[cfg(target_arch = "aarch64")]
-    logger_aarch64::init().unwrap();
+    // If the bootloader did not map the framebuffer for us, then we must map it ourselves,
+    // which we can do now after after initializing the memory mgmt subsystem.
+    if let Some(ref fb_info) = framebuffer_info && !fb_info.is_mapped() {
+        early_printer::init(fb_info)?;
+    }
+
+    #[cfg(target_arch = "aarch64")] {
+        logger_aarch64::init()?;
+        log::info!("Initialized logger_aarch64");
+    }
 
     println_raw!("nano_core(): initialized memory subsystem.");
+
 
     state_store::init();
     log::trace!("state_store initialized.");

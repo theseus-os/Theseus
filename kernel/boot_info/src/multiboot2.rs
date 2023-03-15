@@ -226,4 +226,9 @@ impl crate::BootInformation for multiboot2::BootInformation {
             .next()
             .ok_or("no stack section")
     }
+
+    fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
+        // TODO
+        None
+    }
 }

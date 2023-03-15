@@ -54,9 +54,20 @@ macro_rules! print_raw {
 #[macro_export]
 macro_rules! print_raw {
     ($($arg:tt)*) => ({
-        // to silence warnings about unused variables
-        let _ = format_args!($($arg)*);
+        // If we didn't boot from BIOS, there is no VGA screen,
+        // so just write directly to the logger.
+        // As with `VgaBuffer::write_str()`, here we write *directly* to the logger sink
+        // instead of using the `log` crate's macros, which could cause an
+        // infinite loop when mirror_to_serial is enabled.
+        let _ = $crate::logger_write_fmt(format_args!("[*] {}", format_args!($($arg)*)));
     });
+}
+
+/// A stub for non-BIOS builds to send `print_raw!()` args to the `logger` crate.
+#[cfg(not(feature = "bios"))]
+#[doc(hidden)]
+pub fn logger_write_fmt(args: fmt::Arguments) -> fmt::Result {
+    logger::write_fmt(args)
 }
 
 #[macro_export]
