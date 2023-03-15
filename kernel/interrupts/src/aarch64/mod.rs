@@ -172,8 +172,7 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 pub fn schedule_next_timer_tick() {
     enable_timer(false);
     let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
-    let tick_period_femtosecs = TICK_PERIOD_FEMTOSECS.get()
-        .expect("please call interrupts::init before enabling the timer!");
+    let tick_period_femtosecs = read_timer_period_femtoseconds();
     let ticks = timeslice_femtosecs / tick_period_femtosecs;
     CNTP_TVAL_EL0.set(ticks);
     enable_timer(true);
