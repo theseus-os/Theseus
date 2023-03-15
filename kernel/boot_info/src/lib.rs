@@ -87,6 +87,7 @@ pub struct ReservedMemoryRegion {
     pub len: usize,
 }
 
+/// A physical or virtual address.
 pub enum Address {
     Physical(PhysicalAddress),
     Virtual(VirtualAddress),
