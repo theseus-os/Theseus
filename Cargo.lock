@@ -961,6 +961,7 @@ name = "early_printer"
 version = "0.1.0"
 dependencies = [
  "boot_info",
+ "font",
  "log",
  "memory",
  "spin 0.9.4",

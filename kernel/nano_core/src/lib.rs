@@ -158,7 +158,6 @@ where
         early_printer::init(fb_info)?;
     }
 
-
     #[cfg(target_arch = "aarch64")] {
         logger_aarch64::init()?;
         log::info!("Initialized logger_aarch64");

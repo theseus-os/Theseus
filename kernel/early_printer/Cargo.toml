@@ -11,6 +11,7 @@ log = "0.4.8"
 volatile = "0.2.7"
 
 boot_info = { path = "../boot_info" }
+font = { path = "../font" }
 memory = { path = "../memory" }
 
 [features]

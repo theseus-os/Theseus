@@ -1,15 +1,24 @@
-//! A basic ASCII text printer for displaying text on the screen during early boot.
+//! A basic ASCII text printer for displaying text on a graphical framebuffer during early boot.
 //!
-//! Does not support scrolling, cursors, colors, or any other advanced features.
+//! Does not support user scrolling, cursors, or any other advanced terminal features.
 
 #![no_std]
 
-use core::{fmt, slice, ops::{Deref, DerefMut}};
+use core::{fmt::{self, Write}, slice, ops::{Deref, DerefMut}};
+use boot_info::{FramebufferInfo, Address};
+use font::FONT_BASIC;
 use memory::{BorrowedSliceMappedPages, Mutable, PteFlags};
 use spin::Mutex;
-use boot_info::{FramebufferInfo, Address};
 
-static EARLY_FRAMEBUFFER: Mutex<Option<EarlyFramebuffer>> = Mutex::new(None);
+/// The height in pixels that each character occupies, not including any padding.
+const CHARACTER_HEIGHT: u32 = font::CHARACTER_HEIGHT as u32;
+/// The width in pixels that each character occupies, including 1 pixel of padding.
+const CHARACTER_WIDTH: u32 = font::CHARACTER_WIDTH as u32;
+/// The width in pixels that each character occupies, excluding padding.
+const GLPYH_WIDTH: u32 = CHARACTER_WIDTH - 1;
+
+/// The system-wide framebuffer for early text printing.
+static EARLY_FRAMEBUFFER_PRINTER: Mutex<Option<EarlyFramebufferPrinter>> = Mutex::new(None);
 
 /// Initializes a simple graphical framebuffer for early text printing.
 ///
@@ -27,7 +36,7 @@ static EARLY_FRAMEBUFFER: Mutex<Option<EarlyFramebuffer>> = Mutex::new(None);
 pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
     log::info!("EarlyFramebuffer::init(): {:?}", info);
 
-    if EARLY_FRAMEBUFFER.lock().is_some() {
+    if EARLY_FRAMEBUFFER_PRINTER.lock().is_some() {
         return Err("The early framebuffer printer has already been initialized");
     }
 
@@ -62,20 +71,18 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
         }
     };
 
-    let early_fb = EarlyFramebuffer {
+    let early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
         width: info.width,
         height: info.height,
         stride: info.stride,
-        next_row: 0,
-        next_col: 0,
+        curr_pixel: PixelCoord { x: 0, y: 0 },
     };
-
-    *EARLY_FRAMEBUFFER.lock() = Some(early_fb);
-
+    *EARLY_FRAMEBUFFER_PRINTER.lock() = Some(early_fb);
     Ok(())
 }
 
+/// An abstraction over the underlying framebuffer memory that derefs into a slice of pixels.
 enum FramebufferMemory {
     Slice(&'static mut [u32]),
     Mapping(BorrowedSliceMappedPages<u32, Mutable>),
@@ -98,217 +105,144 @@ impl DerefMut for FramebufferMemory {
     }
 }
 
-pub struct EarlyFramebuffer {
+/// A 2-D coordinate into the framebuffer's pixel array,
+/// in which `(0,0)` is the top left corner.
+#[derive(Copy, Clone)]
+struct PixelCoord {
+    x: u32,
+    y: u32,
+}
+
+/// A text printer for writing characters to an early graphical framebuffer.
+pub struct EarlyFramebufferPrinter {
+    /// The underlying framebuffer memory, accessible as a slice of pixels.
     fb: FramebufferMemory,
+    /// The width in pixels of the framebuffer.
     width: u32,
+    /// The height in pixels of the framebuffer.
     height: u32,
+    /// The stride in pixels of the framebuffer.
     stride: u32,
-    next_row: u32,
-    next_col: u32,
+    /// The current pixel coordinate where the next character will be printed.
+    curr_pixel: PixelCoord,
 }
 
-/*
-impl<'fb> EarlyFramebufferTextPrinter<'fb> {
-    /// Prints a string in a framebuffer.
-    /// Returns (column, line, rectangle), i.e. the position of the next symbol and an rectangle which covers the updated area.
-    /// A block item (index, width) represents the index of line number and the width of charaters in this line as pixels. It can be viewed as a framebuffer block which is described in the `framebuffer_compositor` crate.
-    /// # Arguments
-    /// * `framebuffer`: the framebuffer to display in.
-    /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the framebuffer.
-    /// * `width`, `height`: the size of the text block in number of pixels.
-    /// * `slice`: the string to display.
-    /// * `fg_pixel`: the value of pixels in the foreground.
-    /// * `bg_pixel` the value of pixels in the background.
-    /// * `column`, `line`: the location of the text in the text block in number of characters.
-    pub fn print_string<P: Pixel>(
-        framebuffer: &mut Framebuffer<P>,
-        coordinate: Coord,
-        width: usize,
-        height: usize,
-        slice: &str,
-        fg_pixel: P,
-        bg_pixel: P,
-        column: usize,
-        line: usize,
-    ) -> (usize, usize, Rectangle) {
-        let buffer_width = width / CHARACTER_WIDTH;
-        let buffer_height = height / CHARACTER_HEIGHT;
-        let (x, y) = (coordinate.x, coordinate.y);
-
-        let mut curr_line = line;
-        let mut curr_column = column;
-
-        let top_left = Coord::new(0, (curr_line * CHARACTER_HEIGHT) as isize);
-
-        for byte in slice.bytes() {
-            if byte == b'\n' {
-                let mut blank = Rectangle {
-                    top_left: Coord::new(
-                        coordinate.x + (curr_column * CHARACTER_WIDTH) as isize,
-                        coordinate.y + (curr_line * CHARACTER_HEIGHT) as isize,
-                    ),
-                    bottom_right: Coord::new(
-                        coordinate.x + width as isize,
-                        coordinate.y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-                    )
-                };
-                // fill the remaining blank of current line and go to the next line
-                fill_blank(
-                    framebuffer,
-                    &mut blank,
-                    bg_pixel,
-                );
-                curr_column = 0;
-                curr_line += 1;
-                if curr_line == buffer_height {
-                    break;
-                }
-            } else {
-                if curr_column == buffer_width {
-                    curr_column = 0;
-                    curr_line += 1;
-                    if curr_line == buffer_height {
-                        break;
-                    }
-                }
-                // print the next character
-                print_ascii_character(
-                    framebuffer,
-                    byte,
-                    fg_pixel,
-                    bg_pixel,
-                    coordinate,
-                    curr_column,
-                    curr_line,
-                );
-                curr_column += 1;
-            }
-        }  
-
-        let mut blank = Rectangle {
-            top_left: Coord::new(
-                x + (curr_column * CHARACTER_WIDTH) as isize,
-                y + (curr_line * CHARACTER_HEIGHT) as isize,
-            ),
-            bottom_right: Coord::new(
-                x + width as isize,
-                y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-            )
-        };
-        // fill the blank of the last line
-        fill_blank(
-            framebuffer,
-            &mut blank,
-            bg_pixel,
-        );
-
-        let bottom_right = Coord::new(
-            (buffer_width * CHARACTER_WIDTH) as isize, 
-            ((curr_line + 1) * CHARACTER_HEIGHT) as isize
-        );
-
-        let update_area = Rectangle {
-            top_left: top_left,
-            bottom_right: bottom_right,
-        };
-
-        // fill the blank of the remaining part
-        blank = Rectangle {
-            top_left: Coord::new(
-                x,
-                y + ((curr_line + 1) * CHARACTER_HEIGHT) as isize,
-            ),
-            bottom_right: Coord::new(
-                x + width as isize,
-                y + height as isize,
-            )
-        };
-        fill_blank(
-            framebuffer,
-            &mut blank,
-            bg_pixel,
-        );
-
-        // return the position of next symbol and updated blocks.
-        (curr_column, curr_line, update_area)
-    }
-
-    /// Prints a character to the framebuffer at position (line, column) of all characters in the text area.
-    /// # Arguments
-    /// * `framebuffer`: the framebuffer to display in.
-    /// * `character`: the ASCII code of the character to display.
-    /// * `fg_pixel`: the value of every pixel in the character.
-    /// * `bg_color`: the value of every pixel in the background.
-    /// * `coordinate`: the left top coordinate of the text block relative to the origin(top-left point) of the framebuffer.
-    /// * `column`, `line`: the location of the character in the text block as symbols.
-    pub fn print_ascii_character<P: Pixel>(
-        framebuffer: &mut Framebuffer<P>,
-        character: ASCII,
-        fg_pixel: P,
-        bg_pixel: P,
-        coordinate: Coord,
-        column: usize,
-        line: usize,
+impl EarlyFramebufferPrinter {
+    /// Prints the given character to the current location in this framebuffer.
+    pub fn print_char(
+        &mut self,
+        ch: char,
+        foreground_pixel_color: u32,
+        background_pixel_color: u32,
     ) {
-        let start = coordinate + ((column * CHARACTER_WIDTH) as isize, (line * CHARACTER_HEIGHT) as isize);
-        if !framebuffer.overlaps_with(start, CHARACTER_WIDTH, CHARACTER_HEIGHT) {
-            return
+        if ch == '\n' {
+            return self.newline(background_pixel_color);
         }
-        // print from the offset within the framebuffer
-        let (buffer_width, buffer_height) = framebuffer.get_size();
-        let off_set_x: usize = if start.x < 0 { -(start.x) as usize } else { 0 };
-        let off_set_y: usize = if start.y < 0 { -(start.y) as usize } else { 0 };    
-        let mut j = off_set_x;
-        let mut i = off_set_y;
-        loop {
-            let coordinate = start + (j as isize, i as isize);
-            if framebuffer.contains(coordinate) {
-                let pixel = if j >= 1 {
-                    // leave 1 pixel gap between two characters
-                    let index = j - 1;
-                    let char_font = font::FONT_BASIC[character as usize][i];
-                    if get_bit(char_font, index) != 0 {
-                        fg_pixel
-                    } else {
-                        bg_pixel
-                    }
-                } else {
-                    bg_pixel
+
+        let ascii = if ch.is_ascii() { ch as u8 } else { b'?' };
+        let glyph = &FONT_BASIC[ascii as usize];
+
+        for (row_bits, row) in glyph.into_iter().zip(0u32..) {
+            // Copy each row of the font glyph to the framebuffer in a single action
+            let mut pixel_row: [u32; CHARACTER_WIDTH as usize] = [background_pixel_color; CHARACTER_WIDTH as usize];
+            for (pixel, col) in pixel_row.iter_mut().zip(0 .. GLPYH_WIDTH) {
+                if (row_bits & (0x80 >> col)) != 0 {
+                    *pixel = foreground_pixel_color;
                 };
-                framebuffer.draw_pixel(coordinate, pixel);
             }
-            j += 1;
-            if j == CHARACTER_WIDTH || start.x + j as isize == buffer_width as isize {
-                i += 1;
-                if i == CHARACTER_HEIGHT || start.y + i as isize == buffer_height as isize {
-                    return
-                }
-                j = off_set_x;
-            }
+            let start_idx = (self.curr_pixel.y + row) * self.stride + self.curr_pixel.x;
+            let fb_row_range = start_idx as usize .. (start_idx + CHARACTER_WIDTH) as usize;
+            self.fb[fb_row_range].copy_from_slice(&pixel_row);
+        }
+
+        self.advance_by_one_char(background_pixel_color);
+    }
+
+    /// Advances the current pixel location by one character, wrapping to the next line if needed.
+    fn advance_by_one_char(&mut self, background_pixel_color: u32) {
+        let next_col = self.curr_pixel.x + CHARACTER_WIDTH;
+        if next_col >= self.width {
+            return self.newline(background_pixel_color);
+        }
+
+        self.curr_pixel.x = next_col;
+    }
+
+    /// Advances the current pixel location to the start of the next line, scrolling if needed.
+    fn newline(&mut self, background_pixel_color: u32) {
+        // Fill the rest of the current row starting from the current column.
+        self.fill_character_line(self.curr_pixel, background_pixel_color);
+
+        self.curr_pixel.x = 0;
+        let next_row = self.curr_pixel.y + CHARACTER_HEIGHT;
+        if next_row >= self.height {
+            return self.scroll(background_pixel_color);
+        }
+
+        self.curr_pixel.y = next_row;
+    }
+
+    /// Scrolls the text on screen by one line.
+    fn scroll(&mut self, background_pixel_color: u32) {
+        let start_of_line_two = CHARACTER_HEIGHT * self.stride;
+        let end_of_last_line = self.height * self.stride;
+        self.fb.copy_within(
+            start_of_line_two as usize .. end_of_last_line as usize,
+            0,
+        );
+        let start_of_last_line = self.height - CHARACTER_HEIGHT;
+        self.curr_pixel = PixelCoord { x: 0, y: start_of_last_line };
+        self.fill_character_line(self.curr_pixel, background_pixel_color);
+    }
+
+    /// Fills a full character line;s worth of pixels from the `start_pixel` coordinate
+    /// with the given `background_pixel_color`.
+    ///
+    /// Does not advance or otherwise modify the current pixel location.
+    fn fill_character_line(
+        &mut self,
+        start_pixel: PixelCoord,
+        background_pixel_color: u32,
+    ) {
+        let row_remainder_len = self.width - start_pixel.x;
+        for row in 0 .. CHARACTER_HEIGHT {
+            let start_idx = (start_pixel.y + row) * self.stride + start_pixel.x;
+            let end_idx = start_idx + row_remainder_len;
+            self.fb[start_idx as usize .. end_idx as usize].fill(background_pixel_color);
         }
     }
 }
-*/
 
+impl Write for EarlyFramebufferPrinter {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        pub const BLUE: u32 = 0x0000FF;
+        pub const LIGHT_GRAY: u32 = 0xD3D3D3;
+
+        for ch in s.chars() {
+            self.print_char(ch, BLUE, LIGHT_GRAY);
+        }
+        Ok(())
+    }
+}
 
 #[macro_export]
-macro_rules! print_raw {
+macro_rules! print {
     ($($arg:tt)*) => ({
         let _ = $crate::print_args_raw(format_args!($($arg)*));
     });
 }
 
 #[macro_export]
-macro_rules! println_raw {
-    ($fmt:expr) => ($crate::print_raw!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::print_raw!(concat!($fmt, "\n"), $($arg)*));
+macro_rules! println {
+    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
+    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
 }
 
 #[doc(hidden)]
 pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
-    todo!("EarlyPrinter::print_args_raw!() is unimplemented");
-
-    // use core::fmt::Write;
-    // EARLY_FRAMEBUFFER.lock().write_fmt(args)
+    if let Some(early_fb) = EARLY_FRAMEBUFFER_PRINTER.lock().as_mut() {
+        early_fb.write_fmt(args)
+    } else {
+        Ok(())
+    }
 }
-
