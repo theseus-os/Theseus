@@ -246,6 +246,37 @@
 <a href="#246" id="246">246</a>
 <a href="#247" id="247">247</a>
 <a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for displaying text on a graphical framebuffer during early boot.
 //!
 //! Does not support user scrolling, cursors, or any other advanced terminal features.
@@ -253,9 +284,9 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, slice, ops::{Deref, DerefMut}};
-<span class="kw">use </span>boot_info::{FramebufferInfo, Address};
+<span class="kw">use </span>boot_info::{FramebufferInfo, Address, FramebufferFormat};
 <span class="kw">use </span>font::FONT_BASIC;
-<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags};
+<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress};
 <span class="kw">use </span>spin::Mutex;
 
 <span class="doccomment">/// The height in pixels that each character occupies, not including any padding.
@@ -282,29 +313,32 @@
 ///    * In this case, this function can only be called *after* the memory subsystem
 ///      has been initialized.
 </span><span class="kw">pub fn </span>init(info: <span class="kw-2">&amp;</span>FramebufferInfo) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="macro">log::info!</span>(<span class="string">&quot;EarlyFramebuffer::init(): {:?}&quot;</span>, info);
-
-    <span class="kw">if </span>EARLY_FRAMEBUFFER_PRINTER.lock().is_some() {
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;The early framebuffer printer has already been initialized&quot;</span>);
+    <span class="kw">if </span><span class="macro">matches!</span>(info.format, FramebufferFormat::TextCharacter) {
+        <span class="macro">log::debug!</span>(<span class="string">&quot;Skipping `early_printer::init()` for text-mode VGA&quot;</span>);
+        <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
-
+    <span class="macro">log::info!</span>(<span class="string">&quot;early_printer::init(): {:?}&quot;</span>, info);
     <span class="kw">let </span>fb_pixel_count = (info.stride * info.height) <span class="kw">as </span>usize;
-    <span class="kw">let </span>fb_byte_count  = info.bits_per_pixel <span class="kw">as </span>usize * fb_pixel_count;
 
-    <span class="kw">let </span>fb_memory = <span class="kw">match </span>info.address {
+    <span class="kw">let </span>(fb_paddr, fb_memory) = <span class="kw">match </span>info.address {
         Address::Virtual(vaddr) =&gt; {
+            <span class="kw">let </span>paddr = memory::translate(vaddr)
+                .ok_or(<span class="string">&quot;BUG: bootloader-provided framebuffer virtual address was not mapped!&quot;</span>)<span class="question-mark">?</span>;
             <span class="comment">// SAFETY: we have no alternative but to trust the bootloader-provided address.
             </span><span class="kw">let </span>slc = <span class="kw">unsafe </span>{
                 slice::from_raw_parts_mut(vaddr.value() <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>, fb_pixel_count)
             };
-            FramebufferMemory::Slice(slc)
+            (
+                paddr,
+                FramebufferMemory::Slice(slc),
+            )
         }
         Address::Physical(paddr) =&gt; {
             <span class="kw">let </span>kernel_mmi = memory::get_kernel_mmi_ref().ok_or(
                 <span class="string">&quot;BUG: early framebuffer printer cannot map framebuffer&#39;s \
                 physical address before the memory subsystem is initialized.&quot;
             </span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>frames = memory::allocate_frames_by_bytes_at(paddr, fb_byte_count)
+            <span class="kw">let </span>frames = memory::allocate_frames_by_bytes_at(paddr, info.total_size_in_bytes <span class="kw">as </span>usize)
                 .map_err(|<span class="kw">_</span>| <span class="string">&quot;couldn&#39;t allocate frames for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">let </span>pages = memory::allocate_pages(frames.size_in_frames())
                 .ok_or(<span class="string">&quot;couldn&#39;t allocate pages for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
@@ -313,21 +347,33 @@
                 frames,
                 PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>)
             )<span class="question-mark">?</span>;
-            FramebufferMemory::Mapping(
-                mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).map_err(|(_mp, s)| s)<span class="question-mark">?
-            </span>)
+            (
+                paddr,
+                FramebufferMemory::Mapping(
+                    mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).map_err(|(_mp, s)| s)<span class="question-mark">?
+                </span>),
+            )
         }
     };
 
     <span class="kw">let </span>early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
+        paddr: fb_paddr,
         width: info.width,
         height: info.height,
         stride: info.stride,
+        format: info.format,
         curr_pixel: PixelCoord { x: <span class="number">0</span>, y: <span class="number">0 </span>},
     };
     <span class="kw-2">*</span>EARLY_FRAMEBUFFER_PRINTER.lock() = <span class="prelude-val">Some</span>(early_fb);
     <span class="prelude-val">Ok</span>(())
+}
+
+<span class="doccomment">/// De-initializes and returns the early graphical framebuffer,
+/// allowing it to be re-used elsewhere.
+</span><span class="attr">#[doc(alias(<span class="string">&quot;deinit&quot;</span>, <span class="string">&quot;clean up&quot;</span>))]
+</span><span class="kw">pub fn </span>take() -&gt; <span class="prelude-ty">Option</span>&lt;EarlyFramebufferPrinter&gt; {
+    EARLY_FRAMEBUFFER_PRINTER.lock().take()
 }
 
 <span class="doccomment">/// An abstraction over the underlying framebuffer memory that derefs into a slice of pixels.
@@ -365,17 +411,29 @@
 </span><span class="kw">pub struct </span>EarlyFramebufferPrinter {
     <span class="doccomment">/// The underlying framebuffer memory, accessible as a slice of pixels.
     </span>fb: FramebufferMemory,
+    <span class="doccomment">/// The starting physical address of the framebuffer.
+    </span><span class="kw">pub </span>paddr: PhysicalAddress,
     <span class="doccomment">/// The width in pixels of the framebuffer.
-    </span>width: u32,
+    </span><span class="kw">pub </span>width: u32,
     <span class="doccomment">/// The height in pixels of the framebuffer.
-    </span>height: u32,
+    </span><span class="kw">pub </span>height: u32,
     <span class="doccomment">/// The stride in pixels of the framebuffer.
-    </span>stride: u32,
+    </span><span class="kw">pub </span>stride: u32,
+    <span class="doccomment">/// The format of this framebuffer.
+    </span><span class="kw">pub </span>format: FramebufferFormat,
     <span class="doccomment">/// The current pixel coordinate where the next character will be printed.
     </span>curr_pixel: PixelCoord,
 }
 
 <span class="kw">impl </span>EarlyFramebufferPrinter {
+    <span class="doccomment">/// Returns the memory mapping for the underlying framebuffer, allowing it to be reused.
+    </span><span class="kw">pub fn </span>into_mapping(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;BorrowedSliceMappedPages&lt;u32, Mutable&gt;&gt; {
+        <span class="kw">match </span><span class="self">self</span>.fb {
+            FramebufferMemory::Mapping(m) =&gt; <span class="prelude-val">Some</span>(m),
+            <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
+        }
+    }
+
     <span class="doccomment">/// Prints the given character to the current location in this framebuffer.
     </span><span class="kw">pub fn </span>print_char(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
@@ -473,14 +531,18 @@
     }
 }
 
-<span class="attr">#[macro_export]
+<span class="doccomment">/// Prints the formatted output to the early framebuffer writer,
+/// if it has been initialized.
+</span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>print {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
         <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
-<span class="attr">#[macro_export]
+<span class="doccomment">/// Prints the formatted output with an appended newline (&#39;\n&#39;)
+/// to the early framebuffer writer, if it has been initialized.
+</span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>println {
     (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
     (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));

@@ -203,6 +203,13 @@
 <a href="#203" id="203">203</a>
 <a href="#204" id="204">204</a>
 <a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate defines a `Framebuffer` structure, which is effectively a region of memory
 //! that is interpreted as a 2-D array of pixels.
 
@@ -215,31 +222,38 @@
 <span class="kw">use </span>shapes::Coord;
 <span class="kw">pub use </span>pixel::<span class="kw-2">*</span>;
 
-<span class="doccomment">/// Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
+<span class="doccomment">/// Initializes the final framebuffer based on graphics mode info obtained during boot.
 /// 
-/// The final framebuffer represents the actual pixel content displayed on screen 
-/// because its memory is directly mapped to the VESA display device&#39;s underlying physical memory.
+/// The final framebuffer represents the actual pixel content displayed on screen,
+/// as its memory is directly mapped to the display device&#39;s underlying physical memory.
 </span><span class="kw">pub fn </span>init&lt;P: Pixel&gt;() -&gt; <span class="prelude-ty">Result</span>&lt;Framebuffer&lt;P&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">// get the graphic mode information
-    </span><span class="kw">let </span>graphic_info = multicore_bringup::get_graphic_info()
+    <span class="comment">// Attempt to get the below 3 items of graphic mode info.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>width_height_paddr: <span class="prelude-ty">Option</span>&lt;(usize, usize, PhysicalAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="comment">// Take possession of the early framebuffer and obtain graphic info from it.
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(early_fb) = early_printer::take() {
+        width_height_paddr = <span class="prelude-val">Some</span>((
+            early_fb.width <span class="kw">as </span>usize,
+            early_fb.height <span class="kw">as </span>usize,
+            early_fb.paddr,
+        ));
+        <span class="comment">// Here: the early framebuffer&#39;s underlying mapping is dropped.
+    </span>}
+
+    <span class="comment">// If we booted up other CPUs, we may have switched to a better graphics mode.
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(gi) = multicore_bringup::get_graphic_info() {
+        <span class="kw">let </span>paddr = PhysicalAddress::new(gi.physical_address() <span class="kw">as </span>usize)
+            .ok_or(<span class="string">&quot;Graphic mode physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>width = gi.width() <span class="kw">as </span>usize;
+        <span class="kw">let </span>height = gi.height() <span class="kw">as </span>usize;
+        width_height_paddr = <span class="prelude-val">Some</span>((width, height, paddr));
+    }
+    
+    <span class="kw">let </span>(width, height, paddr) = width_height_paddr
         .ok_or(<span class="string">&quot;Failed to get graphic mode information!&quot;</span>)<span class="question-mark">?</span>;
-
-    <span class="kw">let </span>vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() <span class="kw">as </span>usize)
-        .ok_or(<span class="string">&quot;Graphic mode physical address was invalid&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>buffer_width = graphic_info.width() <span class="kw">as </span>usize;
-    <span class="kw">let </span>buffer_height = graphic_info.height() <span class="kw">as </span>usize;
     <span class="macro">info!</span>(<span class="string">&quot;Graphical framebuffer info: {} x {}, at paddr {:#X}&quot;</span>,
-        graphic_info.width(),
-        graphic_info.height(),
-        graphic_info.physical_address(),
+        width, height, paddr,
     );
-
-    <span class="comment">// create and return the final framebuffer
-    </span>Framebuffer::new(
-        buffer_width,
-        buffer_height,
-        <span class="prelude-val">Some</span>(vesa_display_phys_start),
-    )
+    Framebuffer::new(width, height, <span class="prelude-val">Some</span>(paddr))
 }
 
 <span class="doccomment">/// A framebuffer is a region of memory interpreted as a 2-D array of pixels.

@@ -325,8 +325,8 @@
         </span><span class="kw">if </span>!<span class="self">self</span>.frames.contains(<span class="kw-2">&amp;</span>first_frame) {
             <span class="comment">// Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
             </span><span class="kw">let </span>_orig_mp = core::mem::replace(<span class="kw-2">&amp;mut </span><span class="self">self</span>.mapped_pages, MappedPages::empty());
-            <span class="macro">trace!</span>(<span class="string">&quot;[0] Dropping original {:?}&quot;</span>, _orig_mp);
-            drop(_orig_mp);
+            <span class="comment">// trace!(&quot;[0] Dropping original {:?}&quot;, _orig_mp);
+            </span>drop(_orig_mp);
 
             <span class="kw">let </span>new_frames = <span class="self">self</span>.frames.to_extended(first_frame);
             <span class="kw">let </span>new_pages = allocate_pages(new_frames.size_in_frames())

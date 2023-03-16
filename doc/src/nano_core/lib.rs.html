@@ -294,13 +294,16 @@
 <a href="#294" id="294">294</a>
 <a href="#295" id="295">295</a>
 <a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //!
 //! The `nano_core` is very simple, and only does the following things:
 //! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
 //! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`] as a final step.
-//! 4. That&#39;s it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
+//!
+//! That&#39;s it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
 //! In general, you shouldn&#39;t ever need to change `nano_core`. 
 //! That&#39;s because `nano_core` doesn&#39;t contain any specific program logic, 
@@ -435,10 +438,11 @@
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)<span class="question-mark">?</span>;
 
-    <span class="comment">// If the bootloader did not map the framebuffer for us, then we must map it ourselves,
-    // which we can do now after after initializing the memory mgmt subsystem.
-    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>fb_info) = framebuffer_info &amp;&amp; !fb_info.is_mapped() {
+    <span class="comment">// Now that we initialized the memory subsystem, we can map an early framebuffer
+    // for basic graphical text output.
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>fb_info) = framebuffer_info {
         early_printer::init(fb_info)<span class="question-mark">?</span>;
+        <span class="macro">early_printer::println!</span>(<span class="string">&quot;Hello from early printer! This is currently not fully utilized.&quot;</span>);
     }
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{

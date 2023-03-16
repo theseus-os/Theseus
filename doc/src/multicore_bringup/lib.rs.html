@@ -838,7 +838,7 @@
     }
 
     <span class="comment">// Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
-    </span>{
+    </span><span class="kw">if </span>ap_count != <span class="number">0 </span>{
         <span class="kw">let </span>graphic_info = trampoline_mapped_pages
             .as_type::&lt;GraphicInfo&gt;(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)<span class="question-mark">?</span>;
         <span class="macro">info!</span>(<span class="string">&quot;Obtained graphic info from real mode: {:?}&quot;</span>, graphic_info);

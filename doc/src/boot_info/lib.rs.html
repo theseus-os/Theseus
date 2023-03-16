@@ -394,7 +394,7 @@
 }
 
 <span class="doccomment">/// The format of the framebuffer, in graphical pixels or text-mode characters.
-</span><span class="attr">#[derive(Debug)]
+</span><span class="attr">#[derive(Clone, Copy, Debug)]
 </span><span class="kw">pub enum </span>FramebufferFormat {
     <span class="doccomment">/// The format of a pixel is `[Pad] &lt;Red&gt; &lt;Green&gt; &lt;Blue&gt;`,
     /// in which `&lt;Blue&gt;` occupies the least significant bits.
