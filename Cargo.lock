@@ -1166,6 +1166,7 @@ name = "framebuffer"
 version = "0.1.0"
 dependencies = [
  "color",
+ "early_printer",
  "log",
  "memory",
  "multicore_bringup",

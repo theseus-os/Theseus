@@ -4,7 +4,8 @@
 //! 1. Bootstraps the OS after the bootloader is finished, and initializes simple things like logging.
 //! 2. Establishes a simple virtual memory subsystem so that other modules can be loaded.
 //! 3. Loads the core library module, the `captain` module, and then calls [`captain::init()`] as a final step.
-//! 4. That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
+//!
+//! That's it! Once `nano_core` gives complete control to the `captain`, it takes no other actions.
 //!
 //! In general, you shouldn't ever need to change `nano_core`. 
 //! That's because `nano_core` doesn't contain any specific program logic, 
@@ -139,10 +140,11 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    // If the bootloader did not map the framebuffer for us, then we must map it ourselves,
-    // which we can do now after after initializing the memory mgmt subsystem.
-    if let Some(ref fb_info) = framebuffer_info && !fb_info.is_mapped() {
+    // Now that we initialized the memory subsystem, we can map an early framebuffer
+    // for basic graphical text output.
+    if let Some(ref fb_info) = framebuffer_info {
         early_printer::init(fb_info)?;
+        early_printer::println!("Hello from early printer! This is currently not fully utilized.");
     }
 
     #[cfg(target_arch = "aarch64")] {

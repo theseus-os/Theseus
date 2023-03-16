@@ -76,7 +76,7 @@ impl AcpiTables {
         if !self.frames.contains(&first_frame) {
             // Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
             let _orig_mp = core::mem::replace(&mut self.mapped_pages, MappedPages::empty());
-            trace!("[0] Dropping original {:?}", _orig_mp);
+            // trace!("[0] Dropping original {:?}", _orig_mp);
             drop(_orig_mp);
 
             let new_frames = self.frames.to_extended(first_frame);

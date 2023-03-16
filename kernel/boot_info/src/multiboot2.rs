@@ -1,7 +1,8 @@
-use crate::{ElfSectionFlags, ReservedMemoryRegion};
+use crate::{Address, ElfSectionFlags, ReservedMemoryRegion, FramebufferFormat};
 use core::{cmp, iter::Iterator};
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
+use multiboot2::FramebufferField;
 
 impl<'a> crate::MemoryRegion for &'a multiboot2::MemoryArea {
     fn start(&self) -> PhysicalAddress {
@@ -228,7 +229,35 @@ impl crate::BootInformation for multiboot2::BootInformation {
     }
 
     fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
-        // TODO
-        None
+        let fb_tag = self.framebuffer_tag()?;
+        let width  = fb_tag.width;
+        let height = fb_tag.height;
+        let bits_per_pixel = fb_tag.bpp;
+        let bytes_per_pixel = (bits_per_pixel as u32) / 8;
+        let stride = fb_tag.pitch / bytes_per_pixel;
+
+        let format = match fb_tag.buffer_type {
+            multiboot2::FramebufferType::RGB {
+                red:   FramebufferField { position: 0,  size: 8 },
+                green: FramebufferField { position: 8,  size: 8 },
+                blue:  FramebufferField { position: 16, size: 8 },
+            } => FramebufferFormat::BgrPixel,
+            multiboot2::FramebufferType::RGB {
+                red:   FramebufferField { position: 16, size: 8 },
+                green: FramebufferField { position: 8,  size: 8 },
+                blue:  FramebufferField { position: 0,  size: 8 },
+            } => FramebufferFormat::RgbPixel,
+            multiboot2::FramebufferType::Text => FramebufferFormat::TextCharacter,
+            _ => return None,
+        };
+        Some(crate::FramebufferInfo {
+            address: Address::Physical(PhysicalAddress::new_canonical(fb_tag.address as usize)),
+            total_size_in_bytes: (stride * height * bytes_per_pixel) as u64,
+            width,
+            height,
+            bits_per_pixel: fb_tag.bpp,
+            stride,
+            format,
+        })
     }
 }
