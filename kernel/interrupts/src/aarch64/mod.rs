@@ -23,9 +23,6 @@ global_asm!(include_str!("table.s"));
 // The global Generic Interrupt Controller singleton
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
-// The number of femtoseconds between each internal timer tick
-static TICK_PERIOD_FEMTOSECS: Once<u64> = Once::new();
-
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
 //
@@ -91,12 +88,20 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     loop {}
 }
 
-#[inline(always)]
-fn read_timer_period_femtoseconds() -> u64 { 
-    *TICK_PERIOD_FEMTOSECS.call_once(|| {
-        let counter_freq_hz = CNTFRQ_EL0.get();
-        let fs_in_one_sec = 1_000_000_000_000_000;
-        fs_in_one_sec / counter_freq_hz
+fn read_timer_period_femtoseconds() -> u64 {
+    let counter_freq_hz = CNTFRQ_EL0.get();
+    let fs_in_one_sec = 1_000_000_000_000_000;
+    fs_in_one_sec / counter_freq_hz
+}
+
+fn get_timeslice_ticks() -> u64 {
+    // The number of femtoseconds between each internal timer tick
+    static TIMESLICE_TICKS: Once<u64> = Once::new();
+
+    *TIMESLICE_TICKS.call_once(|| {
+        let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
+        let tick_period_femtosecs = read_timer_period_femtoseconds();
+        timeslice_femtosecs / tick_period_femtosecs
     })
 }
 
@@ -171,10 +176,7 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 /// Disables the timer, schedules its next tick, and re-enables it
 pub fn schedule_next_timer_tick() {
     enable_timer(false);
-    let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
-    let tick_period_femtosecs = read_timer_period_femtoseconds();
-    let ticks = timeslice_femtosecs / tick_period_femtosecs;
-    CNTP_TVAL_EL0.set(ticks);
+    CNTP_TVAL_EL0.set(get_timeslice_ticks());
     enable_timer(true);
 }
 
