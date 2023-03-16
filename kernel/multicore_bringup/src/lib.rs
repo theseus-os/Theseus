@@ -330,7 +330,7 @@ pub fn handle_ap_cores(
     }
 
     // Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
-    {
+    if ap_count != 0 {
         let graphic_info = trampoline_mapped_pages
             .as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
         info!("Obtained graphic info from real mode: {:?}", graphic_info);

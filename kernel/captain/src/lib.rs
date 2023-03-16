@@ -173,11 +173,6 @@ pub fn init(
         info!("Initialized per-core heaps");
     }
 
-    #[cfg(feature = "uefi")] {
-        log::error!("uefi boot cannot proceed as it is not fully implemented");
-        loop {}
-    }
-
     // Initialize the window manager, and also the PAT, if available.
     // The PAT supports write-combining caching of graphics video memory for better performance
     // and must be initialized explicitly on every CPU, 

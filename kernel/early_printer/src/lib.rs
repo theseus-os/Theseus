@@ -5,9 +5,9 @@
 #![no_std]
 
 use core::{fmt::{self, Write}, slice, ops::{Deref, DerefMut}};
-use boot_info::{FramebufferInfo, Address};
+use boot_info::{FramebufferInfo, Address, FramebufferFormat};
 use font::FONT_BASIC;
-use memory::{BorrowedSliceMappedPages, Mutable, PteFlags};
+use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress};
 use spin::Mutex;
 
 /// The height in pixels that each character occupies, not including any padding.
@@ -34,29 +34,32 @@ static EARLY_FRAMEBUFFER_PRINTER: Mutex<Option<EarlyFramebufferPrinter>> = Mutex
 ///    * In this case, this function can only be called *after* the memory subsystem
 ///      has been initialized.
 pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
-    log::info!("EarlyFramebuffer::init(): {:?}", info);
-
-    if EARLY_FRAMEBUFFER_PRINTER.lock().is_some() {
-        return Err("The early framebuffer printer has already been initialized");
+    if matches!(info.format, FramebufferFormat::TextCharacter) {
+        log::debug!("Skipping `early_printer::init()` for text-mode VGA");
+        return Ok(());
     }
-
+    log::info!("early_printer::init(): {:?}", info);
     let fb_pixel_count = (info.stride * info.height) as usize;
-    let fb_byte_count  = info.bits_per_pixel as usize * fb_pixel_count;
 
-    let fb_memory = match info.address {
+    let (fb_paddr, fb_memory) = match info.address {
         Address::Virtual(vaddr) => {
+            let paddr = memory::translate(vaddr)
+                .ok_or("BUG: bootloader-provided framebuffer virtual address was not mapped!")?;
             // SAFETY: we have no alternative but to trust the bootloader-provided address.
             let slc = unsafe {
                 slice::from_raw_parts_mut(vaddr.value() as *mut _, fb_pixel_count)
             };
-            FramebufferMemory::Slice(slc)
+            (
+                paddr,
+                FramebufferMemory::Slice(slc),
+            )
         }
         Address::Physical(paddr) => {
             let kernel_mmi = memory::get_kernel_mmi_ref().ok_or(
                 "BUG: early framebuffer printer cannot map framebuffer's \
                 physical address before the memory subsystem is initialized."
             )?;
-            let frames = memory::allocate_frames_by_bytes_at(paddr, fb_byte_count)
+            let frames = memory::allocate_frames_by_bytes_at(paddr, info.total_size_in_bytes as usize)
                 .map_err(|_| "couldn't allocate frames for early framebuffer printer")?;
             let pages = memory::allocate_pages(frames.size_in_frames())
                 .ok_or("couldn't allocate pages for early framebuffer printer")?;
@@ -65,21 +68,33 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
                 frames,
                 PteFlags::new().valid(true).writable(true).device_memory(true)
             )?;
-            FramebufferMemory::Mapping(
-                mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
+            (
+                paddr,
+                FramebufferMemory::Mapping(
+                    mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
+                ),
             )
         }
     };
 
     let early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
+        paddr: fb_paddr,
         width: info.width,
         height: info.height,
         stride: info.stride,
+        format: info.format,
         curr_pixel: PixelCoord { x: 0, y: 0 },
     };
     *EARLY_FRAMEBUFFER_PRINTER.lock() = Some(early_fb);
     Ok(())
+}
+
+/// De-initializes and returns the early graphical framebuffer,
+/// allowing it to be re-used elsewhere.
+#[doc(alias("deinit", "clean up"))]
+pub fn take() -> Option<EarlyFramebufferPrinter> {
+    EARLY_FRAMEBUFFER_PRINTER.lock().take()
 }
 
 /// An abstraction over the underlying framebuffer memory that derefs into a slice of pixels.
@@ -117,17 +132,29 @@ struct PixelCoord {
 pub struct EarlyFramebufferPrinter {
     /// The underlying framebuffer memory, accessible as a slice of pixels.
     fb: FramebufferMemory,
+    /// The starting physical address of the framebuffer.
+    pub paddr: PhysicalAddress,
     /// The width in pixels of the framebuffer.
-    width: u32,
+    pub width: u32,
     /// The height in pixels of the framebuffer.
-    height: u32,
+    pub height: u32,
     /// The stride in pixels of the framebuffer.
-    stride: u32,
+    pub stride: u32,
+    /// The format of this framebuffer.
+    pub format: FramebufferFormat,
     /// The current pixel coordinate where the next character will be printed.
     curr_pixel: PixelCoord,
 }
 
 impl EarlyFramebufferPrinter {
+    /// Returns the memory mapping for the underlying framebuffer, allowing it to be reused.
+    pub fn into_mapping(self) -> Option<BorrowedSliceMappedPages<u32, Mutable>> {
+        match self.fb {
+            FramebufferMemory::Mapping(m) => Some(m),
+            _ => None,
+        }
+    }
+
     /// Prints the given character to the current location in this framebuffer.
     pub fn print_char(
         &mut self,
@@ -225,6 +252,8 @@ impl Write for EarlyFramebufferPrinter {
     }
 }
 
+/// Prints the formatted output to the early framebuffer writer,
+/// if it has been initialized.
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
@@ -232,6 +261,8 @@ macro_rules! print {
     });
 }
 
+/// Prints the formatted output with an appended newline ('\n')
+/// to the early framebuffer writer, if it has been initialized.
 #[macro_export]
 macro_rules! println {
     ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));

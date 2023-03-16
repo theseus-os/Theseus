@@ -152,7 +152,7 @@ impl FramebufferInfo {
 }
 
 /// The format of the framebuffer, in graphical pixels or text-mode characters.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum FramebufferFormat {
     /// The format of a pixel is `[Pad] <Red> <Green> <Blue>`,
     /// in which `<Blue>` occupies the least significant bits.
