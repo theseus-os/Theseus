@@ -64,15 +64,15 @@ pub fn init(idt_ref: &'static LockedIdt) {
 }
 
 
-/// calls print!() and then print_raw!()
+/// Prints to both the `early_printer` and the current terminal via `app_io`.
 macro_rules! println_both {
     ($fmt:expr) => {
-        vga_buffer::print_raw!(concat!($fmt, "\n"));
-        app_io::print!(concat!($fmt, "\n"));
+        early_printer::println!($fmt);
+        app_io::println!($fmt);
     };
     ($fmt:expr, $($arg:tt)*) => {
-        vga_buffer::print_raw!(concat!($fmt, "\n"), $($arg)*);
-        app_io::print!(concat!($fmt, "\n"), $($arg)*);
+        early_printer::println!($fmt, $($arg)*);
+        app_io::println!($fmt, $($arg)*);
     };
 }
 

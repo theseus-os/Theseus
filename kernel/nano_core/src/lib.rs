@@ -28,12 +28,12 @@ use mod_mgmt::parse_nano_core::NanoCoreItems;
 
 #[cfg(target_arch = "x86_64")]
 use {
-    vga_buffer::println_raw,
+    early_printer::println,
     kernel_config::memory::KERNEL_OFFSET,
 };
 
 #[cfg(target_arch = "aarch64")]
-use log::info as println_raw;
+use log::info as println;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
@@ -67,30 +67,42 @@ macro_rules! try_exit {
 
 /// Shuts down Theseus and prints the given formatted arguuments.
 fn shutdown(msg: core::fmt::Arguments) -> ! {
-    println_raw!("Theseus is shutting down, msg: {}", msg);
+    println!("Theseus is shutting down, msg: {}", msg);
     log::error!("Theseus is shutting down, msg: {}", msg);
 
     // TODO: handle shutdowns properly with ACPI commands
     panic!("{}", msg);
 }
 
-/// Early setup that should be done before bootloader information is available.
-///
-/// This involves:
-/// 1. Setting up an early logger.
-/// 2. Dumping basic information about the Theseus build.
-/// 3. Initializing early exception handlers.
-fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> {
-    irq_safety::disable_interrupts();
-    println_raw!("Entered early_setup(). Interrupts disabled.");
 
-    let logger_ports = [serial_port_basic::take_serial_port(
-        serial_port_basic::SerialPortAddress::COM1,
-    )];
-    logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|_| "failed to initialize early logging")?;
+/// The main nano_core entry routine.
+///
+/// This is invoked by an entry point in the bootloader-specific modules:
+/// * In the `bios` module (for multiboot2 boot), the entry point is `rust_entry`,
+///   which then invokes this function.
+/// * In the `uefi` module (for UEFI boot), the entry point is `_start`,
+///   which invokes `rust_entry`, which then invokes this function.
+#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
+fn nano_core<B>(
+    boot_info: B,
+    double_fault_stack_top: VirtualAddress,
+    kernel_stack_start: VirtualAddress,
+) -> Result<(), &'static str>
+where
+    B: boot_info::BootInformation
+{
+    irq_safety::disable_interrupts();
+    println!("Entered early_setup(). Interrupts disabled.");
+
+    #[cfg(target_arch = "x86_64")] {
+        let logger_ports = [serial_port_basic::take_serial_port(
+            serial_port_basic::SerialPortAddress::COM1,
+        )];
+        logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
+            .map_err(|_| "failed to initialize early logging")?;
+    }
     log::info!("initialized early logger");
-    println_raw!("early_setup(): initialized early logger.");
+    println!("early_setup(): initialized early logger.");
 
     // Dump basic information about this build of Theseus.
     log::info!("\n    \
@@ -100,27 +112,11 @@ fn early_setup(early_double_fault_stack_top: usize) -> Result<(), &'static str> 
         build_info::CUSTOM_CFG_STR,
     );
 
-    exceptions_early::init(Some(VirtualAddress::new_canonical(early_double_fault_stack_top)));
-    println_raw!("early_setup(): initialized early IDT with exception handlers.");
+    exceptions_early::init(Some(double_fault_stack_top));
+    println!("early_setup(): initialized early IDT with exception handlers.");
 
-    Ok(())
-}
-
-/// aarch64 placeholder
-#[cfg(target_arch = "aarch64")]
-fn early_setup(_early_double_fault_stack_top: usize) -> Result<(), &'static str> {
-    irq_safety::disable_interrupts();
-    Ok(())
-}
-
-/// The nano core routine. See crate-level documentation for more information.
-#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
-fn nano_core<T>(boot_info: T, kernel_stack_start: VirtualAddress) -> Result<(), &'static str>
-where
-    T: boot_info::BootInformation
-{
     let rsdp_address = boot_info.rsdp();
-    println_raw!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
+    println!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
     // If the bootloader already mapped the framebuffer for us, the we can use it now
     // before initializing the memory mgmt subsystem.
@@ -144,7 +140,6 @@ where
     // for basic graphical text output.
     if let Some(ref fb_info) = framebuffer_info {
         early_printer::init(fb_info)?;
-        early_printer::println!("Hello from early printer! This is currently not fully utilized.");
     }
 
     #[cfg(target_arch = "aarch64")] {
@@ -152,19 +147,19 @@ where
         log::info!("Initialized logger_aarch64");
     }
 
-    println_raw!("nano_core(): initialized memory subsystem.");
+    println!("nano_core(): initialized memory subsystem.");
 
 
     state_store::init();
     log::trace!("state_store initialized.");
-    println_raw!("nano_core(): initialized state store.");
+    println!("nano_core(): initialized state store.");
 
     // initialize the module management subsystem, so we can create the default crate namespace
     let default_namespace = mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut())?;
-    println_raw!("nano_core(): initialized crate namespace subsystem.");
+    println!("nano_core(): initialized crate namespace subsystem.");
 
     // Parse the nano_core crate (the code we're already running) since we need it to load and run applications.
-    println_raw!("nano_core(): parsing nano_core crate, please wait ...");
+    println!("nano_core(): parsing nano_core crate, please wait ...");
     let (nano_core_crate_ref, multicore_info) = match mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
@@ -173,7 +168,7 @@ where
         false,
     ) {
         Ok(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) => {
-            println_raw!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
+            println!("nano_core(): finished parsing the nano_core crate, {} new symbols.", num_new_symbols);
 
             #[cfg(target_arch = "x86_64")]
             let multicore_info = {
@@ -228,10 +223,10 @@ where
     // if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     #[cfg(loadable)] {
         use mod_mgmt::CrateNamespace;
-        println_raw!("nano_core(): loading the \"captain\" crate...");
+        println!("nano_core(): loading the \"captain\" crate...");
         let (captain_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, "captain-").ok_or("couldn't find the singular \"captain\" crate object file")?;
         let (_captain_crate, _num_captain_syms) = default_namespace.load_crate(&captain_file, None, &kernel_mmi_ref, false)?;
-        println_raw!("nano_core(): loading the panic handling crate(s)...");
+        println!("nano_core(): loading the panic handling crate(s)...");
         let (panic_wrapper_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, "panic_wrapper-").ok_or("couldn't find the singular \"panic_wrapper\" crate object file")?;
         let (_pw_crate, _num_pw_syms) = default_namespace.load_crate(&panic_wrapper_file, None, &kernel_mmi_ref, false)?;
 
@@ -242,7 +237,7 @@ where
 
     // Now we invoke the Captain, which will take over from here.
     // That's it, the nano_core is done! That's really all it does! 
-    println_raw!("nano_core(): invoking the captain...");
+    println!("nano_core(): invoking the captain...");
     let drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
     };

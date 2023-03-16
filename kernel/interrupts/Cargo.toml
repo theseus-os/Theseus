@@ -22,7 +22,7 @@ time = { path = "../time" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
-vga_buffer = { path = "../vga_buffer" }
+early_printer = { path = "../early_printer" }
 apic = { path = "../apic" }
 gdt = { path = "../gdt" }
 pic = { path = "../pic" }

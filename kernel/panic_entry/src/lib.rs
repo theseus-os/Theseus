@@ -20,7 +20,7 @@ extern crate mod_mgmt;
 #[cfg(not(loadable))] extern crate unwind;
 
 #[cfg(target_arch = "x86_64")]
-#[macro_use] extern crate vga_buffer;
+#[macro_use] extern crate early_printer;
 
 #[cfg(target_arch = "x86_64")]
 #[cfg(not(loadable))] extern crate panic_wrapper;
@@ -74,7 +74,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
         error!("Halting due to early panic: {}", info);
         // basic early panic printing with no dependencies
         #[cfg(target_arch = "x86_64")]
-        println_raw!("\nHalting due to early panic: {}", info);
+        println!("\nHalting due to early panic: {}", info);
     }
 
     // If we failed to handle the panic, there's not really much we can do about it,

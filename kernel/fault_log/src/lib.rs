@@ -6,19 +6,13 @@
 #![no_std]
 #![feature(drain_filter)]
 
-#[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate app_io; // for regular println!()
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate memory;
-extern crate task;
-extern crate cpu;
-extern crate irq_safety;
 
 use alloc::{
     string::{String,ToString},
     vec::Vec,
 };
+use log::debug;
 use cpu::CpuId;
 use memory::VirtualAddress;
 use irq_safety::MutexIrqSafe;
@@ -218,15 +212,15 @@ pub fn remove_unhandled_exceptions() -> Vec<FaultEntry> {
     FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
 }
 
-/// calls println!() and then println_raw!()
+/// Prints to both the `early_printer` and the current terminal via `app_io`.
 macro_rules! println_both {
     ($fmt:expr) => {
-        print_raw!(concat!($fmt, "\n"));
-        print!(concat!($fmt, "\n"));
+        early_printer::println!($fmt);
+        app_io::println!($fmt);
     };
     ($fmt:expr, $($arg:tt)*) => {
-        print_raw!(concat!($fmt, "\n"), $($arg)*);
-        print!(concat!($fmt, "\n"), $($arg)*);
+        early_printer::println!($fmt, $($arg)*);
+        app_io::println!($fmt, $($arg)*);
     };
 }
 
