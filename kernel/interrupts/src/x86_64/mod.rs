@@ -7,7 +7,7 @@ use locked_idt::LockedIdt;
 use log::{error, warn, info, debug};
 use memory::VirtualAddress;
 use spin::Once;
-use vga_buffer::println_raw;
+use early_printer::println;
 use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 
 /// The IRQ number reserved for CPU-local timer interrupts,
@@ -296,25 +296,25 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: Interrup
 }
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
+    println!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
 	match apic::INTERRUPT_CHIP.load() {
         apic::InterruptChip::PIC => {
             let irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
-            println_raw!("PIC IRQ Registers: {:?}", irq_regs);
+            println!("PIC IRQ Registers: {:?}", irq_regs);
         }
         apic::InterruptChip::APIC | apic::InterruptChip::X2APIC => {
             if let Some(lapic_ref) = apic::get_my_apic() {
                 let lapic = lapic_ref.read();
                 let isr = lapic.get_isr(); 
                 let irr = lapic.get_irr();
-                println_raw!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
+                println!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
                     IRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
                     isr[0], isr[1], isr[2], isr[3], isr[4], isr[5], isr[6], isr[7],
                     irr[0], irr[1], irr[2], irr[3], irr[4], irr[5], irr[6], irr[7],
                 );
             }
             else {
-                println_raw!("APIC ISR and IRR were unknown.");
+                println!("APIC ISR and IRR were unknown.");
             }
         }
     };
@@ -337,7 +337,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: Interrupt
         // (pretty sure this will never happen)
         // if it was a real IRQ7, we do need to ack it by sending an EOI
         if irq_regs.master_isr & 0x80 == 0x80 {
-            println_raw!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
+            println!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
             error!("Got real IRQ7, not spurious! (Unexpected behavior)");
             eoi(Some(IRQ_BASE_OFFSET + 0x7));
         }

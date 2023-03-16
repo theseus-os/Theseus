@@ -1,4 +1,6 @@
-use crate::{early_setup, nano_core, try_exit};
+//! The main entry point into Rust code from a UEFI bootloader.
+
+use crate::{nano_core, try_exit};
 use boot_info::uefi::STACK_SIZE;
 use core::arch::asm;
 use memory::VirtualAddress;
@@ -81,11 +83,18 @@ pub extern "C" fn _start(boot_info: &'static BootInformation) {
     };
 }
 
-fn rust_entry(boot_info: &'static BootInformation, double_fault_stack: usize) {
-    try_exit!(early_setup(double_fault_stack));
+/// This is invoked by the `_start` entry point above.
+fn rust_entry(boot_info: &'static BootInformation, double_fault_stack_top: usize) {
     // See the above memory layout diagram in `_start`.
-    let kernel_stack_start = VirtualAddress::new_canonical(double_fault_stack - STACK_SIZE);
-    try_exit!(nano_core(boot_info, kernel_stack_start));
+    let kernel_stack_start = try_exit!(
+        VirtualAddress::new(double_fault_stack_top - STACK_SIZE)
+        .ok_or("BUG: kernel_stack_start virtual address is invalid")
+    );
+    let double_fault_stack_top = try_exit!(
+        VirtualAddress::new(double_fault_stack_top)
+            .ok_or("BUG: double_fault_stack_top virtual address is invalid")
+    );
+    try_exit!(nano_core(boot_info, double_fault_stack_top, kernel_stack_start));
 }
 
 #[naked]

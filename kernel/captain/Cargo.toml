@@ -10,6 +10,7 @@ log = "0.4.8"
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 dfqueue = { path = "../../libs/dfqueue", version = "0.1.0" }
+early_printer = { path = "../early_printer" }
 kernel_config = { path = "../kernel_config" }
 interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
@@ -37,7 +38,6 @@ device_manager = { path = "../device_manager" }
 e1000 = { path = "../e1000" }
 console = { path = "../console" }
 app_io = { path = "../app_io" }
-vga_buffer = { path = "../vga_buffer" }
 network_manager = { path = "../network_manager" }
 ota_update_client = { path = "../ota_update_client" }
 
@@ -45,10 +45,6 @@ ota_update_client = { path = "../ota_update_client" }
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
 ## Therefore, it has to be unconditionally included.
 simd_personality = { path = "../simd_personality" }
-
-[features]
-# TODO: Remove when UEFI is fully implemented
-uefi = []
 
 [lib]
 crate-type = ["rlib"]

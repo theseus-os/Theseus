@@ -35,7 +35,7 @@ use {
 mod mirror_log_callbacks {
     /// The callback for use in the logger crate to mirror log functions to the early VGA screen.
     pub(crate) fn mirror_to_early_vga(args: core::fmt::Arguments) {
-        vga_buffer::println_raw!("{}", args);
+        early_printer::println!("{}", args);
     }
 
     /// The callback for use in the logger crate to mirror log functions to the

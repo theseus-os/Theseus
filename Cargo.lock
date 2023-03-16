@@ -363,6 +363,7 @@ dependencies = [
  "device_manager",
  "dfqueue",
  "e1000",
+ "early_printer",
  "exceptions_full",
  "first_application",
  "interrupts",
@@ -386,7 +387,6 @@ dependencies = [
  "task_fs",
  "tlb_shootdown",
  "tsc",
- "vga_buffer",
  "window_manager",
 ]
 
@@ -965,6 +965,7 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
+ "vga_buffer",
  "volatile 0.2.7",
 ]
 
@@ -1037,13 +1038,13 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "gdt",
  "locked_idt",
  "memory",
  "mod_mgmt",
  "spin 0.9.4",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1054,6 +1055,7 @@ dependencies = [
  "app_io",
  "cpu",
  "debug_info",
+ "early_printer",
  "fault_log",
  "locked_idt",
  "log",
@@ -1066,7 +1068,6 @@ dependencies = [
  "tlb_shootdown",
  "tss",
  "unwind",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1124,11 +1125,11 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "cpu",
+ "early_printer",
  "irq_safety",
  "log",
  "memory",
  "task",
- "vga_buffer",
 ]
 
 [[package]]
@@ -1529,6 +1530,7 @@ dependencies = [
  "apic",
  "cortex-a",
  "cpu",
+ "early_printer",
  "exceptions_early",
  "gdt",
  "gic",
@@ -1542,7 +1544,6 @@ dependencies = [
  "time",
  "tock-registers",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -2263,7 +2264,6 @@ dependencies = [
  "stack",
  "state_store",
  "uefi-bootloader-api",
- "vga_buffer",
 ]
 
 [[package]]
@@ -2523,12 +2523,12 @@ dependencies = [
 name = "panic_entry"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "log",
  "memory",
  "mod_mgmt",
  "panic_wrapper",
  "unwind",
- "vga_buffer",
 ]
 
 [[package]]
@@ -4287,9 +4287,6 @@ dependencies = [
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
- "kernel_config",
- "logger_x86_64",
- "spin 0.9.4",
  "volatile 0.2.7",
 ]
 
