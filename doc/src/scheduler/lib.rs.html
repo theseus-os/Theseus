@@ -197,8 +197,8 @@
 <span class="doccomment">/// The handler for each CPU&#39;s local timer interrupt, used for preemptive task switching.
 </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>aarch64_timer_handler(_exc: <span class="kw-2">&amp;</span>interrupts::ExceptionContext) -&gt; interrupts::EoiBehaviour {
+    interrupts::schedule_next_timer_tick();
     cpu_local_timer_tick_handler();
-
     interrupts::EoiBehaviour::HandlerHasSignaledEoi
 }
 
@@ -211,8 +211,8 @@
 <span class="comment">// Cross platform scheduling code
 </span><span class="kw">fn </span>cpu_local_timer_tick_handler() {
     <span class="comment">// tick count, only used for debugging
-    </span><span class="attr">#[cfg(any())] </span>{ <span class="comment">// cfg(any()) is always false
-        </span><span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
+    </span><span class="kw">if </span><span class="bool-val">false </span>{
+        <span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
         <span class="kw">static </span>CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
         <span class="kw">let </span>_ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(<span class="number">1</span>, Ordering::Relaxed);
         <span class="macro">log::info!</span>(<span class="string">&quot;(CPU {}) CPU-LOCAL TIMER HANDLER! TICKS = {}&quot;</span>, cpu::current_cpu(), _ticks);

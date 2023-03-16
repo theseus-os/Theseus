@@ -424,7 +424,7 @@
         <span class="macro">info!</span>(<span class="string">&quot;Initialized per-core heaps&quot;</span>);
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)] </span>{
+    <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature = <span class="string">&quot;uefi&quot;</span>))] </span>{
         <span class="macro">log::error!</span>(<span class="string">&quot;uefi boot cannot proceed as it is not fully implemented&quot;</span>);
         <span class="kw">loop </span>{}
     }
