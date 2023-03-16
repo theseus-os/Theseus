@@ -277,9 +277,45 @@
 <a href="#277" id="277">277</a>
 <a href="#278" id="278">278</a>
 <a href="#279" id="279">279</a>
-</pre><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for displaying text on a graphical framebuffer during early boot.
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+</pre><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for early text output to a graphical framebuffer
+//! or text-mode VGA display.
 //!
-//! Does not support user scrolling, cursors, or any other advanced terminal features.
+//! Does not support user scrolling, cursors, or any other advanced features.
 
 </span><span class="attr">#![no_std]
 
@@ -288,6 +324,7 @@
 <span class="kw">use </span>font::FONT_BASIC;
 <span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress};
 <span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>vga_buffer::VgaBuffer;
 
 <span class="doccomment">/// The height in pixels that each character occupies, not including any padding.
 </span><span class="kw">const </span>CHARACTER_HEIGHT: u32 = font::CHARACTER_HEIGHT <span class="kw">as </span>u32;
@@ -296,8 +333,31 @@
 <span class="doccomment">/// The width in pixels that each character occupies, excluding padding.
 </span><span class="kw">const </span>GLPYH_WIDTH: u32 = CHARACTER_WIDTH - <span class="number">1</span>;
 
-<span class="doccomment">/// The system-wide framebuffer for early text printing.
-</span><span class="kw">static </span>EARLY_FRAMEBUFFER_PRINTER: Mutex&lt;<span class="prelude-ty">Option</span>&lt;EarlyFramebufferPrinter&gt;&gt; = Mutex::new(<span class="prelude-val">None</span>);
+<span class="doccomment">/// The system-wide printer for early text output to the screen.
+</span><span class="kw">static </span>EARLY_FRAMEBUFFER_PRINTER: Mutex&lt;<span class="prelude-ty">Option</span>&lt;EarlyPrinter&gt;&gt; = {
+    <span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)] </span>{
+        Mutex::new(<span class="prelude-val">Some</span>(EarlyPrinter::VgaTextMode(VgaBuffer::new())))
+    }
+    <span class="attr">#[cfg(not(feature = <span class="string">&quot;bios&quot;</span>))] </span>{
+        Mutex::new(<span class="prelude-val">None</span>)
+    }
+};
+
+<span class="doccomment">/// The early printer can either use a graphical framebuffer or text-mode VGA.
+</span><span class="kw">enum </span>EarlyPrinter {
+    Framebuffer(EarlyFramebufferPrinter),
+    <span class="attr">#[cfg_attr(not(feature = <span class="string">&quot;bios&quot;</span>), allow(dead_code))]
+    </span>VgaTextMode(VgaBuffer),
+}
+<span class="doccomment">/// Forward the `fmt::Write` trait through this enum.
+</span><span class="kw">impl </span>Write <span class="kw">for </span>EarlyPrinter {
+    <span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
+        <span class="kw">match </span><span class="self">self </span>{
+            <span class="self">Self</span>::Framebuffer(efb) =&gt; efb.write_str(s),
+            <span class="self">Self</span>::VgaTextMode(vga) =&gt; vga.write_str(s),
+        }
+    }
+}
 
 <span class="doccomment">/// Initializes a simple graphical framebuffer for early text printing.
 ///
@@ -324,7 +384,8 @@
         Address::Virtual(vaddr) =&gt; {
             <span class="kw">let </span>paddr = memory::translate(vaddr)
                 .ok_or(<span class="string">&quot;BUG: bootloader-provided framebuffer virtual address was not mapped!&quot;</span>)<span class="question-mark">?</span>;
-            <span class="comment">// SAFETY: we have no alternative but to trust the bootloader-provided address.
+            <span class="comment">// SAFETY: we checked that the bootloader-provided address was mapped,
+            //         but we have no real alternative but to trust that it maps a framebuffer.
             </span><span class="kw">let </span>slc = <span class="kw">unsafe </span>{
                 slice::from_raw_parts_mut(vaddr.value() <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>, fb_pixel_count)
             };
@@ -356,16 +417,20 @@
         }
     };
 
+    <span class="comment">// Round down the height of the fb to the nearest multiple of `CHARACTER_HEIGHT`
+    // in order to prevent characters from being displayed partially offscreen
+    </span><span class="kw">let </span>height = (info.height / CHARACTER_HEIGHT) * CHARACTER_HEIGHT;
+    <span class="macro">log::info!</span>(<span class="string">&quot;Capping early framebuffer height to {} pixels (from {})&quot;</span>, height, info.height);
     <span class="kw">let </span>early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
         paddr: fb_paddr,
         width: info.width,
-        height: info.height,
+        height,
         stride: info.stride,
         format: info.format,
         curr_pixel: PixelCoord { x: <span class="number">0</span>, y: <span class="number">0 </span>},
     };
-    <span class="kw-2">*</span>EARLY_FRAMEBUFFER_PRINTER.lock() = <span class="prelude-val">Some</span>(early_fb);
+    <span class="kw-2">*</span>EARLY_FRAMEBUFFER_PRINTER.lock() = <span class="prelude-val">Some</span>(EarlyPrinter::Framebuffer(early_fb));
     <span class="prelude-val">Ok</span>(())
 }
 
@@ -373,7 +438,11 @@
 /// allowing it to be re-used elsewhere.
 </span><span class="attr">#[doc(alias(<span class="string">&quot;deinit&quot;</span>, <span class="string">&quot;clean up&quot;</span>))]
 </span><span class="kw">pub fn </span>take() -&gt; <span class="prelude-ty">Option</span>&lt;EarlyFramebufferPrinter&gt; {
-    EARLY_FRAMEBUFFER_PRINTER.lock().take()
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(EarlyPrinter::Framebuffer(early_fb)) = EARLY_FRAMEBUFFER_PRINTER.lock().take() {
+        <span class="prelude-val">Some</span>(early_fb)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>}
 }
 
 <span class="doccomment">/// An abstraction over the underlying framebuffer memory that derefs into a slice of pixels.
@@ -464,14 +533,15 @@
         <span class="self">self</span>.advance_by_one_char(background_pixel_color);
     }
 
-    <span class="doccomment">/// Advances the current pixel location by one character, wrapping to the next line if needed.
+    <span class="doccomment">/// Advances the current pixel location by one character.
+    ///
+    /// If another character wouldn&#39;t fit at the next location, it wraps to the next line.
     </span><span class="kw">fn </span>advance_by_one_char(<span class="kw-2">&amp;mut </span><span class="self">self</span>, background_pixel_color: u32) {
         <span class="kw">let </span>next_col = <span class="self">self</span>.curr_pixel.x + CHARACTER_WIDTH;
-        <span class="kw">if </span>next_col &gt;= <span class="self">self</span>.width {
+        <span class="self">self</span>.curr_pixel.x = next_col;
+        <span class="kw">if </span>next_col + CHARACTER_WIDTH &gt;= <span class="self">self</span>.width {
             <span class="kw">return </span><span class="self">self</span>.newline(background_pixel_color);
         }
-
-        <span class="self">self</span>.curr_pixel.x = next_col;
     }
 
     <span class="doccomment">/// Advances the current pixel location to the start of the next line, scrolling if needed.

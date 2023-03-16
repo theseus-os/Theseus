@@ -377,7 +377,7 @@
 <span class="kw">use </span>log::{error, warn, info, debug};
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>vga_buffer::println_raw;
+<span class="kw">use </span>early_printer::println;
 <span class="kw">use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 
 <span class="doccomment">/// The IRQ number reserved for CPU-local timer interrupts,
@@ -666,25 +666,25 @@
 }
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;\nUnimplemented interrupt handler: {:#?}&quot;</span>, _stack_frame);
+    <span class="macro">println!</span>(<span class="string">&quot;\nUnimplemented interrupt handler: {:#?}&quot;</span>, _stack_frame);
 	<span class="kw">match </span>apic::INTERRUPT_CHIP.load() {
         apic::InterruptChip::PIC =&gt; {
             <span class="kw">let </span>irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
-            <span class="macro">println_raw!</span>(<span class="string">&quot;PIC IRQ Registers: {:?}&quot;</span>, irq_regs);
+            <span class="macro">println!</span>(<span class="string">&quot;PIC IRQ Registers: {:?}&quot;</span>, irq_regs);
         }
         apic::InterruptChip::APIC | apic::InterruptChip::X2APIC =&gt; {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(lapic_ref) = apic::get_my_apic() {
                 <span class="kw">let </span>lapic = lapic_ref.read();
                 <span class="kw">let </span>isr = lapic.get_isr(); 
                 <span class="kw">let </span>irr = lapic.get_irr();
-                <span class="macro">println_raw!</span>(<span class="string">&quot;APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
+                <span class="macro">println!</span>(<span class="string">&quot;APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
                     IRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}&quot;</span>, 
                     isr[<span class="number">0</span>], isr[<span class="number">1</span>], isr[<span class="number">2</span>], isr[<span class="number">3</span>], isr[<span class="number">4</span>], isr[<span class="number">5</span>], isr[<span class="number">6</span>], isr[<span class="number">7</span>],
                     irr[<span class="number">0</span>], irr[<span class="number">1</span>], irr[<span class="number">2</span>], irr[<span class="number">3</span>], irr[<span class="number">4</span>], irr[<span class="number">5</span>], irr[<span class="number">6</span>], irr[<span class="number">7</span>],
                 );
             }
             <span class="kw">else </span>{
-                <span class="macro">println_raw!</span>(<span class="string">&quot;APIC ISR and IRR were unknown.&quot;</span>);
+                <span class="macro">println!</span>(<span class="string">&quot;APIC ISR and IRR were unknown.&quot;</span>);
             }
         }
     };
@@ -707,7 +707,7 @@
         // (pretty sure this will never happen)
         // if it was a real IRQ7, we do need to ack it by sending an EOI
         </span><span class="kw">if </span>irq_regs.master_isr &amp; <span class="number">0x80 </span>== <span class="number">0x80 </span>{
-            <span class="macro">println_raw!</span>(<span class="string">&quot;\nGot real IRQ7, not spurious! (Unexpected behavior)&quot;</span>);
+            <span class="macro">println!</span>(<span class="string">&quot;\nGot real IRQ7, not spurious! (Unexpected behavior)&quot;</span>);
             <span class="macro">error!</span>(<span class="string">&quot;Got real IRQ7, not spurious! (Unexpected behavior)&quot;</span>);
             eoi(<span class="prelude-val">Some</span>(IRQ_BASE_OFFSET + <span class="number">0x7</span>));
         }

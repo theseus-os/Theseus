@@ -144,84 +144,16 @@
 <a href="#144" id="144">144</a>
 <a href="#145" id="145">145</a>
 <a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
-<a href="#149" id="149">149</a>
-<a href="#150" id="150">150</a>
-<a href="#151" id="151">151</a>
-<a href="#152" id="152">152</a>
-<a href="#153" id="153">153</a>
-<a href="#154" id="154">154</a>
-<a href="#155" id="155">155</a>
-<a href="#156" id="156">156</a>
-<a href="#157" id="157">157</a>
-<a href="#158" id="158">158</a>
-<a href="#159" id="159">159</a>
-<a href="#160" id="160">160</a>
-<a href="#161" id="161">161</a>
-<a href="#162" id="162">162</a>
-<a href="#163" id="163">163</a>
-<a href="#164" id="164">164</a>
-<a href="#165" id="165">165</a>
-<a href="#166" id="166">166</a>
-<a href="#167" id="167">167</a>
-<a href="#168" id="168">168</a>
-<a href="#169" id="169">169</a>
-<a href="#170" id="170">170</a>
-<a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
-<a href="#176" id="176">176</a>
-<a href="#177" id="177">177</a>
-<a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
-<a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
-<a href="#190" id="190">190</a>
-<a href="#191" id="191">191</a>
-<a href="#192" id="192">192</a>
-<a href="#193" id="193">193</a>
-<a href="#194" id="194">194</a>
-<a href="#195" id="195">195</a>
-<a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-<a href="#205" id="205">205</a>
-<a href="#206" id="206">206</a>
-<a href="#207" id="207">207</a>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
+</pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA display. 
 //!
-//! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
+//! Does not support user scrolling, cursors, or any other advanced features.
 
 </span><span class="attr">#![no_std]
 #![feature(ptr_internals)]
+#![feature(const_option)]
 
-</span><span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>logger_x86_64 <span class="kw">as </span>logger;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>volatile;
-
-
-<span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, ptr::Unique};
-<span class="kw">use </span>spin::Mutex;
+</span><span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, ptr::Unique};
 <span class="kw">use </span>volatile::Volatile;
-
 
 <span class="doccomment">/// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
 /// We must rely on the early bootstrap code to identity map this address.
@@ -233,77 +165,22 @@
 </span><span class="kw">const </span>BUFFER_WIDTH: usize = <span class="number">80</span>;
 
 
-<span class="doccomment">/// The singleton VGA writer instance that writes to the VGA text buffer.
-</span><span class="kw">static </span>EARLY_VGA_WRITER: Mutex&lt;VgaBuffer&gt; = Mutex::new(
-    VgaBuffer {
-        column_position: <span class="number">0</span>,
-        <span class="comment">// SAFE: the assembly boot up code ensures this is mapped into memory.
-        </span>buffer: <span class="kw">unsafe </span>{ Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>) },
-    }
-);
-
-
-<span class="comment">// Note: we can&#39;t put this cfg block inside the macro, because then it will be
-//       enabled based on the chosen features of the foreign crate that
-//       *calls* this macro, rather than the features activated in *this* crate.
-</span><span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)]
-#[macro_export]
-</span><span class="macro">macro_rules! </span>print_raw {
-    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
-        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
-    });
-}
-
-<span class="comment">// Note: we can&#39;t put this cfg block inside the macro, because then it will be
-//       enabled based on the chosen features of the foreign crate that
-//       *calls* this macro, rather than the features activated in *this* crate.
-</span><span class="attr">#[cfg(not(feature = <span class="string">&quot;bios&quot;</span>))]
-#[macro_export]
-</span><span class="macro">macro_rules! </span>print_raw {
-    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
-        <span class="comment">// If we didn&#39;t boot from BIOS, there is no VGA screen,
-        // so just write directly to the logger.
-        // As with `VgaBuffer::write_str()`, here we write *directly* to the logger sink
-        // instead of using the `log` crate&#39;s macros, which could cause an
-        // infinite loop when mirror_to_serial is enabled.
-        </span><span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::logger_write_fmt</span>(<span class="macro">format_args!</span>(<span class="string">&quot;[*] {}&quot;</span>, <span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>)));
-    });
-}
-
-<span class="doccomment">/// A stub for non-BIOS builds to send `print_raw!()` args to the `logger` crate.
-</span><span class="attr">#[cfg(not(feature = <span class="string">&quot;bios&quot;</span>))]
-#[doc(hidden)]
-</span><span class="kw">pub fn </span>logger_write_fmt(args: fmt::Arguments) -&gt; fmt::Result {
-    logger::write_fmt(args)
-}
-
-<span class="attr">#[macro_export]
-</span><span class="macro">macro_rules! </span>println_raw {
-    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
-    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
-}
-
-<span class="attr">#[doc(hidden)]
-</span><span class="kw">pub fn </span>print_args_raw(args: fmt::Arguments) -&gt; fmt::Result {
-    <span class="comment">// Print the message directly to the logger;
-    // don&#39;t use log macros because that can introduce an infinite loop
-    // when `mirror_log_to_vga` is enabled.
-    </span><span class="kw">let </span>log_result = logger::write_fmt(<span class="macro">format_args!</span>(<span class="string">&quot;[*] {args}&quot;</span>)); 
-    
-    <span class="kw">let </span>vga_result = EARLY_VGA_WRITER.lock().write_fmt(args);
-    vga_result.and(log_result)
-}
-
-
 <span class="kw">type </span>VgaTextBufferLine = [Volatile&lt;ScreenChar&gt;; BUFFER_WIDTH];
 <span class="kw">type </span>VgaTextBuffer     = [VgaTextBufferLine; BUFFER_HEIGHT];
 
 
-<span class="kw">struct </span>VgaBuffer {
+<span class="kw">pub struct </span>VgaBuffer {
     column_position: usize,
     buffer: Unique&lt;VgaTextBuffer&gt;,
 }
 <span class="kw">impl </span>VgaBuffer {
+    <span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
+        VgaBuffer {
+            column_position: <span class="number">0</span>,
+            buffer: Unique::new((VGA_BUFFER_VIRTUAL_ADDR) <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>).unwrap(),
+        }
+    }
+
     <span class="kw">pub fn </span>write_byte(<span class="kw-2">&amp;mut </span><span class="self">self</span>, byte: u8) {
         <span class="kw">match </span>byte {
             <span class="string">b&#39;\n&#39; </span>=&gt; <span class="self">self</span>.new_line(),
@@ -347,10 +224,11 @@
     }
 
     <span class="kw">fn </span>buffer(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>[VgaTextBufferLine] {
-        <span class="comment">// SAFE: mutability is protected by the lock surrounding the RawVgaBuffer instance
+        <span class="comment">// SAFETY: this function requires a `&amp;mut` reference, ensuring exclusivity.
         </span><span class="kw">unsafe </span>{ <span class="self">self</span>.buffer.as_mut() }
     }
 }
+
 <span class="kw">impl </span>Write <span class="kw">for </span>VgaBuffer {
     <span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
         <span class="kw">for </span>byte <span class="kw">in </span>s.bytes() {

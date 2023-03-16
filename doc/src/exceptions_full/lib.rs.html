@@ -516,15 +516,15 @@
 }
 
 
-<span class="doccomment">/// calls print!() and then print_raw!()
+<span class="doccomment">/// Prints to both the `early_printer` and the current terminal via `app_io`.
 </span><span class="macro">macro_rules! </span>println_both {
     (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; {
-        <span class="macro">vga_buffer::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>));
-        <span class="macro">app_io::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>));
+        <span class="macro">early_printer::println!</span>(<span class="macro-nonterminal">$fmt</span>);
+        <span class="macro">app_io::println!</span>(<span class="macro-nonterminal">$fmt</span>);
     };
     (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; {
-        <span class="macro">vga_buffer::print_raw!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
-        <span class="macro">app_io::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
+        <span class="macro">early_printer::println!</span>(<span class="macro-nonterminal">$fmt</span>, $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
+        <span class="macro">app_io::println!</span>(<span class="macro-nonterminal">$fmt</span>, $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>);
     };
 }
 

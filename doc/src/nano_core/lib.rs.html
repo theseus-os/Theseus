@@ -291,11 +291,6 @@
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
 <a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //!
 //! The `nano_core` is very simple, and only does the following things:
@@ -326,12 +321,12 @@
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">use </span>{
-    vga_buffer::println_raw,
+    early_printer::println,
     kernel_config::memory::KERNEL_OFFSET,
 };
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-</span><span class="kw">use </span>log::info <span class="kw">as </span>println_raw;
+</span><span class="kw">use </span>log::info <span class="kw">as </span>println;
 
 <span class="macro">cfg_if::cfg_if! </span>{
     <span class="kw">if </span><span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)] </span>{
@@ -365,30 +360,42 @@
 
 <span class="doccomment">/// Shuts down Theseus and prints the given formatted arguuments.
 </span><span class="kw">fn </span>shutdown(msg: core::fmt::Arguments) -&gt; ! {
-    <span class="macro">println_raw!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
+    <span class="macro">println!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
     <span class="macro">log::error!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
 
     <span class="comment">// TODO: handle shutdowns properly with ACPI commands
     </span><span class="macro">panic!</span>(<span class="string">&quot;{}&quot;</span>, msg);
 }
 
-<span class="doccomment">/// Early setup that should be done before bootloader information is available.
-///
-/// This involves:
-/// 1. Setting up an early logger.
-/// 2. Dumping basic information about the Theseus build.
-/// 3. Initializing early exception handlers.
-</span><span class="kw">fn </span>early_setup(early_double_fault_stack_top: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    irq_safety::disable_interrupts();
-    <span class="macro">println_raw!</span>(<span class="string">&quot;Entered early_setup(). Interrupts disabled.&quot;</span>);
 
-    <span class="kw">let </span>logger_ports = [serial_port_basic::take_serial_port(
-        serial_port_basic::SerialPortAddress::COM1,
-    )];
-    logger_x86_64::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten())
-        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialize early logging&quot;</span>)<span class="question-mark">?</span>;
+<span class="doccomment">/// The main nano_core entry routine.
+///
+/// This is invoked by an entry point in the bootloader-specific modules:
+/// * In the `bios` module (for multiboot2 boot), the entry point is `rust_entry`,
+///   which then invokes this function.
+/// * In the `uefi` module (for UEFI boot), the entry point is `_start`,
+///   which invokes `rust_entry`, which then invokes this function.
+</span><span class="attr">#[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, allow(unused_variables))]
+</span><span class="kw">fn </span>nano_core&lt;B&gt;(
+    boot_info: B,
+    double_fault_stack_top: VirtualAddress,
+    kernel_stack_start: VirtualAddress,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
+<span class="kw">where
+    </span>B: boot_info::BootInformation
+{
+    irq_safety::disable_interrupts();
+    <span class="macro">println!</span>(<span class="string">&quot;Entered early_setup(). Interrupts disabled.&quot;</span>);
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="kw">let </span>logger_ports = [serial_port_basic::take_serial_port(
+            serial_port_basic::SerialPortAddress::COM1,
+        )];
+        logger_x86_64::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten())
+            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialize early logging&quot;</span>)<span class="question-mark">?</span>;
+    }
     <span class="macro">log::info!</span>(<span class="string">&quot;initialized early logger&quot;</span>);
-    <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized early logger.&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;early_setup(): initialized early logger.&quot;</span>);
 
     <span class="comment">// Dump basic information about this build of Theseus.
     </span><span class="macro">log::info!</span>(<span class="string">&quot;\n    \
@@ -398,27 +405,11 @@
         build_info::CUSTOM_CFG_STR,
     );
 
-    exceptions_early::init(<span class="prelude-val">Some</span>(VirtualAddress::new_canonical(early_double_fault_stack_top)));
-    <span class="macro">println_raw!</span>(<span class="string">&quot;early_setup(): initialized early IDT with exception handlers.&quot;</span>);
+    exceptions_early::init(<span class="prelude-val">Some</span>(double_fault_stack_top));
+    <span class="macro">println!</span>(<span class="string">&quot;early_setup(): initialized early IDT with exception handlers.&quot;</span>);
 
-    <span class="prelude-val">Ok</span>(())
-}
-
-<span class="doccomment">/// aarch64 placeholder
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-</span><span class="kw">fn </span>early_setup(_early_double_fault_stack_top: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    irq_safety::disable_interrupts();
-    <span class="prelude-val">Ok</span>(())
-}
-
-<span class="doccomment">/// The nano core routine. See crate-level documentation for more information.
-</span><span class="attr">#[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, allow(unused_variables))]
-</span><span class="kw">fn </span>nano_core&lt;T&gt;(boot_info: T, kernel_stack_start: VirtualAddress) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
-<span class="kw">where
-    </span>T: boot_info::BootInformation
-{
     <span class="kw">let </span>rsdp_address = boot_info.rsdp();
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
+    <span class="macro">println!</span>(<span class="string">&quot;nano_core(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
 
     <span class="comment">// If the bootloader already mapped the framebuffer for us, the we can use it now
     // before initializing the memory mgmt subsystem.
@@ -442,7 +433,6 @@
     // for basic graphical text output.
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>fb_info) = framebuffer_info {
         early_printer::init(fb_info)<span class="question-mark">?</span>;
-        <span class="macro">early_printer::println!</span>(<span class="string">&quot;Hello from early printer! This is currently not fully utilized.&quot;</span>);
     }
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
@@ -450,19 +440,19 @@
         <span class="macro">log::info!</span>(<span class="string">&quot;Initialized logger_aarch64&quot;</span>);
     }
 
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized memory subsystem.&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized memory subsystem.&quot;</span>);
 
 
     state_store::init();
     <span class="macro">log::trace!</span>(<span class="string">&quot;state_store initialized.&quot;</span>);
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized state store.&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized state store.&quot;</span>);
 
     <span class="comment">// initialize the module management subsystem, so we can create the default crate namespace
     </span><span class="kw">let </span>default_namespace = mod_mgmt::init(bootloader_modules, kernel_mmi_ref.lock().deref_mut())<span class="question-mark">?</span>;
-    <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): initialized crate namespace subsystem.&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized crate namespace subsystem.&quot;</span>);
 
     <span class="comment">// Parse the nano_core crate (the code we&#39;re already running) since we need it to load and run applications.
-    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): parsing nano_core crate, please wait ...&quot;</span>);
+    </span><span class="macro">println!</span>(<span class="string">&quot;nano_core(): parsing nano_core crate, please wait ...&quot;</span>);
     <span class="kw">let </span>(nano_core_crate_ref, multicore_info) = <span class="kw">match </span>mod_mgmt::parse_nano_core::parse_nano_core(
         default_namespace,
         text_mapped_pages.into_inner(),
@@ -471,7 +461,7 @@
         <span class="bool-val">false</span>,
     ) {
         <span class="prelude-val">Ok</span>(NanoCoreItems { nano_core_crate_ref, init_symbol_values, num_new_symbols }) =&gt; {
-            <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): finished parsing the nano_core crate, {} new symbols.&quot;</span>, num_new_symbols);
+            <span class="macro">println!</span>(<span class="string">&quot;nano_core(): finished parsing the nano_core crate, {} new symbols.&quot;</span>, num_new_symbols);
 
             <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
             </span><span class="kw">let </span>multicore_info = {
@@ -526,10 +516,10 @@
     <span class="comment">// if in loadable mode, parse the crates we always need: the core library (Rust no_std lib), the panic handlers, and the captain
     </span><span class="attr">#[cfg(loadable)] </span>{
         <span class="kw">use </span>mod_mgmt::CrateNamespace;
-        <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): loading the \&quot;captain\&quot; crate...&quot;</span>);
+        <span class="macro">println!</span>(<span class="string">&quot;nano_core(): loading the \&quot;captain\&quot; crate...&quot;</span>);
         <span class="kw">let </span>(captain_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, <span class="string">&quot;captain-&quot;</span>).ok_or(<span class="string">&quot;couldn&#39;t find the singular \&quot;captain\&quot; crate object file&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>(_captain_crate, _num_captain_syms) = default_namespace.load_crate(<span class="kw-2">&amp;</span>captain_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
-        <span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): loading the panic handling crate(s)...&quot;</span>);
+        <span class="macro">println!</span>(<span class="string">&quot;nano_core(): loading the panic handling crate(s)...&quot;</span>);
         <span class="kw">let </span>(panic_wrapper_file, _ns) = CrateNamespace::get_crate_object_file_starting_with(default_namespace, <span class="string">&quot;panic_wrapper-&quot;</span>).ok_or(<span class="string">&quot;couldn&#39;t find the singular \&quot;panic_wrapper\&quot; crate object file&quot;</span>)<span class="question-mark">?</span>;
         <span class="kw">let </span>(_pw_crate, _num_pw_syms) = default_namespace.load_crate(<span class="kw-2">&amp;</span>panic_wrapper_file, <span class="prelude-val">None</span>, <span class="kw-2">&amp;</span>kernel_mmi_ref, <span class="bool-val">false</span>)<span class="question-mark">?</span>;
 
@@ -540,7 +530,7 @@
 
     <span class="comment">// Now we invoke the Captain, which will take over from here.
     // That&#39;s it, the nano_core is done! That&#39;s really all it does! 
-    </span><span class="macro">println_raw!</span>(<span class="string">&quot;nano_core(): invoking the captain...&quot;</span>);
+    </span><span class="macro">println!</span>(<span class="string">&quot;nano_core(): invoking the captain...&quot;</span>);
     <span class="kw">let </span>drop_after_init = captain::DropAfterInit {
         identity_mappings: identity_mapped_pages,
     };

@@ -165,7 +165,7 @@
 #[cfg(not(loadable))] </span><span class="kw">extern crate </span>unwind;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[macro_use] </span><span class="kw">extern crate </span>vga_buffer;
+#[macro_use] </span><span class="kw">extern crate </span>early_printer;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 #[cfg(not(loadable))] </span><span class="kw">extern crate </span>panic_wrapper;
@@ -219,7 +219,7 @@
         <span class="macro">error!</span>(<span class="string">&quot;Halting due to early panic: {}&quot;</span>, info);
         <span class="comment">// basic early panic printing with no dependencies
         </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-        </span><span class="macro">println_raw!</span>(<span class="string">&quot;\nHalting due to early panic: {}&quot;</span>, info);
+        </span><span class="macro">println!</span>(<span class="string">&quot;\nHalting due to early panic: {}&quot;</span>, info);
     }
 
     <span class="comment">// If we failed to handle the panic, there&#39;s not really much we can do about it,

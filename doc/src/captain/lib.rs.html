@@ -281,7 +281,7 @@
 </span><span class="kw">mod </span>mirror_log_callbacks {
     <span class="doccomment">/// The callback for use in the logger crate to mirror log functions to the early VGA screen.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>mirror_to_early_vga(args: core::fmt::Arguments) {
-        <span class="macro">vga_buffer::println_raw!</span>(<span class="string">&quot;{}&quot;</span>, args);
+        <span class="macro">early_printer::println!</span>(<span class="string">&quot;{}&quot;</span>, args);
     }
 
     <span class="doccomment">/// The callback for use in the logger crate to mirror log functions to the
