@@ -29,26 +29,11 @@ struct MouseInterruptParams {
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
-    //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
-    //the current code beneath just tries to set id = 4, so is not final
-    // Set Mouse ID to 4.
-    if let Err(e) = mouse.set_mouse_id(MouseId::Four) {
-        error!("Failed to set the mouse id to four: {e}");
-        return Err("Failed to set the mouse id to four");
-    }
-    // Read it back to check that it worked.
-    match mouse.mouse_id() {
-        Ok(id) =>  {
-            debug!("The PS/2 mouse ID is: {id:?}");
-            if !matches!(id, MouseId::Four) {
-                error!("Failed to set the mouse id to four");
-                return Err("Failed to set the mouse id to four");
-            }
-        }
-        Err(e) => {
-            error!("Failed to read the PS/2 mouse ID: {e}");
-            return Err("Failed to read the PS/2 mouse ID");
-        }
+    // Set MouseId to the highest possible one
+    if let Err(e) = mouse.set_mouse_id() {
+        error!("Failed to set the mouse id: {e}");
+        loop {}
+        return Err("Failed to set the mouse id");
     }
 
     // Register the interrupt handler
@@ -78,7 +63,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
             // currently get in read_mouse_packet and merge them afterwards
             let mouse_packet = mouse.read_mouse_packet();
-            // warn!("read_mouse_packet: {mouse_packet:?}");
+            warn!("read_mouse_packet: {mouse_packet:?}");
             
             if mouse_packet.always_one() != 1 {
                 // this could signal a hardware error or a mouse which doesn't conform to the rule

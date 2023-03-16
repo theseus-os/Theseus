@@ -47,7 +47,11 @@ pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event
     }
 
     // TODO: figure out what we should do, for now using set 1
-    keyboard.keyboard_scancode_set(ScancodeSet::Set1)?;
+    // some datapoints:
+    // - laptop 1 allows setting Scancode Set 1 and also returns Set 1 on GetScancode, but doesn't interrupt
+    // - laptop 1 allows setting Scancode Set 2 and works
+    // -> this means we can't check by hardware, we can only try setting the default, Set 2 and then try GetScancode
+    keyboard.set_keyboard_scancode_set(ScancodeSet::Set1)?;
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {
@@ -63,6 +67,7 @@ pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event
 
 /// The interrupt handler for a PS/2-connected keyboard, registered at IRQ 0x21.
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame) {
+    debug!("ps2_keyboard_handler");
     // Some of the scancodes are "extended", which means they generate two different interrupts,
     // the first handling the E0 byte, the second handling their second byte.
     static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);
