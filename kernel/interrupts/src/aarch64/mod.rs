@@ -8,10 +8,12 @@ use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
+use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
+use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
@@ -86,6 +88,23 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     loop {}
 }
 
+fn read_timer_period_femtoseconds() -> u64 {
+    let counter_freq_hz = CNTFRQ_EL0.get();
+    let fs_in_one_sec = 1_000_000_000_000_000;
+    fs_in_one_sec / counter_freq_hz
+}
+
+fn get_timeslice_ticks() -> u64 {
+    // The number of femtoseconds between each internal timer tick
+    static TIMESLICE_TICKS: Once<u64> = Once::new();
+
+    *TIMESLICE_TICKS.call_once(|| {
+        let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
+        let tick_period_femtosecs = read_timer_period_femtoseconds();
+        timeslice_femtosecs / tick_period_femtosecs
+    })
+}
+
 /// Please call this (only once) before using this crate.
 ///
 /// This initializes the Generic Interrupt Controller
@@ -96,10 +115,7 @@ pub fn init() -> Result<(), &'static str> {
         static __exception_vector_start: extern "C" fn();
     }
 
-    let counter_freq_hz = CNTFRQ_EL0.get();
-    let fs_in_one_sec = 1_000_000_000_000_000;
-    let period_femtoseconds = fs_in_one_sec / counter_freq_hz;
-
+    let period_femtoseconds = read_timer_period_femtoseconds();
     register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
 
     let mut gic = GIC.lock();
@@ -155,6 +171,13 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
     }
 
     Ok(())
+}
+
+/// Disables the timer, schedules its next tick, and re-enables it
+pub fn schedule_next_timer_tick() {
+    enable_timer(false);
+    CNTP_TVAL_EL0.set(get_timeslice_ticks());
+    enable_timer(true);
 }
 
 /// Enables/Disables the System Timer via the dedicated Arm System Registers

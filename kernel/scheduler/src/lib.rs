@@ -63,8 +63,8 @@ pub fn init() -> Result<(), &'static str> {
 /// The handler for each CPU's local timer interrupt, used for preemptive task switching.
 #[cfg(target_arch = "aarch64")]
 extern "C" fn aarch64_timer_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
+    interrupts::schedule_next_timer_tick();
     cpu_local_timer_tick_handler();
-
     interrupts::EoiBehaviour::HandlerHasSignaledEoi
 }
 
@@ -77,7 +77,7 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::
 // Cross platform scheduling code
 fn cpu_local_timer_tick_handler() {
     // tick count, only used for debugging
-    #[cfg(any())] { // cfg(any()) is always false
+    if false {
         use core::sync::atomic::{AtomicUsize, Ordering};
         static CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
         let _ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);

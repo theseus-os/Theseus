@@ -1533,6 +1533,7 @@ dependencies = [
  "gdt",
  "gic",
  "irq_safety",
+ "kernel_config",
  "locked_idt",
  "log",
  "memory",
