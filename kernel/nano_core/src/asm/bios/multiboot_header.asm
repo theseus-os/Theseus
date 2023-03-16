@@ -28,6 +28,7 @@ multiboot_header_start:
 ; 	dd 20    ; size of this tag (20)
 ; 	; The resolution specified below is limited by the hardware.
 ; 	; We have successfully tested resolutions up to 2560 x 1600.
+;   ; See more VGA/*XGA resolutions here: <https://en.wikipedia.org/wiki/Graphics_display_resolution#Extended_Graphics_Array>
 ; 	dd 1920  ; width in pixels
 ; 	dd 1080  ; height in pixels
 ; 	dd 32    ; depth: pixel size in bits. Theseus only supports 32-bit pixels.
