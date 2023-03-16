@@ -78,7 +78,6 @@ extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::
 fn cpu_local_timer_tick_handler() {
     // tick count, only used for debugging
     if false {
-        // optimized out on release builds
         use core::sync::atomic::{AtomicUsize, Ordering};
         static CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
         let _ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
