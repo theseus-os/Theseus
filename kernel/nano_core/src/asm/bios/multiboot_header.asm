@@ -1,4 +1,4 @@
-; Declare a multiboot2-compliant header, which indicates this program iss a bootable kernel image.
+; Declare a multiboot2-compliant header, which indicates this program is a bootable kernel image.
 ; This must be the first section in the kernel image, which is accomplished via our linker script. 
 ; It must also be aligned to a 4-byte boundary. 
 section .multiboot_header ; Permissions are the same as .rodata by default

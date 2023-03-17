@@ -56,16 +56,11 @@ mod build_info {
 #[macro_export]
 macro_rules! try_exit {
     ($expr:expr) => {
-        match $expr {
-            Ok(val) => val,
-            Err(err_msg) => {
-                $crate::shutdown(format_args!("{}", err_msg));
-            }
-        }
+        $expr.unwrap_or_else(|e| $crate::shutdown(format_args!("{e}")))
     };
 }
 
-/// Shuts down Theseus and prints the given formatted arguuments.
+/// Shuts down Theseus and prints the given formatted arguments.
 fn shutdown(msg: core::fmt::Arguments) -> ! {
     println!("Theseus is shutting down, msg: {}", msg);
     log::error!("Theseus is shutting down, msg: {}", msg);
@@ -92,7 +87,7 @@ where
     B: boot_info::BootInformation
 {
     irq_safety::disable_interrupts();
-    println!("Entered early_setup(). Interrupts disabled.");
+    println!("nano_core(): Entered early setup. Interrupts disabled.");
 
     #[cfg(target_arch = "x86_64")] {
         let logger_ports = [serial_port_basic::take_serial_port(
@@ -102,7 +97,7 @@ where
             .map_err(|_| "failed to initialize early logging")?;
     }
     log::info!("initialized early logger");
-    println!("early_setup(): initialized early logger.");
+    println!("nano_core(): initialized early logger.");
 
     // Dump basic information about this build of Theseus.
     log::info!("\n    \
@@ -113,7 +108,7 @@ where
     );
 
     exceptions_early::init(Some(double_fault_stack_top));
-    println!("early_setup(): initialized early IDT with exception handlers.");
+    println!("nano_core(): initialized early IDT with exception handlers.");
 
     let rsdp_address = boot_info.rsdp();
     println!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);

@@ -9,17 +9,12 @@ use std::{
 /// Whether or not to use the `built` crate to emit the default `built.rs` file.
 const EMIT_BUILT_RS_FILE: bool = false;
 
-/// The prefix that all custom rustc-known cfg keys are given by cargo
-/// when it transforms them into environment variables.
-const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
-
 // We put the feature checks here because the build script will give unhelpful
 // errors if it's built with the wrong combination of features.
 //
 // We prefer BIOS over UEFI to avoid mutually exclusive features as they mess up
 // building with --all-features.
 // https://doc.rust-lang.org/cargo/reference/features.html#mutually-exclusive-features
-
 cfg_if::cfg_if! {
     if #[cfg(feature = "uefi")] {
         const BOOT_SPECIFICATION: &str = "uefi";
@@ -33,20 +28,24 @@ cfg_if::cfg_if! {
 #[cfg(all(feature = "uefi", feature = "bios"))]
 compile_error!("Both the 'bios' and 'uefi' features cannot be jointly enabled");
 
-/// The set of built-in environment variables defined by cargo.
+/// The prefix that all custom rustc-known cfg keys are given by cargo
+/// when it transforms them into environment variables.
+const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
+
+/// The set of built-in environment variables defined by cargo, without prefix.
 static NON_CUSTOM_CFGS: [&str; 12] = [
-    "CARGO_CFG_PANIC",
-    "CARGO_CFG_TARGET_ABI",
-    "CARGO_CFG_TARGET_ARCH",
-    "CARGO_CFG_TARGET_ENDIAN",
-    "CARGO_CFG_TARGET_ENV",
-    "CARGO_CFG_TARGET_FEATURE",
-    "CARGO_CFG_TARGET_HAS_ATOMIC",
-    "CARGO_CFG_TARGET_HAS_ATOMIC_EQUAL_ALIGNMENT",
-    "CARGO_CFG_TARGET_HAS_ATOMIC_LOAD_STORE",
-    "CARGO_CFG_TARGET_OS",
-    "CARGO_CFG_TARGET_POINTER_WIDTH",
-    "CARGO_CFG_TARGET_VENDOR",
+    "PANIC",
+    "TARGET_ABI",
+    "TARGET_ARCH",
+    "TARGET_ENDIAN",
+    "TARGET_ENV",
+    "TARGET_FEATURE",
+    "TARGET_HAS_ATOMIC",
+    "TARGET_HAS_ATOMIC_EQUAL_ALIGNMENT",
+    "TARGET_HAS_ATOMIC_LOAD_STORE",
+    "TARGET_OS",
+    "TARGET_POINTER_WIDTH",
+    "TARGET_VENDOR",
 ];
 
 fn main() {
@@ -79,30 +78,33 @@ fn emit_built_rs_file() {
     let mut custom_cfgs_str = String::new();
 
     for (k, v) in std::env::vars() {
-        if k.starts_with("CARGO_CFG_") && !NON_CUSTOM_CFGS.contains(&k.as_str()) {
-            let key = k[CARGO_CFG_PREFIX.len()..].to_lowercase();
-            custom_cfgs = format!("{custom_cfgs}(\"{key}\", \"{v}\"), ");
-
-            custom_cfgs_str.push_str(&key);
-            if !v.is_empty() {
-                write!(custom_cfgs_str, "=\"{v}\"").expect("Failed to write to custom_cfgs_str");
+        if let Some(key) = k.strip_prefix(CARGO_CFG_PREFIX) {
+            if !NON_CUSTOM_CFGS.contains(&key) {
+                let key = key.to_lowercase();
+                custom_cfgs = format!("{custom_cfgs}(\"{key}\", \"{v}\"), ");
+                custom_cfgs_str.push_str(&key);
+                if !v.is_empty() {
+                    write!(custom_cfgs_str, "=\"{v}\"").expect("Failed to write to custom_cfgs_str");
+                }
+                custom_cfgs_str.push(' ');
+    
+                num_custom_cfgs += 1;
             }
-            custom_cfgs_str.push(' ');
-
-            num_custom_cfgs += 1;
         }
     }
 
     // Append all of the custom cfg values to the built.rs file as an array.
     write!(
         &mut built_file,
-        "#[allow(dead_code)]\npub const CUSTOM_CFG: [(&str, &str); {num_custom_cfgs}] = [{custom_cfgs}];\n",
+        "#[allow(dead_code)]\n
+        pub const CUSTOM_CFG: [(&str, &str); {num_custom_cfgs}] = [{custom_cfgs}];\n",
     ).unwrap();
 
     // Append all of the custom cfg values to the built.rs file as a single string.
     write!(
         &mut built_file,
-        "#[allow(dead_code)]\npub const CUSTOM_CFG_STR: &str = r#\"{custom_cfgs_str}\"#;\n",
+        "#[allow(dead_code)]\n
+        pub const CUSTOM_CFG_STR: &str = r#\"{custom_cfgs_str}\"#;\n",
     ).unwrap();
 }
 
@@ -133,20 +135,19 @@ fn compile_asm() {
         cflags.push_str(" -DBIOS");
     }
 
-    let include_files = match include_path.read_dir() {
-        Ok(include_files) => include_files,
-        Err(_) => panic!("failed to open include dir: {}", include_path.display()),
-    };
-    let files = if BOOT_SPECIFICATION == "bios" {
+    let include_files = include_path.read_dir().unwrap_or_else(|_|
+        panic!("failed to open include dir: {}", include_path.display())
+    );
+
+    let files: Vec<_> = if BOOT_SPECIFICATION == "bios" {
         let asm_path = include_path.join(BOOT_SPECIFICATION);
         include_files
-            .chain(match asm_path.read_dir() {
-                Ok(asm_files) => asm_files,
-                Err(_) => panic!("failed to open asm dir: {}", asm_path.display()),
-            })
-            .collect::<Vec<_>>()
+            .chain(asm_path.read_dir().unwrap_or_else(|_|
+                panic!("failed to open asm dir: {}", asm_path.display())
+            ))
+            .collect()
     } else {
-        include_files.collect::<Vec<_>>()
+        include_files.collect()
     };
 
     for file in files {
