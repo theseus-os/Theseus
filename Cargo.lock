@@ -2185,13 +2185,17 @@ dependencies = [
  "ap_start",
  "apic",
  "cpu",
+ "interrupts",
  "kernel_config",
  "log",
  "madt",
  "memory",
+ "memory_aarch64",
  "mod_mgmt",
+ "no_drop",
  "pause",
  "pit_clock_basic",
+ "psci",
  "spin 0.9.4",
  "stack",
  "volatile 0.2.7",
@@ -2802,6 +2806,12 @@ dependencies = [
  "port_io",
  "spin 0.9.4",
 ]
+
+[[package]]
+name = "psci"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3374e3ae47f134467227a48be93b929e5d304efcd25ce5d176006403ca1d9bab"
 
 [[package]]
 name = "psm"

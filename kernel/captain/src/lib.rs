@@ -55,15 +55,7 @@ impl DropAfterInit {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 pub use multicore_bringup::MulticoreBringupInfo;
-
-/// TODO: in the future this could be defined here or re-exported from another aarch64 crate.
-#[cfg(target_arch = "aarch64")]
-pub struct MulticoreBringupInfo {
-    // nothing needed on aarch64 yet
-}
-
 
 /// Initialize the Captain, which is the main crate that "steers the ship" of Theseus. 
 ///
@@ -144,7 +136,6 @@ pub fn init(
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
         multicore_info,
-        Some(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )?;
     #[cfg(not(target_arch = "x86_64"))]
     let ap_count = 0;
