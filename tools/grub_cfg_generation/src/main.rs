@@ -67,6 +67,10 @@ fn create_grub_cfg_string(input_directory: String) -> Result<String, String> {
     content.push_str("set default=0\n\n");
     content.push_str("menuentry \"Theseus OS\" {\n");
     content.push_str("\tmultiboot2 /boot/kernel.bin \n");
+    // Below is a priority-ordered list of resolutions.
+    // Based on our testing, 4x3 aspect ratios are the most widely supported.
+    content.push_str("\tset gfxpayload=1280x1024x32,1280x720x32,1024x768x32,640x480x32,auto \n");
+    
 
     for path in fs::read_dir(input_directory).map_err(|e| e.to_string())? {
         let path = path.map_err(|e| e.to_string())?;

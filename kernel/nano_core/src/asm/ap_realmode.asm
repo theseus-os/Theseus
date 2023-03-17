@@ -102,31 +102,29 @@ ap_start_realmode:
 
 %ifdef BIOS
     ; need to use BIOS interrupts to write to vga buffer, not mem-mapped 0xb8000
-    mov ah, 0x0E
-    mov al, "A"
-    int 0x10
-    mov al, "P"
-    int 0x10
-    mov al, " "
-    int 0x10
-    mov al, "B"
-    int 0x10
-    mov al, "O"
-    int 0x10
-    mov al, "O"
-    int 0x10
-    mov al, "T"
-    int 0x10
+    ; mov ah, 0x0E
+    ; mov al, "A"
+    ; int 0x10
+    ; mov al, "P"
+    ; int 0x10
+    ; mov al, " "
+    ; int 0x10
+    ; mov al, "B"
+    ; int 0x10
+    ; mov al, "O"
+    ; int 0x10
+    ; mov al, "O"
+    ; int 0x10
+    ; mov al, "T"
+    ; int 0x10
 
-; We only need to execute the graphic mode setting code once, system-wide. 
-; We use the byte at [0000:0900] to indicate if another core has already run this code.
+; We only execute the graphic mode setting code once, when bringing up the last AP.
     mov ax, 0
     mov es, ax
-    mov di, 0x900
-    mov ax, [es:di]
-    cmp ax, 5
-    ; skip graphics mode setting code if it's already been done.
-    je create_gdt
+    mov al, [es:AP_IS_LAST_AP]
+    cmp al, 1
+    ; skip graphics mode setting code 
+    jne after_graphic_mode
 
 
 ; This is the start of the graphics mode code. 
@@ -157,7 +155,7 @@ get_vbe_card_info:
     mov di, VBECardInfo    ; Set `di` to the address where the VBE card info will be written
     int 0x10
     cmp al, 0x4F           ; The result is placed into `al`. A result of `0x4f` means the query was successful.
-    jne graphic_mode_done  ; A failure here means we can't set graphic modes, so just skip to the end. 
+    jne after_graphic_mode  ; A failure here means we can't set graphic modes, so just skip to the end. 
     
     ; initialize the mode pointer so we can iterate over the available graphics modes
     mov si, [VBECardInfo.videomodeptr]
@@ -300,15 +298,10 @@ mode_iter_done:
     mov bx, [best_mode.mode]
     int 0x10
 
-graphic_mode_done:
-    ; Set the byte at [0000:0900] to indicate that we've run the graphic mode setting code.
-    mov ax, 0
-    mov es, ax
-    mov di, 0x900
-    mov byte [es:di], 5
-    ; move on (fall through) to the next step, setting up our GDT
 %endif ; BIOS
 
+after_graphic_mode:
+    ; move on (fall through) to the next step, setting up our GDT
 
 ; Here, we create a GDT manually by writing its contents directly, starting at address 0x800.
 ; Since this code will be forcibly loaded by the GRUB multiboot2 bootloader at an address above 1MB,
@@ -393,12 +386,12 @@ prot_mode:
 %ifdef BIOS
     ; each character is reversed in the dword cuz of little endianness
     ; prints "AP_PROTECTED"
-    mov dword [0xb8000], 0x4f504f41 ; "AP"
-    mov dword [0xb8004], 0x4f504f5F ; "_P"
-    mov dword [0xb8008], 0x4f4f4f52 ; "RO"
-    mov dword [0xb800c], 0x4f454f54 ; "TE"
-    mov dword [0xb8010], 0x4f544f43 ; "CT"
-    mov dword [0xb8014], 0x4f444f45 ; "ED"
+    ; mov dword [0xb8000], 0x4f504f41 ; "AP"
+    ; mov dword [0xb8004], 0x4f504f5F ; "_P"
+    ; mov dword [0xb8008], 0x4f4f4f52 ; "RO"
+    ; mov dword [0xb800c], 0x4f454f54 ; "TE"
+    ; mov dword [0xb8010], 0x4f544f43 ; "CT"
+    ; mov dword [0xb8014], 0x4f444f45 ; "ED"
 %endif ; BIOS
 
     jmp 0x08:ap_start_protected_mode

@@ -8,7 +8,7 @@
 use core::{fmt::{self, Write}, slice, ops::{Deref, DerefMut}};
 use boot_info::{FramebufferInfo, Address, FramebufferFormat};
 use font::FONT_BASIC;
-use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress};
+use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch};
 use spin::Mutex;
 use vga_buffer::VgaBuffer;
 
@@ -65,8 +65,10 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
     }
     log::info!("early_printer::init(): {:?}", info);
     let fb_pixel_count = (info.stride * info.height) as usize;
+    let mut flags_used = None;
+    let mut staging_fb_range = None;
 
-    let (fb_paddr, fb_memory) = match info.address {
+    let (fb_paddr, fb_memory, staging_fb) = match info.address {
         Address::Virtual(vaddr) => {
             let paddr = memory::translate(vaddr)
                 .ok_or("BUG: bootloader-provided framebuffer virtual address was not mapped!")?;
@@ -78,6 +80,7 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
             (
                 paddr,
                 FramebufferMemory::Slice(slc),
+                None,
             )
         }
         Address::Physical(paddr) => {
@@ -87,28 +90,61 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
             )?;
             let frames = memory::allocate_frames_by_bytes_at(paddr, info.total_size_in_bytes as usize)
                 .map_err(|_| "couldn't allocate frames for early framebuffer printer")?;
-            let pages = memory::allocate_pages(frames.size_in_frames())
+            let num_pages = frames.size_in_frames();
+            let pages = memory::allocate_pages(num_pages)
                 .ok_or("couldn't allocate pages for early framebuffer printer")?;
-            let mp = kernel_mmi.lock().page_table.map_allocated_pages_to(
-                pages,
-                frames,
-                PteFlags::new().valid(true).writable(true).device_memory(true)
-            )?;
-            (
-                paddr,
-                FramebufferMemory::Mapping(
-                    mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
-                ),
-            )
+            let mut flags: PteFlagsArch = PteFlags::new()
+                .valid(true)
+                .writable(true)
+                .into();
+
+            #[cfg(target_arch = "x86_64")] {
+                if page_attribute_table::init().is_ok() {
+                    flags = flags.pat_index(
+                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                    );
+                    log::info!("Using PAT write-combining mapping for early_printer framebuffer");
+                } else {
+                    flags = flags.device_memory(true);
+                    log::info!("Falling back to cache-disable mapping for early_printer framebuffer");
+                }
+            }
+            #[cfg(not(target_arch = "x86_64"))] {
+                flags = flags.device_memory(true);
+            }
+
+            flags_used = Some(flags);
+            let mp = kernel_mmi.lock().page_table.map_allocated_pages_to(pages, frames, flags)?;
+            let fb_memory = FramebufferMemory::Mapping(
+                mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
+            );
+
+            // Attempt to allocated a staging framebuffer, which is used to significantly
+            // accelerate scrolling by not having to read from the framebuffer memory.
+            let staging_fb = memory::allocate_pages(num_pages)
+                .and_then(|pages| {
+                    kernel_mmi.lock().page_table.map_allocated_pages(
+                        pages,
+                        PteFlags::new().valid(true).writable(true),
+                    )
+                    .ok()
+                })
+                .and_then(|mp| {
+                    staging_fb_range = Some(mp.deref().clone());
+                    mp.into_borrowed_slice_mut(0, fb_pixel_count).ok()
+                });
+                
+            (paddr, fb_memory, staging_fb)
         }
     };
 
     // Round down the height of the fb to the nearest multiple of `CHARACTER_HEIGHT`
     // in order to prevent characters from being displayed partially offscreen
     let height = (info.height / CHARACTER_HEIGHT) * CHARACTER_HEIGHT;
-    log::info!("Capping early framebuffer height to {} pixels (from {})", height, info.height);
-    let early_fb = EarlyFramebufferPrinter {
+    log::info!("Limiting early framebuffer height to {} pixels (from {})", height, info.height);
+    let mut early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
+        staging_fb,
         paddr: fb_paddr,
         width: info.width,
         height,
@@ -116,6 +152,20 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
         format: info.format,
         curr_pixel: PixelCoord { x: 0, y: 0 },
     };
+
+    let _res = early_fb.write_fmt(format_args!(
+        "Initialized early printer with framebuffer:
+        paddr: {:#X}
+        resolution: {} x {}  (stride {}, capped height {})
+        format: {:?}
+        flags: {:?}
+        staging_fb: {:X?}\n",
+        fb_paddr,
+        info.width, info.height, info.stride, height,
+        info.format,
+        flags_used,
+        staging_fb_range,
+    ));
     *EARLY_FRAMEBUFFER_PRINTER.lock() = Some(EarlyPrinter::Framebuffer(early_fb));
     Ok(())
 }
@@ -166,6 +216,8 @@ struct PixelCoord {
 pub struct EarlyFramebufferPrinter {
     /// The underlying framebuffer memory, accessible as a slice of pixels.
     fb: FramebufferMemory,
+    /// The optional staging buffer, used to accelerate scrolling.
+    staging_fb: Option<BorrowedSliceMappedPages<u32, Mutable>>,
     /// The starting physical address of the framebuffer.
     pub paddr: PhysicalAddress,
     /// The width in pixels of the framebuffer.
@@ -213,7 +265,10 @@ impl EarlyFramebufferPrinter {
             }
             let start_idx = (self.curr_pixel.y + row) * self.stride + self.curr_pixel.x;
             let fb_row_range = start_idx as usize .. (start_idx + CHARACTER_WIDTH) as usize;
-            self.fb[fb_row_range].copy_from_slice(&pixel_row);
+
+            // Write to the staging fb if we have one, otherwise write to the main fb.
+            let dest_fb = self.staging_fb.as_deref_mut().unwrap_or(self.fb.deref_mut());
+            dest_fb[fb_row_range].copy_from_slice(&pixel_row);
         }
 
         self.advance_by_one_char(background_pixel_color);
@@ -234,8 +289,10 @@ impl EarlyFramebufferPrinter {
     fn newline(&mut self, background_pixel_color: u32) {
         // Fill the rest of the current row starting from the current column.
         self.fill_character_line(self.curr_pixel, background_pixel_color);
-
         self.curr_pixel.x = 0;
+
+        self.copy_line_from_staging_fb();
+
         let next_row = self.curr_pixel.y + CHARACTER_HEIGHT;
         if next_row >= self.height {
             return self.scroll(background_pixel_color);
@@ -248,16 +305,27 @@ impl EarlyFramebufferPrinter {
     fn scroll(&mut self, background_pixel_color: u32) {
         let start_of_line_two = CHARACTER_HEIGHT * self.stride;
         let end_of_last_line = self.height * self.stride;
-        self.fb.copy_within(
-            start_of_line_two as usize .. end_of_last_line as usize,
-            0,
-        );
+        let src_range = start_of_line_two as usize .. end_of_last_line as usize;
+
+        if let Some(staging_fb) = self.staging_fb.as_deref_mut() {
+            // Scroll up the staging buffer.
+            staging_fb.copy_within(src_range.clone(), 0);
+        }
+        else {
+            // If we don't have a staging fb, we must scroll within the main fb itself.
+            self.fb.copy_within(src_range.clone(), 0);
+        }
         let start_of_last_line = self.height - CHARACTER_HEIGHT;
         self.curr_pixel = PixelCoord { x: 0, y: start_of_last_line };
         self.fill_character_line(self.curr_pixel, background_pixel_color);
+
+        if let Some(staging_fb) = self.staging_fb.as_deref() {
+            // Copy from the staging fb (if we have one) to the main fb.
+            self.fb.copy_from_slice(&staging_fb);
+        }
     }
 
-    /// Fills a full character line;s worth of pixels from the `start_pixel` coordinate
+    /// Fills a full character line's worth of pixels from the `start_pixel` coordinate
     /// with the given `background_pixel_color`.
     ///
     /// Does not advance or otherwise modify the current pixel location.
@@ -270,7 +338,21 @@ impl EarlyFramebufferPrinter {
         for row in 0 .. CHARACTER_HEIGHT {
             let start_idx = (start_pixel.y + row) * self.stride + start_pixel.x;
             let end_idx = start_idx + row_remainder_len;
-            self.fb[start_idx as usize .. end_idx as usize].fill(background_pixel_color);
+            // Write to the staging fb if we have one, otherwise write to the main fb.
+            let dest_fb = self.staging_fb.as_deref_mut().unwrap_or(self.fb.deref_mut());
+            dest_fb[start_idx as usize .. end_idx as usize].fill(background_pixel_color);
+        }
+    }
+
+    /// Copies a full character line's worth of pixels from the staging fb to the main fb.
+    ///
+    /// If there is no staging fb, this does nothing.
+    fn copy_line_from_staging_fb(&mut self) {
+        if let Some(staging_fb) = self.staging_fb.as_deref() {
+            let start_idx = self.curr_pixel.y * self.stride;
+            let end_idx = start_idx + (CHARACTER_HEIGHT * self.stride);
+            let range = start_idx as usize .. end_idx as usize;
+            self.fb[range.clone()].copy_from_slice(&staging_fb[range]);
         }
     }
 }
