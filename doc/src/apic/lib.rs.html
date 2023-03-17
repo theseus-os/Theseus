@@ -1599,8 +1599,8 @@
     <span class="doccomment">/// After this lapic has been enabled, initialize its LVT timer.
     </span><span class="kw">fn </span>init_lvt_timer(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="kw">let </span>apic_period = <span class="kw">if </span><span class="macro">cfg!</span>(apic_timer_fixed) {
-            <span class="macro">info!</span>(<span class="string">&quot;apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}&quot;</span>, <span class="number">0x10000</span>);
-            <span class="number">0x10000 </span><span class="comment">// for bochs, which doesn&#39;t do apic periods right
+            <span class="macro">info!</span>(<span class="string">&quot;apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}&quot;</span>, <span class="number">1000000</span>);
+            <span class="number">1000000 </span><span class="comment">// for bochs, which doesn&#39;t do apic periods right
         </span>} <span class="kw">else </span>{
             <span class="self">self</span>.calibrate_lapic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
         };

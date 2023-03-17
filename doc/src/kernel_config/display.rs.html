@@ -2,9 +2,17 @@
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
+<a href="#5" id="5">5</a>
+<a href="#6" id="6">6</a>
+<a href="#7" id="7">7</a>
+<a href="#8" id="8">8</a>
 </pre><pre class="rust"><code><span class="doccomment">/// The maximum resolution `(width, height)` of the graphical framebuffer, in pixels.
 /// This is a **requested limit** and does not control what the actual
 /// resolution of the graphical framebuffer will be.
-</span><span class="kw">pub const </span>FRAMEBUFFER_MAX_RESOLUTION: (u16, u16) = (<span class="number">1024</span>, <span class="number">768</span>);
+///
+/// We recommend matching this to the value set in
+/// `kernel/nano_core/src/asm/bios/multiboot_header.asm`,
+/// but it&#39;s not strictly necessary to do so.
+</span><span class="kw">pub const </span>FRAMEBUFFER_MAX_RESOLUTION: (u16, u16) = (<span class="number">1280</span>, <span class="number">1024</span>);
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="kernel_config" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

@@ -506,6 +506,37 @@
 <a href="#506" id="506">506</a>
 <a href="#507" id="507">507</a>
 <a href="#508" id="508">508</a>
+<a href="#509" id="509">509</a>
+<a href="#510" id="510">510</a>
+<a href="#511" id="511">511</a>
+<a href="#512" id="512">512</a>
+<a href="#513" id="513">513</a>
+<a href="#514" id="514">514</a>
+<a href="#515" id="515">515</a>
+<a href="#516" id="516">516</a>
+<a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Initialization and bring-up of secondary CPUs on x86_64.
 //!
 //! These functions are intended to be invoked from the BSP
@@ -779,7 +810,8 @@
     <span class="comment">// Now, the AP startup code is at the PhysicalAddress `AP_STARTUP`.
 
     </span><span class="kw">let </span><span class="kw-2">mut </span>ap_count = <span class="number">0</span>; <span class="comment">// the number of AP cores we have successfully booted.
-    </span><span class="kw">let </span>ap_trampoline_data: <span class="kw-2">&amp;mut </span>ApTrampolineData = trampoline_mapped_pages.as_type_mut(<span class="number">0</span>)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span><span class="kw-2">mut </span>is_last_ap = <span class="bool-val">false</span>;
+    <span class="kw">let </span>ap_trampoline_data: <span class="kw-2">&amp;mut </span>ApTrampolineData = trampoline_mapped_pages.as_type_mut(<span class="number">0</span>)<span class="question-mark">?</span>;
     <span class="comment">// Here, we set up the data items that will be accessible to the APs when they boot up.
     // We only set the values of fields that are the same for ALL APs here;
     // values that change for each AP are set individually in `bring_up_ap()` below.
@@ -793,14 +825,31 @@
         .ok_or(<span class="string">&quot;Couldn&#39;t find the MADT APIC table. Has the ACPI subsystem been initialized yet?&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>madt_iter = madt.iter();
 
-    <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter.clone() {
+    <span class="comment">// Count the total number of CPUs first so we know when we&#39;re bringing up the last AP.
+    </span><span class="kw">let </span>total_cpus_expected: u32 = {
+        <span class="kw">let </span><span class="kw-2">mut </span>total = <span class="number">0</span>;
+        <span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter.clone() {
+            <span class="kw">let </span>flags = <span class="kw">match </span>madt_entry {
+                MadtEntry::LocalApic(entry)   =&gt; entry.flags,
+                MadtEntry::LocalX2Apic(entry) =&gt; entry.flags,
+                <span class="kw">_ </span>=&gt; <span class="kw">continue</span>,
+            };
+            <span class="kw">if </span>flags &amp; <span class="number">0x1 </span>== <span class="number">0x1 </span>{
+                total += <span class="number">1</span>;
+            }
+        }
+        total
+    };
+
+    <span class="comment">// Now, bring up each AP sequentially.
+    </span><span class="kw">for </span>madt_entry <span class="kw">in </span>madt_iter.clone() {
         <span class="kw">let </span>(processor_id, apic_id, flags) = <span class="kw">match </span>madt_entry {
             MadtEntry::LocalApic(entry) =&gt; (entry.processor <span class="kw">as </span>u32, entry.apic_id <span class="kw">as </span>u32, entry.flags),
             MadtEntry::LocalX2Apic(entry) =&gt; (entry.processor, entry.x2apic_id, entry.flags),
             <span class="kw">_ </span>=&gt; <span class="kw">continue</span>,
         };
 
-        <span class="comment">// we already handled the BSP in a different functions
+        <span class="comment">// we already handled the BSP in a different function
         </span><span class="kw">if </span>this_cpu.value() == apic_id {
             <span class="kw">continue</span>;
         }
@@ -824,6 +873,9 @@
 
         <span class="kw">let </span>(nmi_lint, nmi_flags) = find_nmi_entry_for_processor(processor_id, madt_iter.clone());
 
+        <span class="comment">// Subtracr 2:  -1 for the BSP, and another -1 for the last AP.
+        </span>is_last_ap = ap_count == total_cpus_expected.saturating_sub(<span class="number">2</span>);
+
         bring_up_ap(
             bsp_lapic.deref_mut(), 
             processor_id,
@@ -832,13 +884,14 @@
             page_table_phys_addr, 
             ap_stack, 
             nmi_lint,
-            nmi_flags 
+            nmi_flags,
+            is_last_ap,
         );
         ap_count += <span class="number">1</span>;
     }
 
     <span class="comment">// Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
-    </span><span class="kw">if </span>ap_count != <span class="number">0 </span>{
+    </span><span class="kw">if </span>ap_count != <span class="number">0 </span>&amp;&amp; is_last_ap {
         <span class="kw">let </span>graphic_info = trampoline_mapped_pages
             .as_type::&lt;GraphicInfo&gt;(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)<span class="question-mark">?</span>;
         <span class="macro">info!</span>(<span class="string">&quot;Obtained graphic info from real mode: {:?}&quot;</span>, graphic_info);
@@ -906,8 +959,15 @@
     <span class="doccomment">/// The location of the GDT_AP symbol in physical memory.
     </span>ap_gdt:            Volatile&lt;u32&gt;,
     _padding6:         [u8; <span class="number">4</span>],
+    <span class="doccomment">/// A flag indicating whether this is the last AP being brought up:
+    /// * A value of `0` indicates this is NOT the last AP to be initialized,
+    ///   so no graphics mode switching should occur.
+    /// * A value of `1` indicates this is the last AP to be initialized,
+    ///   and therefore it should perform the graphics mode switch.
+    </span>ap_is_last_ap:     Volatile&lt;u8&gt;,
+    _padding7:         [u8; <span class="number">7</span>],
 }
-<span class="kw">const _</span>: () = <span class="macro">assert!</span>(size_of::&lt;ApTrampolineData&gt;() == <span class="number">12 </span>* size_of::&lt;u64&gt;());
+<span class="kw">const _</span>: () = <span class="macro">assert!</span>(size_of::&lt;ApTrampolineData&gt;() == <span class="number">13 </span>* size_of::&lt;u64&gt;());
 
 
 <span class="doccomment">/// Called by the BSP to initialize the given `new_lapic` using IPIs.
@@ -920,7 +980,8 @@
     page_table_paddr: PhysicalAddress, 
     ap_stack: stack::Stack,
     nmi_lint: u8, 
-    nmi_flags: u16
+    nmi_flags: u16,
+    is_last_ap: bool,
 ) {
     ap_trampoline_data.ap_ready.write(<span class="number">0</span>);
     ap_trampoline_data.ap_processor_id.write(new_apic_processor_id);
@@ -931,6 +992,7 @@
     ap_trampoline_data.ap_code.write(VirtualAddress::new_canonical(kstart_ap <span class="kw">as </span>usize));
     ap_trampoline_data.ap_nmi_lint.write(nmi_lint);
     ap_trampoline_data.ap_nmi_flags.write(nmi_flags);
+    ap_trampoline_data.ap_is_last_ap.write(<span class="kw">if </span>is_last_ap { <span class="number">1 </span>} <span class="kw">else </span>{ <span class="number">0 </span>});
     AP_READY_FLAG.store(<span class="bool-val">false</span>, Ordering::SeqCst);
 
     <span class="comment">// Give ownership of the stack we created for this AP to the `ap_start` crate, 

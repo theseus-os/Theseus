@@ -312,6 +312,88 @@
 <a href="#312" id="312">312</a>
 <a href="#313" id="313">313</a>
 <a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for early text output to a graphical framebuffer
 //! or text-mode VGA display.
 //!
@@ -322,7 +404,7 @@
 </span><span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, slice, ops::{Deref, DerefMut}};
 <span class="kw">use </span>boot_info::{FramebufferInfo, Address, FramebufferFormat};
 <span class="kw">use </span>font::FONT_BASIC;
-<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress};
+<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch};
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>vga_buffer::VgaBuffer;
 
@@ -379,8 +461,10 @@
     }
     <span class="macro">log::info!</span>(<span class="string">&quot;early_printer::init(): {:?}&quot;</span>, info);
     <span class="kw">let </span>fb_pixel_count = (info.stride * info.height) <span class="kw">as </span>usize;
+    <span class="kw">let </span><span class="kw-2">mut </span>flags_used = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>staging_fb_range = <span class="prelude-val">None</span>;
 
-    <span class="kw">let </span>(fb_paddr, fb_memory) = <span class="kw">match </span>info.address {
+    <span class="kw">let </span>(fb_paddr, fb_memory, staging_fb) = <span class="kw">match </span>info.address {
         Address::Virtual(vaddr) =&gt; {
             <span class="kw">let </span>paddr = memory::translate(vaddr)
                 .ok_or(<span class="string">&quot;BUG: bootloader-provided framebuffer virtual address was not mapped!&quot;</span>)<span class="question-mark">?</span>;
@@ -392,6 +476,7 @@
             (
                 paddr,
                 FramebufferMemory::Slice(slc),
+                <span class="prelude-val">None</span>,
             )
         }
         Address::Physical(paddr) =&gt; {
@@ -401,28 +486,61 @@
             </span>)<span class="question-mark">?</span>;
             <span class="kw">let </span>frames = memory::allocate_frames_by_bytes_at(paddr, info.total_size_in_bytes <span class="kw">as </span>usize)
                 .map_err(|<span class="kw">_</span>| <span class="string">&quot;couldn&#39;t allocate frames for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>pages = memory::allocate_pages(frames.size_in_frames())
+            <span class="kw">let </span>num_pages = frames.size_in_frames();
+            <span class="kw">let </span>pages = memory::allocate_pages(num_pages)
                 .ok_or(<span class="string">&quot;couldn&#39;t allocate pages for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>mp = kernel_mmi.lock().page_table.map_allocated_pages_to(
-                pages,
-                frames,
-                PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>).device_memory(<span class="bool-val">true</span>)
-            )<span class="question-mark">?</span>;
-            (
-                paddr,
-                FramebufferMemory::Mapping(
-                    mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).map_err(|(_mp, s)| s)<span class="question-mark">?
-                </span>),
-            )
+            <span class="kw">let </span><span class="kw-2">mut </span>flags: PteFlagsArch = PteFlags::new()
+                .valid(<span class="bool-val">true</span>)
+                .writable(<span class="bool-val">true</span>)
+                .into();
+
+            <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+                <span class="kw">if </span>page_attribute_table::init().is_ok() {
+                    flags = flags.pat_index(
+                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                    );
+                    <span class="macro">log::info!</span>(<span class="string">&quot;Using PAT write-combining mapping for early_printer framebuffer&quot;</span>);
+                } <span class="kw">else </span>{
+                    flags = flags.device_memory(<span class="bool-val">true</span>);
+                    <span class="macro">log::info!</span>(<span class="string">&quot;Falling back to cache-disable mapping for early_printer framebuffer&quot;</span>);
+                }
+            }
+            <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
+                flags = flags.device_memory(<span class="bool-val">true</span>);
+            }
+
+            flags_used = <span class="prelude-val">Some</span>(flags);
+            <span class="kw">let </span>mp = kernel_mmi.lock().page_table.map_allocated_pages_to(pages, frames, flags)<span class="question-mark">?</span>;
+            <span class="kw">let </span>fb_memory = FramebufferMemory::Mapping(
+                mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).map_err(|(_mp, s)| s)<span class="question-mark">?
+            </span>);
+
+            <span class="comment">// Attempt to allocated a staging framebuffer, which is used to significantly
+            // accelerate scrolling by not having to read from the framebuffer memory.
+            </span><span class="kw">let </span>staging_fb = memory::allocate_pages(num_pages)
+                .and_then(|pages| {
+                    kernel_mmi.lock().page_table.map_allocated_pages(
+                        pages,
+                        PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
+                    )
+                    .ok()
+                })
+                .and_then(|mp| {
+                    staging_fb_range = <span class="prelude-val">Some</span>(mp.deref().clone());
+                    mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).ok()
+                });
+                
+            (paddr, fb_memory, staging_fb)
         }
     };
 
     <span class="comment">// Round down the height of the fb to the nearest multiple of `CHARACTER_HEIGHT`
     // in order to prevent characters from being displayed partially offscreen
     </span><span class="kw">let </span>height = (info.height / CHARACTER_HEIGHT) * CHARACTER_HEIGHT;
-    <span class="macro">log::info!</span>(<span class="string">&quot;Capping early framebuffer height to {} pixels (from {})&quot;</span>, height, info.height);
-    <span class="kw">let </span>early_fb = EarlyFramebufferPrinter {
+    <span class="macro">log::info!</span>(<span class="string">&quot;Limiting early framebuffer height to {} pixels (from {})&quot;</span>, height, info.height);
+    <span class="kw">let </span><span class="kw-2">mut </span>early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
+        staging_fb,
         paddr: fb_paddr,
         width: info.width,
         height,
@@ -430,6 +548,20 @@
         format: info.format,
         curr_pixel: PixelCoord { x: <span class="number">0</span>, y: <span class="number">0 </span>},
     };
+
+    <span class="kw">let </span>_res = early_fb.write_fmt(<span class="macro">format_args!</span>(
+        <span class="string">&quot;Initialized early printer with framebuffer:
+        paddr: {:#X}
+        resolution: {} x {}  (stride {}, capped height {})
+        format: {:?}
+        flags: {:?}
+        staging_fb: {:X?}\n&quot;</span>,
+        fb_paddr,
+        info.width, info.height, info.stride, height,
+        info.format,
+        flags_used,
+        staging_fb_range,
+    ));
     <span class="kw-2">*</span>EARLY_FRAMEBUFFER_PRINTER.lock() = <span class="prelude-val">Some</span>(EarlyPrinter::Framebuffer(early_fb));
     <span class="prelude-val">Ok</span>(())
 }
@@ -480,6 +612,8 @@
 </span><span class="kw">pub struct </span>EarlyFramebufferPrinter {
     <span class="doccomment">/// The underlying framebuffer memory, accessible as a slice of pixels.
     </span>fb: FramebufferMemory,
+    <span class="doccomment">/// The optional staging buffer, used to accelerate scrolling.
+    </span>staging_fb: <span class="prelude-ty">Option</span>&lt;BorrowedSliceMappedPages&lt;u32, Mutable&gt;&gt;,
     <span class="doccomment">/// The starting physical address of the framebuffer.
     </span><span class="kw">pub </span>paddr: PhysicalAddress,
     <span class="doccomment">/// The width in pixels of the framebuffer.
@@ -527,7 +661,10 @@
             }
             <span class="kw">let </span>start_idx = (<span class="self">self</span>.curr_pixel.y + row) * <span class="self">self</span>.stride + <span class="self">self</span>.curr_pixel.x;
             <span class="kw">let </span>fb_row_range = start_idx <span class="kw">as </span>usize .. (start_idx + CHARACTER_WIDTH) <span class="kw">as </span>usize;
-            <span class="self">self</span>.fb[fb_row_range].copy_from_slice(<span class="kw-2">&amp;</span>pixel_row);
+
+            <span class="comment">// Write to the staging fb if we have one, otherwise write to the main fb.
+            </span><span class="kw">let </span>dest_fb = <span class="self">self</span>.staging_fb.as_deref_mut().unwrap_or(<span class="self">self</span>.fb.deref_mut());
+            dest_fb[fb_row_range].copy_from_slice(<span class="kw-2">&amp;</span>pixel_row);
         }
 
         <span class="self">self</span>.advance_by_one_char(background_pixel_color);
@@ -548,8 +685,10 @@
     </span><span class="kw">fn </span>newline(<span class="kw-2">&amp;mut </span><span class="self">self</span>, background_pixel_color: u32) {
         <span class="comment">// Fill the rest of the current row starting from the current column.
         </span><span class="self">self</span>.fill_character_line(<span class="self">self</span>.curr_pixel, background_pixel_color);
-
         <span class="self">self</span>.curr_pixel.x = <span class="number">0</span>;
+
+        <span class="self">self</span>.copy_line_from_staging_fb();
+
         <span class="kw">let </span>next_row = <span class="self">self</span>.curr_pixel.y + CHARACTER_HEIGHT;
         <span class="kw">if </span>next_row &gt;= <span class="self">self</span>.height {
             <span class="kw">return </span><span class="self">self</span>.scroll(background_pixel_color);
@@ -562,16 +701,27 @@
     </span><span class="kw">fn </span>scroll(<span class="kw-2">&amp;mut </span><span class="self">self</span>, background_pixel_color: u32) {
         <span class="kw">let </span>start_of_line_two = CHARACTER_HEIGHT * <span class="self">self</span>.stride;
         <span class="kw">let </span>end_of_last_line = <span class="self">self</span>.height * <span class="self">self</span>.stride;
-        <span class="self">self</span>.fb.copy_within(
-            start_of_line_two <span class="kw">as </span>usize .. end_of_last_line <span class="kw">as </span>usize,
-            <span class="number">0</span>,
-        );
+        <span class="kw">let </span>src_range = start_of_line_two <span class="kw">as </span>usize .. end_of_last_line <span class="kw">as </span>usize;
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(staging_fb) = <span class="self">self</span>.staging_fb.as_deref_mut() {
+            <span class="comment">// Scroll up the staging buffer.
+            </span>staging_fb.copy_within(src_range, <span class="number">0</span>);
+        }
+        <span class="kw">else </span>{
+            <span class="comment">// If we don&#39;t have a staging fb, we must scroll within the main fb itself.
+            </span><span class="self">self</span>.fb.copy_within(src_range, <span class="number">0</span>);
+        }
         <span class="kw">let </span>start_of_last_line = <span class="self">self</span>.height - CHARACTER_HEIGHT;
         <span class="self">self</span>.curr_pixel = PixelCoord { x: <span class="number">0</span>, y: start_of_last_line };
         <span class="self">self</span>.fill_character_line(<span class="self">self</span>.curr_pixel, background_pixel_color);
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(staging_fb) = <span class="self">self</span>.staging_fb.as_deref() {
+            <span class="comment">// Copy from the staging fb (if we have one) to the main fb.
+            </span><span class="self">self</span>.fb.copy_from_slice(<span class="kw-2">&amp;</span>staging_fb);
+        }
     }
 
-    <span class="doccomment">/// Fills a full character line;s worth of pixels from the `start_pixel` coordinate
+    <span class="doccomment">/// Fills a full character line&#39;s worth of pixels from the `start_pixel` coordinate
     /// with the given `background_pixel_color`.
     ///
     /// Does not advance or otherwise modify the current pixel location.
@@ -584,7 +734,21 @@
         <span class="kw">for </span>row <span class="kw">in </span><span class="number">0 </span>.. CHARACTER_HEIGHT {
             <span class="kw">let </span>start_idx = (start_pixel.y + row) * <span class="self">self</span>.stride + start_pixel.x;
             <span class="kw">let </span>end_idx = start_idx + row_remainder_len;
-            <span class="self">self</span>.fb[start_idx <span class="kw">as </span>usize .. end_idx <span class="kw">as </span>usize].fill(background_pixel_color);
+            <span class="comment">// Write to the staging fb if we have one, otherwise write to the main fb.
+            </span><span class="kw">let </span>dest_fb = <span class="self">self</span>.staging_fb.as_deref_mut().unwrap_or(<span class="self">self</span>.fb.deref_mut());
+            dest_fb[start_idx <span class="kw">as </span>usize .. end_idx <span class="kw">as </span>usize].fill(background_pixel_color);
+        }
+    }
+
+    <span class="doccomment">/// Copies a full character line&#39;s worth of pixels from the staging fb to the main fb.
+    ///
+    /// If there is no staging fb, this does nothing.
+    </span><span class="kw">fn </span>copy_line_from_staging_fb(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(staging_fb) = <span class="self">self</span>.staging_fb.as_deref() {
+            <span class="kw">let </span>start_idx = <span class="self">self</span>.curr_pixel.y * <span class="self">self</span>.stride;
+            <span class="kw">let </span>end_idx = start_idx + (CHARACTER_HEIGHT * <span class="self">self</span>.stride);
+            <span class="kw">let </span>range = start_idx <span class="kw">as </span>usize .. end_idx <span class="kw">as </span>usize;
+            <span class="self">self</span>.fb[range.clone()].copy_from_slice(<span class="kw-2">&amp;</span>staging_fb[range]);
         }
     }
 }

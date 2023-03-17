@@ -244,6 +244,7 @@
 <a href="#244" id="244">244</a>
 <a href="#245" id="245">245</a>
 <a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -396,7 +397,8 @@
     </span><span class="kw">let </span>ap_count = <span class="number">0</span>;
 
     <span class="kw">let </span>cpu_count = ap_count + <span class="number">1</span>;
-    <span class="macro">info!</span>(<span class="string">&quot;Finished handling and booting up all {} AP cores; {} total CPUs are running.&quot;</span>, ap_count, cpu_count);
+    <span class="macro">info!</span>(<span class="string">&quot;Finished booting all {} AP cores; {} total CPUs are running.&quot;</span>, ap_count, cpu_count);
+    <span class="macro">info!</span>(<span class="string">&quot;Proceeding with system initialization, please wait...&quot;</span>);
 
     <span class="comment">// arch-gate: no framebuffer support on aarch64 at the moment
     </span><span class="attr">#[cfg(all(mirror_log_to_vga, target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
