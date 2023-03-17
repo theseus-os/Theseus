@@ -132,13 +132,10 @@ pub fn init(
     
     // boot up the other cores (APs)
     // arch-gate: no multicore support on aarch64 at the moment
-    #[cfg(target_arch = "x86_64")]
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
         multicore_info,
     )?;
-    #[cfg(not(target_arch = "x86_64"))]
-    let ap_count = 0;
 
     let cpu_count = ap_count + 1;
     info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
