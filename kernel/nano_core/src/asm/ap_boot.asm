@@ -27,10 +27,10 @@ ap_start_protected_mode:
 %ifdef BIOS
     ; each character is reversed in the dword cuz of little endianness
 	; prints PGTBL
-	mov dword [0xb8018], 0x4f2E4f2E ; ".."
-    mov dword [0xb801c], 0x4f504f2E ; ".P"
-	mov dword [0xb8020], 0x4f544f47 ; "GT"
-	mov dword [0xb8024], 0x4f4C4f42 ; "BL"
+	; mov dword [0xb8018], 0x4f2E4f2E ; ".."
+    ; mov dword [0xb801c], 0x4f504f2E ; ".P"
+	; mov dword [0xb8020], 0x4f544f47 ; "GT"
+	; mov dword [0xb8024], 0x4f4C4f42 ; "BL"
 %endif ; BIOS
 
 	; Load the 64-bit GDT
@@ -47,9 +47,9 @@ ap_start_protected_mode:
 
 %ifdef BIOS
 	; prints GDT
-	mov dword [0xb8028], 0x4f2E4f2E ; ".."
-    mov dword [0xb802c], 0x4f474f2E ; ".G"
-	mov dword [0xb8030], 0x4f544f44 ; "DT"
+	; mov dword [0xb8028], 0x4f2E4f2E ; ".."
+    ; mov dword [0xb802c], 0x4f474f2E ; ".G"
+	; mov dword [0xb8030], 0x4f544f44 ; "DT"
 	mov eax, 0x4f004f00
 	or eax, GDT_AP.code + 0x30 ; convert GDT_AP.code value to ASCII char
 	mov dword [0xb8034], eax ; prints GDT_AP.code value
@@ -125,9 +125,9 @@ long_mode_start_ap:
 	
 %ifdef BIOS
 	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8038], 0x4f2E4f2E ; ".."
-    mov dword [0xb803c], 0x4f4f4f4c ; "LO"
-	mov dword [0xb8040], 0x4f474f4e ; "NG"
+	; mov dword [0xb8038], 0x4f2E4f2E ; ".."
+    ; mov dword [0xb803c], 0x4f4f4f4c ; "LO"
+	; mov dword [0xb8040], 0x4f474f4e ; "NG"
 %endif ; BIOS
 
 	; Long jump to the higher half. Because `jmp` does not take
@@ -173,10 +173,10 @@ start_high_ap:
 	
 %ifdef BIOS
 	; each character is reversed in the dword cuz of little endianness
-	mov dword [0xb8048], 0x4f2E4f2E ; ".."
-    mov dword [0xb804c], 0x4f494f48 ; "HI"
-	mov dword [0xb8050], 0x4f484f47 ; "GH"
-	mov dword [0xb8054], 0x4f524f45 ; "ER"
+	; mov dword [0xb8048], 0x4f2E4f2E ; ".."
+    ; mov dword [0xb804c], 0x4f494f48 ; "HI"
+	; mov dword [0xb8050], 0x4f484f47 ; "GH"
+	; mov dword [0xb8054], 0x4f524f45 ; "ER"
 %endif ; BIOS
 
 	; move to the new stack that was alloc'd for this AP
