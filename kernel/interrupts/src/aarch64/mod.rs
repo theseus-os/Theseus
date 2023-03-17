@@ -105,16 +105,29 @@ fn get_timeslice_ticks() -> u64 {
     })
 }
 
-/// Please call this (only once) before using this crate.
-///
-/// This initializes the Generic Interrupt Controller
-/// using the addresses which are valid on qemu's "virt" VM.
-pub fn init() -> Result<(), &'static str> {
+/// Sets `VBAR_EL1` to the start of the exception vector
+fn set_vbar_el1() {
     extern "Rust" {
         // in assembly file
         static __exception_vector_start: extern "C" fn();
     }
 
+    // Set the exception handling vector, which
+    // is an array of grouped aarch64 instructions.
+    // see table.s for more info.
+    unsafe { VBAR_EL1.set(&__exception_vector_start as *const _ as u64) };
+}
+
+/// Sets `VBAR_EL1` to the start of the exception vector
+pub fn init_ap() {
+    set_vbar_el1();
+}
+
+/// Please call this (only once) before using this crate.
+///
+/// This initializes the Generic Interrupt Controller
+/// using the addresses which are valid on qemu's "virt" VM.
+pub fn init() -> Result<(), &'static str> {
     let period_femtoseconds = read_timer_period_femtoseconds();
     register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
 
@@ -122,10 +135,7 @@ pub fn init() -> Result<(), &'static str> {
     if gic.is_some() {
         Err("The GIC has already been initialized!")
     } else {
-        // Set the exception handling vector, which
-        // is an array of grouped aarch64 instructions.
-        // see table.s for more info.
-        unsafe { VBAR_EL1.set(&__exception_vector_start as *const _ as u64) };
+        set_vbar_el1();
 
         let kernel_mmi_ref = get_kernel_mmi_ref()
             .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;

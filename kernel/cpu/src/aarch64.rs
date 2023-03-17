@@ -43,6 +43,14 @@ impl CpuId {
         assert!(level < 4, "Valid affinity levels are 0, 1, 2, 3");
         (self.0 >> (level * 8)) as u8
     }
+
+    pub fn new(aff3: u8, aff2: u8, aff1: u8, aff0: u8) -> Self {
+        let aff3 = (aff3 as u32) << 24;
+        let aff2 = (aff2 as u32) << 16;
+        let aff1 = (aff1 as u32) <<  8;
+        let aff0 = (aff0 as u32) <<  0;
+        Self(aff3 | aff2 | aff1 | aff0)
+    }
 }
 
 /// A unique identifier for a CPU, read from the `MPIDR_EL1` register on aarch64.
