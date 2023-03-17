@@ -309,11 +309,11 @@ impl EarlyFramebufferPrinter {
 
         if let Some(staging_fb) = self.staging_fb.as_deref_mut() {
             // Scroll up the staging buffer.
-            staging_fb.copy_within(src_range.clone(), 0);
+            staging_fb.copy_within(src_range, 0);
         }
         else {
             // If we don't have a staging fb, we must scroll within the main fb itself.
-            self.fb.copy_within(src_range.clone(), 0);
+            self.fb.copy_within(src_range, 0);
         }
         let start_of_last_line = self.height - CHARACTER_HEIGHT;
         self.curr_pixel = PixelCoord { x: 0, y: start_of_last_line };
