@@ -32,20 +32,20 @@ compile_error!("Both the 'bios' and 'uefi' features cannot be jointly enabled");
 /// when it transforms them into environment variables.
 const CARGO_CFG_PREFIX: &str = "CARGO_CFG_";
 
-/// The set of built-in environment variables defined by cargo, without prefix.
+/// The set of built-in environment variables defined by cargo.
 static NON_CUSTOM_CFGS: [&str; 12] = [
-    "PANIC",
-    "TARGET_ABI",
-    "TARGET_ARCH",
-    "TARGET_ENDIAN",
-    "TARGET_ENV",
-    "TARGET_FEATURE",
-    "TARGET_HAS_ATOMIC",
-    "TARGET_HAS_ATOMIC_EQUAL_ALIGNMENT",
-    "TARGET_HAS_ATOMIC_LOAD_STORE",
-    "TARGET_OS",
-    "TARGET_POINTER_WIDTH",
-    "TARGET_VENDOR",
+    "CARGO_CFG_PANIC",
+    "CARGO_CFG_TARGET_ABI",
+    "CARGO_CFG_TARGET_ARCH",
+    "CARGO_CFG_TARGET_ENDIAN",
+    "CARGO_CFG_TARGET_ENV",
+    "CARGO_CFG_TARGET_FEATURE",
+    "CARGO_CFG_TARGET_HAS_ATOMIC",
+    "CARGO_CFG_TARGET_HAS_ATOMIC_EQUAL_ALIGNMENT",
+    "CARGO_CFG_TARGET_HAS_ATOMIC_LOAD_STORE",
+    "CARGO_CFG_TARGET_OS",
+    "CARGO_CFG_TARGET_POINTER_WIDTH",
+    "CARGO_CFG_TARGET_VENDOR",
 ];
 
 fn main() {
@@ -78,8 +78,8 @@ fn emit_built_rs_file() {
     let mut custom_cfgs_str = String::new();
 
     for (k, v) in std::env::vars() {
-        if let Some(key) = k.strip_prefix(CARGO_CFG_PREFIX) {
-            if !NON_CUSTOM_CFGS.contains(&key) {
+        if !NON_CUSTOM_CFGS.contains(&k.as_str()) {
+            if let Some(key) = k.strip_prefix(CARGO_CFG_PREFIX) {
                 let key = key.to_lowercase();
                 custom_cfgs = format!("{custom_cfgs}(\"{key}\", \"{v}\"), ");
                 custom_cfgs_str.push_str(&key);
@@ -96,14 +96,14 @@ fn emit_built_rs_file() {
     // Append all of the custom cfg values to the built.rs file as an array.
     write!(
         &mut built_file,
-        "#[allow(dead_code)]\n
+        "#[allow(dead_code)]\n\
         pub const CUSTOM_CFG: [(&str, &str); {num_custom_cfgs}] = [{custom_cfgs}];\n",
     ).unwrap();
 
     // Append all of the custom cfg values to the built.rs file as a single string.
     write!(
         &mut built_file,
-        "#[allow(dead_code)]\n
+        "#[allow(dead_code)]\n\
         pub const CUSTOM_CFG_STR: &str = r#\"{custom_cfgs_str}\"#;\n",
     ).unwrap();
 }
