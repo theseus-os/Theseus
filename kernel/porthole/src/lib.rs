@@ -280,6 +280,7 @@ impl WindowManager {
         }
     }
 
+
     // TODO: This can be greatly simplfied, instead of having one big function cut this into smaller ones.
     fn handle_mouse_events_on_windows(&mut self, screen_position: ScreenPos, mouse_event: &MouseEvent) {
         if !mouse_event.buttons.left() && !mouse_event.buttons.right() {
@@ -371,7 +372,7 @@ impl WindowManager {
                     self.mouse.height,
                     self.mouse.x,
                     self.mouse.y,
-                )) {
+                )) && window.active() {
                     window.resizing = true;
                     window
                         .resize_window(screen_position.x, screen_position.y);

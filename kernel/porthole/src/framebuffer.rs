@@ -315,14 +315,12 @@ impl<'a> FramebufferRowIter<'a> {
             .y
             .try_into()
             .expect("Rectangle's y coord was negative. FIXME");
-        assert!(start_row < fb_height); // FIXME: return result
         let end_row = min(start_row + rect.height(), fb_height);
 
         let start_column: usize = rect
             .x
             .try_into()
-            .expect("Rectangle's x coord was negative. FIXME");
-        assert!(start_column < fb_width); // FIXME: return result
+            .unwrap_or(0);
         let end_column = min(start_column + rect.width(), fb_width);
 
         let idx_of_start_row = start_row * fb_stride;

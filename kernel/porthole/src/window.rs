@@ -158,7 +158,7 @@ impl Window {
         // Calculate the area of the current line that has not yet been printed on
         let mut drawable_area = self.drawable_area();
         drawable_area.y = y;
-        drawable_area.height = 900;
+        drawable_area.height = CHARACTER_HEIGHT - 1;
         drawable_area.x += text_width as isize;
         drawable_area.width -= text_width;
 
@@ -523,8 +523,10 @@ impl Window {
         // so we do the resize check here. Plus to fill the window we need updated version of framebuffer's width and height.
         self.should_resize_framebuffer()?;
 
-        let window_background_area = self.rect();
-        self.fill_rect_abs(window_background_area, color);
+        // We only want to fill visible parts of a window.
+        let area = self.relative_visible_rect();
+        let row_chunks = FramebufferRowIter::new(&mut self.frame_buffer, area);
+        row_chunks.for_each(|row| row.iter_mut().for_each(|pixel| *pixel = color));
 
         self.draw_borders();
         Ok(())
