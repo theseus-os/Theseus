@@ -365,7 +365,7 @@ impl<'c> PS2Mouse<'c> {
                     for rate in [_200, _200, _80] {
                         self.set_mouse_sampling_rate(rate)?;
                     }
-                    // We need to use whatever the hardware returns here, 0 or 3
+                    // We need to use whatever the hardware returns here, 4 or 3
                     if let Ok(id) = self.mouse_id() {
                         self.id = id
                     }
