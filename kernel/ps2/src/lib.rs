@@ -203,7 +203,7 @@ impl PS2Controller {
         for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
             if self.status_register().output_buffer_full() {
                 use PortTestResult::*;
-                match self.log_read().try_into() {
+                match self.read_data().try_into() {
                     Ok(Passed) => return Ok(()),
                     Ok(ClockLineStuckLow)  => warn!("clock line stuck low"),
                     Ok(ClockLineStuckHigh) => warn!("clock line stuck high"),
@@ -234,7 +234,6 @@ impl PS2Controller {
 
     /// e.g. https://wiki.osdev.org/PS/2_Mouse#Set_Sample_Rate_Example
     fn polling_send_receive(&self, value: HostToDevice) -> Result<DeviceToHostResponse, &'static str> {
-        debug!("pollsendrec {:?}", value);
         self.polling_send(value)?;
         self.polling_receive()
     }
@@ -277,7 +276,6 @@ impl PS2Controller {
     }
 
     /// For debugging purposes
-    #[doc(hidden)]
     #[allow(dead_code)]
     fn log_read(&self) -> u8 {
         let data = self.read_data();
@@ -391,7 +389,7 @@ impl<'c> PS2Mouse<'c> {
         const VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX;
         for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
             if self.is_output_buffer_full() {
-                if let Ok(id) = self.controller.log_read().try_into() {
+                if let Ok(id) = self.controller.read_data().try_into() {
                     return Ok(id)
                 }
             }
@@ -534,7 +532,7 @@ impl<'c> PS2Keyboard<'c> {
             })
             .map_err(|e| {
                 warn!("{e}");
-                loop{}
+                e
             })
     }
 
@@ -545,7 +543,7 @@ impl<'c> PS2Keyboard<'c> {
             const VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX;
             for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
                 if self.is_output_buffer_full() {
-                    if let Ok(id) = self.controller.log_read().try_into() {
+                    if let Ok(id) = self.controller.read_data().try_into() {
                         return Ok(id)
                     }
                 }
@@ -554,7 +552,7 @@ impl<'c> PS2Keyboard<'c> {
         })
         .map_err(|e| {
             warn!("{e}");
-            loop{}
+            e
         })
     }
 
@@ -565,24 +563,20 @@ impl<'c> PS2Keyboard<'c> {
     /// This means `PS2Controller::read_data` would presumably return 0x00 here, even though the value is already reserved for the device type "Standard PS/2 mouse".
     /// As we only care about detecting keyboard types here, it should work.
     pub fn keyboard_detect(&self) -> Result<KeyboardType, &'static str> {
-        // return Ok(KeyboardType::MF2Keyboard);
-        //I get random startup blackscreens when multicore is on (no logging)
-        //when doing command_to_keyboard, but it could also be caused by completely different things
         self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(DisableScanning))?;
-
         self.command_to_keyboard(HostToKeyboardCommandOrData::KeyboardCommand(IdentifyKeyboard))?; 
 
         let mut keyboard_type = Err("unrecognized keyboard type");
         const VERY_ARBITRARY_TIMEOUT_VALUE: u16 = u16::MAX; //TODO: replace all these loops with an untyped polling_receive?
         for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
             if self.is_output_buffer_full() {
-                match self.controller.log_read() {
+                match self.controller.read_data() {
                     0x00 => keyboard_type = Ok(KeyboardType::AncientATKeyboard), //might be wrong
                     0xAB => {
                         //This loop + check might be irrelevant
                         for _ in 0..VERY_ARBITRARY_TIMEOUT_VALUE {
                             if self.is_output_buffer_full() {
-                                match self.controller.log_read() {
+                                match self.controller.read_data() {
                                     0x41 | 0xC1 => keyboard_type = Ok(KeyboardType::MF2KeyboardWithPSControllerTranslator),
                                     0x83 => keyboard_type = Ok(KeyboardType::MF2Keyboard),
                                     _ => continue,
