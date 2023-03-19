@@ -15,5 +15,5 @@
 pub fn spin_loop_hint() {
     // core::hint::spin_loop();
     #[cfg(target_arch = "x86_64")]
-    unsafe { core::arch::asm!("pause", options(nomem, nostack)); }
+    unsafe { core::arch::asm!("pause", options(nomem, nostack, preserves_flags)); }
 }
