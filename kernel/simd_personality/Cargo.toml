@@ -31,6 +31,9 @@ path = "../mod_mgmt"
 [dependencies.fs_node]
 path = "../fs_node"
 
+[dependencies.pause]
+pause = "../pause"
+
 # [target.'cfg(target_feature = "sse2")'.dependencies.compiler_builtins]
 # git = "https://github.com/rust-lang-nursery/compiler-builtins"
 # features = [ "no-lang-items" ]

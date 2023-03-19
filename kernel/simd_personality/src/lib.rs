@@ -51,6 +51,7 @@
 #![no_std]
 
 // NOTE: the `cfg_if` macro makes the entire file dependent upon the `simd_personality` config.
+
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(simd_personality)] {
 
@@ -81,6 +82,7 @@ use alloc::{
 };
 use mod_mgmt::{CrateNamespace, CrateType, NamespaceDir, get_initial_kernel_namespace, get_namespaces_directory};
 use task::SimdExt;
+use pause::spin_loop_hint;
 
 
 /// Initializes a new SIMD personality based on the provided `simd_ext` level of given SIMD extensions, e.g., SSE, AVX.
@@ -198,7 +200,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
-	loop { }
+	loop { spin_loop_hint() }
 	
 	// _task1.join()?;
 	// _task2.join()?;

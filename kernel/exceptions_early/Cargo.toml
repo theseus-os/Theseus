@@ -25,6 +25,9 @@ path = "../tss"
 [dependencies.gdt]
 path = "../gdt"
 
+[dependencies.pause]
+path = "../pause"
+
 
 [lib]
 crate-type = ["rlib"]

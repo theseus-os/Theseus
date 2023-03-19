@@ -1043,6 +1043,7 @@ dependencies = [
  "locked_idt",
  "memory",
  "mod_mgmt",
+ "pause 0.1.0",
  "spin 0.9.4",
  "tss",
  "x86_64",
@@ -1060,6 +1061,7 @@ dependencies = [
  "locked_idt",
  "log",
  "memory",
+ "pause 0.1.0",
  "pmu_x86",
  "runqueue",
  "signal_handler",
@@ -2190,7 +2192,7 @@ dependencies = [
  "madt",
  "memory",
  "mod_mgmt",
- "pause",
+ "pause 0.1.0",
  "pit_clock_basic",
  "spin 0.9.4",
  "stack",
@@ -2433,6 +2435,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "numtoa"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8f8bdf33df195859076e54ab11ee78a1b208382d3a26ec40d142ffc1ecc49ef"
+
+[[package]]
 name = "object"
 version = "0.28.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2528,6 +2536,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "panic_wrapper",
+ "pause 0.1.0",
  "unwind",
 ]
 
@@ -2573,6 +2582,15 @@ dependencies = [
 [[package]]
 name = "pause"
 version = "0.1.0"
+
+[[package]]
+name = "pause"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "778411a10652cb1cef2b9bf3157992277cb82268f6b4c62f0e94190aafe161e5"
+dependencies = [
+ "termion",
+]
 
 [[package]]
 name = "pci"
@@ -2918,6 +2936,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "redox_syscall"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
+name = "redox_termios"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8440d8acb4fd3d277125b4bd01a6f38aee8d814b3b5fc09b3f2b825d37d3fe8f"
+dependencies = [
+ "redox_syscall",
+]
+
+[[package]]
 name = "regex"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3037,6 +3073,7 @@ dependencies = [
  "hpet",
  "libtest",
  "log",
+ "pause 0.1.0",
  "runqueue",
  "spawn",
  "task",
@@ -3368,6 +3405,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "pause 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "pit_clock",
  "spawn",
  "task",
@@ -3486,7 +3524,7 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "pause",
+ "pause 0.1.0",
  "preemption",
  "runqueue",
  "scheduler",
@@ -3717,6 +3755,18 @@ dependencies = [
  "preemption",
  "spin 0.9.4",
  "stack",
+]
+
+[[package]]
+name = "termion"
+version = "1.5.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "077185e2eac69c3f8379a4298e1e07cd36beb962290d4a51199acf0fdc10607e"
+dependencies = [
+ "libc",
+ "numtoa",
+ "redox_syscall",
+ "redox_termios",
 ]
 
 [[package]]
@@ -4101,7 +4151,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "pause",
+ "pause 0.1.0",
  "x86_64",
 ]
 

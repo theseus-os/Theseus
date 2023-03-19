@@ -29,6 +29,7 @@ use alloc::{
 use log::{error, info, debug};
 use cpu::CpuId;
 use debugit::debugit;
+use pause::spin_loop_hint;
 use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
@@ -904,7 +905,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { spin_loop_hint() }
 }
 
 /// The final piece of the task cleanup logic for restartable tasks.
@@ -986,7 +987,7 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { spin_loop_hint() }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.

@@ -16,6 +16,9 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
+[dependencies.pause]
+path = "../pause"
+
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 early_printer = { path = "../early_printer" }
 panic_wrapper = { path = "../panic_wrapper" }

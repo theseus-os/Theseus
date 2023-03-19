@@ -52,5 +52,8 @@ path = "../debug_info"
 [dependencies.signal_handler]
 path = "../signal_handler"
 
+[dependencies.pause]
+path = "../pause"
+
 [lib]
 crate-type = ["rlib"]

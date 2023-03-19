@@ -33,7 +33,6 @@ use hpet::get_hpet;
 use task::{Task, TaskRef};
 use libtest::{hpet_timing_overhead, hpet_2_us};
 
-
 const CONFIG: &'static str = "WITHOUT state spill";
 
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
@@ -151,7 +150,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     task.name = String::from("rq_eval_single_task_unrunnable");
     let taskref = TaskRef::create(
         task,
-        |_, _| loop { }, // dummy failure function
+        |_, _| loop { pause::spin_loop_hint() }, // dummy failure function
     );
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;

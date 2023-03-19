@@ -14,6 +14,7 @@ use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
 use spin::Once;
+use pause::spin_loop_hint;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
@@ -79,13 +80,13 @@ type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
     log::error!("Unhandled Exception ({})\r\n{:?}\r\n[looping forever now]", origin, exc);
-    loop {}
+    loop { spin_loop_hint() }
 }
 
 // called for all unhandled interrupt requests
 extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     log::error!("Unhandled IRQ:\r\n{:?}\r\n[looping forever now]", exc);
-    loop {}
+    loop { spin_loop_hint() }
 }
 
 fn read_timer_period_femtoseconds() -> u64 {
