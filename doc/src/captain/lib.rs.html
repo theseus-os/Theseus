@@ -236,15 +236,6 @@
 <a href="#236" id="236">236</a>
 <a href="#237" id="237">237</a>
 <a href="#238" id="238">238</a>
-<a href="#239" id="239">239</a>
-<a href="#240" id="240">240</a>
-<a href="#241" id="241">241</a>
-<a href="#242" id="242">242</a>
-<a href="#243" id="243">243</a>
-<a href="#244" id="244">244</a>
-<a href="#245" id="245">245</a>
-<a href="#246" id="246">246</a>
-<a href="#247" id="247">247</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -302,15 +293,7 @@
     }
 }
 
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">pub use </span>multicore_bringup::MulticoreBringupInfo;
-
-<span class="doccomment">/// TODO: in the future this could be defined here or re-exported from another aarch64 crate.
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-</span><span class="kw">pub struct </span>MulticoreBringupInfo {
-    <span class="comment">// nothing needed on aarch64 yet
-</span>}
-
+<span class="kw">pub use </span>multicore_bringup::MulticoreBringupInfo;
 
 <span class="doccomment">/// Initialize the Captain, which is the main crate that &quot;steers the ship&quot; of Theseus. 
 ///
@@ -391,7 +374,6 @@
     </span><span class="kw">let </span>ap_count = multicore_bringup::handle_ap_cores(
         <span class="kw-2">&amp;</span>kernel_mmi_ref,
         multicore_info,
-        <span class="prelude-val">Some</span>(kernel_config::display::FRAMEBUFFER_MAX_RESOLUTION),
     )<span class="question-mark">?</span>;
     <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
     </span><span class="kw">let </span>ap_count = <span class="number">0</span>;

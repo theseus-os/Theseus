@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/multicore_bringup/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../multicore_bringup/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/multicore_bringup/src/x86_64.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>x86_64.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../multicore_bringup/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -521,22 +521,6 @@
 <a href="#521" id="521">521</a>
 <a href="#522" id="522">522</a>
 <a href="#523" id="523">523</a>
-<a href="#524" id="524">524</a>
-<a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
-<a href="#538" id="538">538</a>
-<a href="#539" id="539">539</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Initialization and bring-up of secondary CPUs on x86_64.
 //!
 //! These functions are intended to be invoked from the BSP
@@ -546,22 +530,7 @@
 </span><span class="attr">#![no_std]
 #![feature(let_chains)]
 
-</span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>volatile;
-<span class="kw">extern crate </span>zerocopy;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>pit_clock_basic;
-<span class="kw">extern crate </span>stack;
-<span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>apic;
-<span class="kw">extern crate </span>acpi;
-<span class="kw">extern crate </span>madt;
-<span class="kw">extern crate </span>mod_mgmt;
-<span class="kw">extern crate </span>ap_start;
-<span class="kw">extern crate </span>pause;
-<span class="kw">extern crate </span>cpu;
+#[macro_use] </span><span class="kw">extern crate </span>log;
 
 <span class="kw">use </span>core::{
     convert::TryInto,
@@ -573,7 +542,7 @@
 <span class="kw">use </span>volatile::Volatile;
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
-<span class="kw">use </span>kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
+<span class="kw">use </span>kernel_config::{memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES}, display::FRAMEBUFFER_MAX_RESOLUTION};
 <span class="kw">use </span>apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 <span class="kw">use </span>ap_start::{kstart_ap, AP_READY_FLAG};
 <span class="kw">use </span>madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
@@ -745,7 +714,6 @@
 </span><span class="kw">pub fn </span>handle_ap_cores(
     kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
     multicore_info: MulticoreBringupInfo,
-    max_framebuffer_resolution: <span class="prelude-ty">Option</span>&lt;(u16, u16)&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;u32, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>MulticoreBringupInfo {
         ap_start_realmode_begin,
@@ -815,7 +783,7 @@
     <span class="comment">// Here, we set up the data items that will be accessible to the APs when they boot up.
     // We only set the values of fields that are the same for ALL APs here;
     // values that change for each AP are set individually in `bring_up_ap()` below.
-    </span><span class="kw">let </span>(max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
+    </span><span class="kw">let </span>(max_width, max_height) = FRAMEBUFFER_MAX_RESOLUTION;
     ap_trampoline_data.ap_max_fb_width.write(max_width);
     ap_trampoline_data.ap_max_fb_height.write(max_height);
     ap_trampoline_data.ap_gdt.write(ap_gdt.value().try_into().map_err(|<span class="kw">_</span>| <span class="string">&quot;AP_GDT physical address larger than u32::MAX&quot;</span>)<span class="question-mark">?</span>);

@@ -291,6 +291,8 @@
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
 <a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //!
 //! The `nano_core` is very simple, and only does the following things:
@@ -405,8 +407,10 @@
         build_info::CUSTOM_CFG_STR,
     );
 
-    exceptions_early::init(<span class="prelude-val">Some</span>(double_fault_stack_top));
-    <span class="macro">println!</span>(<span class="string">&quot;early_setup(): initialized early IDT with exception handlers.&quot;</span>);
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        exceptions_early::init(<span class="prelude-val">Some</span>(double_fault_stack_top));
+        <span class="macro">println!</span>(<span class="string">&quot;early_setup(): initialized early IDT with exception handlers.&quot;</span>);
+    }
 
     <span class="kw">let </span>rsdp_address = boot_info.rsdp();
     <span class="macro">println!</span>(<span class="string">&quot;nano_core(): bootloader-provided RSDP address: {:X?}&quot;</span>, rsdp_address);
