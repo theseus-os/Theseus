@@ -88,7 +88,7 @@ fn rust_entry(boot_info: &'static BootInformation, double_fault_stack_top: usize
     // See the above memory layout diagram in `_start`.
     let kernel_stack_start = try_exit!(
         VirtualAddress::new(double_fault_stack_top - STACK_SIZE)
-        .ok_or("BUG: kernel_stack_start virtual address is invalid")
+            .ok_or("BUG: kernel_stack_start virtual address is invalid")
     );
     let double_fault_stack_top = try_exit!(
         VirtualAddress::new(double_fault_stack_top)
