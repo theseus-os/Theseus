@@ -288,11 +288,6 @@
 <a href="#288" id="288">288</a>
 <a href="#289" id="289">289</a>
 <a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //!
 //! The `nano_core` is very simple, and only does the following things:
@@ -351,16 +346,11 @@
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>try_exit {
     (<span class="macro-nonterminal">$expr</span>:expr) =&gt; {
-        <span class="kw">match </span><span class="macro-nonterminal">$expr </span>{
-            <span class="prelude-val">Ok</span>(val) =&gt; val,
-            <span class="prelude-val">Err</span>(err_msg) =&gt; {
-                <span class="macro-nonterminal">$crate::shutdown</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{}&quot;</span>, err_msg));
-            }
-        }
+        <span class="macro-nonterminal">$expr</span>.unwrap_or_else(|e| <span class="macro-nonterminal">$crate::shutdown</span>(<span class="macro">format_args!</span>(<span class="string">&quot;{e}&quot;</span>)))
     };
 }
 
-<span class="doccomment">/// Shuts down Theseus and prints the given formatted arguuments.
+<span class="doccomment">/// Shuts down Theseus and prints the given formatted arguments.
 </span><span class="kw">fn </span>shutdown(msg: core::fmt::Arguments) -&gt; ! {
     <span class="macro">println!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
     <span class="macro">log::error!</span>(<span class="string">&quot;Theseus is shutting down, msg: {}&quot;</span>, msg);
@@ -387,7 +377,7 @@
     </span>B: boot_info::BootInformation
 {
     irq_safety::disable_interrupts();
-    <span class="macro">println!</span>(<span class="string">&quot;Entered early_setup(). Interrupts disabled.&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;nano_core(): Entered early setup. Interrupts disabled.&quot;</span>);
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
         <span class="kw">let </span>logger_ports = [serial_port_basic::take_serial_port(
@@ -397,7 +387,7 @@
             .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to initialize early logging&quot;</span>)<span class="question-mark">?</span>;
     }
     <span class="macro">log::info!</span>(<span class="string">&quot;initialized early logger&quot;</span>);
-    <span class="macro">println!</span>(<span class="string">&quot;early_setup(): initialized early logger.&quot;</span>);
+    <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized early logger.&quot;</span>);
 
     <span class="comment">// Dump basic information about this build of Theseus.
     </span><span class="macro">log::info!</span>(<span class="string">&quot;\n    \

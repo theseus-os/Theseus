@@ -23,30 +23,34 @@
 <a href="#23" id="23">23</a>
 <a href="#24" id="24">24</a>
 <a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main entry point into Rust code from a legacy BIOS (multiboot2) bootloader.
 
-</span><span class="kw">use crate</span>::{nano_core, shutdown, try_exit};
+</span><span class="kw">use crate</span>::{nano_core, shutdown};
 <span class="kw">use </span>boot_info::BootInformation;
 <span class="kw">use </span>memory::VirtualAddress;
 
 <span class="attr">#[no_mangle]
 </span><span class="kw">pub extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_entry(boot_info_vaddr: usize, double_fault_stack_top: usize) {
-    <span class="kw">if </span>VirtualAddress::new(boot_info_vaddr).is_none() {
-        shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;BUG: multiboot2 info virtual address is invalid&quot;</span>));
+    <span class="kw">match </span>inner(boot_info_vaddr, double_fault_stack_top) {
+        <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;BUG: nano_core() unexpectedly returned!&quot;</span>)),
+        <span class="prelude-val">Err</span>(e) =&gt; shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;{e}&quot;</span>)),
     }
-    <span class="kw">let </span>boot_info = <span class="kw">match unsafe </span>{ multiboot2::load(boot_info_vaddr) } {
-        <span class="prelude-val">Ok</span>(i) =&gt; i,
-        <span class="prelude-val">Err</span>(e) =&gt; shutdown(<span class="macro">format_args!</span>(<span class="string">&quot;BUG: failed to load multiboot 2 info: {e:?}&quot;</span>)),
-    };
-    <span class="kw">let </span>kernel_stack_start = <span class="macro">try_exit!</span>(
-        VirtualAddress::new(double_fault_stack_top - <span class="macro">try_exit!</span>(boot_info.stack_size()))
-            .ok_or(<span class="string">&quot;BUG: kernel_stack_start virtual address is invalid&quot;</span>)
-    );
-    <span class="kw">let </span>double_fault_stack_top = <span class="macro">try_exit!</span>(
-        VirtualAddress::new(double_fault_stack_top)
-            .ok_or(<span class="string">&quot;BUG: double_fault_stack_top virtual address is invalid&quot;</span>)
-    );
-    <span class="macro">try_exit!</span>(nano_core(boot_info, double_fault_stack_top, kernel_stack_start));
+}
+
+<span class="kw">fn </span>inner(boot_info_vaddr: usize, double_fault_stack_top: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    VirtualAddress::new(boot_info_vaddr)
+        .ok_or(<span class="string">&quot;BUG: multiboot2 info virtual address is invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>boot_info = <span class="kw">unsafe </span>{ multiboot2::load(boot_info_vaddr) }
+        .ok()
+        .ok_or(<span class="string">&quot;BUG: failed to load multiboot 2 info&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>kernel_stack_start = VirtualAddress::new(double_fault_stack_top - boot_info.stack_size()<span class="question-mark">?</span>)
+        .ok_or(<span class="string">&quot;BUG: kernel_stack_start virtual address is invalid&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>double_fault_stack_top = VirtualAddress::new(double_fault_stack_top)
+        .ok_or(<span class="string">&quot;BUG: double_fault_stack_top virtual address is invalid&quot;</span>)<span class="question-mark">?</span>;
+
+    nano_core(boot_info, double_fault_stack_top, kernel_stack_start)
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="nano_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
