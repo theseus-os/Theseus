@@ -120,11 +120,13 @@ where
     let rsdp_address = boot_info.rsdp();
     println!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
-    // If the bootloader already mapped the framebuffer for us, the we can use it now
-    // before initializing the memory mgmt subsystem.
-    let framebuffer_info = boot_info.framebuffer_info();
-    if let Some(ref fb_info) = framebuffer_info && fb_info.is_mapped() {
-        early_printer::init(fb_info)?;
+    #[cfg(target_arch = "x86_64")] {
+        // If the bootloader already mapped the framebuffer for us, the we can use it now
+        // before initializing the memory mgmt subsystem.
+        let framebuffer_info = boot_info.framebuffer_info();
+        if let Some(ref fb_info) = framebuffer_info && fb_info.is_mapped() {
+            early_printer::init(fb_info)?;
+        }
     }
 
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
@@ -138,10 +140,12 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    // Now that we initialized the memory subsystem, we can map an early framebuffer
-    // for basic graphical text output.
-    if let Some(ref fb_info) = framebuffer_info {
-        early_printer::init(fb_info)?;
+    #[cfg(target_arch = "x86_64")] {
+        // Now that we initialized the memory subsystem, we can map an early framebuffer
+        // for basic graphical text output.
+        if let Some(ref fb_info) = framebuffer_info {
+            early_printer::init(fb_info)?;
+        }
     }
 
     #[cfg(target_arch = "aarch64")] {
