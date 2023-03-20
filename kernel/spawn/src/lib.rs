@@ -1028,7 +1028,7 @@ fn idle_task_entry(_cpu_id: CpuId) {
     info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state
-        pause::spin_loop_hint();
+        core::hint::spin_loop();
     }
 }
 

@@ -2191,7 +2191,6 @@ dependencies = [
  "madt",
  "memory",
  "mod_mgmt",
- "pause",
  "pit_clock_basic",
  "spin 0.9.4",
  "stack",
@@ -2569,10 +2568,6 @@ dependencies = [
  "spin 0.9.4",
  "vfs_node",
 ]
-
-[[package]]
-name = "pause"
-version = "0.1.0"
 
 [[package]]
 name = "pci"
@@ -3486,7 +3481,6 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "pause",
  "preemption",
  "runqueue",
  "scheduler",
@@ -4101,7 +4095,6 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "pause",
  "x86_64",
 ]
 

@@ -20,7 +20,6 @@ mod_mgmt = { path = "../mod_mgmt" }
 acpi = { path = "../acpi" }
 apic = { path = "../apic" }
 madt = { path = "../acpi/madt" }
-pause = { path = "../pause" }
 
 [lib]
 crate-type = ["rlib"]
