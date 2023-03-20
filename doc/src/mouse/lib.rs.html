@@ -114,35 +114,18 @@
 <a href="#114" id="114">114</a>
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
-<a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic driver for a mouse connected to the legacy PS/2 port.
 
 </span><span class="attr">#![no_std]
 #![feature(abi_x86_interrupt)]
 
-</span><span class="kw">use </span>log::{error, warn, debug};
+</span><span class="kw">use </span>log::{error, warn};
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>mpmc::Queue;
 <span class="kw">use </span>event_types::Event;
 <span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 <span class="kw">use </span>mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-<span class="kw">use </span>ps2::{PS2Mouse, MouseId, MousePacket};
+<span class="kw">use </span>ps2::{PS2Mouse, MousePacket};
 
 <span class="doccomment">/// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -162,26 +145,10 @@
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 </span><span class="kw">pub fn </span>init(<span class="kw-2">mut </span>mouse: PS2Mouse&lt;<span class="lifetime">&#39;static</span>&gt;, mouse_queue_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">//TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
-    //the current code beneath just tries to set id = 4, so is not final
-    // Set Mouse ID to 4.
-    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mouse.set_mouse_id(MouseId::Four) {
-        <span class="macro">error!</span>(<span class="string">&quot;Failed to set the mouse id to four: {e}&quot;</span>);
-        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to set the mouse id to four&quot;</span>);
-    }
-    <span class="comment">// Read it back to check that it worked.
-    </span><span class="kw">match </span>mouse.mouse_id() {
-        <span class="prelude-val">Ok</span>(id) =&gt;  {
-            <span class="macro">debug!</span>(<span class="string">&quot;The PS/2 mouse ID is: {id:?}&quot;</span>);
-            <span class="kw">if </span>!<span class="macro">matches!</span>(id, MouseId::Four) {
-                <span class="macro">error!</span>(<span class="string">&quot;Failed to set the mouse id to four&quot;</span>);
-                <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to set the mouse id to four&quot;</span>);
-            }
-        }
-        <span class="prelude-val">Err</span>(e) =&gt; {
-            <span class="macro">error!</span>(<span class="string">&quot;Failed to read the PS/2 mouse ID: {e}&quot;</span>);
-            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to read the PS/2 mouse ID&quot;</span>);
-        }
+    <span class="comment">// Set MouseId to the highest possible one
+    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = mouse.set_mouse_id() {
+        <span class="macro">error!</span>(<span class="string">&quot;Failed to set the mouse id: {e}&quot;</span>);
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Failed to set the mouse id&quot;</span>);
     }
 
     <span class="comment">// Register the interrupt handler
@@ -211,13 +178,12 @@
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
             // currently get in read_mouse_packet and merge them afterwards
             </span><span class="kw">let </span>mouse_packet = mouse.read_mouse_packet();
-            <span class="comment">// warn!(&quot;read_mouse_packet: {mouse_packet:?}&quot;);
             
-            </span><span class="kw">if </span>mouse_packet.always_one() != <span class="number">1 </span>{
+            <span class="kw">if </span>mouse_packet.always_one() != <span class="number">1 </span>{
                 <span class="comment">// this could signal a hardware error or a mouse which doesn&#39;t conform to the rule
-                </span><span class="macro">warn!</span>(<span class="string">&quot;Discarding mouse data packet since its third bit should always be 1.&quot;</span>);
+                </span><span class="macro">warn!</span>(<span class="string">&quot;ps2_mouse_handler(): Discarding mouse data packet since its third bit should always be 1.&quot;</span>);
             } <span class="kw">else if let </span><span class="prelude-val">Err</span>(e) = handle_mouse_input(mouse_packet, queue) {
-                <span class="macro">error!</span>(<span class="string">&quot;ps2_mouse_handler: {e:?}&quot;</span>);
+                <span class="macro">error!</span>(<span class="string">&quot;ps2_mouse_handler(): {e:?}&quot;</span>);
             }
         }
     } <span class="kw">else </span>{
