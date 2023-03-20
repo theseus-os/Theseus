@@ -101,7 +101,6 @@
 <a href="#101" id="101">101</a>
 <a href="#102" id="102">102</a>
 <a href="#103" id="103">103</a>
-<a href="#104" id="104">104</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for broadcasting and handling TLB shootdown IPIs. 
 
 </span><span class="attr">#![no_std]
@@ -111,14 +110,13 @@
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>apic;
 <span class="kw">extern crate </span>x86_64;
-<span class="kw">extern crate </span>pause;
 
 
 <span class="kw">use </span>core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 <span class="kw">use </span>irq_safety::{hold_interrupts, RwLockIrqSafe};
 <span class="kw">use </span>memory::PageRange;
 <span class="kw">use </span>apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
-<span class="kw">use </span>pause::spin_loop_hint;
+<span class="kw">use </span>core::hint::spin_loop;
 
 
 <span class="doccomment">/// The number of remaining cores that still need to handle the current TLB shootdown IPI
@@ -184,7 +182,7 @@
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="kw">break</span>,
             <span class="prelude-val">Err</span>(v) =&gt; old_lock_val = v,
         }
-        spin_loop_hint();
+        spin_loop();
     }
 
     <span class="kw-2">*</span>TLB_SHOOTDOWN_IPI_PAGES.write() = <span class="prelude-val">Some</span>(pages_to_invalidate);
@@ -197,7 +195,7 @@
     // it must be a blocking, synchronous operation to ensure stale TLB entries don&#39;t cause problems
     // TODO: add timeout!!
     </span><span class="kw">while </span>TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::Relaxed) &gt; <span class="number">0 </span>{ 
-        spin_loop_hint();
+        spin_loop();
     }
 
     <span class="comment">// clear TLB shootdown data

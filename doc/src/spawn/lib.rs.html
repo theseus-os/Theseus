@@ -2062,7 +2062,7 @@
     <span class="macro">info!</span>(<span class="string">&quot;Entered idle task loop on core {}: {:?}&quot;</span>, cpu::current_cpu(), task::get_my_current_task());
     <span class="kw">loop </span>{
         <span class="comment">// TODO: put this core into a low-power state
-        </span>pause::spin_loop_hint();
+        </span>core::hint::spin_loop();
     }
 }
 

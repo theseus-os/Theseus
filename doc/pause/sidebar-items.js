@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":[["spin_loop_hint","A wrapper around the `pause` x86 ASM function.  On non-x86_64 architectures, this is a no-op (empty function)."]]};

@@ -546,7 +546,7 @@
 <span class="kw">use </span>apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 <span class="kw">use </span>ap_start::{kstart_ap, AP_READY_FLAG};
 <span class="kw">use </span>madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
-<span class="kw">use </span>pause::spin_loop_hint;
+<span class="kw">use </span>core::hint::spin_loop;
 
 
 <span class="doccomment">/// The physical address that an AP jumps to when it first is booted by the BSP.
@@ -872,7 +872,7 @@
     <span class="kw">let </span><span class="kw-2">mut </span>num_known_cpus = cpu_count();
     <span class="kw">let </span><span class="kw-2">mut </span>iter = <span class="number">0</span>;
     <span class="kw">while </span>num_known_cpus &lt; expected_cpus {
-        spin_loop_hint();
+        spin_loop();
         num_known_cpus = cpu_count();
         <span class="kw">if </span>iter == <span class="number">100000 </span>{
             <span class="macro">trace!</span>(<span class="string">&quot;BSP is waiting for APs to boot ({} of {})&quot;</span>, num_known_cpus, expected_cpus);
@@ -1036,11 +1036,11 @@
     // Wait for trampoline ready
     </span><span class="macro">debug!</span>(<span class="string">&quot; Wait...&quot;</span>);
     <span class="kw">while </span>ap_trampoline_data.ap_ready.read() == <span class="number">0 </span>{
-        spin_loop_hint();
+        spin_loop();
     }
     <span class="macro">debug!</span>(<span class="string">&quot; Trampoline...&quot;</span>);
     <span class="kw">while </span>! AP_READY_FLAG.load(Ordering::SeqCst) {
-        spin_loop_hint();
+        spin_loop();
     }
     <span class="macro">info!</span>(<span class="string">&quot; AP {} is in Rust code. Ready!&quot;</span>, new_apic_id);
 }

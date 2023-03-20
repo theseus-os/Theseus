@@ -111,7 +111,6 @@ var sourcesIndex = JSON.parse('{\
 "panic_entry":["",[],["lib.rs"]],\
 "panic_wrapper":["",[],["lib.rs"]],\
 "path":["",[],["lib.rs"]],\
-"pause":["",[],["lib.rs"]],\
 "pci":["",[],["lib.rs"]],\
 "percent_encoding":["",[],["lib.rs"]],\
 "physical_nic":["",[],["lib.rs"]],\
