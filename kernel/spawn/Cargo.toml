@@ -25,7 +25,6 @@ mod_mgmt = { path = "../mod_mgmt" }
 context_switch = { path = "../context_switch" }
 path = { path = "../path" }
 fs_node = { path = "../fs_node" }
-pause = { path = "../pause" }
 thread_local_macro = { path = "../thread_local_macro" }
 preemption = { path = "../preemption" }
 no_drop = { path = "../no_drop" }

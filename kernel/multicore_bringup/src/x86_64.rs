@@ -1,3 +1,14 @@
+//! Initialization and bring-up of secondary CPUs on x86_64.
+//!
+//! These functions are intended to be invoked from the BSP
+//! (the Bootstrap Processor, the main CPU in x86 terms)
+//! in order to bring up secondary CPUs (APs in x86 terms).
+
+#![no_std]
+#![feature(let_chains)]
+
+#[macro_use] extern crate log;
+
 use core::{
     convert::TryInto,
     mem::size_of,
@@ -12,8 +23,8 @@ use kernel_config::{memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES},
 use apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
-use pause::spin_loop_hint;
-use no_drop::NoDrop;
+use core::hint::spin_loop;
+
 
 /// The physical address that an AP jumps to when it first is booted by the BSP.
 /// For x2apic systems, this must be at 0x10000 or higher! 
@@ -338,7 +349,7 @@ pub fn handle_ap_cores(
     let mut num_known_cpus = cpu_count();
     let mut iter = 0;
     while num_known_cpus < expected_cpus {
-        spin_loop_hint();
+        spin_loop();
         num_known_cpus = cpu_count();
         if iter == 100000 {
             trace!("BSP is waiting for APs to boot ({} of {})", num_known_cpus, expected_cpus);
@@ -431,7 +442,7 @@ fn bring_up_ap(
 
     // Give ownership of the stack we created for this AP to the `ap_start` crate, 
     // in which the AP will take ownership of it once it boots up.
-    ap_start::insert_ap_stack(new_apic_id, NoDrop::new(ap_stack));
+    ap_start::insert_ap_stack(new_apic_id, ap_stack); 
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_apic_processor_id, new_apic_id);
     
@@ -502,11 +513,11 @@ fn bring_up_ap(
     // Wait for trampoline ready
     debug!(" Wait...");
     while ap_trampoline_data.ap_ready.read() == 0 {
-        spin_loop_hint();
+        spin_loop();
     }
     debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
-        spin_loop_hint();
+        spin_loop();
     }
     info!(" AP {} is in Rust code. Ready!", new_apic_id);
 }
