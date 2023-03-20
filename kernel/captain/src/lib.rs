@@ -141,7 +141,8 @@ pub fn init(
     let ap_count = 0;
 
     let cpu_count = ap_count + 1;
-    info!("Finished handling and booting up all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
+    info!("Finished booting all {} AP cores; {} total CPUs are running.", ap_count, cpu_count);
+    info!("Proceeding with system initialization, please wait...");
 
     // arch-gate: no framebuffer support on aarch64 at the moment
     #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))] {

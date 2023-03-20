@@ -964,6 +964,7 @@ dependencies = [
  "font",
  "log",
  "memory",
+ "page_attribute_table",
  "spin 0.9.4",
  "vga_buffer",
  "volatile 0.2.7",
@@ -2504,7 +2505,6 @@ name = "page_attribute_table"
 version = "0.1.0"
 dependencies = [
  "log",
- "memory",
  "modular-bitfield",
  "msr",
  "raw-cpuid",

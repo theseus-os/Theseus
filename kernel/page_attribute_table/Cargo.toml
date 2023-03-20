@@ -14,9 +14,6 @@ modular-bitfield = "0.11.2"
 [dependencies.msr]
 path = "../../libs/msr"
 
-[dependencies.memory]
-path = "../memory"
-
 [dependencies.raw-cpuid]
 version = "10.6.0"
 

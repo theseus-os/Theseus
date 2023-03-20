@@ -660,8 +660,8 @@ impl LocalApic {
     /// After this lapic has been enabled, initialize its LVT timer.
     fn init_lvt_timer(&mut self) {
         let apic_period = if cfg!(apic_timer_fixed) {
-            info!("apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}", 0x10000);
-            0x10000 // for bochs, which doesn't do apic periods right
+            info!("apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}", 1000000);
+            1000000 // for bochs, which doesn't do apic periods right
         } else {
             self.calibrate_lapic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
         };
