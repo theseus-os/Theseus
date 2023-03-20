@@ -1,14 +1,3 @@
-//! Initialization and bring-up of secondary CPUs on x86_64.
-//!
-//! These functions are intended to be invoked from the BSP
-//! (the Bootstrap Processor, the main CPU in x86 terms)
-//! in order to bring up secondary CPUs (APs in x86 terms).
-
-#![no_std]
-#![feature(let_chains)]
-
-#[macro_use] extern crate log;
-
 use core::{
     convert::TryInto,
     mem::size_of,
@@ -24,6 +13,7 @@ use apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_co
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
 use core::hint::spin_loop;
+use no_drop::NoDrop;
 
 
 /// The physical address that an AP jumps to when it first is booted by the BSP.
@@ -442,7 +432,7 @@ fn bring_up_ap(
 
     // Give ownership of the stack we created for this AP to the `ap_start` crate, 
     // in which the AP will take ownership of it once it boots up.
-    ap_start::insert_ap_stack(new_apic_id, ap_stack); 
+    ap_start::insert_ap_stack(new_apic_id, NoDrop::new(ap_stack)); 
 
     info!("Bringing up AP, proc: {} apic_id: {}", new_apic_processor_id, new_apic_id);
     
