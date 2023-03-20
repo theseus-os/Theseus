@@ -210,7 +210,7 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
             */
         };
         Some(crate::FramebufferInfo {
-            address: Address::Physical(PhysicalAddress::new_canonical(uefi_fb.start)),
+            address: Address::Physical(PhysicalAddress::new_canonical(uefi_fb.physical)),
             total_size_in_bytes: uefi_fb_info.size as u64,
             width: uefi_fb_info.width as u32,
             height: uefi_fb_info.height as u32,
