@@ -198,7 +198,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
-	loop { }
+	loop { core::hint::spin_loop() }
 	
 	// _task1.join()?;
 	// _task2.join()?;

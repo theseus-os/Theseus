@@ -81,7 +81,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     // other than just let the thread spin endlessly (which doesn't hurt correctness but is inefficient). 
     // But in general, this task should be killed by the panic_wrapper, so it shouldn't reach this point.
     // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 
@@ -96,7 +96,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 #[doc(hidden)]
 extern "C" fn rust_eh_personality() -> ! {
     error!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
@@ -109,7 +109,7 @@ extern "C" fn rust_eh_personality() -> ! {
 #[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
 extern "C" fn _Unwind_Resume(arg: usize) -> ! {
     #[cfg(target_arch = "aarch64")]
-    loop { }
+    loop { core::hint::spin_loop() }
 
     #[cfg(all(target_arch = "x86_64", not(loadable)))] {
         unwind::unwind_resume(arg)
@@ -132,7 +132,7 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
             Ok(()) => error!("BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()"),
             Err(e) => error!("_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}", e),
         }
-        loop { }
+        loop { core::hint::spin_loop() }
     }
 }
 

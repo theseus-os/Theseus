@@ -904,7 +904,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// The final piece of the task cleanup logic for restartable tasks.
@@ -986,7 +986,7 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
