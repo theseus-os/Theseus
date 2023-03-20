@@ -3,46 +3,25 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "multicore_bringup"
 description = "Support for bringing up other CPU cores (APs) from the main core (BSP)"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
 volatile = "0.2.7"
 zerocopy = "0.5.0"
 log = "0.4.8"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.pit_clock_basic]
-path = "../pit_clock_basic"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.acpi]
-path = "../acpi"
-
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.cpu]
-path = "../cpu"
-
-[dependencies.ap_start]
-path = "../ap_start"
-
-[dependencies.madt]
-path = "../acpi/madt"
-
-[dependencies.pause]
-path = "../pause"
-
+memory = { path = "../memory" }
+stack = { path = "../stack" }
+cpu = { path = "../cpu" }
+ap_start = { path = "../ap_start" }
+kernel_config = { path = "../kernel_config" }
+pit_clock_basic = { path = "../pit_clock_basic" }
+mod_mgmt = { path = "../mod_mgmt" }
+acpi = { path = "../acpi" }
+apic = { path = "../apic" }
+madt = { path = "../acpi/madt" }
+pause = { path = "../pause" }
 
 [lib]
 crate-type = ["rlib"]
+path = "src/x86_64.rs"

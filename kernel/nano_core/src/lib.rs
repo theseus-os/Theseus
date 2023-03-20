@@ -112,8 +112,10 @@ where
         build_info::CUSTOM_CFG_STR,
     );
 
-    exceptions_early::init(Some(double_fault_stack_top));
-    println!("early_setup(): initialized early IDT with exception handlers.");
+    #[cfg(target_arch = "x86_64")] {
+        exceptions_early::init(Some(double_fault_stack_top));
+        println!("early_setup(): initialized early IDT with exception handlers.");
+    }
 
     let rsdp_address = boot_info.rsdp();
     println!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);

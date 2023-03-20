@@ -7,22 +7,7 @@
 #![no_std]
 #![feature(let_chains)]
 
-extern crate alloc;
 #[macro_use] extern crate log;
-extern crate spin;
-extern crate volatile;
-extern crate zerocopy;
-extern crate memory;
-extern crate pit_clock_basic;
-extern crate stack;
-extern crate kernel_config;
-extern crate apic;
-extern crate acpi;
-extern crate madt;
-extern crate mod_mgmt;
-extern crate ap_start;
-extern crate pause;
-extern crate cpu;
 
 use core::{
     convert::TryInto,
@@ -34,7 +19,7 @@ use spin::Mutex;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
-use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
+use kernel_config::{memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES}, display::FRAMEBUFFER_MAX_RESOLUTION};
 use apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
@@ -206,7 +191,6 @@ pub struct MulticoreBringupInfo {
 pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     multicore_info: MulticoreBringupInfo,
-    max_framebuffer_resolution: Option<(u16, u16)>,
 ) -> Result<u32, &'static str> {
     let MulticoreBringupInfo {
         ap_start_realmode_begin,
@@ -276,7 +260,7 @@ pub fn handle_ap_cores(
     // Here, we set up the data items that will be accessible to the APs when they boot up.
     // We only set the values of fields that are the same for ALL APs here;
     // values that change for each AP are set individually in `bring_up_ap()` below.
-    let (max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
+    let (max_width, max_height) = FRAMEBUFFER_MAX_RESOLUTION;
     ap_trampoline_data.ap_max_fb_width.write(max_width);
     ap_trampoline_data.ap_max_fb_height.write(max_height);
     ap_trampoline_data.ap_gdt.write(ap_gdt.value().try_into().map_err(|_| "AP_GDT physical address larger than u32::MAX")?);
