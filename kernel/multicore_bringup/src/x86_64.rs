@@ -7,22 +7,7 @@
 #![no_std]
 #![feature(let_chains)]
 
-extern crate alloc;
 #[macro_use] extern crate log;
-extern crate spin;
-extern crate volatile;
-extern crate zerocopy;
-extern crate memory;
-extern crate pit_clock_basic;
-extern crate stack;
-extern crate kernel_config;
-extern crate apic;
-extern crate acpi;
-extern crate madt;
-extern crate mod_mgmt;
-extern crate ap_start;
-extern crate pause;
-extern crate cpu;
 
 use core::{
     convert::TryInto,
@@ -34,11 +19,11 @@ use spin::Mutex;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use memory::{VirtualAddress, PhysicalAddress, MappedPages, PteFlags, MmiRef};
-use kernel_config::memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES};
+use kernel_config::{memory::{PAGE_SIZE, PAGE_SHIFT, KERNEL_STACK_SIZE_IN_PAGES}, display::FRAMEBUFFER_MAX_RESOLUTION};
 use apic::{LocalApic, get_lapics, current_cpu, has_x2apic, bootstrap_cpu, cpu_count};
 use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
-use pause::spin_loop_hint;
+use core::hint::spin_loop;
 
 
 /// The physical address that an AP jumps to when it first is booted by the BSP.
@@ -206,7 +191,6 @@ pub struct MulticoreBringupInfo {
 pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     multicore_info: MulticoreBringupInfo,
-    max_framebuffer_resolution: Option<(u16, u16)>,
 ) -> Result<u32, &'static str> {
     let MulticoreBringupInfo {
         ap_start_realmode_begin,
@@ -271,11 +255,12 @@ pub fn handle_ap_cores(
     // Now, the AP startup code is at the PhysicalAddress `AP_STARTUP`.
 
     let mut ap_count = 0; // the number of AP cores we have successfully booted.
+    let mut is_last_ap = false;
     let ap_trampoline_data: &mut ApTrampolineData = trampoline_mapped_pages.as_type_mut(0)?;
     // Here, we set up the data items that will be accessible to the APs when they boot up.
     // We only set the values of fields that are the same for ALL APs here;
     // values that change for each AP are set individually in `bring_up_ap()` below.
-    let (max_width, max_height) = max_framebuffer_resolution.unwrap_or((u16::MAX, u16::MAX));
+    let (max_width, max_height) = FRAMEBUFFER_MAX_RESOLUTION;
     ap_trampoline_data.ap_max_fb_width.write(max_width);
     ap_trampoline_data.ap_max_fb_height.write(max_height);
     ap_trampoline_data.ap_gdt.write(ap_gdt.value().try_into().map_err(|_| "AP_GDT physical address larger than u32::MAX")?);
@@ -285,6 +270,23 @@ pub fn handle_ap_cores(
         .ok_or("Couldn't find the MADT APIC table. Has the ACPI subsystem been initialized yet?")?;
     let madt_iter = madt.iter();
 
+    // Count the total number of CPUs first so we know when we're bringing up the last AP.
+    let total_cpus_expected: u32 = {
+        let mut total = 0;
+        for madt_entry in madt_iter.clone() {
+            let flags = match madt_entry {
+                MadtEntry::LocalApic(entry)   => entry.flags,
+                MadtEntry::LocalX2Apic(entry) => entry.flags,
+                _ => continue,
+            };
+            if flags & 0x1 == 0x1 {
+                total += 1;
+            }
+        }
+        total
+    };
+
+    // Now, bring up each AP sequentially.
     for madt_entry in madt_iter.clone() {
         let (processor_id, apic_id, flags) = match madt_entry {
             MadtEntry::LocalApic(entry) => (entry.processor as u32, entry.apic_id as u32, entry.flags),
@@ -292,7 +294,7 @@ pub fn handle_ap_cores(
             _ => continue,
         };
 
-        // we already handled the BSP in a different functions
+        // we already handled the BSP in a different function
         if this_cpu.value() == apic_id {
             continue;
         }
@@ -316,6 +318,9 @@ pub fn handle_ap_cores(
 
         let (nmi_lint, nmi_flags) = find_nmi_entry_for_processor(processor_id, madt_iter.clone());
 
+        // Subtracr 2:  -1 for the BSP, and another -1 for the last AP.
+        is_last_ap = ap_count == total_cpus_expected.saturating_sub(2);
+
         bring_up_ap(
             bsp_lapic.deref_mut(), 
             processor_id,
@@ -324,13 +329,14 @@ pub fn handle_ap_cores(
             page_table_phys_addr, 
             ap_stack, 
             nmi_lint,
-            nmi_flags 
+            nmi_flags,
+            is_last_ap,
         );
         ap_count += 1;
     }
 
     // Retrieve the graphic mode information written during the AP bootup sequence in `ap_realmode.asm`.
-    if ap_count != 0 {
+    if ap_count != 0 && is_last_ap {
         let graphic_info = trampoline_mapped_pages
             .as_type::<GraphicInfo>(GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE)?;
         info!("Obtained graphic info from real mode: {:?}", graphic_info);
@@ -343,7 +349,7 @@ pub fn handle_ap_cores(
     let mut num_known_cpus = cpu_count();
     let mut iter = 0;
     while num_known_cpus < expected_cpus {
-        spin_loop_hint();
+        spin_loop();
         num_known_cpus = cpu_count();
         if iter == 100000 {
             trace!("BSP is waiting for APs to boot ({} of {})", num_known_cpus, expected_cpus);
@@ -398,8 +404,15 @@ struct ApTrampolineData {
     /// The location of the GDT_AP symbol in physical memory.
     ap_gdt:            Volatile<u32>,
     _padding6:         [u8; 4],
+    /// A flag indicating whether this is the last AP being brought up:
+    /// * A value of `0` indicates this is NOT the last AP to be initialized,
+    ///   so no graphics mode switching should occur.
+    /// * A value of `1` indicates this is the last AP to be initialized,
+    ///   and therefore it should perform the graphics mode switch.
+    ap_is_last_ap:     Volatile<u8>,
+    _padding7:         [u8; 7],
 }
-const _: () = assert!(size_of::<ApTrampolineData>() == 12 * size_of::<u64>());
+const _: () = assert!(size_of::<ApTrampolineData>() == 13 * size_of::<u64>());
 
 
 /// Called by the BSP to initialize the given `new_lapic` using IPIs.
@@ -412,7 +425,8 @@ fn bring_up_ap(
     page_table_paddr: PhysicalAddress, 
     ap_stack: stack::Stack,
     nmi_lint: u8, 
-    nmi_flags: u16
+    nmi_flags: u16,
+    is_last_ap: bool,
 ) {
     ap_trampoline_data.ap_ready.write(0);
     ap_trampoline_data.ap_processor_id.write(new_apic_processor_id);
@@ -423,6 +437,7 @@ fn bring_up_ap(
     ap_trampoline_data.ap_code.write(VirtualAddress::new_canonical(kstart_ap as usize));
     ap_trampoline_data.ap_nmi_lint.write(nmi_lint);
     ap_trampoline_data.ap_nmi_flags.write(nmi_flags);
+    ap_trampoline_data.ap_is_last_ap.write(if is_last_ap { 1 } else { 0 });
     AP_READY_FLAG.store(false, Ordering::SeqCst);
 
     // Give ownership of the stack we created for this AP to the `ap_start` crate, 
@@ -498,11 +513,11 @@ fn bring_up_ap(
     // Wait for trampoline ready
     debug!(" Wait...");
     while ap_trampoline_data.ap_ready.read() == 0 {
-        spin_loop_hint();
+        spin_loop();
     }
     debug!(" Trampoline...");
     while ! AP_READY_FLAG.load(Ordering::SeqCst) {
-        spin_loop_hint();
+        spin_loop();
     }
     info!(" AP {} is in Rust code. Ready!", new_apic_id);
 }

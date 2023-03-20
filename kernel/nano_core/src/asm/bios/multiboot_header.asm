@@ -21,18 +21,19 @@ multiboot_header_start:
 ; NOTE: this works properly now. Uncomment the below sections when we are ready to enable
 ;       early boot-time usage of the graphical framebuffer by default.
 ;
-; %ifndef VGA_TEXT_MODE
-; align 8
-; 	dw 5     ; type (5 means framebuffer tag)
-; 	dw 0     ; flags. Bit 0 = `1` means this tag is optional, Bit 0 = `0` means it's mandatory.
-; 	dd 20    ; size of this tag (20)
-; 	; The resolution specified below is limited by the hardware.
-; 	; We have successfully tested resolutions up to 2560 x 1600.
-;   ; See more VGA/*XGA resolutions here: <https://en.wikipedia.org/wiki/Graphics_display_resolution#Extended_Graphics_Array>
-; 	dd 1920  ; width in pixels
-; 	dd 1080  ; height in pixels
-; 	dd 32    ; depth: pixel size in bits. Theseus only supports 32-bit pixels.
-; %endif
+%ifndef VGA_TEXT_MODE
+align 8
+	dw 5     ; type (5 means framebuffer tag)
+	dw 0     ; flags. Bit 0 = `1` means this tag is optional, Bit 0 = `0` means it's mandatory.
+	dd 20    ; size of this tag (20)
+	; The resolution specified below is limited by the hardware.
+	; We have successfully tested resolutions up to 2560 x 1600.
+	; We recommend matching the resolution set in `kernel_config/src/display.rs`.
+	; See more VGA/*XGA resolutions here: <https://en.wikipedia.org/wiki/Graphics_display_resolution#Extended_Graphics_Array>
+	dd 1280  ; width in pixels
+	dd 1024  ; height in pixels
+	dd 32    ; depth: pixel size in bits. Theseus only supports 32-bit pixels.
+%endif
 
 
 ; This marks the end of the tag region.

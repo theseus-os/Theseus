@@ -13,6 +13,7 @@ volatile = "0.2.7"
 boot_info = { path = "../boot_info" }
 font = { path = "../font" }
 memory = { path = "../memory" }
+page_attribute_table = { path = "../page_attribute_table" }
 vga_buffer = { path = "../vga_buffer" }
 
 [features]
