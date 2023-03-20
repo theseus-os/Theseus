@@ -47,7 +47,13 @@ pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event
     }
 
     // TODO: figure out what we should do, for now using set 1
-    keyboard.keyboard_scancode_set(ScancodeSet::Set1)?;
+    // Acer Aspire 7745G:
+    // - allows setting Set 1 and also returns Set 1 on ScancodeSet::Get, but keyboard interrupts don't fire
+    // - allows setting Set 2 and works
+    // HP Pavilion 17(-ab)-f050ng:
+    // - TODO
+    // -> we can only try setting the default Set 2 and then try ScancodeSet::Get
+    keyboard.set_keyboard_scancode_set(ScancodeSet::Set1)?;
 
     // Register the interrupt handler
     interrupts::register_interrupt(PS2_KEYBOARD_IRQ, ps2_keyboard_handler).map_err(|e| {
