@@ -65,7 +65,7 @@ set_up_page_tables:
 	or eax, 11b ; present + writable
 	mov [(p4_table - KERNEL_OFFSET) + (510 * 8)], eax
 
-	; map the first P4 entry to the first p3 table
+	; map the first P4 entry to the first P3 table
 	;
 	; This will be changed to the page containing
 	; only the first megabyte before rust starts
@@ -98,7 +98,7 @@ set_up_page_tables:
 	cmp ecx, 512       ; if counter == 512, the whole P2 table is mapped
 	jne .map_kernel_table  ; else map the next entry
 
-	; map the first p2 entry to the megabyte table
+	; map the first P2 entry to the megabyte table
 	mov eax, megabyte_table - KERNEL_OFFSET
 	or eax, 11b
 	mov [low_p2_table - KERNEL_OFFSET], eax
@@ -122,9 +122,9 @@ set_up_page_tables:
 unmap_guard_page:
 	; put the address of the stack guard huge pages into ecx
 	mov ecx, (initial_bsp_stack_guard_page - 0x200000 - KERNEL_OFFSET)
-	shr ecx, 18      ; calculate p2 index
-	and ecx, 0x1FF  ; get p2 index by itself
-	; ecx now holds the index into the p2 page table of the entry we want to unmap
+	shr ecx, 18      ; calculate P2 index
+	and ecx, 0x1FF  ; get P2 index by itself
+	; ecx now holds the index into the P2 page table of the entry we want to unmap
 	mov eax, 0x0  ; set huge page flag, clear all others
 	mov [(kernel_table - KERNEL_OFFSET) + ecx], eax ; unmap (clear) ecx-th entry
 	ret
@@ -324,9 +324,9 @@ strings:
 ; The following `resb` commands reserve space for the first page table,
 ; which we must set up before enabling paging and jumping to long mode.
 ; We split it into two parts:
-; (1) the initial p4 page table (the root P4 frame), and
+; (1) the initial P4 page table (the root P4 frame), and
 ; (2) all the other initial page table frames. 
-; This is because Theseus needs to obtain exclusive ownership of the root p4 table
+; This is because Theseus needs to obtain exclusive ownership of the root P4 table
 ; separately from the rest of the .data/.bss section contents.
 section .page_table nobits alloc noexec write  ; same section flags as .bss
 align 4096 
