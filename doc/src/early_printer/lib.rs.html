@@ -412,6 +412,9 @@
 <a href="#412" id="412">412</a>
 <a href="#413" id="413">413</a>
 <a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for early text output to a graphical framebuffer
 //! or text-mode VGA display.
 //!
@@ -420,12 +423,14 @@
 </span><span class="attr">#![no_std]
 #![feature(let_chains)]
 
-</span><span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, slice, ops::{Deref, DerefMut}};
+#[cfg(all(feature = <span class="string">&quot;bios&quot;</span>, not(target_arch = <span class="string">&quot;x86_64&quot;</span>)))]
+</span><span class="macro">compile_error!</span>(<span class="string">&quot;The `bios` feature can only be used on x86_64&quot;</span>);
+
+<span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, slice, ops::{Deref, DerefMut}};
 <span class="kw">use </span>boot_info::{FramebufferInfo, FramebufferFormat};
 <span class="kw">use </span>font::FONT_BASIC;
 <span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch, PageTable};
 <span class="kw">use </span>spin::Mutex;
-<span class="kw">use </span>vga_buffer::VgaBuffer;
 
 <span class="doccomment">/// The height in pixels that each character occupies, not including any padding.
 </span><span class="kw">const </span>CHARACTER_HEIGHT: u32 = font::CHARACTER_HEIGHT <span class="kw">as </span>u32;
@@ -437,7 +442,7 @@
 <span class="doccomment">/// The system-wide printer for early text output to the screen.
 </span><span class="kw">static </span>EARLY_FRAMEBUFFER_PRINTER: Mutex&lt;<span class="prelude-ty">Option</span>&lt;EarlyPrinter&gt;&gt; = {
     <span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)] </span>{
-        Mutex::new(<span class="prelude-val">Some</span>(EarlyPrinter::VgaTextMode(VgaBuffer::new())))
+        Mutex::new(<span class="prelude-val">Some</span>(EarlyPrinter::VgaTextMode(vga_buffer::VgaBuffer::new())))
     }
     <span class="attr">#[cfg(not(feature = <span class="string">&quot;bios&quot;</span>))] </span>{
         Mutex::new(<span class="prelude-val">None</span>)
@@ -447,15 +452,16 @@
 <span class="doccomment">/// The early printer can either use a graphical framebuffer or text-mode VGA.
 </span><span class="kw">enum </span>EarlyPrinter {
     Framebuffer(EarlyFramebufferPrinter),
-    <span class="attr">#[cfg_attr(not(feature = <span class="string">&quot;bios&quot;</span>), allow(dead_code))]
-    </span>VgaTextMode(VgaBuffer),
+    <span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)]
+    </span>VgaTextMode(vga_buffer::VgaBuffer),
 }
 <span class="doccomment">/// Forward the `fmt::Write` trait through this enum.
 </span><span class="kw">impl </span>Write <span class="kw">for </span>EarlyPrinter {
     <span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::Framebuffer(efb) =&gt; efb.write_str(s),
-            <span class="self">Self</span>::VgaTextMode(vga) =&gt; vga.write_str(s),
+            <span class="attr">#[cfg(feature = <span class="string">&quot;bios&quot;</span>)]
+            </span><span class="self">Self</span>::VgaTextMode(vga) =&gt; vga.write_str(s),
         }
     }
 }

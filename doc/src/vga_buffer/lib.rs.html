@@ -144,6 +144,7 @@
 <a href="#144" id="144">144</a>
 <a href="#145" id="145">145</a>
 <a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for basic printing to a simple 80x25 text-mode VGA display. 
 //!
 //! Does not support user scrolling, cursors, or any other advanced features.
@@ -157,6 +158,7 @@
 
 <span class="doccomment">/// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
 /// We must rely on the early bootstrap code to identity map this address.
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span><span class="comment">// ensures build failure on non-x86 platforms
 </span><span class="kw">const </span>VGA_BUFFER_VIRTUAL_ADDR: usize = <span class="number">0xb8000</span>;
 
 <span class="doccomment">/// height of the VGA text window
