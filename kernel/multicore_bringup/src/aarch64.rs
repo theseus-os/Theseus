@@ -7,7 +7,6 @@ use ap_start::kstart_ap;
 use volatile::Volatile;
 use core::arch::asm;
 use cpu::{CpuId, MpidrValue, current_cpu};
-use no_drop::NoDrop;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
 #[cfg(target_arch = "aarch64")]
@@ -93,23 +92,28 @@ pub fn handle_ap_cores(
         dst.copy_from_slice(src);
     }
 
-    // Create a stack
-    let mut ap_stack = Some(NoDrop::new(stack::alloc_stack(
-        KERNEL_STACK_SIZE_IN_PAGES,
-        &mut kernel_mmi_ref.lock().page_table,
-    ).ok_or("could not allocate AP stack!")?));
-
+    let mut ap_stack = None;
     log::error!("Bruteforcing 256 CpuIds that are likely to be valid");
     for aff1 in 0..16 {
         for aff0 in 0..16 {
             let mpidr = MpidrValue::new(0, 0, aff1, aff0);
             let cpu_id: CpuId = mpidr.into();
 
-            // Write the per-core fields of ApTrampolineData
-            let stack = ap_stack.take().unwrap();
             ap_data.ap_ready.write(0);
-            ap_data.ap_stack_start.write(stack.bottom());
-            ap_data.ap_stack_end.write(stack.top_unusable());
+            let stack = if let Some(stack) = ap_stack.take() {
+                stack
+            } else {
+                // Create a new stack
+                let stack = stack::alloc_stack(
+                    KERNEL_STACK_SIZE_IN_PAGES,
+                    &mut kernel_mmi_ref.lock().page_table,
+                ).ok_or("could not allocate AP stack!")?;
+
+                ap_data.ap_stack_start.write(stack.bottom());
+                ap_data.ap_stack_end.write(stack.top_unusable());
+
+                stack
+            };
 
             // Associate the stack to this CpuId
             ap_start::insert_ap_stack(cpu_id.value(), stack);
@@ -132,6 +136,7 @@ pub fn handle_ap_cores(
                 };
 
                 // Dissociate the stack from this CpuId
+                // It's going to be reused for the next CPU
                 ap_stack = ap_start::take_stack_back(cpu_id.value());
 
                 if let Some(msg) = msg {
@@ -143,19 +148,15 @@ pub fn handle_ap_cores(
                 // Wait for the core to take note of the stack boundaries
                 while ap_data.ap_ready.read() != 1 {}
 
+                // ap_stack is None because the stack will be used by
+                // the booting core; a new one will be created for the
+                // next core
+
                 // remember this CpuId
                 online_cores += 1;
-
-                // Create a new stack
-                ap_stack = Some(NoDrop::new(stack::alloc_stack(
-                    KERNEL_STACK_SIZE_IN_PAGES,
-                    &mut kernel_mmi_ref.lock().page_table,
-                ).ok_or("could not allocate AP stack!")?));
             }
         }
     }
-
-    // last created stack is wasted/lost/forgotten
 
     Ok(online_cores)
 }
