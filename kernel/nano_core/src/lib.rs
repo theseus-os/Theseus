@@ -89,39 +89,35 @@ where
     irq_safety::disable_interrupts();
     println!("nano_core(): Entered early setup. Interrupts disabled.");
 
+    // The early logger is only available on x86_64,
+    // as the aarch64 logger relies on memory-mapped I/O.
     #[cfg(target_arch = "x86_64")] {
-        let logger_ports = [serial_port_basic::take_serial_port(
-            serial_port_basic::SerialPortAddress::COM1,
-        )];
-        logger_x86_64::early_init(None, IntoIterator::into_iter(logger_ports).flatten())
-            .map_err(|_| "failed to initialize early logging")?;
+        let logger_ports = [
+            serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
+        ];
+        logger_x86_64::early_init(
+            None,
+            IntoIterator::into_iter(logger_ports).flatten(),
+        ).unwrap_or_else(|_e|
+            println!("Failed to initialize early logger; proceeding with init. Error: {:?}", _e)
+        );
+        println!("nano_core(): initialized early logger.");
+        log::info!("initialized early logger");
     }
-    log::info!("initialized early logger");
-    println!("nano_core(): initialized early logger.");
-
-    // Dump basic information about this build of Theseus.
-    log::info!("\n    \
-        ===================== Theseus build info: =====================\n    \
-        CUSTOM CFGs: {} \n    \
-        ===============================================================",
-        build_info::CUSTOM_CFG_STR,
-    );
 
     #[cfg(target_arch = "x86_64")] {
         exceptions_early::init(Some(double_fault_stack_top));
-        println!("early_setup(): initialized early IDT with exception handlers.");
+        println!("nano_core(): initialized early IDT with exception handlers.");
+    }
+
+    // If the bootloader already mapped the framebuffer for us, then we can use it now.
+    if let Some(ref fb_info) = boot_info.framebuffer_info() && fb_info.is_mapped() {
+        early_printer::init(fb_info, None).unwrap_or_else(|_e|
+            log::error!("Failed to init early_printer; proceeding with init. Error: {:?}", _e)
+        );
     }
 
     let rsdp_address = boot_info.rsdp();
-    println!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
-
-    // If the bootloader already mapped the framebuffer for us, the we can use it now
-    // before initializing the memory mgmt subsystem.
-    let framebuffer_info = boot_info.framebuffer_info();
-    if let Some(ref fb_info) = framebuffer_info && fb_info.is_mapped() {
-        early_printer::init(fb_info)?;
-    }
-
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
         kernel_mmi_ref,
@@ -133,19 +129,21 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    // Now that we initialized the memory subsystem, we can map an early framebuffer
-    // for basic graphical text output.
-    if let Some(ref fb_info) = framebuffer_info {
-        early_printer::init(fb_info)?;
-    }
-
     #[cfg(target_arch = "aarch64")] {
         logger_aarch64::init()?;
         log::info!("Initialized logger_aarch64");
     }
 
     println!("nano_core(): initialized memory subsystem.");
+    println!("nano_core(): bootloader-provided RSDP address: {:X?}", rsdp_address);
 
+    // Dump basic information about this build of Theseus.
+    log::info!("\n    \
+        ===================== Theseus build info: =====================\n    \
+        CUSTOM CFGs: {} \n    \
+        ===============================================================",
+        build_info::CUSTOM_CFG_STR,
+    );
 
     state_store::init();
     log::trace!("state_store initialized.");

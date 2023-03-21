@@ -1,4 +1,4 @@
-use crate::{Address, ElfSectionFlags, ReservedMemoryRegion, FramebufferFormat};
+use crate::{ElfSectionFlags, ReservedMemoryRegion, FramebufferFormat};
 use core::{cmp, iter::Iterator};
 use kernel_config::memory::KERNEL_OFFSET;
 use memory_structs::{PhysicalAddress, VirtualAddress};
@@ -251,7 +251,8 @@ impl crate::BootInformation for multiboot2::BootInformation {
             _ => return None,
         };
         Some(crate::FramebufferInfo {
-            address: Address::Physical(PhysicalAddress::new_canonical(fb_tag.address as usize)),
+            virt_addr: None,
+            phys_addr: PhysicalAddress::new_canonical(fb_tag.address as usize),
             total_size_in_bytes: (stride * height * bytes_per_pixel) as u64,
             width,
             height,
