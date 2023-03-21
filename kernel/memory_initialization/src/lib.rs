@@ -65,6 +65,23 @@ pub fn init_memory_management(
         identity: identity_mapped_pages,
         additional: additional_mapped_pages,
     } = memory::init(&boot_info, kernel_stack_start)?;
+
+    // Immediately after initializing the memory subsystem, we will have switched
+    // to a new page table, so we must re-initialize the early printer because
+    // it would otherwise try to invalidly access the framebuffer via virtual memory
+    // that has since been unmapped.
+    // We should not issue any log or print statements until re-initializing this.
+    if let Some(ref fb_info) = boot_info.framebuffer_info() {
+        early_printer::init(fb_info, Some(&mut page_table)).unwrap_or_else(|_e|
+            log::error!("Failed to re-init early_printer after memory::init(); \
+                proceeding with init. Error: {:?}", _e
+            )
+        );
+    }
+
+    // Ok, now we can safely print or log messages.
+    debug!("Done with memory::init(); new page table: {:?}", page_table);
+
     // After this point, at which `memory::init()` has returned new objects that represent
     // the currently-executing code/data/stack, we must ensure they aren't dropped if an error occurs,
     // because that will cause them to be auto-unmapped.
@@ -74,7 +91,7 @@ pub fn init_memory_management(
         Ok(s) => NoDrop::new(s),
         Err((_stack_guard_page, stack_mp)) => {
             let _stack_mp = NoDrop::new(stack_mp);
-            return Err("initial Stack was not contiguous in virtual memory");
+            return Err("BUG: initial Stack was not contiguous in virtual memory");
         }
     };
 
