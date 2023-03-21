@@ -374,7 +374,7 @@ section .init.text32ap progbits alloc exec
 bits 32
 prot_mode:
 
-    ; set up new segment selectors. Code selector is already set correctly)
+    ; set up new segment selectors. Code selector is already set correctly
     ; GDT: kernel code is 0x08, kernel data is 0x10
     mov ax, 0x10   
     mov ds, ax

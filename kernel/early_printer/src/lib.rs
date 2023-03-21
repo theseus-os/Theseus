@@ -4,13 +4,16 @@
 //! Does not support user scrolling, cursors, or any other advanced features.
 
 #![no_std]
+#![feature(let_chains)]
+
+#[cfg(all(feature = "bios", not(target_arch = "x86_64")))]
+compile_error!("The `bios` feature can only be used on x86_64");
 
 use core::{fmt::{self, Write}, slice, ops::{Deref, DerefMut}};
-use boot_info::{FramebufferInfo, Address, FramebufferFormat};
+use boot_info::{FramebufferInfo, FramebufferFormat};
 use font::FONT_BASIC;
-use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch};
+use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch, PageTable};
 use spin::Mutex;
-use vga_buffer::VgaBuffer;
 
 /// The height in pixels that each character occupies, not including any padding.
 const CHARACTER_HEIGHT: u32 = font::CHARACTER_HEIGHT as u32;
@@ -22,7 +25,7 @@ const GLPYH_WIDTH: u32 = CHARACTER_WIDTH - 1;
 /// The system-wide printer for early text output to the screen.
 static EARLY_FRAMEBUFFER_PRINTER: Mutex<Option<EarlyPrinter>> = {
     #[cfg(feature = "bios")] {
-        Mutex::new(Some(EarlyPrinter::VgaTextMode(VgaBuffer::new())))
+        Mutex::new(Some(EarlyPrinter::VgaTextMode(vga_buffer::VgaBuffer::new())))
     }
     #[cfg(not(feature = "bios"))] {
         Mutex::new(None)
@@ -32,14 +35,15 @@ static EARLY_FRAMEBUFFER_PRINTER: Mutex<Option<EarlyPrinter>> = {
 /// The early printer can either use a graphical framebuffer or text-mode VGA.
 enum EarlyPrinter {
     Framebuffer(EarlyFramebufferPrinter),
-    #[cfg_attr(not(feature = "bios"), allow(dead_code))]
-    VgaTextMode(VgaBuffer),
+    #[cfg(feature = "bios")]
+    VgaTextMode(vga_buffer::VgaBuffer),
 }
 /// Forward the `fmt::Write` trait through this enum.
 impl Write for EarlyPrinter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         match self {
             Self::Framebuffer(efb) => efb.write_str(s),
+            #[cfg(feature = "bios")]
             Self::VgaTextMode(vga) => vga.write_str(s),
         }
     }
@@ -58,90 +62,107 @@ impl Write for EarlyPrinter {
 ///    will attempt to allocate and map a new virtual address to that framebuffer.
 ///    * In this case, this function can only be called *after* the memory subsystem
 ///      has been initialized.
-pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
+///
+/// It is valid (and recommended) to call this function in both circumstances
+/// described above, i.e., right after taking over from the bootloader AND again
+/// after the memory subsystem has been initialized.
+pub fn init(
+    info: &FramebufferInfo,
+    page_table: Option<&mut PageTable>,
+) -> Result<(), &'static str> {
     if matches!(info.format, FramebufferFormat::TextCharacter) {
         log::debug!("Skipping `early_printer::init()` for text-mode VGA");
         return Ok(());
     }
-    log::info!("early_printer::init(): {:?}", info);
     let fb_pixel_count = (info.stride * info.height) as usize;
     let mut flags_used = None;
     let mut staging_fb_range = None;
+    let use_vaddr = page_table.is_none();
 
-    let (fb_paddr, fb_memory, staging_fb) = match info.address {
-        Address::Virtual(vaddr) => {
-            let paddr = memory::translate(vaddr)
-                .ok_or("BUG: bootloader-provided framebuffer virtual address was not mapped!")?;
-            // SAFETY: we checked that the bootloader-provided address was mapped,
-            //         but we have no real alternative but to trust that it maps a framebuffer.
-            let slc = unsafe {
-                slice::from_raw_parts_mut(vaddr.value() as *mut _, fb_pixel_count)
-            };
-            (
-                paddr,
-                FramebufferMemory::Slice(slc),
-                None,
-            )
+    let (fb_paddr, fb_memory, staging_fb) = if use_vaddr && let Some(vaddr) = info.virt_addr {
+        let paddr = memory::translate(vaddr)
+            .ok_or("BUG: bootloader-provided framebuffer virtual address wasn't mapped!")?;
+        if paddr != info.phys_addr {
+            log::error!("Mismatch! paddr: {:#X}, phys_addr: {:#X}", paddr, info.phys_addr);
+            return Err("BUG: bootloader invalidly mapped the early framebuffer");
         }
-        Address::Physical(paddr) => {
-            let kernel_mmi = memory::get_kernel_mmi_ref().ok_or(
-                "BUG: early framebuffer printer cannot map framebuffer's \
-                physical address before the memory subsystem is initialized."
-            )?;
-            let frames = memory::allocate_frames_by_bytes_at(paddr, info.total_size_in_bytes as usize)
-                .map_err(|_| "couldn't allocate frames for early framebuffer printer")?;
-            let num_pages = frames.size_in_frames();
-            let pages = memory::allocate_pages(num_pages)
-                .ok_or("couldn't allocate pages for early framebuffer printer")?;
-            let mut flags: PteFlagsArch = PteFlags::new()
-                .valid(true)
-                .writable(true)
-                .into();
+        // SAFETY: we checked that the bootloader-provided address was mapped,
+        //         but we have no real alternative but to trust that it maps a framebuffer.
+        let slc = unsafe {
+            slice::from_raw_parts_mut(vaddr.value() as *mut u32, fb_pixel_count)
+        };
+        (
+            info.phys_addr,
+            FramebufferMemory::Slice(slc),
+            None,
+        )
+    } else {
+        let pg_tbl = page_table.ok_or(
+            "BUG: early framebuffer printer cannot map framebuffer's \
+            physical address before the memory subsystem is initialized."
+        )?;
+        let frames = memory::allocate_frames_by_bytes_at(
+            info.phys_addr,
+            info.total_size_in_bytes as usize,
+        ).map_err(|_| "couldn't allocate frames for early framebuffer printer")?;
+        let num_pages = frames.size_in_frames();
+        let pages = memory::allocate_pages(num_pages)
+            .ok_or("couldn't allocate pages for early framebuffer printer")?;
+        let mut flags: PteFlagsArch = PteFlags::new()
+            .valid(true)
+            .writable(true)
+            .into();
 
-            #[cfg(target_arch = "x86_64")] {
-                if page_attribute_table::init().is_ok() {
-                    flags = flags.pat_index(
-                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
-                    );
-                    log::info!("Using PAT write-combining mapping for early_printer framebuffer");
-                } else {
-                    flags = flags.device_memory(true);
-                    log::info!("Falling back to cache-disable mapping for early_printer framebuffer");
-                }
-            }
-            #[cfg(not(target_arch = "x86_64"))] {
+        #[cfg(target_arch = "x86_64")] {
+            if page_attribute_table::init().is_ok() {
+                flags = flags.pat_index(
+                    page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                );
+            } else {
                 flags = flags.device_memory(true);
             }
+        }
+        #[cfg(not(target_arch = "x86_64"))] {
+            flags = flags.device_memory(true);
+        }
 
-            flags_used = Some(flags);
-            let mp = kernel_mmi.lock().page_table.map_allocated_pages_to(pages, frames, flags)?;
-            let fb_memory = FramebufferMemory::Mapping(
-                mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
-            );
+        flags_used = Some(flags);
+        let mp = pg_tbl.map_allocated_pages_to(pages, frames, flags)?;
+        let fb_memory = FramebufferMemory::Mapping(
+            mp.into_borrowed_slice_mut(0, fb_pixel_count).map_err(|(_mp, s)| s)?
+        );
 
-            // Attempt to allocated a staging framebuffer, which is used to significantly
-            // accelerate scrolling by not having to read from the framebuffer memory.
-            let staging_fb = memory::allocate_pages(num_pages)
-                .and_then(|pages| {
-                    kernel_mmi.lock().page_table.map_allocated_pages(
-                        pages,
-                        PteFlags::new().valid(true).writable(true),
-                    )
-                    .ok()
-                })
-                .and_then(|mp| {
-                    staging_fb_range = Some(mp.deref().clone());
-                    mp.into_borrowed_slice_mut(0, fb_pixel_count).ok()
-                });
-                
-            (paddr, fb_memory, staging_fb)
+        // Attempt to allocate a staging framebuffer, which is used to significantly
+        // accelerate scrolling by not having to read from the framebuffer memory.
+        let staging_fb = memory::allocate_pages(num_pages)
+            .and_then(|pages|
+                pg_tbl.map_allocated_pages(
+                    pages,
+                    PteFlags::new().valid(true).writable(true),
+                )
+                .ok()
+            )
+            .and_then(|mp| {
+                staging_fb_range = Some(mp.deref().clone());
+                mp.into_borrowed_slice_mut(0, fb_pixel_count).ok()
+            });
+            
+        (info.phys_addr, fb_memory, staging_fb)
+    };
+
+    // Use the current pixel coordinate if the early_printer has already been intiialized,
+    // such that we continue where the existing printer left off.
+    let curr_pixel = {
+        if let Some(EarlyPrinter::Framebuffer(ep)) = EARLY_FRAMEBUFFER_PRINTER.lock().deref() {
+            ep.curr_pixel
+        } else {
+            PixelCoord { x: 0, y: 0 }
         }
     };
 
     // Round down the height of the fb to the nearest multiple of `CHARACTER_HEIGHT`
     // in order to prevent characters from being displayed partially offscreen
     let height = (info.height / CHARACTER_HEIGHT) * CHARACTER_HEIGHT;
-    log::info!("Limiting early framebuffer height to {} pixels (from {})", height, info.height);
     let mut early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
         staging_fb,
@@ -150,7 +171,7 @@ pub fn init(info: &FramebufferInfo) -> Result<(), &'static str> {
         height,
         stride: info.stride,
         format: info.format,
-        curr_pixel: PixelCoord { x: 0, y: 0 },
+        curr_pixel,
     };
 
     let _res = early_fb.write_fmt(format_args!(

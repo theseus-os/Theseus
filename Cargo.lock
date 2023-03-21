@@ -1982,6 +1982,7 @@ version = "0.1.0"
 dependencies = [
  "boot_info",
  "bootloader_modules",
+ "early_printer",
  "heap",
  "irq_safety",
  "kernel_config",
@@ -4173,7 +4174,7 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
-source = "git+https://github.com/theseus-os/uefi-bootloader#593fd590f55b4756ced5389146d987cebd491c4f"
+source = "git+https://github.com/theseus-os/uefi-bootloader#c4e8aabb3430df2b1e16d87cbe567034c6742d02"
 
 [[package]]
 name = "unicode-ident"

@@ -12,7 +12,7 @@ pub mod multiboot2;
 #[cfg(feature = "uefi")]
 pub mod uefi;
 
-use core::{fmt, iter::Iterator};
+use core::iter::Iterator;
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
 pub trait MemoryRegion {
@@ -87,25 +87,15 @@ pub struct ReservedMemoryRegion {
     pub len: usize,
 }
 
-/// A physical or virtual address.
-pub enum Address {
-    Physical(PhysicalAddress),
-    Virtual(VirtualAddress),
-}
-impl fmt::Debug for Address {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Address::Physical(paddr) => write!(f, "p{:#X}", paddr),
-            Address::Virtual(vaddr)  => write!(f, "v{:#X}", vaddr),
-        }
-    }
-}
 
 /// Information about a framebuffer's layout in memory.
 #[derive(Debug)]
 pub struct FramebufferInfo {
-    /// The virtual or physical address of the start of the framebuffer.
-    pub address: Address,
+    /// The virtual address of the start of the framebuffer,
+    /// if it has been mapped for us by the bootloader.
+    pub virt_addr: Option<VirtualAddress>,
+    /// The physical address of the start of the framebuffer.
+    pub phys_addr: PhysicalAddress,
     /// The total size of the framebuffer memory in bytes.
     pub total_size_in_bytes: u64,
     /// The width in pixels (number of columns) of the framebuffer.
@@ -147,7 +137,7 @@ impl FramebufferInfo {
     /// Returns `false` if the bootloader did not map the framebuffer and
     /// can only provide its physical address.
     pub fn is_mapped(&self) -> bool {
-        matches!(self.address, Address::Virtual(_))
+        self.virt_addr.is_some()
     }
 }
 
