@@ -14,7 +14,7 @@ use ap_start::{kstart_ap, AP_READY_FLAG};
 use madt::{Madt, MadtEntry, find_nmi_entry_for_processor};
 use core::hint::spin_loop;
 use no_drop::NoDrop;
-
+use log::{error, warn, info, trace, debug};
 
 /// The physical address that an AP jumps to when it first is booted by the BSP.
 /// For x2apic systems, this must be at 0x10000 or higher! 

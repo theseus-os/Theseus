@@ -8,8 +8,6 @@
 #![cfg_attr(target_arch = "x86_64", feature(let_chains))]
 #![cfg_attr(target_arch = "aarch64", feature(naked_functions))]
 
-#[cfg_attr(target_arch = "x86_64", macro_use)] extern crate log;
-
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 #[cfg_attr(target_arch = "aarch64", path = "aarch64.rs")]
 mod arch;
