@@ -6,12 +6,14 @@
 #![no_std]
 #![feature(let_chains)]
 
+#[cfg(all(feature = "bios", not(target_arch = "x86_64")))]
+compile_error!("The `bios` feature can only be used on x86_64");
+
 use core::{fmt::{self, Write}, slice, ops::{Deref, DerefMut}};
 use boot_info::{FramebufferInfo, FramebufferFormat};
 use font::FONT_BASIC;
 use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch, PageTable};
 use spin::Mutex;
-use vga_buffer::VgaBuffer;
 
 /// The height in pixels that each character occupies, not including any padding.
 const CHARACTER_HEIGHT: u32 = font::CHARACTER_HEIGHT as u32;
@@ -23,7 +25,7 @@ const GLPYH_WIDTH: u32 = CHARACTER_WIDTH - 1;
 /// The system-wide printer for early text output to the screen.
 static EARLY_FRAMEBUFFER_PRINTER: Mutex<Option<EarlyPrinter>> = {
     #[cfg(feature = "bios")] {
-        Mutex::new(Some(EarlyPrinter::VgaTextMode(VgaBuffer::new())))
+        Mutex::new(Some(EarlyPrinter::VgaTextMode(vga_buffer::VgaBuffer::new())))
     }
     #[cfg(not(feature = "bios"))] {
         Mutex::new(None)
@@ -33,14 +35,15 @@ static EARLY_FRAMEBUFFER_PRINTER: Mutex<Option<EarlyPrinter>> = {
 /// The early printer can either use a graphical framebuffer or text-mode VGA.
 enum EarlyPrinter {
     Framebuffer(EarlyFramebufferPrinter),
-    #[cfg_attr(not(feature = "bios"), allow(dead_code))]
-    VgaTextMode(VgaBuffer),
+    #[cfg(feature = "bios")]
+    VgaTextMode(vga_buffer::VgaBuffer),
 }
 /// Forward the `fmt::Write` trait through this enum.
 impl Write for EarlyPrinter {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         match self {
             Self::Framebuffer(efb) => efb.write_str(s),
+            #[cfg(feature = "bios")]
             Self::VgaTextMode(vga) => vga.write_str(s),
         }
     }
