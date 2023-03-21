@@ -9,8 +9,6 @@
 //! [tb]:  fn.new_task_builder.html
 //! [atb]: fn.new_application_task_builder.html
 
-// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-#![allow(clippy::empty_loop)]
 #![allow(clippy::type_complexity)]
 #![no_std]
 #![feature(stmt_expr_attributes)]

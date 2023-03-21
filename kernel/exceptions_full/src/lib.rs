@@ -1,7 +1,5 @@
 //! Exception handlers that are task-aware, and will kill a task on an exception.
 
-// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 

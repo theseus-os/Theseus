@@ -4,8 +4,6 @@
 //! They should never be directly invoked by developers, only by the compiler. 
 //! 
 
-// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]

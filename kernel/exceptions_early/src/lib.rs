@@ -1,7 +1,5 @@
 //! Early exception handlers that do nothing but print an error and hang.
 
-// TODO: Add direct explanation to why each empty loop is necessary and criteria for replacing it with something else
-#![allow(clippy::empty_loop)]
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
