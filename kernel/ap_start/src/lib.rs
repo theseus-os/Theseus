@@ -28,14 +28,15 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Temporary storage for transferring allocated `Stack`s from 
 /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-static AP_STACKS: MutexIrqSafe<BTreeMap<u32, Stack>> = MutexIrqSafe::new(BTreeMap::new());
+static AP_STACKS: MutexIrqSafe<BTreeMap<u32, NoDrop<Stack>>> = MutexIrqSafe::new(BTreeMap::new());
 
 /// Insert a new stack that was allocated for the AP with the given `cpu_id`.
 pub fn insert_ap_stack(cpu_id: u32, stack: Stack) {
-    AP_STACKS.lock().insert(cpu_id, stack);
+    AP_STACKS.lock().insert(cpu_id, NoDrop::new(stack));
 }
 
-pub fn take_stack_back(cpu_id: u32) -> Option<Stack> {
+/// Remove the stack that was allocated for the AP with the given `cpu_id`.
+pub fn take_ap_stack(cpu_id: u32) -> Option<NoDrop<Stack>> {
     AP_STACKS.lock().remove(&cpu_id)
 }
 
@@ -61,8 +62,9 @@ pub fn kstart_ap(
     early_tls::reload();
 
     // get the stack that was allocated for us (this AP) by the BSP.
-    let this_ap_stack = NoDrop::new(AP_STACKS.lock().remove(&cpu_id.value())
-        .unwrap_or_else(|| panic!("BUG: kstart_ap(): couldn't get stack created for CPU {}", cpu_id)));
+    let this_ap_stack = take_ap_stack(cpu_id.value()).unwrap_or_else(
+        || panic!("BUG: kstart_ap(): couldn't get stack created for CPU {}", cpu_id)
+    );
 
     #[cfg(target_arch = "aarch64")] {
         log::info!("cpu {} is ready!", cpu_id);

@@ -135,9 +135,9 @@ pub fn handle_ap_cores(
                     _ => Some("Unknown"),
                 };
 
-                // Dissociate the stack from this CpuId
-                // It's going to be reused for the next CPU
-                ap_stack = ap_start::take_stack_back(cpu_id.value());
+                // Re-take the stack we allocated for this CPU
+                // so we can reuse it the next CPU.
+                ap_stack = ap_start::take_ap_stack(cpu_id.value()).map(|s| s.into_inner());
 
                 if let Some(msg) = msg {
                     log::error!("Tried to start CPU core {} but got PSCI error: {}", cpu_id, msg);
