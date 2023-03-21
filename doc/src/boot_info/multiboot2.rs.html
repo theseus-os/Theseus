@@ -261,7 +261,8 @@
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
-</pre><pre class="rust"><code><span class="kw">use crate</span>::{Address, ElfSectionFlags, ReservedMemoryRegion, FramebufferFormat};
+<a href="#264" id="264">264</a>
+</pre><pre class="rust"><code><span class="kw">use crate</span>::{ElfSectionFlags, ReservedMemoryRegion, FramebufferFormat};
 <span class="kw">use </span>core::{cmp, iter::Iterator};
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 <span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
@@ -514,7 +515,8 @@
             <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
         };
         <span class="prelude-val">Some</span>(<span class="kw">crate</span>::FramebufferInfo {
-            address: Address::Physical(PhysicalAddress::new_canonical(fb_tag.address <span class="kw">as </span>usize)),
+            virt_addr: <span class="prelude-val">None</span>,
+            phys_addr: PhysicalAddress::new_canonical(fb_tag.address <span class="kw">as </span>usize),
             total_size_in_bytes: (stride * height * bytes_per_pixel) <span class="kw">as </span>u64,
             width,
             height,

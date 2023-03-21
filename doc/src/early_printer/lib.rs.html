@@ -394,17 +394,36 @@
 <a href="#394" id="394">394</a>
 <a href="#395" id="395">395</a>
 <a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for early text output to a graphical framebuffer
 //! or text-mode VGA display.
 //!
 //! Does not support user scrolling, cursors, or any other advanced features.
 
 </span><span class="attr">#![no_std]
+#![feature(let_chains)]
 
 </span><span class="kw">use </span>core::{fmt::{<span class="self">self</span>, Write}, slice, ops::{Deref, DerefMut}};
-<span class="kw">use </span>boot_info::{FramebufferInfo, Address, FramebufferFormat};
+<span class="kw">use </span>boot_info::{FramebufferInfo, FramebufferFormat};
 <span class="kw">use </span>font::FONT_BASIC;
-<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch};
+<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch, PageTable};
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>vga_buffer::VgaBuffer;
 
@@ -454,90 +473,107 @@
 ///    will attempt to allocate and map a new virtual address to that framebuffer.
 ///    * In this case, this function can only be called *after* the memory subsystem
 ///      has been initialized.
-</span><span class="kw">pub fn </span>init(info: <span class="kw-2">&amp;</span>FramebufferInfo) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+///
+/// It is valid (and recommended) to call this function in both circumstances
+/// described above, i.e., right after taking over from the bootloader AND again
+/// after the memory subsystem has been initialized.
+</span><span class="kw">pub fn </span>init(
+    info: <span class="kw-2">&amp;</span>FramebufferInfo,
+    page_table: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span>PageTable&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">if </span><span class="macro">matches!</span>(info.format, FramebufferFormat::TextCharacter) {
         <span class="macro">log::debug!</span>(<span class="string">&quot;Skipping `early_printer::init()` for text-mode VGA&quot;</span>);
         <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     }
-    <span class="macro">log::info!</span>(<span class="string">&quot;early_printer::init(): {:?}&quot;</span>, info);
     <span class="kw">let </span>fb_pixel_count = (info.stride * info.height) <span class="kw">as </span>usize;
     <span class="kw">let </span><span class="kw-2">mut </span>flags_used = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>staging_fb_range = <span class="prelude-val">None</span>;
+    <span class="kw">let </span>use_vaddr = page_table.is_none();
 
-    <span class="kw">let </span>(fb_paddr, fb_memory, staging_fb) = <span class="kw">match </span>info.address {
-        Address::Virtual(vaddr) =&gt; {
-            <span class="kw">let </span>paddr = memory::translate(vaddr)
-                .ok_or(<span class="string">&quot;BUG: bootloader-provided framebuffer virtual address was not mapped!&quot;</span>)<span class="question-mark">?</span>;
-            <span class="comment">// SAFETY: we checked that the bootloader-provided address was mapped,
-            //         but we have no real alternative but to trust that it maps a framebuffer.
-            </span><span class="kw">let </span>slc = <span class="kw">unsafe </span>{
-                slice::from_raw_parts_mut(vaddr.value() <span class="kw">as </span><span class="kw-2">*mut </span><span class="kw">_</span>, fb_pixel_count)
-            };
-            (
-                paddr,
-                FramebufferMemory::Slice(slc),
-                <span class="prelude-val">None</span>,
-            )
+    <span class="kw">let </span>(fb_paddr, fb_memory, staging_fb) = <span class="kw">if </span>use_vaddr &amp;&amp; <span class="kw">let </span><span class="prelude-val">Some</span>(vaddr) = info.virt_addr {
+        <span class="kw">let </span>paddr = memory::translate(vaddr)
+            .ok_or(<span class="string">&quot;BUG: bootloader-provided framebuffer virtual address wasn&#39;t mapped!&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">if </span>paddr != info.phys_addr {
+            <span class="macro">log::error!</span>(<span class="string">&quot;Mismatch! paddr: {:#X}, phys_addr: {:#X}&quot;</span>, paddr, info.phys_addr);
+            <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: bootloader invalidly mapped the early framebuffer&quot;</span>);
         }
-        Address::Physical(paddr) =&gt; {
-            <span class="kw">let </span>kernel_mmi = memory::get_kernel_mmi_ref().ok_or(
-                <span class="string">&quot;BUG: early framebuffer printer cannot map framebuffer&#39;s \
-                physical address before the memory subsystem is initialized.&quot;
-            </span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>frames = memory::allocate_frames_by_bytes_at(paddr, info.total_size_in_bytes <span class="kw">as </span>usize)
-                .map_err(|<span class="kw">_</span>| <span class="string">&quot;couldn&#39;t allocate frames for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span>num_pages = frames.size_in_frames();
-            <span class="kw">let </span>pages = memory::allocate_pages(num_pages)
-                .ok_or(<span class="string">&quot;couldn&#39;t allocate pages for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
-            <span class="kw">let </span><span class="kw-2">mut </span>flags: PteFlagsArch = PteFlags::new()
-                .valid(<span class="bool-val">true</span>)
-                .writable(<span class="bool-val">true</span>)
-                .into();
+        <span class="comment">// SAFETY: we checked that the bootloader-provided address was mapped,
+        //         but we have no real alternative but to trust that it maps a framebuffer.
+        </span><span class="kw">let </span>slc = <span class="kw">unsafe </span>{
+            slice::from_raw_parts_mut(vaddr.value() <span class="kw">as </span><span class="kw-2">*mut </span>u32, fb_pixel_count)
+        };
+        (
+            info.phys_addr,
+            FramebufferMemory::Slice(slc),
+            <span class="prelude-val">None</span>,
+        )
+    } <span class="kw">else </span>{
+        <span class="kw">let </span>pg_tbl = page_table.ok_or(
+            <span class="string">&quot;BUG: early framebuffer printer cannot map framebuffer&#39;s \
+            physical address before the memory subsystem is initialized.&quot;
+        </span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>frames = memory::allocate_frames_by_bytes_at(
+            info.phys_addr,
+            info.total_size_in_bytes <span class="kw">as </span>usize,
+        ).map_err(|<span class="kw">_</span>| <span class="string">&quot;couldn&#39;t allocate frames for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span>num_pages = frames.size_in_frames();
+        <span class="kw">let </span>pages = memory::allocate_pages(num_pages)
+            .ok_or(<span class="string">&quot;couldn&#39;t allocate pages for early framebuffer printer&quot;</span>)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>flags: PteFlagsArch = PteFlags::new()
+            .valid(<span class="bool-val">true</span>)
+            .writable(<span class="bool-val">true</span>)
+            .into();
 
-            <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
-                <span class="kw">if </span>page_attribute_table::init().is_ok() {
-                    flags = flags.pat_index(
-                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
-                    );
-                    <span class="macro">log::info!</span>(<span class="string">&quot;Using PAT write-combining mapping for early_printer framebuffer&quot;</span>);
-                } <span class="kw">else </span>{
-                    flags = flags.device_memory(<span class="bool-val">true</span>);
-                    <span class="macro">log::info!</span>(<span class="string">&quot;Falling back to cache-disable mapping for early_printer framebuffer&quot;</span>);
-                }
-            }
-            <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+            <span class="kw">if </span>page_attribute_table::init().is_ok() {
+                flags = flags.pat_index(
+                    page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                );
+            } <span class="kw">else </span>{
                 flags = flags.device_memory(<span class="bool-val">true</span>);
             }
+        }
+        <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
+            flags = flags.device_memory(<span class="bool-val">true</span>);
+        }
 
-            flags_used = <span class="prelude-val">Some</span>(flags);
-            <span class="kw">let </span>mp = kernel_mmi.lock().page_table.map_allocated_pages_to(pages, frames, flags)<span class="question-mark">?</span>;
-            <span class="kw">let </span>fb_memory = FramebufferMemory::Mapping(
-                mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).map_err(|(_mp, s)| s)<span class="question-mark">?
-            </span>);
+        flags_used = <span class="prelude-val">Some</span>(flags);
+        <span class="kw">let </span>mp = pg_tbl.map_allocated_pages_to(pages, frames, flags)<span class="question-mark">?</span>;
+        <span class="kw">let </span>fb_memory = FramebufferMemory::Mapping(
+            mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).map_err(|(_mp, s)| s)<span class="question-mark">?
+        </span>);
 
-            <span class="comment">// Attempt to allocated a staging framebuffer, which is used to significantly
-            // accelerate scrolling by not having to read from the framebuffer memory.
-            </span><span class="kw">let </span>staging_fb = memory::allocate_pages(num_pages)
-                .and_then(|pages| {
-                    kernel_mmi.lock().page_table.map_allocated_pages(
-                        pages,
-                        PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
-                    )
-                    .ok()
-                })
-                .and_then(|mp| {
-                    staging_fb_range = <span class="prelude-val">Some</span>(mp.deref().clone());
-                    mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).ok()
-                });
-                
-            (paddr, fb_memory, staging_fb)
+        <span class="comment">// Attempt to allocate a staging framebuffer, which is used to significantly
+        // accelerate scrolling by not having to read from the framebuffer memory.
+        </span><span class="kw">let </span>staging_fb = memory::allocate_pages(num_pages)
+            .and_then(|pages|
+                pg_tbl.map_allocated_pages(
+                    pages,
+                    PteFlags::new().valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>),
+                )
+                .ok()
+            )
+            .and_then(|mp| {
+                staging_fb_range = <span class="prelude-val">Some</span>(mp.deref().clone());
+                mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).ok()
+            });
+            
+        (info.phys_addr, fb_memory, staging_fb)
+    };
+
+    <span class="comment">// Use the current pixel coordinate if the early_printer has already been intiialized,
+    // such that we continue where the existing printer left off.
+    </span><span class="kw">let </span>curr_pixel = {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(EarlyPrinter::Framebuffer(ep)) = EARLY_FRAMEBUFFER_PRINTER.lock().deref() {
+            ep.curr_pixel
+        } <span class="kw">else </span>{
+            PixelCoord { x: <span class="number">0</span>, y: <span class="number">0 </span>}
         }
     };
 
     <span class="comment">// Round down the height of the fb to the nearest multiple of `CHARACTER_HEIGHT`
     // in order to prevent characters from being displayed partially offscreen
     </span><span class="kw">let </span>height = (info.height / CHARACTER_HEIGHT) * CHARACTER_HEIGHT;
-    <span class="macro">log::info!</span>(<span class="string">&quot;Limiting early framebuffer height to {} pixels (from {})&quot;</span>, height, info.height);
     <span class="kw">let </span><span class="kw-2">mut </span>early_fb = EarlyFramebufferPrinter {
         fb: fb_memory,
         staging_fb,
@@ -546,7 +582,7 @@
         height,
         stride: info.stride,
         format: info.format,
-        curr_pixel: PixelCoord { x: <span class="number">0</span>, y: <span class="number">0 </span>},
+        curr_pixel,
     };
 
     <span class="kw">let </span>_res = early_fb.write_fmt(<span class="macro">format_args!</span>(

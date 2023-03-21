@@ -441,7 +441,6 @@
 <a href="#441" id="441">441</a>
 <a href="#442" id="442">442</a>
 <a href="#443" id="443">443</a>
-<a href="#444" id="444">444</a>
 </pre><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -870,7 +869,6 @@
 
     <span class="macro">debug!</span>(<span class="string">&quot;switching from old page table {:?} to new page table {:?}&quot;</span>, page_table, new_table);
     page_table.switch(<span class="kw-2">&amp;</span>new_table); 
-    <span class="macro">debug!</span>(<span class="string">&quot;switched to new page table {:?}.&quot;</span>, new_table); 
     <span class="comment">// The old page_table set up during bootstrap will be dropped here. It&#39;s no longer being used.
 
     // Return the new page table because that&#39;s the one that should be used by the kernel in future mappings. 

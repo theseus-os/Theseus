@@ -274,9 +274,6 @@
 <a href="#274" id="274">274</a>
 <a href="#275" id="275">275</a>
 <a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -520,9 +517,6 @@
 
     <span class="comment">// Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     </span>paging::init(boot_info, kernel_stack_start, into_alloc_frames_fn)
-        .inspect(|InitialMemoryMappings { page_table, .. } | {
-            <span class="macro">debug!</span>(<span class="string">&quot;Done with paging::init(). new page table: {:?}&quot;</span>, page_table);
-        })
 }
 
 <span class="doccomment">/// Finishes initializing the memory management system after the heap is ready.

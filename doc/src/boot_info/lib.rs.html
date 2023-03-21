@@ -230,16 +230,6 @@
 <a href="#230" id="230">230</a>
 <a href="#231" id="231">231</a>
 <a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
-<a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a>
-<a href="#236" id="236">236</a>
-<a href="#237" id="237">237</a>
-<a href="#238" id="238">238</a>
-<a href="#239" id="239">239</a>
-<a href="#240" id="240">240</a>
-<a href="#241" id="241">241</a>
-<a href="#242" id="242">242</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate provides an abstraction over multiboot2 and UEFI boot
 //! information.
 //!
@@ -254,7 +244,7 @@
 <span class="attr">#[cfg(feature = <span class="string">&quot;uefi&quot;</span>)]
 </span><span class="kw">pub mod </span>uefi;
 
-<span class="kw">use </span>core::{fmt, iter::Iterator};
+<span class="kw">use </span>core::iter::Iterator;
 <span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
 
 <span class="kw">pub trait </span>MemoryRegion {
@@ -329,25 +319,15 @@
     <span class="kw">pub </span>len: usize,
 }
 
-<span class="doccomment">/// A physical or virtual address.
-</span><span class="kw">pub enum </span>Address {
-    Physical(PhysicalAddress),
-    Virtual(VirtualAddress),
-}
-<span class="kw">impl </span>fmt::Debug <span class="kw">for </span>Address {
-    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
-        <span class="kw">match </span><span class="self">self </span>{
-            Address::Physical(paddr) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;p{:#X}&quot;</span>, paddr),
-            Address::Virtual(vaddr)  =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;v{:#X}&quot;</span>, vaddr),
-        }
-    }
-}
 
 <span class="doccomment">/// Information about a framebuffer&#39;s layout in memory.
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>FramebufferInfo {
-    <span class="doccomment">/// The virtual or physical address of the start of the framebuffer.
-    </span><span class="kw">pub </span>address: Address,
+    <span class="doccomment">/// The virtual address of the start of the framebuffer,
+    /// if it has been mapped for us by the bootloader.
+    </span><span class="kw">pub </span>virt_addr: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,
+    <span class="doccomment">/// The physical address of the start of the framebuffer.
+    </span><span class="kw">pub </span>phys_addr: PhysicalAddress,
     <span class="doccomment">/// The total size of the framebuffer memory in bytes.
     </span><span class="kw">pub </span>total_size_in_bytes: u64,
     <span class="doccomment">/// The width in pixels (number of columns) of the framebuffer.
@@ -389,7 +369,7 @@
     /// Returns `false` if the bootloader did not map the framebuffer and
     /// can only provide its physical address.
     </span><span class="kw">pub fn </span>is_mapped(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="macro">matches!</span>(<span class="self">self</span>.address, Address::Virtual(<span class="kw">_</span>))
+        <span class="self">self</span>.virt_addr.is_some()
     }
 }
 
