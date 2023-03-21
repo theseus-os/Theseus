@@ -131,7 +131,6 @@ pub fn init(
     exceptions_full::init(idt);
     
     // boot up the other cores (APs)
-    // arch-gate: no multicore support on aarch64 at the moment
     let ap_count = multicore_bringup::handle_ap_cores(
         &kernel_mmi_ref,
         multicore_info,
