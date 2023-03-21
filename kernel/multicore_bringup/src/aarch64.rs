@@ -6,7 +6,7 @@ use zerocopy::FromBytes;
 use ap_start::kstart_ap;
 use volatile::Volatile;
 use core::arch::asm;
-use cpu::{CpuId, current_cpu, MpidrValue};
+use cpu::{CpuId, MpidrValue, current_cpu};
 use no_drop::NoDrop;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
@@ -102,7 +102,8 @@ pub fn handle_ap_cores(
     log::error!("Bruteforcing 256 CpuIds that are likely to be valid");
     for aff1 in 0..16 {
         for aff0 in 0..16 {
-            let cpu_id = CpuId::new(0, 0, aff1, aff0);
+            let mpidr = MpidrValue::new(0, 0, aff1, aff0);
+            let cpu_id: CpuId = mpidr.into();
 
             // Write the per-core fields of ApTrampolineData
             let stack = ap_stack.take().unwrap();
@@ -113,7 +114,6 @@ pub fn handle_ap_cores(
             // Associate the stack to this CpuId
             ap_start::insert_ap_stack(cpu_id.value(), stack);
 
-            let mpidr: MpidrValue = cpu_id.into();
             if let Err(kind) = cpu_on(mpidr.value(), entry_point_phys_addr.value() as _, ap_data_phys_addr.value() as _) {
                 let msg = match kind {
                     // normal errors (CpuId invalid or equal to the BSP one)
