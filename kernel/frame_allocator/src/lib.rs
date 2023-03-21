@@ -850,7 +850,7 @@ fn contains_any(
         }
         Inner::RBTree(ref tree) => {
             let mut cursor = tree.upper_bound(Bound::Included(frames.start()));
-            while let Some(chunk) = cursor.get().as_deref() {
+            while let Some(chunk) = cursor.get() {
                 if chunk.start() > frames.end() {
                     // We're iterating in ascending order over a sorted tree, so we can stop
                     // looking for overlapping regions once we pass the end of `frames`.

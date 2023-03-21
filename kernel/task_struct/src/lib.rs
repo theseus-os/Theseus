@@ -7,6 +7,7 @@
 #![no_std]
 #![feature(panic_info_message)]
 #![feature(negative_impls)]
+#![allow(clippy::type_complexity)]
 
 extern crate alloc;
 

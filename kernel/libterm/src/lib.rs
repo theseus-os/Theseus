@@ -620,13 +620,12 @@ impl Terminal {
         // Get the bounding box that contains the displayed cursor.
         let bounding_box = {
             let coord = self.window.area().top_left;
-            let bounding_box = self.cursor.display(
+            self.cursor.display(
                 coord,
                 cursor_col,
                 cursor_line,
                 self.window.framebuffer_mut().deref_mut(),
-            )?;
-            bounding_box
+            )?
         };   
 
         self.window.render(Some(bounding_box))

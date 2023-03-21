@@ -255,7 +255,7 @@ impl EarlyFramebufferPrinter {
         let ascii = if ch.is_ascii() { ch as u8 } else { b'?' };
         let glyph = &FONT_BASIC[ascii as usize];
 
-        for (row_bits, row) in glyph.into_iter().zip(0u32..) {
+        for (row_bits, row) in glyph.iter().zip(0u32..) {
             // Copy each row of the font glyph to the framebuffer in a single action
             let mut pixel_row: [u32; CHARACTER_WIDTH as usize] = [background_pixel_color; CHARACTER_WIDTH as usize];
             for (pixel, col) in pixel_row.iter_mut().zip(0 .. GLPYH_WIDTH) {
@@ -281,7 +281,7 @@ impl EarlyFramebufferPrinter {
         let next_col = self.curr_pixel.x + CHARACTER_WIDTH;
         self.curr_pixel.x = next_col;
         if next_col + CHARACTER_WIDTH >= self.width {
-            return self.newline(background_pixel_color);
+            self.newline(background_pixel_color)
         }
     }
 
@@ -321,7 +321,7 @@ impl EarlyFramebufferPrinter {
 
         if let Some(staging_fb) = self.staging_fb.as_deref() {
             // Copy from the staging fb (if we have one) to the main fb.
-            self.fb.copy_from_slice(&staging_fb);
+            self.fb.copy_from_slice(staging_fb);
         }
     }
 
