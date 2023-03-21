@@ -448,13 +448,9 @@
 <a href="#448" id="448">448</a>
 <a href="#449" id="449">449</a>
 <a href="#450" id="450">450</a>
-<a href="#451" id="451">451</a>
-<a href="#452" id="452">452</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.
 
-</span><span class="comment">// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-</span><span class="attr">#![allow(clippy::empty_loop)]
-#![no_std]
+</span><span class="attr">#![no_std]
 #![feature(abi_x86_interrupt)]
 
 </span><span class="kw">use </span>log::{warn, debug, trace};
@@ -685,7 +681,7 @@
     // But in general, this task should have already been marked as killed and thus no longer schedulable,
     // so it should not reach this point. 
     // Only exceptions during the early OS initialization process will get here, meaning that the OS will basically stop.
-    </span><span class="kw">loop </span>{ }
+    </span><span class="kw">loop </span>{ core::hint::spin_loop() }
 }
 
 
@@ -813,7 +809,7 @@
     }
     
     kill_and_halt(<span class="number">0x8</span>, <span class="kw-2">&amp;</span>stack_frame, <span class="prelude-val">Some</span>(error_code.into()), <span class="bool-val">false</span>);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ core::hint::spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x0A
@@ -876,7 +872,7 @@
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>machine_check_handler(stack_frame: InterruptStackFrame) -&gt; ! {
     <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: MACHINE CHECK\n{:#X?}&quot;</span>, stack_frame);
     kill_and_halt(<span class="number">0x12</span>, <span class="kw-2">&amp;</span>stack_frame, <span class="prelude-val">None</span>, <span class="bool-val">true</span>);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ core::hint::spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x13

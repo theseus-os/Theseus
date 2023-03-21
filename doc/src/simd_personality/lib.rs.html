@@ -407,7 +407,7 @@ extern crate compiler_builtins as _compiler_builtins;
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
-	</span><span class="kw">loop </span>{ }
+	</span><span class="kw">loop </span>{ core::hint::spin_loop() }
 	
 	<span class="comment">// _task1.join()?;
 	// _task2.join()?;

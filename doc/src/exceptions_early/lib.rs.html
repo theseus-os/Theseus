@@ -257,9 +257,7 @@
 <a href="#257" id="257">257</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Early exception handlers that do nothing but print an error and hang.
 
-</span><span class="comment">// TODO: Add direct explanation to why each empty loop is necessary and criteria for replacing it with something else
-</span><span class="attr">#![allow(clippy::empty_loop)]
-#![no_std]
+</span><span class="attr">#![no_std]
 #![feature(abi_x86_interrupt)]
 
 </span><span class="kw">use </span>spin::Mutex;
@@ -276,6 +274,8 @@
 <span class="kw">use </span>locked_idt::LockedIdt;
 <span class="kw">use </span>gdt::{Gdt, create_gdt};
 <span class="kw">use </span>early_printer::println;
+
+<span class="kw">use </span>core::hint::spin_loop;
 
 <span class="doccomment">/// An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers.
 /// This is no longer used after interrupts are set up properly, it&#39;s just a failsafe.
@@ -363,7 +363,7 @@
 <span class="doccomment">/// exception 0x00
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>divide_error_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): DIVIDE ERROR\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x01
@@ -375,7 +375,7 @@
 <span class="doccomment">/// exception 0x02
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>nmi_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): NON-MASKABLE INTERRUPT\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{ }
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x03
@@ -387,19 +387,19 @@
 <span class="doccomment">/// exception 0x04
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>overflow_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): OVERFLOW\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{ }
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x05
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): BOUND RANGE EXCEEDED\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{ }
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x06
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>invalid_opcode_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID OPCODE\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x07
@@ -408,7 +408,7 @@
 /// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>device_not_available_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): DEVICE NOT AVAILABLE\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x08
@@ -417,31 +417,31 @@
 </span><span class="kw">pub extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -&gt; ! {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): DOUBLE FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
     <span class="macro">println!</span>(<span class="string">&quot;\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?&quot;</span>);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x0A
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): INVALID TSS\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x0B
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>segment_not_present_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x0C
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>stack_segment_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x0D
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x0E
@@ -468,49 +468,49 @@
             <span class="bool-val">true</span>, <span class="comment">// look at all sections (.data/.bss/.rodata), not just .text
         </span>)),
     );
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x10
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>x87_floating_point_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): x87 FLOATING POINT\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x11
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>alignment_check_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x12
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>machine_check_handler(stack_frame: InterruptStackFrame) -&gt; ! {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): MACHINE CHECK\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x13
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>simd_floating_point_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): SIMD FLOATING POINT\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x14
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>virtualization_handler(stack_frame: InterruptStackFrame) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): VIRTUALIZATION\n{:#X?}&quot;</span>, stack_frame);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x1D
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>vmm_communication_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 
 <span class="doccomment">/// exception 0x1E
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>security_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     <span class="macro">println!</span>(<span class="string">&quot;\nEXCEPTION (early): SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}&quot;</span>, stack_frame, error_code);
-    <span class="kw">loop </span>{}
+    <span class="kw">loop </span>{ spin_loop() }
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="exceptions_early" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

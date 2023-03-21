@@ -141,17 +141,13 @@
 <a href="#141" id="141">141</a>
 <a href="#142" id="142">142</a>
 <a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides the default entry points and lang items for panics and unwinding. 
 //! 
 //! These lang items are required by the Rust compiler. 
 //! They should never be directly invoked by developers, only by the compiler. 
 //! 
 
-</span><span class="comment">// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-</span><span class="attr">#![allow(clippy::empty_loop)]
-#![no_std]
+</span><span class="attr">#![no_std]
 #![feature(alloc_error_handler)]
 #![feature(lang_items)]
 #![feature(panic_info_message)]
@@ -226,7 +222,7 @@
     // other than just let the thread spin endlessly (which doesn&#39;t hurt correctness but is inefficient). 
     // But in general, this task should be killed by the panic_wrapper, so it shouldn&#39;t reach this point.
     // Only panics early on in the initialization process will get here, meaning that the OS will basically stop.
-    </span><span class="kw">loop </span>{ }
+    </span><span class="kw">loop </span>{ core::hint::spin_loop() }
 }
 
 
@@ -241,7 +237,7 @@
 #[doc(hidden)]
 </span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_eh_personality() -&gt; ! {
     <span class="macro">error!</span>(<span class="string">&quot;BUG: Theseus does not use rust_eh_personality. Why has it been invoked?&quot;</span>);
-    <span class="kw">loop </span>{ }
+    <span class="kw">loop </span>{ core::hint::spin_loop() }
 }
 
 <span class="doccomment">/// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
@@ -254,7 +250,7 @@
 #[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, allow(unused_variables))]
 </span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>_Unwind_Resume(arg: usize) -&gt; ! {
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span><span class="kw">loop </span>{ }
+    </span><span class="kw">loop </span>{ core::hint::spin_loop() }
 
     <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, not(loadable)))] </span>{
         unwind::unwind_resume(arg)
@@ -277,7 +273,7 @@
             <span class="prelude-val">Ok</span>(()) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: _Unwind_Resume: unexpectedly returned Ok(()) from unwind::unwind_resume()&quot;</span>),
             <span class="prelude-val">Err</span>(e) =&gt; <span class="macro">error!</span>(<span class="string">&quot;_Unwind_Resume: failed to dynamically invoke unwind::unwind_resume! Error: {}&quot;</span>, e),
         }
-        <span class="kw">loop </span>{ }
+        <span class="kw">loop </span>{ core::hint::spin_loop() }
     }
 }
 
