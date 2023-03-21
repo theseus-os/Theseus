@@ -95,8 +95,8 @@ pub enum Address {
 impl fmt::Debug for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Address::Physical(paddr) => write!(f, "p{:#X}", paddr),
-            Address::Virtual(vaddr)  => write!(f, "v{:#X}", vaddr),
+            Address::Physical(paddr) => write!(f, "p{paddr:#X}"),
+            Address::Virtual(vaddr)  => write!(f, "v{vaddr:#X}"),
         }
     }
 }
