@@ -35,16 +35,6 @@ pub fn current_cpu() -> CpuId {
     MpidrValue(MPIDR_EL1.get() as u64).into()
 }
 
-impl CpuId {
-    /// Reads an affinity `level` from this `CpuId`.
-    ///
-    /// Panics if the given affinity level is not 0, 1, 2, or 3.
-    pub fn affinity(self, level: u8) -> u8 {
-        assert!(level < 4, "Valid affinity levels are 0, 1, 2, 3");
-        (self.0 >> (level * 8)) as u8
-    }
-}
-
 /// A unique identifier for a CPU, read from the `MPIDR_EL1` register on aarch64.
 #[derive(
     Clone, Copy, Debug, Display, PartialEq, Eq, PartialOrd, Ord,
@@ -57,6 +47,29 @@ impl MpidrValue {
     /// Returns the inner raw value read from the `MPIDR_EL1` register.
     pub fn value(self) -> u64 {
         self.0
+    }
+
+    /// Reads an affinity `level` from this `MpidrValue`.
+    ///
+    /// Panics if the given affinity level is not 0, 1, 2, or 3.
+    pub fn affinity(self, level: u8) -> u8 {
+        let shift = match level {
+            0 => 0,
+            1 => 8,
+            2 => 16,
+            3 => 32,
+            _ => panic!("Valid affinity levels are 0, 1, 2, 3"),
+        };
+        (self.0 >> shift) as u8
+    }
+
+    /// Create an `MpidrValue` from its four affinity numbers
+    pub fn new(aff3: u8, aff2: u8, aff1: u8, aff0: u8) -> Self {
+        let aff3 = (aff3 as u64) << 32;
+        let aff2 = (aff2 as u64) << 16;
+        let aff1 = (aff1 as u64) <<  8;
+        let aff0 = (aff0 as u64) <<  0;
+        Self(aff3 | aff2 | aff1 | aff0)
     }
 }
 
