@@ -111,6 +111,27 @@
 <a href="#111" id="111">111</a>
 <a href="#112" id="112">112</a>
 <a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -126,9 +147,13 @@
 <span class="kw">use </span>irq_safety::{enable_interrupts, MutexIrqSafe};
 <span class="kw">use </span>memory::{VirtualAddress, get_kernel_mmi_ref};
 <span class="kw">use </span>stack::Stack;
-<span class="kw">use </span>kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
-<span class="kw">use </span>apic::LocalApic;
 <span class="kw">use </span>no_drop::NoDrop;
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>{
+    kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES,
+    apic::LocalApic,
+};
 
 <span class="doccomment">/// An atomic flag used for synchronizing progress between the BSP 
 /// and the AP that is currently being booted.
@@ -140,10 +165,14 @@
 </span><span class="kw">static </span>AP_STACKS: MutexIrqSafe&lt;BTreeMap&lt;u32, NoDrop&lt;Stack&gt;&gt;&gt; = MutexIrqSafe::new(BTreeMap::new());
 
 <span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `cpu_id`.
-</span><span class="kw">pub fn </span>insert_ap_stack(cpu_id: u32 , stack: Stack) {
+</span><span class="kw">pub fn </span>insert_ap_stack(cpu_id: u32, stack: Stack) {
     AP_STACKS.lock().insert(cpu_id, NoDrop::new(stack));
 }
 
+<span class="doccomment">/// Remove the stack that was allocated for the AP with the given `cpu_id`.
+</span><span class="kw">pub fn </span>take_ap_stack(cpu_id: u32) -&gt; <span class="prelude-ty">Option</span>&lt;NoDrop&lt;Stack&gt;&gt; {
+    AP_STACKS.lock().remove(<span class="kw-2">&amp;</span>cpu_id)
+}
 
 <span class="doccomment">/// Entry to rust for an AP.
 /// The arguments must match the invocation order in &quot;ap_boot.asm&quot;
@@ -167,26 +196,38 @@
     </span>early_tls::reload();
 
     <span class="comment">// get the stack that was allocated for us (this AP) by the BSP.
-    </span><span class="kw">let </span>this_ap_stack = AP_STACKS.lock().remove(<span class="kw-2">&amp;</span>cpu_id.value())
-        .unwrap_or_else(|| <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for CPU {}&quot;</span>, cpu_id));
+    </span><span class="kw">let </span>this_ap_stack = take_ap_stack(cpu_id.value()).unwrap_or_else(
+        || <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for CPU {}&quot;</span>, cpu_id)
+    );
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        <span class="macro">log::info!</span>(<span class="string">&quot;cpu {} is ready!&quot;</span>, cpu_id);
+        <span class="kw">loop </span>{}
+    }
 
     <span class="comment">// initialize interrupts (including TSS/GDT) for this AP
     </span><span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().expect(<span class="string">&quot;kstart_ap(): kernel_mmi ref was None&quot;</span>);
-    <span class="kw">let </span>(double_fault_stack, privilege_stack) = {
-        <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
-        (
-            stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
-                .expect(<span class="string">&quot;kstart_ap(): could not allocate double fault stack&quot;</span>),
-            stack::alloc_stack(<span class="number">1</span>, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
-                .expect(<span class="string">&quot;kstart_ap(): could not allocate privilege stack&quot;</span>),
-        )
-    };
-    <span class="kw">let </span>_idt = interrupts::init_ap(cpu_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
-        .expect(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="kw">let </span>(double_fault_stack, privilege_stack) = {
+            <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
+            (
+                stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
+                    .expect(<span class="string">&quot;kstart_ap(): could not allocate double fault stack&quot;</span>),
+                stack::alloc_stack(<span class="number">1</span>, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
+                    .expect(<span class="string">&quot;kstart_ap(): could not allocate privilege stack&quot;</span>),
+            )
+        };
+        <span class="kw">let </span>_idt = interrupts::init_ap(cpu_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
+            .expect(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
+    }
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span>interrupts::init_ap();
 
     <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.
     // This must be done before initializing task spawning, because that relies on the ability to
     // enable/disable preemption, which is partially implemented by the Local APIC.
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>LocalApic::init(
         <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
         processor_id,
@@ -203,6 +244,7 @@
 
     <span class="comment">// The PAT must be initialized explicitly on every CPU,
     // but it is not a fatal error if it doesn&#39;t exist.
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">if </span>page_attribute_table::init().is_err() {
         <span class="macro">error!</span>(<span class="string">&quot;This CPU does not support the Page Attribute Table&quot;</span>);
     }
