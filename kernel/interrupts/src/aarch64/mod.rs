@@ -79,13 +79,13 @@ type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
     log::error!("Unhandled Exception ({})\r\n{:?}\r\n[looping forever now]", origin, exc);
-    loop {}
+    loop { core::hint::spin_loop() }
 }
 
 // called for all unhandled interrupt requests
 extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     log::error!("Unhandled IRQ:\r\n{:?}\r\n[looping forever now]", exc);
-    loop {}
+    loop { core::hint::spin_loop() }
 }
 
 fn read_timer_period_femtoseconds() -> u64 {
