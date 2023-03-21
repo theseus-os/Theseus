@@ -2193,7 +2193,6 @@ dependencies = [
  "memory",
  "memory_aarch64",
  "mod_mgmt",
- "no_drop",
  "pit_clock_basic",
  "psci",
  "spin 0.9.4",

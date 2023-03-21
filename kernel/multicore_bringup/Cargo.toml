@@ -13,7 +13,6 @@ log = "0.4.8"
 memory = { path = "../memory" }
 stack = { path = "../stack" }
 cpu = { path = "../cpu" }
-no_drop = { path = "../no_drop" }
 ap_start = { path = "../ap_start" }
 kernel_config = { path = "../kernel_config" }
 
