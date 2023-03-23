@@ -191,7 +191,7 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this RunQueue.
     fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
-        #[cfg(not(any(rq_eval, downtime_eval)))]
+        #[cfg(not(rq_eval))]
         debug!("Adding task to runqueue_round_robin {}, {:?}", self.core, task);
 
         let round_robin_taskref = RoundRobinTaskRef::new(task);
@@ -211,7 +211,7 @@ impl RunQueue {
 
     /// Removes a `TaskRef` from this RunQueue.
     pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        #[cfg(not(any(rq_eval, downtime_eval)))]
+        #[cfg(not(rq_eval))]
         debug!("Removing task from runqueue_round_robin {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 

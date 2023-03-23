@@ -153,11 +153,9 @@ dependencies = [
  "core2",
  "crossbeam-utils",
  "debugit",
- "hpet",
  "log",
  "mpmc",
  "spin 0.9.4",
- "task",
  "wait_queue",
 ]
 
@@ -2955,7 +2953,6 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
- "hpet",
  "irq_safety",
  "log",
  "scheduler",
@@ -3770,31 +3767,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_downtime"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "async_channel",
- "color",
- "cpu",
- "framebuffer",
- "framebuffer_drawer",
- "getopts",
- "hpet",
- "libtest",
- "log",
- "rendezvous",
- "runqueue",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "task",
- "unified_channel",
- "window",
-]
-
-[[package]]
 name = "test_filerw"
 version = "0.1.0"
 dependencies = [
@@ -4025,7 +3997,6 @@ dependencies = [
  "test_backtrace",
  "test_block_io",
  "test_channel",
- "test_downtime",
  "test_filerw",
  "test_ixgbe",
  "test_libc",

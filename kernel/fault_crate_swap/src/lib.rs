@@ -89,7 +89,6 @@ pub fn do_self_swap(
             false, //reexport
         ).map_err(|invalid_req| format!("{invalid_req:#?}"))?;
 
-        #[cfg(not(downtime_eval))]
         debug!("swap call {:?}", swap_req);
 
         requests.push(swap_req);
@@ -113,7 +112,6 @@ pub fn do_self_swap(
 
     let (_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(0);
 
-    #[cfg(not(downtime_eval))]
     debug!("{:?}",old_crate_ref);
 
     {
@@ -150,7 +148,6 @@ pub fn do_self_swap(
         return Err("More than one crate matches ".to_string() + crate_name);
     }
 
-    #[cfg(not(downtime_eval))]
     debug!("We got a match");
 
     let (new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(0);
@@ -171,30 +168,25 @@ pub fn do_self_swap(
         return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
         return_struct.new_data   = new_crate.data_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
-        #[cfg(not(downtime_eval))]
-        {
-            if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
-                    debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
-                    debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
-            }
+        if let (Some(old_text) , Some(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
+                debug!("Text Range was {:X} - {:X}", old_text.start, old_text.end);
+                debug!("Text Range is {:X} - {:X}", new_text.start, new_text.end);
+        }
 
-            if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
-                    debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
-                    debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
-            }
+        if let (Some(old_data) , Some(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
+                debug!("Data Range was {:X} - {:X}", old_data.start, old_data.end);
+                debug!("Data Range is {:X} - {:X}", new_data.start, new_data.end);
+        }
 
-            if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
-                    debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
-                    debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
-            }
+        if let (Some(old_rodata) , Some(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
+                debug!("Rodata Range was {:X} - {:X}", old_rodata.start, old_rodata.end);
+                debug!("Rodata Range is {:X} - {:X}", new_rodata.start, new_rodata.end);
         }
     }
 
 
     match swap_result {
         Ok(()) => {
-
-            #[cfg(not(downtime_eval))]
             debug!("Swap operation complete");
 
             Ok(return_struct)
@@ -249,12 +241,6 @@ pub fn constant_offset_fix(
                 let n_ra = ra - old_text.start + new_text.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
-                // For debug purposes we re-read teh value
-                // #[cfg(not(downtime_eval))]
-                // {
-                //     let n =  unsafe { ptr::read(p) };
-                //     debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                // }
             }
         }
 
@@ -265,12 +251,6 @@ pub fn constant_offset_fix(
                 let n_ra = ra - old_rodata.start + new_rodata.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
-
-                // #[cfg(not(downtime_eval))]
-                // {
-                //     let n =  unsafe { ptr::read(p) };
-                //     debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                // }
             }
         }
 
@@ -281,11 +261,6 @@ pub fn constant_offset_fix(
                 let n_ra = ra - old_data.start + new_data.start;
                 let p1 = (x) as *mut usize;
                 unsafe { ptr::write(p1,n_ra.value()) };
-                // #[cfg(not(downtime_eval))]
-                // {
-                //     let n =  unsafe { ptr::read(p) };
-                //     debug!("New value at address {:#X}, value  = {:#X}", x , n);
-                // }
             }
         }
 
@@ -308,7 +283,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
     let taskref = task::get_my_current_task()
         .ok_or_else(|| "failed to get current task".to_string())?;
 
-    #[cfg(not(downtime_eval))]
     debug!("The taskref is {:?}",taskref);
 
     let curr_dir = Arc::clone(&taskref.get_env().lock().working_dir);
@@ -320,7 +294,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
     let tuples: Vec<(&str, &str, bool)> = vec![(crate_name, crate_name , false)];
 
-    #[cfg(not(downtime_eval))]
     debug!("tuples: {:?}", tuples);
 
     // 1) Call generic crate swapping routine
@@ -335,8 +308,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 
     let swap_ranges = match swap_result {
         Ok(x) => {
-
-            #[cfg(not(downtime_eval))]
             debug!("Swap operation complete");
             x
         }
@@ -363,8 +334,6 @@ pub fn self_swap_handler(crate_name: &str) -> Result<SwapRanges, String> {
 /// null crate swap policy.
 /// When this policy is enabled no crate swapping is performed
 fn null_swap_policy() -> Option<String> {
-
-    #[cfg(not(downtime_eval))]
     debug!("Running null swap policy");
 
     // We get all unhanlded faults
@@ -395,8 +364,6 @@ fn null_swap_policy() -> Option<String> {
 /// is swapped.
 #[cfg(use_crate_replacement)]
 fn simple_swap_policy() -> Option<String> {
-
-    #[cfg(not(downtime_eval))]
     debug!("Running simple swap policy");
 
     // We get all unhanlded faults
@@ -430,10 +397,7 @@ fn simple_swap_policy() -> Option<String> {
     }
 
     let crate_to_swap = unhandled_list[0].crate_error_occured.clone();
-
-    #[cfg(not(downtime_eval))]
     debug!("Repalce : {:?}",crate_to_swap);
-
     crate_to_swap
 }
 
@@ -444,8 +408,6 @@ fn simple_swap_policy() -> Option<String> {
 /// 3) Replace the application crate
 #[cfg(use_crate_replacement)]
 fn iterative_swap_policy() -> Option<String> {
-
-    #[cfg(not(downtime_eval))]
     debug!("Running iterative swap policy");
 
     // We get all unhanlded faults
