@@ -888,6 +888,7 @@ fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
+#[allow(clippy::extra_unused_type_parameters)]
 fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: ExitableTaskRef) -> ! 
     where A: Send + 'static, 
           R: Send + 'static,
@@ -984,7 +985,7 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { core::hint::spin_loop() }
+    loop { core::hint::spin_loop()   }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
@@ -1029,4 +1030,3 @@ fn idle_task_entry(_cpu_id: CpuId) {
         core::hint::spin_loop();
     }
 }
-
