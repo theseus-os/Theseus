@@ -682,7 +682,9 @@ view-book: book
 clean-doc:
 	@cargo clean --doc
 	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
-	
+
+hooks:
+	@git config --local core.hooksPath .githooks/
 
 ### The primary documentation for this makefile itself.
 help: 
