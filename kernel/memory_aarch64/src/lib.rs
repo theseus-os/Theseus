@@ -5,22 +5,10 @@
 //! All arch-specific definitions for memory system are exported from this crate.
 
 #![no_std]
-#![feature(ptr_internals)]
-#![feature(unboxed_closures)]
-
-extern crate log;
-extern crate memory_structs;
-extern crate cortex_a;
-extern crate tock_registers;
-extern crate pte_flags;
-extern crate kernel_config;
-extern crate boot_info;
 
 use cortex_a::asm::barrier;
-use cortex_a::registers::*;
-use tock_registers::interfaces::Readable;
-use tock_registers::interfaces::Writeable;
-use tock_registers::interfaces::ReadWriteable;
+use cortex_a::registers::{MAIR_EL1, SCTLR_EL1, TCR_EL1, TTBR0_EL1};
+use tock_registers::interfaces::{Readable, Writeable, ReadWriteable};
 
 use memory_structs::{PhysicalAddress, VirtualAddress};
 use log::{debug, error};
