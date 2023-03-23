@@ -12,8 +12,6 @@
 
 #![no_std]
 #![feature(ptr_internals)]
-#![feature(unboxed_closures)]
-#![feature(result_option_inspect)]
 
 extern crate alloc;
 

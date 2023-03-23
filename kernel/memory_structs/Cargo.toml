@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory_structs"
 description = "Basic types used for memory management"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 bit_field = "0.7.0"
@@ -10,8 +11,7 @@ zerocopy = "0.5.0"
 derive_more = "0.99.0"
 paste = "1.0.5"
 
-[dependencies.kernel_config]
-path = "../kernel_config"
+kernel_config = { path = "../kernel_config" }
 
 [lib]
 crate-type = ["rlib"]
