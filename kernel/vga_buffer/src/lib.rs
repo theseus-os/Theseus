@@ -11,6 +11,7 @@ use volatile::Volatile;
 
 /// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
 /// We must rely on the early bootstrap code to identity map this address.
+#[cfg(target_arch = "x86_64")] // ensures build failure on non-x86 platforms
 const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000;
 
 /// height of the VGA text window

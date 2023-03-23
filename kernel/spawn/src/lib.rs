@@ -9,8 +9,6 @@
 //! [tb]:  fn.new_task_builder.html
 //! [atb]: fn.new_application_task_builder.html
 
-// TODO: Add direct explanation to why this empty loop is necessary and criteria for replacing it with something else
-#![allow(clippy::empty_loop)]
 #![allow(clippy::type_complexity)]
 #![no_std]
 #![feature(stmt_expr_attributes)]
@@ -904,7 +902,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// The final piece of the task cleanup logic for restartable tasks.
@@ -986,7 +984,7 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.

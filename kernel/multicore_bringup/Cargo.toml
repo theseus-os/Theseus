@@ -15,6 +15,12 @@ stack = { path = "../stack" }
 cpu = { path = "../cpu" }
 ap_start = { path = "../ap_start" }
 kernel_config = { path = "../kernel_config" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+psci = "0.1.1"
+memory_aarch64 = { path = "../memory_aarch64" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
 pit_clock_basic = { path = "../pit_clock_basic" }
 mod_mgmt = { path = "../mod_mgmt" }
 acpi = { path = "../acpi" }
@@ -23,4 +29,3 @@ madt = { path = "../acpi/madt" }
 
 [lib]
 crate-type = ["rlib"]
-path = "src/x86_64.rs"

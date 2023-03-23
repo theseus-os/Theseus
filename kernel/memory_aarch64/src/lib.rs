@@ -18,6 +18,7 @@ extern crate boot_info;
 
 use cortex_a::asm::barrier;
 use cortex_a::registers::*;
+use tock_registers::interfaces::Readable;
 use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::ReadWriteable;
 
@@ -212,6 +213,57 @@ pub fn set_as_active_page_table_root(page_table: PhysicalAddress) {
 
         barrier::isb(barrier::SY);
     }
+}
+
+/// See [`read_mmu_config`]
+#[repr(C)]
+pub struct MmuConfig {
+    ttbr0_el1: u64,
+    mair_el1: u64,
+    tcr_el1: u64,
+    sctlr_el1: u64,
+}
+
+/// Reads the current MMU configuration of the current CPU core,
+/// including the following system registers:
+/// - `TTBR0_EL1`,
+/// - `MAIR_EL1`,
+/// - `TCR_EL1`,
+/// - `SCTLR_EL1`
+///
+/// This configuration can be applied using [`asm_set_mmu_config_x2_x3`].
+///
+/// This is intended for use in `multicore_bringup`.
+pub fn read_mmu_config() -> MmuConfig {
+    MmuConfig {
+        ttbr0_el1: TTBR0_EL1.get(),
+        mair_el1: MAIR_EL1.get(),
+        tcr_el1: TCR_EL1.get(),
+        sctlr_el1: SCTLR_EL1.get(),
+    }
+}
+
+/// Configures the MMU based on the pointer to a MmuConfig,
+/// in x2. This function makes use of x3 too. If the MMU was
+/// enabled on the origin core, it will be enabled by this
+/// on the target core.
+///
+/// This is intended for use in `multicore_bringup`.
+#[macro_export]
+macro_rules! asm_set_mmu_config_x2_x3 {
+    () => (
+        // Save all general purpose registers into the previous task.
+        r#"
+            ldr x3, [x2, 0]
+            msr ttbr0_el1, x3
+            ldr x3, [x2, 1*8]
+            msr mair_el1, x3
+            ldr x3, [x2, 2*8]
+            msr tcr_el1, x3
+            ldr x3, [x2, 3*8]
+            msr sctlr_el1, x3
+        "#
+    );
 }
 
 /// The address bounds and mapping flags of a section's memory region.

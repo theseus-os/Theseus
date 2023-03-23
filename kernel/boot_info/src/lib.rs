@@ -87,19 +87,6 @@ pub struct ReservedMemoryRegion {
     pub len: usize,
 }
 
-/// A physical or virtual address.
-pub enum Address {
-    Physical(PhysicalAddress),
-    Virtual(VirtualAddress),
-}
-impl fmt::Debug for Address {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Address::Physical(paddr) => write!(f, "p{paddr:#X}"),
-            Address::Virtual(vaddr)  => write!(f, "v{vaddr:#X}"),
-        }
-    }
-}
 
 /// Information about a framebuffer's layout in memory.
 #[derive(Debug)]
