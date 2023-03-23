@@ -17,4 +17,4 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: .
         run: |
-          cargo clippy -- -D warnings
+          make clippy

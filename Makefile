@@ -599,7 +599,7 @@ clippy : export override FEATURES += --features theseus_features/everything
 clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 clippy:
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
-		cargo clippy \
+		cargo clippy -- -D warnings\
 		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
 		--target $(TARGET)
 
