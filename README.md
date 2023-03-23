@@ -277,7 +277,8 @@ For VS Code, recommended plugins are:
  * **rust-analyzer**, by matklad
  * **Better TOML**, by bungcip
  * **x86 and x86_64 Assembly**, by 13xforever
- 
+
+If you want to contribute, please run `make hooks` once. This way, `clippy` runs automatically on `git push` so you can't forget.
 
 ## Acknowledgements
 We would like to express our thanks to the [OS Dev wiki](https://wiki.osdev.org/) and its community and to Philipp Oppermann's [blog_os](https://os.phil-opp.com/) for serving as excellent starting points for Theseus. The early days of Theseus's development progress are indebted to these resources. 

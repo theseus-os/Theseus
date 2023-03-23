@@ -683,8 +683,13 @@ clean-doc:
 	@cargo clean --doc
 	@rm -rf $(RUSTDOC_OUT) $(BOOK_OUT)
 
+### Sets this repo's git hooks directory
 hooks:
 	@git config --local core.hooksPath .githooks/
+
+### Unsets this repo's git hooks directory
+unhook:
+	@git config --local --unset core.hooksPath
 
 ### The primary documentation for this makefile itself.
 help: 
