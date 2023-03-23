@@ -475,12 +475,6 @@
 <a href="#475" id="475">475</a>
 <a href="#476" id="476">476</a>
 <a href="#477" id="477">477</a>
-<a href="#478" id="478">478</a>
-<a href="#479" id="479">479</a>
-<a href="#480" id="480">480</a>
-<a href="#481" id="481">481</a>
-<a href="#482" id="482">482</a>
-<a href="#483" id="483">483</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -491,13 +485,7 @@
 </span><span class="attr">#![no_std]
 #![feature(step_trait)]
 
-</span><span class="kw">extern crate </span>kernel_config;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>derive_more;
-<span class="kw">extern crate </span>bit_field;
-<span class="kw">extern crate </span>zerocopy;
-<span class="kw">extern crate </span>paste;
-
-<span class="kw">use </span>core::{
+</span><span class="kw">use </span>core::{
     cmp::{min, max},
     fmt,
     iter::Step,
@@ -506,7 +494,7 @@
 <span class="kw">use </span>kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>paste::paste;
-
+<span class="kw">use </span>derive_more::<span class="kw-2">*</span>;
 
 <span class="doccomment">/// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.

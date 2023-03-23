@@ -139,26 +139,12 @@
 <a href="#139" id="139">139</a>
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
-<a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 #![allow(clippy::type_complexity)]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>heap;
-<span class="kw">extern crate </span>kernel_config;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>stack;
-<span class="kw">extern crate </span>no_drop;
-<span class="kw">extern crate </span>bootloader_modules;
-<span class="kw">extern crate </span>boot_info;
 
+<span class="kw">use </span>log::{error, debug};
 <span class="kw">use </span>memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings, EarlyIdentityMappedPages};
 <span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 <span class="kw">use </span>boot_info::{BootInformation, Module};
@@ -221,7 +207,7 @@
     // We should not issue any log or print statements until re-initializing this.
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>fb_info) = boot_info.framebuffer_info() {
         early_printer::init(fb_info, <span class="prelude-val">Some</span>(<span class="kw-2">&amp;mut </span>page_table)).unwrap_or_else(|_e|
-            <span class="macro">log::error!</span>(<span class="string">&quot;Failed to re-init early_printer after memory::init(); \
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to re-init early_printer after memory::init(); \
                 proceeding with init. Error: {:?}&quot;</span>, _e
             )
         );

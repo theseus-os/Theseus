@@ -477,18 +477,6 @@
 <a href="#477" id="477">477</a>
 <a href="#478" id="478">478</a>
 <a href="#479" id="479">479</a>
-<a href="#480" id="480">480</a>
-<a href="#481" id="481">481</a>
-<a href="#482" id="482">482</a>
-<a href="#483" id="483">483</a>
-<a href="#484" id="484">484</a>
-<a href="#485" id="485">485</a>
-<a href="#486" id="486">486</a>
-<a href="#487" id="487">487</a>
-<a href="#488" id="488">488</a>
-<a href="#489" id="489">489</a>
-<a href="#490" id="490">490</a>
-<a href="#491" id="491">491</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on aarch64.
 //! `memory` uses this crate to get the memory layout and do other arch-specific operations on aarch64.  
 //! 
@@ -496,22 +484,10 @@
 //! All arch-specific definitions for memory system are exported from this crate.
 
 </span><span class="attr">#![no_std]
-#![feature(ptr_internals)]
-#![feature(unboxed_closures)]
 
-</span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>memory_structs;
-<span class="kw">extern crate </span>cortex_a;
-<span class="kw">extern crate </span>tock_registers;
-<span class="kw">extern crate </span>pte_flags;
-<span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>boot_info;
-
-<span class="kw">use </span>cortex_a::asm::barrier;
-<span class="kw">use </span>cortex_a::registers::<span class="kw-2">*</span>;
-<span class="kw">use </span>tock_registers::interfaces::Readable;
-<span class="kw">use </span>tock_registers::interfaces::Writeable;
-<span class="kw">use </span>tock_registers::interfaces::ReadWriteable;
+</span><span class="kw">use </span>cortex_a::asm::barrier;
+<span class="kw">use </span>cortex_a::registers::{MAIR_EL1, SCTLR_EL1, TCR_EL1, TTBR0_EL1};
+<span class="kw">use </span>tock_registers::interfaces::{Readable, Writeable, ReadWriteable};
 
 <span class="kw">use </span>memory_structs::{PhysicalAddress, VirtualAddress};
 <span class="kw">use </span>log::{debug, error};

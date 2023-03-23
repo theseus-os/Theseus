@@ -288,31 +288,15 @@
 <a href="#288" id="288">288</a>
 <a href="#289" id="289">289</a>
 <a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //!
 //! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
 //! of the base kernel image (nano_core), and to do other arch-specific operations on x86_64.
 
 </span><span class="attr">#![no_std]
-#![feature(ptr_internals)]
-#![feature(unboxed_closures)]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>memory_structs;
-<span class="kw">extern crate </span>pte_flags;
-<span class="kw">extern crate </span>x86_64;
-<span class="kw">extern crate </span>boot_info;
-
-<span class="kw">pub use </span>boot_info::{BootInformation, ElfSection, Module};
+</span><span class="kw">pub use </span>boot_info::{BootInformation, ElfSection, Module};
+<span class="kw">use </span>log::{debug, error};
 <span class="kw">use </span>pte_flags::PteFlags;
 
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
