@@ -11,6 +11,7 @@
 //! [blog_os]: https://github.com/phil-opp/blog_os
 
 #![no_std]
+#![feature(ptr_internals)]
 
 extern crate alloc;
 
