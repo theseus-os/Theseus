@@ -254,7 +254,6 @@ impl FallibleIterator for StackFrameIter {
             // If this frame is an exception/interrupt handler, we need to adjust RSP and the return address RA accordingly.
             if let Some(extra_offset) = prev_cfa_adjustment {
                 newregs[X86_64::RSP] = Some(cfa.wrapping_add(extra_offset as u64));
-                #[cfg(not(downtime_eval))]
                 trace!("adjusting RSP to {:X?}", newregs[X86_64::RSP]);
             } 
 
@@ -274,7 +273,6 @@ impl FallibleIterator for StackFrameIter {
                     // The stack pointer (RSP) is given by the CFA calculated during the previous iteration;
                     // there should *not* be a register rule defining the value of the RSP directly.
                     if reg_num == X86_64::RSP {
-                        #[cfg(not(downtime_eval))]
                         warn!("Ignoring unwind row's register rule for RSP {:?}, which is invalid on x86_64 because RSP is always set to the CFA value.", rule);
                         continue;
                     }
@@ -300,7 +298,6 @@ impl FallibleIterator for StackFrameIter {
                         let size_of_error_code = core::mem::size_of::<usize>();
                         // TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
                         let value = unsafe { *(cfa.wrapping_add(size_of_error_code as u64) as *const u64) };
-                        #[cfg(not(downtime_eval))]
                         trace!("Using return address from CPU-pushed exception stack frame. Value: {:#X}", value);
                         newregs[X86_64::RA] = Some(value);
                         continue;
@@ -366,7 +363,6 @@ impl FallibleIterator for StackFrameIter {
             )
             // Otherwise, the caller address isn't known to the system, so return an error.
             .ok_or_else(|| {
-                #[cfg(not(downtime_eval))]
                 error!("StackTraceIter::next(): couldn't get unwind info for call site address: {:#X}", caller);
                 "couldn't get unwind info for call site address"
             })?;
@@ -381,14 +377,12 @@ impl FallibleIterator for StackFrameIter {
                 CfaRule::RegisterAndOffset{register, offset} => {
                     // debug!("CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}", register, offset);
                     let reg_value = registers[register].ok_or_else(|| {
-                        #[cfg(not(downtime_eval))]
                         error!("CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!", register, offset, register, register.0);
                         "CFA rule specified register with offset, but that register had no value."
                     })?;
                     reg_value.wrapping_add(offset as u64)
                 }
                 CfaRule::Expression(_expr) => {
-                    #[cfg(not(downtime_eval))]
                     error!("CFA rules based on Expressions are not yet supported. Expression: {:?}", _expr);
                     return Err("CFA rules based on Expressions are not yet supported.");
                 }
@@ -403,13 +397,11 @@ impl FallibleIterator for StackFrameIter {
             // TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes
             cfa_adjustment = if interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
                 let size_of_error_code: i64 = core::mem::size_of::<usize>() as i64;
-                #[cfg(not(downtime_eval))]
                 trace!("StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}", cfa);
 
                 // TODO: we need to set this to true for any exception/interrupt handler, not just those with error codes.
                 // If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.
                 let size_of_exception_stack_frame: i64 = 5 * 8;
-                #[cfg(not(downtime_eval))]
                 trace!("StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}", size_of_exception_stack_frame, cfa);
                 
                 this_frame_is_exception_handler = true;
@@ -790,15 +782,13 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 /// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. 
 fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<(), &'static str> {
     let stack_frame_iter = unsafe { &mut (*unwinding_context_ptr).stack_frame_iter };
-    
-    #[cfg(not(downtime_eval))]
     trace!("continue_unwinding(): stack_frame_iter: {:#X?}", stack_frame_iter);
     
     let (mut regs, landing_pad_address) = if let Some(frame) = stack_frame_iter.next().map_err(|e| {
         error!("continue_unwinding: error getting next stack frame in the call stack: {}", e);
         "continue_unwinding: error getting next stack frame in the call stack"
     })? {
-        #[cfg(not(downtime_eval))] {
+        if true {
             info!("Unwinding StackFrame: {:#X?}", frame);
             info!("  In func: {:?}", stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() as usize), false));
             info!("  Regs: {:?}", stack_frame_iter.registers());
@@ -807,7 +797,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
         if let Some(lsda) = frame.lsda() {
             let lsda = VirtualAddress::new_canonical(lsda as usize);
             if let Some((sec, _)) = stack_frame_iter.namespace().get_section_containing_address(lsda, true) {
-                #[cfg(not(downtime_eval))]
                 info!("  parsing LSDA section: {:?}", sec);
                 
                 let starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.virt_addr.value());
@@ -827,9 +816,7 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 let entry = match table.call_site_table_entry_for_address(frame.call_site_address()) {
                     Ok(x) => x,
                     Err(e) => {
-                        #[cfg(not(downtime_eval))]
                         error!("continue_unwinding(): couldn't find a call site table entry for this stack frame's call site address {:#X}. Error: {}", frame.call_site_address(), e);
-                        
                         // Now we don't have an exact match. We try to use the previous
                         let mut iter = table.call_site_table_entries().map_err(|_e| {"Couldn't find call_site_table_entries"})?;
 
@@ -841,7 +828,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                         }
                         
                         if let Some (closest_entry) = closest_entry {
-                            #[cfg(not(downtime_eval))]
                             debug!("No unwind info for address. Using the closeset");
                             closest_entry
                         } else {
@@ -850,7 +836,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                     }
                 };
 
-                #[cfg(not(downtime_eval))]
                 debug!("Found call site entry for address {:#X}: {:#X?}", frame.call_site_address(), entry);
                 (stack_frame_iter.registers().clone(), entry.landing_pad_address())
             } else {
@@ -858,12 +843,10 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
                 return Err("BUG: couldn't find LSDA section (.gcc_except_table) for LSDA address specified in stack frame");
             }
         } else {
-            #[cfg(not(downtime_eval))]
             trace!("continue_unwinding(): stack frame has no LSDA");
             return continue_unwinding(unwinding_context_ptr);
         }
     } else {
-        #[cfg(not(downtime_eval))]
         trace!("continue_unwinding(): NO REMAINING STACK FRAMES");
         return Ok(());
     };
@@ -872,7 +855,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
     let landing_pad_address = match landing_pad_address {
         Some(lpa) => lpa,
         _ => {
-            #[cfg(not(downtime_eval))]
             warn!("continue_unwinding(): stack frame has LSDA but no landing pad");
             return continue_unwinding(unwinding_context_ptr);
         }
@@ -882,7 +864,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
     // Thus, we skip unwinding an exception handler frame because its landing pad will point to an invalid instruction (usually `ud2`).
     if stack_frame_iter.last_frame_was_exception_handler {
         let landing_pad_value: u16 = unsafe { *(landing_pad_address as *const u16) };
-        #[cfg(not(downtime_eval))]
         warn!("Skipping exception/interrupt handler's landing pad (cleanup function) at {:#X}, which points to {:#X} (UD2: {})", 
             landing_pad_address, landing_pad_value, landing_pad_value == 0x0B0F,  // the `ud2` instruction
         );
@@ -890,7 +871,6 @@ fn continue_unwinding(unwinding_context_ptr: *mut UnwindingContext) -> Result<()
     }
 
     // Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
-    #[cfg(not(downtime_eval))]
     debug!("Jumping to landing pad (cleanup function) at {:#X}", landing_pad_address);
     // Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),
     // and pass the value in the landing registers' RAX register as the argument to _Unwind_Resume. 
@@ -917,7 +897,6 @@ pub fn unwind_resume(unwinding_context_ptr: usize) -> ! {
 
     match continue_unwinding(unwinding_context_ptr) {
         Ok(()) => {
-            #[cfg(not(downtime_eval))]
             debug!("unwind_resume(): continue_unwinding() returned Ok(), meaning it's at the end of the call stack.");
         }
         Err(e) => {
@@ -938,7 +917,6 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     let (stack_frame_iter, cause, current_task) = unwinding_context.into();
     drop(stack_frame_iter);
 
-    #[cfg(not(downtime_eval))]
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     
     let (exitable_taskref, failure_cleanup_function) = 

@@ -106,7 +106,7 @@ fn kill_and_halt(
     }
 
 
-    #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
+    #[cfg(unwind_exceptions)] {
         println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
     }
     #[cfg(not(unwind_exceptions))] {
@@ -138,41 +138,37 @@ fn kill_and_halt(
     }
 
     // print a stack trace
-    #[cfg(not(downtime_eval))] {
-        if print_stack_trace {
-            println_both!("------------------ Stack Trace (DWARF) ---------------------------");
-            let stack_trace_result = stack_trace::stack_trace(
-                &mut |stack_frame, stack_frame_iter| {
-                    let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                        VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
-                        false
-                    ).map(|(sec, offset)| (sec.name.clone(), offset));
-                    if let Some((symbol_name, offset)) = symbol_offset {
-                        println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
-                    } else {
-                        println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
-                    }
-                    true
-                },
-                None,
-            );
-            match stack_trace_result {
-                Ok(()) => { println_both!("  Beginning of stack"); }
-                Err(e) => { println_both!("  {}", e); }
-            }
-            println_both!("---------------------- End of Stack Trace ------------------------");
+    if print_stack_trace {
+        println_both!("------------------ Stack Trace (DWARF) ---------------------------");
+        let stack_trace_result = stack_trace::stack_trace(
+            &mut |stack_frame, stack_frame_iter| {
+                let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                    VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                    false
+                ).map(|(sec, offset)| (sec.name.clone(), offset));
+                if let Some((symbol_name, offset)) = symbol_offset {
+                    println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
+                } else {
+                    println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
+                }
+                true
+            },
+            None,
+        );
+        match stack_trace_result {
+            Ok(()) => { println_both!("  Beginning of stack"); }
+            Err(e) => { println_both!("  {}", e); }
         }
+        println_both!("---------------------- End of Stack Trace ------------------------");
     }
 
     let cause = task::KillReason::Exception(exception_number);
 
     // Call this task's kill handler, if it has one.
     if let Some(ref kh_func) = task::take_kill_handler() {
-        #[cfg(not(downtime_eval))]
         debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
         kh_func(&cause);
     } else {
-        #[cfg(not(downtime_eval))]
         debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
     }
 
@@ -390,16 +386,14 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: Interrup
 extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
     let accessed_vaddr = Cr2::read_raw() as usize;
 
-    #[cfg(not(downtime_eval))] {
-        println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
-            error code: {:?}\n{:#X?}",
-            accessed_vaddr,
-            error_code,
-            stack_frame
-        );
-        if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr)) {
-            println_both!("--> Page fault was caused by stack overflow, tried to access {:#X}\n.", accessed_vaddr);
-        }
+    println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
+        error code: {:?}\n{:#X?}",
+        accessed_vaddr,
+        error_code,
+        stack_frame
+    );
+    if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr)) {
+        println_both!("--> Page fault was caused by stack overflow, tried to access {:#X}\n.", accessed_vaddr);
     }
     
     kill_and_halt(0xE, &stack_frame, Some(ErrorCode::PageFaultError { accessed_address: accessed_vaddr, pf_error: error_code }), true)

@@ -52,7 +52,6 @@ test_async = { path = "../applications/test_async", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
 test_block_io = { path = "../applications/test_block_io", optional = true }
 test_channel = { path = "../applications/test_channel", optional = true }
-test_downtime = { path = "../applications/test_downtime", optional = true }
 test_filerw = { path = "../applications/test_filerw", optional = true }
 test_ixgbe = { path = "../applications/test_ixgbe", optional = true }
 test_libc = { path = "../applications/test_libc", optional = true }
@@ -151,7 +150,6 @@ theseus_tests = [
     "test_backtrace",
     "test_block_io",
     "test_channel",
-    "test_downtime",
     "test_filerw",
     "test_ixgbe",
     "test_libc",

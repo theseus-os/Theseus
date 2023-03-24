@@ -82,7 +82,6 @@ exclude = [
 	"applications/test_backtrace",
 	"applications/test_block_io",
 	"applications/test_channel",
-	"applications/test_downtime",
 	"applications/test_filerw",
 	"applications/test_ixgbe",
 	"applications/test_libc",
