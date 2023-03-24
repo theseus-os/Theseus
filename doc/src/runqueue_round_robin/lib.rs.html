@@ -430,7 +430,7 @@
 
     <span class="doccomment">/// Adds a `TaskRef` to this RunQueue.
     </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {        
-        <span class="attr">#[cfg(not(any(rq_eval, downtime_eval)))]
+        <span class="attr">#[cfg(not(rq_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_round_robin {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
 
         <span class="kw">let </span>round_robin_taskref = RoundRobinTaskRef::new(task);
@@ -450,7 +450,7 @@
 
     <span class="doccomment">/// Removes a `TaskRef` from this RunQueue.
     </span><span class="kw">pub fn </span>remove_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="attr">#[cfg(not(any(rq_eval, downtime_eval)))]
+        <span class="attr">#[cfg(not(rq_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_round_robin {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
         <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.taskref != task);
 

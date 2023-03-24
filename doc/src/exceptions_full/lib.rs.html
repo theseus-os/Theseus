@@ -442,12 +442,6 @@
 <a href="#442" id="442">442</a>
 <a href="#443" id="443">443</a>
 <a href="#444" id="444">444</a>
-<a href="#445" id="445">445</a>
-<a href="#446" id="446">446</a>
-<a href="#447" id="447">447</a>
-<a href="#448" id="448">448</a>
-<a href="#449" id="449">449</a>
-<a href="#450" id="450">450</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.
 
 </span><span class="attr">#![no_std]
@@ -556,7 +550,7 @@
     }
 
 
-    <span class="attr">#[cfg(all(unwind_exceptions, not(downtime_eval)))] </span>{
+    <span class="attr">#[cfg(unwind_exceptions)] </span>{
         <span class="macro">println_both!</span>(<span class="string">&quot;Unwinding {:?} due to exception {}.&quot;</span>, task::get_my_current_task(), exception_number);
     }
     <span class="attr">#[cfg(not(unwind_exceptions))] </span>{
@@ -588,42 +582,38 @@
     }
 
     <span class="comment">// print a stack trace
-    </span><span class="attr">#[cfg(not(downtime_eval))] </span>{
-        <span class="kw">if </span>print_stack_trace {
-            <span class="macro">println_both!</span>(<span class="string">&quot;------------------ Stack Trace (DWARF) ---------------------------&quot;</span>);
-            <span class="kw">let </span>stack_trace_result = stack_trace::stack_trace(
-                <span class="kw-2">&amp;mut </span>|stack_frame, stack_frame_iter| {
-                    <span class="kw">let </span>symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                        VirtualAddress::new_canonical(stack_frame.call_site_address() <span class="kw">as </span>usize),
-                        <span class="bool-val">false
-                    </span>).map(|(sec, offset)| (sec.name.clone(), offset));
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>((symbol_name, offset)) = symbol_offset {
-                        <span class="macro">println_both!</span>(<span class="string">&quot;  {:&gt;#018X} in {} + {:#X}&quot;</span>, stack_frame.call_site_address(), symbol_name, offset);
-                    } <span class="kw">else </span>{
-                        <span class="macro">println_both!</span>(<span class="string">&quot;  {:&gt;#018X} in ??&quot;</span>, stack_frame.call_site_address());
-                    }
-                    <span class="bool-val">true
-                </span>},
-                <span class="prelude-val">None</span>,
-            );
-            <span class="kw">match </span>stack_trace_result {
-                <span class="prelude-val">Ok</span>(()) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;  Beginning of stack&quot;</span>); }
-                <span class="prelude-val">Err</span>(e) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;  {}&quot;</span>, e); }
-            }
-            <span class="macro">println_both!</span>(<span class="string">&quot;---------------------- End of Stack Trace ------------------------&quot;</span>);
+    </span><span class="kw">if </span>print_stack_trace {
+        <span class="macro">println_both!</span>(<span class="string">&quot;------------------ Stack Trace (DWARF) ---------------------------&quot;</span>);
+        <span class="kw">let </span>stack_trace_result = stack_trace::stack_trace(
+            <span class="kw-2">&amp;mut </span>|stack_frame, stack_frame_iter| {
+                <span class="kw">let </span>symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                    VirtualAddress::new_canonical(stack_frame.call_site_address() <span class="kw">as </span>usize),
+                    <span class="bool-val">false
+                </span>).map(|(sec, offset)| (sec.name.clone(), offset));
+                <span class="kw">if let </span><span class="prelude-val">Some</span>((symbol_name, offset)) = symbol_offset {
+                    <span class="macro">println_both!</span>(<span class="string">&quot;  {:&gt;#018X} in {} + {:#X}&quot;</span>, stack_frame.call_site_address(), symbol_name, offset);
+                } <span class="kw">else </span>{
+                    <span class="macro">println_both!</span>(<span class="string">&quot;  {:&gt;#018X} in ??&quot;</span>, stack_frame.call_site_address());
+                }
+                <span class="bool-val">true
+            </span>},
+            <span class="prelude-val">None</span>,
+        );
+        <span class="kw">match </span>stack_trace_result {
+            <span class="prelude-val">Ok</span>(()) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;  Beginning of stack&quot;</span>); }
+            <span class="prelude-val">Err</span>(e) =&gt; { <span class="macro">println_both!</span>(<span class="string">&quot;  {}&quot;</span>, e); }
         }
+        <span class="macro">println_both!</span>(<span class="string">&quot;---------------------- End of Stack Trace ------------------------&quot;</span>);
     }
 
     <span class="kw">let </span>cause = task::KillReason::Exception(exception_number);
 
     <span class="comment">// Call this task&#39;s kill handler, if it has one.
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>kh_func) = task::take_kill_handler() {
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span><span class="macro">debug!</span>(<span class="string">&quot;Found kill handler callback to invoke in Task {:?}&quot;</span>, task::get_my_current_task());
+        <span class="macro">debug!</span>(<span class="string">&quot;Found kill handler callback to invoke in Task {:?}&quot;</span>, task::get_my_current_task());
         kh_func(<span class="kw-2">&amp;</span>cause);
     } <span class="kw">else </span>{
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span><span class="macro">debug!</span>(<span class="string">&quot;No kill handler callback in Task {:?}&quot;</span>, task::get_my_current_task());
+        <span class="macro">debug!</span>(<span class="string">&quot;No kill handler callback in Task {:?}&quot;</span>, task::get_my_current_task());
     }
 
     <span class="comment">// Invoke the proper signal handler registered for this task, if one exists.
@@ -840,16 +830,14 @@
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
     <span class="kw">let </span>accessed_vaddr = Cr2::read_raw() <span class="kw">as </span>usize;
 
-    <span class="attr">#[cfg(not(downtime_eval))] </span>{
-        <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
-            error code: {:?}\n{:#X?}&quot;</span>,
-            accessed_vaddr,
-            error_code,
-            stack_frame
-        );
-        <span class="kw">if </span>is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr)) {
-            <span class="macro">println_both!</span>(<span class="string">&quot;--&gt; Page fault was caused by stack overflow, tried to access {:#X}\n.&quot;</span>, accessed_vaddr);
-        }
+    <span class="macro">println_both!</span>(<span class="string">&quot;\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
+        error code: {:?}\n{:#X?}&quot;</span>,
+        accessed_vaddr,
+        error_code,
+        stack_frame
+    );
+    <span class="kw">if </span>is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr)) {
+        <span class="macro">println_both!</span>(<span class="string">&quot;--&gt; Page fault was caused by stack overflow, tried to access {:#X}\n.&quot;</span>, accessed_vaddr);
     }
     
     kill_and_halt(<span class="number">0xE</span>, <span class="kw-2">&amp;</span>stack_frame, <span class="prelude-val">Some</span>(ErrorCode::PageFaultError { accessed_address: accessed_vaddr, pf_error: error_code }), <span class="bool-val">true</span>)

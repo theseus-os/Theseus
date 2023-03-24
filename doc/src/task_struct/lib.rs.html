@@ -1243,7 +1243,7 @@
 
 <span class="kw">impl </span>Drop <span class="kw">for </span>Task {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="attr">#[cfg(not(any(rq_eval, downtime_eval)))]
+        <span class="attr">#[cfg(not(rq_eval))]
         </span><span class="macro">trace!</span>(<span class="string">&quot;[CPU {}] Task::drop(): {}&quot;</span>, cpu::current_cpu(), <span class="self">self</span>);
 
         <span class="comment">// We must consume/drop the Task&#39;s kill handler BEFORE a Task can possibly be dropped.

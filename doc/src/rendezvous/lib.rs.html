@@ -488,19 +488,6 @@
 <a href="#488" id="488">488</a>
 <a href="#489" id="489">489</a>
 <a href="#490" id="490">490</a>
-<a href="#491" id="491">491</a>
-<a href="#492" id="492">492</a>
-<a href="#493" id="493">493</a>
-<a href="#494" id="494">494</a>
-<a href="#495" id="495">495</a>
-<a href="#496" id="496">496</a>
-<a href="#497" id="497">497</a>
-<a href="#498" id="498">498</a>
-<a href="#499" id="499">499</a>
-<a href="#500" id="500">500</a>
-<a href="#501" id="501">501</a>
-<a href="#502" id="502">502</a>
-<a href="#503" id="503">503</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A rendezvous-based channel for synchronous Inter-Task Communication (ITC).
 //! 
 //! This crate offers a rendezvous channel, in which two tasks can exchange messages
@@ -529,9 +516,6 @@
 <span class="kw">extern crate </span>wait_queue;
 <span class="kw">extern crate </span>task;
 <span class="kw">extern crate </span>scheduler;
-
-<span class="attr">#[cfg(downtime_eval)]
-</span><span class="kw">extern crate </span>hpet;
 
 <span class="kw">use </span>core::fmt;
 <span class="kw">use </span>alloc::sync::Arc;
@@ -718,16 +702,6 @@
     </span><span class="kw">pub fn </span>send(<span class="kw-2">&amp;</span><span class="self">self</span>, msg: T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="attr">#[cfg(trace_channel)]
         </span><span class="macro">trace!</span>(<span class="string">&quot;rendezvous: sending msg: {:?}&quot;</span>, <span class="macro">debugit!</span>(msg));
-
-        <span class="attr">#[cfg(downtime_eval)] </span>{
-            <span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
-            // Fault mimicing a memory write. Function could panic when getting task
-            </span><span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; task::with_current_task(|t| t.is_restartable()).unwrap_or(<span class="bool-val">false</span>) {
-                <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
-                </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
-            }
-        }
 
         <span class="comment">// obtain a sender-side exchange slot, blocking if necessary
         </span><span class="kw">let </span>sender_slot = <span class="self">self</span>.channel.take_sender_slot().map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to take_sender_slot&quot;</span>)<span class="question-mark">?</span>;

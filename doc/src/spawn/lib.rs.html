@@ -1023,13 +1023,6 @@
 <a href="#1023" id="1023">1023</a>
 <a href="#1024" id="1024">1024</a>
 <a href="#1025" id="1025">1025</a>
-<a href="#1026" id="1026">1026</a>
-<a href="#1027" id="1027">1027</a>
-<a href="#1028" id="1028">1028</a>
-<a href="#1029" id="1029">1029</a>
-<a href="#1030" id="1030">1030</a>
-<a href="#1031" id="1031">1031</a>
-<a href="#1032" id="1032">1032</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1723,7 +1716,7 @@
         task_entry_func = task_func_arg.func;
         task_arg        = task_func_arg.arg;
 
-        <span class="attr">#[cfg(not(any(rq_eval, downtime_eval)))]
+        <span class="attr">#[cfg(not(rq_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;task_wrapper [1]: \&quot;{}\&quot; about to call task entry func {:?} {{{}}} with arg {:?}&quot;</span>,
             <span class="kw-2">&amp;**</span>exitable_taskref, <span class="macro">debugit!</span>(task_entry_func), core::any::type_name::&lt;F&gt;(), <span class="macro">debugit!</span>(task_arg)
         );
@@ -1857,8 +1850,7 @@
     <span class="comment">// Disable preemption.
     </span><span class="kw">let </span>preemption_guard = hold_preemption();
 
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;task_cleanup_failure: {:?} panicked with {:?}&quot;</span>, current_task.name, kill_reason);
+    <span class="macro">debug!</span>(<span class="string">&quot;task_cleanup_failure: {:?} panicked with {:?}&quot;</span>, current_task.name, kill_reason);
 
     <span class="kw">if </span>current_task.mark_as_killed(kill_reason).is_err() {
         <span class="macro">error!</span>(<span class="string">&quot;task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?&quot;</span>, current_task.name);
@@ -1974,17 +1966,11 @@
                     <span class="kw">let </span>func_ptr = <span class="kw-2">&amp;</span>restart_info.func <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
                     <span class="kw">let </span>arg_ptr = <span class="kw-2">&amp;</span>restart_info.argument <span class="kw">as </span><span class="kw-2">*const </span><span class="kw">_ as </span>usize;
 
-                    <span class="attr">#[cfg(not(downtime_eval))] </span>{
-                        <span class="macro">debug!</span>(<span class="string">&quot;func_ptr {:#X}&quot;</span>, func_ptr);
-                        <span class="macro">debug!</span>(<span class="string">&quot;arg_ptr {:#X} , {}&quot;</span>, arg_ptr, mem::size_of::&lt;A&gt;());
-                    }
-
                     <span class="comment">// func_ptr is of size 16. Argument is of the argument_size + 8.
                     // This extra size comes due to argument and function both stored in +8 location pointed by the pointer. 
                     // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
                     </span><span class="kw">if </span>fault_crate_swap::constant_offset_fix(<span class="kw-2">&amp;</span>se, func_ptr, func_ptr + <span class="number">16</span>).is_ok() &amp;&amp;  fault_crate_swap::constant_offset_fix(<span class="kw-2">&amp;</span>se, arg_ptr, arg_ptr + <span class="number">8</span>).is_ok() {
-                        <span class="attr">#[cfg(not(downtime_eval))]
-                        </span><span class="macro">debug!</span>(<span class="string">&quot;Function and argument addresses corrected&quot;</span>);
+                        <span class="macro">debug!</span>(<span class="string">&quot;Function and argument addresses corrected&quot;</span>);
                     }
                 }
 

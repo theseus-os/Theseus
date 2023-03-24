@@ -1099,10 +1099,6 @@
 <a href="#1099" id="1099">1099</a>
 <a href="#1100" id="1100">1100</a>
 <a href="#1101" id="1101">1101</a>
-<a href="#1102" id="1102">1102</a>
-<a href="#1103" id="1103">1103</a>
-<a href="#1104" id="1104">1104</a>
-<a href="#1105" id="1105">1105</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines functions and types for crate swapping, used in live evolution and fault recovery.
 //! 
 
@@ -1493,7 +1489,7 @@
                     <span class="kw">let </span>target_sec = <span class="kw">if let </span><span class="prelude-val">Some</span>(sr) = weak_dep.section.upgrade() {
                         sr
                     } <span class="kw">else </span>{
-                        <span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
+                        <span class="attr">#[cfg(not(loscd_eval))]
                         </span><span class="macro">trace!</span>(<span class="string">&quot;Removing dead weak dependency on old_sec: {}&quot;</span>, old_sec.name);
                         dead_weak_deps_to_remove.push(i);
                         <span class="kw">continue</span>;
@@ -1799,7 +1795,7 @@
         <span class="kw">let </span>dest_dir_ref   = new_namespace.dir().deref();
         <span class="comment">// // If the directories are the same (not overridden), we don&#39;t need to do anything.
         </span><span class="kw">if </span>Arc::ptr_eq(<span class="kw-2">&amp;</span>source_dir_ref, dest_dir_ref) {
-            <span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
+            <span class="attr">#[cfg(not(loscd_eval))]
             </span><span class="macro">trace!</span>(<span class="string">&quot;swap_crates(): skipping crate file swap for {:?}&quot;</span>, req);
             <span class="kw">continue</span>;
         }
@@ -1808,7 +1804,7 @@
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>((<span class="kw-2">mut </span>replaced_old_crate_file, original_source_dir)) = move_file(new_crate_object_file, dest_dir_ref)<span class="question-mark">? </span>{
             <span class="comment">// If we replaced a crate object file, put that replaced file back in the source directory, thus completing the &quot;swap&quot; operation.
             // (Note that the file that we replaced should be the same as the old_crate_file.) 
-            </span><span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
+            </span><span class="attr">#[cfg(not(loscd_eval))]
             </span><span class="macro">trace!</span>(<span class="string">&quot;swap_crates(): new_crate_object_file replaced existing (old_crate) object file {:?}&quot;</span>, replaced_old_crate_file.get_name());
 
             replaced_old_crate_file.set_parent_dir(Arc::downgrade(<span class="kw-2">&amp;</span>original_source_dir));
@@ -1821,7 +1817,7 @@
             <span class="comment">// If inserting the new crate object file didn&#39;t end up replacing the existing crate object file (the old_crate&#39;s object file), 
             // then we need to remove the old_crate&#39;s object file here, if one was specified. 
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(ocn) = old_crate_name {
-                <span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
+                <span class="attr">#[cfg(not(loscd_eval))]
                 </span><span class="macro">trace!</span>(<span class="string">&quot;swap_crates(): new_crate_object_file did not replace old_crate&#39;s object file, so we&#39;re removing the old_crate&#39;s object file now&quot;</span>);
                 <span class="kw">let </span>(old_crate_object_file, _old_ns) = CrateNamespace::get_crate_object_file_starting_with(old_namespace, ocn).ok_or_else(|| {
                     <span class="macro">error!</span>(<span class="string">&quot;BUG: swap_crates(): couldn&#39;t find old crate&#39;s object file starting with {:?} in old namespace {:?}.&quot;</span>, ocn, old_namespace.name());
@@ -1852,7 +1848,7 @@
     }
 
 
-    <span class="attr">#[cfg(all(loscd_eval, not(downtime_eval)))] </span>{
+    <span class="attr">#[cfg(loscd_eval)] </span>{
         <span class="comment">// done with everything, print out values
 
         </span><span class="macro">warn!</span>(<span class="string">&quot;Measured time in units of HPET ticks:
@@ -1893,7 +1889,6 @@
     <span class="kw">let </span>parent = file.lock().get_parent_dir().ok_or(<span class="string">&quot;couldn&#39;t get file&#39;s parent directory&quot;</span>)<span class="question-mark">?</span>;
     <span class="comment">// This section is redundent as it is checked before calling the function
     // if Arc::ptr_eq(&amp;parent, dest_dir) {
-    //     #[cfg(not(downtime_eval))]
     //     trace!(&quot;swap_crates::move_file(): skipping move between same directory {:?} for file {:?}&quot;, 
     //         dest_dir.try_lock().map(|f| f.get_absolute_path()), file.try_lock().map(|f| f.get_absolute_path())
     //     );
@@ -1908,14 +1903,14 @@
     <span class="comment">// Log success or failure
     </span><span class="kw">match </span>res {
         <span class="prelude-val">Ok</span>(replaced_file) =&gt; {
-            <span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
+            <span class="attr">#[cfg(not(loscd_eval))]
             </span><span class="macro">debug!</span>(<span class="string">&quot;swap_crates::move_file(): moved file {:?} ({:?}) from {:?} to {:?}&quot;</span>,
                 file.try_lock().map(|f| f.get_name()), removed_file.get_name(), parent.try_lock().map(|p| p.get_name()), dest_dir.try_lock().map(|d| d.get_name())
             );
             <span class="prelude-val">Ok</span>(replaced_file.map(|f| (f, parent)))
         }
         <span class="prelude-val">Err</span>(e) =&gt; {
-            <span class="attr">#[cfg(not(any(loscd_eval, downtime_eval)))]
+            <span class="attr">#[cfg(not(loscd_eval))]
             </span><span class="macro">error!</span>(<span class="string">&quot;swap_crates::move_file(): failed to moved file {:?} ({:?}) from {:?} to {:?}.\n    Error: {:?}&quot;</span>,
                 file.try_lock().map(|f| f.get_name()), removed_file.get_name(), parent.try_lock().map(|p| p.get_name()), dest_dir.try_lock().map(|d| d.get_name()), e
             );
@@ -2093,14 +2088,12 @@
         };
 
         <span class="kw">if </span>!Arc::ptr_eq(<span class="kw-2">&amp;</span>old_namespace, real_old_namespace) {
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">trace!</span>(<span class="string">&quot;SwapRequest::new(): changing old namespace from {:?} to {:?}&quot;</span>, old_namespace.name(), real_old_namespace.name());
+            <span class="macro">trace!</span>(<span class="string">&quot;SwapRequest::new(): changing old namespace from {:?} to {:?}&quot;</span>, old_namespace.name(), real_old_namespace.name());
         }
         
         <span class="comment">// If no new namespace was given, use the same namespace that the old crate was found in.
         </span><span class="kw">let </span><span class="kw-2">mut </span>new_namespace = new_namespace.unwrap_or_else(|| {
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">trace!</span>(<span class="string">&quot;SwapRequest::new(): new namespace was None, using old namespace {:?}&quot;</span>, real_old_namespace.name());
+            <span class="macro">trace!</span>(<span class="string">&quot;SwapRequest::new(): new namespace was None, using old namespace {:?}&quot;</span>, real_old_namespace.name());
             Arc::clone(real_old_namespace)
         });
 
@@ -2129,8 +2122,7 @@
                     }
                 };
                 <span class="kw">if </span>!Arc::ptr_eq(<span class="kw-2">&amp;</span>new_namespace, real_new_namespace) {
-                    <span class="attr">#[cfg(not(downtime_eval))]
-                    </span><span class="macro">trace!</span>(<span class="string">&quot;SwapRequest::new(): changing new namespace from {:?} to {:?}&quot;</span>, new_namespace.name(), real_new_namespace.name());
+                    <span class="macro">trace!</span>(<span class="string">&quot;SwapRequest::new(): changing new namespace from {:?} to {:?}&quot;</span>, new_namespace.name(), real_new_namespace.name());
                     new_namespace = Arc::clone(real_new_namespace);
                 }
                 new_crate_file

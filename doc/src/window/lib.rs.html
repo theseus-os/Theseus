@@ -509,15 +509,6 @@
 <a href="#509" id="509">509</a>
 <a href="#510" id="510">510</a>
 <a href="#511" id="511">511</a>
-<a href="#512" id="512">512</a>
-<a href="#513" id="513">513</a>
-<a href="#514" id="514">514</a>
-<a href="#515" id="515">515</a>
-<a href="#516" id="516">516</a>
-<a href="#517" id="517">517</a>
-<a href="#518" id="518">518</a>
-<a href="#519" id="519">519</a>
-<a href="#520" id="520">520</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A `Window` object should be owned by an application. It can display a `Displayable` object in its framebuffer. See `applications/new_window` as a demo to use this library.
 //!
 //! This library will create a window with default title bar and border. It handles the commonly used interactions like moving
@@ -841,15 +832,6 @@
     /// 
     /// This method should be invoked after updating the window&#39;s contents in order to see its new content.
     </span><span class="kw">pub fn </span>render(<span class="kw-2">&amp;mut </span><span class="self">self</span>, bounding_box: <span class="prelude-ty">Option</span>&lt;Rectangle&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-
-        <span class="comment">// Induced bug rendering attempting to access out of bound memory
-        </span><span class="attr">#[cfg(downtime_eval)]
-        </span>{
-            <span class="kw">if </span>bounding_box.unwrap().top_left == Coord::new(<span class="number">150</span>,<span class="number">150</span>) {
-                <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
-            }
-        }
-
         <span class="kw">let </span>wm_ref = WINDOW_MANAGER.get().ok_or(<span class="string">&quot;The static window manager was not yet initialized&quot;</span>)<span class="question-mark">?</span>;
 
         <span class="comment">// Convert the given relative `bounding_box` to an absolute one (relative to the screen, not the window).

@@ -1106,7 +1106,6 @@
 <a href="#1106" id="1106">1106</a>
 <a href="#1107" id="1107">1107</a>
 <a href="#1108" id="1108">1108</a>
-<a href="#1109" id="1109">1109</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1394,8 +1393,7 @@
 
 <span class="kw">impl </span>Drop <span class="kw">for </span>LoadedCrate {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span><span class="macro">trace!</span>(<span class="string">&quot;### Dropped LoadedCrate: {}&quot;</span>, <span class="self">self</span>.crate_name);
+        <span class="macro">trace!</span>(<span class="string">&quot;### Dropped LoadedCrate: {}&quot;</span>, <span class="self">self</span>.crate_name);
     }
 }
 

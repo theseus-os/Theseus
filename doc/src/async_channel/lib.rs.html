@@ -513,25 +513,6 @@
 <a href="#513" id="513">513</a>
 <a href="#514" id="514">514</a>
 <a href="#515" id="515">515</a>
-<a href="#516" id="516">516</a>
-<a href="#517" id="517">517</a>
-<a href="#518" id="518">518</a>
-<a href="#519" id="519">519</a>
-<a href="#520" id="520">520</a>
-<a href="#521" id="521">521</a>
-<a href="#522" id="522">522</a>
-<a href="#523" id="523">523</a>
-<a href="#524" id="524">524</a>
-<a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
 //! 
 //! This crate offers an asynchronous channel that allows multiple tasks
@@ -552,11 +533,6 @@
 <span class="kw">extern crate </span>mpmc;
 <span class="kw">extern crate </span>crossbeam_utils;
 <span class="kw">extern crate </span>core2;
-
-<span class="attr">#[cfg(downtime_eval)]
-</span><span class="kw">extern crate </span>hpet;
-<span class="attr">#[cfg(downtime_eval)]
-</span><span class="kw">extern crate </span>task;
 
 <span class="kw">use </span>alloc::sync::Arc;
 <span class="kw">use </span>mpmc::Queue <span class="kw">as </span>MpmcQueue;
@@ -825,20 +801,6 @@
                 <span class="kw">return </span><span class="prelude-val">Err</span>((msg, Error::ChannelDisconnected));
             },
             <span class="kw">_ </span>=&gt; {},
-        }
-
-        <span class="comment">// Injected Randomized fault : Page fault
-        </span><span class="attr">#[cfg(downtime_eval)]
-        </span>{
-            <span class="kw">let </span>value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            <span class="comment">// debug!(&quot;Value {} {}&quot;, value, value % 1024);
-
-            </span><span class="kw">let </span>is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(<span class="bool-val">false</span>);
-            <span class="comment">// We restrict the fault to a specific task to make measurements consistent
-            </span><span class="kw">if </span>(value % <span class="number">4096</span>) == <span class="number">0  </span>&amp;&amp; is_restartable {
-                <span class="comment">// debug!(&quot;Fake error {}&quot;, value);
-                </span><span class="kw">unsafe </span>{ <span class="kw-2">*</span>(<span class="number">0x5050DEADBEEF </span><span class="kw">as </span><span class="kw-2">*mut </span>usize) = <span class="number">0x5555_5555_5555</span>; }
-            }
         }
 
         <span class="kw">match </span><span class="self">self</span>.channel.queue.push(msg) {

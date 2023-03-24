@@ -923,28 +923,6 @@
 <a href="#923" id="923">923</a>
 <a href="#924" id="924">924</a>
 <a href="#925" id="925">925</a>
-<a href="#926" id="926">926</a>
-<a href="#927" id="927">927</a>
-<a href="#928" id="928">928</a>
-<a href="#929" id="929">929</a>
-<a href="#930" id="930">930</a>
-<a href="#931" id="931">931</a>
-<a href="#932" id="932">932</a>
-<a href="#933" id="933">933</a>
-<a href="#934" id="934">934</a>
-<a href="#935" id="935">935</a>
-<a href="#936" id="936">936</a>
-<a href="#937" id="937">937</a>
-<a href="#938" id="938">938</a>
-<a href="#939" id="939">939</a>
-<a href="#940" id="940">940</a>
-<a href="#941" id="941">941</a>
-<a href="#942" id="942">942</a>
-<a href="#943" id="943">943</a>
-<a href="#944" id="944">944</a>
-<a href="#945" id="945">945</a>
-<a href="#946" id="946">946</a>
-<a href="#947" id="947">947</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Support for unwinding the call stack and cleaning up stack frames.
 //! 
 //! Uses DWARF debugging information (`.eh_frame` and `.gcc_except_table` sections) from object files.
@@ -1201,8 +1179,7 @@
             <span class="comment">// If this frame is an exception/interrupt handler, we need to adjust RSP and the return address RA accordingly.
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(extra_offset) = prev_cfa_adjustment {
                 newregs[X86_64::RSP] = <span class="prelude-val">Some</span>(cfa.wrapping_add(extra_offset <span class="kw">as </span>u64));
-                <span class="attr">#[cfg(not(downtime_eval))]
-                </span><span class="macro">trace!</span>(<span class="string">&quot;adjusting RSP to {:X?}&quot;</span>, newregs[X86_64::RSP]);
+                <span class="macro">trace!</span>(<span class="string">&quot;adjusting RSP to {:X?}&quot;</span>, newregs[X86_64::RSP]);
             } 
 
             unwind_row_ref.with_unwind_info(|_fde, row| {
@@ -1221,8 +1198,7 @@
                     // The stack pointer (RSP) is given by the CFA calculated during the previous iteration;
                     // there should *not* be a register rule defining the value of the RSP directly.
                     </span><span class="kw">if </span>reg_num == X86_64::RSP {
-                        <span class="attr">#[cfg(not(downtime_eval))]
-                        </span><span class="macro">warn!</span>(<span class="string">&quot;Ignoring unwind row&#39;s register rule for RSP {:?}, which is invalid on x86_64 because RSP is always set to the CFA value.&quot;</span>, rule);
+                        <span class="macro">warn!</span>(<span class="string">&quot;Ignoring unwind row&#39;s register rule for RSP {:?}, which is invalid on x86_64 because RSP is always set to the CFA value.&quot;</span>, rule);
                         <span class="kw">continue</span>;
                     }
 
@@ -1247,8 +1223,7 @@
                         <span class="kw">let </span>size_of_error_code = core::mem::size_of::&lt;usize&gt;();
                         <span class="comment">// TODO FIXME: only skip the error code if the prev_cfa_adjustment included it
                         </span><span class="kw">let </span>value = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(cfa.wrapping_add(size_of_error_code <span class="kw">as </span>u64) <span class="kw">as </span><span class="kw-2">*const </span>u64) };
-                        <span class="attr">#[cfg(not(downtime_eval))]
-                        </span><span class="macro">trace!</span>(<span class="string">&quot;Using return address from CPU-pushed exception stack frame. Value: {:#X}&quot;</span>, value);
+                        <span class="macro">trace!</span>(<span class="string">&quot;Using return address from CPU-pushed exception stack frame. Value: {:#X}&quot;</span>, value);
                         newregs[X86_64::RA] = <span class="prelude-val">Some</span>(value);
                         <span class="kw">continue</span>;
                     }
@@ -1313,8 +1288,7 @@
             )
             <span class="comment">// Otherwise, the caller address isn&#39;t known to the system, so return an error.
             </span>.ok_or_else(|| {
-                <span class="attr">#[cfg(not(downtime_eval))]
-                </span><span class="macro">error!</span>(<span class="string">&quot;StackTraceIter::next(): couldn&#39;t get unwind info for call site address: {:#X}&quot;</span>, caller);
+                <span class="macro">error!</span>(<span class="string">&quot;StackTraceIter::next(): couldn&#39;t get unwind info for call site address: {:#X}&quot;</span>, caller);
                 <span class="string">&quot;couldn&#39;t get unwind info for call site address&quot;
             </span>})<span class="question-mark">?</span>;
 
@@ -1328,15 +1302,13 @@
                 CfaRule::RegisterAndOffset{register, offset} =&gt; {
                     <span class="comment">// debug!(&quot;CfaRule:RegisterAndOffset: reg {:?}, offset: {:#X}&quot;, register, offset);
                     </span><span class="kw">let </span>reg_value = registers[register].ok_or_else(|| {
-                        <span class="attr">#[cfg(not(downtime_eval))]
-                        </span><span class="macro">error!</span>(<span class="string">&quot;CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!&quot;</span>, register, offset, register, register.<span class="number">0</span>);
+                        <span class="macro">error!</span>(<span class="string">&quot;CFA rule specified register {:?} with offset {:#X}, but register {:?}({}) had no value!&quot;</span>, register, offset, register, register.<span class="number">0</span>);
                         <span class="string">&quot;CFA rule specified register with offset, but that register had no value.&quot;
                     </span>})<span class="question-mark">?</span>;
                     reg_value.wrapping_add(offset <span class="kw">as </span>u64)
                 }
                 CfaRule::Expression(_expr) =&gt; {
-                    <span class="attr">#[cfg(not(downtime_eval))]
-                    </span><span class="macro">error!</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported. Expression: {:?}&quot;</span>, _expr);
+                    <span class="macro">error!</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported. Expression: {:?}&quot;</span>, _expr);
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;CFA rules based on Expressions are not yet supported.&quot;</span>);
                 }
             };
@@ -1350,14 +1322,12 @@
             // TODO FIXME: check for any type of exception/interrupt handler, and differentiate between error codes
             </span>cfa_adjustment = <span class="kw">if </span>interrupts::is_exception_handler_with_error_code(fde.initial_address()) {
                 <span class="kw">let </span>size_of_error_code: i64 = core::mem::size_of::&lt;usize&gt;() <span class="kw">as </span>i64;
-                <span class="attr">#[cfg(not(downtime_eval))]
-                </span><span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}&quot;</span>, cfa);
+                <span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame has a CPU-pushed error code on the stack, adjusting CFA to {:#X}&quot;</span>, cfa);
 
                 <span class="comment">// TODO: we need to set this to true for any exception/interrupt handler, not just those with error codes.
                 // If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.
                 </span><span class="kw">let </span>size_of_exception_stack_frame: i64 = <span class="number">5 </span>* <span class="number">8</span>;
-                <span class="attr">#[cfg(not(downtime_eval))]
-                </span><span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}&quot;</span>, size_of_exception_stack_frame, cfa);
+                <span class="macro">trace!</span>(<span class="string">&quot;StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}&quot;</span>, size_of_exception_stack_frame, cfa);
                 
                 this_frame_is_exception_handler = <span class="bool-val">true</span>;
                 <span class="prelude-val">Some</span>(size_of_error_code + size_of_exception_stack_frame)
@@ -1737,15 +1707,13 @@
 /// Upon successfully continuing to iterate up the call stack, this function will actually not return at all. 
 </span><span class="kw">fn </span>continue_unwinding(unwinding_context_ptr: <span class="kw-2">*mut </span>UnwindingContext) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>stack_frame_iter = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut </span>(<span class="kw-2">*</span>unwinding_context_ptr).stack_frame_iter };
-    
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack_frame_iter: {:#X?}&quot;</span>, stack_frame_iter);
+    <span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack_frame_iter: {:#X?}&quot;</span>, stack_frame_iter);
     
     <span class="kw">let </span>(<span class="kw-2">mut </span>regs, landing_pad_address) = <span class="kw">if let </span><span class="prelude-val">Some</span>(frame) = stack_frame_iter.next().map_err(|e| {
         <span class="macro">error!</span>(<span class="string">&quot;continue_unwinding: error getting next stack frame in the call stack: {}&quot;</span>, e);
         <span class="string">&quot;continue_unwinding: error getting next stack frame in the call stack&quot;
     </span>})<span class="question-mark">? </span>{
-        <span class="attr">#[cfg(not(downtime_eval))] </span>{
+        <span class="kw">if </span><span class="bool-val">true </span>{
             <span class="macro">info!</span>(<span class="string">&quot;Unwinding StackFrame: {:#X?}&quot;</span>, frame);
             <span class="macro">info!</span>(<span class="string">&quot;  In func: {:?}&quot;</span>, stack_frame_iter.namespace().get_section_containing_address(VirtualAddress::new_canonical(frame.initial_address() <span class="kw">as </span>usize), <span class="bool-val">false</span>));
             <span class="macro">info!</span>(<span class="string">&quot;  Regs: {:?}&quot;</span>, stack_frame_iter.registers());
@@ -1754,8 +1722,7 @@
         <span class="kw">if let </span><span class="prelude-val">Some</span>(lsda) = frame.lsda() {
             <span class="kw">let </span>lsda = VirtualAddress::new_canonical(lsda <span class="kw">as </span>usize);
             <span class="kw">if let </span><span class="prelude-val">Some</span>((sec, <span class="kw">_</span>)) = stack_frame_iter.namespace().get_section_containing_address(lsda, <span class="bool-val">true</span>) {
-                <span class="attr">#[cfg(not(downtime_eval))]
-                </span><span class="macro">info!</span>(<span class="string">&quot;  parsing LSDA section: {:?}&quot;</span>, sec);
+                <span class="macro">info!</span>(<span class="string">&quot;  parsing LSDA section: {:?}&quot;</span>, sec);
                 
                 <span class="kw">let </span>starting_offset = sec.mapped_pages_offset + (lsda.value() - sec.virt_addr.value());
                 <span class="kw">let </span>length_til_end_of_mp = sec.virt_addr.value() + sec.size - lsda.value();
@@ -1774,9 +1741,7 @@
                 </span><span class="kw">let </span>entry = <span class="kw">match </span>table.call_site_table_entry_for_address(frame.call_site_address()) {
                     <span class="prelude-val">Ok</span>(x) =&gt; x,
                     <span class="prelude-val">Err</span>(e) =&gt; {
-                        <span class="attr">#[cfg(not(downtime_eval))]
-                        </span><span class="macro">error!</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address {:#X}. Error: {}&quot;</span>, frame.call_site_address(), e);
-                        
+                        <span class="macro">error!</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address {:#X}. Error: {}&quot;</span>, frame.call_site_address(), e);
                         <span class="comment">// Now we don&#39;t have an exact match. We try to use the previous
                         </span><span class="kw">let </span><span class="kw-2">mut </span>iter = table.call_site_table_entries().map_err(|_e| {<span class="string">&quot;Couldn&#39;t find call_site_table_entries&quot;</span>})<span class="question-mark">?</span>;
 
@@ -1788,8 +1753,7 @@
                         }
                         
                         <span class="kw">if let </span><span class="prelude-val">Some </span>(closest_entry) = closest_entry {
-                            <span class="attr">#[cfg(not(downtime_eval))]
-                            </span><span class="macro">debug!</span>(<span class="string">&quot;No unwind info for address. Using the closeset&quot;</span>);
+                            <span class="macro">debug!</span>(<span class="string">&quot;No unwind info for address. Using the closeset&quot;</span>);
                             closest_entry
                         } <span class="kw">else </span>{
                             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;continue_unwinding(): couldn&#39;t find a call site table entry for this stack frame&#39;s call site address.&quot;</span>);
@@ -1797,21 +1761,18 @@
                     }
                 };
 
-                <span class="attr">#[cfg(not(downtime_eval))]
-                </span><span class="macro">debug!</span>(<span class="string">&quot;Found call site entry for address {:#X}: {:#X?}&quot;</span>, frame.call_site_address(), entry);
+                <span class="macro">debug!</span>(<span class="string">&quot;Found call site entry for address {:#X}: {:#X?}&quot;</span>, frame.call_site_address(), entry);
                 (stack_frame_iter.registers().clone(), entry.landing_pad_address())
             } <span class="kw">else </span>{
                 <span class="macro">error!</span>(<span class="string">&quot;  BUG: couldn&#39;t find LSDA section (.gcc_except_table) for LSDA address: {:#X}&quot;</span>, lsda);
                 <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: couldn&#39;t find LSDA section (.gcc_except_table) for LSDA address specified in stack frame&quot;</span>);
             }
         } <span class="kw">else </span>{
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack frame has no LSDA&quot;</span>);
+            <span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): stack frame has no LSDA&quot;</span>);
             <span class="kw">return </span>continue_unwinding(unwinding_context_ptr);
         }
     } <span class="kw">else </span>{
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span><span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): NO REMAINING STACK FRAMES&quot;</span>);
+        <span class="macro">trace!</span>(<span class="string">&quot;continue_unwinding(): NO REMAINING STACK FRAMES&quot;</span>);
         <span class="kw">return </span><span class="prelude-val">Ok</span>(());
     };
 
@@ -1819,8 +1780,7 @@
     </span><span class="kw">let </span>landing_pad_address = <span class="kw">match </span>landing_pad_address {
         <span class="prelude-val">Some</span>(lpa) =&gt; lpa,
         <span class="kw">_ </span>=&gt; {
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">warn!</span>(<span class="string">&quot;continue_unwinding(): stack frame has LSDA but no landing pad&quot;</span>);
+            <span class="macro">warn!</span>(<span class="string">&quot;continue_unwinding(): stack frame has LSDA but no landing pad&quot;</span>);
             <span class="kw">return </span>continue_unwinding(unwinding_context_ptr);
         }
     };
@@ -1829,15 +1789,13 @@
     // Thus, we skip unwinding an exception handler frame because its landing pad will point to an invalid instruction (usually `ud2`).
     </span><span class="kw">if </span>stack_frame_iter.last_frame_was_exception_handler {
         <span class="kw">let </span>landing_pad_value: u16 = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(landing_pad_address <span class="kw">as </span><span class="kw-2">*const </span>u16) };
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span><span class="macro">warn!</span>(<span class="string">&quot;Skipping exception/interrupt handler&#39;s landing pad (cleanup function) at {:#X}, which points to {:#X} (UD2: {})&quot;</span>, 
+        <span class="macro">warn!</span>(<span class="string">&quot;Skipping exception/interrupt handler&#39;s landing pad (cleanup function) at {:#X}, which points to {:#X} (UD2: {})&quot;</span>, 
             landing_pad_address, landing_pad_value, landing_pad_value == <span class="number">0x0B0F</span>,  <span class="comment">// the `ud2` instruction
         </span>);
         <span class="kw">return </span>continue_unwinding(unwinding_context_ptr);
     }
 
     <span class="comment">// Jump to the actual landing pad function, or rather, a function that will jump there after setting up register values properly.
-    </span><span class="attr">#[cfg(not(downtime_eval))]
     </span><span class="macro">debug!</span>(<span class="string">&quot;Jumping to landing pad (cleanup function) at {:#X}&quot;</span>, landing_pad_address);
     <span class="comment">// Once the unwinding cleanup function is done, it will call _Unwind_Resume (technically, it jumps to it),
     // and pass the value in the landing registers&#39; RAX register as the argument to _Unwind_Resume. 
@@ -1864,8 +1822,7 @@
 
     <span class="kw">match </span>continue_unwinding(unwinding_context_ptr) {
         <span class="prelude-val">Ok</span>(()) =&gt; {
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">debug!</span>(<span class="string">&quot;unwind_resume(): continue_unwinding() returned Ok(), meaning it&#39;s at the end of the call stack.&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">&quot;unwind_resume(): continue_unwinding() returned Ok(), meaning it&#39;s at the end of the call stack.&quot;</span>);
         }
         <span class="prelude-val">Err</span>(e) =&gt; {
             <span class="macro">error!</span>(<span class="string">&quot;BUG: in unwind_resume(): continue_unwinding() returned an error: {}&quot;</span>, e);
@@ -1885,8 +1842,7 @@
     <span class="kw">let </span>(stack_frame_iter, cause, current_task) = unwinding_context.into();
     drop(stack_frame_iter);
 
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">warn!</span>(<span class="string">&quot;cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}&quot;</span>, current_task);
+    <span class="macro">warn!</span>(<span class="string">&quot;cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}&quot;</span>, current_task);
     
     <span class="kw">let </span>(exitable_taskref, failure_cleanup_function) = 
         task::ExitableTaskRef::obtain_for_unwinder(current_task);

@@ -507,44 +507,6 @@
 <a href="#507" id="507">507</a>
 <a href="#508" id="508">508</a>
 <a href="#509" id="509">509</a>
-<a href="#510" id="510">510</a>
-<a href="#511" id="511">511</a>
-<a href="#512" id="512">512</a>
-<a href="#513" id="513">513</a>
-<a href="#514" id="514">514</a>
-<a href="#515" id="515">515</a>
-<a href="#516" id="516">516</a>
-<a href="#517" id="517">517</a>
-<a href="#518" id="518">518</a>
-<a href="#519" id="519">519</a>
-<a href="#520" id="520">520</a>
-<a href="#521" id="521">521</a>
-<a href="#522" id="522">522</a>
-<a href="#523" id="523">523</a>
-<a href="#524" id="524">524</a>
-<a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a>
-<a href="#535" id="535">535</a>
-<a href="#536" id="536">536</a>
-<a href="#537" id="537">537</a>
-<a href="#538" id="538">538</a>
-<a href="#539" id="539">539</a>
-<a href="#540" id="540">540</a>
-<a href="#541" id="541">541</a>
-<a href="#542" id="542">542</a>
-<a href="#543" id="543">543</a>
-<a href="#544" id="544">544</a>
-<a href="#545" id="545">545</a>
-<a href="#546" id="546">546</a>
-<a href="#547" id="547">547</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines support functions needed for swapping of corrupted crates to a different address for fault tolerance
 //! 
 
@@ -636,8 +598,7 @@
             <span class="bool-val">false</span>, <span class="comment">//reexport
         </span>).map_err(|invalid_req| <span class="macro">format!</span>(<span class="string">&quot;{invalid_req:#?}&quot;</span>))<span class="question-mark">?</span>;
 
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span><span class="macro">debug!</span>(<span class="string">&quot;swap call {:?}&quot;</span>, swap_req);
+        <span class="macro">debug!</span>(<span class="string">&quot;swap call {:?}&quot;</span>, swap_req);
 
         requests.push(swap_req);
 
@@ -660,8 +621,7 @@
 
     <span class="kw">let </span>(_old_crate_name, old_crate_ref, _old_namespace) = matching_crates.remove(<span class="number">0</span>);
 
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;{:?}&quot;</span>,old_crate_ref);
+    <span class="macro">debug!</span>(<span class="string">&quot;{:?}&quot;</span>,old_crate_ref);
 
     {
         <span class="kw">let </span>old_crate = old_crate_ref.lock_as_ref();
@@ -697,8 +657,7 @@
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;More than one crate matches &quot;</span>.to_string() + crate_name);
     }
 
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;We got a match&quot;</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;We got a match&quot;</span>);
 
     <span class="kw">let </span>(new_crate_full_name, _ocr, real_new_namespace) = matching_crates.remove(<span class="number">0</span>);
     <span class="kw">let </span>new_crate_ref = <span class="kw">match </span>CrateNamespace::get_crate_and_namespace(real_new_namespace, <span class="kw-2">&amp;</span>new_crate_full_name) {
@@ -718,31 +677,26 @@
         return_struct.new_rodata = new_crate.rodata_pages.as_ref().map(|(_mp, addr_range)| addr_range.clone());
         return_struct.new_data   = new_crate.data_pages  .as_ref().map(|(_mp, addr_range)| addr_range.clone());
 
-        <span class="attr">#[cfg(not(downtime_eval))]
-        </span>{
-            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_text) , <span class="prelude-val">Some</span>(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
-                    <span class="macro">debug!</span>(<span class="string">&quot;Text Range was {:X} - {:X}&quot;</span>, old_text.start, old_text.end);
-                    <span class="macro">debug!</span>(<span class="string">&quot;Text Range is {:X} - {:X}&quot;</span>, new_text.start, new_text.end);
-            }
+        <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_text) , <span class="prelude-val">Some</span>(new_text)) = (return_struct.old_text.clone(), return_struct.new_text.clone()) {
+                <span class="macro">debug!</span>(<span class="string">&quot;Text Range was {:X} - {:X}&quot;</span>, old_text.start, old_text.end);
+                <span class="macro">debug!</span>(<span class="string">&quot;Text Range is {:X} - {:X}&quot;</span>, new_text.start, new_text.end);
+        }
 
-            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_data) , <span class="prelude-val">Some</span>(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
-                    <span class="macro">debug!</span>(<span class="string">&quot;Data Range was {:X} - {:X}&quot;</span>, old_data.start, old_data.end);
-                    <span class="macro">debug!</span>(<span class="string">&quot;Data Range is {:X} - {:X}&quot;</span>, new_data.start, new_data.end);
-            }
+        <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_data) , <span class="prelude-val">Some</span>(new_data)) = (return_struct.old_data.clone(), return_struct.new_data.clone()) {
+                <span class="macro">debug!</span>(<span class="string">&quot;Data Range was {:X} - {:X}&quot;</span>, old_data.start, old_data.end);
+                <span class="macro">debug!</span>(<span class="string">&quot;Data Range is {:X} - {:X}&quot;</span>, new_data.start, new_data.end);
+        }
 
-            <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_rodata) , <span class="prelude-val">Some</span>(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
-                    <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range was {:X} - {:X}&quot;</span>, old_rodata.start, old_rodata.end);
-                    <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range is {:X} - {:X}&quot;</span>, new_rodata.start, new_rodata.end);
-            }
+        <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_rodata) , <span class="prelude-val">Some</span>(new_rodata)) = (return_struct.old_rodata.clone(), return_struct.new_rodata.clone()) {
+                <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range was {:X} - {:X}&quot;</span>, old_rodata.start, old_rodata.end);
+                <span class="macro">debug!</span>(<span class="string">&quot;Rodata Range is {:X} - {:X}&quot;</span>, new_rodata.start, new_rodata.end);
         }
     }
 
 
     <span class="kw">match </span>swap_result {
         <span class="prelude-val">Ok</span>(()) =&gt; {
-
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
 
             <span class="prelude-val">Ok</span>(return_struct)
         }
@@ -796,13 +750,7 @@
                 </span><span class="kw">let </span>n_ra = ra - old_text.start + new_text.start;
                 <span class="kw">let </span>p1 = (x) <span class="kw">as </span><span class="kw-2">*mut </span>usize;
                 <span class="kw">unsafe </span>{ ptr::write(p1,n_ra.value()) };
-                <span class="comment">// For debug purposes we re-read teh value
-                // #[cfg(not(downtime_eval))]
-                // {
-                //     let n =  unsafe { ptr::read(p) };
-                //     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);
-                // }
-            </span>}
+            }
         }
 
         <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_rodata) , <span class="prelude-val">Some</span>(new_rodata)) = (swap_ranges.old_rodata.clone(), swap_ranges.new_rodata.clone()) {
@@ -812,13 +760,7 @@
                 </span><span class="kw">let </span>n_ra = ra - old_rodata.start + new_rodata.start;
                 <span class="kw">let </span>p1 = (x) <span class="kw">as </span><span class="kw-2">*mut </span>usize;
                 <span class="kw">unsafe </span>{ ptr::write(p1,n_ra.value()) };
-
-                <span class="comment">// #[cfg(not(downtime_eval))]
-                // {
-                //     let n =  unsafe { ptr::read(p) };
-                //     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);
-                // }
-            </span>}
+            }
         }
 
         <span class="kw">if let </span>(<span class="prelude-val">Some</span>(old_data) , <span class="prelude-val">Some</span>(new_data)) = (swap_ranges.old_data.clone(), swap_ranges.new_data.clone()) {
@@ -828,12 +770,7 @@
                 </span><span class="kw">let </span>n_ra = ra - old_data.start + new_data.start;
                 <span class="kw">let </span>p1 = (x) <span class="kw">as </span><span class="kw-2">*mut </span>usize;
                 <span class="kw">unsafe </span>{ ptr::write(p1,n_ra.value()) };
-                <span class="comment">// #[cfg(not(downtime_eval))]
-                // {
-                //     let n =  unsafe { ptr::read(p) };
-                //     debug!(&quot;New value at address {:#X}, value  = {:#X}&quot;, x , n);
-                // }
-            </span>}
+            }
         }
 
         x += <span class="number">8</span>;
@@ -855,8 +792,7 @@
     <span class="kw">let </span>taskref = task::get_my_current_task()
         .ok_or_else(|| <span class="string">&quot;failed to get current task&quot;</span>.to_string())<span class="question-mark">?</span>;
 
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;The taskref is {:?}&quot;</span>,taskref);
+    <span class="macro">debug!</span>(<span class="string">&quot;The taskref is {:?}&quot;</span>,taskref);
 
     <span class="kw">let </span>curr_dir = Arc::clone(<span class="kw-2">&amp;</span>taskref.get_env().lock().working_dir);
 
@@ -867,8 +803,7 @@
 
     <span class="kw">let </span>tuples: Vec&lt;(<span class="kw-2">&amp;</span>str, <span class="kw-2">&amp;</span>str, bool)&gt; = <span class="macro">vec!</span>[(crate_name, crate_name , <span class="bool-val">false</span>)];
 
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;tuples: {:?}&quot;</span>, tuples);
+    <span class="macro">debug!</span>(<span class="string">&quot;tuples: {:?}&quot;</span>, tuples);
 
     <span class="comment">// 1) Call generic crate swapping routine
     </span><span class="kw">let </span>swap_result = do_self_swap(
@@ -882,9 +817,7 @@
 
     <span class="kw">let </span>swap_ranges = <span class="kw">match </span>swap_result {
         <span class="prelude-val">Ok</span>(x) =&gt; {
-
-            <span class="attr">#[cfg(not(downtime_eval))]
-            </span><span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
+            <span class="macro">debug!</span>(<span class="string">&quot;Swap operation complete&quot;</span>);
             x
         }
         <span class="prelude-val">Err</span>(e) =&gt; {
@@ -910,9 +843,7 @@
 <span class="doccomment">/// null crate swap policy.
 /// When this policy is enabled no crate swapping is performed
 </span><span class="kw">fn </span>null_swap_policy() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;Running null swap policy&quot;</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Running null swap policy&quot;</span>);
 
     <span class="comment">// We get all unhanlded faults
     </span><span class="kw">let </span>unhandled_list: Vec&lt;FaultEntry&gt; = remove_unhandled_exceptions();
@@ -942,9 +873,7 @@
 /// is swapped.
 </span><span class="attr">#[cfg(use_crate_replacement)]
 </span><span class="kw">fn </span>simple_swap_policy() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;Running simple swap policy&quot;</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Running simple swap policy&quot;</span>);
 
     <span class="comment">// We get all unhanlded faults
     </span><span class="kw">let </span>unhandled_list: Vec&lt;FaultEntry&gt; = remove_unhandled_exceptions();
@@ -977,10 +906,7 @@
     }
 
     <span class="kw">let </span>crate_to_swap = unhandled_list[<span class="number">0</span>].crate_error_occured.clone();
-
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;Repalce : {:?}&quot;</span>,crate_to_swap);
-
+    <span class="macro">debug!</span>(<span class="string">&quot;Repalce : {:?}&quot;</span>,crate_to_swap);
     crate_to_swap
 }
 
@@ -991,9 +917,7 @@
 /// 3) Replace the application crate
 </span><span class="attr">#[cfg(use_crate_replacement)]
 </span><span class="kw">fn </span>iterative_swap_policy() -&gt; <span class="prelude-ty">Option</span>&lt;String&gt; {
-
-    <span class="attr">#[cfg(not(downtime_eval))]
-    </span><span class="macro">debug!</span>(<span class="string">&quot;Running iterative swap policy&quot;</span>);
+    <span class="macro">debug!</span>(<span class="string">&quot;Running iterative swap policy&quot;</span>);
 
     <span class="comment">// We get all unhanlded faults
     </span><span class="kw">let </span>unhandled_list: Vec&lt;FaultEntry&gt; = remove_unhandled_exceptions();
