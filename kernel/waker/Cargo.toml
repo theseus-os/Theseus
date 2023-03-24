@@ -1,11 +1,12 @@
 [package]
 name = "waker"
 version = "0.1.0"
-authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
-description = "Waker implementation for the task system"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A standard Waker + Blocker implementation that directly uses task blocking"
 edition = "2021"
 
 [dependencies]
-mutex_sleep = { path = "../mutex_sleep" }
-scheduler = { path = "../scheduler" }
+spin = "0.9.4"
+
 task = { path = "../task" }
+waker_generic = { path = "../waker_generic" }

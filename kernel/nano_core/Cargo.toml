@@ -24,12 +24,12 @@ mod_mgmt = { path = "../mod_mgmt" }
 panic_entry = { path = "../panic_entry" }
 memory_initialization = { path = "../memory_initialization" }
 boot_info = { path = "../boot_info" }
+captain = { path = "../captain" }
+early_printer = { path = "../early_printer" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
-captain = { path = "../captain" }
 serial_port_basic = { path = "../serial_port_basic" }
-vga_buffer = { path = "../vga_buffer" }
 logger_x86_64 = { path = "../logger_x86_64" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
@@ -45,9 +45,9 @@ cfg-if = "1.0.0"
 [features]
 default = [ "bios" ]
 ## Build for a system that boots via legacy BIOS (multiboot2).
-bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
+bios = ["boot_info/multiboot2", "early_printer/bios", "dep:multiboot2"]
 ## Build for a system that boots via UEFI.
-uefi = ["boot_info/uefi", "captain/uefi", "dep:uefi-bootloader-api"]
+uefi = ["boot_info/uefi", "dep:uefi-bootloader-api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 

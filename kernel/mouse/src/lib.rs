@@ -3,13 +3,13 @@
 #![no_std]
 #![feature(abi_x86_interrupt)]
 
-use log::{error, warn, debug};
+use log::{error, warn};
 use spin::Once;
 use mpmc::Queue;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
-use ps2::{PS2Mouse, MouseId, MousePacket};
+use ps2::{PS2Mouse, MousePacket};
 
 /// The first PS/2 port for the mouse is connected directly to IRQ 0xC.
 /// Because we perform the typical PIC remapping, the remapped IRQ vector number is 0x2C.
@@ -29,26 +29,10 @@ struct MouseInterruptParams {
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
 pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
-    //TODO: set to 3, failed? id = 0, otherwise set to 4, failed? id = 3, otherwise id = 4
-    //the current code beneath just tries to set id = 4, so is not final
-    // Set Mouse ID to 4.
-    if let Err(e) = mouse.set_mouse_id(MouseId::Four) {
-        error!("Failed to set the mouse id to four: {e}");
-        return Err("Failed to set the mouse id to four");
-    }
-    // Read it back to check that it worked.
-    match mouse.mouse_id() {
-        Ok(id) =>  {
-            debug!("The PS/2 mouse ID is: {id:?}");
-            if !matches!(id, MouseId::Four) {
-                error!("Failed to set the mouse id to four");
-                return Err("Failed to set the mouse id to four");
-            }
-        }
-        Err(e) => {
-            error!("Failed to read the PS/2 mouse ID: {e}");
-            return Err("Failed to read the PS/2 mouse ID");
-        }
+    // Set MouseId to the highest possible one
+    if let Err(e) = mouse.set_mouse_id() {
+        error!("Failed to set the mouse id: {e}");
+        return Err("Failed to set the mouse id");
     }
 
     // Register the interrupt handler
@@ -78,13 +62,12 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
             // try to redesign this to only get one byte per interrupt instead of the 3-4 bytes we
             // currently get in read_mouse_packet and merge them afterwards
             let mouse_packet = mouse.read_mouse_packet();
-            // warn!("read_mouse_packet: {mouse_packet:?}");
             
             if mouse_packet.always_one() != 1 {
                 // this could signal a hardware error or a mouse which doesn't conform to the rule
-                warn!("Discarding mouse data packet since its third bit should always be 1.");
+                warn!("ps2_mouse_handler(): Discarding mouse data packet since its third bit should always be 1.");
             } else if let Err(e) = handle_mouse_input(mouse_packet, queue) {
-                error!("ps2_mouse_handler: {e:?}");
+                error!("ps2_mouse_handler(): {e:?}");
             }
         }
     } else {

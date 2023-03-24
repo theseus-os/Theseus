@@ -38,22 +38,21 @@ pub fn main(args: Vec<String>) -> isize {
         let apic_id = lapic.read().apic_id();
         let processor = lapic.read().processor_id();
         let is_bootstrap_cpu = lapic.read().is_bootstrap_cpu();
-        let core_type = if is_bootstrap_cpu {"BSP Core"}
-                        else {"AP Core"};
+        let core_type = if is_bootstrap_cpu { "Boot CPU" } else { "Secondary CPU" };
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
         
-        if let Some(runqueue) = runqueue::get_runqueue(apic_id).map(|rq| rq.read()) {
+        if let Some(runqueue) = runqueue::get_runqueue(apic_id.value() as u8).map(|rq| rq.read()) {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
-                writeln!(runqueue_contents, "{} ({}) {}", 
+                writeln!(runqueue_contents, "    {} ({}) {}", 
                     task.name, 
                     task.id,
                     if task.is_running() { "*" } else { "" }
                 )
                 .expect("Failed to write to runqueue_contents");
             }
-            println!("RunQueue:\n{}", runqueue_contents);
+            print!("{}", runqueue_contents);
         }
         
         else {
@@ -62,6 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
         }
     }
     
+    println!("");
     0
 }
 

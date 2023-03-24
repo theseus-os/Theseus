@@ -1,15 +1,18 @@
 pub use pic::IRQ_BASE_OFFSET;
 
-use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
-use spin::Once;
 // use rtc;
-use core::sync::atomic::{AtomicUsize, Ordering};
-use memory::VirtualAddress;
 use apic::{INTERRUPT_CHIP, InterruptChip};
+use cpu::CpuId;
 use locked_idt::LockedIdt;
 use log::{error, warn, info, debug};
-use vga_buffer::println_raw;
+use memory::VirtualAddress;
+use spin::Once;
+use early_printer::println;
+use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 
+/// The IRQ number reserved for CPU-local timer interrupts,
+/// which Theseus currently uses for preemptive task switching.
+pub const CPU_LOCAL_TIMER_IRQ: u8 = apic::LOCAL_APIC_LVT_IRQ;
 
 /// The single system-wide Interrupt Descriptor Table (IDT).
 ///
@@ -21,10 +24,10 @@ static PIC: Once<pic::ChainedPics> = Once::new();
 
 /// The list of IRQs reserved for Theseus-specific usage that cannot be
 /// used for general device interrupt handlers.
-/// These cannot be accessed by [`register_interrupt()`] or [`deregister_interrupt()`].
+/// These cannot be removed in [`deregister_interrupt()`].
 static RESERVED_IRQ_LIST: [u8; 3] = [
     pic::PIC_SPURIOUS_INTERRUPT_IRQ,
-    apic::LOCAL_APIC_LVT_IRQ,
+    CPU_LOCAL_TIMER_IRQ,
     apic::APIC_SPURIOUS_INTERRUPT_IRQ,
 ];
 
@@ -68,7 +71,7 @@ pub fn init(
     double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) -> Result<&'static LockedIdt, &'static str> {
-    let bsp_id = apic::bootstrap_cpu().ok_or("couldn't get BSP's id")?;
+    let bsp_id = cpu::bootstrap_cpu().ok_or("couldn't get BSP's id")?;
     info!("Setting up TSS & GDT for BSP (id {})", bsp_id);
     gdt::create_and_load_tss_gdt(bsp_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
@@ -120,14 +123,12 @@ pub fn init(
         }
         // This crate has a fixed dependency on the `pic` and `apic` crates,
         // because they are required to implement certain functions, e.g., `eoi()`.
-        // Thus, we statically reserve the IDT entries used by the PIC & APIC,
-        // instead of making it dynamically register that interrupt like other devices do.
+        // Thus, we statically reserve some non-registerable IDT entries that should only be used
+        // by the PIC & APIC instead of dynamically registering them elsewhere.
         new_idt[pic::PIC_SPURIOUS_INTERRUPT_IRQ as usize]
             .set_handler_fn(pic_spurious_interrupt_handler);
-        new_idt[apic::LOCAL_APIC_LVT_IRQ as usize]
-            .set_handler_fn(lapic_timer_handler);
         new_idt[apic::APIC_SPURIOUS_INTERRUPT_IRQ as usize]
-            .set_handler_fn(apic_spurious_interrupt_handler); 
+            .set_handler_fn(apic_spurious_interrupt_handler);
     }
 
     // try to load our new IDT    
@@ -144,17 +145,17 @@ pub fn init(
 
 /// Similar to `init()`, but for APs to call after the BSP has already invoked `init()`.
 pub fn init_ap(
-    apic_id: u8, 
+    cpu_id: CpuId, 
     double_fault_stack_top_unusable: VirtualAddress, 
     privilege_stack_top_unusable: VirtualAddress,
 ) -> Result<&'static LockedIdt, &'static str> {
-    info!("Setting up TSS & GDT for AP {}", apic_id);
-    gdt::create_and_load_tss_gdt(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    info!("Setting up TSS & GDT for CPU {}", cpu_id);
+    gdt::create_and_load_tss_gdt(cpu_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
 
     // We've already created the IDT initially (currently all CPUs share the initial IDT),
-    // so we only need to re-load it here for each AP.
+    // so we only need to re-load it here for each AP (each secondary CPU).
     IDT.load();
-    info!("loaded IDT for AP {}.", apic_id);
+    info!("loaded IDT for CPU {}.", cpu_id);
     Ok(&IDT)
 }
 
@@ -288,22 +289,6 @@ pub fn eoi(irq: Option<u8>) {
 }
 
 
-pub static APIC_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
-/// 0x22
-extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: InterruptStackFrame) {
-    let _ticks = APIC_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-    // info!(" ({}) APIC TIMER HANDLER! TICKS = {}", apic::current_cpu(), _ticks);
-
-    // Callback to the sleep API to unblock tasks whose waiting time is over
-    // and alert to update the number of ticks elapsed
-    sleep::unblock_sleeping_tasks();
-    
-    // we must acknowledge the interrupt first before handling it because we switch tasks here, which doesn't return
-    eoi(None); // None, because 0x22 IRQ cannot possibly be a PIC interrupt
-    
-    scheduler::schedule();
-}
-
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
 
@@ -311,25 +296,25 @@ extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: Interrup
 }
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
-    println_raw!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
+    println!("\nUnimplemented interrupt handler: {:#?}", _stack_frame);
 	match apic::INTERRUPT_CHIP.load() {
         apic::InterruptChip::PIC => {
             let irq_regs = PIC.get().map(|pic| pic.read_isr_irr());  
-            println_raw!("PIC IRQ Registers: {:?}", irq_regs);
+            println!("PIC IRQ Registers: {:?}", irq_regs);
         }
         apic::InterruptChip::APIC | apic::InterruptChip::X2APIC => {
             if let Some(lapic_ref) = apic::get_my_apic() {
                 let lapic = lapic_ref.read();
                 let isr = lapic.get_isr(); 
                 let irr = lapic.get_irr();
-                println_raw!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
+                println!("APIC ISR: {:#x} {:#x} {:#x} {:#x}, {:#x} {:#x} {:#x} {:#x}\n \
                     IRR: {:#x} {:#x} {:#x} {:#x},{:#x} {:#x} {:#x} {:#x}", 
                     isr[0], isr[1], isr[2], isr[3], isr[4], isr[5], isr[6], isr[7],
                     irr[0], irr[1], irr[2], irr[3], irr[4], irr[5], irr[6], irr[7],
                 );
             }
             else {
-                println_raw!("APIC ISR and IRR were unknown.");
+                println!("APIC ISR and IRR were unknown.");
             }
         }
     };
@@ -352,7 +337,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: Interrupt
         // (pretty sure this will never happen)
         // if it was a real IRQ7, we do need to ack it by sending an EOI
         if irq_regs.master_isr & 0x80 == 0x80 {
-            println_raw!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
+            println!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
             error!("Got real IRQ7, not spurious! (Unexpected behavior)");
             eoi(Some(IRQ_BASE_OFFSET + 0x7));
         }

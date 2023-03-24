@@ -43,6 +43,7 @@ use core::{
     sync::atomic::{AtomicBool, fence, Ordering},
     task::Waker,
 };
+use cpu::CpuId;
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
@@ -221,6 +222,16 @@ impl TaskRef {
             *self.0.exit_value_mailbox.lock() = Some(val);
             self.0.task.runstate().store(RunState::Exited);
 
+            // Synchronize with the acquire fence in `JoinableTaskRef::join()`,
+            // as we have just stored the exit value that `join()` will load.
+            fence(Ordering::Release);
+
+            // Now that we have set the exit value and marked the task as exited,
+            // it is safe to wake any other tasks that are waiting for this task to exit.
+            if let Some(waker) = self.0.task.inner().lock().waker.take() {
+                waker.wake();
+            }
+
             // Corner case: if the task isn't currently running (as with killed tasks), 
             // we must clean it up now rather than in `task_switch()`, as it will never be scheduled in again.
             if !self.is_running() {
@@ -232,12 +243,7 @@ impl TaskRef {
                 // let _taskref_in_tls = deinit_current_task();
                 // drop(_taskref_in_tls);
             }
-            
-            if let Some(waker) = self.0.task.inner().lock().waker.take() {
-                waker.wake();
-            }
         }
-
         Ok(())
     }
 
@@ -398,7 +404,7 @@ impl JoinableTaskRef {
         self.task.0.task.inner().lock().waker = Some(waker);
     }
 
-    /// Busy-waits (spins in a loop) until this task has exited or has been killed.
+    /// Blocks the current task until this task has exited.
     ///
     /// Synchronizes memory with respect to the joined task.
     ///
@@ -409,15 +415,31 @@ impl JoinableTaskRef {
     ///   * This does *not* include cases where this `Task` failed or was killed,
     ///     rather only cases where the `join` operation itself failed.
     #[doc(alias("reap", "exit"))]
-    pub fn join(&self) -> Result<ExitValue, &'static str> {
-        // First, wait for this Task to be marked as Exited (no longer runnable).
-        while !self.has_exited() { }
+    pub fn join(&self) -> Result<ExitValue, &'static str> {        
+        if !self.has_exited() {
+            // Create a waker+blocker pair that will block the current task
+            // and then wake it once this task (`self`) exits.
+            let curr_task = get_my_current_task().ok_or("join(): couldn't get current task")?;
+            let task_to_block = curr_task.clone();
+            let wake_action = move || {
+                let _ = curr_task.unblock();
+            };
+            let (waker, blocker) = waker_generic::new_waker(wake_action);
+            self.set_waker(waker);
+            let block_action = || {
+                let _ = task_to_block.block();
+                ScheduleOnDrop { }
+            };
+            blocker.block(block_action);
+        }
+        
+        // Note: previously, we waited for this task to actually stop running,
+        //       but this isn't actually necessary since we only care whether
+        //       the task has exited and its exit value has been written.
+        // while self.is_running() { }
 
-        // Then, wait for it to actually stop running on any CPU core.
-        while self.is_running() { }
-
-        // This synchronizes with the release fence from when this task first ran
-        // (in `spawn::task_wrapper()`).
+        // Synchronize with the release fence in`TaskRef::internal_exit`
+        // when the exit value for this task was stored.
         fence(Ordering::Acquire);
 
         self.reap_exit_value()
@@ -429,6 +451,14 @@ impl Drop for JoinableTaskRef {
     /// that will be auto-reaped after exiting.
     fn drop(&mut self) {
         self.0.joinable.store(false, Ordering::Relaxed);
+    }
+}
+
+/// An empty struct that invokes [`schedule()`] when it is dropped.
+pub struct ScheduleOnDrop { }
+impl Drop for ScheduleOnDrop {
+    fn drop(&mut self) {
+        schedule();
     }
 }
 
@@ -605,7 +635,7 @@ mod scheduler {
 
         let cpu_id = preemption_guard.cpu_id();
 
-        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) else {
+        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
             return false; // keep running the same current task
         };
 
@@ -648,7 +678,7 @@ mod scheduler {
 ///
 /// ## Arguments
 /// * `next`: the task to switch to.
-/// * `apic_id`: the ID of the current CPU.
+/// * `cpu_id`: the ID of the current CPU.
 /// * `preemption_guard`: a guard that is used to ensure preemption is disabled
 ///    for the duration of this task switch operation.
 ///
@@ -675,7 +705,7 @@ mod scheduler {
 /// the given `next` `Task`'s inner state in order to mutate them.
 pub fn task_switch(
     next: TaskRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> (bool, PreemptionGuard) {
 
@@ -683,7 +713,7 @@ pub fn task_switch(
     // the borrowed reference to the current task is guaranteed to be dropped
     // *before* the actual context switch operation occurs.
     let result = with_current_task_tls_slot_mut(
-        |curr, p_guard| task_switch_inner(curr, next, apic_id, p_guard),
+        |curr, p_guard| task_switch_inner(curr, next, cpu_id, p_guard),
         preemption_guard,
     );
     
@@ -809,7 +839,7 @@ type TaskSwitchInnerRet = (*mut usize, usize, SimdExt, SimdExt);
 fn task_switch_inner(
     curr_task_tls_slot: &mut Option<TaskRef>,
     next: TaskRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> Result<TaskSwitchInnerRet, (bool, PreemptionGuard)> {
     let Some(ref curr) = curr_task_tls_slot else {
@@ -822,7 +852,7 @@ fn task_switch_inner(
         return Err((false, preemption_guard));
     }
 
-    // trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", apic_id, curr, next, irq_safety::interrupts_enabled());
+    // trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", cpu_id, curr, next, irq_safety::interrupts_enabled());
 
     // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
     // if !next.is_runnable() {
@@ -830,12 +860,12 @@ fn task_switch_inner(
     //     return (false, preemption_guard);
     // }
     // if next.is_running() {
-    //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on AP {}!\nCurrent: {:?} Next: {:?}", apic_id, curr, next);
+    //     error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was already running on CPU {}!\nCurrent: {:?} Next: {:?}", cpu_id, curr, next);
     //     return (false, preemption_guard);
     // }
-    // if let Some(pc) = next.pinned_core() {
-    //     if pc != apic_id {
-    //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to AP {:?} but scheduled on AP {}!\n\tCurrent: {:?}, Next: {:?}", pc, apic_id, curr, next);
+    // if let Some(pc) = next.pinned_cpu() {
+    //     if pc != cpu_id {
+    //         error!("BUG: Skipping task_switch due to scheduler bug: chosen 'next' Task was pinned to CPU {:?} but scheduled on CPU {}!\n\tCurrent: {:?}, Next: {:?}", pc, cpu_id, curr, next);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -853,7 +883,7 @@ fn task_switch_inner(
     //     if tss::tss_set_rsp0(new_tss_rsp0).is_ok() { 
     //         // debug!("task_switch [2]: new_tss_rsp = {:#X}", new_tss_rsp0);
     //     } else {
-    //         error!("task_switch(): failed to set AP {} TSS RSP0, aborting task switch!", apic_id);
+    //         error!("task_switch(): failed to set CPU {} TSS RSP0, aborting task switch!", cpu_id);
     //         return (false, preemption_guard);
     //     }
     // }
@@ -921,7 +951,7 @@ fn task_switch_inner(
     // in task runstates, e.g., when an interrupt handler accesses the current task context.
     {
         let _held_interrupts = hold_interrupts();
-        next.0.task.running_on_cpu().store(Some(apic_id).into());
+        next.0.task.running_on_cpu().store(Some(cpu_id).into());
         next.set_as_current_task();
         drop(_held_interrupts);
     }
@@ -943,7 +973,7 @@ pub use tls_current_task::*;
 
 /// A private module to ensure the below TLS variables aren't modified directly.
 mod tls_current_task {
-    use core::cell::{Cell, RefCell};
+    use core::{cell::{Cell, RefCell}, ops::Deref};
     use super::{TASKLIST, TaskRef, ExitableTaskRef};
 
     /// The TLS area that holds the current task's ID.
@@ -1028,26 +1058,39 @@ mod tls_current_task {
     pub fn init_current_task(
         current_task_id: usize,
         current_task: Option<TaskRef>,
-    ) -> Result<ExitableTaskRef, CurrentTaskAlreadyInited> {
+    ) -> Result<ExitableTaskRef, InitCurrentTaskError> {
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
-                return Err(CurrentTaskAlreadyInited);
+                log::error!("BUG: `current_task` {:?} did not match `current_task_id` {}",
+                    t, current_task_id
+                );
+                return Err(InitCurrentTaskError::MismatchedTaskIds(current_task_id, t.id));
             }
             t
         } else {
             TASKLIST.lock()
                 .get(&current_task_id)
                 .cloned()
-                .ok_or(CurrentTaskAlreadyInited)?
+                .ok_or_else(|| {
+                    log::error!("Couldn't find current_task_id {} in TASKLIST", current_task_id);
+                    InitCurrentTaskError::NotInTasklist(current_task_id)
+                })?
         };
 
         match CURRENT_TASK.try_borrow_mut() {
-            Ok(mut t_opt) if t_opt.is_none() => {
+            Ok(mut t_opt) => if let Some(_existing_task) = t_opt.deref() {
+                log::error!("BUG: init_current_task(): CURRENT_TASK was already `Some()`");
+                log::error!("  --> attemping to dump existing task: {:?}", _existing_task);
+                Err(InitCurrentTaskError::AlreadyInited(_existing_task.id))
+            } else {
                 *t_opt = Some(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
                 Ok(ExitableTaskRef { task: taskref })
             }
-            _ => Err(CurrentTaskAlreadyInited),
+            Err(_e) => {
+                log::error!("BUG: init_current_task() failed to mutably borrow CURRENT_TASK");
+                Err(InitCurrentTaskError::AlreadyBorrowed(current_task_id))
+            }
         }
     }
 
@@ -1072,7 +1115,18 @@ mod tls_current_task {
 
     /// An error type indicating that the current task was already initialized.
     #[derive(Debug)]
-    pub struct CurrentTaskAlreadyInited;
+    pub enum InitCurrentTaskError {
+        /// The task IDs used as arguments to `init_current_task()` did not match.
+        MismatchedTaskIds(usize, usize),
+        /// The enclosed Task ID was not in the system-wide task list.
+        NotInTasklist(usize),
+        /// The current task was already initialized; its task ID is enclosed.
+        AlreadyInited(usize),
+        /// The current task reference was already borrowed, thus it could not be
+        /// mutably borrowed again. The ID of the task attempting to be initialized is enclosed.
+        AlreadyBorrowed(usize),
+
+    }
     /// An error type indicating that the current task has not yet been initialized.
     #[derive(Debug)]
     pub struct CurrentTaskNotFound;
@@ -1089,7 +1143,7 @@ mod tls_current_task {
 /// ## Note
 /// This function does not add the new task to any runqueue.
 pub fn bootstrap_task(
-    apic_id: u8, 
+    cpu_id: CpuId, 
     stack: NoDrop<Stack>,
     kernel_mmi_ref: MmiRef,
 ) -> Result<(JoinableTaskRef, ExitableTaskRef), &'static str> {
@@ -1106,7 +1160,7 @@ pub fn bootstrap_task(
             app_crate: None,
         },
     )?;
-    bootstrap_task.name = format!("bootstrap_task_core_{apic_id}");
+    bootstrap_task.name = format!("bootstrap_task_cpu_{cpu_id}");
     let bootstrap_task_id = bootstrap_task.id;
     let joinable_taskref = TaskRef::create(
         bootstrap_task,
@@ -1114,21 +1168,25 @@ pub fn bootstrap_task(
     );
     // Update other relevant states for this new bootstrapped task.
     joinable_taskref.0.task.runstate().store(RunState::Runnable);
-    joinable_taskref.0.task.running_on_cpu().store(Some(apic_id).into()); 
-    joinable_taskref.0.task.inner().lock().pinned_core = Some(apic_id); // can only run on this CPU core
+    joinable_taskref.0.task.running_on_cpu().store(Some(cpu_id).into()); 
+    joinable_taskref.0.task.inner().lock().pinned_cpu = Some(cpu_id); // can only run on this CPU core
     // Set this task as this CPU's current task, as it's already running.
     joinable_taskref.set_as_current_task();
-    let Ok(exitable_taskref) = init_current_task(
-        bootstrap_task_id, 
-        Some(joinable_taskref.clone()),
-    ) else {
-        error!("BUG: failed to set boostrapped task as current task on AP {}", apic_id);
-        // Don't drop the bootstrap task upon error, because it contains the stack
-        // used for the currently running code -- that would trigger an exception.
-        let _task_ref = NoDrop::new(joinable_taskref);
-        return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
+    let exitable_taskref = match init_current_task(
+        bootstrap_task_id,
+        Some(joinable_taskref.clone())
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            error!("BUG: failed to set boostrapped task as current task on CPU {}, {:?}",
+                cpu_id, e
+            );
+            // Don't drop the bootstrap task upon error, because it contains the stack
+            // used for the currently running code -- that would trigger an exception.
+            let _task_ref = NoDrop::new(joinable_taskref);
+            return Err("BUG: bootstrap_task(): failed to set bootstrapped task as current task");
+        }
     };
-
     Ok((joinable_taskref, exitable_taskref))
 }
 

@@ -14,6 +14,7 @@ crossbeam-utils = { version = "0.8.2", default-features = false }
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 context_switch = { path = "../context_switch" }
+cpu = { path = "../cpu" }
 environment = { path = "../environment" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
@@ -21,3 +22,4 @@ no_drop = { path = "../no_drop" }
 preemption = { path = "../preemption" }
 stack = { path = "../stack" }
 task_struct = { path = "../task_struct" }
+waker_generic = { path = "../waker_generic" }

@@ -17,7 +17,7 @@ path = "../memory"
 path = "../mod_mgmt"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-vga_buffer = { path = "../vga_buffer" }
+early_printer = { path = "../early_printer" }
 panic_wrapper = { path = "../panic_wrapper" }
 unwind = { path = "../unwind" }
 

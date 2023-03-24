@@ -1,83 +1,65 @@
-#![feature(negative_impls)]
+//! A standard implementation of a Waker + Blocker pair -- a basic wait event.
+//!
+//! This crate directly By standalone, we mean that this crate does not depend on tasking infrastructure
+//! (e.g., the `task` crate) directly, meaning it is usable in the `task` crate.
+//! This works by accepts generic actions (closures) for waking the [Waker](core::task::Waker)
+//! and blocking the [Blocker].
+
 #![no_std]
+#![feature(negative_impls)]
 
 extern crate alloc;
 
-use alloc::sync::Arc;
-use mutex_sleep::MutexSleep as Mutex;
-use task::{get_my_current_task, TaskRef};
+use task::{ScheduleOnDrop, TaskRef};
 
 /// Creates a new waker and blocker pair that are associated with each other.
 ///
 /// The blocker can be used to block the current task until the waker is woken.
-pub fn waker() -> (core::task::Waker, Blocker) {
-    let activated = Arc::new(Mutex::new(false));
+pub fn new_waker() -> (core::task::Waker, Blocker) {
+    let curr_task = task::get_my_current_task() 
+        .expect("waker::new_waker(): failed to get current task");
+    let task_to_block = curr_task.clone();
+    let wake_action = move || {
+        let _ = curr_task.unblock();
+    };
+    let (waker, blocker_generic) = waker_generic::new_waker(wake_action);
     (
-        core::task::Waker::from(Arc::new(Waker {
-            activated: activated.clone(),
-            task: get_my_current_task().expect("failed to get current task"),
-        })),
-        Blocker { inner: activated },
+        waker,
+        Blocker {
+            blocker_generic,
+            task_to_block,
+        }
     )
 }
 
-/// A blocker that blocks the current task until the associated waker is woken.
+/// A blocker that blocks until the associated waker is woken.
 ///
-/// Call [`waker()`] to obtain a `Blocker` instance and its associated [`core::task::Waker`].
+/// To obtain a `Blocker` and its associated [`core::task::Waker`], call [`new_waker()`].
 ///
 /// `Blocker` will block the current task; thus, it doesn't implement [`Send`] or [`Sync`]
 /// to ensure that it cannot be sent to other tasks.
-
 pub struct Blocker {
-    /// See the docs for the `activated` field in `Waker` for more details.
-    inner: Arc<Mutex<bool>>,
+    blocker_generic: waker_generic::Blocker,
+    task_to_block: TaskRef,
 }
 impl !Send for Blocker {}
 impl !Sync for Blocker {}
 
 impl Blocker {
-    /// Blocks the current task until the associated waker is woken.
+    /// Blocks the current task by putting it to sleep until the associated waker is woken.
     ///
     /// If the waker was already woken prior to this function being called,
     /// it will return immediately.
-    pub fn block(&self) {
-        let task = get_my_current_task().expect("failed to get current task");
-        // Care must be taken not to introduce race conditions.
-        // After registering the waker, the wake condition must be checked to ensure
-        // that it did not complete prior to registering the waker;
-        // otherwise, the waker will never be woken, and this function will block forever.
-        loop {
-            let mut activated = self.inner.lock().expect("failed to lock waker mutex");
-            if *activated {
-                *activated = false;
-                break;
-            } else {
-                let _ = task.block();
-                drop(activated);
-                scheduler::schedule();
-            }
-        }
-    }
-}
-
-/// A waker that unblocks a specific `Task` when woken.
-#[derive(Debug)]
-struct Waker {
-    /// Whether the waker has been activated.
     ///
-    /// This field ensures that [`Blocker::block`] can determine whether the associated waker
-    /// was activated *prior* to [`Blocker::block`] blocking the task.
-    /// Thus, this field cannot be an `AtomicBool`, because the lock must be held
-    /// while blocking or unblocking the task, serving as a critical section.
-    activated: Arc<Mutex<bool>>,
-    task: TaskRef,
-}
-
-impl alloc::task::Wake for Waker {
-    fn wake(self: Arc<Self>) {
-        let mut activated = self.activated.lock().expect("failed to lock waker mutex");
-        *activated = true;
-        let _ = self.task.unblock();
-        drop(activated);
+    /// After this function returns, the inner state of the blocker+waker pair
+    /// will have been reset to its initial "unwoken" state, enabling them to be re-used.
+    /// In other words, this function can be called again, at which point it will
+    /// block until the waker is woken again.
+    pub fn block(&self) {
+        let block_action = || {
+            let _ = self.task_to_block.block();
+            ScheduleOnDrop { }
+        };
+        self.blocker_generic.block(block_action)
     }
 }

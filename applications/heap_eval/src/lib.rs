@@ -10,6 +10,7 @@ extern crate apic;
 extern crate runqueue;
 extern crate libtest;
 extern crate spawn;
+extern crate cpu;
 extern crate getopts;
 extern crate heap;
 
@@ -82,7 +83,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
 	if !check_myrq() {
-		println!("cannot run on a busy core (#{}). Pin me on an idle core.", CPU_ID!());
+		println!("cannot run on a busy CPU (#{}). Pin me on an idle CPU.", cpu::current_cpu());
 		return 0;
 	}
 

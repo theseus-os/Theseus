@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@
 name = "memory_aarch64"
 description = "The memory subsystem interfaces on aarch64."
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"

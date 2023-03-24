@@ -79,7 +79,7 @@ macro_rules! save_registers_regular {
         // Save all general purpose registers into the previous task.
         r#"
             // Make room on the stack for the registers.
-            sub sp,  sp,  #8 * 2 + 6
+            sub sp,  sp,  #8 * 2 * 6
 
             // Push registers on the stack, two at a time.
             stp x19, x20, [sp, #8 * 2 * 0]

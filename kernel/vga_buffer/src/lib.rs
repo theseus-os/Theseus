@@ -1,23 +1,17 @@
-//! Support for basic printing to a simple 80x25 text-mode VGA buffer. 
+//! Support for basic printing to a simple 80x25 text-mode VGA display. 
 //!
-//! Does not support scrolling, cursors, or any other features of a regular drawn framebuffer.
+//! Does not support user scrolling, cursors, or any other advanced features.
 
 #![no_std]
 #![feature(ptr_internals)]
-
-extern crate kernel_config;
-extern crate logger_x86_64 as logger;
-extern crate spin;
-extern crate volatile;
-
+#![feature(const_option)]
 
 use core::{fmt::{self, Write}, ptr::Unique};
-use spin::Mutex;
 use volatile::Volatile;
-
 
 /// The VBE/VESA standard defines the text mode VGA buffer to start at this address.
 /// We must rely on the early bootstrap code to identity map this address.
+#[cfg(target_arch = "x86_64")] // ensures build failure on non-x86 platforms
 const VGA_BUFFER_VIRTUAL_ADDR: usize = 0xb8000;
 
 /// height of the VGA text window
@@ -26,66 +20,22 @@ const BUFFER_HEIGHT: usize = 25;
 const BUFFER_WIDTH: usize = 80;
 
 
-/// The singleton VGA writer instance that writes to the VGA text buffer.
-static EARLY_VGA_WRITER: Mutex<VgaBuffer> = Mutex::new(
-    VgaBuffer {
-        column_position: 0,
-        // SAFE: the assembly boot up code ensures this is mapped into memory.
-        buffer: unsafe { Unique::new_unchecked((VGA_BUFFER_VIRTUAL_ADDR) as *mut _) },
-    }
-);
-
-
-// Note: we can't put this cfg block inside the macro, because then it will be
-//       enabled based on the chosen features of the foreign crate that
-//       *calls* this macro, rather than the features activated in *this* crate.
-#[cfg(feature = "bios")]
-#[macro_export]
-macro_rules! print_raw {
-    ($($arg:tt)*) => ({
-        let _ = $crate::print_args_raw(format_args!($($arg)*));
-    });
-}
-
-// Note: we can't put this cfg block inside the macro, because then it will be
-//       enabled based on the chosen features of the foreign crate that
-//       *calls* this macro, rather than the features activated in *this* crate.
-#[cfg(not(feature = "bios"))]
-#[macro_export]
-macro_rules! print_raw {
-    ($($arg:tt)*) => ({
-        // to silence warnings about unused variables
-        let _ = format_args!($($arg)*);
-    });
-}
-
-#[macro_export]
-macro_rules! println_raw {
-    ($fmt:expr) => ($crate::print_raw!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::print_raw!(concat!($fmt, "\n"), $($arg)*));
-}
-
-#[doc(hidden)]
-pub fn print_args_raw(args: fmt::Arguments) -> fmt::Result {
-    // Print the message directly to the logger;
-    // don't use log macros because that can introduce an infinite loop
-    // when `mirror_log_to_vga` is enabled.
-    let log_result = logger::write_fmt(format_args!("[*] {args}")); 
-    
-    let vga_result = EARLY_VGA_WRITER.lock().write_fmt(args);
-    vga_result.and(log_result)
-}
-
-
 type VgaTextBufferLine = [Volatile<ScreenChar>; BUFFER_WIDTH];
 type VgaTextBuffer     = [VgaTextBufferLine; BUFFER_HEIGHT];
 
 
-struct VgaBuffer {
+pub struct VgaBuffer {
     column_position: usize,
     buffer: Unique<VgaTextBuffer>,
 }
 impl VgaBuffer {
+    pub const fn new() -> Self {
+        VgaBuffer {
+            column_position: 0,
+            buffer: Unique::new((VGA_BUFFER_VIRTUAL_ADDR) as *mut _).unwrap(),
+        }
+    }
+
     pub fn write_byte(&mut self, byte: u8) {
         match byte {
             b'\n' => self.new_line(),
@@ -129,10 +79,11 @@ impl VgaBuffer {
     }
 
     fn buffer(&mut self) -> &mut [VgaTextBufferLine] {
-        // SAFE: mutability is protected by the lock surrounding the RawVgaBuffer instance
+        // SAFETY: this function requires a `&mut` reference, ensuring exclusivity.
         unsafe { self.buffer.as_mut() }
     }
 }
+
 impl Write for VgaBuffer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for byte in s.bytes() {

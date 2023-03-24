@@ -5,21 +5,10 @@
 //! All arch-specific definitions for memory system are exported from this crate.
 
 #![no_std]
-#![feature(ptr_internals)]
-#![feature(unboxed_closures)]
-
-extern crate log;
-extern crate memory_structs;
-extern crate cortex_a;
-extern crate tock_registers;
-extern crate pte_flags;
-extern crate kernel_config;
-extern crate boot_info;
 
 use cortex_a::asm::barrier;
-use cortex_a::registers::*;
-use tock_registers::interfaces::Writeable;
-use tock_registers::interfaces::ReadWriteable;
+use cortex_a::registers::{MAIR_EL1, SCTLR_EL1, TCR_EL1, TTBR0_EL1};
+use tock_registers::interfaces::{Readable, Writeable, ReadWriteable};
 
 use memory_structs::{PhysicalAddress, VirtualAddress};
 use log::{debug, error};
@@ -214,6 +203,57 @@ pub fn set_as_active_page_table_root(page_table: PhysicalAddress) {
     }
 }
 
+/// See [`read_mmu_config`]
+#[repr(C)]
+pub struct MmuConfig {
+    ttbr0_el1: u64,
+    mair_el1: u64,
+    tcr_el1: u64,
+    sctlr_el1: u64,
+}
+
+/// Reads the current MMU configuration of the current CPU core,
+/// including the following system registers:
+/// - `TTBR0_EL1`,
+/// - `MAIR_EL1`,
+/// - `TCR_EL1`,
+/// - `SCTLR_EL1`
+///
+/// This configuration can be applied using [`asm_set_mmu_config_x2_x3`].
+///
+/// This is intended for use in `multicore_bringup`.
+pub fn read_mmu_config() -> MmuConfig {
+    MmuConfig {
+        ttbr0_el1: TTBR0_EL1.get(),
+        mair_el1: MAIR_EL1.get(),
+        tcr_el1: TCR_EL1.get(),
+        sctlr_el1: SCTLR_EL1.get(),
+    }
+}
+
+/// Configures the MMU based on the pointer to a MmuConfig,
+/// in x2. This function makes use of x3 too. If the MMU was
+/// enabled on the origin core, it will be enabled by this
+/// on the target core.
+///
+/// This is intended for use in `multicore_bringup`.
+#[macro_export]
+macro_rules! asm_set_mmu_config_x2_x3 {
+    () => (
+        // Save all general purpose registers into the previous task.
+        r#"
+            ldr x3, [x2, 0]
+            msr ttbr0_el1, x3
+            ldr x3, [x2, 1*8]
+            msr mair_el1, x3
+            ldr x3, [x2, 2*8]
+            msr tcr_el1, x3
+            ldr x3, [x2, 3*8]
+            msr sctlr_el1, x3
+        "#
+    );
+}
+
 /// The address bounds and mapping flags of a section's memory region.
 #[derive(Debug)]
 pub struct SectionMemoryBounds {
@@ -308,10 +348,17 @@ where
         // | (2)  | .text             | end of executable pages       |
         // | (3)  | .rodata           | start of read-only pages      |
         // | (4)  | .eh_frame         | part of read-only pages       |
-        // | (5)  | .gcc_except_table | end of read-only pages        |
-        // | (6)  | .data             | start of read-write pages     | 
-        // | (7)  | .bss              | end of read-write pages       |
+        // | (5)  | .gcc_except_table | part/end of read-only pages   |
+        // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .tbss             | part/end of read-only pages   |
+        // | (8)  | .data             | start of read-write pages     |
+        // | (9)  | .bss              | end of read-write pages       |
         // |------|-------------------|-------------------------------|
+        //
+        // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
+        // because they contain read-only initializer data "images" for each TLS area.
+        // In fact, .tbss can be completedly ignored because it represents a read-only data image of all zeroes,
+        // so there's no point in keeping it around.
         //
         // Those are the only sections we care about; we ignore subsequent `.debug_*` sections (and .got).
         let static_str_name = match section.name() {
@@ -338,6 +385,16 @@ where
                 rodata_end   = Some((end_virt_addr, end_phys_addr));
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
+            }
+            // The following four sections are optional: .tdata, .tbss, .data, .bss.
+            ".tdata" => {
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .tdata"
+            }
+            ".tbss" => {
+                // Ignore .tbss (see above) because it is a read-only section of all zeroes.
+                debug!("     no need to map kernel section \".tbss\", it contains no content");
+                continue;
             }
             ".data" => {
                 data_start.get_or_insert((start_virt_addr, start_phys_addr));

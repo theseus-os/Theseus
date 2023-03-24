@@ -3,13 +3,12 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.
 name = "preemption"
 description = "Handles enabling and disabling preemption for each CPU core"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
 
-[dependencies.apic]
-path = "../apic"
+cpu = { path = "../cpu" }
 
-[lib]
-crate-type = ["rlib"]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic" }

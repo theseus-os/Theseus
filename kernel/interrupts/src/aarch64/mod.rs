@@ -8,10 +8,14 @@ use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
+use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
+use spin::Once;
+
+use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
@@ -19,8 +23,11 @@ global_asm!(include_str!("table.s"));
 // The global Generic Interrupt Controller singleton
 static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
-// Default Timer IRQ number on AArch64 as defined by Arm Manuals
-pub const AARCH64_TIMER_IRQ: InterruptNumber = 30;
+/// The IRQ number reserved for CPU-local timer interrupts,
+/// which Theseus currently uses for preemptive task switching.
+//
+// aarch64 manuals define the default timer IRQ number to be 30.
+pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
 
 const MAX_IRQ_NUM: usize = 256;
 
@@ -60,21 +67,60 @@ pub struct ExceptionContext {
     esr_el1: EsrEL1,
 }
 
-/// Return value:
-/// - true if you sent an End Of Interrupt signal in the handler
-/// - false if you want the caller to do it for you after you return
-type HandlerFunc = extern "C" fn(&ExceptionContext) -> bool;
+#[derive(Debug, PartialEq, Eq)]
+#[repr(C)]
+pub enum EoiBehaviour {
+    CallerMustSignalEoi,
+    HandlerHasSignaledEoi,
+}
+
+type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
 
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
     log::error!("Unhandled Exception ({})\r\n{:?}\r\n[looping forever now]", origin, exc);
-    loop {}
+    loop { core::hint::spin_loop() }
 }
 
 // called for all unhandled interrupt requests
-extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
+extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
     log::error!("Unhandled IRQ:\r\n{:?}\r\n[looping forever now]", exc);
-    loop {}
+    loop { core::hint::spin_loop() }
+}
+
+fn read_timer_period_femtoseconds() -> u64 {
+    let counter_freq_hz = CNTFRQ_EL0.get();
+    let fs_in_one_sec = 1_000_000_000_000_000;
+    fs_in_one_sec / counter_freq_hz
+}
+
+fn get_timeslice_ticks() -> u64 {
+    // The number of femtoseconds between each internal timer tick
+    static TIMESLICE_TICKS: Once<u64> = Once::new();
+
+    *TIMESLICE_TICKS.call_once(|| {
+        let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
+        let tick_period_femtosecs = read_timer_period_femtoseconds();
+        timeslice_femtosecs / tick_period_femtosecs
+    })
+}
+
+/// Sets `VBAR_EL1` to the start of the exception vector
+fn set_vbar_el1() {
+    extern "Rust" {
+        // in assembly file
+        static __exception_vector_start: extern "C" fn();
+    }
+
+    // Set the exception handling vector, which
+    // is an array of grouped aarch64 instructions.
+    // see table.s for more info.
+    unsafe { VBAR_EL1.set(&__exception_vector_start as *const _ as u64) };
+}
+
+/// Sets `VBAR_EL1` to the start of the exception vector
+pub fn init_ap() {
+    set_vbar_el1();
 }
 
 /// Please call this (only once) before using this crate.
@@ -82,19 +128,14 @@ extern "C" fn default_irq_handler(exc: &ExceptionContext) -> bool {
 /// This initializes the Generic Interrupt Controller
 /// using the addresses which are valid on qemu's "virt" VM.
 pub fn init() -> Result<(), &'static str> {
-    extern "Rust" {
-        // in assembly file
-        static __exception_vector_start: extern "C" fn();
-    }
+    let period_femtoseconds = read_timer_period_femtoseconds();
+    register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
 
     let mut gic = GIC.lock();
     if gic.is_some() {
         Err("The GIC has already been initialized!")
     } else {
-        // Set the exception handling vector, which
-        // is an array of grouped aarch64 instructions.
-        // see table.s for more info.
-        unsafe { VBAR_EL1.set(&__exception_vector_start as *const _ as u64) };
+        set_vbar_el1();
 
         let kernel_mmi_ref = get_kernel_mmi_ref()
             .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
@@ -102,7 +143,7 @@ pub fn init() -> Result<(), &'static str> {
         let mut mmi = kernel_mmi_ref.lock();
         let page_table = &mut mmi.deref_mut().page_table;
 
-        log::info!("Configuring the GIC");
+        info!("Configuring the GIC");
         let mut inner = ArmGic::init(
             page_table,
             GicVersion::InitV3 {
@@ -114,23 +155,19 @@ pub fn init() -> Result<(), &'static str> {
         inner.set_minimum_priority(0);
         *gic = Some(inner);
 
-        log::info!("Done Configuring the GIC");
+        info!("Done Configuring the GIC");
 
         Ok(())
     }
 }
 
-pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
-    // called everytime the timer ticks.
-    extern "C" fn timer_handler(_exc: &ExceptionContext) -> bool {
-        info!("timer int!");
-        loop {}
-    }
-
-    // register the handler for the timer IRQ.
-    if let Err(existing_handler) = register_interrupt(AARCH64_TIMER_IRQ, timer_handler) {
-        if timer_handler as *const HandlerFunc != existing_handler {
-            return Err("An interrupt handler has already been setup for the timer IRQ number");
+/// This function registers an interrupt handler for the CPU-local
+/// timer and handles GIC configuration for the timer interrupt.
+pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
+    // register/deregister the handler for the timer IRQ.
+    if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
+        if timer_tick_handler as *const HandlerFunc != existing_handler {
+            return Err("A different interrupt handler has already been setup for the timer IRQ number");
         }
     }
 
@@ -140,13 +177,21 @@ pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
         let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
 
         // enable routing of this interrupt
-        gic.set_interrupt_state(AARCH64_TIMER_IRQ, enable);
+        gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
     }
 
-    // read the frequency (useless atm)
-    // let counter_freq_hz = CNTFRQ_EL0.get();
-    // log::info!("frq: {:?}", counter_freq_hz);
+    Ok(())
+}
 
+/// Disables the timer, schedules its next tick, and re-enables it
+pub fn schedule_next_timer_tick() {
+    enable_timer(false);
+    CNTP_TVAL_EL0.set(get_timeslice_ticks());
+    enable_timer(true);
+}
+
+/// Enables/Disables the System Timer via the dedicated Arm System Registers
+pub fn enable_timer(enable: bool) {
     // unmask the interrupt & enable the timer
     CNTP_CTL_EL0.write(
           CNTP_CTL_EL0::IMASK.val(0)
@@ -158,14 +203,11 @@ pub fn enable_timer_interrupts(enable: bool) -> Result<(), &'static str> {
 
     /* DEBUGGING CODE
 
-    log::info!("timer counter: {:?}", CNTPCT_EL0.get());
-    log::info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-    log::info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-    log::info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
+    info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
+    info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
+    info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
 
     */
-
-    Ok(())
 }
 
 /// Registers an interrupt handler at the given IRQ interrupt number.
@@ -226,6 +268,20 @@ pub fn eoi(irq_num: InterruptNumber) {
     let mut gic = GIC.lock();
     let gic = gic.as_mut().expect("GIC is uninitialized");
     gic.end_of_interrupt(irq_num);
+}
+
+// A ClockSource for the time crate, implemented using
+// the System Counter of the Generic Arm Timer. The
+// period of this timer is computed in `init` above.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct PhysicalSystemCounter;
+
+impl ClockSource for PhysicalSystemCounter {
+    type ClockType = Monotonic;
+
+    fn now() -> Instant {
+        Instant::new(CNTPCT_EL0.get())
+    }
 }
 
 #[rustfmt::skip]
@@ -339,7 +395,8 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
         true => IRQ_HANDLERS.read()[irq_num_usize],
         false => default_irq_handler,
     };
-    if !handler(exc) {
+
+    if handler(exc) == EoiBehaviour::CallerMustSignalEoi {
         // handler has returned, we can lock again
         let mut gic = GIC.lock();
         gic.as_mut().unwrap().end_of_interrupt(irq_num);

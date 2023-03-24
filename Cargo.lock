@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
  "early_tls",
  "interrupts",
  "irq_safety",
@@ -111,6 +112,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "crossbeam-utils",
+ "derive_more",
  "irq_safety",
  "kernel_config",
  "log",
@@ -151,11 +153,9 @@ dependencies = [
  "core2",
  "crossbeam-utils",
  "debugit",
- "hpet",
  "log",
  "mpmc",
  "spin 0.9.4",
- "task",
  "wait_queue",
 ]
 
@@ -301,6 +301,7 @@ dependencies = [
  "apic",
  "app_io",
  "async_channel",
+ "cpu",
  "fs_node",
  "getopts",
  "heapfile",
@@ -360,6 +361,7 @@ dependencies = [
  "device_manager",
  "dfqueue",
  "e1000",
+ "early_printer",
  "exceptions_full",
  "first_application",
  "interrupts",
@@ -383,7 +385,6 @@ dependencies = [
  "task_fs",
  "tlb_shootdown",
  "tsc",
- "vga_buffer",
  "window_manager",
 ]
 
@@ -607,6 +608,9 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cortex-a",
+ "derive_more",
+ "tock-registers",
 ]
 
 [[package]]
@@ -950,6 +954,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "early_printer"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "font",
+ "log",
+ "memory",
+ "page_attribute_table",
+ "spin 0.9.4",
+ "vga_buffer",
+ "volatile 0.2.7",
+]
+
+[[package]]
 name = "early_tls"
 version = "0.1.0"
 dependencies = [
@@ -1018,13 +1036,13 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "gdt",
  "locked_idt",
  "memory",
  "mod_mgmt",
  "spin 0.9.4",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1035,6 +1053,7 @@ dependencies = [
  "app_io",
  "cpu",
  "debug_info",
+ "early_printer",
  "fault_log",
  "locked_idt",
  "log",
@@ -1047,7 +1066,6 @@ dependencies = [
  "tlb_shootdown",
  "tss",
  "unwind",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1105,11 +1123,11 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "cpu",
+ "early_printer",
  "irq_safety",
  "log",
  "memory",
  "task",
- "vga_buffer",
 ]
 
 [[package]]
@@ -1147,6 +1165,7 @@ name = "framebuffer"
 version = "0.1.0"
 dependencies = [
  "color",
+ "early_printer",
  "log",
  "memory",
  "multicore_bringup",
@@ -1274,6 +1293,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",
@@ -1374,6 +1394,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
+ "cpu",
  "getopts",
  "hashbrown",
  "heap",
@@ -1506,20 +1527,21 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cortex-a",
+ "cpu",
+ "early_printer",
  "exceptions_early",
  "gdt",
  "gic",
  "irq_safety",
+ "kernel_config",
  "locked_idt",
  "log",
  "memory",
  "pic",
- "scheduler",
- "sleep",
  "spin 0.9.4",
+ "time",
  "tock-registers",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1548,6 +1570,7 @@ dependencies = [
 name = "ioapic"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "atomic_linked_list",
  "log",
  "memory",
@@ -1731,6 +1754,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
+ "cpu",
  "hashbrown",
  "hpet",
  "libm",
@@ -1955,6 +1979,7 @@ version = "0.1.0"
 dependencies = [
  "boot_info",
  "bootloader_modules",
+ "early_printer",
  "heap",
  "irq_safety",
  "kernel_config",
@@ -2158,13 +2183,15 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
+ "cpu",
  "kernel_config",
  "log",
  "madt",
  "memory",
+ "memory_aarch64",
  "mod_mgmt",
- "pause",
  "pit_clock_basic",
+ "psci",
  "spin 0.9.4",
  "stack",
  "volatile 0.2.7",
@@ -2218,6 +2245,7 @@ dependencies = [
  "boot_info",
  "captain",
  "cfg-if 1.0.0",
+ "early_printer",
  "early_tls",
  "exceptions_early",
  "irq_safety",
@@ -2236,7 +2264,6 @@ dependencies = [
  "stack",
  "state_store",
  "uefi-bootloader-api",
- "vga_buffer",
 ]
 
 [[package]]
@@ -2473,7 +2500,6 @@ name = "page_attribute_table"
 version = "0.1.0"
 dependencies = [
  "log",
- "memory",
  "modular-bitfield",
  "msr",
  "raw-cpuid",
@@ -2496,12 +2522,12 @@ dependencies = [
 name = "panic_entry"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "log",
  "memory",
  "mod_mgmt",
  "panic_wrapper",
  "unwind",
- "vga_buffer",
 ]
 
 [[package]]
@@ -2542,10 +2568,6 @@ dependencies = [
  "spin 0.9.4",
  "vfs_node",
 ]
-
-[[package]]
-name = "pause"
-version = "0.1.0"
 
 [[package]]
 name = "pci"
@@ -2679,6 +2701,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
+ "cpu",
  "irq_safety",
  "lazy_static",
  "log",
@@ -2708,6 +2731,7 @@ name = "preemption"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
  "log",
 ]
 
@@ -2773,6 +2797,12 @@ dependencies = [
  "port_io",
  "spin 0.9.4",
 ]
+
+[[package]]
+name = "psci"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3374e3ae47f134467227a48be93b929e5d304efcd25ce5d176006403ca1d9bab"
 
 [[package]]
 name = "psm"
@@ -2922,7 +2952,6 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
- "hpet",
  "irq_safety",
  "log",
  "scheduler",
@@ -3126,17 +3155,17 @@ checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 1.0.0",
- "irq_safety",
+ "cpu",
+ "interrupts",
  "log",
  "preemption",
- "runqueue",
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
- "spin 0.9.4",
+ "sleep",
  "task",
+ "x86_64",
 ]
 
 [[package]]
@@ -3144,6 +3173,7 @@ name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
  "app_io",
+ "cpu",
  "getopts",
  "scheduler",
  "spawn",
@@ -3399,7 +3429,6 @@ dependencies = [
  "crossbeam-utils",
  "irq_safety",
  "lazy_static",
- "scheduler",
  "task",
  "time",
 ]
@@ -3457,7 +3486,6 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "pause",
  "preemption",
  "runqueue",
  "scheduler",
@@ -3643,6 +3671,7 @@ name = "task"
 version = "0.1.0"
 dependencies = [
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3655,6 +3684,7 @@ dependencies = [
  "stack",
  "static_assertions",
  "task_struct",
+ "waker_generic",
 ]
 
 [[package]]
@@ -3669,14 +3699,6 @@ dependencies = [
  "root",
  "spin 0.9.4",
  "task",
-]
-
-[[package]]
-name = "task_join"
-version = "0.1.0"
-dependencies = [
- "task",
- "waker",
 ]
 
 [[package]]
@@ -3741,30 +3763,6 @@ dependencies = [
  "spawn",
  "spin 0.9.4",
  "task",
-]
-
-[[package]]
-name = "test_downtime"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "async_channel",
- "color",
- "cpu",
- "framebuffer",
- "framebuffer_drawer",
- "getopts",
- "hpet",
- "log",
- "rendezvous",
- "runqueue",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "task",
- "unified_channel",
- "window",
 ]
 
 [[package]]
@@ -3856,6 +3854,7 @@ dependencies = [
 name = "test_scheduler"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "log",
  "scheduler",
  "spawn",
@@ -3997,7 +3996,6 @@ dependencies = [
  "test_backtrace",
  "test_block_io",
  "test_channel",
- "test_downtime",
  "test_filerw",
  "test_ixgbe",
  "test_libc",
@@ -4076,7 +4074,6 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "pause",
  "x86_64",
 ]
 
@@ -4147,7 +4144,7 @@ checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
 [[package]]
 name = "uefi-bootloader-api"
 version = "0.1.0"
-source = "git+https://github.com/theseus-os/uefi-bootloader#593fd590f55b4756ced5389146d987cebd491c4f"
+source = "git+https://github.com/theseus-os/uefi-bootloader#661ea6245885307a3988713eeebcb7de723b7583"
 
 [[package]]
 name = "unicode-ident"
@@ -4262,9 +4259,6 @@ dependencies = [
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
- "kernel_config",
- "logger_x86_64",
- "spin 0.9.4",
  "volatile 0.2.7",
 ]
 
@@ -4358,9 +4352,17 @@ dependencies = [
 name = "waker"
 version = "0.1.0"
 dependencies = [
- "mutex_sleep",
- "scheduler",
+ "spin 0.9.4",
  "task",
+ "waker_generic",
+]
+
+[[package]]
+name = "waker_generic"
+version = "0.1.0"
+dependencies = [
+ "preemption",
+ "spin 0.9.4",
 ]
 
 [[package]]

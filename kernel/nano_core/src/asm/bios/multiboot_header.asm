@@ -1,4 +1,4 @@
-; Declare a multiboot2-compliant header, which indicates this program iss a bootable kernel image.
+; Declare a multiboot2-compliant header, which indicates this program is a bootable kernel image.
 ; This must be the first section in the kernel image, which is accomplished via our linker script. 
 ; It must also be aligned to a 4-byte boundary. 
 section .multiboot_header ; Permissions are the same as .rodata by default
@@ -18,18 +18,22 @@ multiboot_header_start:
 ; By default, we ask the bootloader to switch modes to a graphical framebuffer for us,
 ; though this can be disabled by defining `VGA_TEXT_MODE`.
 ;
-; NOTE: TODO: uncomment the below sections when we are ready to enable
+; NOTE: this works properly now. Uncomment the below sections when we are ready to enable
 ;       early boot-time usage of the graphical framebuffer by default.
 ;
-; %ifndef VGA_TEXT_MODE
-; align 8
-; 	dw 5     ; type (5 means framebuffer tag)
-; 	dw 0     ; flags. Bit 0 = `1` means this tag is optional, Bit 0 = `0` means it's mandatory.
-; 	dd 20    ; size of this tag (20)
-; 	dd 1280  ; width (in pixels)
-; 	dd 1024  ; height (in pixels)
-; 	dd 32    ; depth (pixel size in bits)
-; %endif
+%ifndef VGA_TEXT_MODE
+align 8
+	dw 5     ; type (5 means framebuffer tag)
+	dw 0     ; flags. Bit 0 = `1` means this tag is optional, Bit 0 = `0` means it's mandatory.
+	dd 20    ; size of this tag (20)
+	; The resolution specified below is limited by the hardware.
+	; We have successfully tested resolutions up to 2560 x 1600.
+	; We recommend matching the resolution set in `kernel_config/src/display.rs`.
+	; See more VGA/*XGA resolutions here: <https://en.wikipedia.org/wiki/Graphics_display_resolution#Extended_Graphics_Array>
+	dd 1280  ; width in pixels
+	dd 1024  ; height in pixels
+	dd 32    ; depth: pixel size in bits. Theseus only supports 32-bit pixels.
+%endif
 
 
 ; This marks the end of the tag region.

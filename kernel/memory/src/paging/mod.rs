@@ -426,7 +426,6 @@ pub fn init(
 
     debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
     page_table.switch(&new_table); 
-    debug!("switched to new page table {:?}.", new_table); 
     // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
 
     // Return the new page table because that's the one that should be used by the kernel in future mappings. 

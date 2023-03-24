@@ -1,8 +1,9 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "ioapic"
-description = "IOAPIC (I/O Advanced Programmable Interrupt Controller) support (x86 only) for Theseus"
+description = "IOAPIC (I/O Advanced Programmable Interrupt Controller) support on x86_64 for Theseus"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
@@ -10,13 +11,7 @@ spin = "0.9.4"
 volatile = "0.2.7"
 zerocopy = "0.5.0"
 
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
+atomic_linked_list = { path = "../../libs/atomic_linked_list" }
 
-[dependencies.memory]
-path = "../memory"
-
-
-
-[lib]
-crate-type = ["rlib"]
+apic = { path = "../apic" }
+memory = { path = "../memory" }

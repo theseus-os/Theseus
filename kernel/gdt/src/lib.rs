@@ -1,14 +1,5 @@
 #![no_std]
 
-// #[macro_use] extern crate log;
-#[macro_use] extern crate bitflags;
-extern crate bit_field;
-extern crate atomic_linked_list;
-extern crate x86_64;
-extern crate spin;
-extern crate tss;
-extern crate memory;
-
 use core::ops::Deref;
 use atomic_linked_list::atomic_map::AtomicMap;
 use x86_64::{
@@ -25,10 +16,11 @@ use x86_64::{
 };
 use spin::Once;
 use memory::VirtualAddress;
+use cpu::CpuId;
 
 
-/// The GDT list, one per core, indexed by a key of apic_id
-static GDT: AtomicMap<u8, Gdt> = AtomicMap::new();
+/// The GDT list, one per CPU core.
+static GDT: AtomicMap<CpuId, Gdt> = AtomicMap::new();
 
 
 static KERNEL_CODE_SELECTOR:  Once<SegmentSelector> = Once::new();
@@ -78,11 +70,11 @@ impl AvailableSegmentSelector {
 /// such that the segment selectors are usable 
 /// Future invocations will not change those initial values and load the same GDT based on them.
 pub fn create_and_load_tss_gdt(
-    apic_id: u8, 
-    double_fault_stack_top_unusable: VirtualAddress, 
+    cpu_id: CpuId,
+    double_fault_stack_top_unusable: VirtualAddress,
     privilege_stack_top_unusable: VirtualAddress
 ) { 
-    let tss_ref = tss::create_tss(apic_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
+    let tss_ref = tss::create_tss(cpu_id, double_fault_stack_top_unusable, privilege_stack_top_unusable);
     let (gdt, kernel_cs, kernel_ds, user_cs_32, user_ds_32, user_cs_64, user_ds_64, tss_segment) 
         = create_gdt(tss_ref.lock().deref());
 
@@ -94,10 +86,10 @@ pub fn create_and_load_tss_gdt(
     USER_DATA_64_SELECTOR.call_once(|| user_ds_64);
     TSS_SELECTOR         .call_once(|| tss_segment);
 
-    GDT.insert(apic_id, gdt);
-    let gdt_ref = GDT.get(&apic_id).unwrap(); // safe to unwrap since we just added it to the list
+    GDT.insert(cpu_id, gdt);
+    let gdt_ref = GDT.get(&cpu_id).unwrap(); // safe to unwrap since we just added it to the list
     gdt_ref.load();
-    // debug!("Loaded GDT for apic {}: {}", apic_id, gdt_ref);
+    // log::debug!("Loaded GDT for CPU {}: {}", cpu_id, gdt_ref);
 
     unsafe {
         CS::set_reg(kernel_cs);  // reload code segment register
@@ -300,7 +292,7 @@ impl Descriptor {
     }
 }
 
-bitflags! {
+bitflags::bitflags! {
     struct DescriptorFlags: u64 {
         const ACCESSED          = 1 << 40; // should always be zero, don't use this
         const READ_WRITE        = 1 << 41; // ignored by 64-bit CPU modes

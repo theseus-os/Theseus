@@ -5,6 +5,10 @@
 //!    in order to correctly generate new TLS data images.
 //! 2. [`TlsDataImage`]: a generated TLS data image that can be used as the TLS area
 //!    for a single task.
+//!
+//! TODO FIXME: currently we are unsure of the `virt_addr_value`s calculated 
+//!             for TLS sections on aarch64. The placement of those sections in the
+//!             TLS data image is correct, but relocations against them may not be.
 
 #![no_std]
 #![feature(int_roundings)]
@@ -12,13 +16,16 @@
 extern crate alloc;
 
 use alloc::{sync::Arc, vec::Vec, boxed::Box};
-use core::{mem::size_of, cmp::max, ops::Deref};
+use core::{cmp::max, ops::Deref};
 use crate_metadata::{LoadedSection, SectionType, StrongSectionRef};
 use memory_structs::VirtualAddress;
 use rangemap::RangeMap;
 
 #[cfg(target_arch = "x86_64")]
-use x86_64::{registers::model_specific::FsBase, VirtAddr};
+use {
+    core::mem::size_of,
+    x86_64::{registers::model_specific::FsBase, VirtAddr},
+};
 
 #[cfg(target_arch = "aarch64")]
 use {
@@ -39,11 +46,15 @@ pub struct TlsInitializer {
     cache_status: CacheStatus,
     /// The set of TLS data sections that are defined at link time
     /// and come from the statically-linked base kernel image (the nano_core).
-    /// According to the x86_64 TLS ABI, these exist at **negative** offsets
+    ///
+    /// On x86_64, the ELF TLS ABI specifies that static TLS sections exist at **negative** offsets
     /// from the TLS self pointer, i.e., they exist **before** the TLS self pointer in memory.
     /// Thus, their actual location in memory depends on the size of **all** static TLS data sections.
     /// For example, the last section in this set (with the highest offset) will be placed
-    /// right before the TLS self pointer in memory. 
+    /// right before the TLS self pointer in memory.
+    ///
+    /// On aarch64, the ELF TLS ABI specifies only positive offsets,
+    /// and there is no TLS self pointer.
     static_section_offsets:  RangeMap<usize, StrongSectionRefWrapper>,
     /// The ending offset (an exclusive range end bound) of the last TLS section
     /// in the above set of `static_section_offsets`.
@@ -51,16 +62,27 @@ pub struct TlsInitializer {
     end_of_static_sections: usize,
     /// The set of TLS data sections that come from dynamically-loaded crate object files.
     /// We can control and arbitrarily assign their offsets, and thus,
-    /// we place all of these sections **after** the TLS self pointer in memory.
-    /// For example, the first section in this set (with an offset of `0`) will be place
-    /// right after the TLS self pointer in memory.
+    /// we place all of these sections **after** the static sections
+    /// in the generated TLS data image.
+    ///
+    /// * On x86_64, these are placed right after the TLS self pointer,
+    ///   which itself is right after the static TLS sections.
+    /// * On aarch64, these are placed directly after the static TLS sections,
+    ///   as there is no TLS self pointer.
     dynamic_section_offsets: RangeMap<usize, StrongSectionRefWrapper>,
     /// The ending offset (an exclusive range end bound) of the last TLS section
     /// in the above set of `dynamic_section_offsets`.
     end_of_dynamic_sections: usize,
 } 
 
-const POINTER_SIZE: usize = size_of::<usize>();
+/// On x86_64, a TLS self pointer exists at the 0th index/offset into each TLS data image,
+/// which is just a pointer to itself.
+#[cfg(target_arch = "x86_64")]
+const TLS_SELF_POINTER_SIZE: usize = size_of::<usize>();
+
+/// On aarch64, there is no TLS self pointer.
+#[cfg(target_arch = "aarch64")]
+const TLS_SELF_POINTER_SIZE: usize = 0;
 
 impl TlsInitializer {
     /// Creates an empty TLS initializer with no TLS data sections.
@@ -76,14 +98,24 @@ impl TlsInitializer {
         }
     }
 
+    
     /// Add a TLS section that has pre-determined offset, e.g.,
     /// one that was specified in the statically-linked base kernel image.
     ///
     /// This function modifies the `tls_section`'s starting virtual address field
     /// to hold the proper value such that this `tls_section` can be correctly used
     /// as the source of a relocation calculation (e.g., when another section depends on it).
-    /// That value will be a negative offset from the end of all the static TLS sections,
-    /// i.e., where the TLS self pointer exists in memory.
+    /// * On x86_64, that value will be the negative offset from the end of 
+    ///   all the static TLS sections, i.e., where the TLS self pointer exists in memory,
+    ///   to the start of this section in the TLS image.
+    ///   * `VirtAddr = -1 * (total_static_tls_size - offset);`
+    /// * On aarch64, that value will simply be the given `offset`.
+    ///   * `VirtAddr = offset;`.
+    ///   * However, on aarch64, the actual *location* of this section in the TLS data image
+    ///     is given by `offset + max(16, TLS_segment_align)`.
+    ///     The ELF TLS ABI on aarch64 specifies that this augmented value is
+    ///     the real offset used to *access* this TLS variable from the TLS base address
+    ///     (from the beginning of all sections).
     ///
     /// ## Arguments
     /// * `tls_section`: the TLS section present in base kernel image.
@@ -98,12 +130,18 @@ impl TlsInitializer {
     ///   would overlap with an existing section. 
     ///   An error occurring here would indicate a link-time bug 
     ///   or a bug in the symbol parsing code that invokes this function.
+    #[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
     pub fn add_existing_static_tls_section(
         &mut self,
         mut tls_section: LoadedSection,
         offset: usize,
         total_static_tls_size: usize,
     ) -> Result<StrongSectionRef, ()> {
+        #[cfg(target_arch = "aarch64")]
+        let original_offset = offset;
+        #[cfg(target_arch = "aarch64")]
+        let offset = max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */) + offset;
+
         let range = offset .. (offset + tls_section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
@@ -112,8 +150,13 @@ impl TlsInitializer {
         }
 
         // Calculate the new value of this section's virtual address based on its offset.
-        let starting_offset = (total_static_tls_size - offset).wrapping_neg();
-        tls_section.virt_addr = VirtualAddress::new(starting_offset).ok_or(())?;
+        #[cfg(target_arch = "x86_64")]
+        let virt_addr_value = (total_static_tls_size - offset).wrapping_neg();
+
+        #[cfg(target_arch = "aarch64")]
+        let virt_addr_value = original_offset;
+
+        tls_section.virt_addr = VirtualAddress::new(virt_addr_value).ok_or(())?;
         self.end_of_static_sections = max(self.end_of_static_sections, range.end);
         let section_ref = Arc::new(tls_section);
         self.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
@@ -123,19 +166,16 @@ impl TlsInitializer {
 
     /// Inserts the given `section` into this TLS area at the next index
     /// (i.e., offset into the TLS area) where the section will fit.
-    /// 
+    ///
     /// This also modifies the virtual address field of the given `section`
-    /// to hold the value of that offset, which is necessary for relocation entries
-    /// that depend on this section.
-    /// 
-    /// Note: this will never return an index/offset value less than `size_of::<usize>()`,
-    /// (`8` on a 64-bit machine), as the first slot is reserved for the TLS self pointer.
-    /// 
+    /// to hold the proper value based on that offset, which is necessary
+    /// for calculating relocation entries that depend on this section.
+    ///
     /// Returns a tuple of:
     /// 1. The index at which the new section was inserted, 
     ///    which is the offset from the beginning of the TLS area where the section data starts.
     /// 2. The modified section as a `StrongSectionRef`.
-    /// 
+    ///
     /// Returns an Error if there is no remaining space that can fit the section.
     pub fn add_new_dynamic_tls_section(
         &mut self,
@@ -143,10 +183,16 @@ impl TlsInitializer {
         alignment: usize,
     ) -> Result<(usize, StrongSectionRef), ()> {
         let mut start_index = None;
-        // Find the next "gap" big enough to fit the new TLS section, 
-        // skipping the first `POINTER_SIZE` bytes, which are reserved for the TLS self pointer.
-        let range_after_tls_self_pointer = POINTER_SIZE .. usize::MAX;
-        for gap in self.dynamic_section_offsets.gaps(&range_after_tls_self_pointer) {
+        // First, we find the next "gap" big enough to fit the new TLS section.
+        // On x86_64, we skip the first `TLS_SELF_POINTER_SIZE` bytes, reserved for the TLS self pointer.
+        #[cfg(target_arch = "x86_64")]
+        let start_of_search: usize = TLS_SELF_POINTER_SIZE;
+
+        // On aarch64, the ELF TLS ABI specifies that we must 
+        #[cfg(target_arch = "aarch64")]
+        let start_of_search: usize = max(16, 8 /* TODO FIXME: pass in the TLS SEGMENT's alignment (not the section's alignment)*/);
+
+        for gap in self.dynamic_section_offsets.gaps(&(start_of_search .. usize::MAX)) {
             let aligned_start = gap.start.next_multiple_of(alignment);
             if aligned_start + section.size <= gap.end {
                 start_index = Some(aligned_start);
@@ -155,8 +201,16 @@ impl TlsInitializer {
         }
 
         let start = start_index.ok_or(())?;
+
+        // Calculate this section's virtual address based the range we reserved for it.
+        #[cfg(target_arch = "x86_64")]
+        let virt_addr_value = start;
+
+        #[cfg(target_arch = "aarch64")]
+        let virt_addr_value = start + self.end_of_static_sections - max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
+
+        section.virt_addr = VirtualAddress::new(virt_addr_value).ok_or(())?;
         let range = start .. (start + section.size);
-        section.virt_addr = VirtualAddress::new(range.start).ok_or(())?;
         let section_ref = Arc::new(section);
         self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
         self.dynamic_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
@@ -175,11 +229,11 @@ impl TlsInitializer {
     }
 
     /// Returns a new copy of the TLS data image.
-    /// 
+    ///
     /// This function lazily generates the TLS image data on demand, if needed.
     pub fn get_data(&mut self) -> TlsDataImage {
         let total_section_size = self.end_of_static_sections + self.end_of_dynamic_sections;
-        let required_capacity = if total_section_size > 0 { total_section_size + POINTER_SIZE } else { 0 };
+        let required_capacity = if total_section_size > 0 { total_section_size + TLS_SELF_POINTER_SIZE } else { 0 };
         if required_capacity == 0 {
             return TlsDataImage { _data: None, ptr: 0 };
         }
@@ -209,7 +263,7 @@ impl TlsInitializer {
         }
 
         if self.cache_status == CacheStatus::Invalidated {
-            // debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+            // log::debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
             // On some architectures, such as x86_64, the ABI convention REQUIRES that
             // the TLS area data starts with a pointer to itself (the TLS self pointer).
@@ -219,6 +273,8 @@ impl TlsInitializer {
             // to the `new_data` vector after we insert the static TLS data sections.
             // The location of the new pointer value is the conceptual "start" of the TLS image,
             // and that's what should be used for the value of the TLS register (e.g., `FS_BASE` MSR on x86_64).
+            //
+            // On aarch64, `TLS_SELF_POINTER_SIZE` is 0, so this is still correct.
             let mut new_data: Vec<u8> = Vec::with_capacity(required_capacity);
             
             // Iterate through all static TLS sections and copy their data into the new data image.
@@ -228,10 +284,12 @@ impl TlsInitializer {
 
             // Append space for the TLS self pointer immediately after the end of the last static TLS data section;
             // its actual value will be filled in later (in `get_data()`) after a new copy of the TLS data image is made.
-            new_data.extend_from_slice(&[0u8; POINTER_SIZE]);
+            #[cfg(target_arch = "x86_64")]
+            new_data.extend_from_slice(&[0u8; TLS_SELF_POINTER_SIZE]);
 
             // Iterate through all dynamic TLS sections and copy their data into the new data image.
-            end_of_previous_range = POINTER_SIZE; // we already pushed room for the TLS self pointer above.
+            // If needed (as on x86_64), we already pushed room for the TLS self pointer above.
+            end_of_previous_range = TLS_SELF_POINTER_SIZE;
             copy_tls_section_data(&mut new_data, &self.dynamic_section_offsets, &mut end_of_previous_range);
             if self.end_of_dynamic_sections != 0 {
                 // this assertion only makes sense if there are any dynamic sections
@@ -243,21 +301,33 @@ impl TlsInitializer {
         }
 
         // Here, the `data_cache` is guaranteed to be fresh and ready to use.
-        let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
-        // Every time we create a new copy of the TLS data image, we have to re-calculate
-        // and re-assign the TLS self pointer value (located after the static TLS section data),
-        // because the virtual address of that new TLS data image copy will be unique.
-        // Note that we only do this if the data_copy actually contains any TLS data.
-        let self_ptr_offset = self.end_of_static_sections;
-        if let Some(dest_slice) = data_copy.get_mut(self_ptr_offset .. (self_ptr_offset + POINTER_SIZE)) {
+        #[cfg(target_arch = "x86_64")] {
+            let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+            // Every time we create a new copy of the TLS data image, we have to re-calculate
+            // and re-assign the TLS self pointer value (located after the static TLS section data),
+            // because the virtual address of that new TLS data image copy will be unique.
+            // Note that we only do this if the data_copy actually contains any TLS data.
+            let self_ptr_offset = self.end_of_static_sections;
+            let Some(dest_slice) = data_copy.get_mut(
+                self_ptr_offset .. (self_ptr_offset + TLS_SELF_POINTER_SIZE)
+            ) else {
+                panic!("BUG: offset of TLS self pointer was out of bounds in the TLS data image:\n{:02X?}", data_copy);
+            };
             let tls_self_ptr_value = dest_slice.as_ptr() as usize;
             dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
             TlsDataImage {
                 _data: Some(data_copy),
                 ptr:   tls_self_ptr_value,
             }
-        } else {
-            panic!("BUG: offset of TLS self pointer was out of bounds in the TLS data image:\n{:02X?}", data_copy);
+        }
+
+        #[cfg(target_arch = "aarch64")] {
+            let data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+            let ptr = data_copy.as_ptr() as usize;
+            TlsDataImage {
+                _data: Some(data_copy),
+                ptr,
+            }
         }
     }
 }

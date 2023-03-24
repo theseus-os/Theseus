@@ -12,8 +12,6 @@
 
 #![no_std]
 #![feature(ptr_internals)]
-#![feature(unboxed_closures)]
-#![feature(result_option_inspect)]
 
 extern crate alloc;
 
@@ -241,9 +239,6 @@ pub fn init(
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     paging::init(boot_info, kernel_stack_start, into_alloc_frames_fn)
-        .inspect(|InitialMemoryMappings { page_table, .. } | {
-            debug!("Done with paging::init(). new page table: {:?}", page_table);
-        })
 }
 
 /// Finishes initializing the memory management system after the heap is ready.

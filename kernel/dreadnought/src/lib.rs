@@ -41,7 +41,7 @@ where
 {
     // Pin the future onto the stack. This works because we don't send it anywhere.
     pin_mut!(future);
-    let (waker, blocker) = waker::waker();
+    let (waker, blocker) = waker::new_waker();
     let mut context = Context::from_waker(&waker);
 
     loop {

@@ -19,11 +19,6 @@ extern crate mpmc;
 extern crate crossbeam_utils;
 extern crate core2;
 
-#[cfg(downtime_eval)]
-extern crate hpet;
-#[cfg(downtime_eval)]
-extern crate task;
-
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
@@ -291,20 +286,6 @@ impl <T: Send> Sender<T> {
                 return Err((msg, Error::ChannelDisconnected));
             },
             _ => {},
-        }
-
-        // Injected Randomized fault : Page fault
-        #[cfg(downtime_eval)]
-        {
-            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            // debug!("Value {} {}", value, value % 1024);
-
-            let is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(false);
-            // We restrict the fault to a specific task to make measurements consistent
-            if (value % 4096) == 0  && is_restartable {
-                // debug!("Fake error {}", value);
-                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-            }
         }
 
         match self.channel.queue.push(msg) {
