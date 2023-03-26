@@ -601,7 +601,8 @@ clippy:
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 		cargo clippy \
 		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
-		--target $(TARGET)
+		--target $(TARGET) \
+		-- -D warnings
 
 
 ## The output directory for source-level documentation.
