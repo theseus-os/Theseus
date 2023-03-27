@@ -691,7 +691,7 @@ where
         task_entry_func = task_func_arg.func;
         task_arg        = task_func_arg.arg;
 
-        #[cfg(not(any(rq_eval, downtime_eval)))]
+        #[cfg(not(rq_eval))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
             &**exitable_taskref, debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
@@ -825,7 +825,6 @@ fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: tas
     // Disable preemption.
     let preemption_guard = hold_preemption();
 
-    #[cfg(not(downtime_eval))]
     debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
 
     if current_task.mark_as_killed(kill_reason).is_err() {
@@ -942,16 +941,10 @@ where
                     let func_ptr = &restart_info.func as *const _ as usize;
                     let arg_ptr = &restart_info.argument as *const _ as usize;
 
-                    #[cfg(not(downtime_eval))] {
-                        debug!("func_ptr {:#X}", func_ptr);
-                        debug!("arg_ptr {:#X} , {}", arg_ptr, mem::size_of::<A>());
-                    }
-
                     // func_ptr is of size 16. Argument is of the argument_size + 8.
                     // This extra size comes due to argument and function both stored in +8 location pointed by the pointer. 
                     // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
                     if fault_crate_swap::constant_offset_fix(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix(&se, arg_ptr, arg_ptr + 8).is_ok() {
-                        #[cfg(not(downtime_eval))]
                         debug!("Function and argument addresses corrected");
                     }
                 }
@@ -1029,3 +1022,4 @@ fn idle_task_entry(_cpu_id: CpuId) {
         core::hint::spin_loop();
     }
 }
+
