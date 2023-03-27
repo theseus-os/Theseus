@@ -84,15 +84,16 @@ const TLS_SELF_POINTER_SIZE: usize = size_of::<usize>();
 #[cfg(target_arch = "aarch64")]
 const TLS_SELF_POINTER_SIZE: usize = 0;
 
+/// Errors that may occur when adding TLS sections to a `TlsInitializer`.
 pub enum TlsInitializerError {
-    /// An error if inserting the given section at the given offset
-    /// would overlap with an existing section. 
-    /// An error occurring here would indicate a link-time bug 
-    /// or a bug in the symbol parsing code that invokes this function.
-    OverlapWithExistingSection,
-    /// TLS section has an invalid virtual address.
-    TLSHasInvalidVirtualAddress,
-    /// Can't find find enough space to insert the TLS section into the TLS data image.
+    /// Inserting a TLS section at the included offset
+    /// would erroneously overlap with an existing section. 
+    /// This indicates a link-time bug or a bug in the symbol parsing code
+    /// that invokes the [`TlsInitializer::add_existing_static_tls_section()`].
+    OverlapWithExistingSection(usize),
+    /// The included virtual address calculated for a TLS section was invalid.
+    InvalidVirtualAddress(usize),
+    /// There was insufficient space to insert a TLS section into the TLS data image.
     NoRemainingSpace,
 }
 
@@ -158,7 +159,7 @@ impl TlsInitializer {
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
         {
-            return Err(TlsInitializerError::OverlapWithExistingSection);
+            return Err(TlsInitializerError::OverlapWithExistingSection(offset));
         }
 
         // Calculate the new value of this section's virtual address based on its offset.
@@ -168,7 +169,8 @@ impl TlsInitializer {
         #[cfg(target_arch = "aarch64")]
         let virt_addr_value = original_offset;
 
-        tls_section.virt_addr = VirtualAddress::new(virt_addr_value).ok_or(TlsInitializerError::TLSHasInvalidVirtualAddress)?;
+        tls_section.virt_addr = VirtualAddress::new(virt_addr_value)
+            .ok_or(TlsInitializerError::InvalidVirtualAddress(virt_addr_value))?;
         self.end_of_static_sections = max(self.end_of_static_sections, range.end);
         let section_ref = Arc::new(tls_section);
         self.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
@@ -221,7 +223,8 @@ impl TlsInitializer {
         #[cfg(target_arch = "aarch64")]
         let virt_addr_value = start + self.end_of_static_sections - max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
 
-        section.virt_addr = VirtualAddress::new(virt_addr_value).ok_or(TlsInitializerError::TLSHasInvalidVirtualAddress)?;
+        section.virt_addr = VirtualAddress::new(virt_addr_value)
+            .ok_or(TlsInitializerError::InvalidVirtualAddress(virt_addr_value))?;
         let range = start .. (start + section.size);
         let section_ref = Arc::new(section);
         self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
