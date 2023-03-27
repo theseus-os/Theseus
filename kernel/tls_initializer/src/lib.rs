@@ -84,19 +84,15 @@ const TLS_SELF_POINTER_SIZE: usize = size_of::<usize>();
 #[cfg(target_arch = "aarch64")]
 const TLS_SELF_POINTER_SIZE: usize = 0;
 
-
-/// OverlapWithExistingSection:
-    ///   An error if inserting the given section at the given offset
-    ///   would overlap with an existing section. 
-    ///   An error occurring here would indicate a link-time bug 
-    ///   or a bug in the symbol parsing code that invokes this function.
-/// TLSHasInvalidVirtualAddress
-    /// TLS section has an invalid virtual address.
-/// NoRemainingSpace
-    /// Can't find find enough space to insert the TLS section into the TLS data image.
 pub enum TlsInitializerError {
+    /// An error if inserting the given section at the given offset
+    /// would overlap with an existing section. 
+    /// An error occurring here would indicate a link-time bug 
+    /// or a bug in the symbol parsing code that invokes this function.
     OverlapWithExistingSection,
+    /// TLS section has an invalid virtual address.
     TLSHasInvalidVirtualAddress,
+    /// Can't find find enough space to insert the TLS section into the TLS data image.
     NoRemainingSpace,
 }
 
