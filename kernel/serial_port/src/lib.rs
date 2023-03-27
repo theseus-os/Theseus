@@ -353,7 +353,7 @@ fn serial_port_receive_deferred(
 #[repr(align(64))]
 pub struct DataChunk {
     pub len: u8,
-    pub data: [u8; (64 - 1)],
+    pub data: [u8; 64 - 1],
 }
 const _: () = assert!(core::mem::size_of::<DataChunk>() == 64);
 const _: () = assert!(core::mem::align_of::<DataChunk>() == 64);
