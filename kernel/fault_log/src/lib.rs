@@ -242,8 +242,6 @@ pub fn log_handled_fault(fe: FaultEntry){
 /// Provides the most recent entry in the log for given crate
 /// Utility function for iterative crate replacement
 pub fn get_the_most_recent_match(error_crate: &str) -> Option<FaultEntry> {
-
-    #[cfg(not(downtime_eval))]
     debug!("getting the most recent match");
 
     let mut fe :Option<FaultEntry> = None;
@@ -259,8 +257,6 @@ pub fn get_the_most_recent_match(error_crate: &str) -> Option<FaultEntry> {
     }
 
     if fe.is_none(){
-
-        #[cfg(not(downtime_eval))]
         debug!("No recent entries for the given crate {}", error_crate);
     }
     fe

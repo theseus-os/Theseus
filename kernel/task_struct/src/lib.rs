@@ -569,7 +569,7 @@ impl Task {
 
 impl Drop for Task {
     fn drop(&mut self) {
-        #[cfg(not(any(rq_eval, downtime_eval)))]
+        #[cfg(not(rq_eval))]
         trace!("[CPU {}] Task::drop(): {}", cpu::current_cpu(), self);
 
         // We must consume/drop the Task's kill handler BEFORE a Task can possibly be dropped.

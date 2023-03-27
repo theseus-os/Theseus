@@ -18,12 +18,6 @@ path = "../../libs/debugit"
 [dependencies.wait_queue]
 path = "../wait_queue"
 
-[dependencies.task]
-path = "../task"
-
-[dependencies.hpet]
-path = "../acpi/hpet"
-
 [dependencies.core2]
 version = "0.4.0"
 default-features = false

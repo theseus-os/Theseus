@@ -2,15 +2,8 @@
 #![allow(clippy::type_complexity)]
 
 extern crate alloc;
-extern crate heap;
-extern crate kernel_config;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate stack;
-extern crate no_drop;
-extern crate bootloader_modules;
-extern crate boot_info;
 
+use log::{error, debug};
 use memory::{MmiRef, MappedPages, VirtualAddress, InitialMemoryMappings, EarlyIdentityMappedPages};
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use boot_info::{BootInformation, Module};
@@ -73,7 +66,7 @@ pub fn init_memory_management(
     // We should not issue any log or print statements until re-initializing this.
     if let Some(ref fb_info) = boot_info.framebuffer_info() {
         early_printer::init(fb_info, Some(&mut page_table)).unwrap_or_else(|_e|
-            log::error!("Failed to re-init early_printer after memory::init(); \
+            error!("Failed to re-init early_printer after memory::init(); \
                 proceeding with init. Error: {:?}", _e
             )
         );
