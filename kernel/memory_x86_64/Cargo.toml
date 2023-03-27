@@ -3,22 +3,16 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "memory_x86_64"
 description = "The memory subsystem interfaces on x86_64."
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-multiboot2 = "0.14.0"
 x86_64 = "0.14.8"
+log = "0.4.8"
 
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.entryflags_x86_64]
-path = "../entryflags_x86_64"
-
-[dependencies.memory_structs]
-path = "../memory_structs"
+boot_info = { path = "../boot_info" }
+pte_flags = { path = "../pte_flags" }
+kernel_config = { path = "../kernel_config" }
+memory_structs = { path = "../memory_structs" }
 
 [lib]
 crate-type = ["rlib"]

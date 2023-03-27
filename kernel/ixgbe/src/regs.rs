@@ -72,7 +72,7 @@ pub struct IntelIxgbeRegisters1 {
 
 } // 1 4KiB page
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters1>(), 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeRegisters1>() == 4096);
 
 /// The layout in memory of the first set of receive queue registers of the 82599 device.
 #[derive(FromBytes)]
@@ -83,7 +83,7 @@ pub struct IntelIxgbeRxRegisters1 {
 
 } // 1 4KiB page
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeRxRegisters1>(), 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeRxRegisters1>() == 4096);
 
 /// The layout in memory of the second set of general registers of the 82599 device.
 #[derive(FromBytes)]
@@ -190,7 +190,7 @@ pub struct IntelIxgbeRegisters2 {
     _padding21:                         [u8; 3768],             // 0x5148 - 0x5FFF
 } // 4 4KiB page
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters2>(), 4 * 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeRegisters2>() == 4 * 4096);
 
 /// The layout in memory of the transmit queue registers of the 82599 device.
 #[derive(FromBytes)]
@@ -200,7 +200,7 @@ pub struct IntelIxgbeTxRegisters {
     pub tx_regs:                        [RegistersTx; 128],     // 0x6000 - 0x7FFF
 } // 2 4KiB page
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeTxRegisters>(), 2 * 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeTxRegisters>() == 2 * 4096);
 
 /// The layout in memory of the set of registers containing the MAC address of the 82599 device.
 #[derive(FromBytes)]
@@ -223,7 +223,7 @@ pub struct IntelIxgbeMacRegisters {
     _padding4:                          [u8; 992],              // 0xCC20 - 0xCFFF
 } // 5 4KiB page
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeMacRegisters>(), 5 * 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeMacRegisters>() == 5 * 4096);
 
 /// The layout in memory of the second set of receive queue registers of the 82599 device.
 #[derive(FromBytes)]
@@ -233,7 +233,7 @@ pub struct IntelIxgbeRxRegisters2 {
     pub rx_regs2:                       [RegistersRx; 64],      // 0xD000 - 0xDFFF, for 64 queues
 } // 1 4KiB page
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeRxRegisters2>(), 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeRxRegisters2>() == 4096);
 
 /// The layout in memory of the third set of general registers of the 82599 device.
 #[derive(FromBytes)]
@@ -295,13 +295,19 @@ pub struct IntelIxgbeRegisters3 {
 
 } // 18 4KiB page (total NIC mem = 128 KB)
 
-const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters3>(), 18 * 4096);
+const _: () = assert!(core::mem::size_of::<IntelIxgbeRegisters3>() == 18 * 4096);
 
 // check that the sum of all the register structs is equal to the memory of the ixgbe device (128 KiB).
-const_assert_eq!(core::mem::size_of::<IntelIxgbeRegisters1>() + core::mem::size_of::<IntelIxgbeRxRegisters1>() +
-    core::mem::size_of::<IntelIxgbeRegisters2>() + core::mem::size_of::<IntelIxgbeTxRegisters>() + 
-    core::mem::size_of::<IntelIxgbeMacRegisters>() + core::mem::size_of::<IntelIxgbeRxRegisters2>() +
-    core::mem::size_of::<IntelIxgbeRegisters3>(), 0x20000);
+const _: () = assert!(
+    core::mem::size_of::<IntelIxgbeRegisters1>()
+    + core::mem::size_of::<IntelIxgbeRxRegisters1>()
+    + core::mem::size_of::<IntelIxgbeRegisters2>()
+    + core::mem::size_of::<IntelIxgbeTxRegisters>()
+    + core::mem::size_of::<IntelIxgbeMacRegisters>()
+    + core::mem::size_of::<IntelIxgbeRxRegisters2>()
+    + core::mem::size_of::<IntelIxgbeRegisters3>()
+    == 0x20000
+);
 
 /// Set of registers associated with one transmit descriptor queue.
 #[derive(FromBytes)]
@@ -338,7 +344,7 @@ pub struct RegistersTx {
     pub tdwbah:                         Volatile<u32>,          // 0x603C
 } // 64B
 
-const_assert_eq!(core::mem::size_of::<RegistersTx>(), 64);
+const _: () = assert!(core::mem::size_of::<RegistersTx>() == 64);
 
 /// Set of registers associated with one receive descriptor queue.
 #[derive(FromBytes)]
@@ -371,7 +377,7 @@ pub struct RegistersRx {
     _padding2:                          [u8;20],                // 0x102C - 0x103F                                            
 } // 64B
 
-const_assert_eq!(core::mem::size_of::<RegistersRx>(), 64);
+const _: () = assert!(core::mem::size_of::<RegistersRx>() == 64);
 
 /// Offset where the RDT register starts for the first 64 rx queues
 pub const RDT_1:                        usize = 0x1018;
@@ -559,7 +565,7 @@ pub struct MsixVectorTable {
 #[repr(C)]
 pub struct MsixVectorEntry {
     /// The lower portion of the address for the memory write transaction.
-    /// This part contains the apic id which the interrupt will be redirected to.
+    /// This part contains the CPU ID which the interrupt will be redirected to.
     pub msg_lower_addr:         Volatile<u32>,
     /// The upper portion of the address for the memory write transaction.
     pub msg_upper_addr:         Volatile<u32>,

@@ -5,7 +5,7 @@
 
 #[macro_use] extern crate alloc;
 // #[macro_use] extern crate log;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate memfs;
 extern crate root;
 extern crate memory;
@@ -18,7 +18,7 @@ use core::str;
 
 fn test_filerw() -> Result<(), &'static str> {
     let parent = root::get_root();
-    let testfile = MemFile::new("testfile".to_string(), &parent)?;
+    let testfile = MemFile::create("testfile".to_string(), &parent)?;
 
     // test that we can write to an empty file
     testfile.lock().write_at("test from hello".as_bytes(),0)?;
@@ -69,8 +69,7 @@ fn test_filerw() -> Result<(), &'static str> {
     // we'll allocate the buffer length plus the offset because that's guranteed to be the most bytes we
     // need (because it entered this conditional statement)
     let pages = memory::allocate_pages_by_bytes(1).ok_or("could not allocate pages")?;
-    // the default flag is that the MappedPages are not writable
-    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, Default::default())?;
+    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages(pages, memory::PteFlags::new())?;
 
     let non_writable_file = MemFile::from_mapped_pages(mapped_pages, "non-writable testfile".to_string(), 1, &parent)?;
     match non_writable_file.lock().write_at(&mut string_slice_as_bytes, 0) {
@@ -81,7 +80,7 @@ fn test_filerw() -> Result<(), &'static str> {
 
 
     // tests that the read function works when we pass an oversized buffer with an offset that exceeds the end of the file
-    let testfile2 = MemFile::new("testfile2".to_string(), &parent)?;
+    let testfile2 = MemFile::create("testfile2".to_string(), &parent)?;
     testfile2.lock().write_at("test from hello".as_bytes(),0)?;
     let mut oversize_buffer = vec![0; 4 * file_size];
     let test1_bytesread = testfile2.lock().read_at(&mut oversize_buffer, 0)?;

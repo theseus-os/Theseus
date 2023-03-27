@@ -16,8 +16,8 @@ pub(crate) struct Drhd {
     // Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 }
-const_assert_eq!(core::mem::size_of::<Drhd>(), 16);
-const_assert_eq!(core::mem::align_of::<Drhd>(), 1);
+const _: () = assert!(core::mem::size_of::<Drhd>() == 16);
+const _: () = assert!(core::mem::align_of::<Drhd>() == 1);
 
 
 /// DRHD: DMAR Hardware Unit Definition Structure.

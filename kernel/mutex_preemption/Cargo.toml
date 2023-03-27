@@ -12,6 +12,6 @@ path = "../preemption"
 path = "../../libs/lockable"
 
 [dependencies.spin]
-version = "0.9.0"
+version = "0.9.4"
 default-features = false
 features = ["mutex", "spin_mutex", "rwlock", "once", "barrier"]

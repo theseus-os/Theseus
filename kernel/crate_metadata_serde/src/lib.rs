@@ -144,9 +144,11 @@ impl SectionType {
 
     /// Returns `true` if `Data` or `Bss`, otherwise `false`.
     pub fn is_data_or_bss(&self) -> bool {
-        match self {
-            Self::Data | Self::Bss => true,
-            _ => false,
-        }
+        matches!(self, Self::Data | Self::Bss)
+    }
+
+    /// Returns `true` if `TlsData` or `TlsBss`, otherwise `false`.
+    pub fn is_tls(&self) -> bool {
+        matches!(self, Self::TlsData | Self::TlsBss)
     }
 }

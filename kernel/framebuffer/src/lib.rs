@@ -3,44 +3,45 @@
 
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate multicore_bringup;
-extern crate shapes;
-extern crate color;
-extern crate zerocopy;
-
 pub mod pixel;
 use core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
-
-use memory::{EntryFlags, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
+use log::{info, debug};
+use memory::{PteFlags, PteFlagsArch, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
 use shapes::Coord;
 pub use pixel::*;
 
-/// Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
+/// Initializes the final framebuffer based on graphics mode info obtained during boot.
 /// 
-/// The final framebuffer represents the actual pixel content displayed on screen 
-/// because its memory is directly mapped to the VESA display device's underlying physical memory.
+/// The final framebuffer represents the actual pixel content displayed on screen,
+/// as its memory is directly mapped to the display device's underlying physical memory.
 pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
-    // get the graphic mode information
-    let vesa_display_phys_start: PhysicalAddress;
-    let buffer_width: usize;
-    let buffer_height: usize;
-    {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        info!("Using graphical framebuffer, {} x {}, at paddr {:#X}", graphic_info.width, graphic_info.height, graphic_info.physical_address);
-        if graphic_info.physical_address == 0 {
-            return Err("Failed to get graphic mode information!");
-        }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address as usize)
-            .ok_or("Graphic mode physical address was invalid")?;
-        buffer_width = graphic_info.width as usize;
-        buffer_height = graphic_info.height as usize;
-    };
+    // Attempt to get the below 3 items of graphic mode info.
+    let mut width_height_paddr: Option<(usize, usize, PhysicalAddress)> = None;
+    // Take possession of the early framebuffer and obtain graphic info from it.
+    if let Some(early_fb) = early_printer::take() {
+        width_height_paddr = Some((
+            early_fb.width as usize,
+            early_fb.height as usize,
+            early_fb.paddr,
+        ));
+        // Here: the early framebuffer's underlying mapping is dropped.
+    }
 
-    // create and return the final framebuffer
-    let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-    Ok(framebuffer)
+    // If we booted up other CPUs, we may have switched to a better graphics mode.
+    if let Some(gi) = multicore_bringup::get_graphic_info() {
+        let paddr = PhysicalAddress::new(gi.physical_address() as usize)
+            .ok_or("Graphic mode physical address was invalid")?;
+        let width = gi.width() as usize;
+        let height = gi.height() as usize;
+        width_height_paddr = Some((width, height, paddr));
+    }
+    
+    let (width, height, paddr) = width_height_paddr
+        .ok_or("Failed to get graphic mode information!")?;
+    info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
+        width, height, paddr,
+    );
+    Framebuffer::new(width, height, Some(paddr))
 }
 
 /// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
@@ -61,47 +62,70 @@ impl<P: Pixel> Hash for Framebuffer<P> {
 impl<P: Pixel> Framebuffer<P> {
     /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
     /// specified in number of pixels.
-    /// If the `physical_address` is provided, the returned framebuffer will be **final**,
-    /// i.e., mapped to the physical memory at that address, which is typically a hardware graphics device's memory.
-    /// If the `physical_address` is `None`, the returned framebuffer is a "virtual" one 
+    ///
+    /// If `physical_address` is `Some`, the returned framebuffer will be a real physical one,
+    /// i.e., mapped to the physical memory at that address, which is typically hardware graphics memory.
+    /// In this case, we attempt to map the memory as "write-combining", which only works
+    /// on x86 if the Page Attribute Table feature is enabled.
+    /// Otherwise, we map the real physical framebuffer memory with all caching disabled.
+    ///
+    /// If `physical_address` is `None`, the returned framebuffer is a "virtual" one 
     /// that renders to a randomly-allocated chunk of memory.
     pub fn new(
         width: usize,
         height: usize,
         physical_address: Option<PhysicalAddress>,
     ) -> Result<Framebuffer<P>, &'static str> {
-        // get a reference to the kernel's memory mapping information
-        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;
-
-        let vesa_display_flags: EntryFlags =
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::GLOBAL | EntryFlags::NO_CACHE;
-
+        let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or("KERNEL_MMI was not yet initialized!")?;            
         let size = width * height * core::mem::size_of::<P>();
-        let pages = memory::allocate_pages_by_bytes(size).ok_or("could not allocate pages for a new framebuffer")?;
+        let pages = memory::allocate_pages_by_bytes(size)
+            .ok_or("could not allocate pages for a new framebuffer")?;
 
         let mapped_framebuffer = if let Some(address) = physical_address {
+            // For best performance, we map the real physical framebuffer memory
+            // as write-combining using the PAT (on x86 only).
+            // If PAT isn't available, fall back to disabling caching altogether.
+            let mut flags: PteFlagsArch = PteFlags::new()
+                .valid(true)
+                .writable(true)
+                .into();
+
+            #[cfg(target_arch = "x86_64")] {
+                if page_attribute_table::is_supported() {
+                    flags = flags.pat_index(
+                        page_attribute_table::MemoryCachingType::WriteCombining.pat_slot_index()
+                    );
+                    info!("Using PAT write-combining mapping for real physical framebuffer memory");
+                } else {
+                    flags = flags.device_memory(true);
+                    info!("Falling back to cache-disable mapping for real physical framebuffer memory");
+                }
+            }
+            #[cfg(not(target_arch = "x86_64"))] {
+                flags = flags.device_memory(true);
+            }
+
             let frames = memory::allocate_frames_by_bytes_at(address, size)
                 .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
-            kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+            let fb_mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,
                 frames,
-                vesa_display_flags,
-            )?
+                flags,
+            )?;
+            debug!("Mapped real physical framebuffer: {fb_mp:?}");
+            fb_mp
         } else {
             kernel_mmi_ref.lock().page_table.map_allocated_pages(
                 pages,
-                vesa_display_flags,
+                PteFlags::new().valid(true).writable(true),
             )?
         };
-
-        // obtain a slice reference to the framebuffer's memory
-        let buffer = mapped_framebuffer.into_borrowed_slice_mut(0, width * height)
-            .map_err(|(|_mp, s)| s)?;
 
         Ok(Framebuffer {
             width,
             height,
-            buffer,
+            buffer: mapped_framebuffer.into_borrowed_slice_mut(0, width * height)
+                .map_err(|(|_mp, s)| s)?,
         })
     }
 
@@ -132,7 +156,7 @@ impl<P: Pixel> Framebuffer<P> {
     /// at that `coordinate` in this framebuffer.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
         if let Some(index) = self.index_of(coordinate) {
-            self.buffer[index] = pixel.blend(self.buffer[index]).into();
+            self.buffer[index] = pixel.blend(self.buffer[index]);
         }
     }
 

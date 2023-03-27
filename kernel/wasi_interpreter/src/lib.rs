@@ -32,7 +32,6 @@ extern crate task;
 extern crate wasmi;
 
 use alloc::string::String;
-use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::convert::TryFrom;
 use core::str::FromStr;
@@ -103,14 +102,12 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
     .unwrap();
 
     // Populate environment variables.
-    let pwd: String = task::get_my_current_task()
-        .unwrap()
-        .get_env()
-        .lock()
-        .cwd();
+    let pwd: String = task::with_current_task(|t|
+        t.get_env().lock().cwd()
+    ).expect("couldn't get current task");
 
     let mut theseus_env_vars: Vec<String> = Vec::new();
-    theseus_env_vars.push(format!("PWD={}", pwd));
+    theseus_env_vars.push(format!("PWD={pwd}"));
 
     // Construct initial host externals.
     let mut ext: HostExternals = HostExternals {
@@ -128,14 +125,10 @@ pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec
         let _curr_fd: wasi::Fd = ext
             .fd_table
             .open_path(
-                &preopen_dir,
-                Arc::clone(
-                    &task::get_my_current_task()
-                        .unwrap()
-                        .get_env()
-                        .lock()
-                        .working_dir,
-                ),
+                preopen_dir,
+                task::with_current_task(|t|
+                    t.get_env().lock().working_dir.clone()
+                ).expect("couldn't get current task"),
                 wasi::LOOKUPFLAGS_SYMLINK_FOLLOW,
                 wasi::OFLAGS_DIRECTORY,
                 wasi_definitions::FULL_DIR_RIGHTS,

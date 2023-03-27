@@ -15,7 +15,7 @@ extern crate io;
 
 use alloc::string::String;
 use fs_node::{DirRef, WeakDirRef, File, FsNode};
-use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, EntryFlags};
+use memory::{MappedPages, get_kernel_mmi_ref, allocate_pages_by_bytes, PteFlags};
 use alloc::sync::Arc;
 use spin::Mutex;
 use fs_node::{FileOrDir, FileRef};
@@ -36,7 +36,7 @@ pub struct MemFile {
 
 impl MemFile {
     /// Allocates writable memory space for the given `contents` and creates a new file containing that content in the given `parent` directory.
-    pub fn new(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
+    pub fn create(name: String, parent: &DirRef) -> Result<FileRef, &'static str> {
         let new_file = Self::from_mapped_pages(MappedPages::empty(), name, 0, parent)?;
         Ok(new_file)
     }
@@ -94,7 +94,7 @@ impl ByteWriter for MemFile {
         else {
             // If the mapped pages are empty (this is the first allocation), we make them writable
             let prev_flags = if self.mp.size_in_bytes() == 0 {
-                EntryFlags::WRITABLE
+                PteFlags::new().valid(true).writable(true).into()
             } 
             // Otherwise, use the existing mapped pages flags
             else {
@@ -107,14 +107,13 @@ impl ByteWriter for MemFile {
             
             // first, we need to copy over the bytes from the previous mapped pages
             {
-                // this copies bytes to min(the write offset, all the bytes of the existing mapped pages)
-                let copy_limit;
+                // copy_limit copies bytes to min(the write offset, all the bytes of the existing mapped pages)
                 // The write does not overlap with existing content, so we copy all existing content
-                if offset > self.len { 
-                    copy_limit = self.len;
+                let copy_limit = if offset > self.len { 
+                    self.len
                 } else { // Otherwise, we only copy up to where the overlap begins
-                    copy_limit = offset;
-                }
+                    offset
+                };
                 let existing_bytes = self.mp.as_slice(0, copy_limit)?;
                 let copy_slice = new_mapped_pages.as_slice_mut::<u8>(0, copy_limit)?;
                 copy_slice.copy_from_slice(existing_bytes);

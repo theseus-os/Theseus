@@ -1,0 +1,16 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
+name = "memory_aarch64"
+description = "The memory subsystem interfaces on aarch64."
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.8"
+cortex-a = "7.5.0"
+tock-registers = "0.7.0"
+
+boot_info = { path = "../boot_info" }
+pte_flags = { path = "../pte_flags" }
+kernel_config = { path = "../kernel_config" }
+memory_structs = { path = "../memory_structs" }

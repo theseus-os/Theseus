@@ -7,14 +7,14 @@ edition = "2018"
 
 [dependencies]
 x86_64 = "0.14.8"
-spin = "0.9.0"
+spin = "0.9.4"
 locked_idt = { path = "../../libs/locked_idt" }
 
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
+[dependencies.early_printer]
+path = "../early_printer"
 
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"

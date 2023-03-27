@@ -2,13 +2,16 @@
 /// This crate contains all the necessary functions for navigating the virtual filesystem / obtaining specific
 /// directories via the Path struct 
 // #[macro_use] extern crate log;
-#[macro_use] extern crate alloc;
+extern crate alloc;
 extern crate spin;
 extern crate fs_node;
 extern crate root;
 
-use core::fmt;
-use core::ops::{Deref, DerefMut};
+use core::{
+    fmt,
+    fmt::Write,
+    ops::{Deref, DerefMut},
+};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -68,14 +71,14 @@ impl Path {
     
     /// Returns an iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
-    pub fn components<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn components(&self) -> impl Iterator<Item = &str> {
         self.path.split(PATH_DELIMITER)
             .filter(|&x| !x.is_empty())
     }
 
     /// Returns a reverse iterator over the components of this `Path`,
     /// split by the path delimiter `"/"`.
-    pub fn rcomponents<'a>(&'a self) -> impl Iterator<Item = &'a str> {
+    pub fn rcomponents(&self) -> impl Iterator<Item = &str> {
         self.path.rsplit(PATH_DELIMITER)
             .filter(|&x| !x.is_empty())
     }
@@ -85,14 +88,14 @@ impl Path {
     /// `"/path/to/my/file.a"` -> "file.a"
     /// `"my/file.a"` -> "file.a"
     /// `"file.a"` -> "file.a"
-    pub fn basename<'a>(&'a self) -> &'a str {
+    pub fn basename(&self) -> &str {
         self.rcomponents()
             .next()
             .unwrap_or(&self.path)
     }
 
     /// Like [`basename()`](#method.basename), but excludes the file extension, if present.
-    pub fn file_stem<'a>(&'a self) -> &'a str {
+    pub fn file_stem(&self) -> &str {
         self.basename()
             .split(EXTENSION_DELIMITER)
             .find(|&x| !x.is_empty())
@@ -102,7 +105,7 @@ impl Path {
     /// Returns the file extension, if present. 
     /// If there are multiple extensions as defined by the extension delimiter, `'.'`,
     /// then the last one will be treated as the extension. 
-    pub fn extension<'a>(&'a self) -> Option<&'a str> {
+    pub fn extension(&self) -> Option<&str> {
         self.basename()
             .rsplit(EXTENSION_DELIMITER)
             .find(|&x| !x.is_empty())
@@ -130,11 +133,11 @@ impl Path {
         let mut first_cmpnt = true; 
         for component in new_components {
             if first_cmpnt {
-                new_path.push_str(&format!("{}",  component));
+                new_path.push_str(component);
                 first_cmpnt = false;
             } 
             else {
-                new_path.push_str(&format!("/{}",  component));
+                write!(new_path, "/{component}").expect("Failed to create new path from its components");
             }
         }
         Path::new(new_path)
@@ -159,7 +162,7 @@ impl Path {
                 }
                 (None, _) => comps.push("..".to_string()),
                 (Some(ref a), Some(ref b)) if comps.is_empty() && a == b => continue,
-                (Some(ref _a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
+                (Some(_a), Some(ref b)) if b == &".".to_string() => comps.push("..".to_string()),
                 (Some(_), Some(ref b)) if b == &"..".to_string() => return None,
                 (Some(a), Some(_)) => {
                     comps.push("..".to_string());
@@ -177,7 +180,7 @@ impl Path {
         // Create the new path from its components 
         let mut new_path = String::new();
         for component in comps.iter() {
-                new_path.push_str(&format!("{}/",  component));
+            write!(new_path, "{component}/").expect("Failed to create new path from its components");
         }
         // Remove the trailing slash after the final path component
         new_path.pop();
@@ -199,7 +202,7 @@ impl Path {
                 Arc::clone(root::get_root())
             }
             else {
-                Arc::clone(&starting_dir)
+                Arc::clone(starting_dir)
             }
         };
 

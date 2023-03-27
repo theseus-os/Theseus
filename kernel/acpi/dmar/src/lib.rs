@@ -6,12 +6,6 @@
 
 #![no_std]
 
-extern crate memory;
-extern crate sdt;
-extern crate acpi_table;
-extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
-
 use core::mem::size_of;
 use memory::{PhysicalAddress, MappedPages};
 use sdt::Sdt;
@@ -37,7 +31,7 @@ pub use device_scope::*;
 // pub use satc::*;
 
 
-pub const DMAR_SIGNATURE: &'static [u8; 4] = b"DMAR";
+pub const DMAR_SIGNATURE: &[u8; 4] = b"DMAR";
 
 
 /// The handler for parsing the DMAR table and adding it to the ACPI tables list.
@@ -68,8 +62,8 @@ struct DmarReporting {
     // Following this is a variable number of variable-sized DMAR table entries,
     // so we cannot include them here in the static struct definition.
 }
-const_assert_eq!(core::mem::size_of::<DmarReporting>(), 48);
-const_assert_eq!(core::mem::align_of::<DmarReporting>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarReporting>() == 48);
+const _: () = assert!(core::mem::align_of::<DmarReporting>() == 1);
 
 
 /// A wrapper around the DMAR ACPI table ([`DmarReporting`]),
@@ -94,10 +88,10 @@ pub struct Dmar<'t> {
 impl<'t> Dmar<'t> {
     /// Finds the DMAR in the given `AcpiTables` and returns a reference to it.
     pub fn get(acpi_tables: &'t AcpiTables) -> Option<Dmar<'t>> {
-        let table: &DmarReporting = acpi_tables.table(&DMAR_SIGNATURE).ok()?;
+        let table: &DmarReporting = acpi_tables.table(DMAR_SIGNATURE).ok()?;
         let total_length = table.header.length as usize;
         let dynamic_part_length = total_length - size_of::<DmarReporting>();
-        let loc = acpi_tables.table_location(&DMAR_SIGNATURE)?;
+        let loc = acpi_tables.table_location(DMAR_SIGNATURE)?;
         Some(Dmar {
             table,
             mapped_pages: acpi_tables.mapping(),
@@ -181,8 +175,8 @@ pub struct DmarEntryRecord {
     /// The length in bytes of a DMAR entry table.
     length: u16,
 }
-const_assert_eq!(core::mem::size_of::<DmarEntryRecord>(), 4);
-const_assert_eq!(core::mem::align_of::<DmarEntryRecord>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarEntryRecord>() == 4);
+const _: () = assert!(core::mem::align_of::<DmarEntryRecord>() == 1);
 
 
 /// The set of possible sub-tables that can exist in the top-level DMAR table.
@@ -212,11 +206,11 @@ impl<'t> DmarEntry<'t> {
         }
         match entry.typ {
             0 => Ok(Self::Drhd(DmarDrhd::from_entry(mp, mp_offset, entry)?)),
-            1 => mp.as_type(mp_offset).map(|ent| Self::Rmrr(ent)),
-            2 => mp.as_type(mp_offset).map(|ent| Self::Atsr(ent)),
-            3 => mp.as_type(mp_offset).map(|ent| Self::Rhsa(ent)),
-            4 => mp.as_type(mp_offset).map(|ent| Self::Andd(ent)),
-            5 => mp.as_type(mp_offset).map(|ent| Self::Satc(ent)),
+            1 => mp.as_type(mp_offset).map(Self::Rmrr),
+            2 => mp.as_type(mp_offset).map(Self::Atsr),
+            3 => mp.as_type(mp_offset).map(Self::Rhsa),
+            4 => mp.as_type(mp_offset).map(Self::Andd),
+            5 => mp.as_type(mp_offset).map(Self::Satc),
             _ => Ok(Self::UnknownOrCorrupt(*entry)),
         }
     }
@@ -240,8 +234,8 @@ pub struct DmarRmrr {
     // Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 }
-const_assert_eq!(core::mem::size_of::<DmarRmrr>(), 24);
-const_assert_eq!(core::mem::align_of::<DmarRmrr>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarRmrr>() == 24);
+const _: () = assert!(core::mem::align_of::<DmarRmrr>() == 1);
 
 
 /// ATSR: DMAR Root Port ATS (Address Translation Services) Capability Reporting Structure. 
@@ -256,8 +250,8 @@ pub struct DmarAtsr {
     // Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 }
-const_assert_eq!(core::mem::size_of::<DmarAtsr>(), 8);
-const_assert_eq!(core::mem::align_of::<DmarAtsr>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarAtsr>() == 8);
+const _: () = assert!(core::mem::align_of::<DmarAtsr>() == 1);
 
 
 /// RHSA: DMAR Remapping Hardware Static Affinity Structure. 
@@ -270,8 +264,8 @@ pub struct DmarRhsa {
     register_base_address: u64,
     proximity_domain: u32,
 }
-const_assert_eq!(core::mem::size_of::<DmarRhsa>(), 20);
-const_assert_eq!(core::mem::align_of::<DmarRhsa>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarRhsa>() == 20);
+const _: () = assert!(core::mem::align_of::<DmarRhsa>() == 1);
 
 
 /// ANDD: DMAR ACPI Name-space Device Declaration Structure. 
@@ -287,8 +281,8 @@ pub struct DmarAndd {
     // It's a C-style null-terminated string, which would look something like:
     // acpi_object_name: [u8],
 }
-const_assert_eq!(core::mem::size_of::<DmarAndd>(), 8);
-const_assert_eq!(core::mem::align_of::<DmarAndd>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarAndd>() == 8);
+const _: () = assert!(core::mem::align_of::<DmarAndd>() == 1);
 
 
 /// SATC: DMAR SoC Integrated Address Translation Cache Reorting Structure. 
@@ -303,5 +297,5 @@ pub struct DmarSatc {
     // Following this is a variable number of variable-sized DMAR device scope table entries,
     // so we cannot include them here in the static struct definition.
 }
-const_assert_eq!(core::mem::size_of::<DmarSatc>(), 8);
-const_assert_eq!(core::mem::align_of::<DmarSatc>(), 1);
+const _: () = assert!(core::mem::size_of::<DmarSatc>() == 8);
+const _: () = assert!(core::mem::align_of::<DmarSatc>() == 1);

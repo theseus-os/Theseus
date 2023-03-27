@@ -3,7 +3,7 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 extern crate getopts;
 
 use alloc::vec::Vec;
@@ -41,5 +41,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: example [ARGS]
+const USAGE: &str = "Usage: example [ARGS]
 An example application that just echoes its arguments.";

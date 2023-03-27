@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 
 extern crate alloc;
 extern crate task;
@@ -9,28 +9,30 @@ extern crate vfs_node;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::sync::Arc;
 use alloc::string::ToString;
 // use fs_node::FileOrDir;
 use vfs_node::VFSDirectory;
 
 pub fn main(args: Vec<String>) -> isize {
-    if !(args.is_empty()) {
-        for dir_name in args.iter() {
-            // add child dir to current directory
-            if let Some(taskref) = task::get_my_current_task() {
-                // grabs a pointer to the current working directory; this is scoped so that we drop the lock on the "mkdir" task as soon as we're finished
-                let curr_dir = Arc::clone(&taskref.get_env().lock().working_dir);
-                let _new_dir = match VFSDirectory::new(dir_name.to_string(), &curr_dir) {
-                    Ok(dir) => dir,
-                    Err(err) => {println!("{}", err);
-                                return -1;}
-                };
-            } else {
-                println!("failed to get task ref");    
-            }
-        }
-    } 
+    if args.is_empty() {
+        println!("Error: missing arguments");
+        return -1;
+    }
 
-    0
+    let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        println!("failed to get current task");
+        return -1;
+    };
+
+    let mut ret = 0;
+
+    for dir_name in args.iter() {
+        // add child dir to current directory
+        if let Err(err) = VFSDirectory::create(dir_name.to_string(), &curr_wd) {
+            println!("Error creating {:?}: {}", dir_name, err);
+            ret = -1;
+        }
+    }
+
+    ret
 }

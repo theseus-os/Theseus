@@ -36,7 +36,7 @@ pub(crate) struct TransportInterfaceReceiveContext {
     _padding4:              [u8; 20],
 }
 
-const_assert_eq!(core::mem::size_of::<TransportInterfaceReceiveContext>(), 92);
+const _: () = assert!(core::mem::size_of::<TransportInterfaceReceiveContext>() == 92);
 
 impl TransportInterfaceReceiveContext {
     /// Initialize the TIR object
@@ -93,7 +93,7 @@ pub(crate) struct ReceiveQueueContext {
     _padding1:                          [u8; 20],
 }
 
-const_assert_eq!(core::mem::size_of::<ReceiveQueueContext>(), 48);
+const _: () = assert!(core::mem::size_of::<ReceiveQueueContext>() == 48);
 
 impl fmt::Debug for ReceiveQueueContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -136,7 +136,7 @@ impl ReceiveQueueContext {
     /// Find the state of the RQ from the RQ context 
     pub fn get_state(&self) -> Result<ReceiveQueueState, &'static str> {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
-        Ok( ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")? )
+        ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")
     }
 
     /// Offset that this context is written to in the mailbox buffer
@@ -230,11 +230,11 @@ impl ReceiveQueue {
                 .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
                 .or_else(|_e| {
                     create_contiguous_mapping(buffer_size as usize, NIC_MAPPING_FLAGS)
-                        .map(|(buf_mapped, buf_paddr)| 
+                        .and_then(|(buf_mapped, buf_paddr)|
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, mem_pool)
                         )
                 })?;
-            let paddr_buf = rx_buf.phys_addr;
+            let paddr_buf = rx_buf.phys_addr();
             rx_bufs_in_use.push(rx_buf); 
 
             wqe.update_buffer_info(self.lkey.0, paddr_buf, self.buffer_size_bytes); 

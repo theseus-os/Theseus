@@ -2,8 +2,8 @@
 //! specifically `CrateNamespace`s.
 
 #![no_std]
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
+extern crate alloc;
+#[macro_use] extern crate app_io;
 
 extern crate getopts;
 extern crate memory;
@@ -18,6 +18,7 @@ use core::{
 };
 use alloc::{
     string::String,
+    string::ToString,
     sync::Arc,
     vec::Vec,
 };
@@ -59,10 +60,9 @@ pub fn main(args: Vec<String>) -> isize {
 
 
 fn rmain(matches: Matches) -> Result<(), String> {
-    let curr_task = task::get_my_current_task().ok_or_else(|| format!("unable to get current task"))?;
-    let namespace = curr_task.get_namespace();
-    let env = curr_task.get_env();
-    let curr_wd = env.lock().working_dir.clone();
+    let (namespace, curr_wd) = task::with_current_task(|t|
+        (t.get_namespace().clone(), t.get_env().lock().working_dir.clone())
+    ).map_err(|_| String::from("failed to get current task"))?;
 
     let recursive = matches.opt_present("r");
     let mut output = String::new();
@@ -70,7 +70,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     if let Some(crate_obj_file_path) = matches.opt_str("load") {
         let path = Path::new(crate_obj_file_path);
         let file = path.get_file(&curr_wd).ok_or_else(||
-            format!("Couldn't resolve path to crate object file at {:?}", path)
+            format!("Couldn't resolve path to crate object file at {path:?}")
         )?;
         load_crate(&mut output, file, &namespace)?;
     } else if matches.opt_present("f") {
@@ -87,13 +87,13 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
 
 fn load_crate(output: &mut String, crate_file_ref: FileRef, namespace: &Arc<CrateNamespace>) -> Result<(), String> {
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("Cannot get kernel_mmi_ref"))?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "Cannot get kernel_mmi_ref".to_string())?;
     let (_new_crate_ref, _new_syms) = namespace.load_crate(
         &crate_file_ref,
         None,
         kernel_mmi_ref,
         false
-    ).map_err(|e| String::from(e))?;
+    ).map_err(String::from)?;
     writeln!(output, "Loaded crate with {} new symbols from {}", _new_syms, crate_file_ref.lock().get_absolute_path()).unwrap();
     Ok(())
 }
@@ -127,7 +127,7 @@ fn print_crates(output: &mut String, indent: usize, namespace: &CrateNamespace, 
     });
     crates.sort();
     for c in crates {
-        writeln!(output, "{}", c)?;
+        writeln!(output, "{c}")?;
     }
 
     if recursive {
@@ -145,5 +145,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "\nUsage: ns [OPTION]
+const USAGE: &str = "\nUsage: ns [OPTION]
 Lists the crates that are loaded in the currently-active crate namespace.";

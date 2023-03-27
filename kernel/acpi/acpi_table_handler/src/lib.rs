@@ -6,17 +6,8 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate acpi_table;
 
-extern crate rsdt;
-extern crate fadt;
-extern crate hpet;
-extern crate madt;
-extern crate dmar;
-
-
+use log::warn;
 use memory::PhysicalAddress;
 use acpi_table::{AcpiSignature, AcpiTables};
 

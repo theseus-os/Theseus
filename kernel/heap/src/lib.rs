@@ -13,7 +13,7 @@ extern crate kernel_config;
 extern crate block_allocator;
 
 use alloc::alloc::{GlobalAlloc, Layout};
-use memory::EntryFlags;
+use memory::PteFlags;
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
@@ -35,8 +35,12 @@ pub static DEFAULT_ALLOCATOR: Once<Box<dyn GlobalAlloc + Send + Sync>> = Once::n
 /// Currently it is initialized with an instance of `MultipleHeaps`.
 static DEFAULT_ALLOCATOR: Once<Box<dyn GlobalAlloc + Send + Sync>> = Once::new();
 
-/// The heap mapped pages should be writable
-pub const HEAP_FLAGS: EntryFlags = EntryFlags::WRITABLE;
+/// The heap mapped pages should be writable and non-executable.
+pub const HEAP_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+);
 
 /// The ending address of the initial heap. It is used to determine which heap should be used during deallocation.
 const INITIAL_HEAP_END_ADDR: usize = KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE;

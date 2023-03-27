@@ -1,72 +1,58 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "nano_core"
-description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
 version = "0.1.0"
-build = "build.rs"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "The minimalist crate that takes over after the bootloader and is responsible for pre-initialization of Theseus, before handing off control to the captain"
+edition = "2021"
 
 
 [dependencies]
-spin = "0.9.0"
-multiboot2 = "0.14.0"
+cfg-if = "1.0.0"
+multiboot2 = { version = "0.14.0", optional = true }
 libm = "0.2.1"
+log = "0.4.8"
 
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
-# [dependencies.compiler_builtins]
-# git = "https://github.com/rust-lang-nursery/compiler-builtins"
-# default-features = false
-# features = [ "no-lang-items" ]
+kernel_config = { path = "../kernel_config" }
+state_store = { path = "../state_store" }
+memory = { path = "../memory" }
+no_drop = { path = "../no_drop" }
+early_tls = { path = "../early_tls" }
+stack = { path = "../stack" }
+mod_mgmt = { path = "../mod_mgmt" }
+panic_entry = { path = "../panic_entry" }
+memory_initialization = { path = "../memory_initialization" }
+boot_info = { path = "../boot_info" }
+captain = { path = "../captain" }
+early_printer = { path = "../early_printer" }
 
-[dependencies.log]
-version = "0.4.8"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+exceptions_early = { path = "../exceptions_early" }
+serial_port_basic = { path = "../serial_port_basic" }
+logger_x86_64 = { path = "../logger_x86_64" }
 
-[dependencies.kernel_config]
-path = "../kernel_config"
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+logger_aarch64 = { path = "../logger_aarch64" }
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.uefi-bootloader-api]
+git = "https://github.com/theseus-os/uefi-bootloader"
+optional = true
 
-[dependencies.logger]
-path = "../logger"
+[build-dependencies]
+cfg-if = "1.0.0"
 
-[dependencies.state_store]
-path = "../state_store"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.no_drop]
-path = "../no_drop"
-
-[dependencies.serial_port_basic]
-path = "../serial_port_basic"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.exceptions_early]
-path = "../exceptions_early"
-
-[dependencies.captain]
-path = "../captain"
-
-[dependencies.panic_entry]
-path = "../panic_entry"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
-[dependencies.memory_initialization]
-path = "../memory_initialization"
+[features]
+default = [ "bios" ]
+## Build for a system that boots via legacy BIOS (multiboot2).
+bios = ["boot_info/multiboot2", "early_printer/bios", "dep:multiboot2"]
+## Build for a system that boots via UEFI.
+uefi = ["boot_info/uefi", "dep:uefi-bootloader-api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
 # that we can jump to from the bootloader.
-crate-type = ["staticlib"]  
-
+crate-type = ["staticlib"]
 
 ## Currently not used; see the `build.rs` script.
 # [build-dependencies]

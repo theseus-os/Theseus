@@ -6,7 +6,7 @@ extern crate task;
 extern crate spawn;
 extern crate scheduler;
 extern crate mutex_sleep;
-extern crate apic;
+extern crate cpu;
 
 use core::ops::Deref;
 
@@ -35,25 +35,25 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// A simple test that spawns 3 tasks that all contend to increment a shared usize
 fn test_contention() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
     let t1 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_1"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
     let t2 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_2"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
     
     let t3 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_3"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
@@ -73,8 +73,8 @@ fn test_contention() -> Result<(), &'static str> {
 
 
 fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
-    let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
-    let curr_task = format!("{}", curr_task.deref());
+    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+        .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..1000 {
@@ -93,25 +93,25 @@ fn mutex_sleep_task(lock: Arc<MutexSleep<usize>>) -> Result<(), &'static str> {
 
 /// A test for running multiple tasks that are synchronized in lockstep
 fn test_lockstep() -> Result<(), &'static str> {
-    let my_cpu = apic::get_my_apic_id();
+    let my_cpu = cpu::current_cpu();
 
     let shared_lock = Arc::new(MutexSleep::new(0usize));
 
     let t1 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 0))
         .name(String::from("lockstep_task_1"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
     let t2 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 1))
         .name(String::from("lockstep_task_2"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
     
     let t3 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 2))
         .name(String::from("lockstep_task_3"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
@@ -131,10 +131,8 @@ fn test_lockstep() -> Result<(), &'static str> {
 
 
 fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(), &'static str> {
-    let curr_task = {
-        let t = task::get_my_current_task().ok_or("couldn't get current task")?;
-        format!("{}", t.deref())
-    };
+    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+        .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..20 {

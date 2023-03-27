@@ -1,0 +1,29 @@
+[package]
+name = "net"
+version = "0.1.0"
+description = "Network device abstractions"
+edition = "2021"
+
+[dependencies]
+heapless = "0.7.8"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+log = "0.4.8"
+mutex_sleep = { path = "../mutex_sleep" }
+nic_buffers = { path = "../nic_buffers" }
+random = { path = "../random" }
+spin = "0.9"
+
+[dependencies.smoltcp]
+# TODO: move to patch in root Cargo.toml after removing legacy net interface
+git = "https://github.com/smoltcp-rs/smoltcp"
+default-features = false
+features = [
+    "alloc",
+    "socket-raw",
+    "socket-udp",
+    "socket-tcp",
+    "socket-icmp",
+    "proto-ipv4",
+    "proto-ipv6",
+    "medium-ethernet",
+]

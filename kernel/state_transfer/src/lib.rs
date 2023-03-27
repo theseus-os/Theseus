@@ -37,7 +37,7 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
         let krate = rq_rr_crate.lock_as_ref();
         for sec in krate.sections.values() {
             if sec.name.contains("RUNQUEUES") {
-                debug!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.start_address(), sec.size());
+                debug!("Section {}\n\ttype: {:?}\n\tvaddr: {:#X}\n\tsize: {}\n", sec.name, sec.typ, sec.virt_addr, sec.size);
             }
         }
         warn!("REPLACING LAZY_STATIC RUNQUEUES...");

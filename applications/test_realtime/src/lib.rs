@@ -18,9 +18,9 @@ extern crate alloc;
 extern crate spawn;
 extern crate sleep;
 extern crate scheduler;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
+extern crate time;
 
-use core::sync::atomic::AtomicUsize;
 use alloc::{
     vec::Vec,
     string::String
@@ -50,13 +50,12 @@ pub fn main(_args: Vec<String>) -> isize {
 
 /// A simple task that periodically sleeps and prints a log statement at regular intervals.
 fn _task_delay_tester(_arg: usize) {
-    let start_time : AtomicUsize = AtomicUsize::new(sleep::get_current_time_in_ticks());
+    let mut end_time = time::now::<time::Monotonic>();
     let mut iter = 0;
     loop {
+        end_time += time::Duration::from_secs(1);
         info!("I run periodically (iter {}).", iter);
         iter += 1;
-
-        // This desk will sleep periodically for 1000 systicks
-        sleep::sleep_periodic(&start_time, 1000).unwrap();
+        sleep::sleep_until(end_time).unwrap();
     }
 }

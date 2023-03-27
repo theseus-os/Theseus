@@ -8,13 +8,10 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate sdt;
-extern crate zerocopy;
 
 use alloc::collections::BTreeMap;
-use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, EntryFlags, PhysicalAddress, Frame, FrameRange};
+use log::{trace, error};
+use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange};
 use sdt::Sdt;
 use core::ops::Add;
 use zerocopy::FromBytes;
@@ -39,7 +36,8 @@ pub struct TableLocation {
 /// All ACPI tables are covered by a single large MappedPages object, 
 /// which is necessary because they may span multiple pages/frames,
 /// and generally should not be multiply aliased/accessed due to potential race conditions.
-/// As more ACPI tables are discovered, the single MappedPages object is 
+/// As more ACPI tables are discovered, the single MappedPages object is
+/// extended to cover them.
 pub struct AcpiTables {
     /// The range of pages that cover all of the discovered ACPI tables.
     mapped_pages: MappedPages,
@@ -78,7 +76,7 @@ impl AcpiTables {
         if !self.frames.contains(&first_frame) {
             // Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
             let _orig_mp = core::mem::replace(&mut self.mapped_pages, MappedPages::empty());
-            trace!("[0] Dropping original {:?}", _orig_mp);
+            // trace!("[0] Dropping original {:?}", _orig_mp);
             drop(_orig_mp);
 
             let new_frames = self.frames.to_extended(first_frame);
@@ -89,7 +87,7 @@ impl AcpiTables {
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(true).writable(true),
             )?;
 
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
@@ -114,7 +112,7 @@ impl AcpiTables {
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(true).writable(true),
             )?;
 
             self.adjust_mapping_offsets(new_frames, new_mapped_pages);
@@ -142,7 +140,7 @@ impl AcpiTables {
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
                 af,
-                EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_EXECUTE,
+                PteFlags::new().valid(true).writable(true),
             )?;
             // No real need to adjust mapping offsets here, since we've only appended frames (not prepended);
             // we call this just to set the new frames and new mapped pages

@@ -1,0 +1,17 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "logger_x86_64"
+version = "0.1.0"
+
+[dependencies]
+log = "0.4.8"
+crossbeam-utils = { version = "0.8.12", default-features = false }
+
+[dependencies.irq_safety]
+git = "https://github.com/theseus-os/irq_safety"
+
+[dependencies.serial_port_basic]
+path = "../serial_port_basic"
+
+[lib]
+crate-type = ["rlib"]

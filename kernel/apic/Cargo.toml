@@ -6,13 +6,13 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
+derive_more = "0.99.0"
 volatile = "0.2.7"
 x86_64 = "0.14.8"
 crossbeam-utils = { version = "0.8.12", default-features = false }
 bit_field = "0.7.0"
 zerocopy = "0.5.0"
-static_assertions = "1.1.0"
 log = "0.4.8"
 
 [dependencies.irq_safety]
@@ -36,8 +36,8 @@ path = "../kernel_config"
 [dependencies.raw-cpuid]
 version = "10.6.0"
 
-[features]
-apic_timer_fixed = []
+# [features]
+# apic_timer_fixed = []
 
 
 [lib]

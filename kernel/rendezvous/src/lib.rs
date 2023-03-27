@@ -27,9 +27,6 @@ extern crate wait_queue;
 extern crate task;
 extern crate scheduler;
 
-#[cfg(downtime_eval)]
-extern crate hpet;
-
 use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
@@ -141,7 +138,7 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
 
@@ -174,9 +171,7 @@ impl<T: Send> Channel<T> {
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire sender slot...");
-        let res = self.waiting_senders.wait_until(&|| self.try_take_sender_slot());
-        // trace!("... acquired sender slot!");
-        res
+        self.waiting_senders.wait_until(&|| self.try_take_sender_slot())
     }
     
     /// Obtain a receiver slot, blocking until one is available.
@@ -187,9 +182,7 @@ impl<T: Send> Channel<T> {
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire receiver slot...");
-        let res = self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot());
-        // trace!("... acquired receiver slot!");
-        res
+        self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot())
     }
 
     /// Try to obtain a sender slot in a non-blocking fashion,
@@ -220,22 +213,6 @@ impl <T: Send> Sender<T> {
         #[cfg(trace_channel)]
         trace!("rendezvous: sending msg: {:?}", debugit!(msg));
 
-        #[cfg(downtime_eval)]
-        let value = hpet::get_hpet().as_ref().unwrap().get_counter();
-        // debug!("Value {} {}", value, value % 1024);
-
-        let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
-
-        // Fault mimicing a memory write. Function could panic when getting task
-        #[cfg(downtime_eval)]
-        {
-            if (value % 4096) == 0  && curr_task.is_restartable() {
-                // debug!("Fake error {}", value);
-                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-            }
-        }
-
-
         // obtain a sender-side exchange slot, blocking if necessary
         let sender_slot = self.channel.take_sender_slot().map_err(|_| "failed to take_sender_slot")?;
 
@@ -250,7 +227,11 @@ impl <T: Send> Sender<T> {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
                     // which is currently done automatically because the slot uses a MutexIrqSafe.
-                    *exchange_state = ExchangeState::WaitingForReceiver(WaitGuard::new(curr_task.clone()).map_err(|_| "failed to create wait guard")?, msg);
+                    let curr = task::get_my_current_task().ok_or("couldn't get current task")?;
+                    *exchange_state = ExchangeState::WaitingForReceiver(
+                        WaitGuard::new(curr).map_err(|_| "failed to create wait guard")?,
+                        msg,
+                    );
                     None
                 }
                 ExchangeState::WaitingForSender(receiver_to_notify) => {
@@ -293,7 +274,9 @@ impl <T: Send> Sender<T> {
                 let exchange_state = sender_slot.0.lock();
                 match &*exchange_state {
                     ExchangeState::WaitingForReceiver(blocked_sender, ..) => {
-                        if blocked_sender.task() != curr_task {
+                        if task::with_current_task(|t| t != blocked_sender.task())
+                            .unwrap_or(true)
+                        {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED SENDER");
                         }
                         blocked_sender.block_again().map_err(|_| "failed to block sender")?;
@@ -444,7 +427,7 @@ impl <T: Send> Receiver<T> {
                 match &*exchange_state {
                     ExchangeState::WaitingForSender(blocked_receiver) => {
                         warn!("spurious wakeup while receiver is WaitingForSender... re-blocking task.");
-                        if blocked_receiver.task() != curr_task {
+                        if blocked_receiver.task() != &curr_task {
                             return Err("BUG: CURR TASK WAS DIFFERENT THAN BLOCKED RECEIVER");
                         }
                         blocked_receiver.block_again().map_err(|_| "failed to block receiver")?;

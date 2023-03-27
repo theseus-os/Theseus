@@ -5,9 +5,8 @@ description = "Channel for asynchronous Inter-Task Communication via a bounded b
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 crossbeam-utils = { version = "0.8.12", default-features = false }
-static_assertions = "1.1.0"
 mpmc = "0.1.6"
 
 [dependencies.log]
@@ -19,11 +18,10 @@ path = "../../libs/debugit"
 [dependencies.wait_queue]
 path = "../wait_queue"
 
-[dependencies.task]
-path = "../task"
-
-[dependencies.hpet]
-path = "../acpi/hpet"
+[dependencies.core2]
+version = "0.4.0"
+default-features = false
+features = ["alloc", "nightly"]
 
 [lib]
 crate-type = ["rlib"]

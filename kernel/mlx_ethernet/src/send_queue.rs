@@ -39,7 +39,7 @@ pub(crate) struct TransportInterfaceSendContext {
     _padding3:          [u32; 28]
 }
 
-const_assert_eq!(core::mem::size_of::<TransportInterfaceSendContext>(), 160);
+const _: () = assert!(core::mem::size_of::<TransportInterfaceSendContext>() == 160);
 
 impl TransportInterfaceSendContext {
     /// Create and initialize a TIS object
@@ -87,7 +87,7 @@ pub(crate) struct SendQueueContext {
     tis_num_0:                          Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<SendQueueContext>(), 48);
+const _: () = assert!(core::mem::size_of::<SendQueueContext>() == 48);
 
 impl fmt::Debug for SendQueueContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -148,7 +148,7 @@ impl SendQueueContext {
     /// Find the state of the SQ from the SQ context 
     pub fn get_state(&self) -> Result<SendQueueState, &'static str> {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
-        Ok( SendQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the SQ state")? )
+        SendQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the SQ state")
     }
 
     /// Offset that this context is written to in the mailbox buffer

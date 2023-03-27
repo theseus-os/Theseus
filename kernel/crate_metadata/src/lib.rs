@@ -53,13 +53,14 @@ use spin::{Mutex, RwLock, Once};
 use alloc::{
     collections::BTreeSet,
     format,
-    string::String,
+    string::{
+        String,
+        ToString,
+    },
     sync::{Arc, Weak},
     vec::Vec,
 };
-use memory::{MappedPages, VirtualAddress, EntryFlags};
-#[cfg(internal_deps)]
-use memory::PageTable;
+use memory::{MappedPages, VirtualAddress, PteFlags};
 use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
@@ -90,22 +91,36 @@ pub type StrongSectionRef  = Arc<LoadedSection>;
 pub type WeakSectionRef = Weak<LoadedSection>;
 
 /// `.text` sections are read-only and executable.
-pub const TEXT_SECTION_FLAGS:     EntryFlags = EntryFlags::PRESENT;
+pub const TEXT_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    & !PteFlags::NOT_EXECUTABLE.bits() // clear the no-exec bits
+);
 /// `.rodata` sections are read-only and non-executable.
-pub const RODATA_SECTION_FLAGS:   EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits());
+pub const RODATA_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    & !PteFlags::WRITABLE.bits()
+);
 /// `.data` and `.bss` sections are read-write and non-executable.
-pub const DATA_BSS_SECTION_FLAGS: EntryFlags = EntryFlags::from_bits_truncate(EntryFlags::PRESENT.bits() | EntryFlags::NO_EXECUTE.bits() | EntryFlags::WRITABLE.bits());
+pub const DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    (PteFlags::new().bits() | PteFlags::VALID.bits())
+    | PteFlags::WRITABLE.bits()
+);
+
+// Double-check section flags were defined correctly.
+const _: () = assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
+const _: () = assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
+const _: () = assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
 
 
 /// The Theseus Makefile appends prefixes onto bootloader module names,
 /// which are separated by the "#" character. 
 /// For example, "k#my_crate-hash.o".
-pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
+pub const MODULE_PREFIX_DELIMITER: &str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
-pub const CRATE_HASH_DELIMITER: &'static str = "-";
+pub const CRATE_HASH_DELIMITER: &str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
-/// e.g., "my_crate::section_name::h<hash>".
-pub const SECTION_HASH_DELIMITER: &'static str = "::h";
+/// e.g., `"my_crate::section_name::h<hash>"`.
+pub const SECTION_HASH_DELIMITER: &str = "::h";
 
 
 /// The type of a crate, based on its object file naming convention.
@@ -155,7 +170,7 @@ impl CrateType {
     /// let result = CrateType::from_module_name("ksse#my_crate.o");
     /// assert_eq!(result, (CrateType::Kernel, "sse", "my_crate.o") );
     /// ```
-    pub fn from_module_name<'a>(module_name: &'a str) -> Result<(CrateType, &'a str, &'a str), &'static str> {
+    pub fn from_module_name(module_name: &str) -> Result<(CrateType, &str, &str), &'static str> {
         let mut iter = module_name.split(MODULE_PREFIX_DELIMITER);
         let prefix = iter.next().ok_or("couldn't parse crate type prefix before delimiter")?;
         let crate_name = iter.next().ok_or("couldn't parse crate name after prefix delimiter")?;
@@ -262,7 +277,7 @@ impl fmt::Debug for LoadedCrate {
             .field("name", &self.crate_name)
             .field("object_file", &self.object_file.try_lock()
                 .map(|f| f.get_absolute_path())
-                .unwrap_or_else(|| format!("<Locked>"))
+                .unwrap_or_else(|| "<Locked>".to_string())
             )
             .finish_non_exhaustive()
     }
@@ -270,7 +285,6 @@ impl fmt::Debug for LoadedCrate {
 
 impl Drop for LoadedCrate {
     fn drop(&mut self) {
-        #[cfg(not(downtime_eval))]
         trace!("### Dropped LoadedCrate: {}", self.crate_name);
     }
 }
@@ -280,7 +294,7 @@ impl LoadedCrate {
     /// Only matches demangled names, e.g., "my_crate::foo".
     pub fn get_function_section(&self, func_name: &str) -> Option<&StrongSectionRef> {
         self.find_section(|sec| 
-            sec.get_type() == SectionType::Text &&
+            sec.typ == SectionType::Text &&
             sec.name.as_str() == func_name
         )
     }
@@ -379,19 +393,19 @@ impl LoadedCrate {
     #[cfg(internal_deps)]
     pub fn deep_copy(
         &self, 
-        page_table: &mut PageTable, 
+        page_table: &mut memory::PageTable, 
     ) -> Result<StrongCrateRef, &'static str> {
 
         // This closure deep copies the given mapped_pages (mapping them as WRITABLE)
         // and recalculates the the range of addresses covered by the new mapping.
-        let mut deep_copy_mp = |old_mp_range: &(Arc<Mutex<MappedPages>>, Range<VirtualAddress>), flags: EntryFlags|
+        let mut deep_copy_mp = |old_mp_range: &(Arc<Mutex<MappedPages>>, Range<VirtualAddress>), flags: PteFlags|
             -> Result<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>), &'static str> 
         {
             let old_mp_locked = old_mp_range.0.lock();
             let old_start_address = old_mp_range.1.start.value();
             let size = old_mp_range.1.end.value() - old_start_address;
             let offset = old_start_address - old_mp_locked.start_address().value();
-            let new_mp = old_mp_range.0.lock().deep_copy(Some(flags | EntryFlags::WRITABLE), page_table)?;
+            let new_mp = old_mp_range.0.lock().deep_copy(page_table, Some(flags.writable(true)))?;
             let new_start_address = new_mp.start_address() + offset;
             Ok((Arc::new(Mutex::new(new_mp)), new_start_address .. (new_start_address + size)))
         };
@@ -472,7 +486,7 @@ impl LoadedCrate {
                 new_sec_mapped_pages_ref,               // mapped_pages is different, points to the new duplicated one
                 new_sec_mapped_pages_offset,            // mapped_pages_offset is the same
                 new_sec_virt_addr,                      // virt_addr is different, based on the new mapped_pages
-                old_sec.size(),                         // size is the same
+                old_sec.size,                           // size is the same
                 old_sec.global,                         // globalness is the same
                 new_crate_weak_ref.clone(),             // parent_crate is different, points to the newly-copied crate
                 old_sec_inner.sections_i_depend_on.clone(),   // dependencies are the same, but relocations need to be re-written
@@ -508,7 +522,7 @@ impl LoadedCrate {
             let new_sec_mapped_pages_offset = new_sec.mapped_pages_offset;
             let new_sec_slice: &mut [u8] = new_sec_mapped_pages.as_slice_mut(
                 0,
-                new_sec_mapped_pages_offset + new_sec.size(),
+                new_sec_mapped_pages_offset + new_sec.size,
             )?;
 
             // The newly-duplicated crate still depends on the same sections, so we keep those as is, 
@@ -523,7 +537,7 @@ impl LoadedCrate {
                         strong_dep.relocation, 
                         new_sec_slice, 
                         new_sec_mapped_pages_offset,
-                        source_sec.start_address(),
+                        source_sec.virt_addr,
                         true
                     )?;
 
@@ -549,10 +563,10 @@ impl LoadedCrate {
                 // to ensure that we don't cause deadlock by trying to lock the same section twice.
                 let source_sec_vaddr = if Arc::ptr_eq(source_sec, new_sec) {
                     // here: the source_sec and new_sec are the same, so just use the already-locked new_sec
-                    new_sec.start_address()
+                    new_sec.virt_addr
                 } else {
                     // here: the source_sec and new_sec are different, so we can go ahead and safely lock the source_sec
-                    source_sec.start_address()
+                    source_sec.virt_addr
                 };
                 write_relocation(
                     internal_dep.relocation, 
@@ -617,6 +631,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
 /// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.
 #[derive(Default)]
+#[non_exhaustive]
 pub struct LoadedSectionInner {
     /// The list of sections in foreign crates that this section depends on, i.e., "my required dependencies".
     /// This is kept as a list of strong references because these sections must outlast this section,
@@ -638,6 +653,7 @@ pub struct LoadedSectionInner {
 
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
+#[non_exhaustive]
 pub struct LoadedSection {
     /// The full string name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
@@ -657,15 +673,17 @@ pub struct LoadedSection {
     pub mapped_pages: Arc<Mutex<MappedPages>>, 
     /// The offset into the `mapped_pages` where this section starts
     pub mapped_pages_offset: usize,
-    /// The range of `VirtualAddress`es covered by this section, i.e., 
-    /// the starting (inclusive) and ending (exclusive) `VirtualAddress` of this section.
-    /// This can be used to calculate size, but is primarily a performance optimization
-    /// so we can avoid locking this section's `MappedPages` and avoid recalculating 
-    /// its bounds based on its offset and size. 
-    /// 
-    /// For TLS sections, this `address_range.start` holds the offset (from the TLS base)
-    /// into the TLS area where this section's data exists.
-    pub address_range: Range<VirtualAddress>, 
+    /// The starting `VirtualAddress` of this section (except for TLS sections).
+    ///
+    /// For TLS sections, this is *not* a `VirtualAddress`, but rather the offset
+    /// (from the TLS base) into the TLS area where this section's data exists.
+    ///
+    /// For all other sections, this is simply a performance optimization that avoids
+    /// having to calculate its starting virtual address by invoking
+    /// `self.mapped_pages.address_at_offset(self.mapped_pages_offset)`.
+    pub virt_addr: VirtualAddress,
+    /// The size in bytes of this section.
+    pub size: usize,
     /// The `LoadedCrate` object that contains/owns this section
     pub parent_crate: WeakCrateRef,
     /// The inner contents of a section that could possibly change
@@ -674,6 +692,7 @@ pub struct LoadedSection {
 }
 impl LoadedSection {
     /// Create a new `LoadedSection`, with an empty `dependencies` list.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         typ: SectionType, 
         name: StrRef, 
@@ -701,6 +720,7 @@ impl LoadedSection {
     }
 
     /// Same as [new()`](#method.new), but uses the given `dependencies` instead of the default empty list.
+    #[allow(clippy::too_many_arguments)]
     pub fn with_dependencies(
         typ: SectionType, 
         name: StrRef, 
@@ -720,7 +740,8 @@ impl LoadedSection {
             name,
             mapped_pages,
             mapped_pages_offset,
-            address_range: virt_addr .. (virt_addr + size),
+            virt_addr,
+            size,
             global,
             parent_crate,
             inner: RwLock::new(LoadedSectionInner {
@@ -732,28 +753,12 @@ impl LoadedSection {
         }
     }
 
-    /// Returns the starting `VirtualAddress` of where this section is loaded into memory. 
-    pub fn start_address(&self) -> VirtualAddress {
-        self.address_range.start
-    }
-
-    /// Returns the size in bytes of this section.
-    pub fn size(&self) -> usize {
-        self.address_range.end.value() - self.address_range.start.value()
-    }
-
-    /// Returns the type of this section.
-    pub fn get_type(&self) -> SectionType {
-        self.typ
-    }
-
     /// Returns the substring of this section's name that excludes the trailing hash. 
     /// 
     /// See the identical associated function [`section_name_without_hash()`](#fn.section_name_without_hash.html) for more. 
     pub fn name_without_hash(&self) -> &str {
         Self::section_name_without_hash(self.name.as_str())
     }
-
 
     /// Returns the substring of the given section's name that excludes the trailing hash,
     /// but includes the hash delimiter "`::h`". 
@@ -765,9 +770,8 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or(&sec_name)
+            .unwrap_or(sec_name)
     }
-
 
     /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list
     /// in which the section matches the given `matching_section` 
@@ -791,20 +795,20 @@ impl LoadedSection {
     pub fn copy_section_data_to(&self, destination_section: &LoadedSection) -> Result<(), &'static str> {
 
         let mut dest_sec_mapped_pages = destination_section.mapped_pages.lock();
-        let dest_sec_data: &mut [u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size())?;
+        let dest_sec_data: &mut [u8] = dest_sec_mapped_pages.as_slice_mut(destination_section.mapped_pages_offset, destination_section.size)?;
 
         let source_sec_mapped_pages = self.mapped_pages.lock();
-        let source_sec_data: &[u8] = source_sec_mapped_pages.as_slice(self.mapped_pages_offset, self.size())?;
+        let source_sec_data: &[u8] = source_sec_mapped_pages.as_slice(self.mapped_pages_offset, self.size)?;
 
         if dest_sec_data.len() == source_sec_data.len() {
             dest_sec_data.copy_from_slice(source_sec_data);
             // debug!("Copied data from source section {:?} {:?} ({:#X}) to dest section {:?} {:?} ({:#X})",
-            //     self.typ, self.name, self.size(), destination_section.typ, destination_section.name, destination_section.size());
+            //     self.typ, self.name, self.size, destination_section.typ, destination_section.name, destination_section.size);
             Ok(())
         }
         else {
             error!("This source section {:?}'s size ({:#X}) is different from the destination section {:?}'s size ({:#X})",
-                self.name, self.size(), destination_section.name, destination_section.size());
+                self.name, self.size, destination_section.name, destination_section.size);
             Err("this source section has a different length than the destination section")
         }
     }
@@ -853,7 +857,7 @@ impl LoadedSection {
         }
 
         // Check that the bounds of this entire section fit within its MappedPages
-        let end = self.mapped_pages_offset + self.size();
+        let end = self.mapped_pages_offset + self.size;
         if end > mp.size_in_bytes() {
             error!("Requested LoadedSection as function {:?}, but section's end offset ({:X?}) was beyond its MappedPages ({:X?})",
                 core::any::type_name::<F>(), end, mp.size_in_bytes()
@@ -880,8 +884,8 @@ impl fmt::Display for LoadedSection {
             "LoadedSection({:?}, typ: {:?}, vaddr: {:#X}, size: {})", 
             self.name,
             self.typ,
-            self.start_address(),
-            self.size(),
+            self.virt_addr,
+            self.size,
         )
     }
 }
@@ -907,8 +911,8 @@ impl fmt::Debug for LoadedSection {
         }
 
         // Add the rest of the typical fields
-        dbg.field("vaddr", &self.start_address())
-            .field("size", &self.size())
+        dbg.field("vaddr", &self.virt_addr)
+            .field("size", &self.size)
             .finish_non_exhaustive()
     }
 }
@@ -990,11 +994,7 @@ impl RelocationEntry {
     /// does NOT depend on the target section's address itself in any way 
     /// (i.e., it only depends on the source section)
     pub fn is_absolute(&self) -> bool {
-        match self.typ {
-            R_X86_64_32 | 
-            R_X86_64_64 => true,
-            _ => false,
-        }
+        matches!(self.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 
@@ -1041,7 +1041,7 @@ pub fn write_relocation(
 
     // Perform the actual writing of relocation data here.
     // There is a great, succint table of relocation types here:
-    // <https://docs.rs/goblin/0.0.24/goblin/elf/reloc/index.html>
+    // <https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html>
     match relocation_entry.typ {
         R_X86_64_32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
@@ -1073,19 +1073,34 @@ pub fn write_relocation(
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_TPOFF32 => {
-            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<i32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = u32::try_from(source_sec_vaddr.value())
-                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `u32`")?;
+            // Here we treat the `source_sec_vaddr` value as a signed value 
+            // by casting its bit value directly, i.e., `usize as isize`.
+            let offset_val = source_sec_vaddr.value() as isize;
+            // Now we must check that the signed `offset_val` fits in `i32`
+            let source_val = i32::try_from(offset_val)
+                .map_err(|_| "BUG: TLS relocation (R_X86_64_TPOFF32) source section value (TLS offset) cannot fit in a `i32`")?;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
+        // R_X86_64_GOTTPOFF => {
+        //     // 32-bit signed PC-relative offset to the GOT entry for the IE (Initial Exec(utable) TLS model))
+        //     debug!("R_X86_64_GOTTPOFF: {:#X?}", relocation_entry);
+        //     debug!("R_X86_64_GOTTPOFF: target: {:#X}, source: {:#X}", target_sec_slice.as_ptr() as usize + target_sec_offset, source_sec_vaddr);
+        //     unimplemented!()
+        // }
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
         // }
         _ => {
-            error!("found unsupported relocation type {}\n  --> Are you compiling crates with 'code-model=large'?", relocation_entry.typ);
-            return Err("found unsupported relocation type. Are you compiling crates with 'code-model=large'?");
+            error!("found unsupported relocation type {}\n    \
+                --> Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?",
+                relocation_entry.typ
+            );
+            return Err("found unsupported relocation type. \
+                Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?"
+            );
         }
     }
 

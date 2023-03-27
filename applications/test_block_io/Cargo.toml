@@ -10,8 +10,8 @@ core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nig
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 [dependencies.task]
 path = "../../kernel/task"

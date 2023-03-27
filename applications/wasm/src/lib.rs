@@ -27,7 +27,7 @@ extern crate path;
 extern crate task;
 extern crate wasi_interpreter;
 
-use alloc::{string::String, sync::Arc, vec::Vec};
+use alloc::{string::String, vec::Vec};
 use fs_node::FileOrDir;
 use getopts::{Options, ParsingStyle};
 use path::Path;
@@ -59,19 +59,16 @@ pub fn main(args: Vec<String>) -> isize {
     let preopened_dirs: Vec<String> = matches.opt_strs("d");
 
     // Get current working directory.
-    let curr_wr = Arc::clone(
-        &task::get_my_current_task()
-            .unwrap()
-            .get_env()
-            .lock()
-            .working_dir,
-    );
+    let Ok(curr_wd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        println!("failed to get current task");
+        return -1;
+    };
 
     // Verify passed preopened directories are real directories.
     for dir in preopened_dirs.iter() {
         let dir_path = Path::new(dir.clone());
 
-        match dir_path.get(&curr_wr) {
+        match dir_path.get(&curr_wd) {
             Some(file_dir_enum) => match file_dir_enum {
                 FileOrDir::Dir(_) => {}
                 FileOrDir::File(file) => {
@@ -98,7 +95,7 @@ pub fn main(args: Vec<String>) -> isize {
     let wasm_binary_path = Path::new(args[0].clone());
 
     // Parse inputted WebAssembly binary path into byte array.
-    let wasm_binary: Vec<u8> = match wasm_binary_path.get(&curr_wr) {
+    let wasm_binary: Vec<u8> = match wasm_binary_path.get(&curr_wd) {
         Some(file_dir_enum) => match file_dir_enum {
             FileOrDir::Dir(directory) => {
                 println!("{:?} is a directory.", directory.lock().get_name());
@@ -135,7 +132,7 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "USAGE:
+const USAGE: &str = "USAGE:
     wasm [option]... WASM_BINARY_PATH [arg]...
 
 EXAMPLES:

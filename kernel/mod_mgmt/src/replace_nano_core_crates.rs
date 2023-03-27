@@ -62,7 +62,7 @@ pub fn replace_nano_core_crates(
 
     let _new_crate_ref = load_crate_using_nano_core_data_sections(
         &nano_core_crate, 
-        &namespace,
+        namespace,
         &crate_object_file,
         kernel_mmi_ref,
         false,
@@ -142,7 +142,7 @@ fn load_crate_using_nano_core_data_sections(
         // have already been added to the symbol map when the nano_core was originally parsed.
         _num_new_syms = namespace.add_symbols_filtered(
             new_crate.sections.values(), 
-            |sec| !sec.get_type().is_data_or_bss(),
+            |sec| !sec.typ.is_data_or_bss(),
             verbose_log,
         );
         _num_new_sections = new_crate.sections.len();

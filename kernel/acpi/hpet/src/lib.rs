@@ -1,22 +1,15 @@
-//! Support for the x86 HPET: High Precision Event Timer.
+//! Support for the HPET: High Precision Event Timer.
 
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate kernel_config;
-extern crate memory;
-extern crate volatile;
-extern crate zerocopy;
-extern crate sdt;
-extern crate acpi_table;
-extern crate spin;
-
+use log::debug;
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, EntryFlags, BorrowedMappedPages, Mutable};
+use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, PteFlags, BorrowedMappedPages, Mutable};
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
+use time::Instant;
 
 /// The static instance of the HPET's ACPI memory region, which derefs to an Hpet instance.
 static HPET: Once<RwLock<BorrowedMappedPages<Hpet, Mutable>>> = Once::new();
@@ -65,6 +58,7 @@ pub struct Hpet {
     /// Call [`num_timers`](#method.num_timers) to get the actual number of HPET timers.
     pub timers:                      [HpetTimer; 32],
 }
+const _: () = assert!(core::mem::size_of::<Hpet>() == 1280);
 
 impl Hpet {
     /// Returns the HPET's main counter value
@@ -112,6 +106,13 @@ impl Hpet {
     }
 }
 
+impl time::ClockSource for Hpet {
+    type ClockType = time::Monotonic;
+
+    fn now() -> Instant {
+        Instant::new(get_hpet().expect("couldn't get HPET").get_counter())
+    }
+}
 
 /// A structure that wraps HPET I/O register for each timer comparator, 
 /// specified by the format here: <https://wiki.osdev.org/HPET#HPET_registers>.
@@ -128,9 +129,10 @@ pub struct HpetTimer {
     pub fsb_interrupt_route:          Volatile<u64>,
     _padding:                         u64,
 }
+const _: () = assert!(core::mem::size_of::<HpetTimer>() == 32);
 
 
-pub const HPET_SIGNATURE: &'static [u8; 4] = b"HPET";
+pub const HPET_SIGNATURE: &[u8; 4] = b"HPET";
 
 /// The handler for parsing the HPET table and adding it to the ACPI tables list.
 pub fn handle(
@@ -156,11 +158,12 @@ pub struct HpetAcpiTable {
     /// also called 'page_protection'
     _oem_attribute: u8,
 }
+const _: () = assert!(core::mem::size_of::<HpetAcpiTable>() == 56);
 
 impl HpetAcpiTable {
     /// Finds the HPET in the given `AcpiTables` and returns a reference to it.
-    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t HpetAcpiTable> {
-        acpi_tables.table(&HPET_SIGNATURE).ok()
+    pub fn get(acpi_tables: &AcpiTables) -> Option<&HpetAcpiTable> {
+        acpi_tables.table(HPET_SIGNATURE).ok()
     }
 
     /// Initializes the HPET counter-based timer
@@ -179,8 +182,8 @@ impl HpetAcpiTable {
             .ok_or("Couldn't allocate pages for HPET")?;
         let hpet_mp = page_table.map_allocated_pages_to(
             pages,
-            frames, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE,
+            frames,
+            PteFlags::new().valid(true).writable(true).device_memory(true),
         )?;
 
         let mut hpet = hpet_mp.into_borrowed_mut::<Hpet>(phys_addr.frame_offset())

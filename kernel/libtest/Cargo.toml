@@ -5,12 +5,15 @@ description = "A set of convenience functions that can be used for benchmarking 
 version = "0.1.0"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 bit_field = "0.10.0"
 libm = "0.2.1"
 
 [dependencies.apic]
 path = "../apic"
+
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.log]
 version = "0.4.8"

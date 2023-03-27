@@ -6,33 +6,18 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-spin = "0.9.0"
 log = "0.4.8"
 cfg-if = "1.0.0"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+cpu = { path = "../cpu" }
+interrupts = { path = "../interrupts" }
+preemption = { path = "../preemption" }
+sleep = { path = "../sleep" }
+task = { path = "../task" }
 
-[dependencies.apic]
-path= "../apic"
+scheduler_round_robin = { path = "../scheduler_round_robin" }
+scheduler_priority = { path = "../scheduler_priority" }
+scheduler_realtime = { path = "../scheduler_realtime" }
 
-[dependencies.task]
-path = "../task"
-
-[dependencies.preemption]
-path = "../preemption"
-
-[dependencies.runqueue]
-path = "../runqueue"
-
-[dependencies.scheduler_round_robin]
-path = "../scheduler_round_robin"
-
-[dependencies.scheduler_priority]
-path = "../scheduler_priority"
-
-[dependencies.scheduler_realtime]
-path = "../scheduler_realtime"
-
-[lib]
-crate-type = ["rlib"]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"

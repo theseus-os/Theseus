@@ -1,12 +1,12 @@
 [package]
-authors = ["Bowen Liu <liubowenbob@hotmail.com>", "Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Bowen Liu <liubowenbob@hotmail.com>", "Kevin Boos <kevinaboos@gmail.com>", "Hecatia Elegua"]
 name = "mouse"
-description = "A keyboard driver for keyboards connected to the legacy PS2 port"
+description = "A basic driver for a mouse connected to the legacy PS/2 port"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 mpmc = "0.1.6"
 log = "0.4.8"
 x86_64 = "0.14.8"

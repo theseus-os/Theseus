@@ -7,7 +7,6 @@
 
 extern crate irq_safety;
 #[macro_use] extern crate log;
-#[macro_use] extern crate static_assertions;
 extern crate memory;
 extern crate spin;
 extern crate volatile;
@@ -16,7 +15,7 @@ extern crate bitflags;
 
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use memory::{PageTable, EntryFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
+use memory::{PageTable, PteFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
 
 mod regs;
 use regs::*;
@@ -58,7 +57,7 @@ pub fn init(host_address_width: u8,
     let mp = {
         let frames = allocate_frames_at(register_base_address, 1)?;
         let pages = allocate_pages(1).ok_or("Unable to find virtual page!")?;
-        let flags = EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE;
+        let flags = PteFlags::new().valid(true).writable(true).device_memory(true);
         page_table.map_allocated_pages_to(pages, frames, flags)?
     };
 

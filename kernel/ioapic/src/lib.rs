@@ -1,17 +1,12 @@
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate spin;
-extern crate memory;
-extern crate volatile;
-extern crate zerocopy;
-extern crate atomic_linked_list;
-
+use log::debug;
 use spin::{Mutex, MutexGuard};
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
-use memory::{PageTable, PhysicalAddress, EntryFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
+use memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
 use atomic_linked_list::atomic_map::AtomicMap;
+use apic::ApicId;
 
 
 /// The system-wide list of all `IoApic`s, of which there is usually one, 
@@ -70,13 +65,13 @@ pub struct IoApic {
 impl IoApic {
     /// Creates a new IoApic struct from the given `id`, `PhysicalAddress`, and `gsi_base`,
     /// and then adds it to the system-wide list of all IOAPICs.
-    pub fn new(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
+    pub fn create(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
         let new_page = allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!")?;
         let frame = allocate_frames_at(phys_addr, 1).map_err(|_e| "Couldn't allocate physical frame for IOAPIC")?;
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,
             frame, 
-            EntryFlags::PRESENT | EntryFlags::WRITABLE | EntryFlags::NO_CACHE | EntryFlags::NO_EXECUTE, 
+            PteFlags::new().valid(true).writable(true).device_memory(true),
         )?;
 
         let ioapic_regs = ioapic_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
@@ -140,28 +135,51 @@ impl IoApic {
     ///
     /// # Arguments
     /// * `ioapic_irq`: the IRQ number that this interrupt will trigger on this IoApic.
-    /// * `lapic_id`: the id of the LocalApic that should handle this interrupt.
+    /// * `apic_id`: the ID of the Local APIC, i.e., the CPU, that should handle this interrupt.
     /// * `irq_vector`: the system-wide IRQ vector number,
     ///    which after remapping is from 0x20 to 0x2F 
     ///    (see [`interrupts::IRQ_BASE_OFFSET`](../interrupts/constant.IRQ_BASE_OFFSET.html)).
     ///    For example, 0x20 is the PIT timer, 0x21 is the PS2 keyboard, etc.
-    pub fn set_irq(&mut self, ioapic_irq: u8, lapic_id: u8, irq_vector: u8) {
-        let vector = irq_vector as u8;
+    ///
+    /// # Return
+    /// * Returns `Ok` upon success
+    /// * Returns `Err` if the given `ApicId` value exceeds the bounds of `u8`, i.e.,
+    ///   if it is larger than 255.
+    ///   This is because the IOAPIC only supports redirecting interrupts to APICs
+    ///   with IDs that fit within 8-bit values.
+    pub fn set_irq(
+        &mut self,
+        ioapic_irq: u8,
+        apic_id: ApicId,
+        irq_vector: u8,
+    ) -> Result<(), &'static str> {
+        if apic_id.value() > u8::MAX as u32 {
+            log::error!("Cannot set IOAPIC redirection table {} -> {} for APIC ID {} larger than 255",
+                ioapic_irq, irq_vector, apic_id.value(),
+            );
+            return Err("Cannot set IOAPIC redirection table entry for APIC ID larger than 255")
+        }
 
-        let low_index: u32 = 0x10 + (ioapic_irq as u32) * 2;
-        let high_index: u32 = 0x10 + (ioapic_irq as u32) * 2 + 1;
+        let low_index: u32 = 0x10 + ((ioapic_irq as u32) * 2);
+        let high_index: u32 = low_index + 1;
 
         let mut high = self.read_reg(high_index);
         high &= !0xff000000;
-        high |= (lapic_id as u32) << 24;
+        high |= apic_id.value() << 24;
         self.write_reg(high_index, high);
 
         let mut low = self.read_reg(low_index);
+        // Clear mask, enabling this interrupt
         low &= !(1<<16);
+        // Use physical destination mode, not logical destination mode
         low &= !(1<<11);
+        // Set the delivery mode to Fixed
         low &= !0x700;
+        // Set the lowest 8 bits, which correspond to the IRQ vector.
         low &= !0xff;
-        low |= vector as u32;
+        low |= irq_vector as u32;
         self.write_reg(low_index, low);
+
+        Ok(())
     }
 }

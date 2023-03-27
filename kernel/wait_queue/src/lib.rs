@@ -1,3 +1,4 @@
+#![allow(clippy::new_without_default)]
 #![no_std]
 
 extern crate alloc;
@@ -21,20 +22,18 @@ impl WaitGuard {
     /// Blocks the given `Task` and returns a new `WaitGuard` object
     /// that will automatically unblock that Task when it is dropped. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     pub fn new(task: TaskRef) -> Result<WaitGuard, RunState> {
         task.block()?;
-        Ok(WaitGuard {
-            task,
-        })
+        Ok(WaitGuard { task })
     }
 
     /// Blocks the task guarded by this waitguard,
     /// which is useful to re-block a task after it spuriously woke up. 
     ///
-    /// Returns an error if the task cannot be blocked. See [`Task::block`] for
-    ///  more details.
+    /// Returns an error if the task cannot be blocked;
+    /// see [`task::Task::block()`] for more details.
     pub fn block_again(&self) -> Result<RunState, RunState> {
         self.task.block()
     }
@@ -115,8 +114,6 @@ impl WaitQueue {
     // /// The `condition` closure is invoked with one argument, an immutable reference to the waitqueue, 
     // /// to allow the closure to examine the condition of the waitqueue if necessary. 
     pub fn wait_until<R>(&self, condition: &dyn Fn(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -128,14 +125,16 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)?;
+                task::with_current_task(|curr_task| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } else {
+                        warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                    // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                    curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)
+                }).map_err(|_| WaitError::NoCurrentTask)??;
             }
             scheduler::schedule();
 
@@ -147,8 +146,6 @@ impl WaitQueue {
     /// Similar to [`wait_until`](#method.wait_until), but this function accepts a `condition` closure
     /// that can mutate its environment (a `FnMut`).
     pub fn wait_until_mut<R>(&self, condition: &mut dyn FnMut(/* &VecDeque<TaskRef> */) -> Option<R>) -> Result<R, WaitError> {
-        let curr_task = task::get_my_current_task().ok_or(WaitError::NoCurrentTask)?;
-
         // Do the following atomically:
         // (1) Obtain the waitqueue lock
         // (2) Add the current task to the waitqueue
@@ -160,14 +157,16 @@ impl WaitQueue {
                 if let Some(ret) = condition(/* &wq_locked */) {
                     return Ok(ret);
                 }
-                // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
-                if !wq_locked.contains(curr_task) {
-                    wq_locked.push_back(curr_task.clone());
-                } else {
-                    warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
-                }
-                // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
-                curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)?;
+                task::with_current_task(|curr_task| {
+                    // This is only necessary because we're using a non-Set waitqueue collection that allows duplicates
+                    if !wq_locked.contains(curr_task) {
+                        wq_locked.push_back(curr_task.clone());
+                    } else {
+                        warn!("WaitQueue::wait_until():  task was already on waitqueue (potential spurious wakeup?). {:?}", curr_task);
+                    }
+                    // trace!("WaitQueue::wait_until():  putting task to sleep: {:?}\n    --> WQ: {:?}", curr_task, &*wq_locked);
+                    curr_task.block().map_err(|_| WaitError::CantBlockCurrentTask)
+                }).map_err(|_| WaitError::NoCurrentTask)??;
             }
             scheduler::schedule();
 
@@ -190,6 +189,15 @@ impl WaitQueue {
     /// * returns `false` if there was no such `Task` waiting.
     pub fn notify_specific(&self, task_to_wakeup: &TaskRef) -> bool {
         self.notify(Some(task_to_wakeup))
+    }
+
+    /// Wake up all `Task`s that are waiting on this queue.
+    pub fn notify_all(&self) {
+        for t in self.0.lock().drain(..) {
+            if t.unblock().is_err() {
+                warn!("WaitQueue::notify_all(): failed to unblock {:?}", t);
+            }
+        }
     }
     
     /// The internal routine for notifying / waking up tasks that are blocking on the waitqueue. 

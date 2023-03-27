@@ -1,7 +1,7 @@
 #![no_std]
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate terminal_print;
-#[macro_use] extern crate debugit;
+extern crate alloc;
+#[macro_use] extern crate app_io;
+// #[macro_use] extern crate debugit;
 
 extern crate task;
 extern crate runqueue;
@@ -9,7 +9,7 @@ extern crate getopts;
 
 use getopts::Options;
 use alloc::vec::Vec;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -18,7 +18,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("r", "reap", 
         "reap the task (consume its exit value) in addition to killing it, removing it from the task list."
     );
-    
+
     let matches = match opts.parse(&args) {
         Ok(m) => m,
         Err(_f) => {
@@ -26,11 +26,16 @@ pub fn main(args: Vec<String>) -> isize {
             return -1; 
         }
     };
-    
+
     if matches.opt_present("h") {
         return print_usage(opts);
     }
-    
+
+    println!("`kill` has temporarily been disabled because it needs to be reimplemented.");
+    -1
+}
+
+/*
     let reap = matches.opt_present("r");
 
     for task_id_str in matches.free.iter() {
@@ -98,10 +103,11 @@ fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
         Err(format!("Task ID {} does not exist", task_id))
     }
 }
+*/
 
-
+#[allow(dead_code)]
 fn print_usage(opts: Options) -> isize {
-    let brief = format!("Usage: kill [OPTS] TASK_ID");
+    let brief = "Usage: kill [OPTS] TASK_ID".to_string();
     println!("{}", opts.usage(&brief));
     0
 }

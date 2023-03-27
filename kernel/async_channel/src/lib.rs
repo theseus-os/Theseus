@@ -12,23 +12,18 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate static_assertions;
 #[cfg(trace_channel)] #[macro_use] extern crate log;
 #[cfg(trace_channel)] #[macro_use] extern crate debugit;
 extern crate wait_queue;
 extern crate mpmc;
 extern crate crossbeam_utils;
-
-#[cfg(downtime_eval)]
-extern crate hpet;
-#[cfg(downtime_eval)]
-extern crate task;
+extern crate core2;
 
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
 use crossbeam_utils::atomic::AtomicCell;
-
+use core::sync::atomic::{AtomicUsize, Ordering};
 
 /// Create a new channel that allows senders and receivers to 
 /// asynchronously exchange messages via an internal intermediary buffer.
@@ -49,11 +44,13 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>)
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
-        channel_status: AtomicCell::new(ChannelStatus::Connected)
+        channel_status: AtomicCell::new(ChannelStatus::Connected),
+        sender_count: AtomicUsize::new(1),
+        receiver_count: AtomicUsize::new(1),
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
 
@@ -71,15 +68,27 @@ pub enum ChannelStatus {
 /// Error type for tracking different type of errors sender and receiver 
 /// can encounter.
 #[derive(Debug, PartialEq)]
-pub enum ChannelError {
-    /// Occurs when `try_receive` is performed on an empty channel
-    ChannelEmpty,
-    /// Occurs when `try_send` is performed on a full channel
-    ChannelFull,
+pub enum Error {
+    /// Occurs when a "try" operation would need to block to complete.
+    ///
+    /// I.e. `try_send` is performed on a full channel or `try_receive` is
+    /// performed on an empty channel.
+    WouldBlock,
     /// Occurs when one end of channel is dropped
     ChannelDisconnected,
     /// Occurs when an error occur in `WaitQueue`
     WaitError(wait_queue::WaitError)
+}
+
+impl From<Error> for core2::io::Error {
+    fn from(e: Error) -> Self {
+        match e {
+            Error::WouldBlock => core2::io::ErrorKind::WouldBlock,
+            Error::ChannelDisconnected => core2::io::ErrorKind::BrokenPipe,
+            Error::WaitError(_) => core2::io::ErrorKind::Other,
+        }
+        .into()
+    }
 }
 
 /// The inner channel for asynchronous communication between `Sender`s and `Receiver`s.
@@ -93,11 +102,13 @@ struct Channel<T: Send> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue,
     waiting_receivers: WaitQueue,
-    channel_status: AtomicCell<ChannelStatus>
+    channel_status: AtomicCell<ChannelStatus>,
+    sender_count: AtomicUsize,
+    receiver_count: AtomicUsize,
 }
 
 // Ensure that `AtomicCell<ChannelStatus>` is actually a lock-free atomic.
-const_assert!(AtomicCell::<ChannelStatus>::is_lock_free());
+const _: () = assert!(AtomicCell::<ChannelStatus>::is_lock_free());
 
 impl <T: Send> Channel<T> {
     /// Returns true if the channel is disconnected.
@@ -106,24 +117,56 @@ impl <T: Send> Channel<T> {
         self.get_channel_status() != ChannelStatus::Connected
     }
 
-    /// Returns the channel Status
+    /// Returns the channel's current status.
     #[inline(always)]
     fn get_channel_status(&self) -> ChannelStatus {
         self.channel_status.load()
     }
+    
+    /// Returns another `Sender` endpoint connected to the given channel.
+    ///
+    /// This increments the channel's sender count.
+    /// If there were previously no senders, the channel status is updated to `Connected`.
+    fn add_sender(channel: &Arc<Channel<T>>) -> Sender<T> {
+        if channel.sender_count.fetch_add(1, Ordering::SeqCst) == 0 {
+            channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Sender { channel: channel.clone() }
+    }
+    
+    /// Returns another `Receiver` endpoint connected to the given channel.
+    ///
+    /// This increments the channel's receiver count.
+    /// If there were previously no receivers, the channel status is updated to `Connected`.
+    fn add_receiver(channel: &Arc<Channel<T>>) -> Receiver<T> {
+        if channel.receiver_count.fetch_add(1, Ordering::SeqCst) == 0 {
+            channel.channel_status.store(ChannelStatus::Connected);
+        }
+        Receiver { channel: channel.clone() }
+    }
 }
 
 /// The sender (transmit) side of a channel.
-#[derive(Clone)]
 pub struct Sender<T: Send> {
     channel: Arc<Channel<T>>,
 }
+
+impl<T:Send> Clone for Sender<T> {
+    /// Clones this `Sender`, returning another `Sender` connected to the same channel.
+    ///
+    /// This increments the channel's sender count.
+    /// If there were previously no senders, the channel status is updated to `Connected`.
+    fn clone(&self) -> Self {
+        Channel::add_sender( &self.channel )
+    }
+}
+
 impl <T: Send> Sender<T> {
     /// Send a message, blocking until space in the channel's buffer is available. 
     /// 
     /// Returns `Ok(())` if the message was sent successfully,
-    /// otherwise returns an error of `ChannelError` type. 
-    pub fn send(&self, msg: T) -> Result<(), ChannelError> {
+    /// otherwise returns an [`Error`]. 
+    pub fn send(&self, msg: T) -> Result<(), Error> {
         #[cfg(trace_channel)]
         trace!("async_channel: sending msg: {:?}", debugit!(msg));
         // Fast path: attempt to send the message, assuming the buffer isn't full
@@ -132,7 +175,7 @@ impl <T: Send> Sender<T> {
             Ok(()) => return Ok(()),
             // if unsunccessful check whether it fails due to any other reason than channel being full
             Err((returned_msg, channel_error)) => {
-                if channel_error != ChannelError::ChannelFull {
+                if channel_error != Error::WouldBlock {
                     return Err(channel_error);
                 }
                 returned_msg
@@ -172,7 +215,7 @@ impl <T: Send> Sender<T> {
                  // trace!("Receiver Endpoint is dropped");
                  // Here the receiver end has dropped. 
                  // So we don't wait anymore in the waitqueue
-                 Some(Err(ChannelError::ChannelDisconnected))
+                 Some(Err(Error::ChannelDisconnected))
             } else {
                 result
             }
@@ -184,7 +227,7 @@ impl <T: Send> Sender<T> {
         // or the wait_until runs into error (Err()) 
         let res =  match self.channel.waiting_senders.wait_until_mut(&mut closure) {
             Ok(r) => r,
-            Err(wait_error) => Err(ChannelError::WaitError(wait_error)),
+            Err(wait_error) => Err(Error::WaitError(wait_error)),
         };
 
         // trace!("... sending space became available.");
@@ -198,38 +241,51 @@ impl <T: Send> Sender<T> {
         res
     }
 
+    /// Sends a slice of objects through the channel, returning how many objects were sent.
+    ///
+    /// This method only blocks on the first object being sent.
+    pub fn send_buf(&self, buf: &[T]) -> Result<usize, Error>
+    where
+        T: Copy
+    {
+        for (idx, item) in buf.iter().enumerate() {
+            if idx == 0 {
+                self.send(*item)?;
+            } else {
+                match self.try_send(*item) {
+                    Ok(_) => {},
+                    Err((_, Error::WouldBlock)) => return Ok(idx),
+                    Err((_, e)) => return Err(e),
+                }
+            }
+        }
+        Ok(buf.len())
+    }
+
+    /// Attempts to send an entire slice of objects through the channel.
+    pub fn send_all(&self, buf: &[T]) -> Result<(), Error>
+    where
+        T: Copy
+    {
+        for item in buf.iter() {
+            self.send(*item)?;
+        }
+        Ok(())
+    }
+
     /// Tries to send the message, only succeeding if buffer space is available.
     /// 
-    /// If no buffer space is available, it returns the `msg`  with `ChannelError` back to the caller without blocking. 
-    pub fn try_send(&self, msg: T) -> Result<(), (T, ChannelError)> {
+    /// If no buffer space is available, it returns the `msg`  with `Error` back to the caller without blocking. 
+    pub fn try_send(&self, msg: T) -> Result<(), (T, Error)> {
         // first we'll check whether the channel is active
         match self.channel.get_channel_status() {
             ChannelStatus::SenderDisconnected => {
                 self.channel.channel_status.store(ChannelStatus::Connected);
             },
             ChannelStatus::ReceiverDisconnected  => {
-                return Err((msg, ChannelError::ChannelDisconnected));
+                return Err((msg, Error::ChannelDisconnected));
             },
             _ => {},
-        }
-
-        // Injected Randomized fault : Page fault
-        #[cfg(downtime_eval)]
-        {
-            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            // debug!("Value {} {}", value, value % 1024);
-
-            match task::get_my_current_task() {
-                Some(curr_task) => {
-
-                    // We restrict the fault to a specific task to make measurements consistent
-                    if (value % 4096) == 0  && curr_task.is_restartable() {
-                        // debug!("Fake error {}", value);
-                        unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-                    }
-                },
-                _ => (),
-            }
         }
 
         match self.channel.queue.push(msg) {
@@ -240,32 +296,68 @@ impl <T: Send> Sender<T> {
                 Ok(())
             }
             // queue was full, return message back to caller
-            Err(returned_msg) => Err((returned_msg, ChannelError::ChannelFull)),
+            Err(returned_msg) => Err((returned_msg, Error::WouldBlock)),
         }
+    }
+
+    /// Sends a slice of objects through the channel, returning how many objects were sent.
+    ///
+    /// This method does not block.
+    pub fn try_send_buf(&self, buf: &[T]) -> Result<usize, Error>
+    where
+        T: Copy
+    {
+        for (idx, item) in buf.iter().enumerate() {
+            if idx == 0 {
+                self.try_send(*item).map_err(|(_, e)| e)?;
+            } else {
+                match self.try_send(*item) {
+                    Ok(_) => {},
+                    Err((_, Error::WouldBlock)) => return Ok(idx),
+                    Err((_, e)) => return Err(e),
+                }
+            }
+        }
+        Ok(buf.len())
     }
 
     /// Returns true if the channel is disconnected.
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
+
+    /// Obtain a `Receiver` endpoint connected to the same channel as this `Sender`.
+    pub fn receiver(&self) -> Receiver<T> {
+        Channel::add_receiver( &self.channel )
+    }
 }
 
 /// The receiver side of a channel.
-#[derive(Clone)]
 pub struct Receiver<T: Send> {
     channel: Arc<Channel<T>>,
 }
+
+impl<T: Send> Clone for Receiver<T> {
+    /// Clones this `Receiver`, returning another `Receiver` connected to the same channel.
+    ///
+    /// This increments the channel's receiver count.
+    /// If there were previously no receivers, the channel status is updated to `Connected`.
+    fn clone(&self) -> Self {
+        Channel::add_receiver( &self.channel )
+    }
+}
+
 impl <T: Send> Receiver<T> {
     /// Receive a message, blocking until a message is available in the buffer.
     /// 
-    /// Returns the message if it was received properly, otherwise returns an error of `ChannelError` type.
-    pub fn receive(&self) -> Result<T, ChannelError> {
+    /// Returns the message if it was received properly, otherwise returns an [`Error`].
+    pub fn receive(&self) -> Result<T, Error> {
         // trace!("async_channel: receive() entry");
         // Fast path: attempt to receive a message, assuming the buffer isn't empty
         // The code progresses beyond this match only if try_receive fails due to
         // empty channel
         match self.try_receive() {
-            Err(ChannelError::ChannelEmpty) => {},
+            Err(Error::WouldBlock) => {},
             x => {
                 #[cfg(trace_channel)]
                 trace!("async_channel: received msg: {:?}", debugit!(x));
@@ -286,7 +378,7 @@ impl <T: Send> Receiver<T> {
                 Some(msg) => Some(Ok(msg)),
                 _ => {
                     if self.channel.is_disconnected() {
-                        Some(Err(ChannelError::ChannelDisconnected))
+                        Some(Err(Error::ChannelDisconnected))
                     } else {
                         None
                     }
@@ -300,7 +392,7 @@ impl <T: Send> Receiver<T> {
         let res =  match self.channel.waiting_receivers.wait_until(& closure) {
             Ok(Ok(x)) => Ok(x),
             Ok(Err(error)) => Err(error),
-            Err(wait_error) => Err(ChannelError::WaitError(wait_error)),
+            Err(wait_error) => Err(Error::WaitError(wait_error)),
         };
 
         // trace!("... received msg.");
@@ -318,54 +410,106 @@ impl <T: Send> Receiver<T> {
         res
     }
 
+    /// Receives objects placing them in a buffer and returning the number of objects received.
+    ///
+    /// This method only blocks on the first object being received.
+    pub fn receive_buf(&self, buf: &mut [T]) -> Result<usize, Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        let mut byte = self.receive()?;
+        let mut read = 0;
+
+        loop {
+            buf[read] = byte;
+            read += 1;
+
+            if read == buf.len() {
+                return Ok(read);
+            }
+
+            byte = match self.try_receive() {
+                Ok(b) => b,
+                Err(Error::WouldBlock) => return Ok(read),
+                Err(e) => return Err(e),
+            };
+        }
+    }
+
     /// Tries to receive a message, only succeeding if a message is already available in the buffer.
     /// 
     /// If receive succeeds returns `Some(Ok(T))`. 
     /// If an endpoint is disconnected returns `Some(Err(ChannelStatus::Disconnected))`. 
     /// If no such message exists, it returns `None` without blocking
-    pub fn try_receive(&self) -> Result<T, ChannelError> {
+    pub fn try_receive(&self) -> Result<T, Error> {
         if let Some(msg) = self.channel.queue.pop() {
             // trace!("successful try_receive() is notifying senders.");
             self.channel.waiting_senders.notify_one();
             Ok(msg)
         } else {
-            // We check whther the channel is disconnected
+            // We check whether the channel is disconnected
             match self.channel.get_channel_status() {
                 ChannelStatus::ReceiverDisconnected => {
                     self.channel.channel_status.store(ChannelStatus::Connected);
-                    Err(ChannelError::ChannelEmpty)
+                    Err(Error::WouldBlock)
                 },
                 ChannelStatus::SenderDisconnected  => {
-                    Err(ChannelError::ChannelDisconnected)
+                    Err(Error::ChannelDisconnected)
                 },
                 _ => {
-                    Err(ChannelError::ChannelEmpty)
+                    Err(Error::WouldBlock)
                 },
             }
         }
+    }
+
+    /// Receives objects placing them in a buffer and returning the number of objects received.
+    ///
+    /// This method does not block.
+    pub fn try_receive_buf(&self, buf: &mut [T]) -> Result<usize, Error> {
+        for (idx, item) in buf.iter_mut().enumerate() {
+            *item = match self.try_receive() {
+                Ok(byte) => byte,
+                Err(Error::WouldBlock) => return Ok(idx + 1),
+                Err(e) => return Err(e),
+            };
+        }
+        Ok(buf.len())
     }
 
     /// Returns true if the channel is disconnected.
     pub fn is_disconnected(&self) -> bool {
         self.channel.is_disconnected()
     }
-}
 
-
-/// Drop implementation marks the channel state and notifys the `Sender`
-impl<T: Send> Drop for Receiver<T> {
-    fn drop(&mut self) {
-        // trace!("Dropping the receiver");
-        self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
-        self.channel.waiting_senders.notify_one();
+    /// Obtain a `Sender` endpoint connected to the same channel as this `Receiver`.
+    pub fn sender(&self) -> Sender<T> {
+        Channel::add_sender( &self.channel )
     }
 }
 
-/// Drop implementation marks the channel state and notifys the `Receiver`
+
+/// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
+/// and notify all of the `Senders`
+impl<T: Send> Drop for Receiver<T> {
+    fn drop(&mut self) {
+        // trace!("Dropping a receiver");
+        if self.channel.receiver_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
+            self.channel.waiting_senders.notify_all();
+        }
+    }
+}
+
+/// When the only remaining `Sender` is dropped, we mark the channel as disconnected
+/// and notify all of the `Receivers`
 impl<T: Send> Drop for Sender<T> {
     fn drop(&mut self) {
-        // trace!("Dropping the sender");
-        self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
-        self.channel.waiting_receivers.notify_one();
+        // trace!("Dropping a sender");
+        if self.channel.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
+            self.channel.waiting_receivers.notify_all();
+        }
     }
 }

@@ -3,43 +3,29 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "multicore_bringup"
 description = "Support for bringing up other CPU cores (APs) from the main core (BSP)"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 volatile = "0.2.7"
 zerocopy = "0.5.0"
 log = "0.4.8"
+memory = { path = "../memory" }
+stack = { path = "../stack" }
+cpu = { path = "../cpu" }
+ap_start = { path = "../ap_start" }
+kernel_config = { path = "../kernel_config" }
 
-[dependencies.memory]
-path = "../memory"
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+psci = "0.1.1"
+memory_aarch64 = { path = "../memory_aarch64" }
 
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.pit_clock_basic]
-path = "../pit_clock_basic"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.acpi]
-path = "../acpi"
-
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.ap_start]
-path = "../ap_start"
-
-[dependencies.madt]
-path = "../acpi/madt"
-
-[dependencies.pause]
-path = "../pause"
-
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+pit_clock_basic = { path = "../pit_clock_basic" }
+mod_mgmt = { path = "../mod_mgmt" }
+acpi = { path = "../acpi" }
+apic = { path = "../apic" }
+madt = { path = "../acpi/madt" }
 
 [lib]
 crate-type = ["rlib"]

@@ -11,10 +11,11 @@
 #[macro_use] extern crate alloc;
 extern crate task;
 extern crate hpet;
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 extern crate fs_node;
 extern crate apic;
+extern crate cpu;
 extern crate spawn;
 extern crate path;
 extern crate runqueue;
@@ -38,9 +39,10 @@ use heapfile::HeapFile;
 use path::Path;
 use fs_node::{DirRef, FileOrDir, FileRef};
 use libtest::*;
-use memory::{create_mapping, EntryFlags};
+use memory::{create_mapping, PteFlags};
 use getopts::Options;
 use mod_mgmt::crate_name_from_path;
+use cpu::CpuId;
 
 const SEC_TO_NANO: u64 = 1_000_000_000;
 const SEC_TO_MICRO: u64 = 1_000_000;
@@ -245,7 +247,7 @@ fn do_null_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'static
 
 	start_hpet = hpet.get_counter();
 	for _ in 0..tmp_iterations {
-		mypid = task::get_my_current_task_id().unwrap();
+		mypid = task::get_my_current_task_id();
 	}
 	end_hpet = hpet.get_counter();
 
@@ -314,19 +316,16 @@ fn do_spawn() -> Result<(), &'static str>{
 
 /// Internal function that actually calculates the time to spawn an application.
 /// Measures this by using `TaskBuilder` to spawn a application task.
-fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Result<u64, &'static str> {
+fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, on_cpu: CpuId) -> Result<u64, &'static str> {
     let mut start_hpet: u64;
 	let mut end_hpet: u64;
 	let mut delta_hpet = 0;
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// Get path to application "hello" that we're going to spawn
-	let namespace = task::get_my_current_task()
-		.map(|t| t.get_namespace().clone())
-		.ok_or("could not find the application namespace")?;
-	let namespace_dir = task::get_my_current_task()
-		.map(|t| t.get_namespace().dir().clone())
-		.ok_or("could not find the application namespace")?;
+	let namespace = task::with_current_task(|t| t.get_namespace().clone())
+		.map_err(|_| "could not find the application namespace")?;
+	let namespace_dir = namespace.dir();
 	let app_path = namespace_dir.get_file_starting_with("hello-")
 		.map(|f| Path::new(f.lock().get_absolute_path()))
 		.ok_or("Could not find the application 'hello'")?;
@@ -341,10 +340,10 @@ fn do_spawn_inner(overhead_ct: u64, th: usize, nr: usize, _child_core: u8) -> Re
 
 		start_hpet = hpet.get_counter();
 		let child = spawn::new_application_task_builder(app_path.clone(), None)?
+			.pin_on_cpu(on_cpu)
 	        .spawn()?;
 
 	    child.join()?;
-	    child.take_exit_value().ok_or("Couldn't retrieve exit value")?;
 	    end_hpet = hpet.get_counter();
 		delta_hpet += end_hpet - start_hpet - overhead_ct;		
 	}
@@ -409,7 +408,7 @@ fn do_ctx() -> Result<(), &'static str> {
 /// This is measured by creating two tasks and pinning them to the same core.
 /// The tasks yield to each other repetitively.
 /// Overhead is measured by doing the above operation with two tasks that just return.
-fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static str> {
+fn do_ctx_inner(th: usize, nr: usize, child_core: CpuId) -> Result<u64, &'static str> {
     let start_hpet: u64;
 	let end_hpet: u64;
 	let overhead_end_hpet: u64;
@@ -421,20 +420,16 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 
 		let taskref3 = spawn::new_task_builder(overhead_task ,1)
 			.name(String::from("overhead_task_1"))
-			.pin_on_core(child_core)
+			.pin_on_cpu(child_core)
 			.spawn()?;
 
 		let taskref4 = spawn::new_task_builder(overhead_task ,2)
 			.name(String::from("overhead_task_2"))
-			.pin_on_core(child_core)
+			.pin_on_cpu(child_core)
 			.spawn()?;
 
 		taskref3.join()?;
 		taskref4.join()?;
-
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
-		taskref4.take_exit_value().ok_or("could not retrieve exit value")?;
-
 
 	overhead_end_hpet = hpet.get_counter();
 
@@ -442,19 +437,16 @@ fn do_ctx_inner(th: usize, nr: usize, child_core: u8) -> Result<u64, &'static st
 
 		let taskref1 = spawn::new_task_builder(yield_task ,1)
 			.name(String::from("yield_task_1"))
-			.pin_on_core(child_core)
+			.pin_on_cpu(child_core)
 			.spawn()?;
 
 		let taskref2 = spawn::new_task_builder(yield_task ,2)
 			.name(String::from("yield_task_2"))
-			.pin_on_core(child_core)
+			.pin_on_cpu(child_core)
 			.spawn()?;
 
 		taskref1.join()?;
 		taskref2.join()?;
-
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
-		taskref2.take_exit_value().ok_or("could not retrieve exit value")?;
 
     end_hpet = hpet.get_counter();
 
@@ -517,7 +509,7 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 	start_hpet = hpet.get_counter();
 
 	for _ in 0..ITERATIONS{
-		let mapping = create_mapping(MAPPING_SIZE, EntryFlags::WRITABLE)?;
+		let mapping = create_mapping(MAPPING_SIZE, PteFlags::new().writable(true))?;
 		// write 0xFF to the first byte as lmbench does
 		unsafe{ *(mapping.start_address().value() as *mut u8)  = 0xFF; }
 		drop(mapping);
@@ -587,7 +579,7 @@ fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and the child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
+fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<CpuId>) -> Result<u64, &'static str> {
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// we first spawn one task to get the overhead of creating and joining the task
@@ -600,7 +592,7 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		if let Some(core) = child_core {		
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
@@ -609,7 +601,6 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = hpet.get_counter();
 
@@ -623,7 +614,7 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		if let Some(core) = child_core {		
 			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
 				.name(String::from("sender"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
@@ -635,7 +626,6 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 		rendezvous_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = hpet.get_counter();
 
@@ -653,7 +643,7 @@ fn do_ipc_rendezvous_inner(th: usize, nr: usize, child_core: Option<u8>) -> Resu
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and the child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
+fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>) -> Result<u64, &'static str> {
 	pmu_x86::init()?;
 	let mut counter = start_counting_reference_cycles()?;
 
@@ -667,7 +657,7 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) 
 		if let Some(core) = child_core {		
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
@@ -676,7 +666,6 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) 
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = counter.diff();
 	counter.start()?;
@@ -691,7 +680,7 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) 
 		if let Some(core) = child_core {		
 			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
 				.name(String::from("sender"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref1 = spawn::new_task_builder(rendezvous_task_sender, (sender1, receiver2))
@@ -703,7 +692,6 @@ fn do_ipc_rendezvous_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) 
 		rendezvous_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = counter.end()?;
 
@@ -787,7 +775,7 @@ fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'stat
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bool) -> Result<u64, &'static str> {
+fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	let (sender_task, receiver_task): (fn((async_channel::Sender<u8>, async_channel::Receiver<u8>)), fn((async_channel::Sender<u8>, async_channel::Receiver<u8>))) = if blocking {
@@ -806,7 +794,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		if let Some(core) = child_core {		
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
@@ -815,7 +803,6 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = hpet.get_counter();
 
@@ -832,7 +819,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		if let Some(core) = child_core {		
 			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
 				.name(String::from("sender"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
@@ -844,7 +831,6 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 		receiver_task((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = hpet.get_counter();
 
@@ -862,7 +848,7 @@ fn do_ipc_async_inner(th: usize, nr: usize, child_core: Option<u8>, blocking: bo
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a task that just returns.
-fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, blocking: bool) -> Result<u64, &'static str> {
+fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>, blocking: bool) -> Result<u64, &'static str> {
 	pmu_x86::init()?;
 	let mut counter = start_counting_reference_cycles()?;
 
@@ -882,7 +868,7 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, block
 		if let Some(core) = child_core {		
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
@@ -891,7 +877,6 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, block
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = counter.diff();
 	counter.start()?;
@@ -909,7 +894,7 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, block
 		if let Some(core) = child_core {		
 			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
 				.name(String::from("sender"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref1 = spawn::new_task_builder(sender_task, (sender1, receiver2))
@@ -921,7 +906,6 @@ fn do_ipc_async_inner_cycles(th: usize, nr: usize, child_core: Option<u8>, block
 		receiver_task((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = counter.end()?;
 
@@ -1030,7 +1014,7 @@ fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a tasks that just returns.
-fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
+fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<CpuId>) -> Result<u64, &'static str> {
 	let hpet = get_hpet().ok_or("Could not retrieve hpet counter")?;
 
 	// we first spawn one task to get the overhead of creating and joining the task
@@ -1043,7 +1027,7 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		if let Some(core) = child_core {		
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
@@ -1052,7 +1036,6 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = hpet.get_counter();
 
@@ -1065,7 +1048,7 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		if let Some(core) = child_core {		
 			taskref1 = spawn::new_task_builder(simple_task_sender, (sender1, receiver2))
 				.name(String::from("sender"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref1 = spawn::new_task_builder(simple_task_sender, (sender1, receiver2))
@@ -1078,7 +1061,6 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 		simple_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = hpet.get_counter();
 
@@ -1096,7 +1078,7 @@ fn do_ipc_simple_inner(th: usize, nr: usize, child_core: Option<u8>) -> Result<u
 /// Internal function that actually calculates the round trip time to send a message between two threads.
 /// This is measured by creating a child task, and sending messages between the parent and child.
 /// Overhead is measured by creating a tasks that just returns.
-fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> Result<u64, &'static str> {
+fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<CpuId>) -> Result<u64, &'static str> {
 	pmu_x86::init()?;
 	let mut counter = start_counting_reference_cycles()?;
 
@@ -1110,7 +1092,7 @@ fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> R
 		if let Some(core) = child_core {		
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
 				.name(String::from("overhead_task_1"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref3 = spawn::new_task_builder(overhead_task ,1)
@@ -1119,7 +1101,6 @@ fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> R
 		}
 		
 		taskref3.join()?;
-		taskref3.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let overhead = counter.diff();
 	counter.start()?;
@@ -1133,7 +1114,7 @@ fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> R
 		if let Some(core) = child_core {		
 			taskref1 = spawn::new_task_builder(simple_task_sender, (sender1, receiver2))
 				.name(String::from("sender"))
-				.pin_on_core(core)
+				.pin_on_cpu(core)
 				.spawn()?;
 		} else {
 			taskref1 = spawn::new_task_builder(simple_task_sender, (sender1, receiver2))
@@ -1146,7 +1127,6 @@ fn do_ipc_simple_inner_cycles(th: usize, nr: usize, child_core: Option<u8>) -> R
 		simple_task_receiver((sender2, receiver1));
 
 		taskref1.join()?;
-		taskref1.take_exit_value().ok_or("could not retrieve exit value")?;
 
 	let end = counter.end()?;
 		
@@ -1441,7 +1421,7 @@ fn do_fs_create_del_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'stat
 	start_hpet_create = hpet.get_counter();
 	for filename in filenames {
 		// We first create a file and then write to resemble LMBench.
-		let file = HeapFile::new(filename, &cwd).expect("File cannot be created.");
+		let file = HeapFile::create(filename, &cwd).expect("File cannot be created.");
 		file.lock().write_at(wbuf, 0)?;
 	}
 	end_hpet_create = hpet.get_counter();
@@ -1517,7 +1497,7 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 	// Non measuring loop for file create
 	for filename in &filenames {
 
-		let file = HeapFile::new(filename.to_string(), &cwd).expect("File cannot be created.");
+		let file = HeapFile::create(filename.to_string(), &cwd).expect("File cannot be created.");
 		file.lock().write_at(wbuf, 0)?;
 		file_list.push(file);
 	}
@@ -1547,28 +1527,16 @@ fn do_fs_delete_inner(fsize_b: usize, overhead_ct: u64) -> Result<(), &'static s
 
 /// Helper function to get the name of current task
 fn get_prog_name() -> String {
-	let taskref = match task::get_my_current_task() {
-	   Some(t) => t,
-        None => {
+	task::with_current_task(|t| t.name.clone())
+		.unwrap_or_else(|_| {
             printlninfo!("failed to get current task");
-            return "Unknown".to_string();
-        }
-    };
-
-    taskref.name.clone()
+            "Unknown".to_string()
+		})
 }
 
 /// Helper function to get the PID of current task
 fn getpid() -> usize {
-	let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            printlninfo!("failed to get current task");
-            return 0;
-        }
-    };
-
-    taskref.id
+	task::get_my_current_task_id()
 }
 
 
@@ -1587,9 +1555,9 @@ fn hpet_2_time(msg_header: &str, hpet: u64) -> u64 {
 
 /// Helper function to get current working directory
 fn get_cwd() -> Option<DirRef> {
-	task::get_my_current_task().map(|t| 
+	task::with_current_task(|t| 
 		Arc::clone(&t.get_env().lock().working_dir)
-	)
+	).ok()
 }
 
 /// Helper function to make a temporary file to be used to measure read open latencies
@@ -1605,7 +1573,7 @@ fn mk_tmp_file(filename: &str, sz: usize) -> Result<(), &'static str> {
 		}
 	}
 
-	let file = HeapFile::new(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
+	let file = HeapFile::create(filename.to_string(), &get_cwd().unwrap()).expect("File cannot be created.");
 	file.lock().write_at(&WRITE_BUF[0..sz], 0)?;
 
 	Ok(())

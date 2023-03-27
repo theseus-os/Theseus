@@ -8,11 +8,12 @@
 //! To make a crate (or folder of crates) optional, do the following:
 //! 1. Add it to the set of `exclude`s in the top-level Theseus `Cargo.toml` file.
 //! 2. Add it as an optional dependency in this crate's `Cargo.toml` file, ensuring `optional = true`.
-//! 3. [Optional] Add it as a feature below, in order to give it a specific name.
+//! 3. (Optional) Add it as a feature below, in order to give it a specific name.
 //!    * Technically this isn't required, but it can offer a clearer/different name.
 //!    * You can optionally add it to the `default` set of features,
 //!      or create a new group of features that includes it, 
 //!      or even add it to an existing set of features.
+//!    * If you do so, add that new feature or feature group to the `everything` feature.
 //!
 //! 
 //! ## How to customize what is included in a Theseus build
@@ -31,11 +32,11 @@
 //! make FEATURES=--no-default-features
 //! 
 //! # Build the bare minimum `default-members` of the Theseus workspace, plus all optional crates.
-//! make FEATURES=--all-features
+//! make FEATURES="--features everything"
 //! 
 //! # Build the standard Theseus workspace plus all optional crates. 
 //! # This is what `make full` or `make all` does.
-//! make FEATURES="--workspace --all-features"
+//! make FEATURES="--workspace --features theseus_features/everything"
 //! 
 //! # Build the bare minimum `default-members` of the Theseus workspace, plus the `ps` crate.
 //! make FEATURES="--features ps"

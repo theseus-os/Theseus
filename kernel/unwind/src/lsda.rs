@@ -270,7 +270,6 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
         if self.reader.offset_id().0 < self.end_of_call_site_table {
             let entry = CallSiteTableEntry::parse(&mut self.reader, self.call_site_table_encoding, self.landing_pad_base)?;
             if let Some(action_offset) = entry.action_offset() {
-                #[cfg(not(downtime_eval))]
                 warn!("unsupported/unhandled call site action, offset (with 1 added): {:#X}", action_offset);
             }
             Ok(Some(entry))
@@ -284,11 +283,11 @@ impl<R: Reader> FallibleIterator for CallSiteTableIterator<R> {
 fn read_encoded_pointer<R: gimli::Reader>(reader: &mut R, encoding: DwEhPe) -> gimli::Result<u64> {
     match encoding {
         DW_EH_PE_omit     => Err(gimli::Error::CannotParseOmitPointerEncoding),
-        DW_EH_PE_absptr   => reader.read_u64().map(|v| v as u64),
-        DW_EH_PE_uleb128  => reader.read_uleb128().map(|v| v as u64),
+        DW_EH_PE_absptr   => reader.read_u64(),
+        DW_EH_PE_uleb128  => reader.read_uleb128(),
         DW_EH_PE_udata2   => reader.read_u16().map(|v| v as u64),
         DW_EH_PE_udata4   => reader.read_u32().map(|v| v as u64),
-        DW_EH_PE_udata8   => reader.read_u64().map(|v| v as u64),
+        DW_EH_PE_udata8   => reader.read_u64(),
         DW_EH_PE_sleb128  => reader.read_sleb128().map(|v| v as u64),
         DW_EH_PE_sdata2   => reader.read_i16().map(|v| v as u64),
         DW_EH_PE_sdata4   => reader.read_i32().map(|v| v as u64),

@@ -1,6 +1,18 @@
-#![no_std]
+//! Offers the ability to control or configure the active task scheduling policy.
+//!
+//! ## What is and isn't in this crate?
+//! This crate also defines the timer interrupt handler used for preemptive
+//! task switching on each CPU. In [`init()`], it registers that handler
+//! with the [`interrupts`] subsystem.
+//!
+//! The actual task switching logic is implemented in the [`task`] crate.
+//! This crate re-exports that main [`schedule()`] function for convenience,
+//! legacy compatbility, and to act as an easy landing page for code search.
+//! That means that a caller need only depend on [`task`], not this crate,
+//! to invoke the scheduler (yield the CPU) to switch to another task.
 
-#[macro_use] extern crate log;
+#![no_std]
+#![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
 cfg_if::cfg_if! {
     if #[cfg(priority_scheduler)] {
@@ -12,53 +24,81 @@ cfg_if::cfg_if! {
     }
 }
 
-use apic::get_my_apic_id;
-use task::{get_my_current_task, TaskRef};
+use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi};
+use task::{self, TaskRef};
 
-/// Yields the current CPU by selecting a new `Task` to run 
-/// and then switching to that new `Task`.
+/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
+pub use task::schedule;
+
+
+/// Initializes the scheduler on this system using the policy set at compiler time.
 ///
-/// Preemption will be disabled while this function runs,
-/// but interrupts are not disabled because it is not necessary.
+/// Also registers a timer interrupt handler for preemptive scheduling.
 ///
-/// ## Return
-/// * `true` if a new task was selected and switched to.
-/// * `false` if no new task was selected,
-///    meaning the current task will continue running.
-pub fn schedule() -> bool {
-    let preemption_guard = preemption::hold_preemption();
-    // If preemption was not previously enabled (before we disabled it above),
-    // then we shouldn't perform a task switch here.
-    if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", get_my_apic_id());
-        return false;
+/// Currently, there is a single scheduler policy for the whole system.
+/// The policy is selected by specifying a Rust `cfg` value at build time, like so:
+/// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
+/// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
+/// * `make` --> basic round-robin scheduler, the default.
+pub fn init() -> Result<(), &'static str> {
+    task::set_scheduler_policy(scheduler::select_next_task);
+
+    #[cfg(target_arch = "x86_64")] {
+        interrupts::register_interrupt(
+            CPU_LOCAL_TIMER_IRQ,
+            lapic_timer_handler,
+        ).map_err(|_handler| {
+            log::error!("BUG: interrupt {CPU_LOCAL_TIMER_IRQ} was already registered to handler {_handler:#X}");
+            "BUG: CPU-local timer interrupt was already registered to a handler"
+        })
     }
 
-    let apic_id = get_my_apic_id();
+    #[cfg(target_arch = "aarch64")] {
+        interrupts::init_timer(aarch64_timer_handler)?;
+        interrupts::enable_timer(true);
+        Ok(())
+    }
+}
 
-    let curr_task = if let Some(curr) = get_my_current_task() {
-        curr
-    } else {
-        error!("BUG: schedule(): could not get current task.");
-        return false; // keep running the same current task
-    };
+/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
+#[cfg(target_arch = "aarch64")]
+extern "C" fn aarch64_timer_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
+    interrupts::schedule_next_timer_tick();
+    cpu_local_timer_tick_handler();
+    interrupts::EoiBehaviour::HandlerHasSignaledEoi
+}
 
-    let next_task = if let Some(next) = scheduler::select_next_task(apic_id) {
-        next
-    } else {
-        return false; // keep running the same current task
-    };
+/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
+#[cfg(target_arch = "x86_64")]
+extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
+    cpu_local_timer_tick_handler()
+}
 
-    let (did_switch, recovered_preemption_guard) = curr_task.task_switch(
-        next_task,
-        apic_id,
-        preemption_guard,
-    ); 
+// Cross platform scheduling code
+fn cpu_local_timer_tick_handler() {
+    // tick count, only used for debugging
+    if false {
+        use core::sync::atomic::{AtomicUsize, Ordering};
+        static CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
+        let _ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
+        log::info!("(CPU {}) CPU-LOCAL TIMER HANDLER! TICKS = {}", cpu::current_cpu(), _ticks);
+    }
 
-    // trace!("AFTER TASK_SWITCH CALL (AP {}) new current: {:?}, interrupts are {}", apic_id, get_my_current_task(), irq_safety::interrupts_enabled());
+    // Inform the `sleep` crate that it should update its inner tick count
+    // in order to unblock any tasks that are done sleeping.
+    sleep::unblock_sleeping_tasks();
 
-    drop(recovered_preemption_guard);
-    did_switch
+    // We must acknowledge the interrupt before the end of this handler
+    // because we switch tasks here, which doesn't return.
+    {
+        #[cfg(target_arch = "x86_64")]
+        eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
+
+        #[cfg(target_arch = "aarch64")]
+        eoi(CPU_LOCAL_TIMER_IRQ);
+    }
+
+    schedule();
 }
 
 /// Changes the priority of the given task with the given priority level.

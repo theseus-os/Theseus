@@ -8,8 +8,8 @@ authors = ["Barry Shiberu <berketshiberu@gmail.com>"]
 byteorder = { version = "1.0", default-features = false }
 getopts = "0.2.21"
 
-[dependencies.terminal_print]
-path = "../../kernel/terminal_print"
+[dependencies.app_io]
+path = "../../kernel/app_io"
 
 
 [dependencies.log]

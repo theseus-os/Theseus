@@ -11,14 +11,12 @@ extern crate core2;
 
 use core::str;
 use alloc::{
-    vec::Vec,
     string::{String, ToString},
-    sync::Arc,
+    vec::Vec,
 };
 use getopts::Options;
 use path::Path;
 use fs_node::FileOrDir;
-use core2::io::{Read, Write};
 
 
 pub fn main(args: Vec<String>) -> isize {
@@ -44,20 +42,15 @@ pub fn main(args: Vec<String>) -> isize {
         }
         return 0;
     }
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            println!("failed to get current task");
-            return -1;
-        }
+    
+    let Ok(cwd) = task::with_current_task(|t| t.get_env().lock().working_dir.clone()) else {
+        println!("failed to get current task");
+        return -1;
     };
-
-    // grabs the current working directory pointer; this is scoped so that we drop the lock on the task as soon as we get the working directory pointer
-    let curr_wr = Arc::clone(&taskref.get_env().lock().working_dir);
     let path = Path::new(matches.free[0].to_string());
     
     // navigate to the filepath specified by first argument
-    match path.get(&curr_wr) {
+    match path.get(&cwd) {
         Some(file_dir_enum) => { 
             match file_dir_enum {
                 FileOrDir::Dir(directory) => {
@@ -92,7 +85,7 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    return 0;
+    0
 }
 
 fn print_usage(opts: Options) {
@@ -101,20 +94,18 @@ fn print_usage(opts: Options) {
 
 fn echo_from_stdin() -> Result<(), &'static str> {
     let stdin = app_io::stdin()?;
-    let mut stdin_locked = stdin.lock();
     let stdout = app_io::stdout()?;
-    let mut stdout_locked = stdout.lock();
     let mut buf = [0u8; 256];
 
     // Read from stdin and print it back.
     loop {
-        let cnt = stdin_locked.read(&mut buf).or(Err("failed to perform read"))?;
+        let cnt = stdin.read(&mut buf).or(Err("failed to perform read"))?;
         if cnt == 0 { break; }
-        stdout_locked.write_all(&buf[0..cnt])
+        stdout.write_all(&buf[0..cnt])
             .or(Err("faileld to perform write_all"))?;
     }
     Ok(())
 }
 
-const USAGE: &'static str = "Usage: cat [file ...]
+const USAGE: &str = "Usage: cat [file ...]
 concatenate and print files";

@@ -25,7 +25,7 @@ use crate_metadata::CrateType;
 /// * be absolute or relative,
 /// * optionally end with an extension, e.g., `".o"`,   optionally start 
 /// * optionally start with a module file prefix, e.g., `"k#my_crate-<hash>.o"`.
-pub fn crate_name_from_path<'p>(object_file_path: &'p Path) -> &'p str {
+pub fn crate_name_from_path(object_file_path: &Path) -> &str {
     let stem = object_file_path.file_stem();
     if let Ok((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
         name
@@ -56,7 +56,7 @@ pub fn is_valid_crate_name_char(c: char) -> bool {
 /// * `<alloc::boxed::Box<T>>::into_unique` -> `["alloc"]`
 /// * `<framebuffer::VirtualFramebuffer as display::Display>::fill_rectangle` -> `["framebuffer", "display"]`
 /// * `keyboard::init` -> `["keyboard"]`
-pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Vec<&'a str> {
+pub fn get_containing_crate_name(demangled_full_symbol: &str) -> Vec<&str> {
     get_containing_crate_name_ranges(demangled_full_symbol)
         .into_iter()
         .filter_map(|range| demangled_full_symbol.get(range))
@@ -77,7 +77,7 @@ pub fn get_containing_crate_name<'a>(demangled_full_symbol: &'a str) -> Vec<&'a 
 pub fn get_containing_crate_name_ranges(demangled_full_symbol: &str) -> Vec<Range<usize>> {
     let mut ranges: Vec<Range<usize>> = Vec::new();
     // the separator between independent parts of the symbol string
-    const AS: &'static str = " as ";
+    const AS: &str = " as ";
     // the index at which we are starting our search for a crate name
     let mut beginning_bound = Some(0);
 

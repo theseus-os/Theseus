@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 
 #[macro_use] extern crate alloc;
@@ -11,7 +11,6 @@ extern crate root;
 
 use alloc::vec::Vec;
 use alloc::string::String;
-use alloc::sync::Arc;
 use alloc::string::ToString;
 use getopts::Options;
 use path::Path;
@@ -46,15 +45,11 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
         return Ok(());
     }
 
-
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            return Err("failed to get current task".into());
-        }
+    let Ok(working_dir) = task::with_current_task(|t|
+        t.get_env().lock().working_dir.clone()
+    ) else {
+        return Err("failed to get current task".into());
     };
-
-    let working_dir = Arc::clone(&taskref.get_env().lock().working_dir);
 
     if matches.free.is_empty() {
         return Err("rm: missing argument".into());
@@ -64,7 +59,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
         let path = Path::new(path_string.clone());
         let node_to_delete = match path.get(&working_dir) {
             Some(node) => node,
-            _ => return Err(format!("Couldn't find path {}", path)),
+            _ => return Err(format!("Couldn't find path {path}")),
         };
 
         // Only remove directories if the user specified "-r". 
@@ -95,5 +90,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: rm [PATH]
+const USAGE: &str = "Usage: rm [PATH]
 Remove files or directories from filesystem";

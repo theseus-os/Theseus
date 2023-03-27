@@ -5,12 +5,11 @@ description = "Driver for the 10 GbE Intel 82599 NIC"
 authors = ["Ramla <ijazramla@gmail.com>"]
 
 [dependencies]
-spin = "0.9.0"
+spin = "0.9.4"
 volatile = "0.2.4"
 x86_64 = "0.14.8"
 bit_field = "0.7.0"
 zerocopy = "0.5.0"
-static_assertions = "1.1.0"
 mpmc = "0.1.6"
 
 [dependencies.hashbrown]
@@ -33,9 +32,6 @@ path = "../kernel_config"
 
 [dependencies.memory]
 path = "../memory"
-
-[dependencies.apic]
-path = "../apic"
 
 [dependencies.pic]
 path = "../pic"
@@ -83,6 +79,9 @@ path = "../physical_nic"
 
 [dependencies.virtual_nic]
 path = "../virtual_nic"
+
+[dependencies.net]
+path = "../net"
 
 [lib]
 crate-type = ["rlib"] # "lib" does the same thing I think

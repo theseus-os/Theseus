@@ -68,7 +68,7 @@ impl CacheBlock {
 
     /// checks if the coordinate is within the block
     fn contains(&self, coordinate: Coord) -> bool {
-        return coordinate.x >= self.block.top_left.x
+        coordinate.x >= self.block.top_left.x
             && coordinate.x < self.block.bottom_right.x
             && coordinate.y >= self.block.top_left.y
             && coordinate.y < self.block.bottom_right.y
@@ -102,9 +102,9 @@ impl FrameCompositor {
             Some(cache) => {
                 // The same hash and width means the cache block is identical to the row pixels.
                 // We do not check the height because if the hashes are the same, the number of pixels, namely `width * height` must be the same.
-                return cache.content_hash == hash(row_pixels) && (cache.block.bottom_right.x - cache.block.top_left.x) as usize == width
+                cache.content_hash == hash(row_pixels) && (cache.block.bottom_right.x - cache.block.top_left.x) as usize == width
             }
-            None => return false,
+            None => false
         }
     }
 
@@ -134,7 +134,7 @@ impl FrameCompositor {
         let pixel_slice = &src_fb.buffer()[start_index..core::cmp::min(end_index, src_buffer_len)];
         
         // Skip if the rows are already cached
-        if self.is_cached(&pixel_slice, &coordinate_start, src_width) {
+        if self.is_cached(pixel_slice, &coordinate_start, src_width) {
             return Ok(true);
         }
 
@@ -189,7 +189,7 @@ impl FrameCompositor {
 
         cache_row_end = core::cmp::min(cache_row_end, src_fb_height);
 
-        return cache_row_start..cache_row_end
+        cache_row_start..cache_row_end
     }
 
 }

@@ -65,17 +65,16 @@ impl PriorityTaskRef {
     /// We just give an initial number of tokens to run the task till 
     /// next scheduling epoch
     pub fn new(taskref: TaskRef) -> PriorityTaskRef {
-        let priority_taskref = PriorityTaskRef {
-            taskref: taskref,
+        PriorityTaskRef {
+            taskref,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
             context_switches: 0,
-        };
-        priority_taskref
+        }
     }
 
     /// Increment the number of times the task is picked
-    pub fn increment_context_switches(&mut self) -> (){
+    pub fn increment_context_switches(&mut self) {
         self.context_switches = self.context_switches.saturating_add(1);
     }
 }
@@ -135,11 +134,6 @@ impl RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
-
-        #[cfg(runqueue_spillful)] 
-        {
-            task::RUNQUEUE_REMOVAL_FUNCTION.call_once(|| RunQueue::remove_task_from_within_task);
-        }
 
         if RUNQUEUES.insert(which_core, new_rq).is_some() {
             error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
@@ -204,10 +198,6 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this RunQueue.
     fn add_task(&mut self, task: TaskRef) -> Result<(), &'static str> {        
-        #[cfg(runqueue_spillful)] {
-            task.set_on_runqueue(Some(self.core));
-        }
-
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
         let priority_task_ref = PriorityTaskRef::new(task);
@@ -225,8 +215,8 @@ impl RunQueue {
         Ok(())
     }
 
-    /// The internal function that actually removes the task from the runqueue.
-    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    /// Removes a `TaskRef` from this RunQueue.
+    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
         debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
@@ -241,21 +231,6 @@ impl RunQueue {
         Ok(())
     }
 
-
-    /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, _task: &TaskRef) -> Result<(), &'static str> {
-        #[cfg(runqueue_spillful)] {
-            // For the runqueue state spill evaluation, we disable this method because we 
-            // only want to allow removing a task from a runqueue from within the TaskRef::internal_exit() method.
-            // trace!("skipping remove_task() on core {}, task {:?}", self.core, _task);
-            return Ok(());
-        }
-        #[cfg(not(runqueue_spillful))] {
-            self.remove_internal(_task)
-        }
-    }
-
-
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
@@ -264,24 +239,6 @@ impl RunQueue {
             rq.write().remove_task(task)?;
         }
         Ok(())
-    }
-
-
-    #[cfg(runqueue_spillful)]
-    /// Removes a `TaskRef` from the RunQueue(s) on the given `core`.
-    /// Note: This method is only used by the state spillful runqueue implementation.
-    pub fn remove_task_from_within_task(task: &TaskRef, core: u8) -> Result<(), &'static str> {
-        // warn!("remove_task_from_within_task(): core {}, task: {:?}", core, task);
-        task.set_on_runqueue(None);
-        RUNQUEUES.get(&core)
-            .ok_or("Couldn't get runqueue for specified core")
-            .and_then(|rq| {
-                // Instead of calling `remove_task`, we directly call `remove_internal`
-                // because we want to actually remove the task from the runqueue,
-                // as calling `remove_task` would do nothing due to it skipping the actual removal
-                // when the `runqueue_spillful` cfg is enabled.
-                rq.write().remove_internal(task)
-            })
     }
 
     /// The internal function that sets the priority of a given `Task` in a single `RunQueue`
@@ -329,7 +286,7 @@ impl RunQueue {
                 None => continue,
             }
         }
-        return None;
+        None
     }
 
 }

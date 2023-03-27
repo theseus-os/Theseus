@@ -36,7 +36,6 @@
 #![allow(unused_unsafe)]
 
 extern crate alloc;
-#[macro_use] extern crate static_assertions;
 
 use core::cell::RefCell;
 
@@ -68,7 +67,7 @@ pub struct TlsObjectDestructor {
     pub dtor: unsafe extern "C" fn(*mut u8),
 }
 // See the above [`TLS_DESTRUCTORS`] docs for why this is necessary.
-const_assert!(!core::mem::needs_drop::<TlsObjectDestructor>());
+const _: () = assert!(!core::mem::needs_drop::<TlsObjectDestructor>());
 
 /// Takes ownership of the list of [`TlsObjectDestructor`]s
 /// for TLS objects that have been initialized in this current task's TLS area.
@@ -119,7 +118,7 @@ use alloc::vec::Vec;
 /// # Initialization and Destruction
 ///
 /// Initialization is lazily performed dynamically on the first call to [`with`]
-/// within a thread ([`task::Task`]), and values that implement [`Drop`] get destructed
+/// within a thread (`Task` in Theseus), and values that implement [`Drop`] get destructed
 /// when a thread exits.
 ///
 /// A `LocalKey`'s initializer cannot recursively depend on itself, and using

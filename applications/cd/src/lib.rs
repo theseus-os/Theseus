@@ -1,5 +1,5 @@
 #![no_std]
-#[macro_use] extern crate terminal_print;
+#[macro_use] extern crate app_io;
 // #[macro_use] extern crate log;
 
 extern crate alloc;
@@ -29,14 +29,10 @@ pub fn main(args: Vec<String>) -> isize {
         }
     };
 
-    let taskref = match task::get_my_current_task() {
-        Some(t) => t,
-        None => {
-            println!("failed to get current task");
-            return -1;
-        }
+    let Ok(curr_env) = task::with_current_task(|t| t.get_env()) else {
+        println!("failed to get current task");
+        return -1;
     };
-    let curr_env = taskref.get_env();
 
     // go to root directory
     if matches.free.is_empty() {
@@ -62,5 +58,5 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "Usage: cd [PATH]
+const USAGE: &str = "Usage: cd [PATH]
 Change directory";

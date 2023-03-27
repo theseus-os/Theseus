@@ -4,13 +4,13 @@
 //! <http://www.dwarfstd.org/doc/Debugging%20using%20DWARF.pdf>
 
 #![no_std]
+#![feature(int_roundings)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
 extern crate gimli;
 extern crate xmas_elf;
 extern crate goblin;
-extern crate util;
 extern crate memory;
 extern crate fs_node;
 extern crate owning_ref;
@@ -30,7 +30,7 @@ use alloc::{
 };
 use fs_node::WeakFileRef;
 use owning_ref::ArcRef;
-use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, EntryFlags};
+use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags};
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
@@ -135,7 +135,7 @@ impl DebugSections {
     /// This can be either a variable node itself or anything that may contain a variable node, e.g., lexical blocks.
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// fn main() { // start
     ///     let a = 5;
     ///     { // start
@@ -147,7 +147,7 @@ impl DebugSections {
     ///     { // start
     ///         let d = 8;
     ///     } // end
-    /// } //end
+    /// } // end
     /// ```
     /// 
     /// # Arguments
@@ -251,7 +251,7 @@ impl DebugSections {
         else if tag == gimli::DW_TAG_variable {
             let variable_name = entry.attr(gimli::DW_AT_name)?.expect("Variable DIE didn't have a DW_AT_name attribute")
                 .string_value(context.debug_str_sec).expect("Couldn't convert variable name attribute value to string")
-                .to_string().map(|s| String::from(s))?;
+                .to_string().map(String::from)?;
             debug!("{:indent$}Variable {:?}", "", variable_name, indent = ((depth) * 2));
 
             // Find the latest location that this variable existed (before the instruction pointer, of course).
@@ -290,12 +290,9 @@ impl DebugSections {
                 let mut evaluation = location.data.evaluation(context.unit.encoding());
                 let eval_result = evaluation.evaluate()?;
                 debug!("{:indent$}Evaluation result {:X?}", "", eval_result, indent = ((depth+3) * 2));
-                match eval_result {
-                    gimli::EvaluationResult::Complete => {
-                        let pieces = evaluation.result();
-                        debug!("{:indent$}Completed evaluation: {:X?}", "", pieces, indent = ((depth+4) * 2));
-                    }
-                    _ => { }
+                if let gimli::EvaluationResult::Complete = eval_result {
+                    let pieces = evaluation.result();
+                    debug!("{:indent$}Completed evaluation: {:X?}", "", pieces, indent = ((depth+4) * 2));
                 }
                 // TODO FIXME: check if one of the variable's location ranges contains the instruction pointer
                 let _type_signature = match entry.attr_value(gimli::DW_AT_type)? {
@@ -372,7 +369,7 @@ impl DebugSections {
     /// while looking for a subprogram node that contains the given instruction pointer.
     /// 
     /// A *lexical block* is DWARF's term for a lexical scope block, e.g., curly braces like so:
-    /// ```rust,no_run
+    /// ```rust,ignore
     /// fn main() { // start
     ///     let a = 5;
     ///     { // start
@@ -384,7 +381,7 @@ impl DebugSections {
     ///     { // start
     ///         let d = 8;
     ///     } // end
-    /// } //end
+    /// } // end
     /// ```
     ///
     /// Otherwise, an error is returned upon failure, e.g., a problem parsing the debug sections.
@@ -404,12 +401,12 @@ impl DebugSections {
         if tag == gimli::constants::DW_TAG_subprogram {
             let _subprogram_name = entry.attr(gimli::DW_AT_name)?.and_then(|attr| 
                 attr.string_value(context.debug_str_sec).and_then(|s| 
-                    s.to_string().ok().map(|s| String::from(s))
+                    s.to_string().ok().map(String::from)
                 )
             );
             let _subprogram_linkage_name = entry.attr(gimli::DW_AT_linkage_name)?.and_then(|attr| 
                 attr.string_value(context.debug_str_sec).and_then(|s| 
-                    s.to_string().ok().map(|s| String::from(s))
+                    s.to_string().ok().map(String::from)
                 )
             );
 
@@ -679,7 +676,7 @@ impl DebugSymbols {
             let mut sections: HashMap<usize, &DebugSection> = HashMap::new();
             sections.insert(debug_str.shndx, &debug_str);
             if let Some(ref debug_loc) = debug_loc {
-                sections.insert(debug_loc.shndx, &debug_loc);
+                sections.insert(debug_loc.shndx, debug_loc);
             }
             sections.insert(debug_abbrev.shndx, &debug_abbrev);
             sections.insert(debug_info.shndx, &debug_info);
@@ -730,14 +727,14 @@ impl DebugSymbols {
                     // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
                     //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
                     //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
-                    //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+                    //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size);
                 }
                 
                 let mut source_and_target_in_same_crate = false;
 
                 // We first check if the source section is another debug section, then check if its a local section from the given `loaded_crate`.
                 let (source_sec_vaddr, source_sec_dep) = match shndx_map.get(&source_sec_shndx).map(|s| (s.virt_addr, None))
-                    .or_else(|| loaded_crate.lock_as_ref().sections.get(&source_sec_shndx).map(|sec| (sec.address_range.start, Some(sec.clone()))))
+                    .or_else(|| loaded_crate.lock_as_ref().sections.get(&source_sec_shndx).map(|sec| (sec.virt_addr, Some(sec.clone()))))
                 {
                     // We found the source section in the local debug sections or the given loaded crate. 
                     Some(found) => {
@@ -750,7 +747,7 @@ impl DebugSymbols {
                     // At this point, there's no other way to search for the source section besides its name.
                     None => {
                         if let Ok(source_sec_name) = source_sec_entry.get_name(&elf_file) {
-                            const DATARELRO: &'static str = ".data.rel.ro.";
+                            const DATARELRO: &str = ".data.rel.ro.";
                             let source_sec_name = if source_sec_name.starts_with(DATARELRO) {
                                 source_sec_name.get(DATARELRO.len() ..).ok_or("Couldn't get name of .data.rel.ro. section")?
                             } else {
@@ -764,7 +761,7 @@ impl DebugSymbols {
                             namespace.get_symbol_or_load(&demangled, None, kernel_mmi_ref, false)
                                 .upgrade()
                                 .ok_or("Couldn't get symbol for .debug section's foreign relocation entry, nor load its containing crate")
-                                .map(|sec| (sec.address_range.start, Some(sec)))
+                                .map(|sec| (sec.virt_addr, Some(sec)))
                         }
                         else {
                             let _source_sec_header = source_sec_entry
@@ -799,13 +796,16 @@ impl DebugSymbols {
 
         // The .debug sections were initially mapped as writable so we could modify them,
         // but they should actually just be read-only as specified by the ELF file flags.
-        debug_sections_mp.remap(&mut kernel_mmi_ref.lock().page_table, EntryFlags::PRESENT)?; 
+        debug_sections_mp.remap(
+            &mut kernel_mmi_ref.lock().page_table,
+            PteFlags::new().valid(true),
+        )?; 
         let debug_sections_mp = Arc::new(debug_sections_mp);
 
         let create_debug_section_slice = |debug_sec: DebugSection| -> Result<DebugSectionSlice, &'static str> {
             ArcRef::new(Arc::clone(&debug_sections_mp))
                 .try_map(|mp| mp.as_slice::<u8>(debug_sec.mp_offset, debug_sec.size))
-                .map(|arcref| DebugSectionSlice(arcref))
+                .map(DebugSectionSlice)
         };
 
         let loaded = DebugSections {
@@ -869,7 +869,7 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
 
         let size = sec.size() as usize;
         let align = sec.align() as usize;
-        let addend = util::round_up_power_of_two(size, align);
+        let addend = size.next_multiple_of(align);
 
         // trace!("  Looking at debug sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
         ro_bytes += addend;
@@ -879,8 +879,12 @@ fn allocate_debug_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> 
         return Err("no .debug sections found");
     }
 
-    let allocated_pages = allocate_pages_by_bytes(ro_bytes).ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
-    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, EntryFlags::PRESENT | EntryFlags::WRITABLE)?;
+    let allocated_pages = allocate_pages_by_bytes(ro_bytes)
+        .ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
+    let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages(
+        allocated_pages,
+        PteFlags::new().valid(true).writable(true),
+    )?;
     let start_address = mp.start_address();
     let range = start_address .. (start_address + ro_bytes);
     Ok((mp, range))
