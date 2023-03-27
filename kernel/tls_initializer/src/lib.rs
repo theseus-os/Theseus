@@ -85,6 +85,7 @@ const TLS_SELF_POINTER_SIZE: usize = size_of::<usize>();
 const TLS_SELF_POINTER_SIZE: usize = 0;
 
 /// Errors that may occur when adding TLS sections to a `TlsInitializer`.
+#[derive(Debug)]
 pub enum TlsInitializerError {
     /// Inserting a TLS section at the included offset
     /// would erroneously overlap with an existing section. 
