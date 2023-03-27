@@ -984,7 +984,7 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { core::hint::spin_loop()   }
+    loop { core::hint::spin_loop() }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
