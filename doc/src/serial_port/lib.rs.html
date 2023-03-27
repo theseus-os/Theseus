@@ -745,7 +745,7 @@
 </span><span class="attr">#[repr(align(<span class="number">64</span>))]
 </span><span class="kw">pub struct </span>DataChunk {
     <span class="kw">pub </span>len: u8,
-    <span class="kw">pub </span>data: [u8; (<span class="number">64 </span>- <span class="number">1</span>)],
+    <span class="kw">pub </span>data: [u8; <span class="number">64 </span>- <span class="number">1</span>],
 }
 <span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::size_of::&lt;DataChunk&gt;() == <span class="number">64</span>);
 <span class="kw">const _</span>: () = <span class="macro">assert!</span>(core::mem::align_of::&lt;DataChunk&gt;() == <span class="number">64</span>);

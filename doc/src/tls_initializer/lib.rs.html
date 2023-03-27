@@ -395,6 +395,22 @@
 <a href="#395" id="395">395</a>
 <a href="#396" id="396">396</a>
 <a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Logic for generating Thread-Local Storage (TLS) data image for TLS areas.
 //!
 //! The two key types are:
@@ -481,6 +497,20 @@
 </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">const </span>TLS_SELF_POINTER_SIZE: usize = <span class="number">0</span>;
 
+<span class="doccomment">/// Errors that may occur when adding TLS sections to a `TlsInitializer`.
+</span><span class="attr">#[derive(Debug)]
+</span><span class="kw">pub enum </span>TlsInitializerError {
+    <span class="doccomment">/// Inserting a TLS section at the included offset
+    /// would erroneously overlap with an existing section. 
+    /// This indicates a link-time bug or a bug in the symbol parsing code
+    /// that invokes the [`TlsInitializer::add_existing_static_tls_section()`].
+    </span>OverlapWithExistingSection(usize),
+    <span class="doccomment">/// The included virtual address calculated for a TLS section was invalid.
+    </span>InvalidVirtualAddress(usize),
+    <span class="doccomment">/// There was insufficient space to insert a TLS section into the TLS data image.
+    </span>NoRemainingSpace,
+}
+
 <span class="kw">impl </span>TlsInitializer {
     <span class="doccomment">/// Creates an empty TLS initializer with no TLS data sections.
     </span><span class="kw">pub const fn </span>empty() -&gt; TlsInitializer {
@@ -533,7 +563,7 @@
         <span class="kw-2">mut </span>tls_section: LoadedSection,
         offset: usize,
         total_static_tls_size: usize,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;StrongSectionRef, ()&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;StrongSectionRef, TlsInitializerError&gt; {
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
         </span><span class="kw">let </span>original_offset = offset;
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
@@ -543,7 +573,7 @@
         <span class="kw">if </span><span class="self">self</span>.static_section_offsets.contains_key(<span class="kw-2">&amp;</span>range.start) || 
             <span class="self">self</span>.static_section_offsets.contains_key(<span class="kw-2">&amp;</span>(range.end - <span class="number">1</span>))
         {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(());
+            <span class="kw">return </span><span class="prelude-val">Err</span>(TlsInitializerError::OverlapWithExistingSection(offset));
         }
 
         <span class="comment">// Calculate the new value of this section&#39;s virtual address based on its offset.
@@ -553,7 +583,8 @@
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
         </span><span class="kw">let </span>virt_addr_value = original_offset;
 
-        tls_section.virt_addr = VirtualAddress::new(virt_addr_value).ok_or(())<span class="question-mark">?</span>;
+        tls_section.virt_addr = VirtualAddress::new(virt_addr_value)
+            .ok_or(TlsInitializerError::InvalidVirtualAddress(virt_addr_value))<span class="question-mark">?</span>;
         <span class="self">self</span>.end_of_static_sections = max(<span class="self">self</span>.end_of_static_sections, range.end);
         <span class="kw">let </span>section_ref = Arc::new(tls_section);
         <span class="self">self</span>.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
@@ -578,7 +609,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         <span class="kw-2">mut </span>section: LoadedSection,
         alignment: usize,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(usize, StrongSectionRef), ()&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(usize, StrongSectionRef), TlsInitializerError&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>start_index = <span class="prelude-val">None</span>;
         <span class="comment">// First, we find the next &quot;gap&quot; big enough to fit the new TLS section.
         // On x86_64, we skip the first `TLS_SELF_POINTER_SIZE` bytes, reserved for the TLS self pointer.
@@ -597,7 +628,7 @@
             }
         }
 
-        <span class="kw">let </span>start = start_index.ok_or(())<span class="question-mark">?</span>;
+        <span class="kw">let </span>start = start_index.ok_or(TlsInitializerError::NoRemainingSpace)<span class="question-mark">?</span>;
 
         <span class="comment">// Calculate this section&#39;s virtual address based the range we reserved for it.
         </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
@@ -606,7 +637,8 @@
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
         </span><span class="kw">let </span>virt_addr_value = start + <span class="self">self</span>.end_of_static_sections - max(<span class="number">16</span>, <span class="number">8 </span><span class="comment">/* TODO FIXME: pass in the TLS segment&#39;s alignment */</span>);
 
-        section.virt_addr = VirtualAddress::new(virt_addr_value).ok_or(())<span class="question-mark">?</span>;
+        section.virt_addr = VirtualAddress::new(virt_addr_value)
+            .ok_or(TlsInitializerError::InvalidVirtualAddress(virt_addr_value))<span class="question-mark">?</span>;
         <span class="kw">let </span>range = start .. (start + section.size);
         <span class="kw">let </span>section_ref = Arc::new(section);
         <span class="self">self</span>.end_of_dynamic_sections = max(<span class="self">self</span>.end_of_dynamic_sections, range.end);

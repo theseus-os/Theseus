@@ -673,6 +673,7 @@
 <a href="#673" id="673">673</a>
 <a href="#674" id="674">674</a>
 <a href="#675" id="675">675</a>
+<a href="#676" id="676">676</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the basic [`Task`] structure, which holds contextual execution states
 //! needed to support safe multithreading.
 //! 
@@ -682,6 +683,7 @@
 </span><span class="attr">#![no_std]
 #![feature(panic_info_message)]
 #![feature(negative_impls)]
+#![allow(clippy::type_complexity)]
 
 </span><span class="kw">extern crate </span>alloc;
 

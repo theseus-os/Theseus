@@ -154,10 +154,10 @@
 
 <span class="kw">impl</span>&lt;T&gt; Node&lt;T&gt; {
     <span class="kw">unsafe fn </span>new(v: <span class="prelude-ty">Option</span>&lt;T&gt;) -&gt; <span class="kw-2">*mut </span>Node&lt;T&gt; {
-        Box::into_raw(<span class="kw">box </span>Node {
+        Box::into_raw(Box::new(Node {
             next: AtomicPtr::new(ptr::null_mut()),
             value: v,
-        })
+        }))
     }
 }
 

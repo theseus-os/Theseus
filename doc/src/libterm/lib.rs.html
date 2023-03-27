@@ -654,7 +654,6 @@
 <a href="#654" id="654">654</a>
 <a href="#655" id="655">655</a>
 <a href="#656" id="656">656</a>
-<a href="#657" id="657">657</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic terminal emulator library.
 //!
 //! The terminal has several main responsibilities: 
@@ -1277,14 +1276,13 @@
         <span class="comment">// Get the bounding box that contains the displayed cursor.
         </span><span class="kw">let </span>bounding_box = {
             <span class="kw">let </span>coord = <span class="self">self</span>.window.area().top_left;
-            <span class="kw">let </span>bounding_box = <span class="self">self</span>.cursor.display(
+            <span class="self">self</span>.cursor.display(
                 coord,
                 cursor_col,
                 cursor_line,
                 <span class="self">self</span>.window.framebuffer_mut().deref_mut(),
-            )<span class="question-mark">?</span>;
-            bounding_box
-        };   
+            )<span class="question-mark">?
+        </span>};   
 
         <span class="self">self</span>.window.render(<span class="prelude-val">Some</span>(bounding_box))
     }

@@ -693,7 +693,7 @@
         <span class="kw">let </span>ascii = <span class="kw">if </span>ch.is_ascii() { ch <span class="kw">as </span>u8 } <span class="kw">else </span>{ <span class="string">b&#39;?&#39; </span>};
         <span class="kw">let </span>glyph = <span class="kw-2">&amp;</span>FONT_BASIC[ascii <span class="kw">as </span>usize];
 
-        <span class="kw">for </span>(row_bits, row) <span class="kw">in </span>glyph.into_iter().zip(<span class="number">0u32</span>..) {
+        <span class="kw">for </span>(row_bits, row) <span class="kw">in </span>glyph.iter().zip(<span class="number">0u32</span>..) {
             <span class="comment">// Copy each row of the font glyph to the framebuffer in a single action
             </span><span class="kw">let </span><span class="kw-2">mut </span>pixel_row: [u32; CHARACTER_WIDTH <span class="kw">as </span>usize] = [background_pixel_color; CHARACTER_WIDTH <span class="kw">as </span>usize];
             <span class="kw">for </span>(pixel, col) <span class="kw">in </span>pixel_row.iter_mut().zip(<span class="number">0 </span>.. GLPYH_WIDTH) {
@@ -719,7 +719,7 @@
         <span class="kw">let </span>next_col = <span class="self">self</span>.curr_pixel.x + CHARACTER_WIDTH;
         <span class="self">self</span>.curr_pixel.x = next_col;
         <span class="kw">if </span>next_col + CHARACTER_WIDTH &gt;= <span class="self">self</span>.width {
-            <span class="kw">return </span><span class="self">self</span>.newline(background_pixel_color);
+            <span class="self">self</span>.newline(background_pixel_color)
         }
     }
 
@@ -759,7 +759,7 @@
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(staging_fb) = <span class="self">self</span>.staging_fb.as_deref() {
             <span class="comment">// Copy from the staging fb (if we have one) to the main fb.
-            </span><span class="self">self</span>.fb.copy_from_slice(<span class="kw-2">&amp;</span>staging_fb);
+            </span><span class="self">self</span>.fb.copy_from_slice(staging_fb);
         }
     }
 
