@@ -920,12 +920,11 @@ name = "dreadnought"
 version = "0.1.0"
 dependencies = [
  "futures",
- "mutex_sleep",
- "scheduler",
  "sleep",
  "spawn",
  "task",
  "time",
+ "waker",
 ]
 
 [[package]]
