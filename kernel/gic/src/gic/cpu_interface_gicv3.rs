@@ -8,17 +8,17 @@
 //! - Generating software interrupts
 
 use core::arch::asm;
-use super::TargetCpu;
+use super::IpiTargetCpu;
 use super::Priority;
 use super::InterruptNumber;
 
-const SGIR_TARGET_ALL_OTHER_PE: usize = 1 << 40;
-const IGRPEN_ENABLED: usize = 1;
+const SGIR_TARGET_ALL_OTHER_PE: u64 = 1 << 40;
+const IGRPEN_ENABLED: u64 = 1;
 
 /// Enables routing of group 1 interrupts for the current CPU and configures
 /// the end-of-interrupt mode
 pub fn init() {
-    let mut icc_ctlr: usize;
+    let mut icc_ctlr: u64;
 
     unsafe { asm!("mrs {}, ICC_CTLR_EL1", out(reg) icc_ctlr) };
     // clear bit 1 (EOIMode) so that eoi signals both
@@ -40,7 +40,7 @@ pub fn init() {
 /// until this CPU or another one is ready to handle
 /// them
 pub fn get_minimum_priority() -> Priority {
-    let mut reg_value: usize;
+    let mut reg_value: u64;
     unsafe { asm!("mrs {}, ICC_PMR_EL1", out(reg) reg_value) };
     u8::MAX - (reg_value as u8)
 }
@@ -50,7 +50,7 @@ pub fn get_minimum_priority() -> Priority {
 /// until this CPU or another one is ready to handle
 /// them
 pub fn set_minimum_priority(priority: Priority) {
-    let reg_value = (u8::MAX - priority) as usize;
+    let reg_value = (u8::MAX - priority) as u64;
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
@@ -58,7 +58,7 @@ pub fn set_minimum_priority(priority: Priority) {
 /// been fully handled, by zeroing the current priority level of this CPU.
 /// This implies that the CPU is ready to process interrupts again.
 pub fn end_of_interrupt(int: InterruptNumber) {
-    let reg_value = int as usize;
+    let reg_value = int as u64;
     unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
 }
 
@@ -67,8 +67,8 @@ pub fn end_of_interrupt(int: InterruptNumber) {
 /// the requested interrupt is being handled by
 /// this CPU.
 pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
-    let int_num: usize;
-    let priority: usize;
+    let int_num: u64;
+    let priority: u64;
 
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
@@ -82,26 +82,26 @@ pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
     (int_num as InterruptNumber, priority as u8)
 }
 
-pub fn send_ipi(int_num: InterruptNumber, target: TargetCpu) {
+pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
     let mut value = match target {
-        TargetCpu::Specific(cpu) => {
-            let cpu = cpu as usize;
+        IpiTargetCpu::Specific(cpu) => {
+            let mpidr: cpu::MpidrValue = cpu.into();
 
             // level 3 affinity is expected in cpu[24:31]
             // we want it in bits [48:55]
-            let aff3 = (cpu & 0xff000000) << 24;
+            let aff3 = mpidr.affinity(3) << 48;
 
             // level 2 affinity is expected in cpu[16:23]
             // we want it in bits [32:39]
-            let aff2 = cpu & 0xff0000 << 16;
+            let aff2 = mpidr.affinity(2) << 32;
 
             // level 1 affinity is expected in cpu[8:15]
             // we want it in bits [16:23]
-            let aff1 = cpu & 0xff00 << 8;
+            let aff1 = mpidr.affinity(1) << 16;
 
             // level 0 affinity is expected in cpu[0:7]
             // we want it as a GICv2-style target list
-            let aff0 = cpu & 0xff;
+            let aff0 = mpidr.affinity(0);
             let target_list = if aff0 >= 16 {
                 panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
             } else {
@@ -111,12 +111,12 @@ pub fn send_ipi(int_num: InterruptNumber, target: TargetCpu) {
         },
         // bit 31: Interrupt Routing Mode
         // value of 1 to target any available cpu
-        TargetCpu::AnyCpuAvailable => SGIR_TARGET_ALL_OTHER_PE,
-        TargetCpu::GICv2TargetList(_) => {
-            panic!("Cannot use TargetCpu::GICv2TargetList with GICv3!");
+        IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
+        IpiTargetCpu::GICv2TargetList(_) => {
+            panic!("Cannot use IpiTargetCpu::GICv2TargetList with GICv3!");
         },
     };
 
-    value |= (int_num as usize) << 24;
+    value |= (int_num as u64) << 24;
     unsafe { asm!("msr ICC_SGI1R_EL1, {}", in(reg) value) };
 }
