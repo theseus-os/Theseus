@@ -112,12 +112,8 @@ pub fn init(
         interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())?
     };
 
-    #[cfg(target_arch = "aarch64")] {
-        interrupts::init().unwrap();
-
-        // register BSP CpuId
-        cpu::register_cpu(true).unwrap();
-    }
+    #[cfg(target_arch = "aarch64")]
+    interrupts::init().unwrap();
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;

@@ -2,61 +2,32 @@
 
 use cortex_a::registers::MPIDR_EL1;
 use tock_registers::interfaces::Readable;
-use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
-use irq_safety::RwLockIrqSafe;
+
 use core::fmt;
-use alloc::vec::Vec;
-
 use super::CpuId;
-
-// The vector of CpuIds for known and online CPU cores
-static ONLINE_CORES: RwLockIrqSafe<Vec<CpuId>> = RwLockIrqSafe::new(Vec::new());
-
-/// This must be called once for every CPU core of the system
-/// that should be used for running tasks.
-///
-/// The first CPU to register itself is called the BSP (bootstrap processor).
-/// When it does so (from captain), it must set the `bootstrap` parameter
-/// to true. Other cores must set it to false.
-pub fn register_cpu(bootstrap: bool) -> Result<(), &'static str> {
-    let mut locked = ONLINE_CORES.write();
-
-    // the vector must be empty when the bootstrap
-    // processor registers itself.
-    if bootstrap == locked.is_empty() {
-        let cpu_id = current_cpu();
-
-        if locked.contains(&cpu_id) {
-            Err("Tried to register the same CpuId twice")
-        } else {
-            locked.push(cpu_id);
-
-            Ok(())
-        }
-    } else {
-        match bootstrap {
-            true  => Err("Tried to register the BSP after another core: invalid"),
-            false => Err("Tried to register a secondary CPU before the BSP: invalid"),
-        }
-    }
-}
+use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
 
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
 pub fn cpu_count() -> u32 {
-    ONLINE_CORES.read().len() as u32
+    // The ARM port doesn't start secondary cores for the moment.
+    1
 }
 
 /// Returns the ID of the bootstrap CPU (if known), which
 /// is the first CPU to run after system power-on.
 pub fn bootstrap_cpu() -> Option<CpuId> {
-    ONLINE_CORES.read().first().copied()
+    // The ARM port doesn't start secondary cores for the moment,
+    // so the current CPU can only be the "bootstrap" CPU.
+    Some(current_cpu())
 }
 
 /// Returns true if the currently executing CPU is the bootstrap
 /// CPU, i.e., the first CPU to run after system power-on.
 pub fn is_bootstrap_cpu() -> bool {
-    Some(current_cpu()) == bootstrap_cpu()
+    // The ARM port doesn't start secondary cores for the moment,
+    // so the current CPU can only be the "bootstrap" CPU.
+    true
 }
 
 /// Returns the ID of the currently executing CPU.

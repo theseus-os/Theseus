@@ -610,7 +610,6 @@ dependencies = [
  "apic",
  "cortex-a",
  "derive_more",
- "irq_safety",
  "tock-registers",
 ]
 

@@ -15,7 +15,6 @@ apic = { path = "../apic" }
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 tock-registers = "0.7.0"
 cortex-a = "7.5.0"
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 [lib]
 crate-type = ["rlib"]
