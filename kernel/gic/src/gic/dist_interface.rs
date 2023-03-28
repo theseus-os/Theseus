@@ -13,7 +13,6 @@
 //! - Generating software interrupts (GICv2 style)
 
 use super::GicRegisters;
-use super::{U32BYTES, U64BYTES};
 use super::SpiDestination;
 use super::IpiTargetCpu;
 use super::InterruptNumber;
@@ -23,15 +22,15 @@ use super::TargetList;
 use cpu::MpidrValue;
 
 mod offset {
-    use super::{U32BYTES, U64BYTES};
-    pub const CTLR:      usize = 0x000 / U32BYTES;
-    pub const IGROUPR:   usize = 0x080 / U32BYTES;
-    pub const ISENABLER: usize = 0x100 / U32BYTES;
-    pub const ICENABLER: usize = 0x180 / U32BYTES;
-    pub const ITARGETSR: usize = 0x800 / U32BYTES;
-    pub const SGIR:      usize = 0xf00 / U32BYTES;
+    use crate::{Offset32, Offset64};
+    pub(crate) const CTLR:      Offset32 = Offset32::from_byte_offset(0x000);
+    pub(crate) const IGROUPR:   Offset32 = Offset32::from_byte_offset(0x080);
+    pub(crate) const ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
+    pub(crate) const ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
+    pub(crate) const ITARGETSR: Offset32 = Offset32::from_byte_offset(0x800);
+    pub(crate) const SGIR:      Offset32 = Offset32::from_byte_offset(0xf00);
     /// This one is on the 6th page
-    pub const P6IROUTER: usize = 0x100 / U64BYTES;
+    pub(crate) const P6IROUTER: Offset64 = Offset64::from_byte_offset(0x100);
 }
 
 // enable group 0

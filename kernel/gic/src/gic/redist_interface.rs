@@ -9,16 +9,15 @@
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
 
 use super::GicRegisters;
-use super::U32BYTES;
 use super::InterruptNumber;
 use super::Enabled;
 
 mod offset {
-    use super::U32BYTES;
-    pub const RD_WAKER: usize = 0x14 / U32BYTES;
-    pub const IGROUPR:  usize = 0x80 / U32BYTES;
-    pub const SGIPPI_ISENABLER: usize = 0x100 / U32BYTES;
-    pub const SGIPPI_ICENABLER: usize = 0x180 / U32BYTES;
+    use crate::Offset32;
+    pub(crate) const RD_WAKER: Offset32 = Offset32::from_byte_offset(0x14);
+    pub(crate) const IGROUPR:  Offset32 = Offset32::from_byte_offset(0x80);
+    pub(crate) const SGIPPI_ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
+    pub(crate) const SGIPPI_ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
 }
 
 const RD_WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
