@@ -153,9 +153,13 @@ dependencies = [
  "core2",
  "crossbeam-utils",
  "debugit",
+ "hpet",
  "log",
  "mpmc",
  "spin 0.9.4",
+ "sync",
+ "sync_spin",
+ "task",
  "wait_queue",
 ]
 
@@ -2961,6 +2965,7 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
+ "hpet",
  "irq_safety",
  "log",
  "scheduler",

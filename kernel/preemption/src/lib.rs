@@ -52,6 +52,26 @@ pub fn hold_preemption_no_timer_disable() -> PreemptionGuard {
     hold_preemption_internal::<false>()
 }
 
+/// Disables preemption.
+///
+/// Preemption must be manually reenabled using [`enable_preemption`].
+#[doc(hidden)]
+pub fn disable_preemption() {
+    core::mem::forget(hold_preemption_internal::<true>());
+}
+
+/// Enables preemption.
+///
+/// This function reverses the effects of [`disable_preemption`].
+#[doc(hidden)]
+pub fn enable_preemption() {
+    core::mem::drop(PreemptionGuard {
+        cpu_id: cpu::current_cpu(),
+        // This value isn't important.
+        preemption_was_enabled: true,
+    })
+}
+
 /// The internal routine for disabling preemption.
 ///
 /// If the const argument `DISABLE_TIMER` is `true`, the local timer interrupt
