@@ -19,8 +19,6 @@ use super::InterruptNumber;
 use super::Enabled;
 use super::TargetList;
 
-use cpu::MpidrValue;
-
 mod offset {
     use crate::{Offset32, Offset64};
     pub(crate) const CTLR:      Offset32 = Offset32::from_byte_offset(0x000);
@@ -148,7 +146,7 @@ impl super::ArmGic {
             for i in 0..8 {
                 let target = 1 << i;
                 if target & flags == target {
-                    return SpiDestination::Specific(MpidrValue::new(0, 0, 0, i).into());
+                    return SpiDestination::Specific(cpu::MpidrValue::new(0, 0, 0, i).into());
                 }
             }
 
@@ -167,7 +165,7 @@ impl super::ArmGic {
                 let aff2 = (reg >> 16) as u8;
                 let aff1 = (reg >>  8) as u8;
                 let aff0 = (reg >>  0) as u8;
-                SpiDestination::Specific(MpidrValue::new(aff3, aff2, aff1, aff0).into())
+                SpiDestination::Specific(cpu::MpidrValue::new(aff3, aff2, aff1, aff0).into())
             }
         } else {
             // If we're on gicv2 then affinity routing is off
@@ -197,7 +195,7 @@ impl super::ArmGic {
             self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
         } else if let Self::V3(v3) = self {
             let value = match target {
-                SpiDestination::Specific(cpu) => MpidrValue::from(cpu).value(),
+                SpiDestination::Specific(cpu) => cpu::MpidrValue::from(cpu).value(),
                 // bit 31: Interrupt Routing Mode
                 // value of 1 to target any available cpu
                 SpiDestination::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,

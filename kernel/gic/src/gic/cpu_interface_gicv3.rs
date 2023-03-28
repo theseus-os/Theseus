@@ -11,7 +11,6 @@ use core::arch::asm;
 use super::IpiTargetCpu;
 use super::Priority;
 use super::InterruptNumber;
-use cpu::MpidrValue;
 
 const SGIR_TARGET_ALL_OTHER_PE: u64 = 1 << 40;
 const IGRPEN_ENABLED: u64 = 1;
@@ -86,7 +85,7 @@ pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
 pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
     let mut value = match target {
         IpiTargetCpu::Specific(cpu) => {
-            let mpidr: MpidrValue = cpu.into();
+            let mpidr: cpu::MpidrValue = cpu.into();
 
             // level 3 affinity is expected in cpu[24:31]
             // we want it in bits [48:55]
