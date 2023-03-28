@@ -3,6 +3,8 @@ use core::convert::AsMut;
 use memory::{PageTable, BorrowedMappedPages, Mutable,
 PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
 
+use cpu::CpuId;
+
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
 
@@ -46,15 +48,11 @@ bitflags! {
     }
 }
 
-pub enum TargetCpu {
+/// Target of a shared-peripheral interrupt
+pub enum SpiDestination {
     /// That interrupt must be handled by
     /// a specific PE in the system.
-    ///
-    /// - level 3 affinity is expected in bits [24:31]
-    /// - level 2 affinity is expected in bits [16:23]
-    /// - level 1 affinity is expected in bits [8:15]
-    /// - level 0 affinity is expected in bits [0:7]
-    Specific(u32),
+    Specific(CpuId),
     /// That interrupt can be handled by
     /// any PE that is not busy with another,
     /// more important task
@@ -62,6 +60,18 @@ pub enum TargetCpu {
     GICv2TargetList(TargetList),
 }
 
+/// Target of an inter-processor interrupt
+pub enum IpiTargetCpu {
+    /// That interrupt must be handled by
+    /// a specific PE in the system.
+    Specific(CpuId),
+    /// All PEs will receive this interrupt
+    /// except the sender
+    AllOtherCpus,
+    GICv2TargetList(TargetList),
+}
+
+const U64BYTES: usize = core::mem::size_of::<u64>();
 const U32BYTES: usize = core::mem::size_of::<u32>();
 const U32BITS: usize = u32::BITS as usize;
 
@@ -78,6 +88,14 @@ impl GicRegisters {
 
     fn write_volatile(&mut self, index: usize, value: u32) {
         unsafe { (&mut self.inner[index] as *mut u32).write_volatile(value) }
+    }
+
+    fn read_volatile_64(&self, index: usize) -> u64 {
+        unsafe { (self.inner.as_ptr() as *const u64).add(index).read_volatile() }
+    }
+
+    fn write_volatile_64(&mut self, index: usize, value: u64) {
+        unsafe { (self.inner.as_mut_ptr() as *mut u64).add(index).write_volatile(value) }
     }
 
     // Reads one item of an array spanning across
@@ -242,7 +260,7 @@ impl ArmGic {
     /// also called software generated interrupt (SGI).
     ///
     /// note: on Aarch64, IPIs must have a number below 16 on ARMv8
-    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: TargetCpu) {
+    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: IpiTargetCpu) {
         assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
 
         match self {

@@ -1335,6 +1335,7 @@ name = "gic"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "cpu",
  "log",
  "memory",
  "static_assertions",

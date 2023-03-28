@@ -52,7 +52,7 @@ impl MpidrValue {
     /// Reads an affinity `level` from this `MpidrValue`.
     ///
     /// Panics if the given affinity level is not 0, 1, 2, or 3.
-    pub fn affinity(self, level: u8) -> u8 {
+    pub fn affinity(self, level: u8) -> u64 {
         let shift = match level {
             0 => 0,
             1 => 8,
@@ -60,7 +60,8 @@ impl MpidrValue {
             3 => 32,
             _ => panic!("Valid affinity levels are 0, 1, 2, 3"),
         };
-        (self.0 >> shift) as u8
+
+        self.0 >> shift
     }
 
     /// Create an `MpidrValue` from its four affinity numbers
