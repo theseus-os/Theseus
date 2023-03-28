@@ -5,7 +5,7 @@
 extern crate alloc;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use core::{sync::atomic::{AtomicBool, Ordering::Relaxed}, hint::spin_loop};
 use spin::Mutex;
 
 pub fn main(_: Vec<String>) -> isize {
@@ -37,6 +37,7 @@ fn guard_hog(lock: Arc<Mutex<()>>) {
         // that only covers the instructions associated with the panic, which we would
         // never reach.
         lsda_generator();
+        spin_loop();
     }
 }
 

@@ -197,6 +197,7 @@ fn event_handler_loop(content: &String, map: &BTreeMap<usize, LineSlice>,
             },
             _ => {}
         }
+        core::hint::spin_loop();
     }
 }
 

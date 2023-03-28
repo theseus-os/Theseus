@@ -1,5 +1,7 @@
 //! Builtin shell commands.
 
+use core::hint::spin_loop;
+
 use crate::{Error, Result, Shell};
 use alloc::{borrow::ToOwned, vec::Vec};
 use app_io::println;
@@ -28,6 +30,7 @@ impl Shell {
                     // TODO: Print
                     return Ok(());
                 }
+                spin_loop();
             }
         } else {
             for arg in args {

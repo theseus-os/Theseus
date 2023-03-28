@@ -110,6 +110,7 @@ fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
                         println!("Received packet on vnic {}", nic.id());
                     }
                 }
+                core::hint::spin_loop();
             }
         }
     } else {
@@ -125,6 +126,7 @@ fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
                         println!("Received packet on queue {}", qid);
                     }
                 }
+                core::hint::spin_loop();
             }
         }
     }

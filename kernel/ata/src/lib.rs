@@ -10,7 +10,7 @@
 extern crate alloc;
 #[macro_use] extern crate log;
 
-use core::fmt;
+use core::{fmt, hint::spin_loop};
 use bitflags::bitflags;
 use spin::Mutex;
 use alloc::{
@@ -479,6 +479,7 @@ impl AtaBus {
 			if status.intersects(AtaStatus::DATA_REQUEST_READY) {
 				return Ok(()); // ready to go!
 			}
+			spin_loop();
 		}
 	}
 
@@ -509,6 +510,7 @@ impl AtaBus {
 			if !status.intersects(AtaStatus::DATA_REQUEST_READY) {
 				return Ok(()); // ready to go!
 			}
+			spin_loop();
 		}
 	}
 

@@ -534,6 +534,7 @@ impl Iterator for PrintfIter {
                     _ => break,
                 }
                 self.format = self.format.add(1);
+                core::hint::spin_loop();
             }
 
             // Width and precision:
@@ -574,6 +575,7 @@ impl Iterator for PrintfIter {
                 };
 
                 self.format = self.format.add(1);
+                core::hint::spin_loop();
             }
             let fmt = *self.format;
             let fmtkind = match fmt {

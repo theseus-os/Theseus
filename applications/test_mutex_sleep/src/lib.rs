@@ -150,6 +150,7 @@ fn lockstep_task((lock, remainder): (Arc<MutexSleep<usize>>, usize)) -> Result<(
                 warn!("Task {} going back to sleep, value {}, remainder {}!", curr_task, *locked, remainder);
             }
             scheduler::schedule();
+            core::hint::spin_loop();
         }
     }
     warn!("{} finished loop.", curr_task);

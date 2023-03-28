@@ -16,10 +16,8 @@ use core::str;
 use alloc::vec::Vec;
 use alloc::string::String;
 use hpet::get_hpet;
-use smoltcp::{
-    socket::{SocketSet, TcpSocket, SocketHandle},
-};
-use network_manager::{NetworkInterfaceRef};
+use smoltcp::socket::{SocketSet, TcpSocket, SocketHandle};
+use network_manager::NetworkInterfaceRef;
 use smoltcp_helper::{millis_since, poll_iface};
 
 /// The states that implement the finite state machine for 
@@ -310,6 +308,8 @@ pub fn send_request(
                 state
             }
         }
+        // spinloop skipped because this loop returns value
+        // TODO: verify if this loop is really necessary and if so, find a way to minimize time spent in the loop
     }
 
 

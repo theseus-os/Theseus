@@ -20,6 +20,7 @@ extern crate getopts;
 
 
 use getopts::{Matches, Options};
+use core::hint::spin_loop;
 use core::str::FromStr;
 use hashbrown::HashMap;
 use alloc::vec::Vec;        
@@ -323,8 +324,7 @@ fn ping(address: IpAddress, count: usize, interval: u64, timeout: u64, verbose: 
                 break
             }
         }
-    
-
+        spin_loop();
     }
     
     // Computes ping min/avg/max

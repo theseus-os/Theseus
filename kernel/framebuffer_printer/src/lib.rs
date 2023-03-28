@@ -8,6 +8,8 @@ extern crate font;
 extern crate framebuffer;
 extern crate shapes;
 
+use core::hint::spin_loop;
+
 use alloc::vec;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use framebuffer::{Framebuffer, Pixel};
@@ -193,6 +195,7 @@ pub fn print_ascii_character<P: Pixel>(
             }
             j = off_set_x;
         }
+        spin_loop();
     }
 }
 
@@ -225,6 +228,7 @@ pub fn fill_blank<P: Pixel>(
             framebuffer.composite_buffer(&fill, start);
         }
         coordinate.y += 1;
+        spin_loop();
     }
 }
 

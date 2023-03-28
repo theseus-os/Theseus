@@ -164,6 +164,7 @@ pub unsafe extern "C" fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_
         }
 
         i += 1;
+        core::hint::spin_loop();
     }
 
     dst
@@ -395,6 +396,7 @@ unsafe fn inner_strstr(
             }
 
             i += 1;
+            core::hint::spin_loop();
         }
 
         haystack = haystack.offset(1);

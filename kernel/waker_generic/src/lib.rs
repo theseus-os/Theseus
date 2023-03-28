@@ -9,6 +9,8 @@
 
 extern crate alloc;
 
+use core::hint::spin_loop;
+
 use alloc::sync::Arc;
 use spin::Mutex; 
 
@@ -87,6 +89,7 @@ impl Blocker {
                 };
                 drop(result);
             }
+            spin_loop();
         }
     }
 }

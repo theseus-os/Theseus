@@ -227,7 +227,7 @@ fn kill_and_halt(
     // But in general, this task should have already been marked as killed and thus no longer schedulable,
     // so it should not reach this point. 
     // Only exceptions during the early OS initialization process will get here, meaning that the OS will basically stop.
-    loop { core::hint::spin_loop() }
+    loop { core::hint::spin_loop(); }
 }
 
 
@@ -355,7 +355,7 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame,
     }
     
     kill_and_halt(0x8, &stack_frame, Some(error_code.into()), false);
-    loop { core::hint::spin_loop() }
+    loop { core::hint::spin_loop(); }
 }
 
 /// exception 0x0A
@@ -416,7 +416,7 @@ extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFra
 extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
     println_both!("\nEXCEPTION: MACHINE CHECK\n{:#X?}", stack_frame);
     kill_and_halt(0x12, &stack_frame, None, true);
-    loop { core::hint::spin_loop() }
+    loop { core::hint::spin_loop(); }
 }
 
 /// exception 0x13

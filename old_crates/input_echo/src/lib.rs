@@ -40,6 +40,7 @@ fn run() -> Result<(), &'static str> {
         stdout_locked.write_all(buf.as_bytes())
             .or(Err("faileld to perform write_all"))?;
         buf.clear();
+        core::hint::spin_loop();
     }
     Ok(())
 }

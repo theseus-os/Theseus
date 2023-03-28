@@ -57,5 +57,6 @@ fn _task_delay_tester(_arg: usize) {
         info!("I run periodically (iter {}).", iter);
         iter += 1;
         sleep::sleep_until(end_time).unwrap();
+        core::hint::spin_loop();
     }
 }

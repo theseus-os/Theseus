@@ -11,7 +11,7 @@ extern crate spin;
 extern crate hpet;
 
 use alloc::string::ToString;
-use core::convert::TryInto;
+use core::{convert::TryInto, hint::spin_loop};
 use spin::Once;
 use hpet::get_hpet;
 use smoltcp::{
@@ -106,6 +106,7 @@ pub fn connect(
             error!("smoltcp_helper: failed to connect to socket, timed out after {} ms", timeout_millis);
             return Err("smoltcp_helper: failed to connect to socket, timed out.");
         }
+        spin_loop();
     }
 
     debug!("smoltcp_helper: connected!  (took {} ms)", millis_since(start)?);

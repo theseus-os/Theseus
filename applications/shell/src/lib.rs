@@ -37,6 +37,7 @@ use dfqueue::{DFQueue, DFQueueConsumer, DFQueueProducer};
 use alloc::sync::Arc;
 use spin::Mutex;
 use environment::Environment;
+use core::hint::spin_loop;
 use core::mem;
 use alloc::collections::BTreeMap;
 use stdio::{Stdio, KeyEventQueue, KeyEventQueueReader, KeyEventQueueWriter,
@@ -112,6 +113,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     loop {
         warn!("BUG: blocked shell task was scheduled in unexpectedly");
+        spin_loop();
     }
 
     // TODO: when `join` puts this task to sleep instead of spinning, we can re-enable it.
@@ -426,6 +428,7 @@ impl Shell {
                         if !task_ref.is_running() {
                             break;
                         }
+                        spin_loop();
                     }
                 }
                 self.terminal.lock().print_to_terminal("^C\n".to_string());
@@ -465,6 +468,7 @@ impl Shell {
                         if !task_ref.is_running() {
                             break;
                         }
+                        spin_loop();
                     }
                 }
             }
@@ -1325,6 +1329,7 @@ impl Shell {
                 } else { // currently the key event queue is taken by an application
                     break;
                 }
+                spin_loop();
             }
             if need_refresh {
                 // update if there are inputs
@@ -1332,6 +1337,7 @@ impl Shell {
             } else {
                 scheduler::schedule(); // yield the CPU if nothing to do
             }
+            spin_loop();
         }
     }
 }

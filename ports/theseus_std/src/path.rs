@@ -275,6 +275,7 @@ where
             (None, Some(_)) => return None,
         }
         iter = iter_next;
+        core::hint::spin_loop();
     }
 }
 

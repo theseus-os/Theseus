@@ -1,7 +1,7 @@
 // TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
 #![allow(clippy::missing_safety_doc)]
 
-use core::{fmt, ops::{Deref, DerefMut}};
+use core::{fmt, ops::{Deref, DerefMut}, hint::spin_loop};
 use preemption::{PreemptionGuard, hold_preemption};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use lockable::{Lockable, LockableSized};
@@ -95,6 +95,7 @@ impl<T: ?Sized> RwLockPreempt<T> {
     pub fn read(&self) -> RwLockPreemptReadGuard<T> {
         loop {
             if let Some(guard) = self.try_read() { return guard }
+            spin_loop();
         }
     }
 
@@ -187,6 +188,7 @@ impl<T: ?Sized> RwLockPreempt<T> {
     pub fn write(&self) -> RwLockPreemptWriteGuard<T> {
         loop {
             if let Some(guard) = self.try_write() { return guard }
+            spin_loop();
         }
     }
 

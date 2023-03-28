@@ -4,6 +4,8 @@
 
 extern crate alloc;
 
+use core::hint::spin_loop;
+
 use alloc::{string::String, vec::Vec};
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -30,6 +32,7 @@ fn run() -> Result<(), &'static str> {
         stdout
             .write_all(&buf)
             .or(Err("failed to invoke write_all"))?;
+        spin_loop();
     }
 
     Ok(())

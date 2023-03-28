@@ -6,7 +6,7 @@ extern crate alloc;
 
 use alloc::{format, sync::Arc};
 use async_channel::Receiver;
-use core::sync::atomic::{AtomicU16, Ordering};
+use core::{sync::atomic::{AtomicU16, Ordering}, hint::spin_loop};
 use core2::io::Write;
 use irq_safety::MutexIrqSafe;
 use log::{error, info, warn};
@@ -88,6 +88,7 @@ fn console_connection_detector(
                 serial_port_address
             );
         }
+        spin_loop();
     }
 }
 
@@ -167,6 +168,7 @@ fn tty_to_port_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)
         if let Err(e) = port.lock().write(&data[..len]) {
             error!("couldn't write to port: {e}");
         }
+        spin_loop();
     }
 }
 
@@ -183,5 +185,6 @@ fn port_to_tty_loop((receiver, master): (Receiver<DataChunk>, tty::Master)) {
         if let Err(e) = master.write(&data[..len as usize]) {
             error!("couldn't write to master: {e}");
         }
+        spin_loop();
     }
 }

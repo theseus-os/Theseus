@@ -7,7 +7,7 @@
 extern crate alloc;
 
 use alloc::collections::BTreeMap;
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{sync::atomic::{AtomicBool, Ordering}, hint::spin_loop};
 use log::{error, info};
 use cpu::CpuId;
 use irq_safety::{enable_interrupts, MutexIrqSafe};
@@ -68,7 +68,7 @@ pub fn kstart_ap(
 
     #[cfg(target_arch = "aarch64")] {
         log::info!("cpu {} is ready!", cpu_id);
-        loop {}
+        loop { spin_loop(); }
     }
 
     // initialize interrupts (including TSS/GDT) for this AP
@@ -130,5 +130,6 @@ pub fn kstart_ap(
     scheduler::schedule();
     loop { 
         error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", cpu_id);
+        spin_loop();
     }
 }

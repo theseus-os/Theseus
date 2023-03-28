@@ -23,7 +23,7 @@ use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
 use wait_queue::WaitQueue;
 use crossbeam_utils::atomic::AtomicCell;
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{sync::atomic::{AtomicUsize, Ordering}, hint::spin_loop};
 
 /// Create a new channel that allows senders and receivers to 
 /// asynchronously exchange messages via an internal intermediary buffer.
@@ -434,6 +434,7 @@ impl <T: Send> Receiver<T> {
                 Err(Error::WouldBlock) => return Ok(read),
                 Err(e) => return Err(e),
             };
+            spin_loop();
         }
     }
 

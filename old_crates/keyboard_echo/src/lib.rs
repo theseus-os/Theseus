@@ -47,6 +47,7 @@ fn run() -> Result<(), &'static str> {
             if key_event.keycode == Keycode::Q { break; }
         }
         scheduler::schedule();
+        core::hint::spin_loop();
     }
 
     Ok(())

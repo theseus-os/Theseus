@@ -27,7 +27,7 @@ extern crate wait_queue;
 extern crate task;
 extern crate scheduler;
 
-use core::fmt;
+use core::{fmt, hint::spin_loop};
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
 use spin::Mutex;
@@ -285,6 +285,7 @@ impl <T: Send> Sender<T> {
                 }
             }
             scheduler::schedule();
+            spin_loop();
         }
 
         // Here, we are at the rendezvous point
@@ -338,6 +339,7 @@ impl <T: Send> Sender<T> {
                 }
             };
             let old_state = core::mem::replace(&mut wait_entry, new_state);
+            spin_loop();
         }
         */
     }
@@ -436,6 +438,7 @@ impl <T: Send> Receiver<T> {
                 }
             }
             scheduler::schedule();
+            spin_loop();
         }
 
 

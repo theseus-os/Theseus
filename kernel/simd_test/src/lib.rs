@@ -2,6 +2,8 @@
 #![feature(portable_simd)]
 
 // The entire crate is only built if both `simd_personality` and `sse2` are enabled.
+
+use core::hint::spin_loop;
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(all(simd_personality, target_feature = "sse2"))] {
 
@@ -27,6 +29,7 @@ pub fn test1(_: ()) {
             debug!("SIMD TEST1 (should be 1.111, 11.11, 111.1, 1111): {:?}", x);
         }
         loop_ctr += 1;
+        spin_loop();
     }
 }
 
@@ -46,6 +49,7 @@ pub fn test2(_: ()) {
             trace!("SIMD TEST2 (should be 2.222, 22.22, 222.2, 2222): {:?}", x);
         }
         loop_ctr += 1;
+        spin_loop();
     }
 }
 

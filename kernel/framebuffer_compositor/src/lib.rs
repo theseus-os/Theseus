@@ -30,6 +30,7 @@ extern crate shapes;
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
 use core::hash::{Hash, Hasher, BuildHasher};
+use core::hint::spin_loop;
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 use framebuffer::{Framebuffer, Pixel};
@@ -228,6 +229,7 @@ impl Compositor for FrameCompositor {
                         )?;
                     }
                     row_start += CACHE_BLOCK_HEIGHT;
+                    spin_loop();
                 }
             }
         } else {
@@ -257,6 +259,7 @@ impl Compositor for FrameCompositor {
                             cache_range,
                         )?;
                         row_range.start += CACHE_BLOCK_HEIGHT;
+                        spin_loop();
                     } 
                 }
             }

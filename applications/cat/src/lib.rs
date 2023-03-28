@@ -9,7 +9,7 @@ extern crate path;
 extern crate fs_node;
 extern crate core2;
 
-use core::str;
+use core::{str, hint::spin_loop};
 use alloc::{
     string::{String, ToString},
     vec::Vec,
@@ -103,6 +103,7 @@ fn echo_from_stdin() -> Result<(), &'static str> {
         if cnt == 0 { break; }
         stdout.write_all(&buf[0..cnt])
             .or(Err("faileld to perform write_all"))?;
+        spin_loop();
     }
     Ok(())
 }

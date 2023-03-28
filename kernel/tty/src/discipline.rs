@@ -272,5 +272,7 @@ const fn werase(buf: &[u8]) -> usize {
         } else if buf[len - offset] == b' ' {
             return offset - 1;
         }
+        // spin_loop() is skipped here because it's harder to implement in const environment
+        // TODO: verify whether the loop is necessary and if so, minimize the time spent in the loop
     }
 }

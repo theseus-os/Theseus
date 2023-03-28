@@ -13,7 +13,7 @@ extern crate crate_swap;
 extern crate task;
 extern crate fault_log;
 
-use core::ptr;
+use core::{ptr, hint::spin_loop};
 use core::ops::Range;
 
 use alloc::{
@@ -268,6 +268,7 @@ pub fn constant_offset_fix(
         if x > top {
             break;
         }
+        spin_loop();
     }
     Ok(())
 }

@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use spin::{Mutex, MutexGuard};
 use core2::io::{Read, Write};
 use keycodes_ascii::KeyEvent;
-use core::ops::Deref;
+use core::{ops::Deref, hint::spin_loop};
 
 /// A ring buffer with an EOF mark.
 pub struct RingBufferEof<T> {
@@ -178,6 +178,7 @@ impl StdioReader {
             let mut locked = self.lock();
             new_cnt = locked.read(&mut tmp_buf[..])?;
             if new_cnt == 0 && locked.is_eof() { return Ok(total_cnt); }
+            spin_loop();
         }
     }
 }
@@ -232,6 +233,7 @@ impl<'a> Read for StdioReadGuard<'a> {
 
             // Break if we have read something or we encounter EOF.
             if cnt > 0 || end { break; }
+            spin_loop();
         }
         return Ok(cnt);
     }

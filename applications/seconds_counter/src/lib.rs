@@ -2,6 +2,8 @@
 
 extern crate alloc;
 
+use core::hint::spin_loop;
+
 use alloc::{string::String, vec::Vec};
 
 pub fn main(_: Vec<String>) {
@@ -14,5 +16,6 @@ pub fn main(_: Vec<String>) {
             app_io::println!("{}", counter);
             previous = now;
         }
+        spin_loop();
     }
 }

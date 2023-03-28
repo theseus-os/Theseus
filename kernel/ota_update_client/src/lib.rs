@@ -19,7 +19,7 @@ extern crate itertools;
 #[macro_use] extern crate smoltcp_helper;
 
 
-use core::str;
+use core::{str, hint::spin_loop};
 use alloc::{
     vec::Vec,
     collections::BTreeSet,
@@ -439,6 +439,7 @@ fn download_files<S: AsRef<str>>(
             // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
             // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
         }
+        spin_loop();
     }
 
     if downloaded_files.len() != absolute_paths.len() {

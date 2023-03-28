@@ -7,6 +7,8 @@
 extern crate framebuffer;
 extern crate shapes;
 
+use core::hint::spin_loop;
+
 use framebuffer::{Framebuffer, Pixel};
 use shapes::Coord;
 
@@ -48,6 +50,7 @@ pub fn draw_line<P: Pixel>(
                 break;
             }
             x += step;
+            spin_loop();
         }
     } else {
         let mut x;
@@ -67,6 +70,7 @@ pub fn draw_line<P: Pixel>(
                 break;
             }
             y += step;
+            spin_loop();
         }
     }
 }
@@ -113,6 +117,7 @@ pub fn draw_rectangle<P: Pixel>(
             framebuffer.draw_pixel(top + (0, end_y_offset), pixel);
         }
         top.x += 1;
+        spin_loop();
     }
 
     let mut left = Coord::new(start_x, start_y); 
@@ -128,6 +133,7 @@ pub fn draw_rectangle<P: Pixel>(
             framebuffer.draw_pixel(left + (end_x_offset, 0), pixel);
         }
         left.y += 1;
+        spin_loop();
     }
 }
 
@@ -167,12 +173,14 @@ pub fn fill_rectangle<P: Pixel>(
             if coordinate.x == end_x {
                 break;
             }
+            spin_loop();
         }
         coordinate.y += 1;
         if coordinate.y == end_y {
             break;
         }
         coordinate.x = start_x;
+        spin_loop();
     }
 }
 

@@ -901,7 +901,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { core::hint::spin_loop() }
+    loop { core::hint::spin_loop(); }
 }
 
 /// The final piece of the task cleanup logic for restartable tasks.
@@ -977,7 +977,7 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { core::hint::spin_loop() }
+    loop { core::hint::spin_loop(); }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
@@ -1010,7 +1010,7 @@ pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
         .spawn_restartable(None)
 }
 
-/// A basic idle task that does nothing but loop endlessly.
+/// An idle task that pauses CPU until an interrupt is received.
 ///
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
 /// so we use `()` here instead. 
@@ -1018,7 +1018,6 @@ pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
 fn idle_task_entry(_cpu_id: CpuId) {
     info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), task::get_my_current_task());
     loop {
-        // TODO: put this core into a low-power state
         core::hint::spin_loop();
     }
 }

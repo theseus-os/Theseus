@@ -42,21 +42,21 @@ pub fn libtheseus_hello(_args: Vec<String>) -> isize {
 #[panic_handler] // same as:  #[lang = "panic_impl"]
 fn panic_entry_point(_info: &core::panic::PanicInfo) -> ! {
     // println!("panic: {:?}", info);
-    loop { }
+    loop { core::hint::spin_loop(); }
 }
 
 /// This is the callback entry point that gets invoked when the heap allocator runs out of memory.
 #[alloc_error_handler]
 fn oom(_layout: core::alloc::Layout) -> ! {
     panic!("\n(oom) Out of Heap Memory! requested allocation: {:?}", _layout);
-    // loop { }
+    // loop { core::hint::spin_loop(); }
 }
 
 #[lang = "eh_personality"]
 #[no_mangle]
 extern "C" fn rust_eh_personality() -> ! {
     // println!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
-    loop { }
+    loop { core::hint::spin_loop(); }
 }
 
 #[global_allocator]

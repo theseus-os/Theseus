@@ -10,7 +10,7 @@ extern crate root;
 use core::{
     fmt,
     fmt::Write,
-    ops::{Deref, DerefMut},
+    ops::{Deref, DerefMut}, hint::spin_loop,
 };
 use alloc::{
     string::{String, ToString},
@@ -176,6 +176,7 @@ impl Path {
                     break;
                 }
             }
+            spin_loop();
         }
         // Create the new path from its components 
         let mut new_path = String::new();

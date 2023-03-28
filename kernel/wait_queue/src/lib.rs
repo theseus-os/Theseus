@@ -8,6 +8,8 @@ extern crate task;
 extern crate scheduler;
 
 
+use core::hint::spin_loop;
+
 use alloc::collections::VecDeque;
 use irq_safety::MutexIrqSafe;
 use task::{TaskRef, RunState};
@@ -140,6 +142,7 @@ impl WaitQueue {
 
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
+            spin_loop();
         }
     }
 
@@ -172,6 +175,7 @@ impl WaitQueue {
 
             // Here, we have been woken up, so loop back around and check the condition again
             // trace!("WaitQueue::wait_until():  woke up!");
+            spin_loop();
         }
     }
 
@@ -234,6 +238,7 @@ impl WaitQueue {
                 // trace!("WaitQueue::notify():  did nothing");
                 return false;
             }
+            spin_loop();
         }
     }
 }

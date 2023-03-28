@@ -1,4 +1,4 @@
-use core::{fmt, ops::{Deref, DerefMut}};
+use core::{fmt, ops::{Deref, DerefMut}, hint::spin_loop};
 use preemption::{PreemptionGuard, hold_preemption};
 use spin::{Mutex, MutexGuard};
 use lockable::{Lockable, LockableSized};
@@ -62,6 +62,7 @@ impl<T: ?Sized> MutexPreempt<T> {
             if let Some(guard) = self.try_lock() {
                 return guard;
             }
+            spin_loop();
         }
     }
 

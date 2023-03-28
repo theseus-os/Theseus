@@ -106,7 +106,7 @@ pub fn init(double_fault_stack_top_unusable: Option<memory::VirtualAddress>) {
 /// exception 0x00
 extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): DIVIDE ERROR\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x01
@@ -118,7 +118,7 @@ extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
 /// exception 0x02
 extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): NON-MASKABLE INTERRUPT\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x03
@@ -130,19 +130,19 @@ extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
 /// exception 0x04
 extern "x86-interrupt" fn overflow_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): OVERFLOW\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x05
 extern "x86-interrupt" fn bound_range_exceeded_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): BOUND RANGE EXCEEDED\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x06
 extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): INVALID OPCODE\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x07
@@ -151,7 +151,7 @@ extern "x86-interrupt" fn invalid_opcode_handler(stack_frame: InterruptStackFram
 /// see [here](http://wiki.osdev.org/I_Cant_Get_Interrupts_Working#I_keep_getting_an_IRQ7_for_no_apparent_reason).
 extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): DEVICE NOT AVAILABLE\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x08
@@ -160,31 +160,31 @@ extern "x86-interrupt" fn device_not_available_handler(stack_frame: InterruptSta
 pub extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) -> ! {
     println!("\nEXCEPTION (early): DOUBLE FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
     println!("\nNote: this may be caused by stack overflow. Is the size of the initial_bsp_stack is too small?");
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x0A
 extern "x86-interrupt" fn invalid_tss_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): INVALID TSS\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x0B
 extern "x86-interrupt" fn segment_not_present_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): SEGMENT NOT PRESENT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x0C
 extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): STACK SEGMENT FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x0D
 extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x0E
@@ -211,47 +211,47 @@ extern "x86-interrupt" fn early_page_fault_handler(stack_frame: InterruptStackFr
             true, // look at all sections (.data/.bss/.rodata), not just .text
         )),
     );
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x10
 extern "x86-interrupt" fn x87_floating_point_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): x87 FLOATING POINT\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x11
 extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): ALIGNMENT CHECK\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x12
 extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
     println!("\nEXCEPTION (early): MACHINE CHECK\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x13
 extern "x86-interrupt" fn simd_floating_point_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): SIMD FLOATING POINT\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x14
 extern "x86-interrupt" fn virtualization_handler(stack_frame: InterruptStackFrame) {
     println!("\nEXCEPTION (early): VIRTUALIZATION\n{:#X?}", stack_frame);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x1D
 extern "x86-interrupt" fn vmm_communication_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): VMM COMMUNICATION EXCEPTION\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }
 
 /// exception 0x1E
 extern "x86-interrupt" fn security_exception_handler(stack_frame: InterruptStackFrame, error_code: u64) {
     println!("\nEXCEPTION (early): SECURITY EXCEPTION\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
-    loop { spin_loop() }
+    loop { spin_loop(); }
 }

@@ -4,7 +4,7 @@ extern crate alloc;
 
 use alloc::{string::String, vec, vec::Vec};
 use app_io::println;
-use core::str::FromStr;
+use core::{str::FromStr, hint::spin_loop};
 use getopts::{Matches, Options};
 use net::{
     icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket},
@@ -132,6 +132,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
         if received == count {
             return Ok(());
         }
+        spin_loop();
     }
 }
 

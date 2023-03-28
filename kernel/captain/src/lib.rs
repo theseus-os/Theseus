@@ -19,6 +19,8 @@
 
 extern crate alloc;
 
+use core::hint::spin_loop;
+
 use log::{error, info};
 use memory::{EarlyIdentityMappedPages, MmiRef, PhysicalAddress};
 use irq_safety::enable_interrupts;
@@ -230,5 +232,6 @@ pub fn init(
     scheduler::schedule();
     loop { 
         error!("BUG: captain::init(): captain's bootstrap task was rescheduled after being dead!");
+        spin_loop();
     }
 }

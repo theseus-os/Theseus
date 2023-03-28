@@ -28,6 +28,8 @@ extern crate window_inner;
 extern crate shapes;
 extern crate color;
 
+use core::hint::spin_loop;
+
 use alloc::collections::VecDeque;
 use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
@@ -709,6 +711,7 @@ fn window_manager_loop(
                 }
             }
         }
+        spin_loop();
     }
 }
 

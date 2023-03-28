@@ -55,6 +55,8 @@ extern crate scheduler;
 #[macro_use] extern crate debugit;
 extern crate interrupts;
 
+use core::hint::spin_loop;
+
 use alloc::string::String;
 use task::{get_my_current_task, JoinableTaskRef};
 
@@ -177,5 +179,6 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
         }
 
         scheduler::schedule();
+        spin_loop();
     }
 }

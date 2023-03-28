@@ -23,7 +23,7 @@ extern crate alloc;
 
 use core::{
     future::Future,
-    task::{Context, Poll},
+    task::{Context, Poll}, hint::spin_loop,
 };
 
 pub use futures::{future, pin_mut, select_biased, FutureExt};
@@ -49,5 +49,6 @@ where
             Poll::Ready(output) => return output,
             Poll::Pending => blocker.block(),
         }
+        spin_loop();
     }
 }

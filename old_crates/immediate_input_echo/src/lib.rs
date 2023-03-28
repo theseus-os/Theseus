@@ -41,6 +41,7 @@ fn run() -> Result<(), &'static str> {
         let byte_num = stdin_locked.read(&mut buf).or(Err("failed to invoke read"))?;
         if byte_num == 0 { break; }
         stdout_locked.write_all(&buf).or(Err("failed to invoke write_all"))?;
+        core::hint::spin_loop();
     }
     stdout_locked.write_all(&['\n' as u8]).or(Err("failed to invoke write_all"))?;
     Ok(())

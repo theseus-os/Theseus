@@ -49,6 +49,7 @@ pub fn main(args: Vec<String>) -> isize {
                     serial_port_io.write(s.as_bytes()).expect("serial port write failed");
                 }
             }
+            core::hint::spin_loop();
         }
     }
     else {
@@ -61,6 +62,7 @@ pub fn main(args: Vec<String>) -> isize {
                     serial_port.lock().write_str(s).expect("serial port write failed");
                 }
             }
+            core::hint::spin_loop();
         }
     }
     

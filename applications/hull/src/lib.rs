@@ -22,7 +22,7 @@ pub use error::{Error, Result};
 use crate::job::{JobPart, State};
 use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec, vec::Vec};
 use app_io::println;
-use core::fmt::Write;
+use core::{fmt::Write, hint::spin_loop};
 use hashbrown::HashMap;
 use job::Job;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
@@ -92,6 +92,7 @@ impl Shell {
             } else {
                 write!(io, "failed to read line").expect("failed to write output");
             }
+            spin_loop();
         }
     }
 
@@ -194,6 +195,7 @@ impl Shell {
                     _ => Err(Error::Command(exit_value)),
                 };
             }
+            spin_loop();
         }
     }
 
