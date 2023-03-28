@@ -39,7 +39,7 @@ pub(crate) struct TransportInterfaceSendContext {
     _padding3:          [u32; 28]
 }
 
-const_assert_eq!(core::mem::size_of::<TransportInterfaceSendContext>(), 160);
+const _: () = assert!(core::mem::size_of::<TransportInterfaceSendContext>() == 160);
 
 impl TransportInterfaceSendContext {
     /// Create and initialize a TIS object
@@ -87,7 +87,7 @@ pub(crate) struct SendQueueContext {
     tis_num_0:                          Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<SendQueueContext>(), 48);
+const _: () = assert!(core::mem::size_of::<SendQueueContext>() == 48);
 
 impl fmt::Debug for SendQueueContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

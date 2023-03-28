@@ -2,11 +2,6 @@
 //! which is used to compare a standard runqueue with a state spill-free runqueue.
 //! 
 //! # Instructions for Running
-//! When running experiments, enable the proper configs:
-//! * For the state spill-free (regular) version, use THESEUS_CONFIG="rq_eval"
-//! * For the state spillful version, use THESEUS_CONFIG="rq_eval runqueue_spillful"
-//! You should do a clean build in between each one.
-//! 
 //! You can run the experiments as such:
 //! * `rq_eval -w 100`
 //! * `rq_eval -s 100`
@@ -39,9 +34,6 @@ use task::{Task, TaskRef};
 use libtest::{hpet_timing_overhead, hpet_2_us};
 
 
-#[cfg(runqueue_spillful)]
-const CONFIG: &'static str = "WITH state spill";
-#[cfg(not(runqueue_spillful))]
 const CONFIG: &'static str = "WITHOUT state spill";
 
 const _FEMTOSECONDS_PER_SECOND: u64 = 1000*1000*1000*1000*1000; // 10^15
@@ -152,29 +144,22 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let overhead = hpet_timing_overhead()?;
     let mut task = Task::new(
         None,
-        None,
-        |_, _| loop { }, // dummy failure function
+        task::InheritedStates::FromTask(
+            &*task::get_my_current_task().ok_or("Failed to get current task")?
+        ),
     )?;
     task.name = String::from("rq_eval_single_task_unrunnable");
-    let taskref = TaskRef::new(task);
+    let taskref = TaskRef::create(
+        task,
+        |_, _| loop { core::hint::spin_loop() }, // dummy failure function
+    );
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
     
-    for _i in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(cpu::current_cpu(), taskref.clone())?;
-
-        #[cfg(runqueue_spillful)] {   
-            if let Some(remove_from_runqueue) = task::RUNQUEUE_REMOVAL_FUNCTION.get() {
-                if let Some(rq) = taskref.on_runqueue() {
-                    remove_from_runqueue(&taskref, rq)?;
-                }
-            }
-        }
-        #[cfg(not(runqueue_spillful))]
-        {
-            runqueue::remove_task_from_all(&taskref)?;
-        }
+    for _ in 0..iterations {
+        runqueue::add_task_to_specific_runqueue(cpu::current_cpu().into_u8(), taskref.clone())?;
+        runqueue::remove_task_from_all(&taskref)?;
     }
 
     let end = hpet.get_counter();

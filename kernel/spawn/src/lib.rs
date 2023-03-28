@@ -14,22 +14,24 @@
 #![feature(stmt_expr_attributes)]
 #![feature(naked_functions)]
 
-#[macro_use] extern crate alloc;
-#[macro_use] extern crate log;
+extern crate alloc;
 
 use core::{marker::PhantomData, mem, ops::Deref, sync::atomic::{fence, Ordering}};
 use alloc::{
     boxed::Box,
+    format,
     string::{String, ToString},
     sync::Arc,
     vec::Vec,
 };
+use log::{error, info, debug};
+use cpu::CpuId;
 use debugit::debugit;
 use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, RestartInfo, RunState, TASKLIST, JoinableTaskRef, ExitableTaskRef};
+use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -40,24 +42,25 @@ use no_drop::NoDrop;
 use task::SimdExt;
 
 
-/// Initializes tasking for the given AP core, including creating a runqueue for it
-/// and creating its initial task bootstrapped from the current execution context for that core. 
+/// Initializes tasking for this CPU, including creating a runqueue for it
+/// and creating its initial task bootstrapped from the current execution context.
 pub fn init(
     kernel_mmi_ref: MmiRef,
-    apic_id: u8,
+    cpu_id: CpuId,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    runqueue::init(apic_id)?;
+    let cpu_id_as_u8: u8 = cpu_id.into_u8();
+    runqueue::init(cpu_id_as_u8)?;
     
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
-        task::bootstrap_task(apic_id, stack, kernel_mmi_ref)?;
+        task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
     runqueue::add_task_to_specific_runqueue(
-        apic_id,
+        cpu_id_as_u8,
         exitable_bootstrap_task.clone(),
     )?;
     Ok(BootstrapTaskRef {
-        apic_id,
+        cpu_id,
         exitable_taskref: exitable_bootstrap_task,
     })
 }
@@ -68,11 +71,11 @@ static BOOTSTRAP_TASKS: Mutex<Vec<JoinableTaskRef>> = Mutex::new(Vec::new());
 
 /// Spawns a dedicated task to cleanup all bootstrap tasks
 /// by reaping them, i.e., taking their exit value.
-/// 
+///
 /// This allows them to be fully dropped and cleaned up safely,
 /// as it would be invalid to reap and cleanup bootstrap tasks
 /// while the actual bootstrapped task was still running.
-/// 
+///
 /// ## Arguments
 /// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.
 pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
@@ -92,6 +95,10 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
             }
             info!("Cleaned up all {} bootstrap tasks.", total_tasks);
             *BOOTSTRAP_TASKS.lock() = Vec::new(); // replace the Vec to drop it
+            // Now that all bootstrap tasks are finished executing and have been cleaned up,
+            // we can safely deallocate the early TLS data image because it is guaranteed
+            // to no longer be in use on any CPU.
+            early_tls::drop();
         },
         num_tasks,
     )
@@ -112,7 +119,7 @@ pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
 #[derive(Debug)]
 pub struct BootstrapTaskRef {
     #[allow(dead_code)]
-    apic_id: u8,
+    cpu_id: CpuId,
     exitable_taskref: ExitableTaskRef,
 }
 impl Deref for BootstrapTaskRef {
@@ -135,7 +142,7 @@ impl BootstrapTaskRef {
 impl Drop for BootstrapTaskRef {
     // See the documentation for `BootstrapTaskRef::finish()` for more details.
     fn drop(&mut self) {
-        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.apic_id, self.task_ref);
+        // trace!("Finishing Bootstrap Task on core {}: {:?}", self.cpu_id, self.task_ref);
         remove_current_task_from_runqueue(&self.exitable_taskref);
         self.exitable_taskref.mark_as_exited(Box::new(()))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
@@ -168,7 +175,7 @@ pub fn new_task_builder<F, A, R>(
 
 
 /// Every executable application must have an entry function named "main".
-const ENTRY_POINT_SECTION_NAME: &'static str = "main";
+const ENTRY_POINT_SECTION_NAME: &str = "main";
 
 /// The argument type accepted by the `main` function entry point into each application.
 type MainFuncArg = Vec<String>;
@@ -220,7 +227,7 @@ pub fn new_application_task_builder(
         let app_crate = app_crate_ref.lock_as_ref();
         let expected_main_section_name = format!("{}{}{}", app_crate.crate_name_as_prefix(), ENTRY_POINT_SECTION_NAME, SECTION_HASH_DELIMITER);
         app_crate.find_section(|sec| 
-            sec.typ == SectionType::Text && sec.name_without_hash() == &expected_main_section_name
+            sec.typ == SectionType::Text && sec.name_without_hash() == expected_main_section_name
         ).cloned()
     };
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
@@ -239,7 +246,7 @@ pub fn new_application_task_builder(
         move |new_task| {
             new_task.app_crate = Some(Arc::new(app_crate_ref));
             new_task.namespace = namespace;
-            Ok(())
+            Ok(None)
         }
     ));
     
@@ -264,10 +271,12 @@ pub struct TaskBuilder<F, A, R> {
     name: Option<String>,
     stack: Option<Stack>,
     parent: Option<TaskRef>,
-    pin_on_core: Option<u8>,
+    pin_on_cpu: Option<CpuId>,
     blocked: bool,
     idle: bool,
-    post_build_function: Option<Box< dyn FnOnce(&mut Task) -> Result<(), &'static str> >>,
+    post_build_function: Option<Box<
+        dyn FnOnce(&mut Task) -> Result<Option<FailureCleanupFunction>, &'static str>
+    >>,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
@@ -288,7 +297,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             name: None,
             stack: None,
             parent: None,
-            pin_on_core: None,
+            pin_on_cpu: None,
             blocked: false,
             idle: false,
             post_build_function: None,
@@ -325,9 +334,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         self
     }
 
-    /// Pin the new Task to a specific core.
-    pub fn pin_on_core(mut self, core_apic_id: u8) -> TaskBuilder<F, A, R> {
-        self.pin_on_core = Some(core_apic_id);
+    /// Pin the new Task to a specific CPU.
+    pub fn pin_on_cpu(mut self, cpu_id: CpuId) -> TaskBuilder<F, A, R> {
+        self.pin_on_cpu = Some(cpu_id);
         self
     }
 
@@ -359,8 +368,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
     pub fn spawn(self) -> Result<JoinableTaskRef, &'static str> {
         let mut new_task = Task::new(
             self.stack,
-            self.parent.as_ref(),
-            task_cleanup_failure::<F, A, R>,
+            task::get_my_current_task()
+                .ok_or("spawn: couldn't get current task")?
+                .deref()
+                .into(),
         )?;
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
@@ -391,9 +402,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // If there is a post-build function, invoke it now
         // before finalizing the task and adding it to runqueues.
-        if let Some(pb_func) = self.post_build_function {
-            pb_func(&mut new_task)?;
-        }
+        let failure_cleanup_function = match self.post_build_function {
+            Some(pb_func) => pb_func(&mut new_task)?,
+            None => None,
+        };
 
         // Now that it has been fully initialized, mark the task as no longer `Initing`.
         if self.blocked {
@@ -404,20 +416,17 @@ impl<F, A, R> TaskBuilder<F, A, R>
                 .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
-        let task_ref = TaskRef::new(new_task);
-        let _existing_task = TASKLIST.lock().insert(task_ref.id, task_ref.clone());
-        // insert should return None, because that means there was no existing task with the same ID 
-        if let Some(_existing_task) = _existing_task {
-            error!("BUG: TaskBuilder::spawn(): Fatal Error: TASKLIST already contained a task with the new task's ID! {:?}", _existing_task);
-            return Err("BUG: TASKLIST a contained a task with the new task's ID");
-        }
-
+        let task_ref = TaskRef::create(
+            new_task,
+            failure_cleanup_function.unwrap_or(task_cleanup_failure::<F, A, R>)
+        );
+        
         // This synchronizes with the acquire fence in this task's exit cleanup routine
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        if let Some(core) = self.pin_on_core {
-            runqueue::add_task_to_specific_runqueue(core, task_ref.clone())?;
+        if let Some(cpu) = self.pin_on_cpu {
+            runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
         } else {
             runqueue::add_task_to_any_runqueue(task_ref.clone())?;
         }
@@ -440,18 +449,18 @@ impl<F, A, R> TaskBuilder<F, A, R>
           R: Send + 'static,
           F: FnOnce(A) -> R + Send + Clone +'static,
 {
-    /// Sets this new Task to be the idle task for the given core. 
+    /// Sets this new Task to be the idle task for the given CPU. 
     /// 
     /// Idle tasks will not be scheduled unless there are no other tasks for the scheduler to choose. 
     /// 
     /// Idle tasks must be restartable, so it is only a possible option when spawning a restartable task.
-    /// Marking a task as idle is only needed to set up one for each core when that core is initialized,
+    /// Marking a task as idle is only needed to set up one for each CPU when that CPU is initialized,
     /// but or to restart an idle task that has exited or failed.
     /// 
-    /// There is no harm spawning multiple idle tasks on each core, but it's a waste of space. 
-    pub fn idle(mut self, core_id: u8) -> TaskBuilder<F, A, R> {
+    /// There is no harm spawning multiple idle tasks on each CPU, but it's a waste of space. 
+    pub fn idle(mut self, cpu_id: CpuId) -> TaskBuilder<F, A, R> {
         self.idle = true;
-        self.pin_on_core(core_id)
+        self.pin_on_cpu(cpu_id)
     }
 
     /// Like [`TaskBuilder::spawn()`], this finishes this `TaskBuilder` and spawns the new task.
@@ -488,13 +497,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         };
 
         // Once the new task is created, we set its restart info (func and arg),
-        // and tell it to use the restartable version of the final task cleanup function.
+        // and tell it to use the restartable version of the task entry and cleanup functions.
         self.post_build_function = Some(Box::new(
             move |new_task| {
                 new_task.inner_mut().restart_info = Some(restart_info);
-                new_task.failure_cleanup_function = task_restartable_cleanup_failure::<F, A, R>;
                 setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
-                Ok(())
+                Ok(Some(task_restartable_cleanup_failure::<F, A, R>))
             }
         ));
 
@@ -683,7 +691,7 @@ where
         task_entry_func = task_func_arg.func;
         task_arg        = task_func_arg.arg;
 
-        #[cfg(not(any(rq_eval, downtime_eval)))]
+        #[cfg(not(rq_eval))]
         debug!("task_wrapper [1]: \"{}\" about to call task entry func {:?} {{{}}} with arg {:?}",
             &**exitable_taskref, debugit!(task_entry_func), core::any::type_name::<F>(), debugit!(task_arg)
         );
@@ -705,7 +713,13 @@ where
 
     // Now we actually invoke the entry point function that this Task was spawned for,
     // catching a panic if one occurs.
+    #[cfg(target_arch = "x86_64")]
     let result = catch_unwind::catch_unwind_with_arg(task_entry_func, task_arg);
+
+    // On platforms where unwinding is not implemented, simply call the entry point.
+    #[cfg(not(target_arch = "x86_64"))]
+    let result = Ok(task_entry_func(task_arg));
+
     (result, exitable_taskref)
 }
 
@@ -811,7 +825,6 @@ fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: tas
     // Disable preemption.
     let preemption_guard = hold_preemption();
 
-    #[cfg(not(downtime_eval))]
     debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
 
     if current_task.mark_as_killed(kill_reason).is_err() {
@@ -888,7 +901,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// The final piece of the task cleanup logic for restartable tasks.
@@ -925,19 +938,13 @@ where
         let restartable_info = current_task.with_restart_info(|restart_info_opt| {
             restart_info_opt.map(|restart_info| {
                 #[cfg(use_crate_replacement)] {
-                    let func_ptr = &(restart_info.func) as *const _ as usize;
-                    let arg_ptr = &(restart_info.argument) as *const _ as usize;
-
-                    #[cfg(not(downtime_eval))] {
-                        debug!("func_ptr {:#X}", func_ptr);
-                        debug!("arg_ptr {:#X} , {}", arg_ptr, mem::size_of::<A>());
-                    }
+                    let func_ptr = &restart_info.func as *const _ as usize;
+                    let arg_ptr = &restart_info.argument as *const _ as usize;
 
                     // func_ptr is of size 16. Argument is of the argument_size + 8.
                     // This extra size comes due to argument and function both stored in +8 location pointed by the pointer. 
                     // The exact location pointed by the pointer has value 0x1. (Indicates Some for option ?). 
                     if fault_crate_swap::constant_offset_fix(&se, func_ptr, func_ptr + 16).is_ok() &&  fault_crate_swap::constant_offset_fix(&se, arg_ptr, arg_ptr + 8).is_ok() {
-                        #[cfg(not(downtime_eval))]
                         debug!("Function and argument addresses corrected");
                     }
                 }
@@ -951,8 +958,8 @@ where
         if let Some((func, arg)) = restartable_info {
             let mut new_task = new_task_builder(func, arg)
                 .name(current_task.name.clone());
-            if let Some(core) = current_task.pinned_core() {
-                new_task = new_task.pin_on_core(core);
+            if let Some(cpu) = current_task.pinned_cpu() {
+                new_task = new_task.pin_on_cpu(cpu);
             }
             new_task.spawn_restartable(None)
                 .expect("Failed to respawn the restartable task");
@@ -970,28 +977,21 @@ where
 
     scheduler::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     // Special behavior when evaluating runqueues
     #[cfg(rq_eval)] {
-        // The special spillful version does nothing here, since it was already done in `internal_exit()`
-        #[cfg(runqueue_spillful)] {
-            // do nothing
-        }
-        // The regular spill-free version does brute-force removal of the task from ALL runqueues.
-        #[cfg(not(runqueue_spillful))] {
-            runqueue::remove_task_from_all(current_task).unwrap();
-        }
+        runqueue::remove_task_from_all(current_task).unwrap();
     }
 
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu())
-            .ok_or("couldn't get this core's ID or runqueue to remove exited task from it")
+        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
+            .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {
             error!("BUG: couldn't remove exited task from runqueue: {}", e);
@@ -1001,25 +1001,25 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
 pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let apic_id = cpu::current_cpu();
-    debug!("Spawning a new idle task on core {}", apic_id);
+    let cpu_id = cpu::current_cpu();
+    debug!("Spawning a new idle task on CPU {}", cpu_id);
 
-    new_task_builder(idle_task_entry, apic_id)
-        .name(format!("idle_task_core_{}", apic_id))
-        .idle(apic_id)
+    new_task_builder(idle_task_entry, cpu_id)
+        .name(format!("idle_task_cpu_{cpu_id}"))
+        .idle(cpu_id)
         .spawn_restartable(None)
 }
 
 /// A basic idle task that does nothing but loop endlessly.
-/// 
+///
 /// Note: the current spawn API does not support spawning a task with the return type `!`,
 /// so we use `()` here instead. 
 #[inline(never)]
-fn idle_task_entry(_apic_id: u8) {
+fn idle_task_entry(_cpu_id: CpuId) {
     info!("Entered idle task loop on core {}: {:?}", cpu::current_cpu(), task::get_my_current_task());
     loop {
         // TODO: put this core into a low-power state
-        pause::spin_loop_hint();
+        core::hint::spin_loop();
     }
 }
 

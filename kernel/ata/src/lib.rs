@@ -1067,12 +1067,12 @@ impl fmt::Display for AtaSerialNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
 			.map_err(|_| fmt::Error)
-			.and_then(|s| write!(f, "{}", s))
+			.and_then(|s| write!(f, "{s}"))
 	}
 }
 impl fmt::Debug for AtaSerialNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "\"{}\"", self)
+		write!(f, "\"{self}\"")
 	}
 }
 
@@ -1093,12 +1093,12 @@ impl fmt::Display for AtaModelNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
 			.map_err(|_| fmt::Error)
-			.and_then(|s| write!(f, "{}", s))
+			.and_then(|s| write!(f, "{s}"))
 	}
 }
 impl fmt::Debug for AtaModelNumber {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "\"{}\"", self)
+		write!(f, "\"{self}\"")
 	}
 }
 
@@ -1114,11 +1114,11 @@ impl fmt::Display for AtaFirmwareVersion {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		core::str::from_utf8(&self.0)
 			.map_err(|_| fmt::Error)
-			.and_then(|s| write!(f, "{}", s))
+			.and_then(|s| write!(f, "{s}"))
 	}
 }
 impl fmt::Debug for AtaFirmwareVersion {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "\"{}\"", self)
+		write!(f, "\"{self}\"")
 	}
 }

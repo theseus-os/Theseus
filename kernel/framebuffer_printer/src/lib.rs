@@ -14,7 +14,7 @@ use framebuffer::{Framebuffer, Pixel};
 use shapes::{Coord, Rectangle};
 
 
-type ASCII = u8;
+type Ascii = u8;
 
 /// Prints a string in a framebuffer.
 /// Returns (column, line, rectangle), i.e. the position of the next symbol and an rectangle which covers the updated area.
@@ -116,8 +116,8 @@ pub fn print_string<P: Pixel>(
     );
 
     let update_area = Rectangle {
-        top_left: top_left,
-        bottom_right: bottom_right,
+        top_left,
+        bottom_right,
     };
 
     // fill the blank of the remaining part
@@ -151,7 +151,7 @@ pub fn print_string<P: Pixel>(
 /// * `column`, `line`: the location of the character in the text block as symbols.
 pub fn print_ascii_character<P: Pixel>(
     framebuffer: &mut Framebuffer<P>,
-    character: ASCII,
+    character: Ascii,
     fg_pixel: P,
     bg_pixel: P,
     coordinate: Coord,

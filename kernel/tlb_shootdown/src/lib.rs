@@ -7,14 +7,13 @@ extern crate irq_safety;
 extern crate memory;
 extern crate apic;
 extern crate x86_64;
-extern crate pause;
 
 
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use irq_safety::{hold_interrupts, RwLockIrqSafe};
 use memory::PageRange;
 use apic::{LocalApic, get_my_apic, cpu_count, LapicIpiDestination};
-use pause::spin_loop_hint;
+use core::hint::spin_loop;
 
 
 /// The number of remaining cores that still need to handle the current TLB shootdown IPI
@@ -80,7 +79,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
             Ok(_) => break,
             Err(v) => old_lock_val = v,
         }
-        spin_loop_hint();
+        spin_loop();
     }
 
     *TLB_SHOOTDOWN_IPI_PAGES.write() = Some(pages_to_invalidate);
@@ -93,7 +92,7 @@ pub fn send_tlb_shootdown_ipi(my_lapic: &mut LocalApic, pages_to_invalidate: Pag
     // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
     // TODO: add timeout!!
     while TLB_SHOOTDOWN_IPI_COUNT.load(Ordering::Relaxed) > 0 { 
-        spin_loop_hint();
+        spin_loop();
     }
 
     // clear TLB shootdown data

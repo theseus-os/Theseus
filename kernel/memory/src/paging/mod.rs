@@ -28,16 +28,22 @@ use core::{
     fmt,
 };
 use log::debug;
-use super::{Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+use super::{
+    Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
-    tlb_flush_all, tlb_flush_virt_addr, get_p4, find_section_memory_bounds,
-    get_vga_mem_addr, KERNEL_OFFSET, InitialMemoryMappings
+    InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
+    get_p4, find_section_memory_bounds,
 };
 use pte_flags::PteFlagsArch;
 use no_drop::NoDrop;
 use boot_info::BootInformation;
 use kernel_config::memory::{RECURSIVE_P4_INDEX, PAGE_SIZE, UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX};
 
+#[cfg(target_arch = "aarch64")]
+use memory_aarch64::set_as_active_page_table_root;
+
+#[cfg(target_arch = "x86_64")]
+use super::get_vga_mem_addr;
 
 /// A top-level root (P4) page table.
 /// 
@@ -46,6 +52,7 @@ pub struct PageTable {
     mapper: Mapper,
     p4_table: AllocatedFrames,
 }
+
 impl fmt::Debug for PageTable {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "PageTable(p4: {:#X})", self.p4_table.start_address()) 
@@ -100,9 +107,9 @@ impl PageTable {
         let p4_frame = *new_p4_frame.start();
 
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
-        temporary_page.with_table_and_frame(|table, frame| {
-            table.zero();
-            table[RECURSIVE_P4_INDEX].set_entry(
+        temporary_page.with_table_and_frame(|new_table, frame| {
+            new_table.zero();
+            new_table[RECURSIVE_P4_INDEX].set_entry(
                 frame.as_allocated_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
@@ -182,7 +189,7 @@ impl PageTable {
     pub fn switch(&mut self, new_table: &PageTable) {
         // debug!("PageTable::switch() old table: {:?}, new table: {:?}", self, new_table);
 
-        // perform the actual page table switch
+        #[cfg(target_arch = "x86_64")]
         unsafe { 
             use x86_64::{PhysAddr, structures::paging::frame::PhysFrame, registers::control::{Cr3, Cr3Flags}};
             Cr3::write(
@@ -190,6 +197,12 @@ impl PageTable {
                 Cr3Flags::empty(),
             )
         };
+
+        #[cfg(target_arch = "aarch64")] {
+            set_as_active_page_table_root(new_table.physical_address());
+            // This is only required on aarch64, as setting CR3 on x86_64 flushes the TLB.
+            tlb_flush_all();
+        }
     }
 
 
@@ -283,11 +296,6 @@ pub fn init(
         let rodata_flags  = aggregated_section_memory_bounds.rodata.flags;
         let data_flags    = aggregated_section_memory_bounds.data.flags;
 
-        let init_identity_mapped_pages:    NoDrop<MappedPages>;
-        let text_identity_mapped_pages:    NoDrop<MappedPages>;
-        let rodata_identity_mapped_pages:  NoDrop<MappedPages>;
-        let data_identity_mapped_pages:    NoDrop<MappedPages>;
-        let additional_mapped_pages:       NoDrop<MappedPages>;
         let mut boot_info_mapped_pages:    Option<MappedPages> = None;
 
         let init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())?;
@@ -296,7 +304,7 @@ pub fn init(
             VirtualAddress::new_canonical(init_start_phys.value()),
             init_end_phys.value() - init_start_phys.value(),
         )?;
-        init_identity_mapped_pages = NoDrop::new( unsafe {
+        let init_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, init_pages_identity, &init_frames, init_flags)?
         });
         let mut init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)?;
@@ -307,7 +315,7 @@ pub fn init(
             VirtualAddress::new_canonical(text_start_phys.value()),
             text_end_phys.value() - text_start_phys.value(),
         )?;
-        text_identity_mapped_pages = NoDrop::new( unsafe {
+        let text_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, text_pages_identity, &text_frames, text_flags)?
         });
         init_mapped_pages.merge(new_mapper.map_allocated_pages_to(text_pages, text_frames, text_flags)?).map_err(|(error, _)| error)?;
@@ -319,7 +327,7 @@ pub fn init(
             VirtualAddress::new_canonical(rodata_start_phys.value()),
             rodata_end_phys.value() - rodata_start_phys.value(),
         )?;
-        rodata_identity_mapped_pages = NoDrop::new( unsafe {
+        let rodata_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, rodata_pages_identity, &rodata_frames, rodata_flags)?
         });
         let rodata_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?);
@@ -330,7 +338,7 @@ pub fn init(
             VirtualAddress::new_canonical(data_start_phys.value()),
             data_end_phys.value() - data_start_phys.value(),
         )?;
-        data_identity_mapped_pages = NoDrop::new( unsafe {
+        let data_identity_mapped_pages: NoDrop<MappedPages> = NoDrop::new( unsafe {
             Mapper::map_to_non_exclusive(new_mapper, data_pages_identity, &data_frames, data_flags)?
         });
         let data_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(data_pages, data_frames, data_flags)?);
@@ -359,18 +367,24 @@ pub fn init(
             NoDrop::new(stack_mapped_pages.ok_or("no pages were allocated for the stack")?),
         );
 
-        // Map the VGA display memory as writable. 
-        // We map this *only* using an identity mapping, as it is only used during early init
-        // by both the bootstrap CPU and secondary CPUs.
-        let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
-        let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
-            VirtualAddress::new_canonical(vga_phys_addr.value()),
-            vga_size_in_bytes,
-        )?;
-        let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
-        additional_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(
-            vga_display_pages_identity, vga_display_frames, vga_flags,
-        )?);
+        #[cfg(target_arch = "x86_64")]
+        let additional_mapped_pages = {
+            // Map the VGA display memory as writable. 
+            // We map this *only* using an identity mapping, as it is only used during early init
+            // by both the bootstrap CPU and secondary CPUs.
+            let (vga_phys_addr, vga_size_in_bytes, vga_flags) = get_vga_mem_addr()?;
+            let vga_display_pages_identity = page_allocator::allocate_pages_by_bytes_at(
+                VirtualAddress::new_canonical(vga_phys_addr.value()),
+                vga_size_in_bytes,
+            )?;
+            let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
+            NoDrop::new(new_mapper.map_allocated_pages_to(
+                vga_display_pages_identity, vga_display_frames, vga_flags,
+            )?)
+        };
+
+        #[cfg(target_arch = "aarch64")]
+        let additional_mapped_pages = NoDrop::new(MappedPages::empty());
 
         // Map the bootloader info, a separate region of read-only memory, so that we can access it later.
         // This does not need to be identity mapped.
@@ -412,7 +426,6 @@ pub fn init(
 
     debug!("switching from old page table {:?} to new page table {:?}", page_table, new_table);
     page_table.switch(&new_table); 
-    debug!("switched to new page table {:?}.", new_table); 
     // The old page_table set up during bootstrap will be dropped here. It's no longer being used.
 
     // Return the new page table because that's the one that should be used by the kernel in future mappings. 

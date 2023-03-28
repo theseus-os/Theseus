@@ -1,5 +1,5 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "context_switch_regular"
 description = "Context switching routines and structs for regular (non-SSE) register sets"
 version = "0.1.0"

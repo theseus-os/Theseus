@@ -10,55 +10,30 @@ edition = "2021"
 cfg-if = "1.0.0"
 multiboot2 = { version = "0.14.0", optional = true }
 libm = "0.2.1"
+log = "0.4.8"
 
-[dependencies.log]
-version = "0.4.8"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
-[dependencies.kernel_config]
-path = "../kernel_config"
+kernel_config = { path = "../kernel_config" }
+state_store = { path = "../state_store" }
+memory = { path = "../memory" }
+no_drop = { path = "../no_drop" }
+early_tls = { path = "../early_tls" }
+stack = { path = "../stack" }
+mod_mgmt = { path = "../mod_mgmt" }
+panic_entry = { path = "../panic_entry" }
+memory_initialization = { path = "../memory_initialization" }
+boot_info = { path = "../boot_info" }
+captain = { path = "../captain" }
+early_printer = { path = "../early_printer" }
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+exceptions_early = { path = "../exceptions_early" }
+serial_port_basic = { path = "../serial_port_basic" }
+logger_x86_64 = { path = "../logger_x86_64" }
 
-[dependencies.logger]
-path = "../logger"
-
-[dependencies.state_store]
-path = "../state_store"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.no_drop]
-path = "../no_drop"
-
-[dependencies.serial_port_basic]
-path = "../serial_port_basic"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.exceptions_early]
-path = "../exceptions_early"
-
-[dependencies.captain]
-path = "../captain"
-
-[dependencies.panic_entry]
-path = "../panic_entry"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
-[dependencies.memory_initialization]
-path = "../memory_initialization"
-
-[dependencies.boot_info]
-path = "../boot_info"
-features = ["multiboot2"]
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+logger_aarch64 = { path = "../logger_aarch64" }
 
 [dependencies.uefi-bootloader-api]
 git = "https://github.com/theseus-os/uefi-bootloader"
@@ -70,14 +45,14 @@ cfg-if = "1.0.0"
 [features]
 default = [ "bios" ]
 ## Build for a system that boots via legacy BIOS (multiboot2).
-bios = ["boot_info/multiboot2", "vga_buffer/bios", "dep:multiboot2"]
+bios = ["boot_info/multiboot2", "early_printer/bios", "dep:multiboot2"]
 ## Build for a system that boots via UEFI.
-uefi = ["boot_info/uefi", "captain/uefi", "dep:uefi-bootloader-api"]
+uefi = ["boot_info/uefi", "dep:uefi-bootloader-api"]
 
 [lib]
 # staticlib is required to build a self-contained, fully-linked .a file 
 # that we can jump to from the bootloader.
-crate-type = ["staticlib"]  
+crate-type = ["staticlib"]
 
 ## Currently not used; see the `build.rs` script.
 # [build-dependencies]

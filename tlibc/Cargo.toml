@@ -48,9 +48,6 @@ volatile = { git = "https://github.com/theseus-os/volatile" }
 getopts = { git = "https://github.com/theseus-os/getopts" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
-### Use the latest version of rangemap, which includes our PR that makes constructors const fns.
-### This can be removed once the crates.io version is updated.
-rangemap = { git = "https://github.com/jeffparsons/rangemap" }
 
 ### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
 libc = { git = "https://github.com/theseus-os/libc", branch = "theseus" }

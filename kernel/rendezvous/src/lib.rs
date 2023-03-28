@@ -30,9 +30,6 @@ extern crate scheduler;
 extern crate sync;
 extern crate sync_spin;
 
-#[cfg(downtime_eval)]
-extern crate hpet;
-
 use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
@@ -148,7 +145,7 @@ pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Re
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
 
@@ -223,16 +220,6 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
     pub fn send(&self, msg: T) -> Result<(), &'static str> {
         #[cfg(trace_channel)]
         trace!("rendezvous: sending msg: {:?}", debugit!(msg));
-
-        #[cfg(downtime_eval)] {
-            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            // debug!("Value {} {}", value, value % 1024);
-            // Fault mimicing a memory write. Function could panic when getting task
-            if (value % 4096) == 0  && task::with_current_task(|t| t.is_restartable()).unwrap_or(false) {
-                // debug!("Fake error {}", value);
-                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-            }
-        }
 
         // obtain a sender-side exchange slot, blocking if necessary
         let sender_slot = self.channel.take_sender_slot();

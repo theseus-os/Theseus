@@ -1,4 +1,5 @@
-use crate::ElfSectionFlags;
+use crate::{ElfSectionFlags, FramebufferFormat};
+use uefi_bootloader_api::PixelFormat;
 use core::iter::{Iterator, Peekable};
 use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
@@ -86,7 +87,7 @@ impl crate::Module for Module {
                 .iter()
                 .find(|region| region.kind == MODULES_MEMORY_KIND)
                 .expect("no modules region")
-                .start as usize
+                .start
                 + self.inner.offset,
         )
     }
@@ -169,17 +170,54 @@ impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
                 .filter(|section| section.size > 0)
                 .map(|section| section.start + section.size)
                 .max()
-                .ok_or("couldn't find kernel end address")? as usize,
+                .ok_or("couldn't find kernel end address")?
         )
         .ok_or("kernel virtual end address was invalid")
     }
 
     fn rsdp(&self) -> Option<PhysicalAddress> {
         self.rsdp_address
-            .map(|address| PhysicalAddress::new_canonical(address))
+            .map(PhysicalAddress::new_canonical)
     }
 
     fn stack_size(&self) -> Result<usize, &'static str> {
         Ok(STACK_SIZE)
+    }
+
+    fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
+        let uefi_fb = self.frame_buffer.as_ref()?;
+        let uefi_fb_info = uefi_fb.info;
+        let format = match uefi_fb_info.pixel_format {
+            PixelFormat::Rgb => FramebufferFormat::RgbPixel,
+            PixelFormat::Bgr => FramebufferFormat::BgrPixel,
+            // TODO: handle gop::PixelFormat::Bitmask and BltOnly in `uefi-bootloader` and `uefi-bootloader-api`
+            /*
+            info::PixelFormat::U8  => FramebufferFormat::Grayscale,
+            info::PixelFormat::Unknown {
+                red_position,
+                green_position,
+                blue_position,
+            } => FramebufferFormat::CustomPixel {
+                // each pixel is 8 bits
+                red_bit_position: red_position,
+                red_size_in_bits: 8,
+                green_bit_position: green_position,
+                green_size_in_bits: 8,
+                blue_bit_position: blue_position,
+                blue_size_in_bits: 8,
+            },
+            _ => return None,
+            */
+        };
+        Some(crate::FramebufferInfo {
+            virt_addr: Some(VirtualAddress::new_canonical(uefi_fb.virt)),
+            phys_addr: PhysicalAddress::new_canonical(uefi_fb.physical),
+            total_size_in_bytes: uefi_fb_info.size as u64,
+            width: uefi_fb_info.width as u32,
+            height: uefi_fb_info.height as u32,
+            bits_per_pixel: (uefi_fb_info.bytes_per_pixel * 8) as u8,
+            stride: uefi_fb_info.stride as u32,
+            format,
+        })
     }
 }

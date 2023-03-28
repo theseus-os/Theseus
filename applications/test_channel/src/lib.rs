@@ -32,7 +32,7 @@ static PINNED: Once<bool> = Once::new();
 macro_rules! pin_task {
     ($tb:ident, $cpu:expr) => (
         if PINNED.get() == Some(&true) {
-            $tb.pin_on_core($cpu)
+            $tb.pin_on_cpu($cpu)
         } else {
             $tb
         });

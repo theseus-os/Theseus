@@ -6,19 +6,14 @@
 #![no_std]
 #![feature(drain_filter)]
 
-#[macro_use] extern crate vga_buffer; // for println_raw!()
-#[macro_use] extern crate app_io; // for regular println!()
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate memory;
-extern crate task;
-extern crate cpu;
-extern crate irq_safety;
 
 use alloc::{
     string::{String,ToString},
     vec::Vec,
 };
+use log::debug;
+use cpu::CpuId;
 use memory::VirtualAddress;
 use irq_safety::MutexIrqSafe;
 use core::panic::PanicInfo;
@@ -86,8 +81,8 @@ pub struct FaultEntry {
     pub fault_type: FaultType,
     /// Error code returned with the exception
     pub error_code: Option<u64>,
-    /// The core error occured
-    pub core: Option<u8>,
+    /// The ID of the CPU on which the error occured.
+    pub cpu: Option<CpuId>,
     /// Task runnning immediately before the Exception
     pub running_task: Option<String>,
     /// If available the application crate that spawned the task
@@ -110,9 +105,9 @@ impl FaultEntry {
         fault_type: FaultType
     ) -> FaultEntry {
         FaultEntry {
-            fault_type: fault_type,
+            fault_type,
             error_code: None,
-            core: None,
+            cpu: None,
             running_task: None,
             running_app_crate: None,
             address_accessed: None,
@@ -141,7 +136,7 @@ fn update_and_insert_fault_entry_internal(
 ) {
 
     // Add the core the fault was detected
-    fe.core = Some(cpu::current_cpu());
+    fe.cpu = Some(cpu::current_cpu());
 
     // If current task cannot be obtained we will just add `fault_entry` to 
     // the `fault_log` and return.
@@ -190,7 +185,7 @@ pub fn log_exception (
 ) {
     let mut fe = FaultEntry::new(from_exception_number(fault_type));
     fe.error_code = error_code;
-    fe.address_accessed  = address_accessed.map(|address| VirtualAddress::new_canonical(address));
+    fe.address_accessed  = address_accessed.map(VirtualAddress::new_canonical);
     update_and_insert_fault_entry_internal(fe, Some(instruction_pointer));
 }
 
@@ -217,15 +212,15 @@ pub fn remove_unhandled_exceptions() -> Vec<FaultEntry> {
     FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
 }
 
-/// calls println!() and then println_raw!()
+/// Prints to both the `early_printer` and the current terminal via `app_io`.
 macro_rules! println_both {
     ($fmt:expr) => {
-        print_raw!(concat!($fmt, "\n"));
-        print!(concat!($fmt, "\n"));
+        early_printer::println!($fmt);
+        app_io::println!($fmt);
     };
     ($fmt:expr, $($arg:tt)*) => {
-        print_raw!(concat!($fmt, "\n"), $($arg)*);
-        print!(concat!($fmt, "\n"), $($arg)*);
+        early_printer::println!($fmt, $($arg)*);
+        app_io::println!($fmt, $($arg)*);
     };
 }
 
@@ -247,8 +242,6 @@ pub fn log_handled_fault(fe: FaultEntry){
 /// Provides the most recent entry in the log for given crate
 /// Utility function for iterative crate replacement
 pub fn get_the_most_recent_match(error_crate: &str) -> Option<FaultEntry> {
-
-    #[cfg(not(downtime_eval))]
     debug!("getting the most recent match");
 
     let mut fe :Option<FaultEntry> = None;
@@ -264,8 +257,6 @@ pub fn get_the_most_recent_match(error_crate: &str) -> Option<FaultEntry> {
     }
 
     if fe.is_none(){
-
-        #[cfg(not(downtime_eval))]
         debug!("No recent entries for the given crate {}", error_crate);
     }
     fe

@@ -58,7 +58,7 @@ pub(crate) const P4: *mut Table<Level4> = VirtualAddress::new_canonical(
 /// This works by being a virtual address that always results in the 508th entry
 /// of the page table being accessed, at all four levels of paging.
 ///
-/// Thus, the value of this should be `0o177777_774_774_774_774_0000` (octal).
+/// Thus, the value of this should be `0o177777_774_774_774_774_0000` (octal) on x86_64.
 pub(crate) const UPCOMING_P4: *mut Table<Level4> = VirtualAddress::new_canonical(
     UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (PAGE_SHIFT + P1_INDEX_SHIFT)
     | UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX << (PAGE_SHIFT + P2_INDEX_SHIFT)
@@ -82,6 +82,16 @@ impl<L: TableLevel> Table<L> {
     }
 }
 
+#[cfg(target_arch = "aarch64")]
+fn is_huge(_flags: &PteFlagsArch) -> bool {
+    false
+}
+
+#[cfg(target_arch = "x86_64")]
+fn is_huge(flags: &PteFlagsArch) -> bool {
+    flags.is_huge()
+}
+
 impl<L: HierarchicalLevel> Table<L> {
     /// Uses the given `index` as an index into this table's list of entries.
     ///
@@ -90,7 +100,8 @@ impl<L: HierarchicalLevel> Table<L> {
     /// and so on for P3 -> P3 and P2 -> P1.
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let pte_flags = self[index].flags();
-        if pte_flags.is_valid() && !pte_flags.is_huge() {
+
+        if pte_flags.is_valid() && !is_huge(&pte_flags) {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))
@@ -126,7 +137,7 @@ impl<L: HierarchicalLevel> Table<L> {
         flags: PteFlagsArch,
     ) -> &mut Table<L::NextLevel> {
         if self.next_table(index).is_none() {
-            assert!(!self[index].flags().is_huge(), "mapping code does not support huge pages");
+            assert!(!is_huge(&self[index].flags()), "mapping code does not support huge pages");
             let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
             self[index].set_entry(
                 af.as_allocated_frame(),

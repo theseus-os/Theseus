@@ -99,7 +99,7 @@ fn initialize_multiple_heaps() -> Result<MultipleHeaps, &'static str> {
     let mut multiple_heaps = MultipleHeaps::empty();
 
     for (apic_id, _lapic) in apic::get_lapics().iter() {
-        init_individual_heap(*apic_id as usize, &mut multiple_heaps)?;
+        init_individual_heap(apic_id.value() as usize, &mut multiple_heaps)?;
     }
 
     Ok(multiple_heaps)       
@@ -251,12 +251,13 @@ if #[cfg(unsafe_heap)] {
 } // end cfg_if for initialization functions
 
 
-/// Returns the key which determines the heap that will be used.
-/// Currently we use the apic id as the key, but we can replace it with some
-/// other value e.g. task id
+/// Returns the key that determines which heap will be currently used.
+///
+/// This implementation uses the current CPU ID as the key,
+/// but this can easily be replaced with another value, e.g., Task ID.
 #[inline(always)] 
 fn get_key() -> usize {
-    apic::current_cpu() as usize
+    apic::current_cpu().value() as usize
 }
 
 // The LockedHeap struct definition changes depending on the slabmalloc version used.
@@ -576,7 +577,6 @@ if #[cfg(unsafe_large_allocations)] {
 
 } else {
     extern crate intrusive_collections;
-    #[macro_use] extern crate static_assertions;
 
     use intrusive_collections::{intrusive_adapter,RBTree, RBTreeLink, KeyAdapter, PointerOps};
 
@@ -589,7 +589,7 @@ if #[cfg(unsafe_large_allocations)] {
 
     // Our design depends on the fact that on the large allocation path, only objects smaller than the max allocation size will be allocated from the heap.
     // Otherwise we will have a recursive loop of large allocations.
-    const_assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE); 
+    const _: () = assert!(core::mem::size_of::<LargeAllocation>() < ZoneAllocator::MAX_ALLOC_SIZE);
 
     intrusive_adapter!(LargeAllocationAdapter = Box<LargeAllocation>: LargeAllocation { link: RBTreeLink });
 
@@ -613,7 +613,7 @@ if #[cfg(unsafe_large_allocations)] {
             let ptr = mp.start_address().value();
             let link = Box::new(LargeAllocation {
                 link: RBTreeLink::new(),
-                mp: mp
+                mp
             });
             map.insert(link);
             // trace!("Allocated a large object of {} bytes at address: {:#X}", layout.size(), ptr as usize);

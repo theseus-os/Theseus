@@ -8,12 +8,6 @@
 #![no_std]
 #![feature(step_trait)]
 
-extern crate kernel_config;
-#[macro_use] extern crate derive_more;
-extern crate bit_field;
-extern crate zerocopy;
-extern crate paste;
-
 use core::{
     cmp::{min, max},
     fmt,
@@ -23,7 +17,7 @@ use core::{
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
 use paste::paste;
-
+use derive_more::*;
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.

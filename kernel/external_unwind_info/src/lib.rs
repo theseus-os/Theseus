@@ -31,6 +31,8 @@
 //! [register unwinding information]: https://github.com/bytecodealliance/wasmtime/blob/7cf5f058303d2ee8c42df658d4ca608771a8561d/crates/jit/src/code_memory.rs#L185
 //! [`wasmtime-jit`]: https://docs.rs/wasmtime-jit/latest/wasmtime_jit/
 
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
 #![no_std]
 #![feature(map_try_insert)]
 
@@ -78,26 +80,26 @@ pub unsafe fn register_unwind_info(
         unwind_info:  uw_start   .. uw_end,
     };
 
-    uw.try_insert(text_start, uw_info).map_err(|_e| {
-        error!("External unwind info for {text_start:#X} was already registered");
-        ExternalUnwindInfoError::AlreadyExists
-    })?;
-
-    Ok(())
+    uw.try_insert(text_start, uw_info)
+        .map(|_| ())
+        .map_err(|_e| {
+            error!("External unwind info for {text_start:#X} was already registered");
+            ExternalUnwindInfoError::AlreadyRegistered
+        })
 }
 
 
 /// Remove a previously-registered section of external unwinding information.
 /// 
-/// Returns an error if no unwinding information was registered
-/// for the given `text_section_base_address`.
+/// Returns [`ExternalUnwindInfoError::NotRegistered`] if no unwinding information
+/// was registered for the given `text_section_base_address`.
 pub unsafe fn deregister_unwind_info(
     text_section_base_address: *mut u8
-) -> Result<(), ()> {
+) -> Result<(), ExternalUnwindInfoError> {
     EXTERNAL_UNWIND_INFO.lock()
         .remove(&VirtualAddress::new_canonical(text_section_base_address as usize))
         .map(|_| ())
-        .ok_or(())
+        .ok_or(ExternalUnwindInfoError::NotRegistered)
 }
 
 
@@ -116,6 +118,14 @@ pub fn get_unwind_info(
     None
 }
 
+/// Errors that may occur when [registering] or [deregistering]
+/// external unwind info.
+///
+/// [registering]: register_unwind_info
+/// [deregistering] deregister_unwind_info
 pub enum ExternalUnwindInfoError {
-    AlreadyExists,
+    /// The unwinding info trying to be registered was already registered.
+    AlreadyRegistered,
+    /// The unwinding info trying to be deregistered was not yet registered.
+    NotRegistered,
 }

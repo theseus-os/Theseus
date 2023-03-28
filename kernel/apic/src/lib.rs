@@ -1,7 +1,8 @@
 #![no_std]
 #![feature(let_chains)]
 
-use core::{fmt, sync::atomic::{AtomicU32, Ordering}};
+use core::{fmt, sync::atomic::{AtomicU32, Ordering}, convert::TryFrom};
+use derive_more::*;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 use spin::Once;
@@ -14,16 +15,50 @@ use atomic_linked_list::atomic_map::AtomicMap;
 use crossbeam_utils::atomic::AtomicCell;
 use pit_clock_basic::pit_wait;
 use bit_field::BitField;
-use static_assertions::{const_assert, const_assert_eq};
 use log::{error, info, debug, trace};
 
-/// A unique identifier for a CPU core.
-pub type CpuId = u8;
+// Values for the `IA32_APIC_BASE` MSR.
+const IA32_APIC_IS_BSP:                u64 = 1 << 8;
+const IA32_APIC_XAPIC_ENABLE:          u64 = 1 << 11;
+const IA32_APIC_X2APIC_ENABLE:         u64 = 1 << 10;
 
-/// The IRQ number reserved for Local APIC timer interrupts in the IDT.
-pub const LOCAL_APIC_LVT_IRQ: u8 = 0x22;
+// Value for the APIC spurious interrupt vector register.
+const APIC_SW_ENABLE:                  u32 = 1 << 8;
 /// The IRQ number reserved for spurious APIC interrupts (as recommended by OS dev wiki).
-pub const APIC_SPURIOUS_INTERRUPT_IRQ: u8 = 0xFF;
+pub const APIC_SPURIOUS_INTERRUPT_IRQ: u8  = 0xFF;
+
+// APIC timer register values.
+const APIC_TIMER_DISABLE:              u32 = 1 << 16;
+const _APIC_TIMER_MODE_ONESHOT:        u32 = 0b00 << 17;
+const APIC_TIMER_MODE_PERIODIC:        u32 = 0b01 << 17;
+const _APIC_TIMER_MODE_TSC_DEADLINE:   u32 = 0b10 << 17;
+/// The IRQ number reserved for Local APIC timer interrupts in the IDT.
+pub const LOCAL_APIC_LVT_IRQ:          u8  = 0x22;
+
+
+/// A unique identifier for a Local APIC, i.e., a CPU on x86_64.
+#[derive(
+    Clone, Copy, Debug, Display, PartialEq, Eq, PartialOrd, Ord,
+    Hash, Binary, Octal, LowerHex, UpperHex,
+)]
+pub struct ApicId(u32);
+impl ApicId {
+    /// Returns the inner raw value read from the Local APIC ID register.
+    pub fn value(self) -> u32 {
+        self.0
+    }
+}
+impl TryFrom<u32> for ApicId {
+    type Error = u32;
+    fn try_from(raw_apic_id: u32) -> Result<Self, Self::Error> {
+        let apic_id = ApicId(raw_apic_id);
+        match get_lapics().get(&apic_id) {
+            Some(_) => Ok(apic_id),
+            None => Err(raw_apic_id),
+        }
+    }
+}
+
 
 /// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,
@@ -39,28 +74,28 @@ pub enum InterruptChip {
 }
 
 // Ensure that `AtomicCell<InterruptChip>` is actually a lock-free atomic.
-const_assert!(AtomicCell::<InterruptChip>::is_lock_free());
+const _: () = assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
 /// The set of system-wide `LocalApic`s, one per CPU core.
-static LOCAL_APICS: AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
+static LOCAL_APICS: AtomicMap<ApicId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
 
 /// The number of CPUs currently initialized in the system.
 /// This must match the number of Local APICs initialized in the system.
 static CPU_COUNT: AtomicU32 = AtomicU32::new(0);
 
 /// The processor id (from the ACPI MADT table) of the bootstrap CPU.
-static BSP_PROCESSOR_ID: Once<CpuId> = Once::new(); 
+static BSP_PROCESSOR_ID: Once<ApicId> = Once::new(); 
 
-/// Returns the ID of the bootstrap CPU (if known),
+/// Returns the APIC ID of the bootstrap CPU (if known),
 /// which is the first CPU to run after system power-on.
-pub fn bootstrap_cpu() -> Option<CpuId> {
+pub fn bootstrap_cpu() -> Option<ApicId> {
     BSP_PROCESSOR_ID.get().cloned()
 }
 
 /// Returns true if the currently executing CPU is the bootstrap CPU, 
 /// i.e., the first procesor to run after system power-on.
 pub fn is_bootstrap_cpu() -> bool {
-    rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP
+    rdmsr(IA32_APIC_BASE) & IA32_APIC_IS_BSP == IA32_APIC_IS_BSP
 }
 
 /// Returns true if the machine has support for x2apic
@@ -76,7 +111,7 @@ pub fn has_x2apic() -> bool {
 }
 
 /// Returns a reference to the list of LocalApics, one per CPU core.
-pub fn get_lapics() -> &'static AtomicMap<CpuId, RwLockIrqSafe<LocalApic>> {
+pub fn get_lapics() -> &'static AtomicMap<ApicId, RwLockIrqSafe<LocalApic>> {
 	&LOCAL_APICS
 }
 
@@ -88,8 +123,8 @@ pub fn cpu_count() -> u32 {
 }
 
 /// Returns the ID of the currently executing CPU.
-pub fn current_cpu() -> CpuId {
-    rdmsr(IA32_TSC_AUX) as CpuId
+pub fn current_cpu() -> ApicId {
+    ApicId(rdmsr(IA32_TSC_AUX) as u32)
 }
 
 /// Returns a reference to the LocalApic for the currently executing CPU core.
@@ -97,13 +132,72 @@ pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
     LOCAL_APICS.get(&current_cpu())
 }
 
+/// The delivery mode used when an interrupt is sent to a CPU core.
+///
+/// This value can be used in the following APIC registers:
+/// * timer
+/// * CMCI (corrected machine check error)
+/// * lint0
+/// * lint1
+/// * performance monitoring counters
+/// * thermal sensor
+#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
+pub enum LapicDeliveryMode {
+    /// Delivers the interrupt (as normal) to the IRQ specified in the vector field.
+    Fixed  = 0b000,
+    /// Delivers an SMI interrupt to the CPU; the vector field should be 0x00.
+    Smi    = 0b010,
+    /// Delivers an NMI interrupt to the CPU; the vector field is ignored.
+    Nmi    = 0b100,
+    /// Delivers an INIT request to the CPU; the vector field should be 0x00.
+    Init   = 0b101,
+    /// Causes the CPU to respond to the interrupts as if it originated from
+    /// an external interrupt controller (e.g., the PIC).
+    ExtInt = 0b111,
+    // all other values are reserved
+}
+impl LapicDeliveryMode {
+    fn as_register_value(&self) -> u32 {
+        (*self as u32) << 8
+    }
+}
+
+/// The possible values for the Local APIC Timer Divide Configuration Register.
+#[derive(Clone, Copy, Debug)]
+#[repr(u32)]
+pub enum LapicTimerDivide {
+    By1   = 1,
+    By2   = 2,
+    By4   = 4,
+    By8   = 8,
+    By16  = 16,
+    By32  = 32,
+    By64  = 64,
+    By128 = 128,
+}
+impl LapicTimerDivide {
+    fn as_register_value(&self) -> u32 {
+        // Note: bit 2 is always 0.
+        match self {
+            Self::By1   => 0b1011,
+            Self::By2   => 0b0000,
+            Self::By4   => 0b0001,
+            Self::By8   => 0b0010,
+            Self::By16  => 0b0011,
+            Self::By32  => 0b1000,
+            Self::By64  => 0b1001,
+            Self::By128 => 0b1010,
+        }
+    }
+}
 
 /// The possible destination shorthand values for IPI ICR.
 /// 
 /// See Intel manual Figure 10-28, Vol. 3A, 10-45. (PDF page 3079) 
 pub enum LapicIpiDestination {
     /// Send IPI to a specific APIC 
-    One(CpuId),
+    One(ApicId),
     /// Send IPI to my own (the current) APIC  
     Me,
     /// Send IPI to all APICs, including myself
@@ -117,9 +211,9 @@ impl LapicIpiDestination {
         match *self {
             LapicIpiDestination::One(apic_id) => { 
                 if has_x2apic() {
-                    (apic_id as u64) << 32
+                    (apic_id.0 as u64) << 32
                 } else {
-                    (apic_id as u64) << 56
+                    (apic_id.0 as u64) << 56
                 }
             }
             LapicIpiDestination::Me       => 0b01 << 18, // 0x4_0000
@@ -172,17 +266,6 @@ fn map_apic(page_table: &mut PageTable) -> Result<MappedPages, &'static str> {
 }
 
 
-
-const IA32_APIC_XAPIC_ENABLE: u64 = 1 << 11; // 0x800
-const IA32_APIC_X2APIC_ENABLE: u64 = 1 << 10; // 0x400
-const IA32_APIC_BASE_MSR_IS_BSP: u64 = 1 << 8; // 0x100
-const APIC_SW_ENABLE: u32 = 1 << 8;
-const APIC_TIMER_PERIODIC:  u32 = 0x2_0000;
-const APIC_DISABLE: u32 = 0x1_0000;
-const APIC_NMI: u32 = 4 << 8;
-
-
-
 /// A structure that offers access to APIC/xAPIC through its I/O registers.
 ///
 /// Definitions are based on Intel's x86 Manual Vol 3a, Table 10-1. 
@@ -191,9 +274,13 @@ const APIC_NMI: u32 = 4 << 8;
 #[repr(C)]
 pub struct ApicRegisters {
     _padding0:                        [u32; 8],
-    /// This Lapic's ID. Some systems allow setting the ID, but it is typically read-only.
+    /// This Local APIC's ID.
+    ///
+    /// Some processors (e.g., Intel ones prior to Nehalem) allow writing to the ID register,
+    /// but we define it as read-only for wider compatibility and because we have no reason
+    /// to write to it. See section 10.4.6 of Intel SDM.
     /// Only the top 8 bits are relevant, so bit shift it to the right by 24 bits to get the actual ID.
-    pub lapic_id:                     Volatile<u32>,         // 0x20
+    pub lapic_id:                     ReadOnly<u32>,         // 0x20
     _padding1:                        [u32; 3],
     pub lapic_version:                ReadOnly<u32>,         // 0x30
     _padding2:                        [u32; 3 + 4*4],
@@ -244,7 +331,7 @@ pub struct ApicRegisters {
     _padding23:                       [u32; 3 + 4],
     // ends at 0x400
 }
-const_assert_eq!(core::mem::size_of::<ApicRegisters>(), 0x400);
+const _: () = assert!(core::mem::size_of::<ApicRegisters>() == 0x400);
 
 
 #[derive(FromBytes)]
@@ -267,7 +354,7 @@ pub struct RegisterArray {
     reg7:                             ReadOnly<u32>,
     _padding7:                        [u32; 3],
 }
-const_assert_eq!(core::mem::size_of::<RegisterArray>(), 8 * (4 + 12));
+const _: () = assert!(core::mem::size_of::<RegisterArray>() == 8 * (4 + 12));
 
 /// The Local APIC's vector table local interrupt pins.
 #[doc(alias("lvt", "lint", "lint0", "lint1"))]
@@ -312,14 +399,15 @@ pub enum LapicInitError {
     NotAP,
     /// Invalid NMI local interrupt pin value; given by the included `u8`.
     InvalidNmiLint(u8),
+    /// The actual APIC ID did not match the provided expected APIC ID.
     UnexpectedApicID {
-        expected: u8,
-        actual: u8,
+        expected: u32,
+        actual: ApicId,
     },
     /// An error occurred while mapping the Local APIC's MMIO registers into memory.
     MemoryMappingError(&'static str),
-    /// The Local APIC already existed (BUG), given by the included `u8` APIC ID.
-    AlreadyExisted(u8),
+    /// The Local APIC already existed (BUG), given by the included `ApicId`.
+    AlreadyExisted(ApicId),
 }
 
 
@@ -329,21 +417,24 @@ pub struct LocalApic {
     /// The inner lapic object that disambiguates between xapic and x2apic.
     inner: LapicType,
     /// The hardware-provided ID of this Local APIC.
-    apic_id: u8,
+    apic_id: ApicId,
     /// The processor ID of this APIC (from the `MADT` ACPI table entry).
     /// This is currently not used for anything in Theseus.
-    processor_id: u8,
+    processor_id: u32,
     /// Whether this Local APIC is the BootStrap Processor (the first CPU to boot up).
     is_bootstrap_cpu: bool,
+    /// The value that should be written to the APIC timer's initial count register
+    /// when enabling the LVT timer.
+    initial_timer_count: u32,
 }
 impl fmt::Debug for LocalApic {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("LocalApic")
             .field("type", &self.inner)
-            .field("apic_id", &self.apic_id)
+            .field("apic_id", &self.apic_id.0)
             .field("processor_id", &self.processor_id)
             .field("is_bootstrap_cpu", &self.is_bootstrap_cpu)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 impl Drop for LocalApic {
@@ -377,8 +468,8 @@ impl LocalApic {
     /// the BSP cannot invoke this for other APs.
     pub fn init(
         page_table: &mut PageTable,
-        processor_id: u8,
-        expected_apic_id: Option<u8>,
+        processor_id: u32,
+        expected_apic_id: Option<u32>,
         should_be_bsp: bool,
         nmi_lint: u8,
         nmi_flags: u16,
@@ -397,7 +488,7 @@ impl LocalApic {
         };
 
         // Check whether the caller's expectations about BSP vs AP were met.
-        let is_bootstrap_cpu = rdmsr(IA32_APIC_BASE) & IA32_APIC_BASE_MSR_IS_BSP == IA32_APIC_BASE_MSR_IS_BSP;
+        let is_bootstrap_cpu = rdmsr(IA32_APIC_BASE) & IA32_APIC_IS_BSP == IA32_APIC_IS_BSP;
         if should_be_bsp && !is_bootstrap_cpu {
             return Err(LapicInitError::NotBSP);
         }
@@ -430,13 +521,14 @@ impl LocalApic {
 		let mut lapic = LocalApic {
             inner,
             processor_id,
-            apic_id: CpuId::MAX, // placeholder, is replaced below.
+            apic_id: ApicId(u32::MAX), // placeholder, is replaced below.
             is_bootstrap_cpu,
+            initial_timer_count: 0, // set in `calibrate_lapic_timer()`
         };
 
         // Now that the APIC hardware is enabled, we can safely obtain this Local APIC's ID.
         let actual_apic_id = lapic.read_apic_id();
-        if let Some(expected) = expected_apic_id && expected != actual_apic_id {
+        if let Some(expected) = expected_apic_id && expected != actual_apic_id.0 {
             return Err(LapicInitError::UnexpectedApicID { expected, actual: actual_apic_id });
         }
 
@@ -447,7 +539,7 @@ impl LocalApic {
         info!("Initialized new CPU ({:?})", lapic);
 
         // Theseus uses this MSR to hold each CPU's ID (which is an OS-chosen value).
-        unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id as u64); }
+        unsafe { wrmsr(IA32_TSC_AUX, actual_apic_id.0 as u64); }
         if is_bootstrap_cpu {
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
@@ -466,7 +558,7 @@ impl LocalApic {
     /// 
     /// This value comes from the `MADT` ACPI table entry that was used
     /// to boot up this CPU core.
-    pub fn processor_id(&self) -> u8 { self.processor_id }
+    pub fn processor_id(&self) -> u32 { self.processor_id }
 
     /// Returns `true` if this CPU core was the BootStrap Processor (BSP),
     /// i.e., the first CPU to boot and run the OS code.
@@ -499,10 +591,10 @@ impl LocalApic {
                 // NOTE: we're not yet using logical or cluster mode APIC addressing, only physical APIC addressing.
                 
                 unsafe {
-                    wrmsr(IA32_X2APIC_LVT_TIMER,  APIC_DISABLE as u64);
-                    wrmsr(IA32_X2APIC_LVT_PMI,    APIC_NMI as u64);
-                    wrmsr(IA32_X2APIC_LVT_LINT0,  APIC_DISABLE as u64);
-                    wrmsr(IA32_X2APIC_LVT_LINT1,  APIC_DISABLE as u64);
+                    wrmsr(IA32_X2APIC_LVT_TIMER,  APIC_TIMER_DISABLE as u64);
+                    wrmsr(IA32_X2APIC_LVT_PMI,    LapicDeliveryMode::Nmi.as_register_value() as u64);
+                    wrmsr(IA32_X2APIC_LVT_LINT0,  APIC_TIMER_DISABLE as u64);
+                    wrmsr(IA32_X2APIC_LVT_LINT1,  APIC_TIMER_DISABLE as u64);
                     wrmsr(IA32_X2APIC_TPR,        0);
                     
                     // set bit 8 to start receiving interrupts (still need to "sti")
@@ -518,10 +610,10 @@ impl LocalApic {
                 // Init xAPIC to a clean known state.
                 // See <http://wiki.osdev.org/APIC#Logical_Destination_Mode>
                 regs.destination_format.write(0xFFFF_FFFF);
-                regs.lvt_timer.write(APIC_DISABLE);
-                regs.lvt_perf_monitor.write(APIC_NMI);
-                regs.lvt_lint0.write(APIC_DISABLE);
-                regs.lvt_lint1.write(APIC_DISABLE);
+                regs.lvt_timer.write(APIC_TIMER_DISABLE);
+                regs.lvt_perf_monitor.write(LapicDeliveryMode::Nmi.as_register_value());
+                regs.lvt_lint0.write(APIC_TIMER_DISABLE);
+                regs.lvt_lint1.write(APIC_TIMER_DISABLE);
                 regs.task_priority.write(0);
 
                 // set bit 8 to allow receiving interrupts (still need to "sti")
@@ -531,32 +623,34 @@ impl LocalApic {
     }
 
     /// Returns the number of APIC ticks that occurred during the given number of `microseconds`.
-    fn calibrate_lapic_timer(&mut self, microseconds: u32) -> u64 {
+    ///
+    /// The number of ticks must be a `u32` due to the size of the APIC timer count register.
+    fn calibrate_lapic_timer(&mut self, microseconds: u32) -> u32 {
         // Start with the max counter value, since we're counting down
-        const INITIAL_COUNT: u64 = 0xFFFF_FFFF;
+        const INITIAL_COUNT: u32 = 0xFFFF_FFFF;
 
         let end_count = match &mut self.inner {
             LapicType::X2Apic => {
                 unsafe { 
-                    wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16
-                    wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT);
+                    wrmsr(IA32_X2APIC_DIV_CONF, LapicTimerDivide::By16.as_register_value() as u64);
+                    wrmsr(IA32_X2APIC_INIT_COUNT, INITIAL_COUNT as u64);
                 }
 
                 // wait for the given period using the PIT clock
                 pit_wait(microseconds).unwrap();
 
-                unsafe { wrmsr(IA32_X2APIC_LVT_TIMER, APIC_DISABLE as u64); } // stop apic timer
-                rdmsr(IA32_X2APIC_CUR_COUNT)
+                unsafe { wrmsr(IA32_X2APIC_LVT_TIMER, APIC_TIMER_DISABLE as u64); } // stop apic timer
+                rdmsr(IA32_X2APIC_CUR_COUNT) as u32
             }
             LapicType::XApic(regs) => {
-                regs.timer_divide.write(3); // set divide value to 16
-                regs.timer_initial_count.write(INITIAL_COUNT as u32);
+                regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
+                regs.timer_initial_count.write(INITIAL_COUNT);
 
                 // wait for the given period using the PIT clock
                 pit_wait(microseconds).unwrap();
 
-                regs.lvt_timer.write(APIC_DISABLE); // stop apic timer
-                regs.timer_current_count.read() as u64
+                regs.lvt_timer.write(APIC_TIMER_DISABLE); // stop apic timer
+                regs.timer_current_count.read()
             }
         };
         
@@ -566,71 +660,90 @@ impl LocalApic {
     /// After this lapic has been enabled, initialize its LVT timer.
     fn init_lvt_timer(&mut self) {
         let apic_period = if cfg!(apic_timer_fixed) {
-            info!("apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}", 0x10000);
-            0x10000 // for bochs, which doesn't do apic periods right
+            info!("apic_timer_fixed config: overriding LocalAPIC LVT timer period to {}", 1000000);
+            1000000 // for bochs, which doesn't do apic periods right
         } else {
             self.calibrate_lapic_timer(CONFIG_TIMESLICE_PERIOD_MICROSECONDS)
         };
         trace!("LocalApic {}, timer period count: {} ({:#X})", self.apic_id, apic_period, apic_period);
+        self.initial_timer_count = apic_period;
 
         match &mut self.inner {
             LapicType::X2Apic => unsafe {
-                wrmsr(IA32_X2APIC_DIV_CONF, 3); // set divide value to 16 ( ... how does 3 => 16 )
+                wrmsr(IA32_X2APIC_DIV_CONF, LapicTimerDivide::By16.as_register_value() as u64);
                 
                 // map X2APIC timer to the `LOCAL_APIC_LVT_IRQ` interrupt handler in the IDT
-                wrmsr(IA32_X2APIC_LVT_TIMER, LOCAL_APIC_LVT_IRQ as u64 | APIC_TIMER_PERIODIC as u64); 
-                wrmsr(IA32_X2APIC_INIT_COUNT, apic_period); 
+                wrmsr(IA32_X2APIC_LVT_TIMER, LOCAL_APIC_LVT_IRQ as u64 | APIC_TIMER_MODE_PERIODIC as u64); 
+                wrmsr(IA32_X2APIC_INIT_COUNT, apic_period as u64); 
     
                 wrmsr(IA32_X2APIC_LVT_THERMAL, 0);
                 wrmsr(IA32_X2APIC_ESR, 0);
     
                 // os dev wiki guys say that setting this again as a last step helps on some strange hardware.
-                wrmsr(IA32_X2APIC_DIV_CONF, 3);
+                wrmsr(IA32_X2APIC_DIV_CONF, LapicTimerDivide::By16.as_register_value() as u64);
             }
             LapicType::XApic(regs) => {
-                regs.timer_divide.write(3); // set divide value to 16 ( ... how does 3 => 16 )
+                regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
                 // map APIC timer to an interrupt handler in the IDT
-                regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_PERIODIC); 
-                regs.timer_initial_count.write(apic_period as u32); 
+                regs.lvt_timer.write(LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_MODE_PERIODIC); 
+                regs.timer_initial_count.write(apic_period); 
 
                 regs.lvt_thermal.write(0);
                 regs.lvt_error.write(0);
 
                 // os dev wiki guys say that setting this again as a last step helps on some strange hardware.
-                regs.timer_divide.write(3);
+                regs.timer_divide.write(LapicTimerDivide::By16.as_register_value());
             }
         }
     }
 
     /// Enable (unmask) or disable (mask) the LVT timer interrupt on this lapic.
-    /// 
-    /// This does **not** modify the timer's current count value.
     pub fn enable_lvt_timer(&mut self, enable: bool) {
-        let value = if enable {
-            LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_PERIODIC
+        // From section 10.5.4 of Intel SDM:
+        //   Changing the mode of the APIC timer (from one-shot to periodic or vice versa)
+        //   by writing to the timer LVT entry does not start the timer.
+        //   To start the timer, it is necessary to write to the initial-count register.
+        //
+        // Thus, when enabling the timer, we must immeditely write the initial count again.
+        if enable {
+            let timer_enable = LOCAL_APIC_LVT_IRQ as u32 | APIC_TIMER_MODE_PERIODIC;
+            match &mut self.inner {
+                LapicType::X2Apic => unsafe {
+                    wrmsr(IA32_X2APIC_LVT_TIMER, timer_enable as u64);
+                    wrmsr(IA32_X2APIC_INIT_COUNT, self.initial_timer_count as u64);
+                }
+                LapicType::XApic(regs) => {
+                    regs.lvt_timer.write(timer_enable);
+                    regs.timer_initial_count.write(self.initial_timer_count);
+                }
+            }
         } else {
-            APIC_DISABLE
-        };
-        match &mut self.inner {
-            LapicType::X2Apic => unsafe {
-                wrmsr(IA32_X2APIC_LVT_TIMER, value as u64)
-            },
-            LapicType::XApic(regs) => regs.lvt_timer.write(value),
+            let timer_disable = APIC_TIMER_DISABLE;
+            match &mut self.inner {
+                LapicType::X2Apic => unsafe {
+                    wrmsr(IA32_X2APIC_LVT_TIMER, timer_disable as u64);
+                }
+                LapicType::XApic(regs) => {
+                    regs.lvt_timer.write(timer_disable);
+                }
+            }
         }
     }
 
     /// Returns the ID of this Local APIC (fast).
     /// 
     /// Unlike [`LocalApic::read_apic_id()`], this does not read any hardware registers.
-    pub fn apic_id(&self) -> u8 { self.apic_id }
+    pub fn apic_id(&self) -> ApicId { self.apic_id }
 
     /// Reads the hardware-provided ID of this Local APIC from its registers (slow).
-    pub fn read_apic_id(&self) -> u8 {
+    ///
+    /// The semantics of this are defined in section 10.4.6 of the Intel SDM.
+    pub fn read_apic_id(&self) -> ApicId {
         match &self.inner {
-            LapicType::X2Apic => rdmsr(IA32_X2APIC_APICID) as u32 as u8,
+            LapicType::X2Apic => ApicId(rdmsr(IA32_X2APIC_APICID) as u32),
             LapicType::XApic(regs) => {
                 let raw = regs.lapic_id.read();
-                (raw >> 24) as u8
+                ApicId(raw >> 24)
             }
         }
     }
@@ -725,10 +838,11 @@ impl LocalApic {
     }
 
     /// Set the NonMaskableInterrupt redirect for this LocalApic.
+    ///
     /// Argument `lint` can be either 0 or 1, since each local APIC has two LVT LINTs
     /// (Local Vector Table Local INTerrupts)
     pub fn set_nmi(&mut self, lint: LvtLint, flags: u16) {
-        let value = (flags << 12) as u32 | APIC_NMI; // or APIC_NMI | 0x2000 ??
+        let value = (flags << 12) as u32 | LapicDeliveryMode::Nmi.as_register_value();
         match &mut self.inner {
             LapicType::X2Apic => unsafe { wrmsr(lint.msr(), value as u64) },
             LapicType::XApic(regs) => match lint {

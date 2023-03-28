@@ -29,7 +29,7 @@ pub struct DoorbellRecord {
     pub(crate) send_counter:   Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<DoorbellRecord>(), 8);
+const _: () = assert!(core::mem::size_of::<DoorbellRecord>() == 8);
 
 /// The possible formats for a WQ buffer.
 #[derive(Debug, TryFromPrimitive)]
@@ -79,7 +79,7 @@ pub(crate) struct WorkQueue {
     _padding1:                          [u64; 19],
 }
 
-const_assert_eq!(core::mem::size_of::<WorkQueue>(), 192);
+const _: () = assert!(core::mem::size_of::<WorkQueue>() == 192);
 
 impl WorkQueue {
     /// Create and initialize the fields of the WQ for a SQ or RQ context.
@@ -177,7 +177,7 @@ pub struct WorkQueueEntrySend {
     data: MemoryPointerDataSegment
 }
 
-const_assert_eq!(core::mem::size_of::<WorkQueueEntrySend>(), 64);
+const _: () = assert!(core::mem::size_of::<WorkQueueEntrySend>() == 64);
 
 impl WorkQueueEntrySend {
     /// set a WQE to an initial state
@@ -230,7 +230,7 @@ pub struct WorkQueueEntryReceive {
     data: MemoryPointerDataSegment
 }
 
-const_assert_eq!(core::mem::size_of::<WorkQueueEntryReceive>(), 16);
+const _: () = assert!(core::mem::size_of::<WorkQueueEntryReceive>() == 16);
 
 impl WorkQueueEntryReceive {
     /// set a WQE to an initial state
@@ -294,7 +294,7 @@ pub(crate) struct ControlSegment {
     ctrl_general_id:                Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<ControlSegment>(), 16);
+const _: () = assert!(core::mem::size_of::<ControlSegment>() == 16);
 
 impl ControlSegment {
     /// Initialize the fields of the control segment.
@@ -358,7 +358,7 @@ pub(crate) struct EthSegment {
     inline_headers_4:       Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<EthSegment>(), 32);
+const _: () = assert!(core::mem::size_of::<EthSegment>() == 32);
 
 impl EthSegment {
     /// Initialize the fields of the eth segment to send a packet.
@@ -391,7 +391,7 @@ pub(crate) struct MemoryPointerDataSegment {
     local_address_l:    Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<MemoryPointerDataSegment>(), 16);
+const _: () = assert!(core::mem::size_of::<MemoryPointerDataSegment>() == 16);
 
 impl MemoryPointerDataSegment {
     /// Initialize the fields of the data segment to send or receive a packet.

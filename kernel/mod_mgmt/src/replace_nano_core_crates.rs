@@ -62,7 +62,7 @@ pub fn replace_nano_core_crates(
 
     let _new_crate_ref = load_crate_using_nano_core_data_sections(
         &nano_core_crate, 
-        &namespace,
+        namespace,
         &crate_object_file,
         kernel_mmi_ref,
         false,

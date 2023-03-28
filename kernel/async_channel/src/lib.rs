@@ -12,7 +12,6 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate static_assertions;
 #[cfg(trace_channel)] #[macro_use] extern crate log;
 #[cfg(trace_channel)] #[macro_use] extern crate debugit;
 extern crate wait_queue;
@@ -21,11 +20,6 @@ extern crate crossbeam_utils;
 extern crate core2;
 extern crate sync;
 extern crate sync_spin;
-
-#[cfg(downtime_eval)]
-extern crate hpet;
-#[cfg(downtime_eval)]
-extern crate task;
 
 use alloc::sync::Arc;
 use mpmc::Queue as MpmcQueue;
@@ -115,7 +109,7 @@ struct Channel<T: Send, P: DeadlockPrevention> {
 }
 
 // Ensure that `AtomicCell<ChannelStatus>` is actually a lock-free atomic.
-const_assert!(AtomicCell::<ChannelStatus>::is_lock_free());
+const _: () = assert!(AtomicCell::<ChannelStatus>::is_lock_free());
 
 impl <T: Send, P: DeadlockPrevention> Channel<T, P> {
     /// Returns true if the channel is disconnected.
@@ -290,20 +284,6 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
                 return Err((msg, Error::ChannelDisconnected));
             },
             _ => {},
-        }
-
-        // Injected Randomized fault : Page fault
-        #[cfg(downtime_eval)]
-        {
-            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            // debug!("Value {} {}", value, value % 1024);
-
-            let is_restartable = task::with_current_task(|t| t.is_restartable()).unwrap_or(false);
-            // We restrict the fault to a specific task to make measurements consistent
-            if (value % 4096) == 0  && is_restartable {
-                // debug!("Fake error {}", value);
-                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-            }
         }
 
         match self.channel.queue.push(msg) {

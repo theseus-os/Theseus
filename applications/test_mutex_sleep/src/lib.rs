@@ -41,19 +41,19 @@ fn test_contention() -> Result<(), &'static str> {
 
     let t1 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_1"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
     let t2 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_2"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
     
     let t3 = spawn::new_task_builder(mutex_sleep_task, shared_lock.clone())
         .name(String::from("mutex_sleep_test_3"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
@@ -99,19 +99,19 @@ fn test_lockstep() -> Result<(), &'static str> {
 
     let t1 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 0))
         .name(String::from("lockstep_task_1"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
     let t2 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 1))
         .name(String::from("lockstep_task_2"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
     
     let t3 = spawn::new_task_builder(lockstep_task, (shared_lock.clone(), 2))
         .name(String::from("lockstep_task_3"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 

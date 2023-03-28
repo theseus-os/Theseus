@@ -79,7 +79,7 @@ fn console_connection_detector(
         }
 
         if spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
-            .name(format!("{:?}_manager", serial_port_address))
+            .name(format!("{serial_port_address:?}_manager"))
             .spawn()
             .is_err()
         {
@@ -103,10 +103,10 @@ fn shell_loop(
     let tty = tty::Tty::new();
 
     let reader_task = spawn::new_task_builder(tty_to_port_loop, (port.clone(), tty.master()))
-        .name(format!("tty_to_{:?}", address))
+        .name(format!("tty_to_{address:?}"))
         .spawn()?;
     let writer_task = spawn::new_task_builder(port_to_tty_loop, (receiver, tty.master()))
-        .name(format!("{:?}_to_tty", address))
+        .name(format!("{address:?}_to_tty"))
         .spawn()?;
 
     let new_app_ns = mod_mgmt::create_application_namespace(None)?;
@@ -117,7 +117,7 @@ fn shell_loop(
 
     let path = path::Path::new(app_file.lock().get_absolute_path());
     let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-        .name(format!("{:?}_shell", address))
+        .name(format!("{address:?}_shell"))
         .block()
         .spawn()?;
 

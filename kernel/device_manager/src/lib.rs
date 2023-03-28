@@ -10,7 +10,7 @@ extern crate apic;
 extern crate acpi;
 extern crate serial_port;
 extern crate console;
-extern crate logger;
+extern crate logger_x86_64 as logger;
 extern crate keyboard;
 extern crate pci;
 extern crate mouse;
@@ -41,7 +41,7 @@ use memory::PhysicalAddress;
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
-const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
+const DEFAULT_LOCAL_IP: &str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
 
 /// Standard home router address.
 /// TODO: use DHCP to acquire gateway IP
@@ -82,7 +82,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
         .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
             .ok()
             .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        ).map(|arc_ref| arc_ref.clone());
+        ).cloned();
 
     logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
     info!("Initialized full logger.");

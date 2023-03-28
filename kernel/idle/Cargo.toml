@@ -1,0 +1,10 @@
+[package]
+name = "idle"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "CPU idle management"
+edition = "2021"
+
+[dependencies]
+cfg-if = "1.0.0"
+raw-cpuid = "10.6.0"

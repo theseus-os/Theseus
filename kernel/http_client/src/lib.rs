@@ -121,8 +121,8 @@ impl<'i, 's, 'sockset_a, 'sockset_b, 'sockset_c> ConnectedTcpSocket<'i, 's, 'soc
         }
 
         Ok(ConnectedTcpSocket {
-            iface: iface,
-            sockets: sockets,
+            iface,
+            sockets,
             handle: tcp_socket_handle,
         })
     }
@@ -166,7 +166,7 @@ pub fn send_request(
     loop { 
         _loop_ctr += 1;
 
-        let _packet_io_occurred = poll_iface(&iface, sockets, startup_time)?;
+        let _packet_io_occurred = poll_iface(iface, sockets, startup_time)?;
 
         // check if we have timed out
         if let Some(t) = timeout_millis {
@@ -215,7 +215,7 @@ pub fn send_request(
                             Ok(httparse::Status::Complete(total_header_len)) => {
                                 packet_header_length = Some(total_header_len);
                                 response_status_code = response.code;
-                                response_reason = response.reason.map(|s| String::from(s));
+                                response_reason = response.reason.map(String::from);
 
                                 // Here: we've received all headers, but we may not be done receiving the full response.
                                 // If there is a "Content-Length" header present, we can use that to see if all the bytes are received.

@@ -85,7 +85,7 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    return 0;
+    0
 }
 
 fn print_usage(opts: Options) {
@@ -107,5 +107,5 @@ fn echo_from_stdin() -> Result<(), &'static str> {
     Ok(())
 }
 
-const USAGE: &'static str = "Usage: cat [file ...]
+const USAGE: &str = "Usage: cat [file ...]
 concatenate and print files";

@@ -1,5 +1,7 @@
- //! Defines the Command Queue that is used to pass commands from the driver to the NIC.
- //! Also defines multiple enums that specify the valid input and output values for different commands.
+//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
+//! Also defines multiple enums that specify the valid input and output values for different commands.
+
+#![allow(clippy::upper_case_acronyms)]
 
 use alloc::{vec::Vec, boxed::Box};
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
@@ -438,7 +440,7 @@ struct NicVportContext {
     permanent_address_l: Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<NicVportContext>(), 252);
+const _: () = assert!(core::mem::size_of::<NicVportContext>() == 252);
 
 /// A struct storing a 4KiB page that can be used as an input or output mailbox
 struct MailboxBuffer {
@@ -578,7 +580,7 @@ pub struct CommandBuilder {
 impl CommandBuilder {
     pub fn new(opcode: CommandOpcode) -> CommandBuilder {
         CommandBuilder { 
-            opcode: opcode, 
+            opcode, 
             opmod: None, 
             allocated_pages: None, 
             user_access_region: None, 
@@ -737,7 +739,7 @@ impl CommandQueue {
     pub fn create_and_execute_command(&mut self, parameters: CommandBuilder, init_segment: &mut InitializationSegment) -> Result<Command<{CmdState::Completed}>, CommandQueueError> {
         Ok( self.create_command(parameters)?
                 .post(init_segment)
-                .complete(&self) )
+                .complete(self) )
     }
     
     /// Fill in the fields of a command queue entry.
@@ -1197,7 +1199,7 @@ impl CommandQueue {
 
         let dest_list_mb: usize = libm::ceilf((0x30 + 0x300) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         const DEST_LIST_MB_OFFSET: usize = 304; 
-        let dest_list = DestinationEntry::init(DestinationType::TIR, tirn);
+        let dest_list = DestinationEntry::init(DestinationType::Tir, tirn);
         input_mailbox_buffers[dest_list_mb - 1].write_to_mailbox(dest_list, DEST_LIST_MB_OFFSET)?;
 
         Ok(())
@@ -1481,7 +1483,7 @@ pub struct CommandQueueEntry {
     token_signature_status_own:     Volatile<U32<BigEndian>>
 }
 
-const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
+const _: () = assert!(core::mem::size_of::<CommandQueueEntry>() == 64);
 
 impl fmt::Debug for CommandQueueEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1669,7 +1671,7 @@ struct CommandInterfaceMailbox {
     /// Should have the same value in the command and the mailbox blocks.
     token_ctrl_signature:   Volatile<U32<BigEndian>>
 }
-const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), MAILBOX_SIZE_IN_BYTES);
+const _: () = assert!(core::mem::size_of::<CommandInterfaceMailbox>() == MAILBOX_SIZE_IN_BYTES);
 
 impl CommandInterfaceMailbox {
     /// Sets all fields of the mailbox to 0.
@@ -1781,7 +1783,7 @@ struct HCACapabilitiesLayout {
     match_definer:                  ReadOnly<U32<BigEndian>>, 
 }
 
-const_assert_eq!(core::mem::size_of::<HCACapabilitiesLayout>(), 256);
+const _: () = assert!(core::mem::size_of::<HCACapabilitiesLayout>() == 256);
 
 /// The HCA capabilities are stored in this struct after being extracted from [`HCACapabilitiesLayout`]
 #[allow(dead_code)]

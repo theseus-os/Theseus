@@ -1,3 +1,4 @@
+#![allow(clippy::new_without_default)]
 #![no_std]
 
 use mpmc_queue::Queue;

@@ -92,7 +92,7 @@ impl<T> CowArc<T> {
     pub fn downgrade(this: &CowArc<T>) -> CowWeak<T> {
         CowWeak {
             weak: InnerWeak {
-                inner_weak: Arc::downgrade(&(this.arc.inner_arc))
+                inner_weak: Arc::downgrade(&this.arc.inner_arc)
             },
         }
     }

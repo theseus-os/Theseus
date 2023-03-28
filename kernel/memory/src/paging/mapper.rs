@@ -26,11 +26,14 @@ use crate::paging::{
 };
 use pte_flags::PteFlagsArch;
 use spin::Once;
-use kernel_config::memory::{PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::PAGE_SIZE;
 use super::tlb_flush_virt_addr;
 use zerocopy::FromBytes;
 use page_table_entry::UnmapResult;
 use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
+
+#[cfg(target_arch = "x86_64")]
+use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
 /// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
 /// 
@@ -276,8 +279,8 @@ impl Mapper {
         // Only the lowest-level P1 entry can be considered exclusive, and only because
         // we are mapping it exclusively (to owned `AllocatedFrames`).
         let actual_flags = flags
-            .exclusive(true)
-            .valid(true);
+            .valid(true)
+            .exclusive(true);
 
         for page in pages.deref().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;

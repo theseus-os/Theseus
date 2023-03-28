@@ -41,7 +41,7 @@ use spin::Mutex;
 use alloc::sync::Arc;
 use fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 use memory::MappedPages;
-use task::{TaskRef, TASKLIST};
+use task::WeakTaskRef;
 use path::Path;
 use io::{ByteReader, ByteWriter, KnownLength, IoError};
 
@@ -54,7 +54,7 @@ pub const TASKS_DIRECTORY_PATH: &str = "/tasks";
 
 /// Initializes the tasks virtual filesystem directory within the root directory.
 pub fn init() -> Result<(), &'static str> {
-    TaskFs::new()?;
+    TaskFs::create()?;
     Ok(())
 }
 
@@ -65,7 +65,7 @@ pub fn init() -> Result<(), &'static str> {
 pub struct TaskFs { }
 
 impl TaskFs {
-    fn new() -> Result<DirRef, &'static str> {
+    fn create() -> Result<DirRef, &'static str> {
         let root = root::get_root();
         let dir_ref = Arc::new(Mutex::new(TaskFs { })) as DirRef;
         root.lock().insert(FileOrDir::Dir(dir_ref.clone()))?;
@@ -77,12 +77,12 @@ impl TaskFs {
     }
 
     fn get_internal(&self, node: &str) -> Result<FileOrDir, &'static str> {
-        let id = node.parse::<usize>().map_err(|_e| "could not parse Task id as usize")?;
-        let task_ref = task::get_task(id).ok_or("could not get taskref from TASKLIST")?;
+        let id = node.parse::<usize>().map_err(|_e| "could not parse Task ID as usize")?;
+        let task_ref = task::get_task(id).ok_or("No task existed for Task ID")?;
         let parent_dir = self.get_self_pointer().ok_or("BUG: tasks directory wasn't in root")?;
-        let dir_name = task_ref.id.to_string(); 
+        let dir_name = id.to_string(); 
         // lazily compute a new TaskDir everytime the caller wants to get a TaskDir
-        let task_dir = TaskDir::new(dir_name, &parent_dir, task_ref)?;        
+        let task_dir = TaskDir::new(dir_name, &parent_dir, id, task_ref)?;        
         let boxed_task_dir = Arc::new(Mutex::new(task_dir)) as DirRef;
         Ok(FileOrDir::Dir(boxed_task_dir))
     }
@@ -125,8 +125,8 @@ impl Directory for TaskFs {
     /// Returns a string listing all the children in the directory
     fn list(&self) -> Vec<String> {
         let mut tasks_string = Vec::new();
-        for (id, _taskref) in TASKLIST.lock().iter() {
-            tasks_string.push(format!("{}", id));
+        for (id, _taskref) in task::all_tasks() {
+            tasks_string.push(format!("{id}"));
         }
         tasks_string
     }
@@ -147,19 +147,25 @@ pub struct TaskDir {
     pub name: String,
     /// The absolute path of the TaskDir
     path: Path,
-    taskref: TaskRef,
+    task_id: usize,
+    taskref: WeakTaskRef,
     /// We can store the parent (TaskFs) because it is a persistent directory
     parent: DirRef,
 }
 
 impl TaskDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new(name: String, parent: &DirRef, taskref: TaskRef)  -> Result<TaskDir, &'static str> {
-        let task_id = taskref.id;
+    pub fn new(
+        name: String,
+        parent: &DirRef,
+        task_id: usize,
+        taskref: WeakTaskRef,
+    ) -> Result<TaskDir, &'static str> {
         let directory = TaskDir {
-            name: name,
-            path: Path::new(format!("{}/{}", TASKS_DIRECTORY_PATH, task_id)),
-            taskref: taskref,
+            name,
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}")),
+            task_id,
+            taskref,
             parent: Arc::clone(parent),
         };
         Ok(directory)
@@ -173,12 +179,12 @@ impl Directory for TaskDir {
 
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "taskInfo" {
-            let task_file = TaskFile::new(self.taskref.clone());
+            let task_file = TaskFile::new(self.task_id, self.taskref.clone());
             return Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as FileRef));
         }
 
         if child_name == "mmi" {
-            let mmi_dir = MmiDir::new(self.taskref.clone());
+            let mmi_dir = MmiDir::new(self.task_id, self.taskref.clone());
             return Some(FileOrDir::Dir(Arc::new(Mutex::new(mmi_dir)) as DirRef));
         }
 
@@ -219,38 +225,41 @@ impl FsNode for TaskDir {
 /// Lazily computed file that holds information about this task. This taskfile
 /// does not exist witin the actual filesystem. 
 pub struct TaskFile {
-    taskref: TaskRef,
+    taskref: WeakTaskRef,
     task_id: usize,
     path: Path, 
 }
 
 impl TaskFile {
-    pub fn new(taskref: TaskRef) -> TaskFile {
-        let task_id = taskref.id;
+    pub fn new(task_id: usize, taskref: WeakTaskRef) -> TaskFile {
         TaskFile {
             taskref,
             task_id,
-            path: Path::new(format!("{}/{}/task_info", TASKS_DIRECTORY_PATH, task_id)), 
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/task_info")), 
         }
     }
 
     /// Generates the task info string.
     fn generate(&self) -> String {
+        let Some(taskref) = self.taskref.upgrade() else {
+            return String::from("Task Not Found");
+        };
+
         // Print all tasks
-        let cpu = self.taskref.running_on_cpu().map(|cpu| format!("{}", cpu)).unwrap_or_else(|| String::from("-"));
-        let pinned = &self.taskref.pinned_core().map(|pin| format!("{}", pin)).unwrap_or_else(|| String::from("-"));
-        let task_type = if self.taskref.is_an_idle_task {
+        let cpu = taskref.running_on_cpu().map(|cpu| format!("{cpu}")).unwrap_or_else(|| String::from("-"));
+        let pinned = &taskref.pinned_cpu().map(|pin| format!("{pin}")).unwrap_or_else(|| String::from("-"));
+        let task_type = if taskref.is_an_idle_task {
             "I"
-        } else if self.taskref.is_application() {
+        } else if taskref.is_application() {
             "A"
         } else {
             " "
         };  
 
         format!("{0:<10} {1}\n{2:<10} {3}\n{4:<10} {5:?}\n{6:<10} {7}\n{8:<10} {9}\n{10:<10} {11:<10}", 
-            "name", self.taskref.name,
-            "task id", self.taskref.id,
-            "runstate", self.taskref.runstate(),
+            "name", taskref.name,
+            "task id", taskref.id,
+            "runstate", taskref.runstate(),
             "cpu", cpu,
             "pinned", pinned,
             "task type", task_type
@@ -264,7 +273,10 @@ impl FsNode for TaskFile {
     }
 
     fn get_name(&self) -> String {
-        self.taskref.name.clone()
+        self.taskref.upgrade().map_or_else(
+            || String::from("Task Not Found"),
+            |taskref| taskref.name.clone(),
+        )
     }
 
     fn get_parent_dir(&self) -> Option<DirRef> {
@@ -319,19 +331,18 @@ impl File for TaskFile {
 /// Lazily computed directory that contains subfiles and directories 
 /// relevant to the task's memory management information. 
 pub struct MmiDir {
-    taskref: TaskRef,
+    taskref: WeakTaskRef,
     task_id: usize,
     path: Path, 
 }
 
 impl MmiDir {
     /// Creates a new directory and passes a pointer to the new directory created as output
-    pub fn new(taskref: TaskRef) -> MmiDir {
-        let task_id = taskref.id;
+    pub fn new(task_id: usize, taskref: WeakTaskRef) -> MmiDir {
         MmiDir {
             taskref,
             task_id,
-            path: Path::new(format!("{}/{}/mmi", TASKS_DIRECTORY_PATH, task_id)),
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi")),
         }
     }
 }
@@ -344,7 +355,7 @@ impl Directory for MmiDir {
     fn get(&self, child_name: &str) -> Option<FileOrDir> {
         if child_name == "MmiInfo" {
             // create the new mmi dir here on demand
-            let task_file = MmiFile::new(self.taskref.clone());
+            let task_file = MmiFile::new(self.task_id, self.taskref.clone());
             Some(FileOrDir::File(Arc::new(Mutex::new(task_file)) as FileRef))
         } else {
             None
@@ -389,24 +400,27 @@ impl FsNode for MmiDir {
 /// Lazily computed file that contains information 
 /// about a task's memory management information. 
 pub struct MmiFile {
-    taskref: TaskRef,
+    taskref: WeakTaskRef,
     task_id: usize,
     path: Path, 
 }
 
 impl MmiFile {
-    pub fn new(taskref: TaskRef) -> MmiFile {
-        let task_id = taskref.id;
+    pub fn new(task_id: usize, taskref: WeakTaskRef) -> MmiFile {
         MmiFile {
             taskref,
             task_id,
-            path: Path::new(format!("{}/{}/mmi/MmiInfo", TASKS_DIRECTORY_PATH, task_id)), 
+            path: Path::new(format!("{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo")), 
         }
     }
 
     /// Generates the mmi info string.
     fn generate(&self) -> String {
-        format!("Page table: {:?}\n", self.taskref.mmi.lock().page_table)
+        if let Some(taskref) = self.taskref.upgrade() {
+            format!("Page table: {:?}\n", taskref.mmi.lock().page_table)
+        } else {
+            String::from("Task Not Found")
+        }
     }
 }
 

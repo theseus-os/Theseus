@@ -65,7 +65,6 @@ use cow_arc::{CowArc, CowWeak};
 use fs_node::{FileRef, WeakFileRef};
 use hashbrown::HashMap;
 use goblin::elf::reloc::*;
-use static_assertions::const_assert;
 
 pub use str_ref::StrRef;
 pub use crate_metadata_serde::{
@@ -108,20 +107,20 @@ pub const DATA_BSS_SECTION_FLAGS: PteFlags = PteFlags::from_bits_truncate(
 );
 
 // Double-check section flags were defined correctly.
-const_assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
-const_assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
-const_assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
+const _: () = assert!(TEXT_SECTION_FLAGS.is_executable() && !TEXT_SECTION_FLAGS.is_writable());
+const _: () = assert!(!RODATA_SECTION_FLAGS.is_writable() && !RODATA_SECTION_FLAGS.is_executable());
+const _: () = assert!(DATA_BSS_SECTION_FLAGS.is_writable() && !DATA_BSS_SECTION_FLAGS.is_executable());
 
 
 /// The Theseus Makefile appends prefixes onto bootloader module names,
 /// which are separated by the "#" character. 
 /// For example, "k#my_crate-hash.o".
-pub const MODULE_PREFIX_DELIMITER: &'static str = "#";
+pub const MODULE_PREFIX_DELIMITER: &str = "#";
 /// A crate's name and its hash are separated by "-", i.e., "my_crate-hash".
-pub const CRATE_HASH_DELIMITER: &'static str = "-";
+pub const CRATE_HASH_DELIMITER: &str = "-";
 /// A section's demangled name and its hash are separated by "::h", 
 /// e.g., `"my_crate::section_name::h<hash>"`.
-pub const SECTION_HASH_DELIMITER: &'static str = "::h";
+pub const SECTION_HASH_DELIMITER: &str = "::h";
 
 
 /// The type of a crate, based on its object file naming convention.
@@ -286,7 +285,6 @@ impl fmt::Debug for LoadedCrate {
 
 impl Drop for LoadedCrate {
     fn drop(&mut self) {
-        #[cfg(not(downtime_eval))]
         trace!("### Dropped LoadedCrate: {}", self.crate_name);
     }
 }
@@ -633,6 +631,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
 /// The parts of a `LoadedSection` that may be mutable, i.e., 
 /// only the parts that could change after a section is initially loaded and linked.
 #[derive(Default)]
+#[non_exhaustive]
 pub struct LoadedSectionInner {
     /// The list of sections in foreign crates that this section depends on, i.e., "my required dependencies".
     /// This is kept as a list of strong references because these sections must outlast this section,
@@ -654,6 +653,7 @@ pub struct LoadedSectionInner {
 
 /// Represents a section that has been loaded and is part of a `LoadedCrate`.
 /// The containing `SectionType` enum determines which type of section it is.
+#[non_exhaustive]
 pub struct LoadedSection {
     /// The full string name of this section, a fully-qualified symbol, 
     /// with the format `<crate>::[<module>::][<struct>::]<fn_name>::<hash>`.
@@ -770,7 +770,7 @@ impl LoadedSection {
     pub fn section_name_without_hash(sec_name: &str) -> &str {
         sec_name.rfind(SECTION_HASH_DELIMITER)
             .and_then(|end| sec_name.get(0 .. (end + SECTION_HASH_DELIMITER.len())))
-            .unwrap_or(&sec_name)
+            .unwrap_or(sec_name)
     }
 
     /// Returns the index of the first `WeakDependent` object in this `LoadedSection`'s `sections_dependent_on_me` list
@@ -994,11 +994,7 @@ impl RelocationEntry {
     /// does NOT depend on the target section's address itself in any way 
     /// (i.e., it only depends on the source section)
     pub fn is_absolute(&self) -> bool {
-        match self.typ {
-            R_X86_64_32 | 
-            R_X86_64_64 => true,
-            _ => false,
-        }
+        matches!(self.typ, R_X86_64_32 | R_X86_64_64)
     }
 }
 
