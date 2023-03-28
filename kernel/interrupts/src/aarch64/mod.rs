@@ -119,8 +119,16 @@ fn set_vbar_el1() {
 }
 
 /// Sets `VBAR_EL1` to the start of the exception vector
+/// and enables timer interrupts
 pub fn init_ap() {
     set_vbar_el1();
+
+    // Enable the CPU-local timer
+    let mut gic = GIC.lock();
+    let gic = gic.as_mut().expect("GIC is uninitialized");
+    gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+
+    enable_timer(true);
 }
 
 /// Please call this (only once) before using this crate.
