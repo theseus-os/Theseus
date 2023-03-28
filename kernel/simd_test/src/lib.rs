@@ -3,7 +3,6 @@
 
 // The entire crate is only built if both `simd_personality` and `sse2` are enabled.
 
-use core::hint::spin_loop;
 #[macro_use] extern crate cfg_if;
 cfg_if! { if #[cfg(all(simd_personality, target_feature = "sse2"))] {
 
