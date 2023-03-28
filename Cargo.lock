@@ -4073,10 +4073,13 @@ name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
+ "interrupts",
  "irq_safety",
  "log",
  "memory",
- "x86_64",
+ "memory_aarch64",
+ "memory_x86_64",
 ]
 
 [[package]]

@@ -12,6 +12,7 @@ irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 dfqueue = { path = "../../libs/dfqueue", version = "0.1.0" }
 multicore_bringup = { path = "../multicore_bringup" }
 early_printer = { path = "../early_printer" }
+tlb_shootdown = { path = "../tlb_shootdown" }
 kernel_config = { path = "../kernel_config" }
 interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
@@ -29,7 +30,6 @@ logger_x86_64 = { path = "../logger_x86_64" }
 window_manager = { path = "../window_manager" }
 first_application = { path = "../first_application" }
 exceptions_full = { path = "../exceptions_full" }
-tlb_shootdown = { path = "../tlb_shootdown" }
 multiple_heaps = { path = "../multiple_heaps" }
 tsc = { path = "../tsc" }
 acpi = { path = "../acpi" }

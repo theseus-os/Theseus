@@ -9,7 +9,7 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
-use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
+use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, IpiTargetCpu, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
@@ -28,6 +28,11 @@ static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 //
 // aarch64 manuals define the default timer IRQ number to be 30.
 pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
+
+/// The IRQ/IPI number for TLB Shootdowns
+///
+/// This is arbitrarily defined (range: 0..16)
+pub const TLB_SHOOTDOWN_IPI: InterruptNumber = 2;
 
 const MAX_IRQ_NUM: usize = 256;
 
@@ -191,6 +196,30 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
     Ok(())
 }
 
+/// This function registers an interrupt handler for an inter-processor interrupt
+/// and handles GIC configuration for that interrupt.
+pub fn init_ipi(handler: HandlerFunc, irq_num: InterruptNumber) -> Result<(), &'static str> {
+    assert!(irq_num < 16, "Inter-processor interrupts must have a number in the range 0..16");
+
+    // register/deregister the handler for the timer IRQ.
+    if let Err(existing_handler) = register_interrupt(irq_num, handler) {
+        if handler as *const HandlerFunc != existing_handler {
+            return Err("A different interrupt handler has already been setup for the timer IRQ number");
+        }
+    }
+
+    // Route the IRQ to this core (implicit as irq_num < 32) & Enable the interrupt.
+    {
+        let mut gic = GIC.lock();
+        let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
+
+        // enable routing of this interrupt
+        gic.set_interrupt_state(irq_num, true);
+    }
+
+    Ok(())
+}
+
 /// Disables the timer, schedules its next tick, and re-enables it
 pub fn schedule_next_timer_tick() {
     enable_timer(false);
@@ -268,6 +297,14 @@ pub fn deregister_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Resu
         error!("deregister_interrupt: Cannot free interrupt due to incorrect handler function");
         Err(value)
     }
+}
+
+/// Broadcast an Inter-Processor Interrupt to all other
+/// cores in the system
+pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
+    let mut gic = GIC.lock();
+    let gic = gic.as_mut().expect("GIC is uninitialized");
+    gic.send_ipi(irq_num, IpiTargetCpu::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that

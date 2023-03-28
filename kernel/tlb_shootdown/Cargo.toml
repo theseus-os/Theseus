@@ -3,23 +3,21 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "tlb_shootdown"
 description = "Routines for handling TLB shootdowns"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-x86_64 = "0.14.8"
+log = "0.4.8"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+memory = { path = "../memory" }
+cpu = { path = "../cpu" }
 
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+memory_x86_64 = { path = "../memory_x86_64" }
+apic = { path = "../apic" }
 
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.apic]
-path = "../apic"
-
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+memory_aarch64 = { path = "../memory_aarch64" }
+interrupts = { path = "../interrupts" }
 
 [lib]
 crate-type = ["rlib"]
