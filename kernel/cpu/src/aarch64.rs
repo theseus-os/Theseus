@@ -10,7 +10,7 @@ use alloc::vec::Vec;
 use super::CpuId;
 
 // The vector of CpuIds for known and online CPU cores
-static ONLINE_CORES: RwLockIrqSafe<Vec<CpuId>> = RwLockIrqSafe::new(Vec::new());
+static ONLINE_CPUS: RwLockIrqSafe<Vec<CpuId>> = RwLockIrqSafe::new(Vec::new());
 
 /// This must be called once for every CPU core of the system
 /// that should be used for running tasks.
@@ -19,7 +19,7 @@ static ONLINE_CORES: RwLockIrqSafe<Vec<CpuId>> = RwLockIrqSafe::new(Vec::new());
 /// When it does so (from captain), it must set the `bootstrap` parameter
 /// to true. Other cores must set it to false.
 pub fn register_cpu(bootstrap: bool) -> Result<(), &'static str> {
-    let mut locked = ONLINE_CORES.write();
+    let mut locked = ONLINE_CPUS.write();
 
     // the vector must be empty when the bootstrap
     // processor registers itself.
@@ -44,13 +44,13 @@ pub fn register_cpu(bootstrap: bool) -> Result<(), &'static str> {
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
 pub fn cpu_count() -> u32 {
-    ONLINE_CORES.read().len() as u32
+    ONLINE_CPUS.read().len() as u32
 }
 
 /// Returns the ID of the bootstrap CPU (if known), which
 /// is the first CPU to run after system power-on.
 pub fn bootstrap_cpu() -> Option<CpuId> {
-    ONLINE_CORES.read().first().copied()
+    ONLINE_CPUS.read().first().copied()
 }
 
 /// Returns true if the currently executing CPU is the bootstrap
