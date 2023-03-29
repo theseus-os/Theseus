@@ -87,21 +87,17 @@ pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
         IpiTargetCpu::Specific(cpu) => {
             let mpidr: cpu::MpidrValue = cpu.into();
 
-            // level 3 affinity is expected in cpu[24:31]
-            // we want it in bits [48:55]
-            let aff3 = mpidr.affinity(3) << 48;
+            // level 3 affinity in bits [48:55]
+            let aff3 = mpidr.affinity(cpu::AffinityShift::LevelThree) << 48;
 
-            // level 2 affinity is expected in cpu[16:23]
-            // we want it in bits [32:39]
-            let aff2 = mpidr.affinity(2) << 32;
+            // level 2 affinity in bits [32:39]
+            let aff2 = mpidr.affinity(cpu::AffinityShift::LevelTwo) << 32;
 
-            // level 1 affinity is expected in cpu[8:15]
-            // we want it in bits [16:23]
-            let aff1 = mpidr.affinity(1) << 16;
+            // level 1 affinity in bits [16:23]
+            let aff1 = mpidr.affinity(cpu::AffinityShift::LevelOne) << 16;
 
-            // level 0 affinity is expected in cpu[0:7]
-            // we want it as a GICv2-style target list
-            let aff0 = mpidr.affinity(0);
+            // level 0 affinity as a GICv2-style target list
+            let aff0 = mpidr.affinity(cpu::AffinityShift::LevelZero);
             let target_list = if aff0 >= 16 {
                 panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
             } else {

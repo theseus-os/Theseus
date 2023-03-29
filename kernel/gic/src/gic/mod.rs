@@ -50,24 +50,22 @@ bitflags! {
 
 /// Target of a shared-peripheral interrupt
 pub enum SpiDestination {
-    /// That interrupt must be handled by
-    /// a specific PE in the system.
+    /// The interrupt must be delivered to a specific CPU.
     Specific(CpuId),
-    /// That interrupt can be handled by
-    /// any PE that is not busy with another,
-    /// more important task
+    /// That interrupt can be handled by any PE that is not busy with another, more
+    /// important task
     AnyCpuAvailable,
+    /// The interrupt will be delivered to all CPUs specified by the included target list
     GICv2TargetList(TargetList),
 }
 
 /// Target of an inter-processor interrupt
 pub enum IpiTargetCpu {
-    /// That interrupt must be handled by
-    /// a specific PE in the system.
+    /// The interrupt will be delivered to a specific CPU.
     Specific(CpuId),
-    /// All PEs will receive this interrupt
-    /// except the sender
+    /// The interrupt will be delivered to all CPUs except the sender.
     AllOtherCpus,
+    /// The interrupt will be delivered to all CPUs specified by the included target list
     GICv2TargetList(TargetList),
 }
 
