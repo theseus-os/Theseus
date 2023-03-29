@@ -43,6 +43,19 @@ pub fn current_cpu() -> CpuId {
 #[repr(transparent)]
 pub struct MpidrValue(u64);
 
+/// Affinity Levels and corresponding bit ranges
+///
+/// The associated integers are the locations (N..(N+8))
+/// of the corresponding bits in an [`MpidrValue`].
+#[derive(Copy, Clone, Debug)]
+#[repr(u64)]
+pub enum AffinityShift {
+    LevelZero  = 0,
+    LevelOne   = 8,
+    LevelTwo   = 16,
+    LevelThree = 32,
+}
+
 impl MpidrValue {
     /// Returns the inner raw value read from the `MPIDR_EL1` register.
     pub fn value(self) -> u64 {
@@ -50,18 +63,8 @@ impl MpidrValue {
     }
 
     /// Reads an affinity `level` from this `MpidrValue`.
-    ///
-    /// Panics if the given affinity level is not 0, 1, 2, or 3.
-    pub fn affinity(self, level: u8) -> u64 {
-        let shift = match level {
-            0 => 0,
-            1 => 8,
-            2 => 16,
-            3 => 32,
-            _ => panic!("Valid affinity levels are 0, 1, 2, 3"),
-        };
-
-        self.0 >> shift
+    pub fn affinity(self, level: AffinityShift) -> u64 {
+        (self.0 >> (level as u64)) & (u8::MAX as u64)
     }
 
     /// Create an `MpidrValue` from its four affinity numbers
