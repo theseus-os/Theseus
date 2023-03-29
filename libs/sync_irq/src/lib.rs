@@ -1,3 +1,4 @@
+#![feature(negative_impls)]
 #![no_std]
 
 pub type Mutex<T> = sync::Mutex<DisableIrq, T>;
@@ -7,9 +8,9 @@ pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisableIrq, T>;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DisableIrq {}
 
-impl sync::DeadlockPrevention for DisableIrq {
-    type GuardMarker = sync::GuardNoSend;
+impl !Send for DisableIrq {}
 
+impl sync::DeadlockPrevention for DisableIrq {
     #[inline]
     fn enter() {
         // FIXME: Recursive disabling doesn't work.

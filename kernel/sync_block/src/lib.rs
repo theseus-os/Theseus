@@ -1,3 +1,4 @@
+#![feature(negative_impls)]
 #![no_std]
 
 use sync::{mutex, Flavour};
@@ -9,29 +10,34 @@ use wait_queue::WaitQueue;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Block {}
 
-unsafe impl Flavour for Block {
+impl !Send for Block {}
+
+impl Flavour for Block {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self::LockData = WaitQueue::new();
 
     type LockData = WaitQueue<Spin>;
 
-    type GuardMarker = sync::GuardNoSend;
+    type DeadlockPrevention = Spin;
 
     #[inline]
-    fn mutex_lock(mutex: &mutex::RawMutex<Self>) {
-        if !mutex.try_lock_weak() {
-            mutex.data.wait_until(|| {
-                if mutex.try_lock_weak() {
-                    Some(())
-                } else {
-                    None
-                }
-            });
+    fn mutex_lock<'a, T>(
+        mutex: &'a mutex::SpinMutex<Self::DeadlockPrevention, T>,
+        data: &'a Self::LockData,
+    ) -> mutex::SpinMutexGuard<'a, Self::DeadlockPrevention, T> {
+        // TODO: try_lock_weak.
+        if let Some(guard) = mutex.try_lock() {
+            guard
+        } else {
+            data.wait_until(|| {
+                // TODO: try_lock_weak
+                mutex.try_lock()
+            })
         }
     }
 
     #[inline]
-    fn post_unlock(mutex: &mutex::RawMutex<Self>) {
-        mutex.data.notify_one();
+    fn post_unlock(data: &Self::LockData) {
+        data.notify_one();
     }
 }
