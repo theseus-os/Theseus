@@ -50,13 +50,12 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
+    // As a cheap precaution
+    irq_safety::disable_interrupts();
+
     info!("Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
         processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
-
-    // As a cheap precaution
-    #[cfg(target_arch = "aarch64")]
-    irq_safety::disable_interrupts();
 
     // set a flag telling the BSP that this AP has entered Rust code
     AP_READY_FLAG.store(true, Ordering::SeqCst);
