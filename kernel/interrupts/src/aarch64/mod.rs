@@ -190,7 +190,7 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 
 /// This function registers an interrupt handler for an inter-processor interrupt
 /// and handles GIC configuration for that interrupt.
-pub fn init_ipi(handler: HandlerFunc, irq_num: InterruptNumber) -> Result<(), &'static str> {
+pub fn setup_ipi_handler(handler: HandlerFunc, irq_num: InterruptNumber) -> Result<(), &'static str> {
     assert!(irq_num < 16, "Inter-processor interrupts must have a number in the range 0..16");
 
     // register/deregister the handler for the timer IRQ.

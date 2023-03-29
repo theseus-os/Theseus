@@ -28,7 +28,7 @@ pub fn init() {
     memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
 
     #[cfg(target_arch = "aarch64")]
-    interrupts::init_ipi(tlb_shootdown_ipi_handler, interrupts::TLB_SHOOTDOWN_IPI).unwrap();
+    interrupts::setup_ipi_handler(tlb_shootdown_ipi_handler, interrupts::TLB_SHOOTDOWN_IPI).unwrap();
 }
 
 /// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
