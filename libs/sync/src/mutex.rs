@@ -6,13 +6,14 @@ use core::{
     sync::atomic::{AtomicBool, Ordering},
 };
 
+/// A mutual exclusion primitive.
 pub struct Mutex<F, T>
 where
     F: Flavour,
 {
     inner: SpinMutex<F::DeadlockPrevention, T>,
     data: F::LockData,
-    // To propagate !Send + !Sync bounds.
+    /// Propagates !Send + !Sync bounds.
     _phantom: PhantomData<F>,
 }
 
@@ -20,6 +21,7 @@ impl<F, T> Mutex<F, T>
 where
     F: Flavour,
 {
+    /// Creates a new mutex.
     pub const fn new(value: T) -> Self {
         Self {
             inner: SpinMutex::new(value),
@@ -28,29 +30,36 @@ where
         }
     }
 
+    /// Consumes this mutex, returning the underlying data.
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
 
+    /// Acquires this mutex.
     pub fn lock(&self) -> MutexGuard<'_, F, T> {
         MutexGuard {
             inner: ManuallyDrop::new(self.inner.lock()),
             data: &self.data,
+            _phantom: PhantomData,
         }
     }
 
+    /// Attempts to acquire this mutex.
     pub fn try_lock(&self) -> Option<MutexGuard<'_, F, T>> {
         // TODO: Weak cmpxchg?
         self.inner.try_lock().map(|guard| MutexGuard {
             inner: ManuallyDrop::new(guard),
             data: &self.data,
+            _phantom: PhantomData,
         })
     }
 
+    /// Returns a mutable reference to the underlying data.
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.get_mut()
     }
 
+    /// Checks whether the mutex is currently locked.
     pub fn is_locked(&self) -> bool {
         self.inner.is_locked()
     }
@@ -62,6 +71,8 @@ where
 {
     inner: ManuallyDrop<SpinMutexGuard<'a, F::DeadlockPrevention, T>>,
     data: &'a F::LockData,
+    /// Propagates !Send + !Sync bounds.
+    _phantom: PhantomData<F>,
 }
 
 impl<'a, F, T> Deref for MutexGuard<'a, F, T>
@@ -94,6 +105,8 @@ where
     }
 }
 
+// Types below are implementation details.
+
 pub type SpinMutex<P, T> = lock_api::Mutex<RawMutex<P>, T>;
 pub type SpinMutexGuard<'a, P, T> = lock_api::MutexGuard<'a, RawMutex<P>, T>;
 
@@ -102,6 +115,7 @@ where
     P: DeadlockPrevention,
 {
     lock: AtomicBool,
+    /// Propagates !Send + !Sync bounds.
     _phantom: PhantomData<P>,
 }
 

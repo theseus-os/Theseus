@@ -13,6 +13,7 @@ pub mod mutex;
 
 pub use mutex::{Mutex, MutexGuard};
 
+/// A synchronisation flavour.
 pub trait Flavour {
     /// Initial value for the lock data.
     const INIT: Self::LockData;
@@ -36,6 +37,7 @@ pub trait Flavour {
         Self: Sized;
 }
 
+/// A deadlock prevention method.
 pub trait DeadlockPrevention {
     /// Performs any necessary actions prior to locking.
     fn enter();
