@@ -60,7 +60,9 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
         return;
     }
 
-    // log::trace!("send_tlb_shootdown_ipi(): cpu_count: {}, {:?}", cpu_count, pages_to_invalidate);
+    if false {
+        log::trace!("send_tlb_shootdown_ipi(): from CPU {:?}, cpu_count: {}, {:?}", cpu::current_cpu(), cpu_count, pages_to_invalidate);
+    }
 
     // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
     // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
