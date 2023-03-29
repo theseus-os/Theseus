@@ -125,7 +125,7 @@ pub fn init_ap() {
 
     // Enable the CPU-local timer
     let mut gic = GIC.lock();
-    let gic = gic.as_mut().expect("GIC is uninitialized");
+    let gic = gic.as_mut().expect("BUG: init_ap(): GIC was uninitialized");
     gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
 
     enable_timer(true);
@@ -274,7 +274,7 @@ pub fn deregister_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Resu
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: InterruptNumber) {
     let mut gic = GIC.lock();
-    let gic = gic.as_mut().expect("GIC is uninitialized");
+    let gic = gic.as_mut().expect("BUG: eoi(): GIC was uninitialized");
     gic.end_of_interrupt(irq_num);
 }
 
