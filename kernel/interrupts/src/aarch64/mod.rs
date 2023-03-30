@@ -33,7 +33,7 @@ pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
 ///
 /// Note: This is arbitrarily defined in the range 0..16,
 /// which is reserved for IPIs (SGIs - for software generated
-/// interrupts - in GIC terminology)
+/// interrupts - in GIC terminology).
 pub const TLB_SHOOTDOWN_IPI: InterruptNumber = 2;
 
 const MAX_IRQ_NUM: usize = 256;
@@ -171,7 +171,7 @@ pub fn init() -> Result<(), &'static str> {
 /// This function registers an interrupt handler for the CPU-local
 /// timer and handles GIC configuration for the timer interrupt.
 pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
-    // register/deregister the handler for the timer IRQ.
+    // register the handler for the timer IRQ.
     if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
         if timer_tick_handler as *const HandlerFunc != existing_handler {
             return Err("A different interrupt handler has already been setup for the timer IRQ number");
@@ -195,10 +195,10 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 pub fn setup_ipi_handler(handler: HandlerFunc, irq_num: InterruptNumber) -> Result<(), &'static str> {
     assert!(irq_num < 16, "Inter-processor interrupts must have a number in the range 0..16");
 
-    // register/deregister the handler for the timer IRQ.
+    // register the handler
     if let Err(existing_handler) = register_interrupt(irq_num, handler) {
         if handler as *const HandlerFunc != existing_handler {
-            return Err("A different interrupt handler has already been setup for the timer IRQ number");
+            return Err("A different interrupt handler has already been setup for that IPI");
         }
     }
 
