@@ -31,7 +31,9 @@ pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
 
 /// The IRQ/IPI number for TLB Shootdowns
 ///
-/// This is arbitrarily defined (range: 0..16)
+/// Note: This is arbitrarily defined in the range 0..16,
+/// which is reserved for IPIs (SGIs - for software generated
+/// interrupts - in GIC terminology)
 pub const TLB_SHOOTDOWN_IPI: InterruptNumber = 2;
 
 const MAX_IRQ_NUM: usize = 256;
