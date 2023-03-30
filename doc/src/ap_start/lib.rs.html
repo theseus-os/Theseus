@@ -132,6 +132,8 @@
 <a href="#132" id="132">132</a>
 <a href="#133" id="133">133</a>
 <a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -184,6 +186,8 @@
     nmi_lint: u8,
     nmi_flags: u16,
 ) -&gt; ! {
+    irq_safety::disable_interrupts();
+
     <span class="macro">info!</span>(<span class="string">&quot;Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
         processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
@@ -200,15 +204,11 @@
         || <span class="macro">panic!</span>(<span class="string">&quot;BUG: kstart_ap(): couldn&#39;t get stack created for CPU {}&quot;</span>, cpu_id)
     );
 
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-        <span class="macro">log::info!</span>(<span class="string">&quot;cpu {} is ready!&quot;</span>, cpu_id);
-        <span class="kw">loop </span>{}
-    }
+    <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().expect(<span class="string">&quot;kstart_ap(): kernel_mmi ref was None&quot;</span>);
 
-    <span class="comment">// initialize interrupts (including TSS/GDT) for this AP
-    </span><span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().expect(<span class="string">&quot;kstart_ap(): kernel_mmi ref was None&quot;</span>);
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
-        <span class="kw">let </span>(double_fault_stack, privilege_stack) = {
+        <span class="comment">// initialize interrupts (including TSS/GDT) for this AP
+        </span><span class="kw">let </span>(double_fault_stack, privilege_stack) = {
             <span class="kw">let </span><span class="kw-2">mut </span>kernel_mmi = kernel_mmi_ref.lock();
             (
                 stack::alloc_stack(KERNEL_STACK_SIZE_IN_PAGES, <span class="kw-2">&amp;mut </span>kernel_mmi.page_table)
@@ -219,23 +219,27 @@
         };
         <span class="kw">let </span>_idt = interrupts::init_ap(cpu_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
             .expect(<span class="string">&quot;kstart_ap(): failed to initialize interrupts!&quot;</span>);
+
+        <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.
+        // This must be done before initializing task spawning, because that relies on the ability to
+        // enable/disable preemption, which is partially implemented by the Local APIC.
+        </span>LocalApic::init(
+            <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
+            processor_id,
+            <span class="prelude-val">Some</span>(cpu_id.value()),
+            <span class="bool-val">false</span>,
+            nmi_lint,
+            nmi_flags,
+        ).unwrap();
     }
 
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span>interrupts::init_ap();
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        interrupts::init_ap();
 
-    <span class="comment">// Initialize this CPU&#39;s Local APIC such that we can use everything that depends on APIC IDs.
-    // This must be done before initializing task spawning, because that relies on the ability to
-    // enable/disable preemption, which is partially implemented by the Local APIC.
-    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-    </span>LocalApic::init(
-        <span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table,
-        processor_id,
-        <span class="prelude-val">Some</span>(cpu_id.value()),
-        <span class="bool-val">false</span>,
-        nmi_lint,
-        nmi_flags,
-    ).unwrap();
+        <span class="comment">// Register this CPU as online in the system
+        // This is the equivalent of `LocalApic::init` on aarch64
+        </span>cpu::register_cpu(<span class="bool-val">false</span>).unwrap();
+    }
 
     <span class="comment">// Now that the Local APIC has been initialized for this CPU, we can initialize the
     // task management subsystem and create the idle task for this CPU.

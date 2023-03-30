@@ -232,6 +232,10 @@
 <a href="#232" id="232">232</a>
 <a href="#233" id="233">233</a>
 <a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -346,8 +350,12 @@
         interrupts::init(double_fault_stack.top_unusable(), privilege_stack.top_unusable())<span class="question-mark">?
     </span>};
 
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span>interrupts::init().unwrap();
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        interrupts::init()<span class="question-mark">?</span>;
+
+        <span class="comment">// register BSP CpuId
+        </span>cpu::register_cpu(<span class="bool-val">true</span>)<span class="question-mark">?</span>;
+    }
     
     <span class="comment">// get BSP&#39;s CPU ID
     </span><span class="kw">let </span>bsp_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
