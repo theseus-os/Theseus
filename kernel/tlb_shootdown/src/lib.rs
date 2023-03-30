@@ -83,7 +83,8 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
     TLB_SHOOTDOWN_IPI_COUNT.store(cpu_count - 1, Ordering::SeqCst); // -1 to exclude this core 
 
     #[cfg(target_arch = "x86_64")] {
-        let my_lapic = apic::get_my_apic().expect("If there are more than one CPU ready, this one should be registered");
+        let my_lapic = apic::get_my_apic()
+            .expect("BUG: broadcast_tlb_shootdown(): couldn't get LocalApic");
 
         // use NMI, since it will interrupt everyone forcibly and result in the fastest handling
         my_lapic.write().send_nmi_ipi(apic::LapicIpiDestination::AllButMe); // send IPI to all other cores but this one
