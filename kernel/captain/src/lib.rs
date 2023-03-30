@@ -113,10 +113,10 @@ pub fn init(
     };
 
     #[cfg(target_arch = "aarch64")] {
-        interrupts::init().unwrap();
+        interrupts::init()?;
 
         // register BSP CpuId
-        cpu::register_cpu(true).unwrap();
+        cpu::register_cpu(true)?;
     }
     
     // get BSP's CPU ID

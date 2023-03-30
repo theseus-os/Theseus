@@ -12,12 +12,11 @@ use super::CpuId;
 // The vector of CpuIds for known and online CPU cores
 static ONLINE_CPUS: RwLockIrqSafe<Vec<CpuId>> = RwLockIrqSafe::new(Vec::new());
 
-/// This must be called once for every CPU core of the system
-/// that should be used for running tasks.
+/// This must be called once for every CPU core in the system.
 ///
 /// The first CPU to register itself is called the BSP (bootstrap processor).
 /// When it does so (from captain), it must set the `bootstrap` parameter
-/// to true. Other cores must set it to false.
+/// to `true`. Other cores must set it to `false`.
 pub fn register_cpu(bootstrap: bool) -> Result<(), &'static str> {
     let mut locked = ONLINE_CPUS.write();
 
@@ -26,12 +25,11 @@ pub fn register_cpu(bootstrap: bool) -> Result<(), &'static str> {
     if bootstrap == locked.is_empty() {
         let cpu_id = current_cpu();
 
-        if locked.contains(&cpu_id) {
-            Err("Tried to register the same CpuId twice")
-        } else {
+        if !locked.contains(&cpu_id) {
             locked.push(cpu_id);
-
             Ok(())
+        } else {
+            Err("Tried to register the same CpuId twice")
         }
     } else {
         match bootstrap {

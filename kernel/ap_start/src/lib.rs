@@ -50,7 +50,6 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
-    // As a cheap precaution
     irq_safety::disable_interrupts();
 
     info!("Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
