@@ -10,6 +10,8 @@
 
 #![no_std]
 
+#![cfg_attr(target_arch = "aarch64", feature(const_trait_impl))]
+
 #[cfg(target_arch = "aarch64")]
 extern crate alloc;
 

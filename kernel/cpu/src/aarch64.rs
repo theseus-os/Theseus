@@ -91,7 +91,7 @@ impl MpidrValue {
     }
 
     /// Create an `MpidrValue` from its four affinity numbers
-    pub fn new(aff3: u8, aff2: u8, aff1: u8, aff0: u8) -> Self {
+    pub const fn new(aff3: u8, aff2: u8, aff1: u8, aff0: u8) -> Self {
         let aff3 = (aff3 as u64) << 32;
         let aff2 = (aff2 as u64) << 16;
         let aff1 = (aff1 as u64) <<  8;
@@ -100,7 +100,7 @@ impl MpidrValue {
     }
 }
 
-impl From<CpuId> for MpidrValue {
+impl const From<CpuId> for MpidrValue {
     fn from(cpu_id: CpuId) -> Self {
         // move aff3 from bits [24:31] to [32:39]
         let aff_3     = ((cpu_id.0 & 0xff000000) as u64) << 8;
@@ -110,7 +110,7 @@ impl From<CpuId> for MpidrValue {
     }
 }
 
-impl From<MpidrValue> for CpuId {
+impl const From<MpidrValue> for CpuId {
     fn from(mpidr: MpidrValue) -> Self {
         // move aff3 from bits [32:39] to [24:31]
         let aff_3     = ((mpidr.0 & 0xff00000000) >> 8) as u32;
