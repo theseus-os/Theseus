@@ -3,6 +3,8 @@ use core::convert::AsMut;
 use memory::{PageTable, BorrowedMappedPages, Mutable,
 PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
 
+use arm_boards::{CPUS, CPUIDS};
+use arrayvec::ArrayVec;
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
 
@@ -10,16 +12,6 @@ mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
 mod dist_interface;
 mod redist_interface;
-
-/// Physical addresses of the CPU and Distributor
-/// interfaces as exposed by the qemu "virt" VM.
-pub mod qemu_virt_addrs {
-    use super::*;
-
-    pub const GICD: PhysicalAddress = PhysicalAddress::new_canonical(0x08000000);
-    pub const GICC: PhysicalAddress = PhysicalAddress::new_canonical(0x08010000);
-    pub const GICR: PhysicalAddress = PhysicalAddress::new_canonical(0x080A0000);
-}
 
 /// Boolean
 pub type Enabled = bool;
@@ -132,6 +124,13 @@ impl GicRegisters {
 
 const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
+fn current_redist_index() -> usize {
+    let cpu_id = cpu::current_cpu();
+    CPUIDS.iter()
+          .position(|id| *id == cpu_id)
+          .expect("BUG: current_redist_index: unexpected CpuId for current CPU")
+}
+
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
 
@@ -140,12 +139,16 @@ pub struct ArmGicV2 {
     pub processor: BorrowedMappedPages<GicRegisters, Mutable>,
 }
 
+pub struct ArmGicV3RedistPages {
+    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
+}
+
 pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redistributors: [ArmGicV3RedistPages; CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -165,7 +168,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: PhysicalAddress,
+        redist: [PhysicalAddress; CPUS],
     }
 }
 
@@ -208,25 +211,36 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
-                    let frames = allocate_frames_at(redist, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
-                    mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
-                };
+                let mut redistributors: ArrayVec<ArmGicV3RedistPages, CPUS> = ArrayVec::new();
+                for phys_addr in redist {
+                    let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
+                        let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
+                        let frames = allocate_frames_at(phys_addr, 1)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
+                    };
 
-                let redist_sgippi = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
-                    let frames = allocate_frames_at(redist + REDIST_SGIPPI_OFFSET, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
-                    mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
-                };
+                    redist_interface::init(redistributor.as_mut())?;
 
-                redist_interface::init(redistributor.as_mut())?;
+                    let redist_sgippi = {
+                        let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
+                        let frames = allocate_frames_at(phys_addr + REDIST_SGIPPI_OFFSET, 1)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
+                    };
+
+                    redistributors.push(ArmGicV3RedistPages {
+                        redistributor,
+                        redist_sgippi,
+                    });
+                }
+                // this cannot fail as we pushed exactly CPUS items
+                let redistributors = redistributors.into_inner().unwrap();
+
                 cpu_interface_gicv3::init();
                 let affinity_routing = dist_interface::init(distributor.as_mut());
 
-                Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributor, redist_sgippi, affinity_routing }))
+                Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributors, affinity_routing }))
             },
         }
     }
@@ -272,7 +286,8 @@ impl ArmGic {
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::is_sgippi_enabled(&v3.redist_sgippi, int)
+                let i = current_redist_index();
+                redist_interface::is_sgippi_enabled(&v3.redistributors[i].redist_sgippi, int)
             } else {
                 true
             },
@@ -285,7 +300,8 @@ impl ArmGic {
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::enable_sgippi(&mut v3.redist_sgippi, int, enabled);
+                let i = current_redist_index();
+                redist_interface::enable_sgippi(&mut v3.redistributors[i].redist_sgippi, int, enabled);
             },
             _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
         };
@@ -311,5 +327,11 @@ impl ArmGic {
             Self::V2(v2) => cpu_interface_gicv2::set_minimum_priority(&mut v2.processor, priority),
             Self::V3( _) => cpu_interface_gicv3::set_minimum_priority(priority),
         }
+    }
+}
+
+impl core::fmt::Debug for ArmGicV3RedistPages {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ArmGicV3RedistPages")
     }
 }
