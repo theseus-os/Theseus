@@ -13,7 +13,7 @@ use super::InterruptNumber;
 use super::Enabled;
 
 mod offset {
-    use crate::Offset32;
+    use crate::{Offset32, Offset64};
     pub(crate) const CTLR:             Offset32 = Offset32::from_byte_offset(0x00);
     pub(crate) const TYPER:            Offset64 = Offset64::from_byte_offset(0x08);
     pub(crate) const WAKER:            Offset32 = Offset32::from_byte_offset(0x14);
