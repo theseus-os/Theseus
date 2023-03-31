@@ -8,7 +8,7 @@ description = "A text-based terminal emulator that supports ANSI, VT100, xterm, 
 bitflags = "1.1.0"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 unicode-width = "0.1.8"
-vte = "0.10.1"
+vte = "0.11.0"
 derive_more = "0.99.0"
 
 [dependencies.log]
