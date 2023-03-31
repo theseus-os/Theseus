@@ -1,0 +1,17 @@
+[package]
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
+name = "arm_boards"
+description = "Per-board AArch64 configuration"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+memory_structs = { path = "../memory_structs" }
+cpu = { path = "../cpu" }
+
+[features]
+default = [ "qemu_virt" ]
+qemu_virt = []
+
+[lib]
+crate-type = ["rlib"]
