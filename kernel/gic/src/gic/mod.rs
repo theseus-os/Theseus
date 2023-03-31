@@ -3,7 +3,6 @@ use core::convert::AsMut;
 use memory::{PageTable, BorrowedMappedPages, Mutable,
 PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
 
-use arm_boards::{CPUS, CPUIDS};
 use arrayvec::ArrayVec;
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
@@ -151,7 +150,7 @@ const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
 fn current_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
-    CPUIDS.iter()
+    arm_boards::CPUIDS.iter()
           .position(|id| *id == cpu_id)
           .expect("BUG: current_redist_index: unexpected CpuId for current CPU")
 }
@@ -173,7 +172,7 @@ pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributors: [ArmGicV3RedistPages; CPUS],
+    pub redistributors: [ArmGicV3RedistPages; arm_boards::CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -193,7 +192,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: [PhysicalAddress; CPUS],
+        redist: [PhysicalAddress; arm_boards::CPUS],
     }
 }
 
@@ -236,7 +235,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributors: ArrayVec<ArmGicV3RedistPages, CPUS> = ArrayVec::new();
+                let mut redistributors: ArrayVec<ArmGicV3RedistPages, { arm_boards::CPUS }> = ArrayVec::new();
                 for phys_addr in redist {
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
                         let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
@@ -259,7 +258,7 @@ impl ArmGic {
                         redist_sgippi,
                     });
                 }
-                // this cannot fail as we pushed exactly CPUS items
+                // this cannot fail as we pushed exactly `arm_boards::CPUS` items
                 let redistributors = redistributors.into_inner().unwrap();
 
                 cpu_interface_gicv3::init();
