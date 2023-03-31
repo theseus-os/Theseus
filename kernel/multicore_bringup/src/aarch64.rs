@@ -6,7 +6,8 @@ use zerocopy::FromBytes;
 use ap_start::kstart_ap;
 use volatile::Volatile;
 use core::arch::asm;
-use cpu::{CpuId, MpidrValue, current_cpu};
+use cpu::{MpidrValue, current_cpu};
+use arm_boards::CPUIDS;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
 #[cfg(target_arch = "aarch64")]
@@ -93,68 +94,59 @@ pub fn handle_ap_cores(
     }
 
     let mut ap_stack = None;
-    log::error!("Bruteforcing 256 CpuIds that are likely to be valid");
-    for aff1 in 0..16 {
-        for aff0 in 0..16 {
-            let mpidr = MpidrValue::new(0, 0, aff1, aff0);
-            let cpu_id: CpuId = mpidr.into();
+    for cpu_id in CPUIDS {
+        let mpidr: MpidrValue = cpu_id.into();
 
-            ap_data.ap_ready.write(0);
-            let stack = if let Some(stack) = ap_stack.take() {
-                stack
-            } else {
-                // Create a new stack
-                let stack = stack::alloc_stack(
-                    KERNEL_STACK_SIZE_IN_PAGES,
-                    &mut kernel_mmi_ref.lock().page_table,
-                ).ok_or("could not allocate AP stack!")?;
+        ap_data.ap_ready.write(0);
+        let stack = if let Some(stack) = ap_stack.take() {
+            stack
+        } else {
+            // Create a new stack
+            let stack = stack::alloc_stack(
+                KERNEL_STACK_SIZE_IN_PAGES,
+                &mut kernel_mmi_ref.lock().page_table,
+            ).ok_or("could not allocate AP stack!")?;
 
-                ap_data.ap_stack_start.write(stack.bottom());
-                ap_data.ap_stack_end.write(stack.top_unusable());
+            ap_data.ap_stack_start.write(stack.bottom());
+            ap_data.ap_stack_end.write(stack.top_unusable());
 
-                stack
+            stack
+        };
+
+        // Associate the stack to this CpuId
+        ap_start::insert_ap_stack(cpu_id.value(), stack);
+
+        if let Err(kind) = cpu_on(mpidr.value(), entry_point_phys_addr.value() as _, ap_data_phys_addr.value() as _) {
+            let msg = match kind {
+                InvalidParameters => Some("InvalidParameters"),
+                AlreadyOn => Some("AlreadyOn"),
+                NotPresent => Some("NotPresent"),
+                Disabled => Some("Disabled"),
+                NotSupported => Some("NotSupported"),
+                Denied => Some("Denied"),
+                OnPending => Some("OnPending"),
+                InternalFailure => Some("InternalFailure"),
+                InvalidAddress => Some("InvalidAddress"),
+                _ => Some("Unknown"),
             };
 
-            // Associate the stack to this CpuId
-            ap_start::insert_ap_stack(cpu_id.value(), stack);
+            // Re-take the stack we allocated for this CPU
+            // so we can reuse it the next CPU.
+            ap_stack = ap_start::take_ap_stack(cpu_id.value()).map(|s| s.into_inner());
 
-            if let Err(kind) = cpu_on(mpidr.value(), entry_point_phys_addr.value() as _, ap_data_phys_addr.value() as _) {
-                let msg = match kind {
-                    // normal errors (CpuId invalid or equal to the BSP one)
-                    InvalidParameters => None,
-                    AlreadyOn => None,
-                    NotPresent => None,
-                    Disabled => None,
-
-                    // unpredicted errors
-                    NotSupported => Some("NotSupported"),
-                    Denied => Some("Denied"),
-                    OnPending => Some("OnPending"),
-                    InternalFailure => Some("InternalFailure"),
-                    InvalidAddress => Some("InvalidAddress"),
-                    _ => Some("Unknown"),
-                };
-
-                // Re-take the stack we allocated for this CPU
-                // so we can reuse it the next CPU.
-                ap_stack = ap_start::take_ap_stack(cpu_id.value()).map(|s| s.into_inner());
-
-                if let Some(msg) = msg {
-                    log::error!("Tried to start CPU core {} but got PSCI error: {}", cpu_id, msg);
-                }
-            } else {
-                log::info!("CpuId {:?} seems to be valid", cpu_id);
-
-                // Wait for the core to take note of the stack boundaries
-                while ap_data.ap_ready.read() != 1 {}
-
-                // ap_stack is None because the stack will be used by
-                // the booting core; a new one will be created for the
-                // next core
-
-                // remember this CpuId
-                online_cores += 1;
+            if let Some(msg) = msg {
+                log::error!("Tried to start CPU core {} but got PSCI error: {}", cpu_id, msg);
             }
+        } else {
+            // Wait for the core to take note of the stack boundaries
+            while ap_data.ap_ready.read() != 1 {}
+
+            // ap_stack is None because the stack will be used by
+            // the booting core; a new one will be created for the
+            // next core
+
+            // remember this CpuId
+            online_cores += 1;
         }
     }
 
