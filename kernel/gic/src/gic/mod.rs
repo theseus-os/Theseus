@@ -54,8 +54,25 @@ pub enum TargetCpu {
     GICv2TargetList(TargetList),
 }
 
-const U32BYTES: usize = core::mem::size_of::<u32>();
 const U32BITS: usize = u32::BITS as usize;
+
+#[derive(Copy, Clone)]
+pub(crate) struct Offset32(usize);
+
+#[derive(Copy, Clone)]
+pub(crate) struct Offset64(usize);
+
+impl Offset32 {
+    pub(crate) const fn from_byte_offset(byte_offset: usize) -> Self {
+        Self(byte_offset / core::mem::size_of::<u32>())
+    }
+}
+
+impl Offset64 {
+    pub(crate) const fn from_byte_offset(byte_offset: usize) -> Self {
+        Self(byte_offset / core::mem::size_of::<u64>())
+    }
+}
 
 #[repr(C)]
 #[derive(zerocopy::FromBytes)]
@@ -64,12 +81,20 @@ pub struct GicRegisters {
 }
 
 impl GicRegisters {
-    fn read_volatile(&self, index: usize) -> u32 {
-        unsafe { (&self.inner[index] as *const u32).read_volatile() }
+    fn read_volatile(&self, offset: Offset32) -> u32 {
+        unsafe { (&self.inner[offset.0] as *const u32).read_volatile() }
     }
 
-    fn write_volatile(&mut self, index: usize, value: u32) {
-        unsafe { (&mut self.inner[index] as *mut u32).write_volatile(value) }
+    fn write_volatile(&mut self, offset: Offset32, value: u32) {
+        unsafe { (&mut self.inner[offset.0] as *mut u32).write_volatile(value) }
+    }
+
+    fn read_volatile_64(&self, offset: Offset64) -> u64 {
+        unsafe { (self.inner.as_ptr() as *const u64).add(offset.0).read_volatile() }
+    }
+
+    fn write_volatile_64(&mut self, offset: Offset64, value: u64) {
+        unsafe { (self.inner.as_mut_ptr() as *mut u64).add(offset.0).write_volatile(value) }
     }
 
     // Reads one item of an array spanning across
@@ -82,12 +107,12 @@ impl GicRegisters {
     // - `int` is the index
     // - `offset` tells the beginning of the array
     // - `INTS_PER_U32` = how many array slots per u32 in this array
-    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: usize, int: InterruptNumber) -> u32 {
+    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: Offset32, int: InterruptNumber) -> u32 {
         let int = int as usize;
         let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
 
-        let offset = offset + (int / INTS_PER_U32);
+        let offset = Offset32(offset.0 + (int / INTS_PER_U32));
         let reg_index = int & (INTS_PER_U32 - 1);
         let shift = reg_index * bits_per_int;
 
@@ -106,12 +131,12 @@ impl GicRegisters {
     // - `offset` tells the beginning of the array
     // - `INTS_PER_U32` = how many array slots per u32 in this array
     // - `value` is the value to write
-    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: usize, int: InterruptNumber, value: u32) {
+    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: Offset32, int: InterruptNumber, value: u32) {
         let int = int as usize;
         let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
 
-        let offset = offset + (int / INTS_PER_U32);
+        let offset = Offset32(offset.0 + (int / INTS_PER_U32));
         let reg_index = int & (INTS_PER_U32 - 1);
         let shift = reg_index * bits_per_int;
 
