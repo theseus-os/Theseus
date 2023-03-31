@@ -14,14 +14,28 @@ use super::Enabled;
 
 mod offset {
     use crate::Offset32;
-    pub(crate) const RD_WAKER: Offset32 = Offset32::from_byte_offset(0x14);
-    pub(crate) const IGROUPR:  Offset32 = Offset32::from_byte_offset(0x80);
+    pub(crate) const CTLR:             Offset32 = Offset32::from_byte_offset(0x00);
+    pub(crate) const TYPER:            Offset64 = Offset64::from_byte_offset(0x08);
+    pub(crate) const WAKER:            Offset32 = Offset32::from_byte_offset(0x14);
+    pub(crate) const IGROUPR:          Offset32 = Offset32::from_byte_offset(0x80);
     pub(crate) const SGIPPI_ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
     pub(crate) const SGIPPI_ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
 }
 
-const RD_WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
-const RD_WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
+const WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
+const WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
+
+// Bit that is set if GICR_CTLR.DPG* bits are supported
+const TYPER_DPGS: u64 = 1 << 5;
+
+// If bit is set, the PE cannot be selected for non-secure group 1 "1 of N" interrupts.
+const CTLR_DPG1S: u32 = 1 << 26;
+
+// If bit is set, the PE cannot be selected for secure group 1 "1 of N" interrupts.
+const CTLR_DPG1NS: u32 = 1 << 25;
+
+// If bit is set, the PE cannot be selected for group 0 "1 of N" interrupts.
+const CTLR_DPG0: u32 = 1 << 24;
 
 // const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
@@ -43,18 +57,17 @@ const TIMEOUT_ITERATIONS: usize = 0xffff;
 /// Initializes the redistributor by waking
 /// it up and checking that it's awake
 pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
-    let mut reg;
-    reg = registers.read_volatile(offset::RD_WAKER);
+    let mut reg = registers.read_volatile(offset::WAKER);
 
     // Wake the redistributor
-    reg &= !RD_WAKER_PROCESSOR_SLEEP;
+    reg &= !WAKER_PROCESSOR_SLEEP;
 
-    registers.write_volatile(offset::RD_WAKER, reg);
+    registers.write_volatile(offset::WAKER, reg);
 
     // then poll ChildrenAsleep until it's cleared
 
     let children_asleep = || {
-        registers.read_volatile(offset::RD_WAKER) & RD_WAKER_CHLIDREN_ASLEEP > 0
+        registers.read_volatile(offset::WAKER) & WAKER_CHLIDREN_ASLEEP > 0
     };
 
     let mut counter = 0;
@@ -65,12 +78,26 @@ pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
 
     while children_asleep() && !timed_out() { }
 
-    match timed_out() {
-        false => Ok(()),
-
-        // see definition of TIMEOUT_ITERATIONS
-        true => Err("gic: The redistributor didn't wake up in time."),
+    if timed_out() {
+        return Err("BUG: gic driver: The redistributor didn't wake up in time.");
     }
+
+    if registers.read_volatile_64(offset::TYPER) & TYPER_DPGS != 0 {
+        // DPGS bits are supported in GICR_CTLR
+
+        let mut reg = registers.read_volatile(offset::CTLR);
+
+        // Enable PE selection for non-secure group 1 SPIs
+        reg &= !CTLR_DPG1NS;
+
+        // Disable PE selection for group 0 & secure group 1 SPIs
+        reg |= CTLR_DPG0;
+        reg |= CTLR_DPG1S;
+
+        registers.write_volatile(offset::CTLR, reg);
+    }
+
+    Ok(())
 }
 
 /// Returns whether the given SGI (software generated interrupts) or
