@@ -37,6 +37,9 @@ mod offset {
 // enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
 
+// enable 1 of N wakeup functionality
+const CTLR_E1NWF: u32 = 1 << 7;
+
 // Affinity Routing Enable, Non-secure state.
 const CTLR_ARE_NS: u32 = 1 << 5;
 
@@ -63,7 +66,8 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 }
 
 /// Initializes the distributor by enabling forwarding
-/// of group 1 interrupts
+/// of group 1 interrupts and allowing the GIC to pick
+/// a core that is asleep for "1 of N" interrupts.
 ///
 /// Return value: whether or not affinity routing is
 /// currently enabled for both secure and non-secure
@@ -71,6 +75,7 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 pub fn init(registers: &mut GicRegisters) -> Enabled {
     let mut reg = registers.read_volatile(offset::CTLR);
     reg |= CTLR_ENGRP1;
+    reg |= CTLR_E1NWF;
     registers.write_volatile(offset::CTLR, reg);
 
     // Return value: whether or not affinity routing is
