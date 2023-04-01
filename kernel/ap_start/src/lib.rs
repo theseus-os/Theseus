@@ -61,6 +61,8 @@ pub fn kstart_ap(
     // so all we need to do here is to reload it on this CPU.
     early_tls::reload();
 
+    per_cpu::init(cpu_id).unwrap();
+
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = take_ap_stack(cpu_id.value()).unwrap_or_else(
         || panic!("BUG: kstart_ap(): couldn't get stack created for CPU {}", cpu_id)
