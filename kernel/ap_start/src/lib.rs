@@ -61,8 +61,6 @@ pub fn kstart_ap(
     // so all we need to do here is to reload it on this CPU.
     early_tls::reload();
 
-    per_cpu::init(cpu_id).unwrap();
-
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = take_ap_stack(cpu_id.value()).unwrap_or_else(
         || panic!("BUG: kstart_ap(): couldn't get stack created for CPU {}", cpu_id)
@@ -93,8 +91,8 @@ pub fn kstart_ap(
     interrupts::init_ap();
 
     // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
-    // This must be done before initializing task spawning, because that relies on the ability to
-    // enable/disable preemption, which is partially implemented by the Local APIC.
+    // This must be done before initializing per-CPU storage, task spawning, and more,
+    // as those rely on enable/disable preemption, which itself depends on the Local APIC.
     #[cfg(target_arch = "x86_64")]
     LocalApic::init(
         &mut kernel_mmi_ref.lock().page_table,
@@ -104,9 +102,10 @@ pub fn kstart_ap(
         nmi_lint,
         nmi_flags,
     ).unwrap();
-
+    
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
-    // task management subsystem and create the idle task for this CPU.
+    // per-CPU storage, tasking, and create the idle task for this CPU.
+    per_cpu::init(cpu_id).unwrap();
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
     spawn::create_idle_task().unwrap();
 

@@ -1,13 +1,11 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "per_cpu"
-description = "Definition of the struct containing data maintained for each CPU"
+description = "Support for defining per-CPU data types"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-log = "0.4.8"
-
 cpu = { path = "../cpu" }
 cpu_local = { path = "../cpu_local" }
 preemption = { path = "../preemption" }

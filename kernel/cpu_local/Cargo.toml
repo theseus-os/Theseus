@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "cpu_local"
-description = "Support for CPU-local storage; per-CPU variables"
+description = "Support for accessing CPU-local storage via per-CPU variables"
 version = "0.1.0"
 edition = "2021"
 
@@ -11,4 +11,6 @@ log = "0.4.8"
 spin = "0.9.0"
 x86_64 = "0.14.8"
 
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 memory = { path = "../memory" }
+preemption = { path = "../preemption" }
