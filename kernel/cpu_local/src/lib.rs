@@ -35,7 +35,6 @@ pub struct FixedCpuLocal {
 }
 // NOTE: These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
 impl FixedCpuLocal {
-    const SELF_PTR_OFFSET: usize = 0;
     pub const CPU_ID:                       Self = Self { offset: 8,  size: 4, align: 4 };
     pub const PREEMPTION_COUNT:             Self = Self { offset: 12, size: 1, align: 1 };
     pub const TASK_SWITCH_PREEMPTION_GUARD: Self = Self { offset: 16, size: 8, align: 4 };
@@ -120,7 +119,7 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
         unsafe {
             #[cfg(target_arch = "x86_64")]
             asm!(
-                concat!("mov {}, gs:[0]"), // the SELF_PTR_OFFSET is 0
+                "mov {}, gs:[0]", // the SELF_PTR_OFFSET is 0
                 lateout(reg) self_ptr,
                 options(nostack, preserves_flags, readonly, pure)
             );
@@ -135,7 +134,7 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
 impl<const OFFSET: usize, T: Copy> CpuLocal<OFFSET, T> {
     /// Returns a copy of this `CpuLocal`'s inner value of type `T`.
     ///
-    /// This is a convenience functiononly available for types where `T: Copy`.
+    /// This is a convenience function only available for types where `T: Copy`.
     pub fn get(&self) -> T {
         self.with(|v| *v)
     }
@@ -144,67 +143,66 @@ impl<const OFFSET: usize, T: Copy> CpuLocal<OFFSET, T> {
 
 /// The underlying memory region for each CPU's per-CPU data.
 #[derive(Debug)]
-struct CpuLocalDataImage(MappedPages);
-impl CpuLocalDataImage {
-    /// This function does 3 main things:
-    /// 1. Allocates a new CPU-local data image for this CPU.
-    /// 2. Sets the self pointer value such that it can be properly accessed.
-    /// 3. Sets this CPU's base register (e.g., GsBase on x86_64) to the address
-    ///    of this new data image, making it "currently active" and accessible.
-    fn new() -> Result<CpuLocalDataImage, &'static str> {
-        // 1. Allocate a single page to store each CPU's local data.
-        let mut mp = memory::create_mapping(1, PteFlags::new().writable(true).valid(true))?;
+struct CpuLocalDataRegion(MappedPages);
+impl CpuLocalDataRegion {
+    /// Allocates a new CPU-local data image.
+    fn new(size_of_per_cpu_data: usize) -> Result<CpuLocalDataRegion, &'static str> {
+        let mp = memory::create_mapping(
+            size_of_per_cpu_data,
+            PteFlags::new().writable(true).valid(true),
+        )?;
+        Ok(CpuLocalDataRegion(mp))
+    }
 
-        // 2. Set up the self pointer for the new data image.
-        let self_ptr_value = mp.start_address().value();
-        let self_ptr_dest = mp.as_type_mut::<usize>(0)?;
-        *self_ptr_dest = self_ptr_value;
+    /// Sets this CPU's base register (e.g., GsBase on x86_64) to the address
+    /// of this CPU-local data image, making it "currently active" and accessible.
+    fn set_as_current_cpu_local_base(&self) {
+        let self_ptr_value = self.0.start_address().value();
 
-        // 3. Set the base register used for CPU-local data.
-        {
-            #[cfg(target_arch = "x86_64")] {
-                let gsbase_val = VirtAddr::new_truncate(self_ptr_value as u64);
-                log::warn!("Writing value {:#X} to GSBASE", gsbase_val);
-                GsBase::write(gsbase_val);
-            }
-
-            #[cfg(not(target_arch = "x86_64"))]
-            todo!("CPU-local variable access is not yet implemented on this architecture")
+        #[cfg(target_arch = "x86_64")] {
+            let gsbase_val = VirtAddr::new_truncate(self_ptr_value as u64);
+            log::warn!("Writing value {:#X} to GSBASE", gsbase_val);
+            GsBase::write(gsbase_val);
         }
 
-        Ok(CpuLocalDataImage(mp))
+        #[cfg(not(target_arch = "x86_64"))]
+        todo!("CPU-local variable access is not yet implemented on this architecture")
     }
 }
 
 
-/// Initializes the CPU-local data image for this CPU.
+/// Initializes the CPU-local data region for this CPU.
 ///
 /// Note: this is invoked by the `per_cpu` crate;
 ///       other crates do not need to invoke this.
 pub fn init<P>(
     cpu_id: u32,
+    size_of_per_cpu_data: usize,
     per_cpu_data_initializer: impl FnOnce(usize) -> P
 ) -> Result<(), &'static str> {
     /// The global set of all per-CPU data regions.
-    static CPU_LOCAL_DATA_REGIONS: Mutex<BTreeMap<u32, CpuLocalDataImage>> = Mutex::new(BTreeMap::new());
+    static CPU_LOCAL_DATA_REGIONS: Mutex<BTreeMap<u32, CpuLocalDataRegion>> = Mutex::new(BTreeMap::new());
 
     let mut regions = CPU_LOCAL_DATA_REGIONS.lock();
     let entry = regions.entry(cpu_id);
-    let data_image = match entry {
-        Entry::Vacant(v) => v.insert(CpuLocalDataImage::new()?),
+    let data_region = match entry {
+        Entry::Vacant(v) => v.insert(CpuLocalDataRegion::new(size_of_per_cpu_data)?),
         Entry::Occupied(_) => return Err("BUG: cannot init CPU-local data more than once"),
     };
-    let self_ptr = data_image.0.start_address().value();
 
-    // Run the given initializer function on the per-CPU data.
-    let new_data_image = CpuLocal::<{FixedCpuLocal::SELF_PTR_OFFSET}, P>(PhantomData);
-    new_data_image.with_mut(|per_cpu_data_mut| {
+    // Run the given initializer function to initialize the per-CPU data region.
+    {
+        let self_ptr = data_region.0.start_address().value();
         let initial_value = per_cpu_data_initializer(self_ptr);
-        let existing_junk = core::mem::replace(per_cpu_data_mut, initial_value);
-        // The memory contents we just replaced was random junk, so it'd be invalid
-        // to run any destructors on it. Thus, we must forget it here.
-        core::mem::forget(existing_junk);
-    });
+        // SAFETY:
+        // ✅ We just allocated memory for the self ptr above, it is only accessible by us.
+        // ✅ That memory is mutable (writable) and is aligned to a page boundary.
+        // ✅ The memory is at least as large as `size_of::<P>()`.
+        unsafe { core::ptr::write(self_ptr as *mut P, initial_value) };
+    }
+
+    // Set the new CPU-local data region as active and ready to be used on this CPU.
+    data_region.set_as_current_cpu_local_base();
 
     // TODO Remove, temp tests
     if true {

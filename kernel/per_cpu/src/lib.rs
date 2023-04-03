@@ -61,7 +61,9 @@ pub struct PerCpuData {
     /// This has a different initial value for each CPU's data image, of course.
     ///
     /// We use this to allow writes to this entire structure (for initialization),
-    /// and also to allow faster access to large fields herein () accelerate accesses to large items
+    /// and also to allow faster access to large fields herein, as they don't need to be
+    /// loaded in full before accessing a single sub-field. See this for more:
+    /// <https://github.com/rust-osdev/x86_64/pull/257#issuecomment-849514649>.
     self_ptr: usize,
     // NOTE: These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
     /// The unique ID of this CPU.
@@ -103,6 +105,7 @@ impl PerCpuData {
 pub fn init(cpu_id: CpuId) -> Result<(), &'static str> {
     cpu_local::init(
         cpu_id.value(),
+        core::mem::size_of::<PerCpuData>(),
         |self_ptr| PerCpuData::new(self_ptr, cpu_id),
     )
 }

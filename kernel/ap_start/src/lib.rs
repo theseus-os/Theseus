@@ -102,7 +102,7 @@ pub fn kstart_ap(
         nmi_lint,
         nmi_flags,
     ).unwrap();
-    
+
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // per-CPU storage, tasking, and create the idle task for this CPU.
     per_cpu::init(cpu_id).unwrap();
