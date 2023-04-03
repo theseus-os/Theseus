@@ -28,10 +28,13 @@ use spin::Mutex;
 use x86_64::{registers::model_specific::GsBase, VirtAddr};
 
 /// Info use to obtain a reference to a CPU-local variable; see [`CpuLocal::new()`].
+///
+/// This struct is marked `#[non_exhaustive]`, so it cannot be instantiated elsewhere.
+#[non_exhaustive]
 pub struct FixedCpuLocal {
-    offset: usize,
-    size:   usize,
-    align:  usize,
+    pub offset: usize,
+    pub size:   usize,
+    pub align:  usize,
 }
 // NOTE: These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
 impl FixedCpuLocal {
@@ -119,7 +122,7 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
         unsafe {
             #[cfg(target_arch = "x86_64")]
             asm!(
-                "mov {}, gs:[0]", // the SELF_PTR_OFFSET is 0
+                "mov {}, gs:[0]", // the self ptr offset is 0
                 lateout(reg) self_ptr,
                 options(nostack, preserves_flags, readonly, pure)
             );

@@ -31,20 +31,13 @@
 //!
 
 #![no_std]
+#![feature(const_refs_to_cell)]
 
 extern crate alloc; // TODO temp remove this 
 
 use cpu::CpuId;
 use preemption::{PreemptionCount, PreemptionGuard};
 use task::TaskRef;
-
-
-struct TestU32(u32);
-impl Drop for TestU32 {
-    fn drop(&mut self) {
-        panic!("Dropping TestU32({})", self.0);
-    }
-}
 
 /// The data stored on a per-CPU basis in Theseus.
 ///
@@ -56,6 +49,11 @@ impl Drop for TestU32 {
 /// by other crates using the functions in the [`cpu_local`] crate.
 #[allow(dead_code)] // These fields are accessed via `cpu_local` functions.
 #[repr(C)]
+//
+// IMPORTANT NOTE:
+// * These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
+// * The same applies for the `const_assertions` module at the end of this file.
+//
 pub struct PerCpuData {
     /// A pointer to the start of this struct in memory, similar to a TLS self pointer.
     /// This has a different initial value for each CPU's data image, of course.
@@ -65,7 +63,6 @@ pub struct PerCpuData {
     /// loaded in full before accessing a single sub-field. See this for more:
     /// <https://github.com/rust-osdev/x86_64/pull/257#issuecomment-849514649>.
     self_ptr: usize,
-    // NOTE: These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
     /// The unique ID of this CPU.
     cpu_id: CpuId,
     /// The current preemption count of this CPU, which is used to determine
@@ -109,3 +106,30 @@ pub fn init(cpu_id: CpuId) -> Result<(), &'static str> {
         |self_ptr| PerCpuData::new(self_ptr, cpu_id),
     )
 }
+
+mod const_assertions {
+    use core::mem::{align_of, size_of};
+    use cpu_local::FixedCpuLocal;
+    use memoffset::offset_of;
+    use super::*;
+
+    const _: () = assert!(0 == offset_of!(PerCpuData, self_ptr));
+    const _: () = assert!(8 == size_of::<usize>());
+    const _: () = assert!(8 == align_of::<usize>());
+
+    const _: () = assert!(FixedCpuLocal::CPU_ID.offset == offset_of!(PerCpuData, cpu_id));
+    const _: () = assert!(FixedCpuLocal::CPU_ID.size   == size_of::<CpuId>());
+    const _: () = assert!(FixedCpuLocal::CPU_ID.align  == align_of::<CpuId>());
+
+    const _: () = assert!(FixedCpuLocal::PREEMPTION_COUNT.offset == offset_of!(PerCpuData, preemption_count));
+    const _: () = assert!(FixedCpuLocal::PREEMPTION_COUNT.size   == size_of::<PreemptionCount>());
+    const _: () = assert!(FixedCpuLocal::PREEMPTION_COUNT.align  == align_of::<PreemptionCount>());
+
+    const _: () = assert!(FixedCpuLocal::TASK_SWITCH_PREEMPTION_GUARD.offset == offset_of!(PerCpuData, task_switch_preemption_guard));
+    const _: () = assert!(FixedCpuLocal::TASK_SWITCH_PREEMPTION_GUARD.size   == size_of::<Option<PreemptionGuard>>());
+    const _: () = assert!(FixedCpuLocal::TASK_SWITCH_PREEMPTION_GUARD.align  == align_of::<Option<PreemptionGuard>>());
+
+    const _: () = assert!(FixedCpuLocal::DROP_AFTER_TASK_SWITCH.offset == offset_of!(PerCpuData, drop_after_task_switch));
+    const _: () = assert!(FixedCpuLocal::DROP_AFTER_TASK_SWITCH.size   == size_of::<Option<TaskRef>>());
+    const _: () = assert!(FixedCpuLocal::DROP_AFTER_TASK_SWITCH.align  == align_of::<Option<TaskRef >>());
+} 

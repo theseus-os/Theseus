@@ -6,6 +6,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+memoffset = "0.8.0"
+
 cpu = { path = "../cpu" }
 cpu_local = { path = "../cpu_local" }
 preemption = { path = "../preemption" }
