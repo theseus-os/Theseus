@@ -3,16 +3,6 @@
 version = 3
 
 [[package]]
-name = "acpi_table"
-version = "0.1.0"
-dependencies = [
- "log",
- "memory",
- "sdt",
- "zerocopy",
-]
-
-[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -30,6 +20,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "crossbeam-utils",
+ "derive_more",
  "irq_safety",
  "kernel_config",
  "log",
@@ -37,7 +28,7 @@ dependencies = [
  "msr",
  "pit_clock_basic",
  "raw-cpuid",
- "spin 0.9.4",
+ "spin 0.9.8",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -64,11 +55,9 @@ dependencies = [
  "core2",
  "crossbeam-utils",
  "debugit",
- "hpet",
  "log",
  "mpmc",
- "spin 0.9.4",
- "task",
+ "spin 0.9.8",
  "wait_queue",
 ]
 
@@ -244,7 +233,7 @@ name = "cow_arc"
 version = "0.1.0"
 dependencies = [
  "dereffer",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -252,6 +241,10 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cortex-a",
+ "derive_more",
+ "irq_safety",
+ "tock-registers",
 ]
 
 [[package]]
@@ -267,7 +260,7 @@ dependencies = [
  "memory",
  "qp-trie",
  "serde",
- "spin 0.9.4",
+ "spin 0.9.8",
  "str_ref",
  "xmas-elf",
 ]
@@ -346,6 +339,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "early_printer"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "font",
+ "log",
+ "memory",
+ "page_attribute_table",
+ "spin 0.9.8",
+ "vga_buffer",
+ "volatile 0.2.7",
+]
+
+[[package]]
+name = "early_tls"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.8",
+ "tls_initializer",
+]
+
+[[package]]
 name = "either"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -365,13 +380,13 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "gdt",
  "locked_idt",
  "memory",
  "mod_mgmt",
- "spin 0.9.4",
+ "spin 0.9.8",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -381,7 +396,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "memory",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -396,11 +411,18 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "cpu",
+ "early_printer",
  "irq_safety",
  "log",
  "memory",
  "task",
- "vga_buffer",
+]
+
+[[package]]
+name = "font"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -411,7 +433,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin 0.9.4",
+ "spin 0.9.8",
  "static_assertions",
 ]
 
@@ -423,7 +445,7 @@ dependencies = [
  "lazy_static",
  "log",
  "memory",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -433,9 +455,10 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "cpu",
  "log",
  "memory",
- "spin 0.9.4",
+ "spin 0.9.8",
  "tss",
  "x86_64",
 ]
@@ -449,6 +472,17 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "wasi",
+]
+
+[[package]]
+name = "gic"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "log",
+ "memory",
+ "static_assertions",
+ "zerocopy",
 ]
 
 [[package]]
@@ -486,22 +520,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "hpet"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "kernel_config",
- "log",
- "memory",
- "sdt",
- "spin 0.9.4",
- "time",
- "volatile 0.2.7",
- "zerocopy",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -509,17 +528,22 @@ name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cortex-a",
+ "cpu",
+ "early_printer",
  "exceptions_early",
  "gdt",
+ "gic",
+ "irq_safety",
+ "kernel_config",
  "locked_idt",
  "log",
  "memory",
  "pic",
- "scheduler",
- "sleep",
- "spin 0.9.4",
+ "spin 0.9.8",
+ "time",
+ "tock-registers",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -541,7 +565,7 @@ dependencies = [
  "lazy_static",
  "lockable",
  "log",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -550,7 +574,7 @@ version = "0.1.1"
 source = "git+https://github.com/theseus-os/irq_safety#4908fbb38aca1513572e0b4c7a98884390ef361a"
 dependencies = [
  "owning_ref",
- "spin 0.9.4",
+ "spin 0.9.8",
  "stable_deref_trait",
 ]
 
@@ -609,7 +633,7 @@ name = "lockable"
 version = "0.1.0"
 dependencies = [
  "irq_safety",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -654,7 +678,7 @@ dependencies = [
  "irq_safety",
  "log",
  "memory",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -687,7 +711,7 @@ dependencies = [
  "page_allocator",
  "page_table_entry",
  "pte_flags",
- "spin 0.9.4",
+ "spin 0.9.8",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -741,6 +765,7 @@ dependencies = [
  "crate_metadata_serde",
  "crate_name_utils",
  "cstr_core",
+ "early_tls",
  "fs_node",
  "hashbrown",
  "kernel_config",
@@ -750,14 +775,34 @@ dependencies = [
  "no_drop",
  "path",
  "qp-trie",
- "rangemap",
  "root",
  "rustc-demangle",
  "serde",
- "spin 0.9.4",
+ "spin 0.9.8",
+ "tls_initializer",
  "vfs_node",
- "x86_64",
  "xmas-elf",
+]
+
+[[package]]
+name = "modular-bitfield"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a53d79ba8304ac1c4f9eb3b9d281f21f7be9d4626f72ce7df4ad8fbde4f38a74"
+dependencies = [
+ "modular-bitfield-impl",
+ "static_assertions",
+]
+
+[[package]]
+name = "modular-bitfield-impl"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -776,7 +821,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "preemption",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -785,7 +830,7 @@ version = "0.1.0"
 dependencies = [
  "lockable",
  "log",
- "spin 0.9.4",
+ "spin 0.9.8",
  "task",
  "wait_queue",
 ]
@@ -847,7 +892,7 @@ name = "owning_ref"
 version = "0.4.1"
 source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
 dependencies = [
- "spin 0.9.4",
+ "spin 0.9.8",
  "stable_deref_trait",
 ]
 
@@ -859,8 +904,20 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
- "spin 0.9.4",
+ "spin 0.9.8",
  "static_assertions",
+]
+
+[[package]]
+name = "page_attribute_table"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "modular-bitfield",
+ "msr",
+ "raw-cpuid",
+ "spin 0.9.8",
+ "x86_64",
 ]
 
 [[package]]
@@ -878,12 +935,12 @@ dependencies = [
 name = "panic_entry"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "log",
  "memory",
  "mod_mgmt",
  "panic_wrapper",
  "unwind",
- "vga_buffer",
 ]
 
 [[package]]
@@ -915,7 +972,7 @@ dependencies = [
  "lazy_static",
  "log",
  "root",
- "spin 0.9.4",
+ "spin 0.9.8",
  "vfs_node",
 ]
 
@@ -933,7 +990,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "port_io",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -951,6 +1008,7 @@ name = "preemption"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
  "log",
 ]
 
@@ -1012,7 +1070,7 @@ dependencies = [
  "fs_node",
  "lazy_static",
  "log",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -1088,17 +1146,17 @@ checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 1.0.0",
- "irq_safety",
+ "cpu",
+ "interrupts",
  "log",
  "preemption",
- "runqueue",
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
- "spin 0.9.4",
+ "sleep",
  "task",
+ "x86_64",
 ]
 
 [[package]]
@@ -1108,7 +1166,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_priority",
- "spin 0.9.4",
+ "spin 0.9.8",
  "task",
 ]
 
@@ -1128,7 +1186,7 @@ dependencies = [
  "log",
  "runqueue",
  "runqueue_round_robin",
- "spin 0.9.4",
+ "spin 0.9.8",
  "task",
 ]
 
@@ -1145,13 +1203,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2f84d114ef17fd144153d608fba7c446b0145d038985e7a8cc5d08bb0ce20383"
 dependencies = [
  "rustc_version",
-]
-
-[[package]]
-name = "sdt"
-version = "0.1.0"
-dependencies = [
- "zerocopy",
 ]
 
 [[package]]
@@ -1195,7 +1246,7 @@ version = "0.1.0"
 dependencies = [
  "irq_safety",
  "port_io",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -1214,7 +1265,6 @@ dependencies = [
  "crossbeam-utils",
  "irq_safety",
  "lazy_static",
- "scheduler",
  "task",
  "time",
 ]
@@ -1227,9 +1277,9 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 
 [[package]]
 name = "spin"
-version = "0.9.4"
+version = "0.9.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
+checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
 ]
@@ -1239,7 +1289,7 @@ name = "stable_deref_trait"
 version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
 dependencies = [
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -1251,7 +1301,7 @@ dependencies = [
  "memory",
  "memory_structs",
  "page_allocator",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -1285,7 +1335,7 @@ version = "0.1.0"
 dependencies = [
  "core2",
  "keycodes_ascii",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
@@ -1324,18 +1374,33 @@ dependencies = [
  "crossbeam-utils",
  "environment",
  "irq_safety",
- "kernel_config",
  "log",
  "memory",
  "mod_mgmt",
  "no_drop",
  "preemption",
- "root",
- "spin 0.9.4",
+ "spin 0.9.8",
  "stack",
  "static_assertions",
- "tss",
- "x86_64",
+ "task_struct",
+ "waker_generic",
+]
+
+[[package]]
+name = "task_struct"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "crossbeam-utils",
+ "environment",
+ "irq_safety",
+ "kernel_config",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "preemption",
+ "spin 0.9.8",
+ "stack",
 ]
 
 [[package]]
@@ -1361,8 +1426,21 @@ dependencies = [
  "memchr",
  "memory",
  "panic_entry",
- "spin 0.9.4",
+ "spin 0.9.8",
  "task",
+]
+
+[[package]]
+name = "tls_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.8",
+ "tock-registers",
+ "x86_64",
 ]
 
 [[package]]
@@ -1379,7 +1457,7 @@ dependencies = [
  "cpu",
  "log",
  "memory",
- "spin 0.9.4",
+ "spin 0.9.8",
  "x86_64",
 ]
 
@@ -1440,16 +1518,13 @@ dependencies = [
  "fs_node",
  "log",
  "memory",
- "spin 0.9.4",
+ "spin 0.9.8",
 ]
 
 [[package]]
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
- "kernel_config",
- "logger_x86_64",
- "spin 0.9.4",
  "volatile 0.2.7",
 ]
 
@@ -1481,6 +1556,14 @@ dependencies = [
  "log",
  "scheduler",
  "task",
+]
+
+[[package]]
+name = "waker_generic"
+version = "0.1.0"
+dependencies = [
+ "preemption",
+ "spin 0.9.8",
 ]
 
 [[package]]
