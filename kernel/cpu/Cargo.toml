@@ -8,14 +8,14 @@ edition = "2021"
 [dependencies]
 derive_more = "0.99.0"
 
-
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+arm_boards = { path = "../arm_boards" }
 tock-registers = "0.7.0"
 cortex-a = "7.5.0"
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 [lib]
 crate-type = ["rlib"]

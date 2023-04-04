@@ -7,17 +7,16 @@
 //! - Sending End-Of-Interrupts signals
 
 use super::GicRegisters;
-use super::U32BYTES;
 use super::Priority;
 use super::InterruptNumber;
 
 mod offset {
-    use super::U32BYTES;
-    pub const CTLR: usize = 0x00 / U32BYTES;
-    pub const PMR:  usize = 0x04 / U32BYTES;
-    pub const IAR:  usize = 0x0C / U32BYTES;
-    pub const RPR:  usize = 0x14 / U32BYTES;
-    pub const EOIR: usize = 0x10 / U32BYTES;
+    use crate::Offset32;
+    pub(crate) const CTLR: Offset32 = Offset32::from_byte_offset(0x00);
+    pub(crate) const PMR:  Offset32 = Offset32::from_byte_offset(0x04);
+    pub(crate) const IAR:  Offset32 = Offset32::from_byte_offset(0x0C);
+    pub(crate) const RPR:  Offset32 = Offset32::from_byte_offset(0x14);
+    pub(crate) const EOIR: Offset32 = Offset32::from_byte_offset(0x10);
 }
 
 // enable group 0

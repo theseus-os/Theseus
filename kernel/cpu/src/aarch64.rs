@@ -6,6 +6,7 @@ use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
 use irq_safety::RwLockIrqSafe;
 use core::fmt;
 use alloc::vec::Vec;
+use arm_boards::mpidr::DefinedMpidrValue;
 
 use super::CpuId;
 
@@ -89,14 +90,17 @@ impl MpidrValue {
         };
         (self.0 >> shift) as u8
     }
+}
 
-    /// Create an `MpidrValue` from its four affinity numbers
-    pub fn new(aff3: u8, aff2: u8, aff1: u8, aff0: u8) -> Self {
-        let aff3 = (aff3 as u64) << 32;
-        let aff2 = (aff2 as u64) << 16;
-        let aff1 = (aff1 as u64) <<  8;
-        let aff0 = (aff0 as u64) <<  0;
-        Self(aff3 | aff2 | aff1 | aff0)
+impl From<DefinedMpidrValue> for MpidrValue {
+    fn from(def_mpidr: DefinedMpidrValue) -> Self {
+        Self(def_mpidr.value())
+    }
+}
+
+impl From<DefinedMpidrValue> for CpuId {
+    fn from(def_mpidr: DefinedMpidrValue) -> Self {
+        Self::from(MpidrValue::from(def_mpidr))
     }
 }
 

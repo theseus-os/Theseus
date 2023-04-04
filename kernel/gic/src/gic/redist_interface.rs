@@ -9,69 +9,92 @@
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
 
 use super::GicRegisters;
-use super::U32BYTES;
 use super::InterruptNumber;
 use super::Enabled;
 
 mod offset {
-    use super::U32BYTES;
-    pub const RD_WAKER: usize = 0x14 / U32BYTES;
-    pub const IGROUPR:  usize = 0x80 / U32BYTES;
-    pub const SGIPPI_ISENABLER: usize = 0x100 / U32BYTES;
-    pub const SGIPPI_ICENABLER: usize = 0x180 / U32BYTES;
+    use crate::{Offset32, Offset64};
+    pub(crate) const CTLR:             Offset32 = Offset32::from_byte_offset(0x00);
+    pub(crate) const TYPER:            Offset64 = Offset64::from_byte_offset(0x08);
+    pub(crate) const WAKER:            Offset32 = Offset32::from_byte_offset(0x14);
+    pub(crate) const IGROUPR:          Offset32 = Offset32::from_byte_offset(0x80);
+    pub(crate) const SGIPPI_ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
+    pub(crate) const SGIPPI_ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
 }
 
-const RD_WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
-const RD_WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
+const WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
+const WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
 
-// const GROUP_0: u32 = 0;
+/// Bit that is set if GICR_CTLR.DPG* bits are supported
+const TYPER_DPGS: u64 = 1 << 5;
+
+/// If bit is set, the PE cannot be selected for non-secure group 1 "1 of N" interrupts.
+const CTLR_DPG1S: u32 = 1 << 26;
+
+/// If bit is set, the PE cannot be selected for secure group 1 "1 of N" interrupts.
+const CTLR_DPG1NS: u32 = 1 << 25;
+
+/// If bit is set, the PE cannot be selected for group 0 "1 of N" interrupts.
+const CTLR_DPG0: u32 = 1 << 24;
+
+/// const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
 
-// This timeout value works on some ARM SoCs:
-// - qemu's virt virtual machine
-//
-// (if the value works for your SoC, please add it to this list.)
-//
-// If the redistributor's initialization times out, it means either:
-// - that your ARM SoC is not GICv3 compliant (try initializing it as GICv2)
-// - that the timeout value is too low for your ARM SoC. Try increasing it
-// to see if the booting sequence continues.
-//
-// If it wasn't enough for your machine, reach out to the Theseus
-// developers (or directly submit a PR).
+/// This timeout value works on some ARM SoCs:
+/// - qemu's virt virtual machine
+///
+/// (if the value works for your SoC, please add it to this list.)
+///
+/// If the redistributor's initialization times out, it means either:
+/// - that your ARM SoC is not GICv3 compliant (try initializing it as GICv2)
+/// - that the timeout value is too low for your ARM SoC. Try increasing it
+/// to see if the booting sequence continues.
+///
+/// If it wasn't enough for your machine, reach out to the Theseus
+/// developers (or directly submit a PR).
 const TIMEOUT_ITERATIONS: usize = 0xffff;
 
-/// Initializes the redistributor by waking
-/// it up and checking that it's awake
+/// Initializes the redistributor by waking it up and waiting for it to awaken.
+///
+/// Returns an error if a timeout occurs while waiting.
 pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
-    let mut reg;
-    reg = registers.read_volatile(offset::RD_WAKER);
+    let mut reg = registers.read_volatile(offset::WAKER);
 
     // Wake the redistributor
-    reg &= !RD_WAKER_PROCESSOR_SLEEP;
+    reg &= !WAKER_PROCESSOR_SLEEP;
+    registers.write_volatile(offset::WAKER, reg);
 
-    registers.write_volatile(offset::RD_WAKER, reg);
-
-    // then poll ChildrenAsleep until it's cleared
-
+    // Then, wait for the children to wake up, timing out if it never happens.
     let children_asleep = || {
-        registers.read_volatile(offset::RD_WAKER) & RD_WAKER_CHLIDREN_ASLEEP > 0
+        registers.read_volatile(offset::WAKER) & WAKER_CHLIDREN_ASLEEP > 0
     };
-
     let mut counter = 0;
-    let mut timed_out = || {
+    while children_asleep() {
         counter += 1;
-        counter >= TIMEOUT_ITERATIONS
-    };
-
-    while children_asleep() && !timed_out() { }
-
-    match timed_out() {
-        false => Ok(()),
-
-        // see definition of TIMEOUT_ITERATIONS
-        true => Err("gic: The redistributor didn't wake up in time."),
+        if counter >= TIMEOUT_ITERATIONS {
+            break;
+        }
     }
+
+    if counter >= TIMEOUT_ITERATIONS {
+        return Err("BUG: gic driver: The redistributor didn't wake up in time.");
+    }
+
+    if registers.read_volatile_64(offset::TYPER) & TYPER_DPGS != 0 {
+        // DPGS bits are supported in GICR_CTLR
+        let mut reg = registers.read_volatile(offset::CTLR);
+
+        // Enable PE selection for non-secure group 1 SPIs
+        reg &= !CTLR_DPG1NS;
+
+        // Disable PE selection for group 0 & secure group 1 SPIs
+        reg |= CTLR_DPG0;
+        reg |= CTLR_DPG1S;
+
+        registers.write_volatile(offset::CTLR, reg);
+    }
+
+    Ok(())
 }
 
 /// Returns whether the given SGI (software generated interrupts) or

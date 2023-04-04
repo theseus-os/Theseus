@@ -1,7 +1,10 @@
 use core::convert::AsMut;
 
-use memory::{PageTable, BorrowedMappedPages, Mutable,
-PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
+use cpu::CpuId;
+use memory::{
+    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
+    allocate_pages, allocate_frames_at
+};
 
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
@@ -10,16 +13,6 @@ mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
 mod dist_interface;
 mod redist_interface;
-
-/// Physical addresses of the CPU and Distributor
-/// interfaces as exposed by the qemu "virt" VM.
-pub mod qemu_virt_addrs {
-    use super::*;
-
-    pub const GICD: PhysicalAddress = PhysicalAddress::new_canonical(0x08000000);
-    pub const GICC: PhysicalAddress = PhysicalAddress::new_canonical(0x08010000);
-    pub const GICR: PhysicalAddress = PhysicalAddress::new_canonical(0x080A0000);
-}
 
 /// Boolean
 pub type Enabled = bool;
@@ -62,8 +55,25 @@ pub enum TargetCpu {
     GICv2TargetList(TargetList),
 }
 
-const U32BYTES: usize = core::mem::size_of::<u32>();
 const U32BITS: usize = u32::BITS as usize;
+
+#[derive(Copy, Clone)]
+pub(crate) struct Offset32(usize);
+
+#[derive(Copy, Clone)]
+pub(crate) struct Offset64(usize);
+
+impl Offset32 {
+    pub(crate) const fn from_byte_offset(byte_offset: usize) -> Self {
+        Self(byte_offset / core::mem::size_of::<u32>())
+    }
+}
+
+impl Offset64 {
+    pub(crate) const fn from_byte_offset(byte_offset: usize) -> Self {
+        Self(byte_offset / core::mem::size_of::<u64>())
+    }
+}
 
 #[repr(C)]
 #[derive(zerocopy::FromBytes)]
@@ -72,12 +82,20 @@ pub struct GicRegisters {
 }
 
 impl GicRegisters {
-    fn read_volatile(&self, index: usize) -> u32 {
-        unsafe { (&self.inner[index] as *const u32).read_volatile() }
+    fn read_volatile(&self, offset: Offset32) -> u32 {
+        unsafe { (&self.inner[offset.0] as *const u32).read_volatile() }
     }
 
-    fn write_volatile(&mut self, index: usize, value: u32) {
-        unsafe { (&mut self.inner[index] as *mut u32).write_volatile(value) }
+    fn write_volatile(&mut self, offset: Offset32, value: u32) {
+        unsafe { (&mut self.inner[offset.0] as *mut u32).write_volatile(value) }
+    }
+
+    fn read_volatile_64(&self, offset: Offset64) -> u64 {
+        unsafe { (self.inner.as_ptr() as *const u64).add(offset.0).read_volatile() }
+    }
+
+    fn write_volatile_64(&mut self, offset: Offset64, value: u64) {
+        unsafe { (self.inner.as_mut_ptr() as *mut u64).add(offset.0).write_volatile(value) }
     }
 
     // Reads one item of an array spanning across
@@ -90,12 +108,12 @@ impl GicRegisters {
     // - `int` is the index
     // - `offset` tells the beginning of the array
     // - `INTS_PER_U32` = how many array slots per u32 in this array
-    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: usize, int: InterruptNumber) -> u32 {
+    fn read_array_volatile<const INTS_PER_U32: usize>(&self, offset: Offset32, int: InterruptNumber) -> u32 {
         let int = int as usize;
         let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
 
-        let offset = offset + (int / INTS_PER_U32);
+        let offset = Offset32(offset.0 + (int / INTS_PER_U32));
         let reg_index = int & (INTS_PER_U32 - 1);
         let shift = reg_index * bits_per_int;
 
@@ -114,12 +132,12 @@ impl GicRegisters {
     // - `offset` tells the beginning of the array
     // - `INTS_PER_U32` = how many array slots per u32 in this array
     // - `value` is the value to write
-    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: usize, int: InterruptNumber, value: u32) {
+    fn write_array_volatile<const INTS_PER_U32: usize>(&mut self, offset: Offset32, int: InterruptNumber, value: u32) {
         let int = int as usize;
         let bits_per_int: usize = U32BITS / INTS_PER_U32;
         let mask: u32 = u32::MAX >> (U32BITS - bits_per_int);
 
-        let offset = offset + (int / INTS_PER_U32);
+        let offset = Offset32(offset.0 + (int / INTS_PER_U32));
         let reg_index = int & (INTS_PER_U32 - 1);
         let shift = reg_index * bits_per_int;
 
@@ -132,6 +150,17 @@ impl GicRegisters {
 
 const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
+/// Returns the index to the redistributor base address for this CPU
+/// in the array of register base addresses.
+///
+/// This is defined in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
+fn get_current_cpu_redist_index() -> usize {
+    let cpu_id = cpu::current_cpu();
+    arm_boards::BOARD_CONFIG.cpu_ids.iter()
+          .position(|mpidr| CpuId::from(*mpidr) == cpu_id)
+          .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
+}
+
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
 
@@ -140,12 +169,16 @@ pub struct ArmGicV2 {
     pub processor: BorrowedMappedPages<GicRegisters, Mutable>,
 }
 
+pub struct ArmGicV3RedistPages {
+    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
+}
+
 pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -165,7 +198,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: PhysicalAddress,
+        redist: [PhysicalAddress; arm_boards::NUM_CPUS],
     }
 }
 
@@ -208,25 +241,38 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
-                    let frames = allocate_frames_at(redist, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
-                    mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
-                };
+                let redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS] = core::array::try_from_fn(|i| {
+                    let phys_addr = redist[i];
 
-                let redist_sgippi = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
-                    let frames = allocate_frames_at(redist + REDIST_SGIPPI_OFFSET, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
-                    mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
-                };
+                    let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
+                        let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
+                        let frames = allocate_frames_at(phys_addr, 1)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
+                    };
 
-                redist_interface::init(redistributor.as_mut())?;
+                    redist_interface::init(redistributor.as_mut())?;
+
+                    let redist_sgippi = {
+                        let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
+                        let frames = allocate_frames_at(phys_addr + REDIST_SGIPPI_OFFSET, 1)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
+                    };
+
+                    Ok::<ArmGicV3RedistPages, &'static str>(ArmGicV3RedistPages {
+                        redistributor,
+                        redist_sgippi,
+                    })
+                })?;
+
+                // this cannot fail as we pushed exactly `arm_boards::CPUS` items
+                // let redistributors = redistributors.into_inner().unwrap();
+
                 cpu_interface_gicv3::init();
                 let affinity_routing = dist_interface::init(distributor.as_mut());
 
-                Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributor, redist_sgippi, affinity_routing }))
+                Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributors, affinity_routing }))
             },
         }
     }
@@ -272,7 +318,8 @@ impl ArmGic {
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::is_sgippi_enabled(&v3.redist_sgippi, int)
+                let i = get_current_cpu_redist_index();
+                redist_interface::is_sgippi_enabled(&v3.redistributors[i].redist_sgippi, int)
             } else {
                 true
             },
@@ -285,7 +332,8 @@ impl ArmGic {
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::enable_sgippi(&mut v3.redist_sgippi, int, enabled);
+                let i = get_current_cpu_redist_index();
+                redist_interface::enable_sgippi(&mut v3.redistributors[i].redist_sgippi, int, enabled);
             },
             _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
         };
@@ -311,5 +359,11 @@ impl ArmGic {
             Self::V2(v2) => cpu_interface_gicv2::set_minimum_priority(&mut v2.processor, priority),
             Self::V3( _) => cpu_interface_gicv3::set_minimum_priority(priority),
         }
+    }
+}
+
+impl core::fmt::Debug for ArmGicV3RedistPages {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ArmGicV3RedistPages")
     }
 }

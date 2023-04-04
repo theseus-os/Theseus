@@ -141,6 +141,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arm_boards"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "derive_more",
+ "memory_structs",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -608,6 +617,7 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "arm_boards",
  "cortex-a",
  "derive_more",
  "irq_safety",
@@ -1335,7 +1345,9 @@ dependencies = [
 name = "gic"
 version = "0.1.0"
 dependencies = [
+ "arm_boards",
  "bitflags",
+ "cpu",
  "log",
  "memory",
  "static_assertions",
@@ -1527,6 +1539,7 @@ name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "arm_boards",
  "cortex-a",
  "cpu",
  "early_printer",
@@ -2184,6 +2197,7 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
+ "arm_boards",
  "cpu",
  "kernel_config",
  "log",
