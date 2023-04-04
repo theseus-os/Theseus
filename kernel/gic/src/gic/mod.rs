@@ -152,7 +152,7 @@ const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 // in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
 fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
-    arm_boards::CPUIDS.iter()
+    arm_boards::BOARD_CONFIG.cpu_ids.iter()
           .position(|id| *id == cpu_id)
           .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
 }
@@ -174,7 +174,7 @@ pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributors: [ArmGicV3RedistPages; arm_boards::CPUS],
+    pub redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -194,7 +194,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: [PhysicalAddress; arm_boards::CPUS],
+        redist: [PhysicalAddress; arm_boards::NUM_CPUS],
     }
 }
 
@@ -237,7 +237,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let redistributors: [ArmGicV3RedistPages; arm_boards::CPUS] = core::array::try_from_fn(|i| {
+                let redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS] = core::array::try_from_fn(|i| {
                     let phys_addr = redist[i];
 
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {

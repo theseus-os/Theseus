@@ -9,7 +9,7 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
-use arm_boards::{INTERRUPT_CONTROLLER_CONFIG, InterruptControllerConfig};
+use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
 use gic::{ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
@@ -147,7 +147,7 @@ pub fn init() -> Result<(), &'static str> {
         set_vbar_el1();
 
         info!("Configuring the interrupt controller");
-        match INTERRUPT_CONTROLLER_CONFIG {
+        match BOARD_CONFIG.interrupt_controller {
             InterruptControllerConfig::GicV3(gicv3_cfg) => {
                 let kernel_mmi_ref = get_kernel_mmi_ref()
                     .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;

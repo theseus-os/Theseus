@@ -13,7 +13,7 @@ use memory_structs::PhysicalAddress;
 #[derive(Debug, Copy, Clone)]
 pub struct GicV3InterruptControllerConfig {
     pub distributor_base_address: PhysicalAddress,
-    pub redistributor_base_addresses: [PhysicalAddress; board::CPUS],
+    pub redistributor_base_addresses: [PhysicalAddress; board::NUM_CPUS],
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -28,6 +28,12 @@ pub enum SecondaryCoresStartup {
 }
 */
 
+#[derive(Debug, Copy, Clone)]
+pub struct BoardConfig {
+    pub cpu_ids: [cpu::CpuId; board::NUM_CPUS],
+    pub interrupt_controller: InterruptControllerConfig,
+}
+
 // by default & on x86_64, the default.rs file is used
 #[cfg_attr(all(target_arch = "aarch64", feature = "qemu_virt"), path = "qemu_virt.rs")]
 #[cfg_attr(not(any(
@@ -35,4 +41,5 @@ pub enum SecondaryCoresStartup {
 )), path = "default.rs")]
 mod board;
 
-pub use board::*;
+pub use board::NUM_CPUS;
+pub use board::BOARD_CONFIG;

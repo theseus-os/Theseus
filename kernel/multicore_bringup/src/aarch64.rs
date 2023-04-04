@@ -7,7 +7,7 @@ use ap_start::kstart_ap;
 use volatile::Volatile;
 use core::arch::asm;
 use cpu::{MpidrValue, current_cpu};
-use arm_boards::CPUIDS;
+use arm_boards::BOARD_CONFIG;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
 #[cfg(target_arch = "aarch64")]
@@ -94,7 +94,7 @@ pub fn handle_ap_cores(
     }
 
     let mut ap_stack = None;
-    for cpu_id in CPUIDS {
+    for cpu_id in BOARD_CONFIG.cpu_ids {
         let mpidr: MpidrValue = cpu_id.into();
 
         ap_data.ap_ready.write(0);
