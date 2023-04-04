@@ -1,4 +1,4 @@
-//! AArch64 Board Config for the `virt` machine of Qemu
+//! Board configuration for QEMU's basic `virt` machine with 4 CPUs.
 
 use super::{
     InterruptControllerConfig::GicV3, GicV3InterruptControllerConfig,
@@ -6,20 +6,18 @@ use super::{
 };
 use memory_structs::PhysicalAddress;
 
-// local utility function to generate the CPU id from
-// the affinity level 0 number of the cpu core
+/// Generates an MPIDR value from a CPU's 0th affinity level.
 const fn cpu_id(aff0: u8) -> DefinedMpidrValue {
     DefinedMpidrValue::new(0, 0, 0, aff0)
 }
 
-// local utility function to generate the redistributor base
-// address from the affinity level 0 number of the cpu core
+/// Generates a Redistributor base address from a CPU's 0th affinity level.
 const fn redist(aff0: usize) -> PhysicalAddress {
     PhysicalAddress::new_canonical(0x080A0000 + 0x20000 * aff0)
 }
 
 pub const NUM_CPUS: usize = 4;
-pub const BOARD_CONFIG: BoardConfig = BoardConfig {
+pub static BOARD_CONFIG: BoardConfig = BoardConfig {
     cpu_ids: [
         cpu_id(0),
         cpu_id(1),

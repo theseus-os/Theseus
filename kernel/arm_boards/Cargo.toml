@@ -1,11 +1,12 @@
 [package]
 authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "arm_boards"
-description = "Per-board AArch64 configuration"
+description = "Board-specific configuration and definitions for aarch64 systems"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+cfg-if = "1.0.0"
 memory_structs = { path = "../memory_structs" }
 derive_more = "0.99.0"
 

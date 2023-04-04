@@ -150,9 +150,10 @@ impl GicRegisters {
 
 const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
-// Returns the index to the redistributor base address of this
-// CPU in the array of register base addresses, which is defined
-// in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
+/// Returns the index to the redistributor base address for this CPU
+/// in the array of register base addresses.
+///
+/// This is defined in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
 fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
     arm_boards::BOARD_CONFIG.cpu_ids.iter()

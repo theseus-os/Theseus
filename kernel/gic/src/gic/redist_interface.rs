@@ -25,33 +25,33 @@ mod offset {
 const WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
 const WAKER_CHLIDREN_ASLEEP: u32 = 1 << 2;
 
-// Bit that is set if GICR_CTLR.DPG* bits are supported
+/// Bit that is set if GICR_CTLR.DPG* bits are supported
 const TYPER_DPGS: u64 = 1 << 5;
 
-// If bit is set, the PE cannot be selected for non-secure group 1 "1 of N" interrupts.
+/// If bit is set, the PE cannot be selected for non-secure group 1 "1 of N" interrupts.
 const CTLR_DPG1S: u32 = 1 << 26;
 
-// If bit is set, the PE cannot be selected for secure group 1 "1 of N" interrupts.
+/// If bit is set, the PE cannot be selected for secure group 1 "1 of N" interrupts.
 const CTLR_DPG1NS: u32 = 1 << 25;
 
-// If bit is set, the PE cannot be selected for group 0 "1 of N" interrupts.
+/// If bit is set, the PE cannot be selected for group 0 "1 of N" interrupts.
 const CTLR_DPG0: u32 = 1 << 24;
 
-// const GROUP_0: u32 = 0;
+/// const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
 
-// This timeout value works on some ARM SoCs:
-// - qemu's virt virtual machine
-//
-// (if the value works for your SoC, please add it to this list.)
-//
-// If the redistributor's initialization times out, it means either:
-// - that your ARM SoC is not GICv3 compliant (try initializing it as GICv2)
-// - that the timeout value is too low for your ARM SoC. Try increasing it
-// to see if the booting sequence continues.
-//
-// If it wasn't enough for your machine, reach out to the Theseus
-// developers (or directly submit a PR).
+/// This timeout value works on some ARM SoCs:
+/// - qemu's virt virtual machine
+///
+/// (if the value works for your SoC, please add it to this list.)
+///
+/// If the redistributor's initialization times out, it means either:
+/// - that your ARM SoC is not GICv3 compliant (try initializing it as GICv2)
+/// - that the timeout value is too low for your ARM SoC. Try increasing it
+/// to see if the booting sequence continues.
+///
+/// If it wasn't enough for your machine, reach out to the Theseus
+/// developers (or directly submit a PR).
 const TIMEOUT_ITERATIONS: usize = 0xffff;
 
 /// Initializes the redistributor by waking
