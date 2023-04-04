@@ -38,7 +38,7 @@ pub struct BoardConfig {
 #[cfg_attr(all(target_arch = "aarch64", feature = "qemu_virt"), path = "boards/qemu_virt.rs")]
 #[cfg_attr(not(any(
     all(target_arch = "aarch64", feature = "qemu_virt"),
-)), path = "boards/default.rs")]
+)), path = "boards/unselected.rs")]
 mod board;
 
 pub mod mpidr;
