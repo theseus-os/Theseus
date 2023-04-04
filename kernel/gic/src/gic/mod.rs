@@ -3,7 +3,6 @@ use core::convert::AsMut;
 use memory::{PageTable, BorrowedMappedPages, Mutable,
 PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
 
-use arrayvec::ArrayVec;
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
 
@@ -235,8 +234,9 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributors: ArrayVec<ArmGicV3RedistPages, { arm_boards::CPUS }> = ArrayVec::new();
-                for phys_addr in redist {
+                let redistributors: [ArmGicV3RedistPages; arm_boards::CPUS] = core::array::try_from_fn(|i| {
+                    let phys_addr = redist[i];
+
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
                         let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
                         let frames = allocate_frames_at(phys_addr, 1)?;
@@ -253,13 +253,14 @@ impl ArmGic {
                         mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                     };
 
-                    redistributors.push(ArmGicV3RedistPages {
+                    Ok::<ArmGicV3RedistPages, &'static str>(ArmGicV3RedistPages {
                         redistributor,
                         redist_sgippi,
-                    });
-                }
+                    })
+                })?;
+
                 // this cannot fail as we pushed exactly `arm_boards::CPUS` items
-                let redistributors = redistributors.into_inner().unwrap();
+                // let redistributors = redistributors.into_inner().unwrap();
 
                 cpu_interface_gicv3::init();
                 let affinity_routing = dist_interface::init(distributor.as_mut());
