@@ -14,6 +14,7 @@
 <a href="#14" id="14">14</a>
 <a href="#15" id="15">15</a>
 <a href="#16" id="16">16</a>
+<a href="#17" id="17">17</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Allows configuring the Generic Interrupt Controller
 //!
 //! The term &quot;Forwarding&quot; is sometimes used in this crate.
@@ -24,11 +25,12 @@
 
 </span><span class="attr">#![no_std]
 #![feature(doc_cfg)]
+#![feature(array_try_from_fn)]
 
-#[cfg(any(target_arch = <span class="string">&quot;aarch64&quot;</span>, doc))]
+#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">mod </span>gic;
 
-<span class="attr">#[cfg(any(target_arch = <span class="string">&quot;aarch64&quot;</span>, doc))]
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">pub use </span>gic::<span class="kw-2">*</span>;
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="gic" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

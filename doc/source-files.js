@@ -6,6 +6,7 @@ var sourcesIndex = JSON.parse('{\
 "ap_start":["",[],["lib.rs"]],\
 "apic":["",[],["lib.rs"]],\
 "app_io":["",[],["lib.rs"]],\
+"arm_boards":["",[],["lib.rs"]],\
 "async_channel":["",[],["lib.rs"]],\
 "ata":["",[],["lib.rs"]],\
 "atomic_linked_list":["",[],["atomic_linked_list.rs","atomic_map.rs","lib.rs"]],\
@@ -58,7 +59,7 @@ var sourcesIndex = JSON.parse('{\
 "framebuffer_printer":["",[],["lib.rs"]],\
 "fs_node":["",[],["lib.rs"]],\
 "gdt":["",[],["lib.rs"]],\
-"gic":["",[["gic",[],["cpu_interface_gicv2.rs","cpu_interface_gicv3.rs","dist_interface.rs","mod.rs","redist_interface.rs"]]],["lib.rs"]],\
+"gic":["",[],["lib.rs"]],\
 "heap":["",[],["lib.rs"]],\
 "heapfile":["",[],["lib.rs"]],\
 "hpet":["",[],["lib.rs"]],\
