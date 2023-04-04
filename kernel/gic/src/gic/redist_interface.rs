@@ -54,37 +54,34 @@ const GROUP_1: u32 = 1;
 /// developers (or directly submit a PR).
 const TIMEOUT_ITERATIONS: usize = 0xffff;
 
-/// Initializes the redistributor by waking
-/// it up and checking that it's awake
+/// Initializes the redistributor by waking it up and waiting for it to awaken.
+///
+/// Returns an error if a timeout occurs while waiting.
 pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
     let mut reg = registers.read_volatile(offset::WAKER);
 
     // Wake the redistributor
     reg &= !WAKER_PROCESSOR_SLEEP;
-
     registers.write_volatile(offset::WAKER, reg);
 
-    // then poll ChildrenAsleep until it's cleared
-
+    // Then, wait for the children to wake up, timing out if it never happens.
     let children_asleep = || {
         registers.read_volatile(offset::WAKER) & WAKER_CHLIDREN_ASLEEP > 0
     };
-
     let mut counter = 0;
-    let mut timed_out = || {
+    while children_asleep() {
         counter += 1;
-        counter >= TIMEOUT_ITERATIONS
-    };
+        if counter >= TIMEOUT_ITERATIONS {
+            break;
+        }
+    }
 
-    while children_asleep() && !timed_out() { }
-
-    if timed_out() {
+    if counter >= TIMEOUT_ITERATIONS {
         return Err("BUG: gic driver: The redistributor didn't wake up in time.");
     }
 
     if registers.read_volatile_64(offset::TYPER) & TYPER_DPGS != 0 {
         // DPGS bits are supported in GICR_CTLR
-
         let mut reg = registers.read_volatile(offset::CTLR);
 
         // Enable PE selection for non-secure group 1 SPIs
