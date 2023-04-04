@@ -147,11 +147,14 @@ impl GicRegisters {
 
 const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
-fn current_redist_index() -> usize {
+// Returns the index to the redistributor base address of this
+// CPU in the array of register base addresses, which is defined
+// in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
+fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
     arm_boards::CPUIDS.iter()
           .position(|id| *id == cpu_id)
-          .expect("BUG: current_redist_index: unexpected CpuId for current CPU")
+          .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
 }
 
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
@@ -311,7 +314,7 @@ impl ArmGic {
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                let i = current_redist_index();
+                let i = get_current_cpu_redist_index();
                 redist_interface::is_sgippi_enabled(&v3.redistributors[i].redist_sgippi, int)
             } else {
                 true
@@ -325,7 +328,7 @@ impl ArmGic {
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                let i = current_redist_index();
+                let i = get_current_cpu_redist_index();
                 redist_interface::enable_sgippi(&mut v3.redistributors[i].redist_sgippi, int, enabled);
             },
             _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
