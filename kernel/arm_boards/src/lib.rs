@@ -8,15 +8,18 @@
 #![no_std]
 #![feature(const_trait_impl)]
 
+#[cfg(target_arch = "aarch64")]
 use memory_structs::PhysicalAddress;
 
 #[derive(Debug, Copy, Clone)]
+#[cfg(target_arch = "aarch64")]
 pub struct GicV3InterruptControllerConfig {
     pub distributor_base_address: PhysicalAddress,
     pub redistributor_base_addresses: [PhysicalAddress; board::NUM_CPUS],
 }
 
 #[derive(Debug, Copy, Clone)]
+#[cfg(target_arch = "aarch64")]
 pub enum InterruptControllerConfig {
     GicV3(GicV3InterruptControllerConfig),
 }
@@ -28,20 +31,23 @@ pub enum SecondaryCoresStartup {
 }
 */
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
+#[cfg(target_arch = "aarch64")]
 pub struct BoardConfig {
     pub cpu_ids: [mpidr::DefinedMpidrValue; board::NUM_CPUS],
     pub interrupt_controller: InterruptControllerConfig,
 }
 
 // by default & on x86_64, the default.rs file is used
-#[cfg_attr(all(target_arch = "aarch64", feature = "qemu_virt"), path = "boards/qemu_virt.rs")]
+#[cfg(target_arch = "aarch64")]
+#[cfg_attr(feature = "qemu_virt", path = "boards/qemu_virt.rs")]
 #[cfg_attr(not(any(
-    all(target_arch = "aarch64", feature = "qemu_virt"),
+    feature = "qemu_virt",
 )), path = "boards/unselected.rs")]
 mod board;
 
+#[cfg(target_arch = "aarch64")]
 pub mod mpidr;
 
-pub use board::NUM_CPUS;
-pub use board::BOARD_CONFIG;
+#[cfg(target_arch = "aarch64")]
+pub use board::{NUM_CPUS, BOARD_CONFIG};
