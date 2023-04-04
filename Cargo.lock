@@ -144,7 +144,7 @@ dependencies = [
 name = "arm_boards"
 version = "0.1.0"
 dependencies = [
- "cpu",
+ "derive_more",
  "memory_structs",
 ]
 
@@ -616,6 +616,7 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "arm_boards",
  "cortex-a",
  "derive_more",
  "irq_safety",

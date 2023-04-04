@@ -1,7 +1,10 @@
 use core::convert::AsMut;
 
-use memory::{PageTable, BorrowedMappedPages, Mutable,
-PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
+use cpu::CpuId;
+use memory::{
+    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
+    allocate_pages, allocate_frames_at
+};
 
 use static_assertions::const_assert_eq;
 use bitflags::bitflags;
@@ -153,7 +156,7 @@ const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
     arm_boards::BOARD_CONFIG.cpu_ids.iter()
-          .position(|id| *id == cpu_id)
+          .position(|mpidr| CpuId::from(*mpidr) == cpu_id)
           .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
 }
 

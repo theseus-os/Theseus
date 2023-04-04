@@ -1,13 +1,15 @@
 //! AArch64 Board Config for the `virt` machine of Qemu
 
-use super::{InterruptControllerConfig::GicV3, GicV3InterruptControllerConfig, BoardConfig};
-use cpu::{CpuId, MpidrValue};
+use super::{
+    InterruptControllerConfig::GicV3, GicV3InterruptControllerConfig,
+    BoardConfig, mpidr::DefinedMpidrValue,
+};
 use memory_structs::PhysicalAddress;
 
 // local utility function to generate the CPU id from
 // the affinity level 0 number of the cpu core
-const fn cpu_id(aff0: u8) -> CpuId {
-    CpuId::from(MpidrValue::new(0, 0, 0, aff0))
+const fn cpu_id(aff0: u8) -> DefinedMpidrValue {
+    DefinedMpidrValue::new(0, 0, 0, aff0)
 }
 
 // local utility function to generate the redistributor base

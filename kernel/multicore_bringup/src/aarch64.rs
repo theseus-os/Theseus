@@ -6,7 +6,7 @@ use zerocopy::FromBytes;
 use ap_start::kstart_ap;
 use volatile::Volatile;
 use core::arch::asm;
-use cpu::{MpidrValue, current_cpu};
+use cpu::{CpuId, MpidrValue, current_cpu};
 use arm_boards::BOARD_CONFIG;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
@@ -94,8 +94,9 @@ pub fn handle_ap_cores(
     }
 
     let mut ap_stack = None;
-    for cpu_id in BOARD_CONFIG.cpu_ids {
-        let mpidr: MpidrValue = cpu_id.into();
+    for def_mpidr in BOARD_CONFIG.cpu_ids {
+        let cpu_id = CpuId::from(def_mpidr);
+        let mpidr = MpidrValue::from(cpu_id);
 
         ap_data.ap_ready.write(0);
         let stack = if let Some(stack) = ap_stack.take() {

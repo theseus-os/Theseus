@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 memory_structs = { path = "../memory_structs" }
-cpu = { path = "../cpu" }
+derive_more = "0.99.0"
 
 [features]
 default = [ "qemu_virt" ]

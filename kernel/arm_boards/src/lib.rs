@@ -30,16 +30,18 @@ pub enum SecondaryCoresStartup {
 
 #[derive(Debug, Copy, Clone)]
 pub struct BoardConfig {
-    pub cpu_ids: [cpu::CpuId; board::NUM_CPUS],
+    pub cpu_ids: [mpidr::DefinedMpidrValue; board::NUM_CPUS],
     pub interrupt_controller: InterruptControllerConfig,
 }
 
 // by default & on x86_64, the default.rs file is used
-#[cfg_attr(all(target_arch = "aarch64", feature = "qemu_virt"), path = "qemu_virt.rs")]
+#[cfg_attr(all(target_arch = "aarch64", feature = "qemu_virt"), path = "boards/qemu_virt.rs")]
 #[cfg_attr(not(any(
     all(target_arch = "aarch64", feature = "qemu_virt"),
-)), path = "default.rs")]
+)), path = "boards/default.rs")]
 mod board;
+
+pub mod mpidr;
 
 pub use board::NUM_CPUS;
 pub use board::BOARD_CONFIG;

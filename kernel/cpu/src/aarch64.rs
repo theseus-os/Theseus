@@ -6,6 +6,7 @@ use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
 use irq_safety::RwLockIrqSafe;
 use core::fmt;
 use alloc::vec::Vec;
+use arm_boards::mpidr::DefinedMpidrValue;
 
 use super::CpuId;
 
@@ -89,18 +90,21 @@ impl MpidrValue {
         };
         (self.0 >> shift) as u8
     }
+}
 
-    /// Create an `MpidrValue` from its four affinity numbers
-    pub const fn new(aff3: u8, aff2: u8, aff1: u8, aff0: u8) -> Self {
-        let aff3 = (aff3 as u64) << 32;
-        let aff2 = (aff2 as u64) << 16;
-        let aff1 = (aff1 as u64) <<  8;
-        let aff0 = (aff0 as u64) <<  0;
-        Self(aff3 | aff2 | aff1 | aff0)
+impl From<DefinedMpidrValue> for MpidrValue {
+    fn from(def_mpidr: DefinedMpidrValue) -> Self {
+        Self(def_mpidr.value())
     }
 }
 
-impl const From<CpuId> for MpidrValue {
+impl From<DefinedMpidrValue> for CpuId {
+    fn from(def_mpidr: DefinedMpidrValue) -> Self {
+        Self::from(MpidrValue::from(def_mpidr))
+    }
+}
+
+impl From<CpuId> for MpidrValue {
     fn from(cpu_id: CpuId) -> Self {
         // move aff3 from bits [24:31] to [32:39]
         let aff_3     = ((cpu_id.0 & 0xff000000) as u64) << 8;
@@ -110,7 +114,7 @@ impl const From<CpuId> for MpidrValue {
     }
 }
 
-impl const From<MpidrValue> for CpuId {
+impl From<MpidrValue> for CpuId {
     fn from(mpidr: MpidrValue) -> Self {
         // move aff3 from bits [32:39] to [24:31]
         let aff_3     = ((mpidr.0 & 0xff00000000) >> 8) as u32;
