@@ -28,8 +28,11 @@ pub enum SecondaryCoresStartup {
 }
 */
 
-// by default & on x86_64, the board.rs file is used
+// by default & on x86_64, the default.rs file is used
 #[cfg_attr(all(target_arch = "aarch64", feature = "qemu_virt"), path = "qemu_virt.rs")]
+#[cfg_attr(not(any(
+    all(target_arch = "aarch64", feature = "qemu_virt"),
+)), path = "default.rs")]
 mod board;
 
 pub use board::*;
