@@ -36,20 +36,64 @@ pub struct FixedCpuLocal {
     pub size:   usize,
     pub align:  usize,
 }
+
 // NOTE: These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
-impl FixedCpuLocal {
-    pub const CPU_ID:                       Self = Self { offset: 8,  size: 4, align: 4 };
-    pub const PREEMPTION_COUNT:             Self = Self { offset: 12, size: 1, align: 1 };
-    pub const TASK_SWITCH_PREEMPTION_GUARD: Self = Self { offset: 16, size: 8, align: 4 };
-    pub const DROP_AFTER_TASK_SWITCH:       Self = Self { offset: 24, size: 8, align: 8 };
+pub enum CpuLocalField {
+    CpuId,
+    PreemptionCount,
+    TaskSwitchPreemptionGuard,
+    DropAfterTaskSwitch,
+}
+
+impl CpuLocalField {
+    pub const fn offset(&self) -> usize {
+        match self {
+            Self::CpuId => 8,
+            Self::PreemptionCount => 12,
+            Self::TaskSwitchPreemptionGuard => 16,
+            Self::DropAfterTaskSwitch => 24,
+        }
+    }
+
+    // TODO: Do we even need to know the size and alignment?
+
+    // pub const fn size(&self) -> usize {
+    //     match self {
+    //         Self::CpuId => 4,
+    //         Self::PreemptionCount => 1,
+    //         Self::TaskSwitchPreemptionGuard => 8,
+    //         Self::DropAfterTaskSwitch => 8,
+    //     }
+    // }
+
+    // pub const fn align(&self) -> usize {
+    //     match self {
+    //         Self::CpuId => 4,
+    //         Self::PreemptionCount => 1,
+    //         Self::TaskSwitchPreemptionGuard => 4,
+    //         Self::DropAfterTaskSwitch => 8,
+    //     }
+    // }
+}
+
+// TODO: Could come up with a more imaginative name.
+pub unsafe trait Field: Sized {
+    const FIELD: CpuLocalField;
+
+    // const SIZE_CHECK: () = assert!(Self::FIELD.size() == size_of::<Self>());
+    // const ALIGN_CHECK: () = assert!(Self::FIELD.align() == align_of::<Self>());
 }
 
 /// A reference to a CPU-local variable.
 ///
 /// Note that this struct doesn't contain an instance of the type `T`,
 /// and dropping it has no effect.
-pub struct CpuLocal<const OFFSET: usize, T>(PhantomData<*mut T>);
-impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
+pub struct CpuLocal<T: Field>(PhantomData<*mut T>);
+
+impl<T> CpuLocal<T>
+where
+    T: Field,
+{
     /// Creates a new reference to a predefined CPU-local variable.
     ///
     /// # Arguments
@@ -63,12 +107,8 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
     ///
     /// Thus, the caller must guarantee that the type `T` is correct for the
     /// given `FixedCpuLocal`.
-    pub const unsafe fn new_fixed(
-        fixed: FixedCpuLocal,
-    ) -> Self {
-        assert!(OFFSET == fixed.offset);
-        assert!(size_of::<T>()  == fixed.size);
-        assert!(align_of::<T>() == fixed.align);
+    pub const unsafe fn new_fixed() -> Self {
+        // FIXME: Should this still be unsafe?
         Self(PhantomData)
     }
 
@@ -97,7 +137,7 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
     where
         F: FnOnce(&T) -> R,
     {
-        let ptr_to_cpu_local = self.self_ptr() + OFFSET;
+        let ptr_to_cpu_local = self.self_ptr() + T::FIELD.offset();
         let local_ref = unsafe { &*(ptr_to_cpu_local as *const T) };
         func(local_ref)
     }
@@ -111,7 +151,7 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
         F: FnOnce(&mut T) -> R,
     {
         let _held_interrupts = irq_safety::hold_interrupts();
-        let ptr_to_cpu_local = self.self_ptr() + OFFSET;
+        let ptr_to_cpu_local = self.self_ptr() + T::FIELD.offset();
         let local_ref_mut = unsafe { &mut *(ptr_to_cpu_local as *mut T) };
         func(local_ref_mut)
     }
@@ -134,7 +174,10 @@ impl<const OFFSET: usize, T> CpuLocal<OFFSET, T> {
     }
 }
 
-impl<const OFFSET: usize, T: Copy> CpuLocal<OFFSET, T> {
+impl<T> CpuLocal<T>
+where
+    T: Copy + Field,
+{
     /// Returns a copy of this `CpuLocal`'s inner value of type `T`.
     ///
     /// This is a convenience function only available for types where `T: Copy`.
@@ -209,18 +252,23 @@ pub fn init<P>(
 
     // TODO Remove, temp tests
     if true {
-        let test_value = CpuLocal::<32, u64>(PhantomData);
-        test_value.with(|tv| log::warn!("Got test_value: {:#X}", *tv));
-        log::warn!("Setting test_value to 0x12345678...");
-        test_value.with_mut(|tv| { *tv = 0x12345678; });
-        test_value.with(|tv| log::warn!("Got test_value: {:#X}", *tv));
+        // NOTE: The fact that this previously compiled in `cpu_local` is
+        // indicative of an unsafe API, as the offsets (and types) are
+        // completely arbitrary. There's nothing stopping us from trying to
+        // access CpuLocal::<16, String> which would be undefined behaviour.
 
-        let test_string = CpuLocal::<40, alloc::string::String>(PhantomData);
-        test_string.with(|s| log::warn!("Got test_string: {:?}", s));
-        let new_str = ", world!";
-        log::warn!("Appending {:?} to test_string...", new_str);
-        test_string.with_mut(|s| s.push_str(new_str));
-        test_string.with(|s| log::warn!("Got test_string: {:?}", s));
+        // let test_value = CpuLocal::<32, u64>(PhantomData);
+        // test_value.with(|tv| log::warn!("Got test_value: {:#X}", *tv));
+        // log::warn!("Setting test_value to 0x12345678...");
+        // test_value.with_mut(|tv| { *tv = 0x12345678; });
+        // test_value.with(|tv| log::warn!("Got test_value: {:#X}", *tv));
+
+        // let test_string = CpuLocal::<40, alloc::string::String>(PhantomData);
+        // test_string.with(|s| log::warn!("Got test_string: {:?}", s));
+        // let new_str = ", world!";
+        // log::warn!("Appending {:?} to test_string...", new_str);
+        // test_string.with_mut(|s| s.push_str(new_str));
+        // test_string.with(|s| log::warn!("Got test_string: {:?}", s));
     }
     Ok(())
 }

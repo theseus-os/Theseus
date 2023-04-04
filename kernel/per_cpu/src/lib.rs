@@ -35,8 +35,8 @@
 
 extern crate alloc; // TODO temp remove this 
 
-use cpu::CpuId;
-use preemption::{PreemptionCount, PreemptionGuard};
+use cpu_local::{CpuLocalField, Field};
+use preemption::PreemptionGuard;
 use task::TaskRef;
 
 /// The data stored on a per-CPU basis in Theseus.
@@ -71,23 +71,24 @@ pub struct PerCpuData {
     /// A preemption guard used during task switching to ensure that one task switch
     /// cannot interrupt (preempt) another task switch already in progress.
     // task_switch_preemption_guard: Option<TestU32>, // TODO temp remove this
-    task_switch_preemption_guard: Option<PreemptionGuard>,
+    task_switch_preemption_guard: TaskSwitchPreemptionGuard,
     /// Data that should be dropped after switching away from a task that has exited.
     /// Currently, this contains the previous task's `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
-    drop_after_task_switch: Option<TaskRef>,
+    drop_after_task_switch: DropAfterTaskSwitch,
     test_value: u64,
     test_string: alloc::string::String,
 }
+
 impl PerCpuData {
     /// Defines the initial values of each per-CPU state.
-    fn new(self_ptr: usize, cpu_id: CpuId) -> Self {
+    fn new(self_ptr: usize, cpu_id: cpu::CpuId) -> Self {
         Self {
             self_ptr,
-            cpu_id,
-            preemption_count: PreemptionCount::new(),
-            task_switch_preemption_guard: None,
-            drop_after_task_switch: None,
+            cpu_id: CpuId(cpu_id),
+            preemption_count: PreemptionCount(preemption::PreemptionCount::new()),
+            task_switch_preemption_guard: TaskSwitchPreemptionGuard(None),
+            drop_after_task_switch: DropAfterTaskSwitch(None),
             test_value: 0xDEADBEEF,
             test_string: alloc::string::String::from("test_string hello"),
 
@@ -95,11 +96,39 @@ impl PerCpuData {
     }
 }
 
+#[repr(transparent)]
+pub struct CpuId(pub cpu::CpuId);
+
+unsafe impl Field for CpuId {
+    const FIELD: CpuLocalField = CpuLocalField::CpuId;
+}
+
+#[repr(transparent)]
+pub struct PreemptionCount(pub preemption::PreemptionCount);
+
+unsafe impl Field for PreemptionCount {
+    const FIELD: CpuLocalField = CpuLocalField::PreemptionCount;
+}
+
+#[repr(transparent)]
+pub struct TaskSwitchPreemptionGuard(pub Option<PreemptionGuard>);
+
+unsafe impl Field for TaskSwitchPreemptionGuard {
+    const FIELD: CpuLocalField = CpuLocalField::TaskSwitchPreemptionGuard;
+}
+
+#[repr(transparent)]
+pub struct DropAfterTaskSwitch(pub Option<TaskRef>);
+
+unsafe impl Field for DropAfterTaskSwitch {
+    const FIELD: CpuLocalField = CpuLocalField::DropAfterTaskSwitch;
+}
+
 /// Initializes the current CPU's `PerCpuData`.
 ///
 /// This must be invoked from (run on) the actual CPU with the given `cpu_id`;
 /// the main bootstrap CPU cannot run this for all CPUs itself.
-pub fn init(cpu_id: CpuId) -> Result<(), &'static str> {
+pub fn init(cpu_id: cpu::CpuId) -> Result<(), &'static str> {
     cpu_local::init(
         cpu_id.value(),
         core::mem::size_of::<PerCpuData>(),
@@ -109,27 +138,16 @@ pub fn init(cpu_id: CpuId) -> Result<(), &'static str> {
 
 mod const_assertions {
     use core::mem::{align_of, size_of};
-    use cpu_local::FixedCpuLocal;
+    use cpu_local::CpuLocalField;
     use memoffset::offset_of;
     use super::*;
 
-    const _: () = assert!(0 == offset_of!(PerCpuData, self_ptr));
     const _: () = assert!(8 == size_of::<usize>());
     const _: () = assert!(8 == align_of::<usize>());
 
-    const _: () = assert!(FixedCpuLocal::CPU_ID.offset == offset_of!(PerCpuData, cpu_id));
-    const _: () = assert!(FixedCpuLocal::CPU_ID.size   == size_of::<CpuId>());
-    const _: () = assert!(FixedCpuLocal::CPU_ID.align  == align_of::<CpuId>());
-
-    const _: () = assert!(FixedCpuLocal::PREEMPTION_COUNT.offset == offset_of!(PerCpuData, preemption_count));
-    const _: () = assert!(FixedCpuLocal::PREEMPTION_COUNT.size   == size_of::<PreemptionCount>());
-    const _: () = assert!(FixedCpuLocal::PREEMPTION_COUNT.align  == align_of::<PreemptionCount>());
-
-    const _: () = assert!(FixedCpuLocal::TASK_SWITCH_PREEMPTION_GUARD.offset == offset_of!(PerCpuData, task_switch_preemption_guard));
-    const _: () = assert!(FixedCpuLocal::TASK_SWITCH_PREEMPTION_GUARD.size   == size_of::<Option<PreemptionGuard>>());
-    const _: () = assert!(FixedCpuLocal::TASK_SWITCH_PREEMPTION_GUARD.align  == align_of::<Option<PreemptionGuard>>());
-
-    const _: () = assert!(FixedCpuLocal::DROP_AFTER_TASK_SWITCH.offset == offset_of!(PerCpuData, drop_after_task_switch));
-    const _: () = assert!(FixedCpuLocal::DROP_AFTER_TASK_SWITCH.size   == size_of::<Option<TaskRef>>());
-    const _: () = assert!(FixedCpuLocal::DROP_AFTER_TASK_SWITCH.align  == align_of::<Option<TaskRef >>());
+    const _: () = assert!(0 == offset_of!(PerCpuData, self_ptr));
+    const _: () = assert!(CpuLocalField::CpuId.offset() == offset_of!(PerCpuData, cpu_id));
+    const _: () = assert!(CpuLocalField::PreemptionCount.offset() == offset_of!(PerCpuData, preemption_count));
+    const _: () = assert!(CpuLocalField::TaskSwitchPreemptionGuard.offset() == offset_of!(PerCpuData, task_switch_preemption_guard));
+    const _: () = assert!(CpuLocalField::DropAfterTaskSwitch.offset() == offset_of!(PerCpuData, drop_after_task_switch));
 } 
