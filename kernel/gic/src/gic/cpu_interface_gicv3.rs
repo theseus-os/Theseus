@@ -13,12 +13,12 @@ use super::Priority;
 use super::InterruptNumber;
 
 const SGIR_TARGET_ALL_OTHER_PE: u64 = 1 << 40;
-const IGRPEN_ENABLED: usize = 1;
+const IGRPEN_ENABLED: u64 = 1;
 
 /// Enables routing of group 1 interrupts for the current CPU and configures
 /// the end-of-interrupt mode
 pub fn init() {
-    let mut icc_ctlr: usize;
+    let mut icc_ctlr: u64;
 
     unsafe { asm!("mrs {}, ICC_CTLR_EL1", out(reg) icc_ctlr) };
     // clear bit 1 (EOIMode) so that eoi signals both
@@ -40,7 +40,7 @@ pub fn init() {
 /// until this CPU or another one is ready to handle
 /// them
 pub fn get_minimum_priority() -> Priority {
-    let mut reg_value: usize;
+    let mut reg_value: u64;
     unsafe { asm!("mrs {}, ICC_PMR_EL1", out(reg) reg_value) };
     u8::MAX - (reg_value as u8)
 }
@@ -50,7 +50,7 @@ pub fn get_minimum_priority() -> Priority {
 /// until this CPU or another one is ready to handle
 /// them
 pub fn set_minimum_priority(priority: Priority) {
-    let reg_value = (u8::MAX - priority) as usize;
+    let reg_value = (u8::MAX - priority) as u64;
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
@@ -58,7 +58,7 @@ pub fn set_minimum_priority(priority: Priority) {
 /// been fully handled, by zeroing the current priority level of this CPU.
 /// This implies that the CPU is ready to process interrupts again.
 pub fn end_of_interrupt(int: InterruptNumber) {
-    let reg_value = int as usize;
+    let reg_value = int as u64;
     unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
 }
 
@@ -67,8 +67,8 @@ pub fn end_of_interrupt(int: InterruptNumber) {
 /// the requested interrupt is being handled by
 /// this CPU.
 pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
-    let int_num: usize;
-    let priority: usize;
+    let int_num: u64;
+    let priority: u64;
 
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
