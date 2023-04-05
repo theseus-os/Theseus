@@ -50,6 +50,8 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
+    irq_safety::disable_interrupts();
+
     info!("Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
         processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
@@ -66,14 +68,10 @@ pub fn kstart_ap(
         || panic!("BUG: kstart_ap(): couldn't get stack created for CPU {}", cpu_id)
     );
 
-    #[cfg(target_arch = "aarch64")] {
-        log::info!("cpu {} is ready!", cpu_id);
-        loop {}
-    }
-
-    // initialize interrupts (including TSS/GDT) for this AP
     let kernel_mmi_ref = get_kernel_mmi_ref().expect("kstart_ap(): kernel_mmi ref was None");
+
     #[cfg(target_arch = "x86_64")] {
+        // initialize interrupts (including TSS/GDT) for this AP
         let (double_fault_stack, privilege_stack) = {
             let mut kernel_mmi = kernel_mmi_ref.lock();
             (
@@ -85,23 +83,27 @@ pub fn kstart_ap(
         };
         let _idt = interrupts::init_ap(cpu_id, double_fault_stack.top_unusable(), privilege_stack.top_unusable())
             .expect("kstart_ap(): failed to initialize interrupts!");
+
+        // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
+        // This must be done before initializing task spawning, because that relies on the ability to
+        // enable/disable preemption, which is partially implemented by the Local APIC.
+        LocalApic::init(
+            &mut kernel_mmi_ref.lock().page_table,
+            processor_id,
+            Some(cpu_id.value()),
+            false,
+            nmi_lint,
+            nmi_flags,
+        ).unwrap();
     }
 
-    #[cfg(target_arch = "aarch64")]
-    interrupts::init_ap();
+    #[cfg(target_arch = "aarch64")] {
+        interrupts::init_ap();
 
-    // Initialize this CPU's Local APIC such that we can use everything that depends on APIC IDs.
-    // This must be done before initializing task spawning, because that relies on the ability to
-    // enable/disable preemption, which is partially implemented by the Local APIC.
-    #[cfg(target_arch = "x86_64")]
-    LocalApic::init(
-        &mut kernel_mmi_ref.lock().page_table,
-        processor_id,
-        Some(cpu_id.value()),
-        false,
-        nmi_lint,
-        nmi_flags,
-    ).unwrap();
+        // Register this CPU as online in the system
+        // This is the equivalent of `LocalApic::init` on aarch64
+        cpu::register_cpu(false).unwrap();
+    }
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // task management subsystem and create the idle task for this CPU.

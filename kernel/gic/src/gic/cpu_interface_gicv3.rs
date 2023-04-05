@@ -98,15 +98,13 @@ pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
 
             // level 0 affinity as a GICv2-style target list
             let aff0 = mpidr.affinity(cpu::AffinityShift::LevelZero);
-            let target_list = if aff0 >= 16 {
-                panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
-            } else {
-                1 << aff0
+            let target_list = match aff0 >= 16 {
+                true => panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16"),
+                false => 1 << aff0,
             };
+
             aff3 | aff2 | aff1 | target_list
         },
-        // bit 31: Interrupt Routing Mode
-        // value of 1 to target any available cpu
         IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
         IpiTargetCpu::GICv2TargetList(_) => {
             panic!("Cannot use IpiTargetCpu::GICv2TargetList with GICv3!");

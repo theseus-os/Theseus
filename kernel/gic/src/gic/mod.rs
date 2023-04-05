@@ -1,27 +1,18 @@
 use core::convert::AsMut;
 
-use memory::{PageTable, BorrowedMappedPages, Mutable,
-PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at};
-
-use cpu::CpuId;
+use cpu::{CpuId, MpidrValue};
+use arm_boards::{mpidr::find_mpidr, NUM_CPUS, BOARD_CONFIG};
+use memory::{
+    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
+    allocate_pages, allocate_frames_at
+};
 
 use static_assertions::const_assert_eq;
-use bitflags::bitflags;
 
 mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
 mod dist_interface;
 mod redist_interface;
-
-/// Physical addresses of the CPU and Distributor
-/// interfaces as exposed by the qemu "virt" VM.
-pub mod qemu_virt_addrs {
-    use super::*;
-
-    pub const GICD: PhysicalAddress = PhysicalAddress::new_canonical(0x08000000);
-    pub const GICC: PhysicalAddress = PhysicalAddress::new_canonical(0x08010000);
-    pub const GICR: PhysicalAddress = PhysicalAddress::new_canonical(0x080A0000);
-}
 
 /// Boolean
 pub type Enabled = bool;
@@ -32,19 +23,61 @@ pub type InterruptNumber = u32;
 /// 8-bit unsigned integer
 pub type Priority = u8;
 
-bitflags! {
-    /// The legacy (GICv2) way of specifying
-    /// multiple target CPUs
-    pub struct TargetList: u8 {
-        const CPU_0 = 1 << 0;
-        const CPU_1 = 1 << 1;
-        const CPU_2 = 1 << 2;
-        const CPU_3 = 1 << 3;
-        const CPU_4 = 1 << 4;
-        const CPU_5 = 1 << 5;
-        const CPU_6 = 1 << 6;
-        const CPU_7 = 1 << 7;
-        const ALL_CPUS = u8::MAX;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TargetList(u8);
+
+impl TargetList {
+    pub fn new(list: &[CpuId]) -> Result<Self, &'static str> {
+        let mut this = 0;
+
+        for cpu_id in list {
+            let mpidr = MpidrValue::from(*cpu_id).value();
+            if mpidr < 8 {
+                this |= 1 << mpidr;
+            } else {
+                return Err("CPU id is too big for GICv2 (should be < 8)");
+            }
+        }
+
+        Ok(Self(this))
+    }
+
+    /// Tries to create a `TargetList` from `arm_boards::BOARD_CONFIG.cpu_ids`
+    pub fn new_all_cpus() -> Result<Self, &'static str> {
+        let cpu_ids: [CpuId; NUM_CPUS] = core::array::from_fn(|i| {
+            CpuId::from(BOARD_CONFIG.cpu_ids[i])
+        });
+
+        Self::new(&cpu_ids).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
+    }
+
+    pub fn iter(self) -> TargetListIterator {
+        TargetListIterator {
+            bitfield: self.0,
+            shift: 0,
+        }
+    }
+}
+
+pub struct TargetListIterator {
+    bitfield: u8,
+    shift: u8,
+}
+
+impl Iterator for TargetListIterator {
+    type Item = Option<CpuId>;
+    fn next(&mut self) -> Option<Self::Item> {
+        while ((self.bitfield >> self.shift) & 1 == 0) && self.shift < 8 {
+            self.shift += 1;
+        }
+
+        if self.shift < 8 {
+            let def_mpidr = find_mpidr(self.shift as u64);
+            self.shift += 1;
+            Some(def_mpidr.map(|m| m.into()))
+        } else {
+            None
+        }
     }
 }
 
@@ -67,6 +100,21 @@ pub enum IpiTargetCpu {
     AllOtherCpus,
     /// The interrupt will be delivered to all CPUs specified by the included target list
     GICv2TargetList(TargetList),
+}
+
+impl SpiDestination {
+    /// When this is a GICv2TargetList, converts the list to
+    /// `AnyCpuAvailable` if the list contains all CPUs.
+    pub fn canonicalize(self) -> Self {
+        match self {
+            Self::Specific(cpu_id) => Self::Specific(cpu_id),
+            Self::AnyCpuAvailable => Self::AnyCpuAvailable,
+            Self::GICv2TargetList(list) => match TargetList::new_all_cpus() == Ok(list) {
+                true => Self::AnyCpuAvailable,
+                false => Self::GICv2TargetList(list),
+            },
+        }
+    }
 }
 
 const U32BITS: usize = u32::BITS as usize;
@@ -164,6 +212,17 @@ impl GicRegisters {
 
 const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 
+/// Returns the index to the redistributor base address for this CPU
+/// in the array of register base addresses.
+///
+/// This is defined in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
+fn get_current_cpu_redist_index() -> usize {
+    let cpu_id = cpu::current_cpu();
+    arm_boards::BOARD_CONFIG.cpu_ids.iter()
+          .position(|mpidr| CpuId::from(*mpidr) == cpu_id)
+          .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
+}
+
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
 
@@ -172,12 +231,16 @@ pub struct ArmGicV2 {
     pub processor: BorrowedMappedPages<GicRegisters, Mutable>,
 }
 
+pub struct ArmGicV3RedistPages {
+    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
+}
+
 pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributor: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redist_sgippi: BorrowedMappedPages<GicRegisters, Mutable>,
+    pub redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -197,7 +260,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: PhysicalAddress,
+        redist: [PhysicalAddress; arm_boards::NUM_CPUS],
     }
 }
 
@@ -240,25 +303,38 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
-                    let frames = allocate_frames_at(redist, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
-                    mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
-                };
+                let redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS] = core::array::try_from_fn(|i| {
+                    let phys_addr = redist[i];
 
-                let redist_sgippi = {
-                    let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
-                    let frames = allocate_frames_at(redist + REDIST_SGIPPI_OFFSET, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
-                    mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
-                };
+                    let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
+                        let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
+                        let frames = allocate_frames_at(phys_addr, 1)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
+                    };
 
-                redist_interface::init(redistributor.as_mut())?;
+                    redist_interface::init(redistributor.as_mut())?;
+
+                    let redist_sgippi = {
+                        let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
+                        let frames = allocate_frames_at(phys_addr + REDIST_SGIPPI_OFFSET, 1)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
+                    };
+
+                    Ok::<ArmGicV3RedistPages, &'static str>(ArmGicV3RedistPages {
+                        redistributor,
+                        redist_sgippi,
+                    })
+                })?;
+
+                // this cannot fail as we pushed exactly `arm_boards::CPUS` items
+                // let redistributors = redistributors.into_inner().unwrap();
+
                 cpu_interface_gicv3::init();
                 let affinity_routing = dist_interface::init(distributor.as_mut());
 
-                Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributor, redist_sgippi, affinity_routing }))
+                Ok(Self::V3(ArmGicV3 { distributor, dist_extended, redistributors, affinity_routing }))
             },
         }
     }
@@ -304,7 +380,8 @@ impl ArmGic {
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::is_sgippi_enabled(&v3.redist_sgippi, int)
+                let i = get_current_cpu_redist_index();
+                redist_interface::is_sgippi_enabled(&v3.redistributors[i].redist_sgippi, int)
             } else {
                 true
             },
@@ -317,7 +394,8 @@ impl ArmGic {
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         match int {
             0..=31 => if let Self::V3(v3) = self {
-                redist_interface::enable_sgippi(&mut v3.redist_sgippi, int, enabled);
+                let i = get_current_cpu_redist_index();
+                redist_interface::enable_sgippi(&mut v3.redistributors[i].redist_sgippi, int, enabled);
             },
             _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
         };
@@ -343,5 +421,11 @@ impl ArmGic {
             Self::V2(v2) => cpu_interface_gicv2::set_minimum_priority(&mut v2.processor, priority),
             Self::V3( _) => cpu_interface_gicv3::set_minimum_priority(priority),
         }
+    }
+}
+
+impl core::fmt::Debug for ArmGicV3RedistPages {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "ArmGicV3RedistPages")
     }
 }
