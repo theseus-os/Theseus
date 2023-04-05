@@ -10,6 +10,9 @@
 
 #![no_std]
 
+#[cfg(target_arch = "aarch64")]
+extern crate alloc;
+
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 #[cfg_attr(target_arch = "aarch64", path = "aarch64.rs")]
 mod arch;

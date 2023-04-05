@@ -13,22 +13,21 @@
 //! - Generating software interrupts (GICv2 style)
 
 use super::GicRegisters;
-use super::U32BYTES;
 use super::TargetCpu;
 use super::InterruptNumber;
 use super::Enabled;
 use super::TargetList;
 
 mod offset {
-    use super::U32BYTES;
-    pub const CTLR:      usize = 0x000 / U32BYTES;
-    pub const IGROUPR:   usize = 0x080 / U32BYTES;
-    pub const ISENABLER: usize = 0x100 / U32BYTES;
-    pub const ICENABLER: usize = 0x180 / U32BYTES;
-    pub const ITARGETSR: usize = 0x800 / U32BYTES;
-    pub const SGIR:      usize = 0xf00 / U32BYTES;
+    use crate::{Offset32, Offset64};
+    pub(crate) const CTLR:      Offset32 = Offset32::from_byte_offset(0x000);
+    pub(crate) const IGROUPR:   Offset32 = Offset32::from_byte_offset(0x080);
+    pub(crate) const ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
+    pub(crate) const ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
+    pub(crate) const ITARGETSR: Offset32 = Offset32::from_byte_offset(0x800);
+    pub(crate) const SGIR:      Offset32 = Offset32::from_byte_offset(0xf00);
     /// This one is on the 6th page
-    pub const P6IROUTER: usize = 0x100 / U32BYTES;
+    pub(crate) const P6IROUTER: Offset64 = Offset64::from_byte_offset(0x100);
 }
 
 // enable group 0
@@ -36,6 +35,9 @@ mod offset {
 
 // enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
+
+// enable 1 of N wakeup functionality
+const CTLR_E1NWF: u32 = 1 << 7;
 
 // Affinity Routing Enable, Non-secure state.
 const CTLR_ARE_NS: u32 = 1 << 5;
@@ -48,7 +50,7 @@ const SGIR_TARGET_ALL_OTHER_PE: u32 = 1 << 24;
 // bit 31: SPI routing
 //   1 = any available PE
 //   0 = route to specific PE
-const P6IROUTER_ANY_AVAILABLE_PE: u32 = 1 << 31;
+const P6IROUTER_ANY_AVAILABLE_PE: u64 = 1 << 31;
 
 // const GROUP_0: u32 = 0;
 const GROUP_1: u32 = 1;
@@ -63,7 +65,8 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 }
 
 /// Initializes the distributor by enabling forwarding
-/// of group 1 interrupts
+/// of group 1 interrupts and allowing the GIC to pick
+/// a core that is asleep for "1 of N" interrupts.
 ///
 /// Return value: whether or not affinity routing is
 /// currently enabled for both secure and non-secure
@@ -71,6 +74,7 @@ fn assert_cpu_bounds(target: &TargetCpu) {
 pub fn init(registers: &mut GicRegisters) -> Enabled {
     let mut reg = registers.read_volatile(offset::CTLR);
     reg |= CTLR_ENGRP1;
+    reg |= CTLR_E1NWF;
     registers.write_volatile(offset::CTLR, reg);
 
     // Return value: whether or not affinity routing is
@@ -157,7 +161,7 @@ impl super::ArmGic {
             let list = TargetList::from_bits_truncate(flags as u8);
             TargetCpu::GICv2TargetList(list)
         } else if let Self::V3(v3) = self {
-            let reg = v3.dist_extended.read_volatile(offset::P6IROUTER);
+            let reg = v3.dist_extended.read_volatile_64(offset::P6IROUTER);
 
             // bit 31: Interrupt Routing Mode
             // value of 1 to target any available cpu
@@ -167,7 +171,7 @@ impl super::ArmGic {
             } else {
                 let aff3 = (reg >> 8) & 0xff000000;
                 let aff012 = reg & 0xffffff;
-                TargetCpu::Specific(aff3 | aff012)
+                TargetCpu::Specific((aff3 | aff012) as u32)
             }
         } else {
             // If we're on gicv2 then affinity routing is off
@@ -196,6 +200,7 @@ impl super::ArmGic {
         } else if let Self::V3(v3) = self {
             let value = match target {
                 TargetCpu::Specific(cpu) => {
+                    let cpu = cpu as u64;
                     // shift aff3 8 bits to the left
                     let aff3 = (cpu & 0xff000000) << 8;
                     // keep aff 0, 1 & 2 where they are
@@ -212,7 +217,7 @@ impl super::ArmGic {
                 },
             };
 
-            v3.dist_extended.write_volatile(offset::P6IROUTER, value);
+            v3.dist_extended.write_volatile_64(offset::P6IROUTER, value);
         }
 
         // If we're on gicv2 then affinity routing is off

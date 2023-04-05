@@ -8,9 +8,10 @@
 
 #![no_std]
 #![feature(doc_cfg)]
+#![feature(array_try_from_fn)]
 
-#[cfg(any(target_arch = "aarch64", doc))]
+#[cfg(target_arch = "aarch64")]
 mod gic;
 
-#[cfg(any(target_arch = "aarch64", doc))]
+#[cfg(target_arch = "aarch64")]
 pub use gic::*;

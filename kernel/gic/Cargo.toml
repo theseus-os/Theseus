@@ -12,3 +12,5 @@ zerocopy = "0.5.0"
 log = "0.4.8"
 
 memory = { path = "../memory" }
+cpu = { path = "../cpu" }
+arm_boards = { path = "../arm_boards" }
