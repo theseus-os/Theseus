@@ -19,8 +19,8 @@ use super::InterruptNumber;
 use super::Enabled;
 use super::TargetList;
 
-use arm_boards::mpidr::find_mpidr;
-use cpu::MpidrValue;
+use arm_boards::{mpidr::find_mpidr, NUM_CPUS, BOARD_CONFIG};
+use cpu::{CpuId, MpidrValue};
 
 mod offset {
     use crate::{Offset32, Offset64};
@@ -185,7 +185,12 @@ impl super::ArmGic {
 
             let value = match target {
                 SpiDestination::Specific(cpu) => 1 << cpu.value(),
-                SpiDestination::AnyCpuAvailable => 0xff,
+                SpiDestination::AnyCpuAvailable => {
+                    let cpu_ids: [CpuId; NUM_CPUS] = core::array::from_fn(|i| {
+                        CpuId::from(BOARD_CONFIG.cpu_ids[i])
+                    });
+                    TargetList::new(&cpu_ids).unwrap().0 as u32
+                },
                 SpiDestination::GICv2TargetList(list) => list.0 as u32,
             };
 
