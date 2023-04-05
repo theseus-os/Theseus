@@ -39,19 +39,24 @@ bitflags! {
     }
 }
 
-pub enum TargetCpu {
-    /// That interrupt must be handled by
-    /// a specific PE in the system.
-    ///
-    /// - level 3 affinity is expected in bits [24:31]
-    /// - level 2 affinity is expected in bits [16:23]
-    /// - level 1 affinity is expected in bits [8:15]
-    /// - level 0 affinity is expected in bits [0:7]
-    Specific(u32),
-    /// That interrupt can be handled by
-    /// any PE that is not busy with another,
-    /// more important task
+/// Target of a shared-peripheral interrupt
+pub enum SpiDestination {
+    /// The interrupt must be delivered to a specific CPU.
+    Specific(CpuId),
+    /// That interrupt can be handled by any PE that is not busy with another, more
+    /// important task
     AnyCpuAvailable,
+    /// The interrupt will be delivered to all CPUs specified by the included target list
+    GICv2TargetList(TargetList),
+}
+
+/// Target of an inter-processor interrupt
+pub enum IpiTargetCpu {
+    /// The interrupt will be delivered to a specific CPU.
+    Specific(CpuId),
+    /// The interrupt will be delivered to all CPUs except the sender.
+    AllOtherCpus,
+    /// The interrupt will be delivered to all CPUs specified by the included target list
     GICv2TargetList(TargetList),
 }
 
@@ -288,7 +293,7 @@ impl ArmGic {
     /// also called software generated interrupt (SGI).
     ///
     /// note: on Aarch64, IPIs must have a number below 16 on ARMv8
-    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: TargetCpu) {
+    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: IpiTargetCpu) {
         assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
 
         match self {

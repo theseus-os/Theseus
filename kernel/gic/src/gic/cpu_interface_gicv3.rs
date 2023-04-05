@@ -8,11 +8,11 @@
 //! - Generating software interrupts
 
 use core::arch::asm;
-use super::TargetCpu;
+use super::IpiTargetCpu;
 use super::Priority;
 use super::InterruptNumber;
 
-const SGIR_TARGET_ALL_OTHER_PE: usize = 1 << 40;
+const SGIR_TARGET_ALL_OTHER_PE: u64 = 1 << 40;
 const IGRPEN_ENABLED: usize = 1;
 
 /// Enables routing of group 1 interrupts for the current CPU and configures
@@ -82,41 +82,35 @@ pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
     (int_num as InterruptNumber, priority as u8)
 }
 
-pub fn send_ipi(int_num: InterruptNumber, target: TargetCpu) {
+pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
     let mut value = match target {
-        TargetCpu::Specific(cpu) => {
-            let cpu = cpu as usize;
+        IpiTargetCpu::Specific(cpu) => {
+            let mpidr: cpu::MpidrValue = cpu.into();
 
-            // level 3 affinity is expected in cpu[24:31]
-            // we want it in bits [48:55]
-            let aff3 = (cpu & 0xff000000) << 24;
+            // level 3 affinity in bits [48:55]
+            let aff3 = mpidr.affinity(3) << 48;
 
-            // level 2 affinity is expected in cpu[16:23]
-            // we want it in bits [32:39]
-            let aff2 = cpu & 0xff0000 << 16;
+            // level 2 affinity in bits [32:39]
+            let aff2 = mpidr.affinity(2) << 32;
 
-            // level 1 affinity is expected in cpu[8:15]
-            // we want it in bits [16:23]
-            let aff1 = cpu & 0xff00 << 8;
+            // level 1 affinity in bits [16:23]
+            let aff1 = mpidr.affinity(1) << 16;
 
-            // level 0 affinity is expected in cpu[0:7]
-            // we want it as a GICv2-style target list
-            let aff0 = cpu & 0xff;
-            let target_list = if aff0 >= 16 {
-                panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16");
-            } else {
-                1 << aff0
+            // level 0 affinity as a GICv2-style target list
+            let aff0 = mpidr.affinity(0);
+            let target_list = match aff0 >= 16 {
+                true => panic!("[GIC driver] cannot send an IPI to a core with Aff0 >= 16"),
+                false => 1 << aff0,
             };
+
             aff3 | aff2 | aff1 | target_list
         },
-        // bit 31: Interrupt Routing Mode
-        // value of 1 to target any available cpu
-        TargetCpu::AnyCpuAvailable => SGIR_TARGET_ALL_OTHER_PE,
-        TargetCpu::GICv2TargetList(_) => {
-            panic!("Cannot use TargetCpu::GICv2TargetList with GICv3!");
+        IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
+        IpiTargetCpu::GICv2TargetList(_) => {
+            panic!("Cannot use IpiTargetCpu::GICv2TargetList with GICv3!");
         },
     };
 
-    value |= (int_num as usize) << 24;
+    value |= (int_num as u64) << 24;
     unsafe { asm!("msr ICC_SGI1R_EL1, {}", in(reg) value) };
 }

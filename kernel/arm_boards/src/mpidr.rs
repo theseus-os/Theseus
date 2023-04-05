@@ -23,3 +23,16 @@ impl DefinedMpidrValue {
         Self(aff3 | aff2 | aff1 | aff0)
     }
 }
+
+/// Tries to find this MPIDR value among those known for this board.
+///
+/// Returns None if no CPU has this MPIDR value.
+pub fn find_mpidr(mpidr_value: u64) -> Option<DefinedMpidrValue> {
+    for def_mpidr in crate::BOARD_CONFIG.cpu_ids {
+        if def_mpidr.value() == mpidr_value {
+            return Some(def_mpidr)
+        }
+    }
+
+    None
+}
