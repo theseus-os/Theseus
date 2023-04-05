@@ -91,8 +91,6 @@ impl MpidrValue {
     }
 
     /// Reads an affinity `level` from this `MpidrValue`.
-    ///
-    /// Panics if the given affinity level is not 0, 1, 2, or 3.
     pub fn affinity(self, level: AffinityShift) -> u64 {
         (self.0 >> (level as u64)) & (u8::MAX as u64)
     }
