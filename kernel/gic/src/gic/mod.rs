@@ -1,7 +1,7 @@
 use core::convert::AsMut;
 
 use cpu::{CpuId, MpidrValue};
-use arm_boards::mpidr::find_mpidr;
+use arm_boards::{mpidr::find_mpidr, NUM_CPUS, BOARD_CONFIG};
 use memory::{
     PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
     allocate_pages, allocate_frames_at
@@ -23,7 +23,7 @@ pub type InterruptNumber = u32;
 /// 8-bit unsigned integer
 pub type Priority = u8;
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct TargetList(u8);
 
 impl TargetList {
@@ -40,6 +40,14 @@ impl TargetList {
         }
 
         Ok(Self(this))
+    }
+
+    pub fn new_all_cpus() -> Self {
+        let cpu_ids: [CpuId; NUM_CPUS] = core::array::from_fn(|i| {
+            CpuId::from(BOARD_CONFIG.cpu_ids[i])
+        });
+
+        Self::new(&cpu_ids).unwrap()
     }
 
     pub fn iter(self) -> TargetListIterator {
@@ -91,6 +99,21 @@ pub enum IpiTargetCpu {
     AllOtherCpus,
     /// The interrupt will be delivered to all CPUs specified by the included target list
     GICv2TargetList(TargetList),
+}
+
+impl SpiDestination {
+    /// When this is a GICv2TargetList, converts the list to
+    /// `AnyCpuAvailable` if the list contains all CPUs.
+    pub fn canonicalize(self) -> Self {
+        match self {
+            Self::Specific(cpu_id) => Self::Specific(cpu_id),
+            Self::AnyCpuAvailable => Self::AnyCpuAvailable,
+            Self::GICv2TargetList(list) => match TargetList::new_all_cpus() == list {
+                true => Self::AnyCpuAvailable,
+                false => Self::GICv2TargetList(list),
+            },
+        }
+    }
 }
 
 const U32BITS: usize = u32::BITS as usize;
