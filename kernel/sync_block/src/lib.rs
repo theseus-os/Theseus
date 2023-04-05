@@ -10,29 +10,31 @@ use wait_queue::WaitQueue;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Block {}
 
-impl !Send for Block {}
-
 impl Flavour for Block {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self::LockData = WaitQueue::new();
 
     type LockData = WaitQueue<Spin>;
 
-    type DeadlockPrevention = Spin;
+    type Guard = ();
+
+    #[inline]
+    fn mutex_try_lock<'a, T>(
+        mutex: &'a mutex::SpinMutex<T>,
+        _: &'a Self::LockData,
+    ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
+        mutex.try_lock_weak().map(|guard| (guard, ()))
+    }
 
     #[inline]
     fn mutex_lock<'a, T>(
-        mutex: &'a mutex::SpinMutex<Self::DeadlockPrevention, T>,
+        mutex: &'a mutex::SpinMutex<T>,
         data: &'a Self::LockData,
-    ) -> mutex::SpinMutexGuard<'a, Self::DeadlockPrevention, T> {
-        // TODO: try_lock_weak.
-        if let Some(guard) = mutex.try_lock() {
-            guard
+    ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {
+        if let Some(guard) = mutex.try_lock_weak() {
+            (guard, ())
         } else {
-            data.wait_until(|| {
-                // TODO: try_lock_weak
-                mutex.try_lock()
-            })
+            (data.wait_until(|| mutex.try_lock_weak()), ())
         }
     }
 

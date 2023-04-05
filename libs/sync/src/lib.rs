@@ -18,20 +18,30 @@ pub trait Flavour {
     /// Initial value for the lock data.
     const INIT: Self::LockData;
 
-    /// Additional data stored on the lock.
+    /// Additional data stored in the lock.
     type LockData;
 
-    type DeadlockPrevention: DeadlockPrevention;
+    type Guard;
+
+    /// Tries to acquire the given mutex.
+    fn mutex_try_lock<'a, T>(
+        mutex: &'a mutex::SpinMutex<T>,
+        data: &'a Self::LockData,
+    ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)>
+    where
+        Self: Sized;
 
     /// Acquires the given mutex.
     fn mutex_lock<'a, T>(
-        mutex: &'a mutex::SpinMutex<Self::DeadlockPrevention, T>,
+        mutex: &'a mutex::SpinMutex<T>,
         data: &'a Self::LockData,
-    ) -> mutex::SpinMutexGuard<'a, Self::DeadlockPrevention, T>
+    ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard)
     where
         Self: Sized;
 
     /// Performs any necessary actions after unlocking the mutex.
+    ///
+    /// This runs after the deadlock prevention guard has been dropped.
     fn post_unlock(mutex: &Self::LockData)
     where
         Self: Sized;
@@ -39,11 +49,10 @@ pub trait Flavour {
 
 /// A deadlock prevention method.
 pub trait DeadlockPrevention {
-    /// Performs any necessary actions prior to locking.
-    fn enter();
+    /// A guard that is stored in the mutex guard.
+    type Guard;
 
-    /// Performs any necessary actions after unlocking.
-    fn exit();
+    fn enter() -> Self::Guard;
 }
 
 impl<P> Flavour for P
@@ -54,14 +63,38 @@ where
 
     type LockData = ();
 
-    type DeadlockPrevention = P;
+    type Guard = <Self as DeadlockPrevention>::Guard;
+
+    #[inline]
+    fn mutex_try_lock<'a, T>(
+        mutex: &'a mutex::SpinMutex<T>,
+        _: &'a Self::LockData,
+    ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
+        let deadlock_guard = Self::enter();
+
+        if let Some(guard) = mutex.try_lock() {
+            Some((guard, deadlock_guard))
+        } else {
+            None
+        }
+    }
 
     #[inline]
     fn mutex_lock<'a, T>(
-        mutex: &'a mutex::SpinMutex<Self::DeadlockPrevention, T>,
+        mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
-    ) -> mutex::SpinMutexGuard<'a, Self::DeadlockPrevention, T> {
-        mutex.lock()
+    ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {
+        loop {
+            let deadlock_guard = Self::enter();
+            if let Some(guard) = mutex.try_lock_weak() {
+                return (guard, deadlock_guard);
+            }
+            drop(deadlock_guard);
+
+            while mutex.is_locked() {
+                core::hint::spin_loop();
+            }
+        }
     }
 
     #[inline]

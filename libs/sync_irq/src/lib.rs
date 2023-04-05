@@ -8,17 +8,11 @@ pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisableIrq, T>;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DisableIrq {}
 
-impl !Send for DisableIrq {}
-
 impl sync::DeadlockPrevention for DisableIrq {
-    #[inline]
-    fn enter() {
-        // FIXME: Recursive disabling doesn't work.
-        irq_safety::disable_interrupts();
-    }
+    type Guard = HeldInterrupts;
 
     #[inline]
-    fn exit() {
-        irq_safety::enable_interrupts();
+    fn enter() -> Self::Guard {
+        irq_safety::hold_interrupts();
     }
 }

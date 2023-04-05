@@ -1,6 +1,6 @@
-use crate::{DeadlockPrevention, Flavour};
+use crate::Flavour;
 use core::{
-    marker::PhantomData,
+    cell::UnsafeCell,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, Ordering},
@@ -9,12 +9,11 @@ use core::{
 /// A mutual exclusion primitive.
 pub struct Mutex<F, T>
 where
+    T: ?Sized,
     F: Flavour,
 {
-    inner: SpinMutex<F::DeadlockPrevention, T>,
     data: F::LockData,
-    /// Propagates !Send + !Sync bounds.
-    _phantom: PhantomData<F>,
+    inner: SpinMutex<T>,
 }
 
 impl<F, T> Mutex<F, T>
@@ -26,7 +25,6 @@ where
         Self {
             inner: SpinMutex::new(value),
             data: F::INIT,
-            _phantom: PhantomData,
         }
     }
 
@@ -37,20 +35,23 @@ where
 
     /// Acquires this mutex.
     pub fn lock(&self) -> MutexGuard<'_, F, T> {
+        let (inner, guard) = F::mutex_lock(&self.inner, &self.data);
+
         MutexGuard {
-            inner: ManuallyDrop::new(self.inner.lock()),
+            inner: ManuallyDrop::new(inner),
             data: &self.data,
-            _phantom: PhantomData,
+            _guard: guard,
         }
     }
 
     /// Attempts to acquire this mutex.
     pub fn try_lock(&self) -> Option<MutexGuard<'_, F, T>> {
-        // TODO: Weak cmpxchg?
-        self.inner.try_lock().map(|guard| MutexGuard {
-            inner: ManuallyDrop::new(guard),
+        let (inner, guard) = F::mutex_try_lock(&self.inner, &self.data)?;
+
+        Some(MutexGuard {
+            inner: ManuallyDrop::new(inner),
             data: &self.data,
-            _phantom: PhantomData,
+            _guard: guard,
         })
     }
 
@@ -69,10 +70,9 @@ pub struct MutexGuard<'a, F, T>
 where
     F: Flavour,
 {
-    inner: ManuallyDrop<SpinMutexGuard<'a, F::DeadlockPrevention, T>>,
+    inner: ManuallyDrop<SpinMutexGuard<'a, T>>,
     data: &'a F::LockData,
-    /// Propagates !Send + !Sync bounds.
-    _phantom: PhantomData<F>,
+    _guard: F::Guard,
 }
 
 impl<'a, F, T> Deref for MutexGuard<'a, F, T>
@@ -105,70 +105,106 @@ where
     }
 }
 
-// Types below are implementation details.
+// Types below are copied from spin except that try_lock_weak is exposed.
 
-pub type SpinMutex<P, T> = lock_api::Mutex<RawMutex<P>, T>;
-pub type SpinMutexGuard<'a, P, T> = lock_api::MutexGuard<'a, RawMutex<P>, T>;
-
-pub struct RawMutex<P>
+pub struct SpinMutex<T>
 where
-    P: DeadlockPrevention,
+    T: ?Sized,
 {
     lock: AtomicBool,
-    /// Propagates !Send + !Sync bounds.
-    _phantom: PhantomData<P>,
+    data: UnsafeCell<T>,
 }
 
-unsafe impl<P> lock_api::RawMutex for RawMutex<P>
-where
-    P: DeadlockPrevention,
-{
-    const INIT: Self = Self {
-        lock: AtomicBool::new(false),
-        _phantom: PhantomData,
-    };
-
-    type GuardMarker = ();
-
-    #[inline]
-    fn lock(&self) {
-        P::enter();
-        while !self.try_lock_weak() {
-            P::exit();
-            while self.is_locked() {
-                core::hint::spin_loop();
-            }
-            P::enter();
+impl<T> SpinMutex<T> {
+    pub const fn new(data: T) -> Self {
+        Self {
+            lock: AtomicBool::new(false),
+            data: UnsafeCell::new(data),
         }
     }
 
-    #[inline]
-    fn try_lock(&self) -> bool {
-        self.lock
-            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
+    pub fn get_mut(&mut self) -> &mut T {
+        self.data.get_mut()
     }
 
-    #[inline]
-    unsafe fn unlock(&self) {
-        self.lock.store(false, Ordering::Release);
+    pub fn into_inner(self) -> T
+    where
+        T: Sized,
+    {
+        self.data.into_inner()
     }
 
-    #[inline]
-    fn is_locked(&self) -> bool {
+    pub fn is_locked(&self) -> bool {
         self.lock.load(Ordering::Relaxed)
     }
-}
 
-impl<P> RawMutex<P>
-where
-    P: DeadlockPrevention,
-{
-    /// Tries to lock the mutex using [`AtomicBool::compare_exchange_weak`].
     #[inline]
-    pub fn try_lock_weak(&self) -> bool {
+    pub fn try_lock(&self) -> Option<SpinMutexGuard<'_, T>> {
+        self.lock
+            .compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed)
+            .ok()?;
+
+        Some(unsafe { self.guard() })
+    }
+
+    #[inline]
+    pub fn try_lock_weak(&self) -> Option<SpinMutexGuard<'_, T>> {
         self.lock
             .compare_exchange_weak(false, true, Ordering::Acquire, Ordering::Relaxed)
-            .is_ok()
+            .ok()?;
+
+        Some(unsafe { self.guard() })
+    }
+
+    unsafe fn guard(&self) -> SpinMutexGuard<'_, T> {
+        SpinMutexGuard {
+            lock: &self.lock,
+            data: unsafe { &mut *self.data.get() },
+        }
     }
 }
+
+pub struct SpinMutexGuard<'a, T>
+where
+    T: ?Sized,
+{
+    lock: &'a AtomicBool,
+    data: *mut T,
+}
+
+impl<'a, T> Deref for SpinMutexGuard<'a, T>
+where
+    T: ?Sized,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { &*self.data }
+    }
+}
+
+impl<'a, T> DerefMut for SpinMutexGuard<'a, T>
+where
+    T: ?Sized,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { &mut *self.data }
+    }
+}
+
+impl<'a, T> Drop for SpinMutexGuard<'a, T>
+where
+    T: ?Sized,
+{
+    fn drop(&mut self) {
+        self.lock.store(false, Ordering::Release);
+    }
+}
+
+// Same unsafe impls as `std::sync::Mutex`.
+
+unsafe impl<T: ?Sized + Send> Sync for SpinMutex<T> {}
+unsafe impl<T: ?Sized + Send> Send for SpinMutex<T> {}
+
+unsafe impl<T: ?Sized + Sync> Sync for SpinMutexGuard<'_, T> {}
+unsafe impl<T: ?Sized + Send> Send for SpinMutexGuard<'_, T> {}

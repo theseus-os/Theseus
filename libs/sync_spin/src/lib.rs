@@ -8,9 +8,10 @@ pub type MutexGuard<'a, T> = sync::MutexGuard<'a, Spin, T>;
 pub struct Spin {}
 
 impl sync::DeadlockPrevention for Spin {
-    #[inline]
-    fn enter() {}
+    type Guard = ();
 
     #[inline]
-    fn exit() {}
+    fn enter() -> Self::Guard {
+        ()
+    }
 }

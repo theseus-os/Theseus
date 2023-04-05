@@ -1,6 +1,8 @@
 #![feature(negative_impls)]
 #![no_std]
 
+use preemption::{hold_preemption, PreemptionGuard};
+
 pub type Mutex<T> = sync::Mutex<DisablePreemption, T>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisablePreemption, T>;
 
@@ -8,16 +10,16 @@ pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisablePreemption, T>;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct DisablePreemption {}
 
-impl !Send for DisablePreemption {}
+#[doc(hidden)]
+pub struct Guard(PreemptionGuard);
+
+impl !Send for Guard {}
 
 impl sync::DeadlockPrevention for DisablePreemption {
-    #[inline]
-    fn enter() {
-        preemption::disable_preemption()
-    }
+    type Guard = Guard;
 
     #[inline]
-    fn exit() {
-        preemption::enable_preemption()
+    fn enter() -> Self::Guard {
+        Guard(hold_preemption())
     }
 }
