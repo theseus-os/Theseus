@@ -2610,6 +2610,7 @@ version = "0.1.0"
 dependencies = [
  "cpu",
  "cpu_local",
+ "log",
  "memoffset 0.8.0",
  "preemption",
  "task",

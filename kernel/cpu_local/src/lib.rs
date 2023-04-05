@@ -17,7 +17,6 @@ extern crate alloc;
 use core::{
     arch::asm,
     marker::PhantomData,
-    mem::{size_of, align_of},
 };
 use alloc::collections::{BTreeMap, btree_map::Entry};
 use memory::{MappedPages, PteFlags};
@@ -27,88 +26,102 @@ use spin::Mutex;
 #[cfg(target_arch = "x86_64")]
 use x86_64::{registers::model_specific::GsBase, VirtAddr};
 
-/// Info use to obtain a reference to a CPU-local variable; see [`CpuLocal::new()`].
-///
-/// This struct is marked `#[non_exhaustive]`, so it cannot be instantiated elsewhere.
-#[non_exhaustive]
-pub struct FixedCpuLocal {
-    pub offset: usize,
-    pub size:   usize,
-    pub align:  usize,
-}
 
-// NOTE: These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
-pub enum CpuLocalField {
+/// The available CPU-local variables, i.e., fields in `per_cpu::PerCpuData` struct.
+//
+// NOTE: These fields and their offsets must be kept in sync with `per_cpu::PerCpuData`.
+//
+pub enum PerCpuField {
     CpuId,
     PreemptionCount,
     TaskSwitchPreemptionGuard,
     DropAfterTaskSwitch,
+    TestValue,
+    TestString,
 }
-
-impl CpuLocalField {
+impl PerCpuField {
+    /// Returns the offset of this field in the `per_cpu::PerCpuData` struct.
     pub const fn offset(&self) -> usize {
         match self {
             Self::CpuId => 8,
             Self::PreemptionCount => 12,
             Self::TaskSwitchPreemptionGuard => 16,
             Self::DropAfterTaskSwitch => 24,
+            Self::TestValue => 32,
+            Self::TestString => 40,
         }
     }
-
-    // TODO: Do we even need to know the size and alignment?
-
-    // pub const fn size(&self) -> usize {
-    //     match self {
-    //         Self::CpuId => 4,
-    //         Self::PreemptionCount => 1,
-    //         Self::TaskSwitchPreemptionGuard => 8,
-    //         Self::DropAfterTaskSwitch => 8,
-    //     }
-    // }
-
-    // pub const fn align(&self) -> usize {
-    //     match self {
-    //         Self::CpuId => 4,
-    //         Self::PreemptionCount => 1,
-    //         Self::TaskSwitchPreemptionGuard => 4,
-    //         Self::DropAfterTaskSwitch => 8,
-    //     }
-    // }
 }
 
-// TODO: Could come up with a more imaginative name.
-pub unsafe trait Field: Sized {
-    const FIELD: CpuLocalField;
 
-    // const SIZE_CHECK: () = assert!(Self::FIELD.size() == size_of::<Self>());
+/// This trait must be implemented for each field in `per_cpu::PerCpuData`.
+///
+/// Use the [`define_per_cpu_field!()`] macro to implement this trait.
+///
+/// ## Safety
+/// This is marked `unsafe` because the implementor must guarantee
+/// that the associated `FIELD` constant is correctly specified.
+/// * For example, the implementation of this trait for `CpuId` must specify
+///   the `FIELD` const as [`PerCpuField::CpuId`],
+///   but we cannot verify that here due to cyclic dependency issues.
+pub unsafe trait CpuLocalField: Sized {
+    const FIELD: PerCpuField;
+
+    // In the future, we will add a `DeadlockPrevention` parameter here
+    // to allow each field to dictate what needs to be temporarily disabled
+    // while accessing this field immutably or mutably.
+    // For example, disabling preemption, interrupts, or nothing.
+
+    // const SIZE_CHECK:  () = assert!(Self::FIELD.size() == size_of::<Self>());
     // const ALIGN_CHECK: () = assert!(Self::FIELD.align() == align_of::<Self>());
+}
+
+/// A macro used to define a type wrapper for inclusion in the `PerCpuData` struct.
+///
+/// This macro implements the [`CpuLocalField`]
+#[macro_export]
+macro_rules! define_per_cpu_field {
+    ($TypeWrapper:ident, $InnerType:ty, $PerCpuField:expr) => {
+        #[repr(transparent)]
+        struct $TypeWrapper($InnerType);
+        unsafe impl $crate::CpuLocalField for $TypeWrapper {
+            const FIELD: $crate::PerCpuField = $PerCpuField;
+        }
+
+        impl core::ops::Deref for $TypeWrapper {
+            type Target = $InnerType;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl core::ops::DerefMut for $TypeWrapper {
+            fn deref_mut(&mut self) -> &mut Self::Target {
+                &mut self.0
+            }
+        }
+    };
 }
 
 /// A reference to a CPU-local variable.
 ///
-/// Note that this struct doesn't contain an instance of the type `T`,
-/// and dropping it has no effect.
-pub struct CpuLocal<T: Field>(PhantomData<*mut T>);
-
-impl<T> CpuLocal<T>
-where
-    T: Field,
-{
+/// ## Usage Notes
+/// * This does not currently permit or handle usage of `CpuLocal::with_mut()`
+///   from within an interrupt handler context.
+///   * Interrupt handler contexts should only access a `CpuLocal` *immutably*.
+///   * If you need to mutate/modify a CPU-local variable from within an
+///     interrupt handler, please file an issue to alert the Theseus developers.
+/// * This struct does not contain an instance of the type `T`.
+///   Thus, dropping it has no effect.
+pub struct CpuLocal<T: CpuLocalField>(PhantomData<*const T>);
+impl<T: CpuLocalField> CpuLocal<T> {
     /// Creates a new reference to a predefined CPU-local variable.
     ///
-    /// # Arguments
-    /// * `fixed`: information about this CPU-local variable.
-    ///    Must be one of the public constants defined in [`FixedCpuLocal`].
-    ///
-    /// # Safety
-    /// This is unsafe because we currently do not have a way to guarantee
-    /// that the caller-provided type `T` is the same as the type intended for use
-    /// by the given `FixedCpuLocal`.
-    ///
-    /// Thus, the caller must guarantee that the type `T` is correct for the
-    /// given `FixedCpuLocal`.
-    pub const unsafe fn new_fixed() -> Self {
-        // FIXME: Should this still be unsafe?
+    /// The type `T: CpuLocalField` must be specified with the turbofish operator:
+    /// ```rust,no_run
+    /// static CPU_ID: CpuLocal<CpuId> = CpuId::new();
+    /// ```
+    pub const fn new() -> Self {
         Self(PhantomData)
     }
 
@@ -176,7 +189,7 @@ where
 
 impl<T> CpuLocal<T>
 where
-    T: Copy + Field,
+    T: Copy + CpuLocalField,
 {
     /// Returns a copy of this `CpuLocal`'s inner value of type `T`.
     ///
@@ -249,27 +262,6 @@ pub fn init<P>(
 
     // Set the new CPU-local data region as active and ready to be used on this CPU.
     data_region.set_as_current_cpu_local_base();
-
-    // TODO Remove, temp tests
-    if true {
-        // NOTE: The fact that this previously compiled in `cpu_local` is
-        // indicative of an unsafe API, as the offsets (and types) are
-        // completely arbitrary. There's nothing stopping us from trying to
-        // access CpuLocal::<16, String> which would be undefined behaviour.
-
-        // let test_value = CpuLocal::<32, u64>(PhantomData);
-        // test_value.with(|tv| log::warn!("Got test_value: {:#X}", *tv));
-        // log::warn!("Setting test_value to 0x12345678...");
-        // test_value.with_mut(|tv| { *tv = 0x12345678; });
-        // test_value.with(|tv| log::warn!("Got test_value: {:#X}", *tv));
-
-        // let test_string = CpuLocal::<40, alloc::string::String>(PhantomData);
-        // test_string.with(|s| log::warn!("Got test_string: {:?}", s));
-        // let new_str = ", world!";
-        // log::warn!("Appending {:?} to test_string...", new_str);
-        // test_string.with_mut(|s| s.push_str(new_str));
-        // test_string.with(|s| log::warn!("Got test_string: {:?}", s));
-    }
     Ok(())
 }
 

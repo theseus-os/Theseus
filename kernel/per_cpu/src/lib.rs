@@ -35,8 +35,7 @@
 
 extern crate alloc; // TODO temp remove this 
 
-use cpu_local::{CpuLocalField, Field};
-use preemption::PreemptionGuard;
+use cpu_local::{define_per_cpu_field, PerCpuField};
 use task::TaskRef;
 
 /// The data stored on a per-CPU basis in Theseus.
@@ -47,11 +46,17 @@ use task::TaskRef;
 ///
 /// This struct is not directly accessible; per-CPU states are accessible
 /// by other crates using the functions in the [`cpu_local`] crate.
+///
+/// ## Required traits
+/// Each field in this struct must implement [`cpu_local::PerCpuField`],
+/// which in turn mandates that each field have a unique type distinct from the type
+/// of every other field.
+/// Currently we achieve this with newtype wrappers
 #[allow(dead_code)] // These fields are accessed via `cpu_local` functions.
 #[repr(C)]
 //
 // IMPORTANT NOTE:
-// * These fields must be kept in sync with `cpu_local::FixedCpuLocal`.
+// * These fields must be kept in sync with `cpu_local::PerCpuField`.
 // * The same applies for the `const_assertions` module at the end of this file.
 //
 pub struct PerCpuData {
@@ -76,8 +81,8 @@ pub struct PerCpuData {
     /// Currently, this contains the previous task's `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
     drop_after_task_switch: DropAfterTaskSwitch,
-    test_value: u64,
-    test_string: alloc::string::String,
+    test_value: TestValue,
+    test_string: TestString,
 }
 
 impl PerCpuData {
@@ -89,40 +94,22 @@ impl PerCpuData {
             preemption_count: PreemptionCount(preemption::PreemptionCount::new()),
             task_switch_preemption_guard: TaskSwitchPreemptionGuard(None),
             drop_after_task_switch: DropAfterTaskSwitch(None),
-            test_value: 0xDEADBEEF,
-            test_string: alloc::string::String::from("test_string hello"),
+            test_value: TestValue(0xDEADBEEF),
+            test_string: TestString(alloc::string::String::from("test_string hello")),
 
         }
     }
 }
 
-#[repr(transparent)]
-pub struct CpuId(pub cpu::CpuId);
+define_per_cpu_field!(CpuId, cpu::CpuId, PerCpuField::CpuId);
+define_per_cpu_field!(PreemptionCount, preemption::PreemptionCount, PerCpuField::PreemptionCount);
+define_per_cpu_field!(TaskSwitchPreemptionGuard, Option<preemption::PreemptionGuard>, PerCpuField::TaskSwitchPreemptionGuard);
+define_per_cpu_field!(DropAfterTaskSwitch, Option<TaskRef>, PerCpuField::DropAfterTaskSwitch);
 
-unsafe impl Field for CpuId {
-    const FIELD: CpuLocalField = CpuLocalField::CpuId;
-}
+// TODO: temp testing, remove these
+define_per_cpu_field!(TestValue, u64, PerCpuField::TestValue);
+define_per_cpu_field!(TestString, alloc::string::String, PerCpuField::TestString);
 
-#[repr(transparent)]
-pub struct PreemptionCount(pub preemption::PreemptionCount);
-
-unsafe impl Field for PreemptionCount {
-    const FIELD: CpuLocalField = CpuLocalField::PreemptionCount;
-}
-
-#[repr(transparent)]
-pub struct TaskSwitchPreemptionGuard(pub Option<PreemptionGuard>);
-
-unsafe impl Field for TaskSwitchPreemptionGuard {
-    const FIELD: CpuLocalField = CpuLocalField::TaskSwitchPreemptionGuard;
-}
-
-#[repr(transparent)]
-pub struct DropAfterTaskSwitch(pub Option<TaskRef>);
-
-unsafe impl Field for DropAfterTaskSwitch {
-    const FIELD: CpuLocalField = CpuLocalField::DropAfterTaskSwitch;
-}
 
 /// Initializes the current CPU's `PerCpuData`.
 ///
@@ -133,21 +120,34 @@ pub fn init(cpu_id: cpu::CpuId) -> Result<(), &'static str> {
         cpu_id.value(),
         core::mem::size_of::<PerCpuData>(),
         |self_ptr| PerCpuData::new(self_ptr, cpu_id),
-    )
+    )?;
+
+    // TODO Remove, temp tests
+    if true {
+        let test_value = cpu_local::CpuLocal::<TestValue>::new();
+        test_value.with(|tv| log::warn!("Got test_value: {:#X}", &**tv));
+        log::warn!("Setting test_value to 0x12345678...");
+        test_value.with_mut(|tv| { **tv = 0x12345678; });
+        test_value.with(|tv| log::warn!("Got test_value: {:#X}", &**tv));
+
+        let test_string = cpu_local::CpuLocal::<TestString>::new();
+        test_string.with(|s| log::warn!("Got test_string: {:?}", &**s));
+        let new_str = ", world!";
+        log::warn!("Appending {:?} to test_string...", new_str);
+        test_string.with_mut(|s| s.push_str(new_str));
+        test_string.with(|s| log::warn!("Got test_string: {:?}", &**s));
+    }
+    
+    Ok(())
 }
 
 mod const_assertions {
-    use core::mem::{align_of, size_of};
-    use cpu_local::CpuLocalField;
     use memoffset::offset_of;
     use super::*;
 
-    const _: () = assert!(8 == size_of::<usize>());
-    const _: () = assert!(8 == align_of::<usize>());
-
     const _: () = assert!(0 == offset_of!(PerCpuData, self_ptr));
-    const _: () = assert!(CpuLocalField::CpuId.offset() == offset_of!(PerCpuData, cpu_id));
-    const _: () = assert!(CpuLocalField::PreemptionCount.offset() == offset_of!(PerCpuData, preemption_count));
-    const _: () = assert!(CpuLocalField::TaskSwitchPreemptionGuard.offset() == offset_of!(PerCpuData, task_switch_preemption_guard));
-    const _: () = assert!(CpuLocalField::DropAfterTaskSwitch.offset() == offset_of!(PerCpuData, drop_after_task_switch));
+    const _: () = assert!(PerCpuField::CpuId.offset() == offset_of!(PerCpuData, cpu_id));
+    const _: () = assert!(PerCpuField::PreemptionCount.offset() == offset_of!(PerCpuData, preemption_count));
+    const _: () = assert!(PerCpuField::TaskSwitchPreemptionGuard.offset() == offset_of!(PerCpuData, task_switch_preemption_guard));
+    const _: () = assert!(PerCpuField::DropAfterTaskSwitch.offset() == offset_of!(PerCpuData, drop_after_task_switch));
 } 
