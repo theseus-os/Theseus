@@ -1,3 +1,7 @@
+[submodule "libs/dfqueue"]
+	path = libs/dfqueue
+	url = https://github.com/theseus-os/DFQueue
+	shallow = true
 [submodule "ports/wasmtime"]
 	path = ports/wasmtime
 	url = https://github.com/theseus-os/wasmtime.git
@@ -18,6 +22,3 @@
 	path = libs/core2
 	url = https://github.com/theseus-os/core2.git
 	shallow = true
-[submodule "libs/dfqueue"]
-	path = libs/dfqueue
-	url = https://github.com/theseus-os/DFQueue
