@@ -19,7 +19,7 @@ impl Flavour for Block {
     type Guard = ();
 
     #[inline]
-    fn mutex_try_lock<'a, T>(
+    fn try_lock_mutex<'a, T>(
         mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
     ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
@@ -27,7 +27,7 @@ impl Flavour for Block {
     }
 
     #[inline]
-    fn mutex_lock<'a, T>(
+    fn lock_mutex<'a, T>(
         mutex: &'a mutex::SpinMutex<T>,
         data: &'a Self::LockData,
     ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {

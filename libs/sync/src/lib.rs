@@ -24,7 +24,7 @@ pub trait Flavour {
     type Guard;
 
     /// Tries to acquire the given mutex.
-    fn mutex_try_lock<'a, T>(
+    fn try_lock_mutex<'a, T>(
         mutex: &'a mutex::SpinMutex<T>,
         data: &'a Self::LockData,
     ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)>
@@ -32,7 +32,7 @@ pub trait Flavour {
         Self: Sized;
 
     /// Acquires the given mutex.
-    fn mutex_lock<'a, T>(
+    fn lock_mutex<'a, T>(
         mutex: &'a mutex::SpinMutex<T>,
         data: &'a Self::LockData,
     ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard)
@@ -66,7 +66,7 @@ where
     type Guard = <Self as DeadlockPrevention>::Guard;
 
     #[inline]
-    fn mutex_try_lock<'a, T>(
+    fn try_lock_mutex<'a, T>(
         mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
     ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
@@ -80,7 +80,7 @@ where
     }
 
     #[inline]
-    fn mutex_lock<'a, T>(
+    fn lock_mutex<'a, T>(
         mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
     ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {

@@ -35,7 +35,7 @@ where
 
     /// Acquires this mutex.
     pub fn lock(&self) -> MutexGuard<'_, F, T> {
-        let (inner, guard) = F::mutex_lock(&self.inner, &self.data);
+        let (inner, guard) = F::lock_mutex(&self.inner, &self.data);
 
         MutexGuard {
             inner: ManuallyDrop::new(inner),
@@ -46,7 +46,7 @@ where
 
     /// Attempts to acquire this mutex.
     pub fn try_lock(&self) -> Option<MutexGuard<'_, F, T>> {
-        let (inner, guard) = F::mutex_try_lock(&self.inner, &self.data)?;
+        let (inner, guard) = F::try_lock_mutex(&self.inner, &self.data)?;
 
         Some(MutexGuard {
             inner: ManuallyDrop::new(inner),
