@@ -185,7 +185,11 @@ impl super::ArmGic {
 
             let value = match target {
                 SpiDestination::Specific(cpu) => 1 << cpu.value(),
-                SpiDestination::AnyCpuAvailable => TargetList::new_all_cpus().0 as u32,
+                SpiDestination::AnyCpuAvailable => {
+                    let list = TargetList::new_all_cpus()
+                        .expect("This is invalid: CpuId > 8 AND GICv2 interrupt controller");
+                    list.0 as u32
+                },
                 SpiDestination::GICv2TargetList(list) => list.0 as u32,
             };
 

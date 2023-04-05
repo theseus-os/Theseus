@@ -42,12 +42,13 @@ impl TargetList {
         Ok(Self(this))
     }
 
-    pub fn new_all_cpus() -> Self {
+    /// Tries to create a `TargetList` from `arm_boards::BOARD_CONFIG.cpu_ids`
+    pub fn new_all_cpus() -> Result<Self, &'static str> {
         let cpu_ids: [CpuId; NUM_CPUS] = core::array::from_fn(|i| {
             CpuId::from(BOARD_CONFIG.cpu_ids[i])
         });
 
-        Self::new(&cpu_ids).unwrap()
+        Self::new(&cpu_ids).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
     }
 
     pub fn iter(self) -> TargetListIterator {
@@ -108,7 +109,7 @@ impl SpiDestination {
         match self {
             Self::Specific(cpu_id) => Self::Specific(cpu_id),
             Self::AnyCpuAvailable => Self::AnyCpuAvailable,
-            Self::GICv2TargetList(list) => match TargetList::new_all_cpus() == list {
+            Self::GICv2TargetList(list) => match TargetList::new_all_cpus() == Ok(list) {
                 true => Self::AnyCpuAvailable,
                 false => Self::GICv2TargetList(list),
             },
