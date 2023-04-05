@@ -116,7 +116,7 @@ pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTar
     let target_list = match target {
         IpiTargetCpu::Specific(cpu) => (1 << cpu.value()) << 16,
         IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
-        IpiTargetCpu::GICv2TargetList(list) => (list.bits as u32) << 16,
+        IpiTargetCpu::GICv2TargetList(list) => (list.0 as u32) << 16,
     };
 
     let value: u32 = int_num | target_list | SGIR_NSATT_GRP1;
@@ -155,8 +155,7 @@ impl super::ArmGic {
                 }
             }
 
-            let list = TargetList::from_bits_truncate(flags as u8);
-            SpiDestination::GICv2TargetList(list)
+            SpiDestination::GICv2TargetList(TargetList(flags as u8))
         } else if let Self::V3(v3) = self {
             let reg = v3.dist_extended.read_volatile_64(offset::P6IROUTER);
 
@@ -187,7 +186,7 @@ impl super::ArmGic {
             let value = match target {
                 SpiDestination::Specific(cpu) => 1 << cpu.value(),
                 SpiDestination::AnyCpuAvailable => 0xff,
-                SpiDestination::GICv2TargetList(list) => list.bits as u32,
+                SpiDestination::GICv2TargetList(list) => list.0 as u32,
             };
 
             self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);

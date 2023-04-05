@@ -1346,7 +1346,6 @@ name = "gic"
 version = "0.1.0"
 dependencies = [
  "arm_boards",
- "bitflags",
  "cpu",
  "log",
  "memory",

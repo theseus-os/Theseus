@@ -1,13 +1,13 @@
 use core::convert::AsMut;
 
-use cpu::CpuId;
+use cpu::{CpuId, MpidrValue};
+use arm_boards::mpidr::find_mpidr;
 use memory::{
     PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
     allocate_pages, allocate_frames_at
 };
 
 use static_assertions::const_assert_eq;
-use bitflags::bitflags;
 
 mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
@@ -23,19 +23,52 @@ pub type InterruptNumber = u32;
 /// 8-bit unsigned integer
 pub type Priority = u8;
 
-bitflags! {
-    /// The legacy (GICv2) way of specifying
-    /// multiple target CPUs
-    pub struct TargetList: u8 {
-        const CPU_0 = 1 << 0;
-        const CPU_1 = 1 << 1;
-        const CPU_2 = 1 << 2;
-        const CPU_3 = 1 << 3;
-        const CPU_4 = 1 << 4;
-        const CPU_5 = 1 << 5;
-        const CPU_6 = 1 << 6;
-        const CPU_7 = 1 << 7;
-        const ALL_CPUS = u8::MAX;
+#[derive(Copy, Clone, Debug)]
+pub struct TargetList(u8);
+
+impl TargetList {
+    pub fn new(list: &[CpuId]) -> Result<Self, &'static str> {
+        let mut this = 0;
+
+        for cpu_id in list {
+            let mpidr = MpidrValue::from(*cpu_id).value();
+            if mpidr < 8 {
+                this |= 1 << mpidr;
+            } else {
+                return Err("CPU id is too big for GICv2 (should be < 8)");
+            }
+        }
+
+        Ok(Self(this))
+    }
+
+    pub fn iter(self) -> TargetListIterator {
+        TargetListIterator {
+            bitfield: self.0,
+            shift: 0,
+        }
+    }
+}
+
+pub struct TargetListIterator {
+    bitfield: u8,
+    shift: u8,
+}
+
+impl Iterator for TargetListIterator {
+    type Item = Option<CpuId>;
+    fn next(&mut self) -> Option<Self::Item> {
+        while ((self.bitfield >> self.shift) & 1 == 0) && self.shift < 8 {
+            self.shift += 1;
+        }
+
+        if self.shift < 8 {
+            let def_mpidr = find_mpidr(self.shift as u64);
+            self.shift += 1;
+            Some(def_mpidr.map(|m| m.into()))
+        } else {
+            None
+        }
     }
 }
 
