@@ -145,7 +145,7 @@ impl super::ArmGic {
     /// of that destination is not checked.
     pub fn get_spi_target(&self, int: InterruptNumber) -> Option<SpiDestination> {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
-        Some(if !self.affinity_routing() {
+        if !self.affinity_routing() {
             let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
 
             for i in 0..8 {
@@ -155,7 +155,7 @@ impl super::ArmGic {
                 }
             }
 
-            SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize()
+            Some(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
         } else if let Self::V3(v3) = self {
             let reg = v3.dist_extended.read_volatile_64(offset::P6IROUTER);
 
@@ -163,16 +163,16 @@ impl super::ArmGic {
             // value of 1 to target any available cpu
             // value of 0 to target a specific cpu
             if reg & P6IROUTER_ANY_AVAILABLE_PE > 0 {
-                SpiDestination::AnyCpuAvailable
+                Some(SpiDestination::AnyCpuAvailable)
             } else {
                 let mpidr = reg & 0xff00ffffff;
-                SpiDestination::Specific(find_mpidr(mpidr)?.into())
+                Some(SpiDestination::Specific(find_mpidr(mpidr)?.into()))
             }
         } else {
             // If we're on gicv2 then affinity routing is off
             // so we landed in the first block
             unreachable!()
-        })
+        }
     }
 
     /// Sets the destination of an SPI.
