@@ -33,10 +33,7 @@
 #![no_std]
 #![feature(const_refs_to_cell)]
 
-extern crate alloc; // TODO temp remove this 
-
 use core::ops::Deref;
-
 use cpu::CpuId;
 use cpu_local::PerCpuField;
 use task::{DropAfterTaskSwitch, TaskSwitchPreemptionGuard};
@@ -87,8 +84,6 @@ pub struct PerCpuData {
     /// Currently, this contains the previous task's `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
     drop_after_task_switch: DropAfterTaskSwitch,
-    test_value: TestValue,
-    test_string: TestString,
 }
 
 impl PerCpuData {
@@ -100,9 +95,6 @@ impl PerCpuData {
             preemption_count: PreemptionCount::new(),
             task_switch_preemption_guard: TaskSwitchPreemptionGuard::new(),
             drop_after_task_switch: DropAfterTaskSwitch::new(),
-            test_value: TestValue(0xDEADBEEF),
-            test_string: TestString(alloc::string::String::from("test_string hello")),
-
         }
     }
 }
@@ -125,17 +117,6 @@ unsafe impl cpu_local::CpuLocalField for CpuLocalCpuId {
 }
 
 
-// TODO: temp testing, remove these
-pub struct TestValue(u64);
-unsafe impl cpu_local::CpuLocalField for TestValue {
-    const FIELD: PerCpuField = PerCpuField::TestValue;
-}
-pub struct TestString(alloc::string::String);
-unsafe impl cpu_local::CpuLocalField for TestString {
-    const FIELD: PerCpuField = PerCpuField::TestString;
-}
-
-
 /// Initializes the current CPU's `PerCpuData`.
 ///
 /// This must be invoked from (run on) the actual CPU with the given `cpu_id`;
@@ -145,28 +126,7 @@ pub fn init(cpu_id: cpu::CpuId) -> Result<(), &'static str> {
         cpu_id.value(),
         core::mem::size_of::<PerCpuData>(),
         |self_ptr| PerCpuData::new(self_ptr, cpu_id),
-    )?;
-
-    // TODO Remove, temp tests
-    if true {
-        let test_value = cpu_local::CpuLocal::<TestValue>::new(PerCpuField::TestValue);
-        test_value.with(|tv| log::warn!("Got test_value: {:#X}", tv.0));
-        log::warn!("Setting test_value to 0x12345678...");
-        test_value.with_mut(|tv| { tv.0 = 0x12345678; });
-        test_value.with(|tv| log::warn!("Got test_value: {:#X}", tv.0));
-
-        let test_string = cpu_local::CpuLocal::<TestString>::new(PerCpuField::TestString);
-        test_string.with(|s| log::warn!("Got test_string: {:?}", s.0));
-        let new_str = ", world!";
-        log::warn!("Appending {:?} to test_string...", new_str);
-        test_string.with_mut(|s| s.0.push_str(new_str));
-        test_string.with(|s| log::warn!("Got test_string: {:?}", s.0));
-
-        let test_cpu_id = cpu_local::CpuLocal::<CpuLocalCpuId>::new(PerCpuField::CpuId);
-        test_cpu_id.with(|id| log::warn!("Got test_cpu_id: {:?}", &**id));
-    }
-    
-    Ok(())
+    )
 }
 
 mod const_assertions {
