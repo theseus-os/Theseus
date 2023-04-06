@@ -4398,6 +4398,7 @@ name = "wait_queue"
 version = "0.1.0"
 dependencies = [
  "mpmc_queue",
+ "preemption",
  "scheduler",
  "sync",
  "sync_spin",

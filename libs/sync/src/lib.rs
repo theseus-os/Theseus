@@ -21,6 +21,7 @@ pub trait Flavour {
     /// Additional data stored in the lock.
     type LockData;
 
+    /// Additional guard stored in the synchronisation guards.
     type Guard;
 
     /// Tries to acquire the given mutex.
@@ -40,8 +41,6 @@ pub trait Flavour {
         Self: Sized;
 
     /// Performs any necessary actions after unlocking the mutex.
-    ///
-    /// This runs after the deadlock prevention guard has been dropped.
     fn post_unlock(mutex: &Self::LockData)
     where
         Self: Sized;
@@ -49,9 +48,10 @@ pub trait Flavour {
 
 /// A deadlock prevention method.
 pub trait DeadlockPrevention {
-    /// A guard that is stored in the mutex guard.
+    /// Additional guard stored in the synchronisation guards.
     type Guard;
 
+    /// Enters the deadlock prevention context.
     fn enter() -> Self::Guard;
 }
 

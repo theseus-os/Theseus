@@ -74,17 +74,21 @@ where
         unsafe { self.push_inner(pointers, node, node, 1) };
     }
 
-    pub fn push_if_fail<A, B>(&self, item: T, condition: A) -> Option<B>
+    /// Appends an item to the queue if a condition fails.
+    ///
+    /// The condition will be tested while the internal lock is held.
+    pub fn push_if_fail<A, B, C>(&self, item: T, condition: A) -> Result<B, C>
     where
-        A: FnOnce() -> Option<B>,
+        A: FnOnce() -> Result<B, C>,
     {
-        let node = box_pointer(Node::new(item));
         let pointers = self.pointers.lock();
-        if let Some(value) = condition() {
-            Some(value)
-        } else {
-            unsafe { self.push_inner(pointers, node, node, 1) };
-            None
+        match condition() {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                let node = box_pointer(Node::new(item));
+                unsafe { self.push_inner(pointers, node, node, 1) };
+                Err(e)
+            }
         }
     }
 

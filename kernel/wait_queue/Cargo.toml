@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 mpmc_queue = { path = "../../libs/mpmc_queue" }
+preemption = { path = "../preemption" }
 scheduler = { path = "../scheduler" }
 sync = { path = "../../libs/sync" }
 sync_spin = { path = "../../libs/sync_spin" }

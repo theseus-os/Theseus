@@ -1,6 +1,7 @@
 use crate::Flavour;
 use core::{
     cell::UnsafeCell,
+    fmt,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     sync::atomic::{AtomicBool, Ordering},
@@ -66,6 +67,35 @@ where
     }
 }
 
+impl<F, T> fmt::Debug for Mutex<F, T>
+where
+    F: Flavour,
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut d = f.debug_struct("Mutex");
+        match self.try_lock() {
+            Some(guard) => {
+                d.field("data", &&*guard);
+            }
+            None => {
+                struct LockedPlaceholder;
+                impl fmt::Debug for LockedPlaceholder {
+                    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        f.write_str("<locked>")
+                    }
+                }
+                d.field("data", &LockedPlaceholder);
+            }
+        }
+        d.finish_non_exhaustive()
+    }
+}
+
+/// A RAII implementation of a "scoped lock" of a mutex.
+///
+/// When this structure is dropped, the lock will be unlocked.
+#[derive(Debug)]
 pub struct MutexGuard<'a, F, T>
 where
     F: Flavour,
@@ -164,6 +194,31 @@ impl<T> SpinMutex<T> {
     }
 }
 
+impl<T> fmt::Debug for SpinMutex<T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut d = f.debug_struct("SpinMutex");
+        match self.try_lock() {
+            Some(guard) => {
+                d.field("data", &&*guard);
+            }
+            None => {
+                struct LockedPlaceholder;
+                impl fmt::Debug for LockedPlaceholder {
+                    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        f.write_str("<locked>")
+                    }
+                }
+                d.field("data", &LockedPlaceholder);
+            }
+        }
+        d.finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug)]
 pub struct SpinMutexGuard<'a, T>
 where
     T: ?Sized,

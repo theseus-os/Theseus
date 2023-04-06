@@ -23,7 +23,7 @@ impl Flavour for Block {
         mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
     ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
-        mutex.try_lock_weak().map(|guard| (guard, ()))
+        mutex.try_lock().map(|guard| (guard, ()))
     }
 
     #[inline]
