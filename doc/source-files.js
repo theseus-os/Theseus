@@ -25,6 +25,7 @@ var sourcesIndex = JSON.parse('{\
 "context_switch_sse":["",[],["lib.rs"]],\
 "cow_arc":["",[],["lib.rs"]],\
 "cpu":["",[],["lib.rs","x86_64.rs"]],\
+"cpu_local":["",[],["lib.rs"]],\
 "crate_metadata":["",[],["lib.rs"]],\
 "crate_metadata_serde":["",[],["lib.rs"]],\
 "crate_name_utils":["",[],["lib.rs"]],\
@@ -113,6 +114,7 @@ var sourcesIndex = JSON.parse('{\
 "panic_wrapper":["",[],["lib.rs"]],\
 "path":["",[],["lib.rs"]],\
 "pci":["",[],["lib.rs"]],\
+"per_cpu":["",[],["lib.rs"]],\
 "percent_encoding":["",[],["lib.rs"]],\
 "physical_nic":["",[],["lib.rs"]],\
 "pic":["",[],["lib.rs"]],\

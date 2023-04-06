@@ -173,6 +173,12 @@
 <a href="#173" id="173">173</a>
 <a href="#174" id="174">174</a>
 <a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU core basis.
 //! 
 //! Supports enabling and disabling preemption for the purpose of 
@@ -202,6 +208,12 @@
 /// If a CPU&#39;s preemption count is greater than `0`, preemption is disabled.
 </span><span class="kw">static </span>PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CORES];
 
+<span class="kw">pub struct </span>PreemptionCount(AtomicU8);
+<span class="kw">impl </span>PreemptionCount {
+    <span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
+        PreemptionCount(ATOMIC_U8_ZERO)
+    }
+}
 
 <span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.

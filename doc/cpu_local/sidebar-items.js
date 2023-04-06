@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":[["PerCpuField","The available CPU-local variables, i.e., fields in `per_cpu::PerCpuData` struct."]],"fn":[["init","Initializes the CPU-local data region for this CPU."]],"struct":[["CpuLocal","A reference to a CPU-local variable."]],"trait":[["CpuLocalField","This trait must be implemented for each field in `per_cpu::PerCpuData`."]]};
