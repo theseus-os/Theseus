@@ -100,6 +100,7 @@ dependencies = [
  "memory",
  "no_drop",
  "page_attribute_table",
+ "per_cpu",
  "scheduler",
  "spawn",
  "stack",
@@ -386,6 +387,7 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
+ "per_cpu",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -622,6 +624,19 @@ dependencies = [
  "derive_more",
  "irq_safety",
  "tock-registers",
+]
+
+[[package]]
+name = "cpu_local"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-utils",
+ "irq_safety",
+ "log",
+ "memory",
+ "preemption",
+ "spin 0.9.4",
+ "x86_64",
 ]
 
 [[package]]
@@ -1948,6 +1963,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "memory"
 version = "0.1.0"
 dependencies = [
@@ -2593,6 +2617,18 @@ dependencies = [
  "memory",
  "port_io",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "per_cpu"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "cpu_local",
+ "log",
+ "memoffset 0.8.0",
+ "preemption",
+ "task",
 ]
 
 [[package]]
@@ -3687,6 +3723,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
+ "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",
