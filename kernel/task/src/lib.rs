@@ -94,9 +94,10 @@ pub type FailureCleanupFunction = fn(ExitableTaskRef, KillReason) -> !;
 
 /// A type wrapper used to hold a CPU-local `PreemptionGuard` 
 /// on the current CPU during a task switch operation.
+#[derive(Default)]
 pub struct TaskSwitchPreemptionGuard(Option<PreemptionGuard>);
 impl TaskSwitchPreemptionGuard {
-    pub fn new() -> Self { Self(None) }
+    pub const fn new() -> Self { Self(None) }
 }
 // SAFETY: The `TaskSwitchPreemptionGuard` type corresponds to a field in `PerCpuData`
 //         with the offset specified by `PerCpuField::TaskSwitchPreemptionGuard`.
@@ -104,11 +105,13 @@ unsafe impl CpuLocalField for TaskSwitchPreemptionGuard {
     const FIELD: PerCpuField = PerCpuField::TaskSwitchPreemptionGuard;
 }
 
+
 /// A type wrapper used to hold CPU-local data that should be dropped
 /// after switching away from a task that has exited.
+#[derive(Default)]
 pub struct DropAfterTaskSwitch(Option<TaskRef>);
 impl DropAfterTaskSwitch {
-    pub fn new() -> Self { Self(None) }
+    pub const fn new() -> Self { Self(None) }
 }
 // SAFETY: The `DropAfterTaskSwitch` type corresponds to a field in `PerCpuData`
 //         with the offset specified by `PerCpuField::DropAfterTaskSwitch`.

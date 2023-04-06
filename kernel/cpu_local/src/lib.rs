@@ -17,7 +17,7 @@ extern crate alloc;
 
 use core::{
     arch::asm,
-    marker::PhantomData, ops::Deref,
+    marker::PhantomData,
 };
 use alloc::collections::{BTreeMap, btree_map::Entry};
 use memory::{MappedPages, PteFlags};
