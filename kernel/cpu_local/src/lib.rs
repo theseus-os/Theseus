@@ -8,15 +8,16 @@
 //! Note that Rust offers the `#[thread_local]` attribute for thread-local storage (TLS),
 //! but there is no equivalent for CPU-local storage.
 //! On x86_64, TLS areas use the `fs` segment register for the TLS base,
-//! and this crates uses the `gs` segment register for the CPU-local base.
+//! and this crate uses the `gs` segment register for the CPU-local base.
 
 #![no_std]
 #![feature(thread_local)]
+
 extern crate alloc;
 
 use core::{
     arch::asm,
-    marker::PhantomData,
+    marker::PhantomData, ops::Deref,
 };
 use alloc::collections::{BTreeMap, btree_map::Entry};
 use memory::{MappedPages, PteFlags};
@@ -31,6 +32,7 @@ use x86_64::{registers::model_specific::GsBase, VirtAddr};
 //
 // NOTE: These fields and their offsets must be kept in sync with `per_cpu::PerCpuData`.
 //
+#[derive(PartialEq, Eq)]
 pub enum PerCpuField {
     CpuId,
     PreemptionCount,
@@ -56,8 +58,6 @@ impl PerCpuField {
 
 /// This trait must be implemented for each field in `per_cpu::PerCpuData`.
 ///
-/// Use the [`define_per_cpu_field!()`] macro to implement this trait.
-///
 /// ## Safety
 /// This is marked `unsafe` because the implementor must guarantee
 /// that the associated `FIELD` constant is correctly specified.
@@ -71,37 +71,8 @@ pub unsafe trait CpuLocalField: Sized {
     // to allow each field to dictate what needs to be temporarily disabled
     // while accessing this field immutably or mutably.
     // For example, disabling preemption, interrupts, or nothing.
-
-    // const SIZE_CHECK:  () = assert!(Self::FIELD.size() == size_of::<Self>());
-    // const ALIGN_CHECK: () = assert!(Self::FIELD.align() == align_of::<Self>());
 }
 
-/// A macro used to define a type wrapper for inclusion in the `PerCpuData` struct.
-///
-/// This macro implements the [`CpuLocalField`]
-#[macro_export]
-macro_rules! define_per_cpu_field {
-    ($TypeWrapper:ident, $InnerType:ty, $PerCpuField:expr) => {
-        #[repr(transparent)]
-        struct $TypeWrapper($InnerType);
-        unsafe impl $crate::CpuLocalField for $TypeWrapper {
-            const FIELD: $crate::PerCpuField = $PerCpuField;
-        }
-
-        impl core::ops::Deref for $TypeWrapper {
-            type Target = $InnerType;
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-
-        impl core::ops::DerefMut for $TypeWrapper {
-            fn deref_mut(&mut self) -> &mut Self::Target {
-                &mut self.0
-            }
-        }
-    };
-}
 
 /// A reference to a CPU-local variable.
 ///
@@ -113,15 +84,20 @@ macro_rules! define_per_cpu_field {
 ///     interrupt handler, please file an issue to alert the Theseus developers.
 /// * This struct does not contain an instance of the type `T`.
 ///   Thus, dropping it has no effect.
-pub struct CpuLocal<T: CpuLocalField>(PhantomData<*const T>);
+pub struct CpuLocal<T: CpuLocalField>(PhantomData<T>);
 impl<T: CpuLocalField> CpuLocal<T> {
     /// Creates a new reference to a predefined CPU-local variable.
     ///
+    /// ## Arguments
+    /// * `field`: the field in the `per_cpu::PerCpuData` struct that
+    ///   you wish to access via the returned `CpuLocal` object.
+    ///
     /// The type `T: CpuLocalField` must be specified with the turbofish operator:
     /// ```rust,no_run
-    /// static CPU_ID: CpuLocal<CpuId> = CpuId::new();
+    /// static CPU_ID: CpuLocal<CpuId> = CpuId::new(PerCpuField::CpuId);
     /// ```
-    pub const fn new() -> Self {
+    pub const fn new(field: PerCpuField) -> Self {
+        assert!(field.offset() == T::FIELD.offset());
         Self(PhantomData)
     }
 

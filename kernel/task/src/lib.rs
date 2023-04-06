@@ -44,6 +44,7 @@ use core::{
     task::Waker,
 };
 use cpu::CpuId;
+use cpu_local::{CpuLocalField, PerCpuField};
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
@@ -89,6 +90,31 @@ pub fn all_tasks() -> Vec<(usize, WeakTaskRef)> {
 
 /// The signature of a Task's failure cleanup function.
 pub type FailureCleanupFunction = fn(ExitableTaskRef, KillReason) -> !;
+
+
+/// A type wrapper used to hold a CPU-local `PreemptionGuard` 
+/// on the current CPU during a task switch operation.
+pub struct TaskSwitchPreemptionGuard(Option<PreemptionGuard>);
+impl TaskSwitchPreemptionGuard {
+    pub fn new() -> Self { Self(None) }
+}
+// SAFETY: The `TaskSwitchPreemptionGuard` type corresponds to a field in `PerCpuData`
+//         with the offset specified by `PerCpuField::TaskSwitchPreemptionGuard`.
+unsafe impl CpuLocalField for TaskSwitchPreemptionGuard {
+    const FIELD: PerCpuField = PerCpuField::TaskSwitchPreemptionGuard;
+}
+
+/// A type wrapper used to hold CPU-local data that should be dropped
+/// after switching away from a task that has exited.
+pub struct DropAfterTaskSwitch(Option<TaskRef>);
+impl DropAfterTaskSwitch {
+    pub fn new() -> Self { Self(None) }
+}
+// SAFETY: The `DropAfterTaskSwitch` type corresponds to a field in `PerCpuData`
+//         with the offset specified by `PerCpuField::DropAfterTaskSwitch`.
+unsafe impl CpuLocalField for DropAfterTaskSwitch {
+    const FIELD: PerCpuField = PerCpuField::DropAfterTaskSwitch;
+}
 
 
 /// A shareable, cloneable reference to a `Task` that exposes more methods
