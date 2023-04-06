@@ -1,13 +1,13 @@
 use core::convert::AsMut;
 
-use cpu::CpuId;
+use cpu::{CpuId, MpidrValue};
+use arm_boards::{BOARD_CONFIG, NUM_CPUS};
 use memory::{
     PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
     allocate_pages, allocate_frames_at
 };
 
 use static_assertions::const_assert_eq;
-use bitflags::bitflags;
 
 mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
@@ -23,36 +23,95 @@ pub type InterruptNumber = u32;
 /// 8-bit unsigned integer
 pub type Priority = u8;
 
-bitflags! {
-    /// The legacy (GICv2) way of specifying
-    /// multiple target CPUs
-    pub struct TargetList: u8 {
-        const CPU_0 = 1 << 0;
-        const CPU_1 = 1 << 1;
-        const CPU_2 = 1 << 2;
-        const CPU_3 = 1 << 3;
-        const CPU_4 = 1 << 4;
-        const CPU_5 = 1 << 5;
-        const CPU_6 = 1 << 6;
-        const CPU_7 = 1 << 7;
-        const ALL_CPUS = u8::MAX;
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TargetList(u8);
+
+impl TargetList {
+    pub fn new<T: Iterator<Item=MpidrValue>>(list: T) -> Result<Self, &'static str> {
+        let mut this = 0;
+
+        for mpidr in list {
+            let mpidr = mpidr.value();
+            if mpidr < 8 {
+                this |= 1 << mpidr;
+            } else {
+                return Err("CPU id is too big for GICv2 (should be < 8)");
+            }
+        }
+
+        Ok(Self(this))
+    }
+
+    /// Tries to create a `TargetList` from `arm_boards::BOARD_CONFIG.cpu_ids`
+    pub fn new_all_cpus() -> Result<Self, &'static str> {
+        let list = BOARD_CONFIG.cpu_ids.iter().map(|def_mpidr| (*def_mpidr).into());
+        Self::new(list).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
+    }
+
+    pub fn iter(self) -> TargetListIterator {
+        TargetListIterator {
+            bitfield: self.0,
+            shift: 0,
+        }
     }
 }
 
-pub enum TargetCpu {
-    /// That interrupt must be handled by
-    /// a specific PE in the system.
-    ///
-    /// - level 3 affinity is expected in bits [24:31]
-    /// - level 2 affinity is expected in bits [16:23]
-    /// - level 1 affinity is expected in bits [8:15]
-    /// - level 0 affinity is expected in bits [0:7]
-    Specific(u32),
-    /// That interrupt can be handled by
-    /// any PE that is not busy with another,
-    /// more important task
+pub struct TargetListIterator {
+    bitfield: u8,
+    shift: u8,
+}
+
+impl Iterator for TargetListIterator {
+    type Item = Result<CpuId, &'static str>;
+    fn next(&mut self) -> Option<Self::Item> {
+        while ((self.bitfield >> self.shift) & 1 == 0) && self.shift < 8 {
+            self.shift += 1;
+        }
+
+        if self.shift < 8 {
+            let def_mpidr = MpidrValue::try_from(self.shift as u64);
+            self.shift += 1;
+            Some(def_mpidr.map(|m| m.into()))
+        } else {
+            None
+        }
+    }
+}
+
+/// Target of a shared-peripheral interrupt
+pub enum SpiDestination {
+    /// The interrupt must be delivered to a specific CPU.
+    Specific(CpuId),
+    /// That interrupt can be handled by any PE that is not busy with another, more
+    /// important task
     AnyCpuAvailable,
+    /// The interrupt will be delivered to all CPUs specified by the included target list
     GICv2TargetList(TargetList),
+}
+
+/// Target of an inter-processor interrupt
+pub enum IpiTargetCpu {
+    /// The interrupt will be delivered to a specific CPU.
+    Specific(CpuId),
+    /// The interrupt will be delivered to all CPUs except the sender.
+    AllOtherCpus,
+    /// The interrupt will be delivered to all CPUs specified by the included target list
+    GICv2TargetList(TargetList),
+}
+
+impl SpiDestination {
+    /// When this is a GICv2TargetList, converts the list to
+    /// `AnyCpuAvailable` if the list contains all CPUs.
+    pub fn canonicalize(self) -> Self {
+        match self {
+            Self::Specific(cpu_id) => Self::Specific(cpu_id),
+            Self::AnyCpuAvailable => Self::AnyCpuAvailable,
+            Self::GICv2TargetList(list) => match TargetList::new_all_cpus() == Ok(list) {
+                true => Self::AnyCpuAvailable,
+                false => Self::GICv2TargetList(list),
+            },
+        }
+    }
 }
 
 const U32BITS: usize = u32::BITS as usize;
@@ -156,7 +215,7 @@ const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 /// This is defined in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
 fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
-    arm_boards::BOARD_CONFIG.cpu_ids.iter()
+    BOARD_CONFIG.cpu_ids.iter()
           .position(|mpidr| CpuId::from(*mpidr) == cpu_id)
           .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
 }
@@ -178,7 +237,7 @@ pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS],
+    pub redistributors: [ArmGicV3RedistPages; NUM_CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -198,7 +257,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: [PhysicalAddress; arm_boards::NUM_CPUS],
+        redist: [PhysicalAddress; NUM_CPUS],
     }
 }
 
@@ -241,7 +300,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS] = core::array::try_from_fn(|i| {
+                let redistributors: [ArmGicV3RedistPages; NUM_CPUS] = core::array::try_from_fn(|i| {
                     let phys_addr = redist[i];
 
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
@@ -288,7 +347,7 @@ impl ArmGic {
     /// also called software generated interrupt (SGI).
     ///
     /// note: on Aarch64, IPIs must have a number below 16 on ARMv8
-    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: TargetCpu) {
+    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: IpiTargetCpu) {
         assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
 
         match self {

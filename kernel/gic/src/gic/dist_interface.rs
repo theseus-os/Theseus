@@ -13,10 +13,13 @@
 //! - Generating software interrupts (GICv2 style)
 
 use super::GicRegisters;
-use super::TargetCpu;
+use super::IpiTargetCpu;
+use super::SpiDestination;
 use super::InterruptNumber;
 use super::Enabled;
 use super::TargetList;
+
+use cpu::MpidrValue;
 
 mod offset {
     use crate::{Offset32, Offset64};
@@ -57,12 +60,6 @@ const GROUP_1: u32 = 1;
 
 // bit 15: which interrupt group to target
 const SGIR_NSATT_GRP1: u32 = 1 << 15;
-
-fn assert_cpu_bounds(target: &TargetCpu) {
-    if let TargetCpu::Specific(cpu) = target {
-        assert!(*cpu < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
-    }
-}
 
 /// Initializes the distributor by enabling forwarding
 /// of group 1 interrupts and allowing the GIC to pick
@@ -110,13 +107,15 @@ pub fn enable_spi(registers: &mut GicRegisters, int: InterruptNumber, enabled: E
 ///
 /// legacy / GICv2 method
 /// int_num must be less than 16
-pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: TargetCpu) {
-    assert_cpu_bounds(&target);
+pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTargetCpu) {
+    if let IpiTargetCpu::Specific(cpu) = &target {
+        assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
+    }
 
     let target_list = match target {
-        TargetCpu::Specific(cpu) => (1 << cpu) << 16,
-        TargetCpu::AnyCpuAvailable => SGIR_TARGET_ALL_OTHER_PE,
-        TargetCpu::GICv2TargetList(list) => (list.bits as u32) << 16,
+        IpiTargetCpu::Specific(cpu) => (1 << cpu.value()) << 16,
+        IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
+        IpiTargetCpu::GICv2TargetList(list) => (list.0 as u32) << 16,
     };
 
     let value: u32 = int_num | target_list | SGIR_NSATT_GRP1;
@@ -138,28 +137,26 @@ impl super::ArmGic {
         }
     }
 
-    /// The GIC can be configured to route
-    /// Shared-Peripheral Interrupts (SPI) either
-    /// to a specific CPU or to any PE that is ready
-    /// to process them, i.e. not handling another
-    /// higher-priority interrupt.
-    pub fn get_spi_target(&self, int: InterruptNumber) -> TargetCpu {
+    /// Returns the destination of an SPI if it's valid, i.e. if it
+    /// points to existing CPU(s).
+    ///
+    /// Note: If the destination is a `GICv2TargetList`, the validity
+    /// of that destination is not checked.
+    pub fn get_spi_target(&self, int: InterruptNumber) -> Result<SpiDestination, &'static str> {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
             let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
-            if flags == 0xff {
-                return TargetCpu::AnyCpuAvailable;
-            }
 
             for i in 0..8 {
                 let target = 1 << i;
-                if target & flags == target {
-                    return TargetCpu::Specific(i);
+                if target & flags == flags {
+                    let mpidr = i;
+                    let cpu_id = MpidrValue::try_from(mpidr)?.into();
+                    return Ok(SpiDestination::Specific(cpu_id));
                 }
             }
 
-            let list = TargetList::from_bits_truncate(flags as u8);
-            TargetCpu::GICv2TargetList(list)
+            Ok(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
         } else if let Self::V3(v3) = self {
             let reg = v3.dist_extended.read_volatile_64(offset::P6IROUTER);
 
@@ -167,11 +164,11 @@ impl super::ArmGic {
             // value of 1 to target any available cpu
             // value of 0 to target a specific cpu
             if reg & P6IROUTER_ANY_AVAILABLE_PE > 0 {
-                TargetCpu::AnyCpuAvailable
+                Ok(SpiDestination::AnyCpuAvailable)
             } else {
-                let aff3 = (reg >> 8) & 0xff000000;
-                let aff012 = reg & 0xffffff;
-                TargetCpu::Specific((aff3 | aff012) as u32)
+                let mpidr = reg & 0xff00ffffff;
+                let cpu_id = MpidrValue::try_from(mpidr)?.into();
+                return Ok(SpiDestination::Specific(cpu_id));
             }
         } else {
             // If we're on gicv2 then affinity routing is off
@@ -180,40 +177,33 @@ impl super::ArmGic {
         }
     }
 
-    /// The GIC can be configured to route
-    /// Shared-Peripheral Interrupts (SPI) either
-    /// to a specific CPU or to any PE that is ready
-    /// to process them, i.e. not handling another
-    /// higher-priority interrupt.
-    pub fn set_spi_target(&mut self, int: InterruptNumber, target: TargetCpu) {
+    /// Sets the destination of an SPI.
+    pub fn set_spi_target(&mut self, int: InterruptNumber, target: SpiDestination) {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
-            assert_cpu_bounds(&target);
+            if let SpiDestination::Specific(cpu) = &target {
+                assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
+            }
 
             let value = match target {
-                TargetCpu::Specific(cpu) => 1 << cpu,
-                TargetCpu::AnyCpuAvailable => 0xff,
-                TargetCpu::GICv2TargetList(list) => list.bits as u32,
+                SpiDestination::Specific(cpu) => 1 << cpu.value(),
+                SpiDestination::AnyCpuAvailable => {
+                    let list = TargetList::new_all_cpus()
+                        .expect("This is invalid: CpuId > 8 AND GICv2 interrupt controller");
+                    list.0 as u32
+                },
+                SpiDestination::GICv2TargetList(list) => list.0 as u32,
             };
 
             self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
         } else if let Self::V3(v3) = self {
             let value = match target {
-                TargetCpu::Specific(cpu) => {
-                    let cpu = cpu as u64;
-                    // shift aff3 8 bits to the left
-                    let aff3 = (cpu & 0xff000000) << 8;
-                    // keep aff 0, 1 & 2 where they are
-                    let aff012 = cpu & 0xffffff;
-                    // leave bit 31 clear to indicate
-                    // a specific target
-                    aff3 | aff012
-                },
+                SpiDestination::Specific(cpu) => MpidrValue::from(cpu).value(),
                 // bit 31: Interrupt Routing Mode
                 // value of 1 to target any available cpu
-                TargetCpu::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,
-                TargetCpu::GICv2TargetList(_) => {
-                    panic!("Cannot use TargetCpu::GICv2TargetList with GICv3!");
+                SpiDestination::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,
+                SpiDestination::GICv2TargetList(_) => {
+                    panic!("Cannot use SpiDestination::GICv2TargetList with GICv3!");
                 },
             };
 
