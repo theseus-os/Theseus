@@ -192,7 +192,6 @@ impl CpuLocalDataRegion {
 
         #[cfg(target_arch = "x86_64")] {
             let gsbase_val = VirtAddr::new_truncate(self_ptr_value as u64);
-            log::warn!("Writing value {:#X} to GSBASE", gsbase_val);
             GsBase::write(gsbase_val);
         }
 
