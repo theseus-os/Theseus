@@ -19,7 +19,6 @@ use super::InterruptNumber;
 use super::Enabled;
 use super::TargetList;
 
-use arm_boards::mpidr::find_mpidr;
 use cpu::MpidrValue;
 
 mod offset {
@@ -143,7 +142,7 @@ impl super::ArmGic {
     ///
     /// Note: If the destination is a `GICv2TargetList`, the validity
     /// of that destination is not checked.
-    pub fn get_spi_target(&self, int: InterruptNumber) -> Option<SpiDestination> {
+    pub fn get_spi_target(&self, int: InterruptNumber) -> Result<SpiDestination, &'static str> {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         if !self.affinity_routing() {
             let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
@@ -151,11 +150,13 @@ impl super::ArmGic {
             for i in 0..8 {
                 let target = 1 << i;
                 if target & flags == flags {
-                    return Some(SpiDestination::Specific(find_mpidr(i)?.into()));
+                    let mpidr = i;
+                    let cpu_id = MpidrValue::try_from(mpidr)?.into();
+                    return Ok(SpiDestination::Specific(cpu_id));
                 }
             }
 
-            Some(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
+            Ok(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
         } else if let Self::V3(v3) = self {
             let reg = v3.dist_extended.read_volatile_64(offset::P6IROUTER);
 
@@ -163,10 +164,11 @@ impl super::ArmGic {
             // value of 1 to target any available cpu
             // value of 0 to target a specific cpu
             if reg & P6IROUTER_ANY_AVAILABLE_PE > 0 {
-                Some(SpiDestination::AnyCpuAvailable)
+                Ok(SpiDestination::AnyCpuAvailable)
             } else {
                 let mpidr = reg & 0xff00ffffff;
-                Some(SpiDestination::Specific(find_mpidr(mpidr)?.into()))
+                let cpu_id = MpidrValue::try_from(mpidr)?.into();
+                return Ok(SpiDestination::Specific(cpu_id));
             }
         } else {
             // If we're on gicv2 then affinity routing is off

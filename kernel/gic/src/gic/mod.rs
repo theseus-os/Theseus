@@ -1,7 +1,7 @@
 use core::convert::AsMut;
 
 use cpu::{CpuId, MpidrValue};
-use arm_boards::{mpidr::find_mpidr, BOARD_CONFIG};
+use arm_boards::{BOARD_CONFIG, NUM_CPUS};
 use memory::{
     PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
     allocate_pages, allocate_frames_at
@@ -62,14 +62,14 @@ pub struct TargetListIterator {
 }
 
 impl Iterator for TargetListIterator {
-    type Item = Option<CpuId>;
+    type Item = Result<CpuId, &'static str>;
     fn next(&mut self) -> Option<Self::Item> {
         while ((self.bitfield >> self.shift) & 1 == 0) && self.shift < 8 {
             self.shift += 1;
         }
 
         if self.shift < 8 {
-            let def_mpidr = find_mpidr(self.shift as u64);
+            let def_mpidr = MpidrValue::try_from(self.shift as u64);
             self.shift += 1;
             Some(def_mpidr.map(|m| m.into()))
         } else {
@@ -215,7 +215,7 @@ const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 /// This is defined in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
 fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
-    arm_boards::BOARD_CONFIG.cpu_ids.iter()
+    BOARD_CONFIG.cpu_ids.iter()
           .position(|mpidr| CpuId::from(*mpidr) == cpu_id)
           .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
 }
@@ -237,7 +237,7 @@ pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS],
+    pub redistributors: [ArmGicV3RedistPages; NUM_CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -257,7 +257,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: [PhysicalAddress; arm_boards::NUM_CPUS],
+        redist: [PhysicalAddress; NUM_CPUS],
     }
 }
 
@@ -300,7 +300,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS] = core::array::try_from_fn(|i| {
+                let redistributors: [ArmGicV3RedistPages; NUM_CPUS] = core::array::try_from_fn(|i| {
                     let phys_addr = redist[i];
 
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
