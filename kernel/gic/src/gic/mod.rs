@@ -1,7 +1,7 @@
 use core::convert::AsMut;
 
 use cpu::{CpuId, MpidrValue};
-use arm_boards::{mpidr::find_mpidr, NUM_CPUS, BOARD_CONFIG};
+use arm_boards::{mpidr::find_mpidr, BOARD_CONFIG};
 use memory::{
     PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
     allocate_pages, allocate_frames_at
@@ -27,11 +27,11 @@ pub type Priority = u8;
 pub struct TargetList(u8);
 
 impl TargetList {
-    pub fn new(list: &[CpuId]) -> Result<Self, &'static str> {
+    pub fn new<T: Iterator<Item=MpidrValue>>(list: T) -> Result<Self, &'static str> {
         let mut this = 0;
 
-        for cpu_id in list {
-            let mpidr = MpidrValue::from(*cpu_id).value();
+        for mpidr in list {
+            let mpidr = mpidr.value();
             if mpidr < 8 {
                 this |= 1 << mpidr;
             } else {
@@ -44,11 +44,8 @@ impl TargetList {
 
     /// Tries to create a `TargetList` from `arm_boards::BOARD_CONFIG.cpu_ids`
     pub fn new_all_cpus() -> Result<Self, &'static str> {
-        let cpu_ids: [CpuId; NUM_CPUS] = core::array::from_fn(|i| {
-            CpuId::from(BOARD_CONFIG.cpu_ids[i])
-        });
-
-        Self::new(&cpu_ids).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
+        let list = BOARD_CONFIG.cpu_ids.iter().map(|def_mpidr| (*def_mpidr).into());
+        Self::new(list).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
     }
 
     pub fn iter(self) -> TargetListIterator {
