@@ -94,7 +94,7 @@ impl<T: CpuLocalField> CpuLocal<T> {
     ///
     /// The type `T: CpuLocalField` must be specified with the turbofish operator:
     /// ```rust,no_run
-    /// static CPU_ID: CpuLocal<CpuId> = CpuId::new(PerCpuField::CpuId);
+    /// static CPU_ID: CpuLocal<CpuLocalCpuId> = CpuId::new(PerCpuField::CpuId);
     /// ```
     pub const fn new(field: PerCpuField) -> Self {
         assert!(field.offset() == T::FIELD.offset());
