@@ -15,10 +15,7 @@
 
 extern crate alloc;
 
-use core::{
-    arch::asm,
-    marker::PhantomData,
-};
+use core::marker::PhantomData;
 use alloc::collections::{BTreeMap, btree_map::Entry};
 use memory::{MappedPages, PteFlags};
 use preemption::{hold_preemption, PreemptionGuard};
@@ -142,19 +139,21 @@ impl<T: CpuLocalField> CpuLocal<T> {
     }
 
     /// Returns the value of the self pointer, which points to this CPU's `PerCpuData`.
+    #[cfg_attr(not(target_arch = "x86_64"), allow(unreachable_code, unused))]
     fn self_ptr(&self) -> usize {
         let self_ptr: usize;
+        #[cfg(target_arch = "x86_64")]
         unsafe {
-            #[cfg(target_arch = "x86_64")]
-            asm!(
+            core::arch::asm!(
                 "mov {}, gs:[0]", // the self ptr offset is 0
                 lateout(reg) self_ptr,
                 options(nostack, preserves_flags, readonly, pure)
             );
+        }
 
-            #[cfg(not(target_arch = "x86_64"))]
-            todo!("CPU Locals are not yet supported on non-x86_64 platforms");
-        };
+        #[cfg(not(target_arch = "x86_64"))]
+        todo!("CPU Locals are not yet supported on non-x86_64 platforms");
+
         self_ptr 
     }
 }
@@ -195,8 +194,10 @@ impl CpuLocalDataRegion {
             GsBase::write(gsbase_val);
         }
 
-        #[cfg(not(target_arch = "x86_64"))]
-        todo!("CPU-local variable access is not yet implemented on this architecture")
+        #[cfg(not(target_arch = "x86_64"))] {
+            let _ = self_ptr_value; // TODO
+            todo!("CPU-local variable access is not yet implemented on this architecture")
+        }
     }
 }
 
