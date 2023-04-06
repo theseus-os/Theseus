@@ -6,7 +6,7 @@ use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
 use irq_safety::RwLockIrqSafe;
 use core::fmt;
 use alloc::vec::Vec;
-use arm_boards::mpidr::DefinedMpidrValue;
+use arm_boards::{mpidr::DefinedMpidrValue, BOARD_CONFIG};
 
 use super::CpuId;
 
@@ -125,6 +125,22 @@ impl From<MpidrValue> for CpuId {
         let aff_0_1_2 =  (mpidr.0 & 0x0000ffffff) as u32;
 
         Self(aff_3 | aff_0_1_2)
+    }
+}
+
+impl TryFrom<u64> for MpidrValue {
+    type Error = &'static str;
+
+    /// Tries to find this MPIDR value in those defined by
+    /// `arm_boards::cpu_ids`. Fails if No CPU has this MPIDR value.
+    fn try_from(mpidr_value: u64) -> Result<Self, Self::Error> {
+        for def_mpidr in BOARD_CONFIG.cpu_ids {
+            if def_mpidr.value() == mpidr_value {
+                return Ok(def_mpidr.into())
+            }
+        }
+
+        Err("No CPU has this MPIDR value")
     }
 }
 

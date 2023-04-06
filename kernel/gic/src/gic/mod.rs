@@ -1,7 +1,7 @@
 use core::convert::AsMut;
 
 use cpu::{CpuId, MpidrValue};
-use arm_boards::{mpidr::find_mpidr, NUM_CPUS, BOARD_CONFIG};
+use arm_boards::{BOARD_CONFIG, NUM_CPUS};
 use memory::{
     PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
     allocate_pages, allocate_frames_at
@@ -27,11 +27,11 @@ pub type Priority = u8;
 pub struct TargetList(u8);
 
 impl TargetList {
-    pub fn new(list: &[CpuId]) -> Result<Self, &'static str> {
+    pub fn new<T: Iterator<Item=MpidrValue>>(list: T) -> Result<Self, &'static str> {
         let mut this = 0;
 
-        for cpu_id in list {
-            let mpidr = MpidrValue::from(*cpu_id).value();
+        for mpidr in list {
+            let mpidr = mpidr.value();
             if mpidr < 8 {
                 this |= 1 << mpidr;
             } else {
@@ -44,11 +44,8 @@ impl TargetList {
 
     /// Tries to create a `TargetList` from `arm_boards::BOARD_CONFIG.cpu_ids`
     pub fn new_all_cpus() -> Result<Self, &'static str> {
-        let cpu_ids: [CpuId; NUM_CPUS] = core::array::from_fn(|i| {
-            CpuId::from(BOARD_CONFIG.cpu_ids[i])
-        });
-
-        Self::new(&cpu_ids).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
+        let list = BOARD_CONFIG.cpu_ids.iter().map(|def_mpidr| (*def_mpidr).into());
+        Self::new(list).map_err(|_| "Some CPUs in the system cannot be stored in a TargetList")
     }
 
     pub fn iter(self) -> TargetListIterator {
@@ -65,14 +62,14 @@ pub struct TargetListIterator {
 }
 
 impl Iterator for TargetListIterator {
-    type Item = Option<CpuId>;
+    type Item = Result<CpuId, &'static str>;
     fn next(&mut self) -> Option<Self::Item> {
         while ((self.bitfield >> self.shift) & 1 == 0) && self.shift < 8 {
             self.shift += 1;
         }
 
         if self.shift < 8 {
-            let def_mpidr = find_mpidr(self.shift as u64);
+            let def_mpidr = MpidrValue::try_from(self.shift as u64);
             self.shift += 1;
             Some(def_mpidr.map(|m| m.into()))
         } else {
@@ -218,7 +215,7 @@ const_assert_eq!(core::mem::size_of::<GicRegisters>(), 0x1000);
 /// This is defined in `arm_boards::INTERRUPT_CONTROLLER_CONFIG`.
 fn get_current_cpu_redist_index() -> usize {
     let cpu_id = cpu::current_cpu();
-    arm_boards::BOARD_CONFIG.cpu_ids.iter()
+    BOARD_CONFIG.cpu_ids.iter()
           .position(|mpidr| CpuId::from(*mpidr) == cpu_id)
           .expect("BUG: get_current_cpu_redist_index: unexpected CpuId for current CPU")
 }
@@ -240,7 +237,7 @@ pub struct ArmGicV3 {
     pub affinity_routing: Enabled,
     pub distributor: BorrowedMappedPages<GicRegisters, Mutable>,
     pub dist_extended: BorrowedMappedPages<GicRegisters, Mutable>,
-    pub redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS],
+    pub redistributors: [ArmGicV3RedistPages; NUM_CPUS],
 }
 
 /// Arm Generic Interrupt Controller
@@ -260,7 +257,7 @@ pub enum Version {
     },
     InitV3 {
         dist: PhysicalAddress,
-        redist: [PhysicalAddress; arm_boards::NUM_CPUS],
+        redist: [PhysicalAddress; NUM_CPUS],
     }
 }
 
@@ -303,7 +300,7 @@ impl ArmGic {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let redistributors: [ArmGicV3RedistPages; arm_boards::NUM_CPUS] = core::array::try_from_fn(|i| {
+                let redistributors: [ArmGicV3RedistPages; NUM_CPUS] = core::array::try_from_fn(|i| {
                     let phys_addr = redist[i];
 
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
