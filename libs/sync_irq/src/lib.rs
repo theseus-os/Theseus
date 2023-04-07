@@ -1,5 +1,6 @@
-#![feature(negative_impls)]
 #![no_std]
+
+use irq_safety::{hold_interrupts, HeldInterrupts};
 
 pub type Mutex<T> = sync::Mutex<DisableIrq, T>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisableIrq, T>;
@@ -15,6 +16,6 @@ impl sync::DeadlockPrevention for DisableIrq {
 
     #[inline]
     fn enter() -> Self::Guard {
-        irq_safety::hold_interrupts();
+        hold_interrupts()
     }
 }
