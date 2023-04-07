@@ -102,7 +102,7 @@ impl<T: ?Sized> RwLockSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the lock.
-        Ok(self.queue.wait_until(&|| self.try_read()))
+        Ok(self.queue.wait_until(|| self.try_read()))
     }
 
     /// Attempt to acquire this lock with shared read (immutable) access.
@@ -196,7 +196,7 @@ impl<T: ?Sized> RwLockSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the write lock.
-        Ok(self.queue.wait_until(&|| self.try_write()))
+        Ok(self.queue.wait_until(|| self.try_write()))
     }
 
     /// Attempt to acquire this lock with exclusive write (mutable) access.

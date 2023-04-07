@@ -71,7 +71,7 @@ impl<T: ?Sized> MutexSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the lock.
-        Ok(self.queue.wait_until(&|| self.try_lock()))
+        Ok(self.queue.wait_until(|| self.try_lock()))
     }
 
     /// Tries to lock the MutexSleep. If it is already locked, it will return `None`.
