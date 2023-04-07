@@ -3700,6 +3700,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+
+[[package]]
+name = "sync_block"
+version = "0.1.0"
+dependencies = [
+ "sync",
+ "sync_spin",
+ "wait_queue",
+]
+
+[[package]]
+name = "sync_preemption"
+version = "0.1.0"
+dependencies = [
+ "preemption",
+ "sync",
+]
+
+[[package]]
+name = "sync_spin"
+version = "0.1.0"
+dependencies = [
+ "sync",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
