@@ -156,8 +156,6 @@ pub fn init(
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
-    // arch-gate: no multicore support on aarch64 at the moment
-    #[cfg(target_arch = "x86_64")]
     tlb_shootdown::init();
     
     // Initialize the per-core heaps.

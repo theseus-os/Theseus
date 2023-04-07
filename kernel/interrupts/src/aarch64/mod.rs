@@ -9,8 +9,8 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
+use gic::{ArmGic, InterruptNumber, IpiTargetCpu, Version as GicVersion};
 use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
-use gic::{ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
@@ -29,6 +29,13 @@ static INTERRUPT_CONTROLLER: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(No
 //
 // aarch64 manuals define the default timer IRQ number to be 30.
 pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
+
+/// The IRQ/IPI number for TLB Shootdowns
+///
+/// Note: This is arbitrarily defined in the range 0..16,
+/// which is reserved for IPIs (SGIs - for software generated
+/// interrupts - in GIC terminology).
+pub const TLB_SHOOTDOWN_IPI: InterruptNumber = 2;
 
 const MAX_IRQ_NUM: usize = 256;
 
@@ -175,7 +182,7 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 /// This function registers an interrupt handler for the CPU-local
-/// timer and handles INTERRUPT_CONTROLLER configuration for the timer interrupt.
+/// timer and handles interrupt controller configuration for the timer interrupt.
 pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
     if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
@@ -191,6 +198,30 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 
         // enable routing of this interrupt
         int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+    }
+
+    Ok(())
+}
+
+/// This function registers an interrupt handler for an inter-processor interrupt
+/// and handles interrupt controller configuration for that interrupt.
+pub fn setup_ipi_handler(handler: HandlerFunc, irq_num: InterruptNumber) -> Result<(), &'static str> {
+    assert!(irq_num < 16, "Inter-processor interrupts must have a number in the range 0..16");
+
+    // register the handler
+    if let Err(existing_handler) = register_interrupt(irq_num, handler) {
+        if handler as *const HandlerFunc != existing_handler {
+            return Err("A different interrupt handler has already been setup for that IPI");
+        }
+    }
+
+    // Route the IRQ to this core (implicit as irq_num < 32) & Enable the interrupt.
+    {
+        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+        let int_ctrl = int_ctrl.as_mut().ok_or("INTERRUPT_CONTROLLER is uninitialized")?;
+
+        // enable routing of this interrupt
+        int_ctrl.set_interrupt_state(irq_num, true);
     }
 
     Ok(())
@@ -273,6 +304,14 @@ pub fn deregister_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Resu
         error!("deregister_interrupt: Cannot free interrupt due to incorrect handler function");
         Err(value)
     }
+}
+
+/// Broadcast an Inter-Processor Interrupt to all other
+/// cores in the system
+pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
+    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+    let int_ctrl = int_ctrl.as_mut().expect("INTERRUPT_CONTROLLER is uninitialized");
+    int_ctrl.send_ipi(irq_num, IpiTargetCpu::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
@@ -395,7 +434,7 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     // read IRQ num
     // read IRQ priority
-    // ackownledge IRQ to the INTERRUPT_CONTROLLER
+    // ackownledge IRQ to the interrupt controller
     let (irq_num, _priority) = {
         let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
         let int_ctrl = int_ctrl.as_mut().expect("INTERRUPT_CONTROLLER is uninitialized");
