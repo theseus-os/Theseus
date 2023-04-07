@@ -3669,9 +3669,6 @@ dependencies = [
 [[package]]
 name = "sync"
 version = "0.1.0"
-dependencies = [
- "lock_api",
-]
 
 [[package]]
 name = "sync_block"
