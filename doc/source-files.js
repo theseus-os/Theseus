@@ -163,6 +163,8 @@ var sourcesIndex = JSON.parse('{\
 "storage_device":["",[],["lib.rs"]],\
 "storage_manager":["",[],["lib.rs"]],\
 "str_ref":["",[],["lib.rs"]],\
+"sync_block":["",[],["lib.rs"]],\
+"sync_preemption":["",[],["lib.rs"]],\
 "task":["",[],["lib.rs"]],\
 "task_fs":["",[],["lib.rs"]],\
 "task_struct":["",[],["lib.rs"]],\

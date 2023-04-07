@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["DisablePreemption","A deadlock prevention method that disables preemption."]],"type":[["Mutex",""],["MutexGuard",""]]};
