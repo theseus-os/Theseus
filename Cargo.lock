@@ -100,6 +100,7 @@ dependencies = [
  "memory",
  "no_drop",
  "page_attribute_table",
+ "per_cpu",
  "scheduler",
  "spawn",
  "stack",
@@ -386,6 +387,7 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
+ "per_cpu",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -622,6 +624,19 @@ dependencies = [
  "derive_more",
  "irq_safety",
  "tock-registers",
+]
+
+[[package]]
+name = "cpu_local"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-utils",
+ "irq_safety",
+ "log",
+ "memory",
+ "preemption",
+ "spin 0.9.4",
+ "x86_64",
 ]
 
 [[package]]
@@ -1608,7 +1623,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#4908fbb38aca1513572e0b4c7a98884390ef361a"
+source = "git+https://github.com/theseus-os/irq_safety#39ef02580d199b32ac6336fc35ae73682b95bf89"
 dependencies = [
  "owning_ref",
  "spin 0.9.4",
@@ -1942,6 +1957,15 @@ name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
+name = "memoffset"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
 dependencies = [
  "autocfg",
 ]
@@ -2592,6 +2616,18 @@ dependencies = [
  "memory",
  "port_io",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "per_cpu"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "cpu_local",
+ "log",
+ "memoffset 0.8.0",
+ "preemption",
+ "task",
 ]
 
 [[package]]
@@ -3664,6 +3700,34 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+
+[[package]]
+name = "sync_block"
+version = "0.1.0"
+dependencies = [
+ "sync",
+ "sync_spin",
+ "wait_queue",
+]
+
+[[package]]
+name = "sync_preemption"
+version = "0.1.0"
+dependencies = [
+ "preemption",
+ "sync",
+]
+
+[[package]]
+name = "sync_spin"
+version = "0.1.0"
+dependencies = [
+ "sync",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3686,6 +3750,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
+ "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",

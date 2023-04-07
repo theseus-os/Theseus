@@ -1,0 +1,8 @@
+[package]
+name = "sync_spin"
+version = "0.1.0"
+description = "Spin-based synchronisation primitives"
+edition = "2021"
+
+[dependencies]
+sync = { path = "../sync" }
