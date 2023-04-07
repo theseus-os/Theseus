@@ -31,10 +31,12 @@ impl Flavour for Block {
         mutex: &'a mutex::SpinMutex<T>,
         data: &'a Self::LockData,
     ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {
-        if let Some(guard) = mutex.try_lock_weak() {
-            (guard, ())
+        // This must be a strong compare exchange, otherwise we could block ourselves
+        // when the mutex is unlocked and never be unblocked.
+        if let Some(guards) = Self::try_lock_mutex(mutex, data) {
+            guards
         } else {
-            (data.wait_until(|| mutex.try_lock_weak()), ())
+            data.wait_until(|| Self::try_lock_mutex(mutex, data))
         }
     }
 
