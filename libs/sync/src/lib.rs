@@ -51,6 +51,12 @@ pub trait DeadlockPrevention {
     /// Additional guard stored in the synchronisation guards.
     type Guard;
 
+    /// Whether entering the deadlock prevention context is *expensive*.
+    ///
+    /// This determines whether to check that the mutex is locked before
+    /// attempting to lock the mutex in `try_lock`.
+    const EXPENSIVE: bool;
+
     /// Enters the deadlock prevention context.
     fn enter() -> Self::Guard;
 }
@@ -70,6 +76,10 @@ where
         mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
     ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
+        if Self::EXPENSIVE && mutex.is_locked() {
+            return None;
+        }
+
         let deadlock_guard = Self::enter();
 
         if let Some(guard) = mutex.try_lock() {

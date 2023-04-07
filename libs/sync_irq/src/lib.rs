@@ -11,6 +11,8 @@ pub struct DisableIrq {}
 impl sync::DeadlockPrevention for DisableIrq {
     type Guard = HeldInterrupts;
 
+    const EXPENSIVE: bool = true;
+
     #[inline]
     fn enter() -> Self::Guard {
         irq_safety::hold_interrupts();

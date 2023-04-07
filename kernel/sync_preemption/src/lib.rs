@@ -18,6 +18,8 @@ impl !Send for Guard {}
 impl sync::DeadlockPrevention for DisablePreemption {
     type Guard = Guard;
 
+    const EXPENSIVE: bool = true;
+
     #[inline]
     fn enter() -> Self::Guard {
         Guard(hold_preemption())

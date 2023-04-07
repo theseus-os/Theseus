@@ -10,6 +10,8 @@ pub struct Spin {}
 impl sync::DeadlockPrevention for Spin {
     type Guard = ();
 
+    const EXPENSIVE: bool = false;
+
     #[inline]
     fn enter() -> Self::Guard {
         ()
