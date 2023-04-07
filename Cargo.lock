@@ -163,13 +163,10 @@ dependencies = [
  "core2",
  "crossbeam-utils",
  "debugit",
- "hpet",
  "log",
  "mpmc",
- "spin 0.9.4",
  "sync",
  "sync_spin",
- "task",
  "wait_queue",
 ]
 
