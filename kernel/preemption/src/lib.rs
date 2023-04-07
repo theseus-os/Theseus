@@ -27,6 +27,12 @@ const ATOMIC_U8_ZERO: AtomicU8 = AtomicU8::new(0);
 /// If a CPU's preemption count is greater than `0`, preemption is disabled.
 static PREEMPTION_COUNT: [AtomicU8; MAX_CPU_CORES] = [ATOMIC_U8_ZERO; MAX_CPU_CORES];
 
+pub struct PreemptionCount(AtomicU8);
+impl PreemptionCount {
+    pub const fn new() -> Self {
+        PreemptionCount(ATOMIC_U8_ZERO)
+    }
+}
 
 /// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.

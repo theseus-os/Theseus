@@ -9,7 +9,8 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
-use gic::{qemu_virt_addrs, ArmGic, InterruptNumber, Version as GicVersion};
+use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
+use gic::{ArmGic, InterruptNumber, Version as GicVersion};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
@@ -21,7 +22,7 @@ use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 global_asm!(include_str!("table.s"));
 
 // The global Generic Interrupt Controller singleton
-static GIC: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
+static INTERRUPT_CONTROLLER: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -119,8 +120,16 @@ fn set_vbar_el1() {
 }
 
 /// Sets `VBAR_EL1` to the start of the exception vector
+/// and enables timer interrupts
 pub fn init_ap() {
     set_vbar_el1();
+
+    // Enable the CPU-local timer
+    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+    let int_ctrl = int_ctrl.as_mut().expect("BUG: init_ap(): INTERRUPT_CONTROLLER was uninitialized");
+    int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+
+    enable_timer(true);
 }
 
 /// Please call this (only once) before using this crate.
@@ -131,38 +140,42 @@ pub fn init() -> Result<(), &'static str> {
     let period_femtoseconds = read_timer_period_femtoseconds();
     register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
 
-    let mut gic = GIC.lock();
-    if gic.is_some() {
-        Err("The GIC has already been initialized!")
+    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+    if int_ctrl.is_some() {
+        Err("The interrupt controller has already been initialized!")
     } else {
         set_vbar_el1();
 
-        let kernel_mmi_ref = get_kernel_mmi_ref()
-            .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
+        info!("Configuring the interrupt controller");
+        match BOARD_CONFIG.interrupt_controller {
+            InterruptControllerConfig::GicV3(gicv3_cfg) => {
+                let kernel_mmi_ref = get_kernel_mmi_ref()
+                    .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
 
-        let mut mmi = kernel_mmi_ref.lock();
-        let page_table = &mut mmi.deref_mut().page_table;
+                let mut mmi = kernel_mmi_ref.lock();
+                let page_table = &mut mmi.deref_mut().page_table;
 
-        info!("Configuring the GIC");
-        let mut inner = ArmGic::init(
-            page_table,
-            GicVersion::InitV3 {
-                dist: qemu_virt_addrs::GICD,
-                redist: qemu_virt_addrs::GICR,
+                let mut inner = ArmGic::init(
+                    page_table,
+                    GicVersion::InitV3 {
+                        dist: gicv3_cfg.distributor_base_address,
+                        redist: gicv3_cfg.redistributor_base_addresses,
+                    },
+                )?;
+
+                inner.set_minimum_priority(0);
+                *int_ctrl = Some(inner);
             },
-        )?;
+        }
 
-        inner.set_minimum_priority(0);
-        *gic = Some(inner);
-
-        info!("Done Configuring the GIC");
+        info!("Done Configuring the interrupt controller");
 
         Ok(())
     }
 }
 
 /// This function registers an interrupt handler for the CPU-local
-/// timer and handles GIC configuration for the timer interrupt.
+/// timer and handles INTERRUPT_CONTROLLER configuration for the timer interrupt.
 pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
     if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
@@ -173,11 +186,11 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 
     // Route the IRQ to this core (implicit as IRQ < 32) & Enable the interrupt.
     {
-        let mut gic = GIC.lock();
-        let gic = gic.as_mut().ok_or("GIC is uninitialized")?;
+        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+        let int_ctrl = int_ctrl.as_mut().ok_or("INTERRUPT_CONTROLLER is uninitialized")?;
 
         // enable routing of this interrupt
-        gic.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+        int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
     }
 
     Ok(())
@@ -265,9 +278,9 @@ pub fn deregister_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Resu
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: InterruptNumber) {
-    let mut gic = GIC.lock();
-    let gic = gic.as_mut().expect("GIC is uninitialized");
-    gic.end_of_interrupt(irq_num);
+    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+    let int_ctrl = int_ctrl.as_mut().expect("BUG: eoi(): INTERRUPT_CONTROLLER was uninitialized");
+    int_ctrl.end_of_interrupt(irq_num);
 }
 
 // A ClockSource for the time crate, implemented using
@@ -382,13 +395,13 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     // read IRQ num
     // read IRQ priority
-    // ackownledge IRQ to the GIC
+    // ackownledge IRQ to the INTERRUPT_CONTROLLER
     let (irq_num, _priority) = {
-        let mut gic = GIC.lock();
-        let gic = gic.as_mut().expect("GIC is uninitialized");
-        gic.acknowledge_interrupt()
+        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+        let int_ctrl = int_ctrl.as_mut().expect("INTERRUPT_CONTROLLER is uninitialized");
+        int_ctrl.acknowledge_interrupt()
     };
-    // important: GIC mutex is now implicitly unlocked
+    // important: INTERRUPT_CONTROLLER mutex is now implicitly unlocked
     let irq_num_usize = irq_num as usize;
 
     let handler = match irq_num_usize < MAX_IRQ_NUM {
@@ -398,8 +411,8 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
 
     if handler(exc) == EoiBehaviour::CallerMustSignalEoi {
         // handler has returned, we can lock again
-        let mut gic = GIC.lock();
-        gic.as_mut().unwrap().end_of_interrupt(irq_num);
+        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+        int_ctrl.as_mut().unwrap().end_of_interrupt(irq_num);
     }
 }
 

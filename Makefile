@@ -602,7 +602,7 @@ clippy:
 		cargo clippy \
 		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
 		--target $(TARGET) \
-		-- -D warnings
+		-- -D clippy::all
 
 
 ## The output directory for source-level documentation.
