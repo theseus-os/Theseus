@@ -28,9 +28,6 @@ path = "../wait_queue"
 [dependencies.wait_guard]
 path = "../wait_guard"
 
-[dependencies.hpet]
-path = "../acpi/hpet"
-
 [dependencies.sync]
 path = "../../libs/sync"
 
