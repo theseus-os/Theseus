@@ -22,6 +22,7 @@ where
     F: Flavour,
 {
     /// Creates a new mutex.
+    #[inline]
     pub const fn new(value: T) -> Self {
         Self {
             inner: SpinMutex::new(value),
@@ -30,11 +31,13 @@ where
     }
 
     /// Consumes this mutex, returning the underlying data.
+    #[inline]
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
 
     /// Acquires this mutex.
+    #[inline]
     pub fn lock(&self) -> MutexGuard<'_, F, T> {
         let (inner, guard) = F::lock_mutex(&self.inner, &self.data);
 
@@ -46,6 +49,7 @@ where
     }
 
     /// Attempts to acquire this mutex.
+    #[inline]
     pub fn try_lock(&self) -> Option<MutexGuard<'_, F, T>> {
         let (inner, guard) = F::try_lock_mutex(&self.inner, &self.data)?;
 
@@ -57,11 +61,13 @@ where
     }
 
     /// Returns a mutable reference to the underlying data.
+    #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.get_mut()
     }
 
     /// Checks whether the mutex is currently locked.
+    #[inline]
     pub fn is_locked(&self) -> bool {
         self.inner.is_locked()
     }
@@ -111,6 +117,7 @@ where
 {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         self.inner.deref()
     }
@@ -120,6 +127,7 @@ impl<'a, F, T> DerefMut for MutexGuard<'a, F, T>
 where
     F: Flavour,
 {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner.deref_mut()
     }
@@ -129,6 +137,7 @@ impl<'a, F, T> Drop for MutexGuard<'a, F, T>
 where
     F: Flavour,
 {
+    #[inline]
     fn drop(&mut self) {
         unsafe { ManuallyDrop::drop(&mut self.inner) };
         F::post_unlock(self.data);
@@ -146,6 +155,7 @@ where
 }
 
 impl<T> SpinMutex<T> {
+    #[inline]
     pub const fn new(data: T) -> Self {
         Self {
             lock: AtomicBool::new(false),
@@ -153,10 +163,12 @@ impl<T> SpinMutex<T> {
         }
     }
 
+    #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.data.get_mut()
     }
 
+    #[inline]
     pub fn into_inner(self) -> T
     where
         T: Sized,
@@ -164,6 +176,7 @@ impl<T> SpinMutex<T> {
         self.data.into_inner()
     }
 
+    #[inline]
     pub fn is_locked(&self) -> bool {
         self.lock.load(Ordering::Relaxed)
     }
@@ -186,6 +199,7 @@ impl<T> SpinMutex<T> {
         Some(unsafe { self.guard() })
     }
 
+    #[inline]
     unsafe fn guard(&self) -> SpinMutexGuard<'_, T> {
         SpinMutexGuard {
             lock: &self.lock,
@@ -233,6 +247,7 @@ where
 {
     type Target = T;
 
+    #[inline]
     fn deref(&self) -> &Self::Target {
         unsafe { &*self.data }
     }
@@ -242,6 +257,7 @@ impl<'a, T> DerefMut for SpinMutexGuard<'a, T>
 where
     T: ?Sized,
 {
+    #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { &mut *self.data }
     }
@@ -251,6 +267,7 @@ impl<'a, T> Drop for SpinMutexGuard<'a, T>
 where
     T: ?Sized,
 {
+    #[inline]
     fn drop(&mut self) {
         self.lock.store(false, Ordering::Release);
     }
