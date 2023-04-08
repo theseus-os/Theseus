@@ -186,10 +186,11 @@ mod tests {
         sync::atomic::{AtomicBool, Ordering},
         thread,
     };
+    use sync_spin::Spin;
 
     #[test]
     fn test_spsc() {
-        static QUEUE: Queue<i32> = Queue::new();
+        static QUEUE: Queue<Spin, i32> = Queue::new();
 
         for i in 0..100 {
             QUEUE.push(i);
@@ -211,7 +212,7 @@ mod tests {
         const FALSE: AtomicBool = AtomicBool::new(false);
 
         static RECEIVED: [AtomicBool; AMOUNT * NUM_THREADS] = [FALSE; AMOUNT * NUM_THREADS];
-        static QUEUE: Queue<usize> = Queue::new();
+        static QUEUE: Queue<Spin, usize> = Queue::new();
 
         let mut receivers = Vec::with_capacity(NUM_THREADS);
         for _ in 0..NUM_THREADS {

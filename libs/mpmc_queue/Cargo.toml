@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 sync = { path = "../sync" }
+
+[dev-dependencies]
+sync_spin = { path = "../sync_spin"}
