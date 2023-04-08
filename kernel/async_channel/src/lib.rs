@@ -42,7 +42,10 @@ use sync_spin::Spin;
 /// future attempts to send another message will either block or return a `Full` error 
 /// until the channel's buffer is drained by a receiver and space in the buffer becomes available.
 /// 
-/// Returns a tuple of `(Sender, Receiver)`.
+/// The asynchronous channel uses a wait queue internally and hence exposes a
+/// deadlock prevention type parameter. By default it is set to [`Spin`]. See
+/// [`WaitQueue`]'s documentation for more information on when to change this
+/// type parameter.
 pub fn new_channel<T: Send, P: DeadlockPrevention>(minimum_capacity: usize) -> (Sender<T, P>, Receiver<T, P>) {
     let channel = Arc::new(Channel::<T, P> {
         queue: MpmcQueue::with_capacity(minimum_capacity),

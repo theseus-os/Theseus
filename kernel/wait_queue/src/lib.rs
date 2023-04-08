@@ -14,8 +14,8 @@ use task::{get_my_current_task, TaskRef};
 ///
 /// The wait queue uses a mutex internally and hence exposes a deadlock
 /// prevention type parameter. By default it is set to [`Spin`]. It should only
-/// be set to another deadlock prevention method if a regular mutex could lead
-/// to a deadlock, for example in an interrupt context. You do not need to use
+/// be set to another deadlock prevention method if a spin mutex could lead to a
+/// deadlock, for example in an interrupt context. You do not need to use
 /// `DisablePreemption` deadlock prevention to avoid scheduler race conditions -
 /// they are already accounted for in the [`Spin`] implementation.
 ///
