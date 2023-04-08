@@ -4426,7 +4426,6 @@ dependencies = [
 name = "wait_condition"
 version = "0.1.0"
 dependencies = [
- "task",
  "wait_queue",
 ]
 
