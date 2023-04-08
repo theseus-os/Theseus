@@ -7,6 +7,20 @@ use sync::DeadlockPrevention;
 use sync_spin::Spin;
 use task::{get_my_current_task, TaskRef};
 
+/// A queue of tasks.
+///
+/// When tasks are popped off the front of the queue using [`notify_one`] or
+/// [`notify_all`] they are unblocked.
+///
+/// The wait queue uses a mutex internally and hence exposes a deadlock
+/// prevention type parameter. By default it is set to `Spin`. It should only be
+/// set to another deadlock prevention method if a regular mutex could lead to a
+/// deadlock, for example in an interrupt context. You do not need to use
+/// `DisablePreemption` deadlock prevention to avoid scheduler race conditions -
+/// they are already accounted for in the `Spin` implementation.
+///
+/// [`notify_one`]: Self::notify_one
+/// [`notify_all`]: Self::notify_all
 pub struct WaitQueue<P = Spin>
 where
     P: DeadlockPrevention,
@@ -55,6 +69,9 @@ where
     }
 
     /// Notifies the first task in the wait queue.
+    ///
+    /// If it fails to unblock the first task, it will continue unblocking
+    /// subsequent tasks until a task is successfully unblocked.
     pub fn notify_one(&self) -> bool {
         loop {
             let task = match self.inner.pop() {
