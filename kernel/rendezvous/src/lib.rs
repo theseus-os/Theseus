@@ -132,10 +132,13 @@ impl<T> fmt::Debug for ExchangeState<T> {
 // }
 
 
-/// Create a new channel that requires a sender a receiver to rendezvous
-/// in order to exchange a message. 
-/// 
-/// Returns a tuple of `(Sender, Receiver)`.
+/// Create a new channel that requires the sender and receiver to rendezvous
+/// when exchanging a message.
+///
+/// The rendezvous channel uses a wait queue internally and hence exposes a
+/// deadlock prevention type parameter. By default it is set to [`Spin`]. See
+/// [`WaitQueue`]'s documentation for more information on when to change this
+/// type parameter.
 #[allow(invalid_type_param_default)]
 pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Receiver<T, P>) {
     let channel = Arc::new(Channel::<T, P> {
