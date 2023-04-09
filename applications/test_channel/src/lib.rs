@@ -320,46 +320,47 @@ fn asynchronous_test_oneshot() -> Result<(), &'static str> {
 }
 
 // Modified version of asynchronous_test_oneshot to test the drop() method of sender and receiver
-// fn asynchronous_test_oneshot_drop() -> Result<(), &'static str>{
-//     let my_cpu = cpu::current_cpu();
+fn asynchronous_test_oneshot_drop() -> Result<(), &'static str>{
+    let my_cpu = cpu::current_cpu();
 
-//     let (sender, receiver) = async_channel::new_channel(2);
+    let (sender, receiver) = async_channel::new_channel(2);
 
-//     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-//         warn!("asynchronous_test_oneshot(): Entered sender task!");
-//         sender.send("hello").map_err(|error| {
-//             warn!("Sender task failed due to : {:?}", error);
-//             return "Sender task failed";
-//         })?;
-//         Ok(())
-//     }, ())
-//         .name(String::from("sender_task_asynchronous_oneshot"))
-//         .block();
-//     let t1 = pin_task!(t1, my_cpu).spawn()?;
+    let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
+        warn!("asynchronous_test_oneshot(): Entered sender task!");
+        sender.send("hello").map_err(|error| {
+            warn!("Sender task failed due to : {:?}", error);
+            return "Sender task failed";
+        })?;
+        Ok(())
+    }, ())
+        .name(String::from("sender_task_asynchronous_oneshot"))
+        .block();
+    let t1 = pin_task!(t1, my_cpu).spawn()?;
 
-//     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
-//         warn!("asynchronous_test_oneshot(): Entered receiver task!");
-//         let msg = receiver.receive().map_err(|error| {
-//             warn!("Receiver task failed due to : {:?}", error);
-//             return "Receiver task failed"
-//         })?;
-//         warn!("asynchronous_test_oneshot(): Receiver got msg: {:?}", msg);
-//         Ok(())
-//     }, ())
-//         .name(String::from("receiver_task_asynchronous_oneshot"))
-//         .block();
-//     let t2 = pin_task!(t2, my_cpu).spawn()?;
+    let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
+        warn!("asynchronous_test_oneshot(): Entered receiver task!");
+        let msg = receiver.receive().map_err(|error| {
+            warn!("Receiver task failed due to : {:?}", error);
+            return "Receiver task failed"
+        })?;
+        warn!("asynchronous_test_oneshot(): Receiver got msg: {:?}", msg);
+        Ok(())
+    }, ())
+        .name(String::from("receiver_task_asynchronous_oneshot"))
+        .block();
+    let t2 = pin_task!(t2, my_cpu).spawn()?;
 
-//     warn!("asynchronous_test_oneshot(): Finished spawning the sender and receiver tasks");
-//     t2.unblock().unwrap();
-//     t1.unblock().unwrap();
+    warn!("asynchronous_test_oneshot(): Finished spawning the sender and receiver tasks");
+    t2.unblock().unwrap();
+    t1.unblock().unwrap();
 
-//     t1.join()?;
-//     t2.join()?;
-//     warn!("asynchronous_test_oneshot(): Joined the sender and receiver tasks.");
+    t1.join()?;
+    t2.join()?;
+    warn!("asynchronous_test_oneshot(): Joined the sender and receiver tasks.");
     
-//     Ok(())
-// }
+    Ok(())
+}
+
 
 /// A simple test that spawns a sender & receiver task to send `send_count` and receive `receive_count` messages.
 fn asynchronous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
