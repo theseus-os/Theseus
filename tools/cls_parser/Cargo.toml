@@ -1,0 +1,9 @@
+[package]
+name = "cls_parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies.goblin]
+version = "0.6.1"
+default-features = false
+features = ["elf32", "elf64", "endian_fd", "std"]

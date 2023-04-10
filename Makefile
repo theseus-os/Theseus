@@ -297,6 +297,12 @@ else
 $(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
 
+## Sixth, parse CPU local sections.
+## TODO: nano core binary
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
+		cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/cls_parser/Cargo.toml -- $${f} & \
+	done; wait
+
 #############################
 ### end of "build" target ###
 #############################

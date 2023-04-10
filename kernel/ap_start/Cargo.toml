@@ -19,6 +19,7 @@ cpu = { path = "../cpu" }
 per_cpu = { path = "../per_cpu" }
 no_drop = { path = "../no_drop" }
 early_tls = { path = "../early_tls" }
+cls = { path = "../cls" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 page_attribute_table = { path = "../page_attribute_table" }

@@ -123,6 +123,8 @@ pub fn init(
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
     #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     per_cpu::init(bsp_id)?;
+    #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
+    cls::init(bsp_id).unwrap();
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.

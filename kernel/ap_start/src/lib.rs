@@ -111,6 +111,9 @@ pub fn kstart_ap(
     #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     per_cpu::init(cpu_id).unwrap();
 
+    #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
+    cls::init(cpu_id).unwrap();
+
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
     spawn::create_idle_task().unwrap();
 

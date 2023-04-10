@@ -3,10 +3,12 @@ name = "cls"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-proc-macro = true
-
 [dependencies]
-proc-macro2 = "1.0.56"
-quote = "1.0.26"
-syn = { version = "2.0.13", features = ["extra-traits"] }
+cfg-if = "1.0.0"
+cls-proc = { path = "cls-proc" }
+cpu = { path = "../cpu"}
+memory = { path = "../memory" }
+sync_spin = { path = "../../libs/sync_spin" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"
