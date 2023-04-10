@@ -303,6 +303,21 @@
 <a href="#303" id="303">303</a>
 <a href="#304" id="304">304</a>
 <a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Offers types and macros to declare and access CPU-local storage (per-CPU variables).
 //!
 //! CPU-local variables cannot be used until after a given CPU has been initialized,
@@ -329,6 +344,11 @@
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">use </span>x86_64::{registers::model_specific::GsBase, VirtAddr};
 
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">use </span>{
+    cortex_a::registers::TPIDR_EL1,
+    tock_registers::interfaces::Writeable,
+};
 
 <span class="doccomment">/// The available CPU-local variables, i.e., fields in `per_cpu::PerCpuData` struct.
 </span><span class="comment">//
@@ -424,7 +444,7 @@
     <span class="kw">where
         </span>F: FnOnce(<span class="kw-2">&amp;</span>T) -&gt; R,
     {
-        <span class="kw">let </span>ptr_to_cpu_local = <span class="self">self</span>.self_ptr() + T::FIELD.offset();
+        <span class="kw">let </span>ptr_to_cpu_local = self_ptr() + T::FIELD.offset();
         <span class="kw">let </span>local_ref = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;*</span>(ptr_to_cpu_local <span class="kw">as </span><span class="kw-2">*const </span>T) };
         func(local_ref)
     }
@@ -438,29 +458,37 @@
         </span>F: FnOnce(<span class="kw-2">&amp;mut </span>T) -&gt; R,
     {
         <span class="kw">let </span>_held_interrupts = irq_safety::hold_interrupts();
-        <span class="kw">let </span>ptr_to_cpu_local = <span class="self">self</span>.self_ptr() + T::FIELD.offset();
+        <span class="kw">let </span>ptr_to_cpu_local = self_ptr() + T::FIELD.offset();
         <span class="kw">let </span>local_ref_mut = <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut *</span>(ptr_to_cpu_local <span class="kw">as </span><span class="kw-2">*mut </span>T) };
         func(local_ref_mut)
     }
+}
 
-    <span class="doccomment">/// Returns the value of the self pointer, which points to this CPU&#39;s `PerCpuData`.
-    </span><span class="attr">#[cfg_attr(not(target_arch = <span class="string">&quot;x86_64&quot;</span>), allow(unreachable_code, unused))]
-    </span><span class="kw">fn </span>self_ptr(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
-        <span class="kw">let </span>self_ptr: usize;
-        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-        </span><span class="kw">unsafe </span>{
-            <span class="macro">core::arch::asm!</span>(
-                <span class="string">&quot;mov {}, gs:[0]&quot;</span>, <span class="comment">// the self ptr offset is 0
-                </span>lateout(reg) self_ptr,
-                options(nostack, preserves_flags, readonly, pure)
-            );
-        }
-
-        <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))]
-        </span><span class="macro">todo!</span>(<span class="string">&quot;CPU Locals are not yet supported on non-x86_64 platforms&quot;</span>);
-
-        self_ptr 
+<span class="doccomment">/// Returns the value of the self pointer, which points to this CPU&#39;s `PerCpuData`.
+</span><span class="kw">fn </span>self_ptr() -&gt; usize {
+    <span class="kw">let </span>self_ptr: usize;
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span><span class="kw">unsafe </span>{
+        <span class="macro">core::arch::asm!</span>(
+            <span class="string">&quot;mov {}, gs:[0]&quot;</span>, <span class="comment">// the self ptr offset is 0
+            </span>lateout(reg) self_ptr,
+            options(nostack, preserves_flags, readonly, pure)
+        );
     }
+
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span><span class="kw">unsafe </span>{
+        <span class="comment">// The self ptr offset is 0, so we can skip adding an offset to reg `{0}`.
+        </span><span class="macro">core::arch::asm!</span>(
+            <span class="string">&quot;mrs {0}, TPIDR_EL1&quot;</span>,
+            <span class="string">&quot;ldr {1}, [{0}]&quot;</span>,
+            out(reg) <span class="kw">_</span>,
+            lateout(reg) self_ptr,
+            options(nostack)
+        );
+    }
+
+    self_ptr 
 }
 
 <span class="kw">impl</span>&lt;T&gt; CpuLocal&lt;T&gt;
@@ -489,8 +517,11 @@
         <span class="prelude-val">Ok</span>(CpuLocalDataRegion(mp))
     }
 
-    <span class="doccomment">/// Sets this CPU&#39;s base register (e.g., GsBase on x86_64) to the address
-    /// of this CPU-local data image, making it &quot;currently active&quot; and accessible.
+    <span class="doccomment">/// Sets this CPU&#39;s base register to the address of this CPU-local data image,
+    /// making it &quot;currently active&quot; and accessible.
+    ///
+    /// * On x86_64, this sets the `GsBase` register.
+    /// * On aarch64, this sets the `TPIDR_EL1` register.
     </span><span class="kw">fn </span>set_as_current_cpu_local_base(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="kw">let </span>self_ptr_value = <span class="self">self</span>.<span class="number">0</span>.start_address().value();
 
@@ -499,9 +530,8 @@
             GsBase::write(gsbase_val);
         }
 
-        <span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
-            <span class="kw">let _ </span>= self_ptr_value; <span class="comment">// TODO
-            </span><span class="macro">todo!</span>(<span class="string">&quot;CPU-local variable access is not yet implemented on this architecture&quot;</span>)
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+            TPIDR_EL1.set(self_ptr_value <span class="kw">as </span>u64);
         }
     }
 }
