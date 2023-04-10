@@ -18,6 +18,9 @@ path = "../task"
 [dependencies.lockable]
 path = "../../libs/lockable"
 
+[dependencies.sync_spin]
+path = "../../libs/sync_spin"
+
 
 [lib]
 crate-type = ["rlib"]

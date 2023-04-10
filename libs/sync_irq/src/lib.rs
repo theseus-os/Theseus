@@ -1,4 +1,3 @@
-#![feature(negative_impls)]
 #![no_std]
 
 use irq_safety::{hold_interrupts, HeldInterrupts};

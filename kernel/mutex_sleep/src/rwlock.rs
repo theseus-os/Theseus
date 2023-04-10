@@ -6,6 +6,7 @@ use core::ops::{Deref, DerefMut};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use wait_queue::WaitQueue;
 use lockable::{Lockable, LockableSized};
+use sync_spin::Spin;
 
 /// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep
 /// while waiting for the lock to become available. 
@@ -16,7 +17,7 @@ use lockable::{Lockable, LockableSized};
 /// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
 /// will be notified (woken up) so they can attempt to acquire the lock again.
 pub struct RwLockSleep<T: ?Sized> {
-    queue: WaitQueue,
+    queue: WaitQueue<Spin>,
     rwlock: RwLock<T>,
 }
 
@@ -27,7 +28,7 @@ pub struct RwLockSleep<T: ?Sized> {
 /// which then notifies any `Task`s waiting on the lock.
 pub struct RwLockSleepReadGuard<'a, T: ?Sized + 'a> {
     guard: RwLockReadGuard<'a, T>,
-    queue: &'a WaitQueue,
+    queue: &'a WaitQueue<Spin>,
 }
 
 /// A guard that allows the locked data to be mutably accessed,
@@ -37,7 +38,7 @@ pub struct RwLockSleepReadGuard<'a, T: ?Sized + 'a> {
 /// which then notifies any `Task`s waiting on the lock.
 pub struct RwLockSleepWriteGuard<'a, T: ?Sized + 'a> {
     guard: RwLockWriteGuard<'a, T>,
-    queue: &'a WaitQueue,
+    queue: &'a WaitQueue<Spin>,
 }
 
 // Same unsafe impls as `std::sync::RwLock`
@@ -101,9 +102,7 @@ impl<T: ?Sized> RwLockSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the lock.
-        self.queue
-            .wait_until(&|| self.try_read())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_read()))
     }
 
     /// Attempt to acquire this lock with shared read (immutable) access.
@@ -197,9 +196,7 @@ impl<T: ?Sized> RwLockSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the write lock.
-        self.queue
-            .wait_until(&|| self.try_write())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_write()))
     }
 
     /// Attempt to acquire this lock with exclusive write (mutable) access.

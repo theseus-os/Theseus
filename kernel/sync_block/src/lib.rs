@@ -2,6 +2,7 @@
 #![no_std]
 
 use sync::{mutex, Flavour};
+use sync_spin::Spin;
 use wait_queue::WaitQueue;
 
 /// A synchronisation flavour that blocks the current thread while waiting for
@@ -10,16 +11,12 @@ use wait_queue::WaitQueue;
 pub struct Block {}
 
 impl Flavour for Block {
-    // #[allow(clippy::declare_interior_mutable_const)]
-    // const INIT: Self::LockData = WaitQueue::new();
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self::LockData = WaitQueue::new();
 
-    type LockData = WaitQueue;
+    type LockData = WaitQueue<Spin>;
 
     type Guard = ();
-
-    fn new() -> Self::LockData {
-        WaitQueue::new()
-    }
 
     #[inline]
     fn try_lock_mutex<'a, T>(
@@ -39,7 +36,7 @@ impl Flavour for Block {
         if let Some(guards) = Self::try_lock_mutex(mutex, data) {
             guards
         } else {
-            data.wait_until(&|| Self::try_lock_mutex(mutex, data)).unwrap()
+            data.wait_until(|| Self::try_lock_mutex(mutex, data))
         }
     }
 

@@ -21,13 +21,12 @@ impl<F, T> Mutex<F, T>
 where
     F: Flavour,
 {
-    // TODO: Constify.
     /// Creates a new mutex.
     #[inline]
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self {
             inner: SpinMutex::new(value),
-            data: F::new(),
+            data: F::INIT,
         }
     }
 
