@@ -73,9 +73,6 @@ pub struct PerCpuData {
     cpu_id: CpuLocalCpuId,
     /// The current preemption count of this CPU, which is used to determine
     /// whether task switching can occur or not.
-    ///
-    /// TODO: we must merge `cpu_local_preemption` and `preemption` in order to use something like
-    ///       `CpuLocal<PreemptionCount>` in the `preemption` crate.
     preemption_count: PreemptionCount,
     /// A preemption guard used during task switching to ensure that one task switch
     /// cannot interrupt (preempt) another task switch already in progress.
