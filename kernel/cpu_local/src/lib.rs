@@ -24,6 +24,11 @@ use spin::Mutex;
 #[cfg(target_arch = "x86_64")]
 use x86_64::{registers::model_specific::GsBase, VirtAddr};
 
+#[cfg(target_arch = "aarch64")]
+use {
+    cortex_a::registers::TPIDR_EL1,
+    tock_registers::interfaces::Writeable,
+};
 
 /// The available CPU-local variables, i.e., fields in `per_cpu::PerCpuData` struct.
 //
@@ -119,7 +124,7 @@ impl<T: CpuLocalField> CpuLocal<T> {
     where
         F: FnOnce(&T) -> R,
     {
-        let ptr_to_cpu_local = self.self_ptr() + T::FIELD.offset();
+        let ptr_to_cpu_local = self_ptr() + T::FIELD.offset();
         let local_ref = unsafe { &*(ptr_to_cpu_local as *const T) };
         func(local_ref)
     }
@@ -133,29 +138,37 @@ impl<T: CpuLocalField> CpuLocal<T> {
         F: FnOnce(&mut T) -> R,
     {
         let _held_interrupts = irq_safety::hold_interrupts();
-        let ptr_to_cpu_local = self.self_ptr() + T::FIELD.offset();
+        let ptr_to_cpu_local = self_ptr() + T::FIELD.offset();
         let local_ref_mut = unsafe { &mut *(ptr_to_cpu_local as *mut T) };
         func(local_ref_mut)
     }
+}
 
-    /// Returns the value of the self pointer, which points to this CPU's `PerCpuData`.
-    #[cfg_attr(not(target_arch = "x86_64"), allow(unreachable_code, unused))]
-    fn self_ptr(&self) -> usize {
-        let self_ptr: usize;
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            core::arch::asm!(
-                "mov {}, gs:[0]", // the self ptr offset is 0
-                lateout(reg) self_ptr,
-                options(nostack, preserves_flags, readonly, pure)
-            );
-        }
-
-        #[cfg(not(target_arch = "x86_64"))]
-        todo!("CPU Locals are not yet supported on non-x86_64 platforms");
-
-        self_ptr 
+/// Returns the value of the self pointer, which points to this CPU's `PerCpuData`.
+fn self_ptr() -> usize {
+    let self_ptr: usize;
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        core::arch::asm!(
+            "mov {}, gs:[0]", // the self ptr offset is 0
+            lateout(reg) self_ptr,
+            options(nostack, preserves_flags, readonly, pure)
+        );
     }
+
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        // The self ptr offset is 0, so we can skip adding an offset to reg `{0}`.
+        core::arch::asm!(
+            "mrs {0}, TPIDR_EL1",
+            "ldr {1}, [{0}]",
+            out(reg) _,
+            lateout(reg) self_ptr,
+            options(nostack)
+        );
+    }
+
+    self_ptr 
 }
 
 impl<T> CpuLocal<T>
@@ -184,8 +197,11 @@ impl CpuLocalDataRegion {
         Ok(CpuLocalDataRegion(mp))
     }
 
-    /// Sets this CPU's base register (e.g., GsBase on x86_64) to the address
-    /// of this CPU-local data image, making it "currently active" and accessible.
+    /// Sets this CPU's base register to the address of this CPU-local data image,
+    /// making it "currently active" and accessible.
+    ///
+    /// * On x86_64, this sets the `GsBase` register.
+    /// * On aarch64, this sets the `TPIDR_EL1` register.
     fn set_as_current_cpu_local_base(&self) {
         let self_ptr_value = self.0.start_address().value();
 
@@ -194,9 +210,8 @@ impl CpuLocalDataRegion {
             GsBase::write(gsbase_val);
         }
 
-        #[cfg(not(target_arch = "x86_64"))] {
-            let _ = self_ptr_value; // TODO
-            todo!("CPU-local variable access is not yet implemented on this architecture")
+        #[cfg(target_arch = "aarch64")] {
+            TPIDR_EL1.set(self_ptr_value as u64);
         }
     }
 }
