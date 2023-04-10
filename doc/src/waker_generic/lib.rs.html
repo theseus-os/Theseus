@@ -210,7 +210,7 @@
                 // disables this task, it keeps running long enough to return here and
                 // drop the lock on `woken`.
                 </span><span class="kw">let </span>result = {
-                    <span class="kw">let </span>guard = preemption::hold_preemption_no_timer_disable();
+                    <span class="kw">let </span>guard = cpu_local_preemption::hold_preemption_no_timer_disable();
                     <span class="kw">let </span>r = block_action();
                     drop(woken);
                     drop(guard);
@@ -254,7 +254,7 @@
         // is released expediently after `wake_action()` is done.
         // This is not technically required, but it prevents this waker task
         // from being scheduled out while still holding the `woken` lock.
-        </span><span class="kw">let </span>guard = preemption::hold_preemption_no_timer_disable();
+        </span><span class="kw">let </span>guard = cpu_local_preemption::hold_preemption_no_timer_disable();
         (<span class="self">self</span>.wake_action)();
         drop(woken);
         drop(guard);

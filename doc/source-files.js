@@ -25,7 +25,7 @@ var sourcesIndex = JSON.parse('{\
 "context_switch_sse":["",[],["lib.rs"]],\
 "cow_arc":["",[],["lib.rs"]],\
 "cpu":["",[],["lib.rs","x86_64.rs"]],\
-"cpu_local":["",[],["lib.rs"]],\
+"cpu_local_preemption":["",[],["cpu_local.rs","lib.rs","preemption.rs"]],\
 "crate_metadata":["",[],["lib.rs"]],\
 "crate_metadata_serde":["",[],["lib.rs"]],\
 "crate_name_utils":["",[],["lib.rs"]],\
@@ -122,7 +122,6 @@ var sourcesIndex = JSON.parse('{\
 "pit_clock_basic":["",[],["lib.rs"]],\
 "pmu_x86":["",[],["lib.rs","stat.rs"]],\
 "port_io":["",[],["lib.rs","x86.rs"]],\
-"preemption":["",[],["lib.rs"]],\
 "ps2":["",[],["lib.rs"]],\
 "pte_flags":["",[],["lib.rs","pte_flags_aarch64.rs","pte_flags_x86_64.rs"]],\
 "random":["",[],["lib.rs"]],\

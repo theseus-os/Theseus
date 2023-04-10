@@ -712,7 +712,7 @@
 <span class="kw">use </span>mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 <span class="kw">use </span>environment::Environment;
 <span class="kw">use </span>spin::Mutex;
-<span class="kw">use </span>preemption::PreemptionGuard;
+<span class="kw">use </span>cpu_local_preemption::PreemptionGuard;
 
 <span class="doccomment">/// The function signature of the callback that will be invoked when a `Task`
 /// panics or otherwise fails, e.g., a machine exception occurs.

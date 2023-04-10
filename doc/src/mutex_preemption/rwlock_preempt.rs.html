@@ -294,7 +294,7 @@
 </span><span class="attr">#![allow(clippy::missing_safety_doc)]
 
 </span><span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
-<span class="kw">use </span>preemption::{PreemptionGuard, hold_preemption};
+<span class="kw">use </span>cpu_local_preemption::{PreemptionGuard, hold_preemption};
 <span class="kw">use </span>spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 <span class="kw">use </span>lockable::{Lockable, LockableSized};
 

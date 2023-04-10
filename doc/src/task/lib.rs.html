@@ -1284,14 +1284,14 @@
     task::Waker,
 };
 <span class="kw">use </span>cpu::CpuId;
-<span class="kw">use </span>cpu_local::{CpuLocalField, PerCpuField};
+<span class="kw">use </span>cpu_local_preemption::{CpuLocalField, PerCpuField};
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>irq_safety::{hold_interrupts, MutexIrqSafe};
 <span class="kw">use </span>log::error;
 <span class="kw">use </span>environment::Environment;
 <span class="kw">use </span>memory::MmiRef;
 <span class="kw">use </span>no_drop::NoDrop;
-<span class="kw">use </span>preemption::PreemptionGuard;
+<span class="kw">use </span>cpu_local_preemption::PreemptionGuard;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>task_struct::ExposedTask;
@@ -1894,7 +1894,7 @@
     ///    meaning the current task will continue running.
     </span><span class="attr">#[doc(alias(<span class="string">&quot;yield&quot;</span>))]
     </span><span class="kw">pub fn </span>schedule() -&gt; bool {
-        <span class="kw">let </span>preemption_guard = preemption::hold_preemption();
+        <span class="kw">let </span>preemption_guard = cpu_local_preemption::hold_preemption();
         <span class="comment">// If preemption was not previously enabled (before we disabled it above),
         // then we shouldn&#39;t perform a task switch here.
         </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {

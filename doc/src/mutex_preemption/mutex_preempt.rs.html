@@ -165,7 +165,7 @@
 <a href="#165" id="165">165</a>
 <a href="#166" id="166">166</a>
 </pre><pre class="rust"><code><span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
-<span class="kw">use </span>preemption::{PreemptionGuard, hold_preemption};
+<span class="kw">use </span>cpu_local_preemption::{PreemptionGuard, hold_preemption};
 <span class="kw">use </span>spin::{Mutex, MutexGuard};
 <span class="kw">use </span>lockable::{Lockable, LockableSized};
 
