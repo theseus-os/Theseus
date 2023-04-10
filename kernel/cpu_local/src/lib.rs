@@ -27,7 +27,7 @@ use x86_64::{registers::model_specific::GsBase, VirtAddr};
 #[cfg(target_arch = "aarch64")]
 use {
     cortex_a::registers::TPIDR_EL1,
-    tock_registers::interfaces::Writeable,
+    tock_registers::interfaces::{Readable, Writeable},
 };
 
 /// The available CPU-local variables, i.e., fields in `per_cpu::PerCpuData` struct.
@@ -156,16 +156,10 @@ fn self_ptr() -> usize {
         );
     }
 
-    #[cfg(target_arch = "aarch64")]
-    unsafe {
-        // The self ptr offset is 0, so we can skip adding an offset to reg `{0}`.
-        core::arch::asm!(
-            "mrs {0}, TPIDR_EL1",
-            "ldr {1}, [{0}]",
-            out(reg) _,
-            lateout(reg) self_ptr,
-            options(nostack)
-        );
+    #[cfg(target_arch = "aarch64")] {
+        let base = TPIDR_EL1.get();
+        // The self ptr offset is 0; no need to add an offset to the base.
+        self_ptr = unsafe { *(base as *const usize) };
     }
 
     self_ptr 
