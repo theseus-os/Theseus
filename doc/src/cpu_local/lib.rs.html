@@ -312,12 +312,6 @@
 <a href="#312" id="312">312</a>
 <a href="#313" id="313">313</a>
 <a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Offers types and macros to declare and access CPU-local storage (per-CPU variables).
 //!
 //! CPU-local variables cannot be used until after a given CPU has been initialized,
@@ -347,7 +341,7 @@
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">use </span>{
     cortex_a::registers::TPIDR_EL1,
-    tock_registers::interfaces::Writeable,
+    tock_registers::interfaces::{Readable, Writeable},
 };
 
 <span class="doccomment">/// The available CPU-local variables, i.e., fields in `per_cpu::PerCpuData` struct.
@@ -476,16 +470,10 @@
         );
     }
 
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span><span class="kw">unsafe </span>{
-        <span class="comment">// The self ptr offset is 0, so we can skip adding an offset to reg `{0}`.
-        </span><span class="macro">core::arch::asm!</span>(
-            <span class="string">&quot;mrs {0}, TPIDR_EL1&quot;</span>,
-            <span class="string">&quot;ldr {1}, [{0}]&quot;</span>,
-            out(reg) <span class="kw">_</span>,
-            lateout(reg) self_ptr,
-            options(nostack)
-        );
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        <span class="kw">let </span>base = TPIDR_EL1.get();
+        <span class="comment">// The self ptr offset is 0; no need to add an offset to the base.
+        </span>self_ptr = <span class="kw">unsafe </span>{ <span class="kw-2">*</span>(base <span class="kw">as </span><span class="kw-2">*const </span>usize) };
     }
 
     self_ptr 
