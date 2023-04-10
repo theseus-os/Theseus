@@ -630,12 +630,14 @@ dependencies = [
 name = "cpu_local"
 version = "0.1.0"
 dependencies = [
+ "cortex-a",
  "crossbeam-utils",
  "irq_safety",
  "log",
  "memory",
  "preemption",
  "spin 0.9.4",
+ "tock-registers",
  "x86_64",
 ]
 
