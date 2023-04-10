@@ -151,7 +151,7 @@ impl Drop for PreemptionGuard {
         );
 
         let prev_val = PREEMPTION_COUNT.with_preempt(
-            &self,
+            self,
             |count| count.0.fetch_sub(1, Ordering::Relaxed)
         );
         if prev_val == 1 {
