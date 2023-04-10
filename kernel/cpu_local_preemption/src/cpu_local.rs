@@ -10,15 +10,10 @@
 //! On x86_64, TLS areas use the `fs` segment register for the TLS base,
 //! and this crate uses the `gs` segment register for the CPU-local base.
 
-#![no_std]
-#![feature(thread_local)]
-
-extern crate alloc;
-
 use core::marker::PhantomData;
 use alloc::collections::{BTreeMap, btree_map::Entry};
 use memory::{MappedPages, PteFlags};
-use preemption::{hold_preemption, PreemptionGuard};
+use crate::preemption::{hold_preemption, PreemptionGuard};
 use spin::Mutex;
 
 #[cfg(target_arch = "x86_64")]
@@ -119,7 +114,7 @@ impl<T: CpuLocalField> CpuLocal<T> {
     /// Invokes the given `func` with an immutable reference to this `CpuLocal` variable.
     ///
     /// This function accepts an existing preemption guard, which efficiently proves
-    /// that preemption has already been disabled.
+    /// that preemption has already been disabled on this CPU.
     pub fn with_preempt<F, R>(&self, _guard: &PreemptionGuard, func: F) -> R
     where
         F: FnOnce(&T) -> R,

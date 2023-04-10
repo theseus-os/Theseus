@@ -627,15 +627,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu_local"
+name = "cpu_local_preemption"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "cortex-a",
- "crossbeam-utils",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
- "preemption",
+ "no_drop",
  "spin 0.9.4",
  "tock-registers",
  "x86_64",
@@ -2262,8 +2263,8 @@ dependencies = [
 name = "mutex_preemption"
 version = "0.1.0"
 dependencies = [
+ "cpu_local_preemption",
  "lockable",
- "preemption",
  "spin 0.9.4",
 ]
 
@@ -2625,10 +2626,10 @@ name = "per_cpu"
 version = "0.1.0"
 dependencies = [
  "cpu",
- "cpu_local",
+ "cpu_local_preemption",
  "log",
  "memoffset 0.8.0",
- "preemption",
+ "no_drop",
  "task",
 ]
 
@@ -2777,15 +2778,6 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
-
-[[package]]
-name = "preemption"
-version = "0.1.0"
-dependencies = [
- "apic",
- "cpu",
- "log",
-]
 
 [[package]]
 name = "print_fault_log"
@@ -3209,9 +3201,9 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cpu",
+ "cpu_local_preemption",
  "interrupts",
  "log",
- "preemption",
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
@@ -3526,6 +3518,7 @@ dependencies = [
  "catch_unwind",
  "context_switch",
  "cpu",
+ "cpu_local_preemption",
  "debugit",
  "early_tls",
  "fault_crate_swap",
@@ -3538,7 +3531,6 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "preemption",
  "runqueue",
  "scheduler",
  "spin 0.9.4",
@@ -3718,7 +3710,7 @@ dependencies = [
 name = "sync_preemption"
 version = "0.1.0"
 dependencies = [
- "preemption",
+ "cpu_local_preemption",
  "sync",
 ]
 
@@ -3752,7 +3744,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
- "cpu_local",
+ "cpu_local_preemption",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3760,7 +3752,6 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "no_drop",
- "preemption",
  "spin 0.9.4",
  "stack",
  "static_assertions",
@@ -3787,6 +3778,7 @@ name = "task_struct"
 version = "0.1.0"
 dependencies = [
  "cpu",
+ "cpu_local_preemption",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3794,7 +3786,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "preemption",
  "spin 0.9.4",
  "stack",
 ]
@@ -4445,7 +4436,7 @@ dependencies = [
 name = "waker_generic"
 version = "0.1.0"
 dependencies = [
- "preemption",
+ "cpu_local_preemption",
  "spin 0.9.4",
 ]
 

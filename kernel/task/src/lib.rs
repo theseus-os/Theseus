@@ -44,14 +44,14 @@ use core::{
     task::Waker,
 };
 use cpu::CpuId;
-use cpu_local::{CpuLocalField, PerCpuField};
+use cpu_local_preemption::{CpuLocalField, PerCpuField};
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
 use environment::Environment;
 use memory::MmiRef;
 use no_drop::NoDrop;
-use preemption::PreemptionGuard;
+use cpu_local_preemption::PreemptionGuard;
 use spin::Mutex;
 use stack::Stack;
 use task_struct::ExposedTask;
@@ -654,7 +654,7 @@ mod scheduler {
     ///    meaning the current task will continue running.
     #[doc(alias("yield"))]
     pub fn schedule() -> bool {
-        let preemption_guard = preemption::hold_preemption();
+        let preemption_guard = cpu_local_preemption::hold_preemption();
         // If preemption was not previously enabled (before we disabled it above),
         // then we shouldn't perform a task switch here.
         if !preemption_guard.preemption_was_enabled() {
