@@ -476,6 +476,7 @@ dependencies = [
  "cls-proc",
  "cpu",
  "memory",
+ "sync_spin",
  "x86_64",
 ]
 

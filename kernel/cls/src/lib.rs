@@ -1,7 +1,10 @@
 #![no_std]
 
+extern crate alloc;
+
 mod arch;
 
+use alloc::collections::BTreeMap;
 use cpu::CpuId;
 use memory::PteFlags;
 use sync_spin::Mutex;
@@ -10,7 +13,7 @@ pub use cls_proc::cpu_local;
 
 pub fn init(_cpu_id: CpuId) -> Result<(), ()> {
     // TODO: Check it isn't being initialised twice.
-    static CPU_LOCAL_DATA_REGIONS: Mutex<BTreeMap<u32, CpuLocalDataRegion>> =
+    static CPU_LOCAL_DATA_REGIONS: Mutex<BTreeMap<u32, u32>> =
         Mutex::new(BTreeMap::new());
 
     let data_region =
