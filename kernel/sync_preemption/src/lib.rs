@@ -1,7 +1,7 @@
 #![feature(negative_impls)]
 #![no_std]
 
-use preemption::{hold_preemption, PreemptionGuard};
+use cpu_local_preemption::{hold_preemption, PreemptionGuard};
 
 pub type Mutex<T> = sync::Mutex<DisablePreemption, T>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisablePreemption, T>;

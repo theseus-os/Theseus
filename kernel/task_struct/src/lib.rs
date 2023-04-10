@@ -36,7 +36,7 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use preemption::PreemptionGuard;
+use cpu_local_preemption::PreemptionGuard;
 
 /// The function signature of the callback that will be invoked when a `Task`
 /// panics or otherwise fails, e.g., a machine exception occurs.
