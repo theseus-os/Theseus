@@ -6,8 +6,8 @@
 //! 
 //! Only `Send` types can be sent or received through the channel.
 //! 
-//! This is not a zero-copy channel; 
-//! to avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! This is not a zero-copy channel; to avoid copying large messages,
+//! use a reference type like `Box` or another layer of indirection.
 
 #![no_std]
 
@@ -42,21 +42,20 @@ use sync_spin::Spin;
 /// future attempts to send another message will either block or return a `Full` error 
 /// until the channel's buffer is drained by a receiver and space in the buffer becomes available.
 ///
-/// For the vast majority of use cases, no deadlock prevention is sufficient. To
-/// create a channel with deadlock prevention see [`new_channel_with`].
+/// For the vast majority of use cases, this function is recommended way to create
+/// a new channel, because there is no need to specify a deadlock prevention method.
+/// To create a channel with different deadlock prevention, see [`new_channel_with()`].
 pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
     new_channel_with(minimum_capacity)
 }
 
-/// Creates a new asynchronous channel with the specified deadlock prevention
-/// method.
+/// Creates a new asynchronous channel with the specified deadlock prevention method.
 ///
-/// See [`new_channel`] for more details.
+/// See [`new_channel()`] for more details.
 ///
 /// The asynchronous channel uses a wait queue internally and hence exposes a
-/// deadlock prevention type parameter. By default it is set to [`Spin`]. See
-/// [`WaitQueue`]'s documentation for more information on when to change this
-/// type parameter.
+/// deadlock prevention type parameter `P` that is [`Spin`] by default.
+/// See [`WaitQueue`]'s documentation for more info on setting this type parameter.
 pub fn new_channel_with<T: Send, P: DeadlockPrevention>(
     minimum_capacity: usize,
 ) -> (Sender<T, P>, Receiver<T, P>) {
@@ -69,9 +68,7 @@ pub fn new_channel_with<T: Send, P: DeadlockPrevention>(
         receiver_count: AtomicUsize::new(1),
     });
     (
-        Sender {
-            channel: channel.clone(),
-        },
+        Sender { channel: channel.clone() },
         Receiver { channel },
     )
 }
@@ -231,10 +228,10 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
             });
 
             if self.channel.is_disconnected() {
-                 // trace!("Receiver Endpoint is dropped");
-                 // Here the receiver end has dropped. 
-                 // So we don't wait anymore in the waitqueue
-                 Some(Err(Error::ChannelDisconnected))
+                // trace!("Receiver Endpoint is dropped");
+                // Here the receiver end has dropped. 
+                // So we don't wait anymore in the waitqueue
+                Some(Err(Error::ChannelDisconnected))
             } else {
                 result
             }
