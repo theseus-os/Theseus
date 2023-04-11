@@ -13,7 +13,6 @@ spin = "0.9.4"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
 environment = { path = "../environment" }
 kernel_config = { path = "../kernel_config" }
 memory = { path = "../memory" }
