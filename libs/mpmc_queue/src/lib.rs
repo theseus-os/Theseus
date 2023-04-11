@@ -77,9 +77,9 @@ where
     /// Appends an item to the queue if a condition fails.
     ///
     /// The condition will be tested while the internal lock is held.
-    pub fn push_if_fail<A, B, C>(&self, item: T, condition: A) -> Result<B, C>
+    pub fn push_if_fail<C, R, E>(&self, item: T, condition: C) -> Result<R, E>
     where
-        A: FnOnce() -> Result<B, C>,
+        C: FnOnce() -> Result<R, E>,
     {
         let pointers = self.pointers.lock();
         match condition() {
