@@ -134,7 +134,7 @@ dependencies = [
  "core2",
  "hashbrown",
  "lazy_static",
- "logger_x86_64",
+ "logger",
  "mutex_sleep",
  "stdio",
  "task",
@@ -379,7 +379,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "log",
- "logger_x86_64",
+ "logger",
  "memory",
  "mod_mgmt",
  "multicore_bringup",
@@ -890,7 +890,7 @@ dependencies = [
  "ixgbe",
  "keyboard",
  "log",
- "logger_x86_64",
+ "logger",
  "memory",
  "mlx5",
  "mouse",
@@ -1857,18 +1857,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "logger_aarch64"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "log",
- "memory",
- "pl011_qemu",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "logger_x86_64"
+name = "logger"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
@@ -2302,8 +2291,7 @@ dependencies = [
  "kernel_config",
  "libm",
  "log",
- "logger_aarch64",
- "logger_x86_64",
+ "logger",
  "memory",
  "memory_initialization",
  "mod_mgmt",
@@ -3357,7 +3345,10 @@ dependencies = [
 name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
+ "arm_boards",
  "irq_safety",
+ "memory",
+ "pl011_qemu",
  "port_io",
  "spin 0.9.4",
 ]

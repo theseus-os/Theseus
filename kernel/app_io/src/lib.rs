@@ -12,7 +12,7 @@
 #![no_std]
 
 extern crate alloc;
-extern crate logger_x86_64 as logger;
+extern crate logger;
 
 use alloc::{format, sync::Arc};
 use core2::io::{self, Error, ErrorKind, Read, Write};

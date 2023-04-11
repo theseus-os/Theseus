@@ -22,18 +22,15 @@ early_tls = { path = "../early_tls" }
 stack = { path = "../stack" }
 mod_mgmt = { path = "../mod_mgmt" }
 panic_entry = { path = "../panic_entry" }
+serial_port_basic = { path = "../serial_port_basic" }
 memory_initialization = { path = "../memory_initialization" }
 boot_info = { path = "../boot_info" }
 captain = { path = "../captain" }
 early_printer = { path = "../early_printer" }
+logger = { path = "../logger" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
-serial_port_basic = { path = "../serial_port_basic" }
-logger_x86_64 = { path = "../logger_x86_64" }
-
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-logger_aarch64 = { path = "../logger_aarch64" }
 
 [dependencies.uefi-bootloader-api]
 git = "https://github.com/theseus-os/uefi-bootloader"

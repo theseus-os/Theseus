@@ -20,6 +20,7 @@ mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
 task_fs = { path = "../task_fs" }
 memory = { path = "../memory" }
+logger = { path = "../logger" }
 spawn = { path = "../spawn" }
 stack = { path = "../stack" }
 task = { path = "../task" }
@@ -27,7 +28,6 @@ cpu = { path = "../cpu" }
 per_cpu = { path = "../per_cpu" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-logger_x86_64 = { path = "../logger_x86_64" }
 window_manager = { path = "../window_manager" }
 first_application = { path = "../first_application" }
 exceptions_full = { path = "../exceptions_full" }

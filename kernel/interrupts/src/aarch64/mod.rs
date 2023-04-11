@@ -157,7 +157,7 @@ pub fn init() -> Result<(), &'static str> {
         match BOARD_CONFIG.interrupt_controller {
             InterruptControllerConfig::GicV3(gicv3_cfg) => {
                 let kernel_mmi_ref = get_kernel_mmi_ref()
-                    .ok_or("logger_aarch64: couldn't get kernel MMI ref")?;
+                    .ok_or("interrupts::aarch64::init: couldn't get kernel MMI ref")?;
 
                 let mut mmi = kernel_mmi_ref.lock();
                 let page_table = &mut mmi.deref_mut().page_table;
