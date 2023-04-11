@@ -1,39 +1,6 @@
-//! Support for basic serial port access, including initialization, transmit, and receive.
-//!
-//! This is a near-standalone crate with very minimal dependencies and a basic feature set
-//! intended for use during early Theseus boot up and initialization.
-//! For a more featureful serial port driver, use the `serial_port` crate.
-//!
-//! # Notes
-//! Some serial port drivers use special cases for transmitting some byte values,
-//! specifically `0x08` and `0x7F`, which are ASCII "backspace" and "delete", respectively.
-//! They do so by writing them as three distinct values (with proper busy waiting in between):
-//! 1. `0x08`
-//! 2. `0x20` (an ascii space character)
-//! 3. `0x08` again. 
-//!
-//! This isn't necessarily a bad idea, as it "clears out" whatever character was there before,
-//! presumably to prevent rendering/display issues for a deleted character. 
-//! But, this isn't required, and I personally believe it should be handled by a higher layer,
-//! such as a shell or TTY program. 
-//! We don't do anything like that here, in case a user of this crate wants to send binary data
-//! across the serial port, rather than "smartly-interpreted" ASCII characters.
-//!
-//! # Resources
-//! * <https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming>
-//! * <https://tldp.org/HOWTO/Modem-HOWTO-4.html>
-//! * <https://wiki.osdev.org/Serial_Ports>
-//! * <https://www.sci.muni.cz/docs/pc/serport.txt>
-
-#![no_std]
-
-extern crate spin;
-extern crate port_io;
-extern crate irq_safety;
-
 use core::{convert::TryFrom, fmt, str::FromStr};
+use super::{TriState, SerialPortInterruptEvent};
 use port_io::Port;
-use irq_safety::MutexIrqSafe;
 
 /// The base port I/O addresses for COM serial ports.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -48,17 +15,7 @@ pub enum SerialPortAddress {
     /// The base port I/O address for the COM4 serial port.
     COM4 = 0x2E8,
 }
-impl SerialPortAddress {
-    /// Returns a reference to the static instance of this serial port.
-    fn to_static_port(self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
-        match self {
-            SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
-            SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
-            SerialPortAddress::COM3 => &COM3_SERIAL_PORT,
-            SerialPortAddress::COM4 => &COM4_SERIAL_PORT,
-        }
-    }
-}
+
 impl TryFrom<&str> for SerialPortAddress {
     type Error = ();
     fn try_from(s: &str) -> Result<Self, Self::Error> {
@@ -71,12 +28,14 @@ impl TryFrom<&str> for SerialPortAddress {
         }
     }
 }
+
 impl FromStr for SerialPortAddress {
     type Err = ();
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::try_from(s)
     }
 }
+
 impl TryFrom<u16> for SerialPortAddress {
     type Error = ();
     fn try_from(port: u16) -> Result<Self, Self::Error> {
@@ -90,54 +49,9 @@ impl TryFrom<u16> for SerialPortAddress {
     }
 }
 
-/// This type is used to ensure that an object of type `T` is only initialized once,
-/// but still allows for a caller to take ownership of the object `T`. 
-enum TriState<T> {
-    Uninited,
-    Inited(T),
-    Taken,
-}
-impl<T> TriState<T> {
-    fn take(&mut self) -> Option<T> {
-        if let Self::Inited(_) = self {
-            if let Self::Inited(v) = core::mem::replace(self, Self::Taken) {
-                return Some(v);
-            }
-        }
-        None
-    }
-}
-
-// Serial ports cannot be reliably probed (discovered dynamically), thus,
-// we ensure they are exposed safely as singletons through the below static instances.
-static COM1_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-static COM2_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-static COM3_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-static COM4_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-
-
-/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
-///
-/// This function initializes the given serial port if it has not yet been initialized.
-/// If the serial port has already been initialized and taken by another crate,
-/// this returns `None`.
-///
-/// The returned [`SerialPort`] will be restored to this crate upon being dropped.
-pub fn take_serial_port(
-    serial_port_address: SerialPortAddress
-) -> Option<SerialPort> {
-    let sp = serial_port_address.to_static_port();
-    let mut locked = sp.lock();
-    if let TriState::Uninited = &*locked {
-        *locked = TriState::Inited(SerialPort::new(serial_port_address as u16));
-    }
-    locked.take()
-}
-
 // The E9 port can be used with the Bochs emulator for extra debugging info.
 // const PORT_E9: u16 = 0xE9; // for use with bochs
 // static E9: Port<u8> = Port::new(PORT_E9); // see Bochs's port E9 hack
-
 
 /// A serial port and its various data and control registers.
 ///
@@ -360,14 +274,4 @@ impl fmt::Write for SerialPort {
         self.out_str(s); 
         Ok(())
     }
-}
-
-/// The types of events that can trigger an interrupt on a serial port.
-#[derive(Debug)]
-#[repr(u8)]
-pub enum SerialPortInterruptEvent {
-    DataReceived     = 1 << 0,
-    TransmitterEmpty = 1 << 1,
-    ErrorOrBreak     = 1 << 2,
-    StatusChange     = 1 << 3,
 }

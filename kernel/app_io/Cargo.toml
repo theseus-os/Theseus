@@ -9,6 +9,7 @@ edition = "2021"
 [dependencies]
 hashbrown = "0.11"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+logger = { path = "../logger" }
 
 [dependencies.task]
 path = "../../kernel/task"
@@ -25,9 +26,6 @@ path = "../../kernel/tty"
 [dependencies.lazy_static]
 features = ["spin_no_std"]
 version = "1.4.0"
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-logger_x86_64 = { path = "../logger_x86_64" }
 
 [lib]
 crate-type = ["rlib"]

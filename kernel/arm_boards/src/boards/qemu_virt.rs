@@ -17,6 +17,8 @@ const fn redist(aff0: usize) -> PhysicalAddress {
 }
 
 pub const NUM_CPUS: usize = 4;
+pub const NUM_PL011_UARTS: usize = 1;
+
 pub static BOARD_CONFIG: BoardConfig = BoardConfig {
     cpu_ids: [
         cpu_id(0),
@@ -33,4 +35,5 @@ pub static BOARD_CONFIG: BoardConfig = BoardConfig {
             redist(3),
         ],
     }),
+    pl011_base_addresses: [ PhysicalAddress::new_canonical(0x09000000) ],
 };
