@@ -1250,9 +1250,6 @@
 <a href="#1250" id="1250">1250</a>
 <a href="#1251" id="1251">1251</a>
 <a href="#1252" id="1252">1252</a>
-<a href="#1253" id="1253">1253</a>
-<a href="#1254" id="1254">1254</a>
-<a href="#1255" id="1255">1255</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1530,27 +1527,6 @@
     </span><span class="kw">fn </span>set_as_current_task(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.<span class="number">0</span>.task.tls_area().set_as_current_tls_base();
     }
-
-    <span class="doccomment">/// Perform any actions needed after a context switch.
-    /// 
-    /// Currently this only does two things:
-    /// 1. Drops any data that the original previous task (before the context switch)
-    ///    prepared for us to drop.
-    /// 2. Obtains the preemption guard such that preemption can be re-enabled
-    ///    when it is appropriate to do so.
-    </span><span class="kw">fn </span>post_context_switch_action(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PreemptionGuard {
-        <span class="comment">// Step 1: drop data from previously running task
-        </span>{
-            <span class="kw">let </span>prev_task_data_to_drop = DROP_AFTER_TASK_SWITCH.with_mut(|d| d.<span class="number">0</span>.take());
-            drop(prev_task_data_to_drop);
-        }
-
-        <span class="comment">// Step 2: retake ownership of preemption guard in order to re-enable preemption.
-        </span>{
-            TASK_SWITCH_PREEMPTION_GUARD.with_mut(|p| p.<span class="number">0</span>.take())
-                .expect(<span class="string">&quot;BUG: post_context_switch_action: no PreemptionGuard existed&quot;</span>)
-        }
-    }
 }
 
 <span class="kw">impl </span>PartialEq <span class="kw">for </span>TaskRef {
@@ -1802,15 +1778,15 @@
     /// 
     /// Currently this only does two things:
     /// 1. Drops any data that the original previous task (before the context switch)
-    ///    prepared for us to drop.
+    ///    prepared for us to drop after the context switch has completed.
     /// 2. Obtains the preemption guard such that preemption can be re-enabled
     ///    when it is appropriate to do so.
     ///
-    /// Note: this publicly re-exports the private `TaskRef::post_context_switch_action()`
+    /// Note: this publicly re-exports the private `post_context_switch_action()`
     ///       function for use in the early `spawn::task_wrapper` functions,
     ///       which is the only place where an `ExitableTaskRef` can be obtained. 
     </span><span class="kw">pub fn </span>post_context_switch_action(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PreemptionGuard {
-        <span class="self">self</span>.task.post_context_switch_action()
+        post_context_switch_action()
     }
 
     <span class="doccomment">/// Allows the unwinder to use the current task to obtain its `ExitableTaskRef`
@@ -2068,10 +2044,7 @@
     // and are easy to replicate in `task_wrapper()`.
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    </span><span class="kw">let </span>recovered_preemption_guard = with_current_task(
-        |t| t.post_context_switch_action()
-    ).expect(<span class="string">&quot;BUG: task_switch(): failed to get current task for post_context_switch_action&quot;</span>);
-
+    </span><span class="kw">let </span>recovered_preemption_guard = post_context_switch_action();
     (<span class="bool-val">true</span>, recovered_preemption_guard)
 }
 
@@ -2216,6 +2189,27 @@
     </span><span class="kw">return </span><span class="prelude-val">Ok</span>((prev_task_saved_sp, next_task_saved_sp));
     <span class="attr">#[cfg(simd_personality)]
     </span><span class="kw">return </span><span class="prelude-val">Ok</span>((prev_task_saved_sp, next_task_saved_sp, curr_simd, next.simd));
+}
+
+<span class="doccomment">/// Perform any actions needed after a context switch.
+///
+/// Currently this only does two things:
+/// 1. Drops any data that the original previous task (before the context switch)
+///    prepared for us to drop.
+/// 2. Obtains the preemption guard such that preemption can be re-enabled
+///    when it is appropriate to do so.
+</span><span class="kw">fn </span>post_context_switch_action() -&gt; PreemptionGuard {
+    <span class="comment">// Step 1: drop data from previously running task
+    </span>{
+        <span class="kw">let </span>prev_task_data_to_drop = DROP_AFTER_TASK_SWITCH.with_mut(|d| d.<span class="number">0</span>.take());
+        drop(prev_task_data_to_drop);
+    }
+
+    <span class="comment">// Step 2: retake ownership of preemption guard in order to re-enable preemption.
+    </span>{
+        TASK_SWITCH_PREEMPTION_GUARD.with_mut(|p| p.<span class="number">0</span>.take())
+            .expect(<span class="string">&quot;BUG: post_context_switch_action: no PreemptionGuard existed&quot;</span>)
+    }
 }
 
 
