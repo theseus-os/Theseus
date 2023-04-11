@@ -2,7 +2,7 @@
 #![no_std]
 
 use mpmc_queue::Queue;
-use preemption::hold_preemption;
+use cpu_local_preemption::hold_preemption;
 use sync::DeadlockPrevention;
 use sync_spin::Spin;
 use task::{get_my_current_task, TaskRef};

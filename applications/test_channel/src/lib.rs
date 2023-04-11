@@ -160,7 +160,7 @@ fn rmain(matches: Matches) -> Result<(), &'static str> {
 fn rendezvous_test_oneshot() -> Result<(), &'static str> {
     let my_cpu = cpu::current_cpu();
 
-    let (sender, receiver): (rendezvous::Sender<_>, _) = rendezvous::new_channel();
+    let (sender, receiver) = rendezvous::new_channel();
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("rendezvous_test_oneshot(): Entered sender task!");
@@ -199,7 +199,7 @@ fn rendezvous_test_oneshot() -> Result<(), &'static str> {
 fn rendezvous_test_multiple(send_count: usize, receive_count: usize, send_panic: Option<usize>, receive_panic: Option<usize>) -> Result<(), &'static str> {
     let my_cpu = cpu::current_cpu();
 
-    let (sender, receiver): (rendezvous::Sender<_>, _) = rendezvous::new_channel();
+    let (sender, receiver) = rendezvous::new_channel();
 
     let t1 = spawn::new_task_builder(rendezvous_sender_task, (sender, send_count, send_panic))
         .name(String::from("sender_task_rendezvous"))

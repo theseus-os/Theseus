@@ -132,16 +132,12 @@ impl<T> fmt::Debug for ExchangeState<T> {
 // }
 
 
-/// Create a new channel that requires the sender and receiver to rendezvous
-/// when exchanging a message.
+/// Creates a new rendezvous channel with no deadlock prevention.
 ///
-/// The rendezvous channel uses a wait queue internally and hence exposes a
-/// deadlock prevention type parameter. By default it is set to [`Spin`]. See
-/// [`WaitQueue`]'s documentation for more information on when to change this
-/// type parameter.
-#[allow(invalid_type_param_default)]
-pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Receiver<T, P>) {
-    let channel = Arc::new(Channel::<T, P> {
+/// For the vast majority of use cases, no deadlock prevention is sufficient. To
+/// create a channel with deadlock prevention see [`new_channel_with`].
+pub fn new_channel<T: Send>() -> (Sender<T, Spin>, Receiver<T, Spin>) {
+    let channel = Arc::new(Channel {
         slot: ExchangeSlot::new(),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
@@ -152,7 +148,23 @@ pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Re
     )
 }
 
-
+/// Creates a new rendezvous channel with the specified deadlock prevention
+/// method.
+///
+/// The rendezvous channel uses a wait queue internally and hence exposes a
+/// deadlock prevention type parameter. See [`WaitQueue`]'s documentation for
+/// more information on when to change this type parameter.
+pub fn new_channel_with<T: Send, P: DeadlockPrevention>() -> (Sender<T, P>, Receiver<T, P>) {
+    let channel = Arc::new(Channel {
+        slot: ExchangeSlot::new(),
+        waiting_senders: WaitQueue::new(),
+        waiting_receivers: WaitQueue::new(),
+    });
+    (
+        Sender   { channel: channel.clone() },
+        Receiver { channel }
+    )
+}
 
 /// The inner channel for synchronous rendezvous-based communication
 /// between `Sender`s and `Receiver`s. 
@@ -163,7 +175,7 @@ pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Re
 /// Sender-side and Receiver-side references to an exchange slot can be obtained in both 
 /// a blocking and non-blocking fashion, 
 /// which supports both synchronous (rendezvous-based) and asynchronous channels.
-struct Channel<T: Send, P: DeadlockPrevention> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     /// In a zero-capacity synchronous channel, there is only a single slot,
     /// but senders and receivers perform a blocking wait on it until the slot becomes available.
     /// In contrast, a synchronous channel with a capacity of 1 would return a "channel full" error
