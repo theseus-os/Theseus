@@ -140,7 +140,7 @@ var sourcesIndex = JSON.parse('{\
 "scheduler_round_robin":["",[],["lib.rs"]],\
 "sdt":["",[],["lib.rs"]],\
 "serial_port":["",[],["lib.rs"]],\
-"serial_port_basic":["",[],["lib.rs"]],\
+"serial_port_basic":["",[],["x86_64.rs"]],\
 "shapes":["",[],["lib.rs"]],\
 "signal_handler":["",[],["lib.rs"]],\
 "simd_personality":["",[],["lib.rs"]],\
