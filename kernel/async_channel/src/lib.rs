@@ -117,7 +117,7 @@ impl From<Error> for core2::io::Error {
 /// 
 /// This channel object is not Send/Sync or cloneable itself;
 /// it can be shared across tasks using an `Arc`.
-struct Channel<T: Send, P: DeadlockPrevention> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue<P>,
     waiting_receivers: WaitQueue<P>,
