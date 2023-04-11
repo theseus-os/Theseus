@@ -36,7 +36,6 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
-use cpu_local_preemption::PreemptionGuard;
 
 /// The function signature of the callback that will be invoked when a `Task`
 /// panics or otherwise fails, e.g., a machine exception occurs.
@@ -177,24 +176,6 @@ pub struct RestartInfo {
 pub struct TaskInner {
     /// the saved stack pointer value, used for task switching.
     pub saved_sp: usize,
-    /// The preemption guard that was used for safely task switching to this task.
-    ///
-    /// The `PreemptionGuard` is stored here right before a context switch begins
-    /// and then retrieved from here right after the context switch ends.
-    //
-    // TODO: this should be kept in a per-CPU variable rather than within
-    //       the `TaskInner` structure, because it's not really related
-    //       to a specific task, but rather to a specific CPU's preemption status.
-    pub preemption_guard: Option<PreemptionGuard>,
-    /// Data that should be dropped after switching away from a task that has exited.
-    /// Currently, this contains the previous Task's `TaskRef` removed from its TLS area;
-    /// we use `Box<Any>` (type erasure) to avoid a direct dependency on the `TaskRef` type,
-    /// which is impossible because it would cause a cyclic dependency.
-    //
-    // TODO: like the above `preemption_guard`, this should be stored in
-    //       a per-CPU variable because it's only related to the task switching
-    //       operation on a specific CPU, and not related to a specific task.
-    pub drop_after_task_switch: Option<Box<dyn Any + Send>>,
     /// The kernel stack, which all `Task`s must have in order to execute.
     pub kstack: Stack,
     /// Whether or not this task is pinned to a certain CPU.
@@ -340,8 +321,6 @@ impl Task {
         Ok(Task {
             inner: MutexIrqSafe::new(TaskInner {
                 saved_sp: 0,
-                preemption_guard: None,
-                drop_after_task_switch: None,
                 kstack,
                 pinned_cpu: None,
                 kill_handler: None,
