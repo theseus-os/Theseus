@@ -136,7 +136,7 @@ impl<T> fmt::Debug for ExchangeState<T> {
 ///
 /// For the vast majority of use cases, no deadlock prevention is sufficient. To
 /// create a channel with deadlock prevention see [`new_channel_with`].
-pub fn new_channel<T: Send>() -> (Sender<T, Spin>, Receiver<T, Spin>) {
+pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
     new_channel_with()
 }
 

@@ -44,7 +44,7 @@ use sync_spin::Spin;
 ///
 /// For the vast majority of use cases, no deadlock prevention is sufficient. To
 /// create a channel with deadlock prevention see [`new_channel_with`].
-pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T, Spin>, Receiver<T, Spin>) {
+pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
     new_channel_with(minimum_capacity)
 }
 
