@@ -677,7 +677,7 @@ where
         // Thus, the first thing we must do here is to perform post-context switch actions,
         // because this is the first code to run immediately after a context switch
         // switches to this task for the first time.
-        // For more details, see the comments at the end of `Task::task_switch()`.
+        // For more details, see the comments at the end of `task::task_switch()`.
         recovered_preemption_guard = exitable_taskref.post_context_switch_action();
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
