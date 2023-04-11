@@ -19,37 +19,25 @@
 <a href="#19" id="19">19</a>
 <a href="#20" id="20">20</a>
 <a href="#21" id="21">21</a>
-<a href="#22" id="22">22</a>
-<a href="#23" id="23">23</a>
-<a href="#24" id="24">24</a>
-<a href="#25" id="25">25</a>
-<a href="#26" id="26">26</a>
-<a href="#27" id="27">27</a>
-</pre><pre class="rust"><code><span class="attr">#![feature(negative_impls)]
-#![no_std]
+</pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">use </span>cpu_local_preemption::{hold_preemption, PreemptionGuard};
 
-<span class="kw">pub type </span>Mutex&lt;T&gt; = sync::Mutex&lt;DisablePreemption, T&gt;;
-<span class="kw">pub type </span>MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::MutexGuard&lt;<span class="lifetime">&#39;a</span>, DisablePreemption, T&gt;;
+<span class="kw">pub type </span>Mutex&lt;T&gt; = sync::Mutex&lt;T, DisablePreemption&gt;;
+<span class="kw">pub type </span>MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T, DisablePreemption&gt;;
 
 <span class="doccomment">/// A deadlock prevention method that disables preemption.
 </span><span class="attr">#[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 </span><span class="kw">pub struct </span>DisablePreemption {}
 
-<span class="attr">#[doc(hidden)]
-</span><span class="kw">pub struct </span>Guard(PreemptionGuard);
-
-<span class="kw">impl </span>!Send <span class="kw">for </span>Guard {}
-
 <span class="kw">impl </span>sync::DeadlockPrevention <span class="kw">for </span>DisablePreemption {
-    <span class="kw">type </span>Guard = Guard;
+    <span class="kw">type </span>Guard = PreemptionGuard;
 
     <span class="kw">const </span>EXPENSIVE: bool = <span class="bool-val">true</span>;
 
     <span class="attr">#[inline]
     </span><span class="kw">fn </span>enter() -&gt; <span class="self">Self</span>::Guard {
-        Guard(hold_preemption())
+        hold_preemption()
     }
 }
 </code></pre></div>

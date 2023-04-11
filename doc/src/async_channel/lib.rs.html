@@ -513,6 +513,14 @@
 <a href="#513" id="513">513</a>
 <a href="#514" id="514">514</a>
 <a href="#515" id="515">515</a>
+<a href="#516" id="516">516</a>
+<a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An asynchronous channel for Inter-Task Communication (ITC) with an internal queue for buffering messages.
 //! 
 //! This crate offers an asynchronous channel that allows multiple tasks
@@ -521,8 +529,8 @@
 //! 
 //! Only `Send` types can be sent or received through the channel.
 //! 
-//! This is not a zero-copy channel; 
-//! to avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! This is not a zero-copy channel; to avoid copying large messages,
+//! use a reference type like `Box` or another layer of indirection.
 
 </span><span class="attr">#![no_std]
 
@@ -533,12 +541,16 @@
 <span class="kw">extern crate </span>mpmc;
 <span class="kw">extern crate </span>crossbeam_utils;
 <span class="kw">extern crate </span>core2;
+<span class="kw">extern crate </span>sync;
+<span class="kw">extern crate </span>sync_spin;
 
 <span class="kw">use </span>alloc::sync::Arc;
 <span class="kw">use </span>mpmc::Queue <span class="kw">as </span>MpmcQueue;
 <span class="kw">use </span>wait_queue::WaitQueue;
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
+<span class="kw">use </span>sync::DeadlockPrevention;
+<span class="kw">use </span>sync_spin::Spin;
 
 <span class="doccomment">/// Create a new channel that allows senders and receivers to 
 /// asynchronously exchange messages via an internal intermediary buffer.
@@ -552,10 +564,25 @@
 /// Depending on whether a non-blocking or blocking send function is invoked,
 /// future attempts to send another message will either block or return a `Full` error 
 /// until the channel&#39;s buffer is drained by a receiver and space in the buffer becomes available.
-/// 
-/// Returns a tuple of `(Sender, Receiver)`.
+///
+/// For the vast majority of use cases, this function is recommended way to create
+/// a new channel, because there is no need to specify a deadlock prevention method.
+/// To create a channel with different deadlock prevention, see [`new_channel_with()`].
 </span><span class="kw">pub fn </span>new_channel&lt;T: Send&gt;(minimum_capacity: usize) -&gt; (Sender&lt;T&gt;, Receiver&lt;T&gt;) {
-    <span class="kw">let </span>channel = Arc::new(Channel::&lt;T&gt; {
+    new_channel_with(minimum_capacity)
+}
+
+<span class="doccomment">/// Creates a new asynchronous channel with the specified deadlock prevention method.
+///
+/// See [`new_channel()`] for more details.
+///
+/// The asynchronous channel uses a wait queue internally and hence exposes a
+/// deadlock prevention type parameter `P` that is [`Spin`] by default.
+/// See [`WaitQueue`]&#39;s documentation for more info on setting this type parameter.
+</span><span class="kw">pub fn </span>new_channel_with&lt;T: Send, P: DeadlockPrevention&gt;(
+    minimum_capacity: usize,
+) -&gt; (Sender&lt;T, P&gt;, Receiver&lt;T, P&gt;) {
+    <span class="kw">let </span>channel = Arc::new(Channel {
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
@@ -564,8 +591,8 @@
         receiver_count: AtomicUsize::new(<span class="number">1</span>),
     });
     (
-        Sender   { channel: channel.clone() },
-        Receiver { channel }
+        Sender { channel: channel.clone() },
+        Receiver { channel },
     )
 }
 
@@ -591,8 +618,6 @@
     </span>WouldBlock,
     <span class="doccomment">/// Occurs when one end of channel is dropped
     </span>ChannelDisconnected,
-    <span class="doccomment">/// Occurs when an error occur in `WaitQueue`
-    </span>WaitError(wait_queue::WaitError)
 }
 
 <span class="kw">impl </span>From&lt;Error&gt; <span class="kw">for </span>core2::io::Error {
@@ -600,7 +625,6 @@
         <span class="kw">match </span>e {
             Error::WouldBlock =&gt; core2::io::ErrorKind::WouldBlock,
             Error::ChannelDisconnected =&gt; core2::io::ErrorKind::BrokenPipe,
-            Error::WaitError(<span class="kw">_</span>) =&gt; core2::io::ErrorKind::Other,
         }
         .into()
     }
@@ -613,10 +637,10 @@
 /// 
 /// This channel object is not Send/Sync or cloneable itself;
 /// it can be shared across tasks using an `Arc`.
-</span><span class="kw">struct </span>Channel&lt;T: Send&gt; {
+</span><span class="kw">struct </span>Channel&lt;T: Send, P: DeadlockPrevention = Spin&gt; {
     queue: MpmcQueue&lt;T&gt;,
-    waiting_senders: WaitQueue,
-    waiting_receivers: WaitQueue,
+    waiting_senders: WaitQueue&lt;P&gt;,
+    waiting_receivers: WaitQueue&lt;P&gt;,
     channel_status: AtomicCell&lt;ChannelStatus&gt;,
     sender_count: AtomicUsize,
     receiver_count: AtomicUsize,
@@ -625,7 +649,7 @@
 <span class="comment">// Ensure that `AtomicCell&lt;ChannelStatus&gt;` is actually a lock-free atomic.
 </span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;ChannelStatus&gt;::is_lock_free());
 
-<span class="kw">impl </span>&lt;T: Send&gt; Channel&lt;T&gt; {
+<span class="kw">impl </span>&lt;T: Send, P: DeadlockPrevention&gt; Channel&lt;T, P&gt; {
     <span class="doccomment">/// Returns true if the channel is disconnected.
     </span><span class="attr">#[inline(always)]
     </span><span class="kw">fn </span>is_disconnected(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
@@ -642,7 +666,7 @@
     ///
     /// This increments the channel&#39;s sender count.
     /// If there were previously no senders, the channel status is updated to `Connected`.
-    </span><span class="kw">fn </span>add_sender(channel: <span class="kw-2">&amp;</span>Arc&lt;Channel&lt;T&gt;&gt;) -&gt; Sender&lt;T&gt; {
+    </span><span class="kw">fn </span>add_sender(channel: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;) -&gt; Sender&lt;T, P&gt; {
         <span class="kw">if </span>channel.sender_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
             channel.channel_status.store(ChannelStatus::Connected);
         }
@@ -653,7 +677,7 @@
     ///
     /// This increments the channel&#39;s receiver count.
     /// If there were previously no receivers, the channel status is updated to `Connected`.
-    </span><span class="kw">fn </span>add_receiver(channel: <span class="kw-2">&amp;</span>Arc&lt;Channel&lt;T&gt;&gt;) -&gt; Receiver&lt;T&gt; {
+    </span><span class="kw">fn </span>add_receiver(channel: <span class="kw-2">&amp;</span>Arc&lt;<span class="self">Self</span>&gt;) -&gt; Receiver&lt;T, P&gt; {
         <span class="kw">if </span>channel.receiver_count.fetch_add(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">0 </span>{
             channel.channel_status.store(ChannelStatus::Connected);
         }
@@ -662,11 +686,11 @@
 }
 
 <span class="doccomment">/// The sender (transmit) side of a channel.
-</span><span class="kw">pub struct </span>Sender&lt;T: Send&gt; {
-    channel: Arc&lt;Channel&lt;T&gt;&gt;,
+</span><span class="kw">pub struct </span>Sender&lt;T: Send, P: DeadlockPrevention = Spin&gt; {
+    channel: Arc&lt;Channel&lt;T, P&gt;&gt;,
 }
 
-<span class="kw">impl</span>&lt;T:Send&gt; Clone <span class="kw">for </span>Sender&lt;T&gt; {
+<span class="kw">impl</span>&lt;T:Send, P: DeadlockPrevention&gt; Clone <span class="kw">for </span>Sender&lt;T, P&gt; {
     <span class="doccomment">/// Clones this `Sender`, returning another `Sender` connected to the same channel.
     ///
     /// This increments the channel&#39;s sender count.
@@ -676,7 +700,7 @@
     }
 }
 
-<span class="kw">impl </span>&lt;T: Send&gt; Sender&lt;T&gt; {
+<span class="kw">impl </span>&lt;T: Send, P: DeadlockPrevention&gt; Sender&lt;T, P&gt; {
     <span class="doccomment">/// Send a message, blocking until space in the channel&#39;s buffer is available. 
     /// 
     /// Returns `Ok(())` if the message was sent successfully,
@@ -727,10 +751,10 @@
             });
 
             <span class="kw">if </span><span class="self">self</span>.channel.is_disconnected() {
-                 <span class="comment">// trace!(&quot;Receiver Endpoint is dropped&quot;);
-                 // Here the receiver end has dropped. 
-                 // So we don&#39;t wait anymore in the waitqueue
-                 </span><span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(Error::ChannelDisconnected))
+                <span class="comment">// trace!(&quot;Receiver Endpoint is dropped&quot;);
+                // Here the receiver end has dropped. 
+                // So we don&#39;t wait anymore in the waitqueue
+                </span><span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(Error::ChannelDisconnected))
             } <span class="kw">else </span>{
                 result
             }
@@ -740,10 +764,7 @@
         <span class="comment">// When `wait_until_mut` returns it can be either a successful send marked as  Ok(Ok()), 
         // Error in the condition (channel disconnection) marked as Ok(Err()),
         // or the wait_until runs into error (Err()) 
-        </span><span class="kw">let </span>res =  <span class="kw">match </span><span class="self">self</span>.channel.waiting_senders.wait_until_mut(<span class="kw-2">&amp;mut </span>closure) {
-            <span class="prelude-val">Ok</span>(r) =&gt; r,
-            <span class="prelude-val">Err</span>(wait_error) =&gt; <span class="prelude-val">Err</span>(Error::WaitError(wait_error)),
-        };
+        </span><span class="kw">let </span>res = <span class="self">self</span>.channel.waiting_senders.wait_until(<span class="kw-2">&amp;mut </span>closure);
 
         <span class="comment">// trace!(&quot;... sending space became available.&quot;);
 
@@ -842,17 +863,17 @@
     }
 
     <span class="doccomment">/// Obtain a `Receiver` endpoint connected to the same channel as this `Sender`.
-    </span><span class="kw">pub fn </span>receiver(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Receiver&lt;T&gt; {
+    </span><span class="kw">pub fn </span>receiver(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Receiver&lt;T, P&gt; {
         Channel::add_receiver( <span class="kw-2">&amp;</span><span class="self">self</span>.channel )
     }
 }
 
 <span class="doccomment">/// The receiver side of a channel.
-</span><span class="kw">pub struct </span>Receiver&lt;T: Send&gt; {
-    channel: Arc&lt;Channel&lt;T&gt;&gt;,
+</span><span class="kw">pub struct </span>Receiver&lt;T: Send, P: DeadlockPrevention = Spin&gt; {
+    channel: Arc&lt;Channel&lt;T, P&gt;&gt;,
 }
 
-<span class="kw">impl</span>&lt;T: Send&gt; Clone <span class="kw">for </span>Receiver&lt;T&gt; {
+<span class="kw">impl</span>&lt;T: Send, P: DeadlockPrevention&gt; Clone <span class="kw">for </span>Receiver&lt;T, P&gt; {
     <span class="doccomment">/// Clones this `Receiver`, returning another `Receiver` connected to the same channel.
     ///
     /// This increments the channel&#39;s receiver count.
@@ -862,7 +883,7 @@
     }
 }
 
-<span class="kw">impl </span>&lt;T: Send&gt; Receiver&lt;T&gt; {
+<span class="kw">impl </span>&lt;T: Send, P: DeadlockPrevention&gt; Receiver&lt;T, P&gt; {
     <span class="doccomment">/// Receive a message, blocking until a message is available in the buffer.
     /// 
     /// Returns the message if it was received properly, otherwise returns an [`Error`].
@@ -904,12 +925,7 @@
         <span class="comment">// When wait returns it can be either a successful receiver marked as  Ok(Ok(msg)), 
         // Error in wait condition marked as Ok(Err(error)),
         // or the wait_until runs into error (Err()) 
-        </span><span class="kw">let </span>res =  <span class="kw">match </span><span class="self">self</span>.channel.waiting_receivers.wait_until(&amp; closure) {
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Ok</span>(x)) =&gt; <span class="prelude-val">Ok</span>(x),
-            <span class="prelude-val">Ok</span>(<span class="prelude-val">Err</span>(error)) =&gt; <span class="prelude-val">Err</span>(error),
-            <span class="prelude-val">Err</span>(wait_error) =&gt; <span class="prelude-val">Err</span>(Error::WaitError(wait_error)),
-        };
-
+        </span><span class="kw">let </span>res =  <span class="self">self</span>.channel.waiting_receivers.wait_until(<span class="kw-2">&amp;</span>closure);
         <span class="comment">// trace!(&quot;... received msg.&quot;);
 
         // If we successfully received a message, we need to notify any waiting senders.
@@ -999,7 +1015,7 @@
     }
 
     <span class="doccomment">/// Obtain a `Sender` endpoint connected to the same channel as this `Receiver`.
-    </span><span class="kw">pub fn </span>sender(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Sender&lt;T&gt; {
+    </span><span class="kw">pub fn </span>sender(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Sender&lt;T, P&gt; {
         Channel::add_sender( <span class="kw-2">&amp;</span><span class="self">self</span>.channel )
     }
 }
@@ -1007,7 +1023,7 @@
 
 <span class="doccomment">/// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
 /// and notify all of the `Senders`
-</span><span class="kw">impl</span>&lt;T: Send&gt; Drop <span class="kw">for </span>Receiver&lt;T&gt; {
+</span><span class="kw">impl</span>&lt;T: Send, P: DeadlockPrevention&gt; Drop <span class="kw">for </span>Receiver&lt;T, P&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="comment">// trace!(&quot;Dropping a receiver&quot;);
         </span><span class="kw">if </span><span class="self">self</span>.channel.receiver_count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">1 </span>{
@@ -1019,7 +1035,7 @@
 
 <span class="doccomment">/// When the only remaining `Sender` is dropped, we mark the channel as disconnected
 /// and notify all of the `Receivers`
-</span><span class="kw">impl</span>&lt;T: Send&gt; Drop <span class="kw">for </span>Sender&lt;T&gt; {
+</span><span class="kw">impl</span>&lt;T: Send, P: DeadlockPrevention&gt; Drop <span class="kw">for </span>Sender&lt;T, P&gt; {
     <span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="comment">// trace!(&quot;Dropping a sender&quot;);
         </span><span class="kw">if </span><span class="self">self</span>.channel.sender_count.fetch_sub(<span class="number">1</span>, Ordering::SeqCst) == <span class="number">1 </span>{

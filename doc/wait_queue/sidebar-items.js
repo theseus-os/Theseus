@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["WaitError","Errors that may occur while waiting on a waitqueue/condition/event."]],"struct":[["WaitGuard","An object that holds a blocked `Task`  that will be automatically unblocked upon drop.  "],["WaitQueue","A queue in which multiple `Task`s can wait for other `Task`s to notify them."]]};
+window.SIDEBAR_ITEMS = {"struct":[["WaitQueue","A queue of tasks waiting for an event to occur."]]};

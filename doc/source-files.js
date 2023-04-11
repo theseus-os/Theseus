@@ -182,6 +182,7 @@ var sourcesIndex = JSON.parse('{\
 "vga_buffer":["",[],["lib.rs"]],\
 "virtual_nic":["",[],["lib.rs"]],\
 "wait_condition":["",[],["lib.rs"]],\
+"wait_guard":["",[],["lib.rs"]],\
 "wait_queue":["",[],["lib.rs"]],\
 "waker":["",[],["lib.rs"]],\
 "waker_generic":["",[],["lib.rs"]],\

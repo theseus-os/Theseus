@@ -315,10 +315,6 @@
 <a href="#315" id="315">315</a>
 <a href="#316" id="316">316</a>
 <a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a>
-<a href="#321" id="321">321</a>
 </pre><pre class="rust"><code><span class="comment">// TODO: add documentation to each unsafe block, laying out all the conditions under which it&#39;s safe or unsafe to use it.
 </span><span class="attr">#![allow(clippy::missing_safety_doc)]
 
@@ -422,9 +418,7 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(guard);
         }
         <span class="comment">// Slow path if already locked elsewhere: wait until we obtain the lock.
-        </span><span class="self">self</span>.queue
-            .wait_until(<span class="kw-2">&amp;</span>|| <span class="self">self</span>.try_read())
-            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to add current task to waitqueue&quot;</span>)
+        </span><span class="prelude-val">Ok</span>(<span class="self">self</span>.queue.wait_until(|| <span class="self">self</span>.try_read()))
     }
 
     <span class="doccomment">/// Attempt to acquire this lock with shared read (immutable) access.
@@ -518,9 +512,7 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(guard);
         }
         <span class="comment">// Slow path if already locked elsewhere: wait until we obtain the write lock.
-        </span><span class="self">self</span>.queue
-            .wait_until(<span class="kw-2">&amp;</span>|| <span class="self">self</span>.try_write())
-            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to add current task to waitqueue&quot;</span>)
+        </span><span class="prelude-val">Ok</span>(<span class="self">self</span>.queue.wait_until(|| <span class="self">self</span>.try_write()))
     }
 
     <span class="doccomment">/// Attempt to acquire this lock with exclusive write (mutable) access.
