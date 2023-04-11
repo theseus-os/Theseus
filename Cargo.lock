@@ -2144,6 +2144,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bootloader_modules",
+ "cls",
  "const_format",
  "cow_arc",
  "cpio_reader",

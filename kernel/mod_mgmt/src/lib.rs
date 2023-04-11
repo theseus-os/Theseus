@@ -1189,6 +1189,7 @@ impl CrateNamespace {
         let mut rodata_shndx:            Option<Shndx>                     = None;
         let mut data_shndx:              Option<Shndx>                     = None;
         let mut bss_shndx_and_offset:    Option<(Shndx, usize)>            = None;
+        let mut cls_shndx_and_offset:    Option<(Shndx, usize)>            = None;
         let mut tdata_shndx_and_section: Option<(Shndx, StrongSectionRef)> = None;
         let mut tbss_shndx_and_section:  Option<(Shndx, StrongSectionRef)> = None;
 
@@ -1215,6 +1216,8 @@ impl CrateNamespace {
             let is_write   = sec_flags & SHF_WRITE     == SHF_WRITE;
             let is_exec    = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
             let is_tls     = sec_flags & SHF_TLS       == SHF_TLS;
+            // TODO: Use custom ELF type.
+            let is_cls = sec.get_name(elf_file) == Ok(".cls");
 
             let mut is_rodata = false;
             let mut is_eh_frame = false;
@@ -1267,30 +1270,44 @@ impl CrateNamespace {
             // we load TLS sections into the same read-only pages as other read-only sections
             // because they contain thread-local storage initializer data that is only read from.
             else if is_tls {
-                match sec.get_type() {
-                    Ok(ShType::ProgBits) => {
-                        typ = SectionType::TlsData;
-                        let read_only_start = read_only_offset.get_or_insert(sec_offset);
-                        mapped_pages_offset = sec_offset - *read_only_start;
-                    }
-                    Ok(ShType::NoBits) => {
-                        typ = SectionType::TlsBss;
-                        // Here: a TLS .tbss section has no actual content, so we use a max-value offset
-                        // as a canary value to ensure it cannot be used to index into a MappedPages.
-                        mapped_pages_offset = usize::MAX;
-                    }
-                    _other => {
-                        error!("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss): type: {:?}, {:X?}", _other, sec);
-                        return Err("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss)");
-                    }
-                };
+                if !is_cls {
+                    match sec.get_type() {
+                        Ok(ShType::ProgBits) => {
+                            typ = SectionType::TlsData;
+                            let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                            mapped_pages_offset = sec_offset - *read_only_start;
+                        }
+                        Ok(ShType::NoBits) => {
+                            typ = SectionType::TlsBss;
+                            // Here: a TLS .tbss section has no actual content, so we use a max-value offset
+                            // as a canary value to ensure it cannot be used to index into a MappedPages.
+                            mapped_pages_offset = usize::MAX;
+                        }
+                        _other => {
+                            error!("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss): type: {:?}, {:X?}", _other, sec);
+                            return Err("BUG: TLS section was neither PROGBITS (.tdata) nor NOBITS (.tbss)");
+                        }
+                    };
 
-                (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
-                    .map(|(rp_ref, rp, _)| (rp_ref, rp))
-                    .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
-                // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
-                virt_addr = VirtualAddress::zero(); 
-                tls_sections.insert(shndx);
+                    (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
+                        .map(|(rp_ref, rp, _)| (rp_ref, rp))
+                        .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
+                    // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
+                    virt_addr = VirtualAddress::zero(); 
+                    tls_sections.insert(shndx);
+                } else {
+                    // TODO: Handle ShType::NoBits
+
+                    let offset = cls::allocate(sec_size).unwrap();
+                    cls_shndx_and_offset = Some((shndx, offset));
+                    virt_addr = VirtualAddress::zero();
+                    typ = SectionType::TlsData;
+                    let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                    mapped_pages_offset = sec_offset - *read_only_start;
+                    (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
+                        .map(|(rp_ref, rp, _)| (rp_ref, rp))
+                        .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
+                }
             }
 
             // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
@@ -1488,7 +1505,6 @@ impl CrateNamespace {
                 if sym_shndx == 0 {
                     continue;
                 }
-
                 // TLS sections have been copied into the read-only pages.
                 // The merged TLS sections have already been dynamically assigned a virtual address above,
                 // so we can calculate a TLS symbol's vaddr and mapped_pages_offset by adding 
@@ -1497,20 +1513,27 @@ impl CrateNamespace {
                     .map(|(mp_arc, ..)| mp_arc)
                     .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
 
-                if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
+                if let Some((cls_shndx, cls_offset)) = cls_shndx_and_offset && cls_shndx == sym_shndx {
+                    // TODO
                     typ = SectionType::TlsData;
-                    mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
-                    virt_addr = tdata_sec.virt_addr + sec_value;
-                } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
-                    typ = SectionType::TlsBss;
-                    // Here: a TLS .tbss section has no actual content, so we use a max-value offset
-                    // as a canary value to ensure it cannot be used to index into a MappedPages.
-                    mapped_pages_offset = usize::MAX;
-                    virt_addr = tbss_sec.virt_addr + sec_value;
+                    mapped_pages_offset = cls_offset + sec_value;
+                    virt_addr = VirtualAddress::zero();
                 } else {
-                    error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
-                    return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
-                };
+                    if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
+                        typ = SectionType::TlsData;
+                        mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
+                        virt_addr = tdata_sec.virt_addr + sec_value;
+                    } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
+                        typ = SectionType::TlsBss;
+                        // Here: a TLS .tbss section has no actual content, so we use a max-value offset
+                        // as a canary value to ensure it cannot be used to index into a MappedPages.
+                        mapped_pages_offset = usize::MAX;
+                        virt_addr = tbss_sec.virt_addr + sec_value;
+                    } else {
+                        error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
+                        return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
+                    };
+                }
                 mapped_pages = rp_ref;
             }
 
@@ -2897,6 +2920,12 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let sec_flags = sec.flags();
             // Skip non-allocated sections; they don't need to be loaded into memory
             if sec_flags & SHF_ALLOC == 0 {
+                continue;
+            }
+
+            // TODO: Use custom ELF type.
+            // Skip CLS sections; their data is stored in the CLS mapped pages.
+            if sec.get_name(elf_file) == Ok(".cls") {
                 continue;
             }
 

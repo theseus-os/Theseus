@@ -32,6 +32,7 @@ vfs_node = { path = "../vfs_node" }
 tls_initializer = { path = "../tls_initializer" }
 path = { path = "../path" }
 memfs = { path = "../memfs" }
+cls = { path = "../cls" }
 
 serde   = { version = "1.0.137",    default-features = false, features = ["alloc", "derive"] }
 bincode = { version = "2.0.0-rc.1", default-features = false, features = ["alloc", "serde"] }
