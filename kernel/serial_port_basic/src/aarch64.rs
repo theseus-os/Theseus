@@ -43,6 +43,13 @@ impl Drop for SerialPort {
 }
 
 impl SerialPort {
+    /// Creates and returns a new serial port structure.
+    /// 
+    /// The configuration parameters of the serial port aren't set by
+    /// this function.
+    ///
+    /// Note: This constructor allocates memory pages and frames; make
+    /// sure to initialize the memory subsystem before using it.
     pub fn new(serial_port_address: SerialPortAddress) -> SerialPort {
         let index = serial_port_address as usize;
         let mmio_base = match BOARD_CONFIG.pl011_base_addresses.get(index) {
@@ -79,6 +86,8 @@ impl SerialPort {
     }
 
     /// Enable or disable interrupts on this serial port for various events.
+    ///
+    /// Note: currently unimplemented on `aarch64`.
     pub fn enable_interrupt(&mut self, _event: SerialPortInterruptEvent, _enable: bool) {
         unimplemented!()
     }
@@ -118,8 +127,7 @@ impl SerialPort {
 
     /// Read one byte from the serial port, blocking until data is available.
     pub fn in_byte(&mut self) -> u8 {
-        // self.inner.as_mut().unwrap().read_byte()
-        0
+        self.inner.as_mut().unwrap().read_byte()
     }
 
     /// Reads multiple bytes from the serial port into the given `buffer`, non-blocking.
@@ -136,8 +144,7 @@ impl SerialPort {
             if !self.data_available() {
                 break;
             }
-            // *byte = self.inner.as_mut().unwrap().read_byte();
-            *byte = 0;
+            *byte = self.inner.as_mut().unwrap().read_byte();
             bytes_read += 1;
         }
         bytes_read
@@ -152,8 +159,7 @@ impl SerialPort {
     /// Returns `true` if the serial port has data available to read.
     #[inline(always)]
     pub fn data_available(&self) -> bool {
-        // self.inner.as_ref().unwrap().has_incoming_data()
-        false
+        self.inner.as_ref().unwrap().has_incoming_data()
     }
 
     pub fn base_port_address(&self) -> SerialPortAddress {

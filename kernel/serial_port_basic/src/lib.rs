@@ -19,6 +19,10 @@
 //! We don't do anything like that here, in case a user of this crate wants to send binary data
 //! across the serial port, rather than "smartly-interpreted" ASCII characters.
 //!
+//! On `x86_64`, this uses I/O ports to access the standard COM1 to COM4 serial ports. On
+//! Aarch64 (ARMv8), the system is assumed to present serial ports through the PL011 standard
+//! interface. The `arm_boards` crate contains the base addresses for each port.
+//!
 //! # Resources
 //! * <https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming>
 //! * <https://tldp.org/HOWTO/Modem-HOWTO-4.html>
