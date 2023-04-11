@@ -101,9 +101,7 @@ impl<T: ?Sized> RwLockSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the lock.
-        self.queue
-            .wait_until(&|| self.try_read())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_read()))
     }
 
     /// Attempt to acquire this lock with shared read (immutable) access.
@@ -197,9 +195,7 @@ impl<T: ?Sized> RwLockSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the write lock.
-        self.queue
-            .wait_until(&|| self.try_write())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_write()))
     }
 
     /// Attempt to acquire this lock with exclusive write (mutable) access.

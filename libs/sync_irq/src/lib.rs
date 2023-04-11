@@ -1,10 +1,9 @@
-#![feature(negative_impls)]
 #![no_std]
 
 use irq_safety::{hold_interrupts, HeldInterrupts};
 
-pub type Mutex<T> = sync::Mutex<DisableIrq, T>;
-pub type MutexGuard<'a, T> = sync::MutexGuard<'a, DisableIrq, T>;
+pub type Mutex<T> = sync::Mutex<T, DisableIrq>;
+pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, DisableIrq>;
 
 /// A deadlock prevention method that disables interrupt requests.
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

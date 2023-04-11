@@ -15,16 +15,14 @@ pub use mutex::{Mutex, MutexGuard};
 
 /// A synchronisation flavour.
 pub trait Flavour {
-    // /// Initial value for the lock data.
-    // const INIT: Self::LockData;
+    /// Initial value for the lock data.
+    const INIT: Self::LockData;
 
     /// Additional data stored in the lock.
     type LockData;
 
     /// Additional guard stored in the synchronisation guards.
     type Guard;
-
-    fn new() -> Self::LockData;
 
     /// Tries to acquire the given mutex.
     fn try_lock_mutex<'a, T>(
@@ -67,15 +65,11 @@ impl<P> Flavour for P
 where
     P: DeadlockPrevention,
 {
-    // const INIT: Self::LockData = ();
+    const INIT: Self::LockData = ();
 
     type LockData = ();
 
     type Guard = <Self as DeadlockPrevention>::Guard;
-
-    fn new() -> Self::LockData {
-        ()
-    }
 
     #[inline]
     fn try_lock_mutex<'a, T>(

@@ -8,26 +8,24 @@ use core::{
 };
 
 /// A mutual exclusion primitive.
-pub struct Mutex<F, T>
+pub struct Mutex<T, F>
 where
-    T: ?Sized,
     F: Flavour,
 {
-    data: F::LockData,
     inner: SpinMutex<T>,
+    data: F::LockData,
 }
 
-impl<F, T> Mutex<F, T>
+impl<T, F> Mutex<T, F>
 where
     F: Flavour,
 {
-    // TODO: Constify.
     /// Creates a new mutex.
     #[inline]
-    pub fn new(value: T) -> Self {
+    pub const fn new(value: T) -> Self {
         Self {
             inner: SpinMutex::new(value),
-            data: F::new(),
+            data: F::INIT,
         }
     }
 
@@ -39,7 +37,7 @@ where
 
     /// Acquires this mutex.
     #[inline]
-    pub fn lock(&self) -> MutexGuard<'_, F, T> {
+    pub fn lock(&self) -> MutexGuard<'_, T, F> {
         let (inner, guard) = F::lock_mutex(&self.inner, &self.data);
 
         MutexGuard {
@@ -51,7 +49,7 @@ where
 
     /// Attempts to acquire this mutex.
     #[inline]
-    pub fn try_lock(&self) -> Option<MutexGuard<'_, F, T>> {
+    pub fn try_lock(&self) -> Option<MutexGuard<'_, T, F>> {
         let (inner, guard) = F::try_lock_mutex(&self.inner, &self.data)?;
 
         Some(MutexGuard {
@@ -74,10 +72,10 @@ where
     }
 }
 
-impl<F, T> fmt::Debug for Mutex<F, T>
+impl<T, F> fmt::Debug for Mutex<T, F>
 where
-    F: Flavour,
     T: fmt::Debug,
+    F: Flavour,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Mutex");
@@ -103,7 +101,7 @@ where
 ///
 /// When this structure is dropped, the lock will be unlocked.
 #[derive(Debug)]
-pub struct MutexGuard<'a, F, T>
+pub struct MutexGuard<'a, T, F>
 where
     F: Flavour,
 {
@@ -112,7 +110,7 @@ where
     _guard: F::Guard,
 }
 
-impl<'a, F, T> Deref for MutexGuard<'a, F, T>
+impl<'a, T, F> Deref for MutexGuard<'a, T, F>
 where
     F: Flavour,
 {
@@ -124,7 +122,7 @@ where
     }
 }
 
-impl<'a, F, T> DerefMut for MutexGuard<'a, F, T>
+impl<'a, T, F> DerefMut for MutexGuard<'a, T, F>
 where
     F: Flavour,
 {
@@ -134,7 +132,7 @@ where
     }
 }
 
-impl<'a, F, T> Drop for MutexGuard<'a, F, T>
+impl<'a, T, F> Drop for MutexGuard<'a, T, F>
 where
     F: Flavour,
 {

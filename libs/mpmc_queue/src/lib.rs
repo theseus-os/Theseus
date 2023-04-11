@@ -13,11 +13,14 @@ use core::{
     ptr::NonNull,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use spin::Mutex;
+use sync::{Flavour, Mutex, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
-pub struct Queue<T> {
-    pointers: Mutex<Pointers<T>>,
+pub struct Queue<T, F>
+where
+    F: Flavour,
+{
+    pointers: Mutex<Pointers<T>, F>,
     /// Prevents unnecessary locking in the fast path.
     len: AtomicUsize,
 }
@@ -40,7 +43,10 @@ impl<T> Node<T> {
     }
 }
 
-impl<T> Queue<T> {
+impl<T, F> Queue<T, F>
+where
+    F: Flavour,
+{
     pub const fn new() -> Self {
         Self {
             pointers: Mutex::new(Pointers {
@@ -64,7 +70,26 @@ impl<T> Queue<T> {
     /// Appends an item to the queue.
     pub fn push(&self, item: T) {
         let node = box_pointer(Node::new(item));
-        unsafe { self.push_inner(node, node, 1) };
+        let pointers = self.pointers.lock();
+        unsafe { self.push_inner(pointers, node, node, 1) };
+    }
+
+    /// Appends an item to the queue if a condition fails.
+    ///
+    /// The condition will be tested while the internal lock is held.
+    pub fn push_if_fail<C, R, E>(&self, item: T, condition: C) -> Result<R, E>
+    where
+        C: FnOnce() -> Result<R, E>,
+    {
+        let pointers = self.pointers.lock();
+        match condition() {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                let node = box_pointer(Node::new(item));
+                unsafe { self.push_inner(pointers, node, node, 1) };
+                Err(e)
+            }
+        }
     }
 
     /// Appends several items to the queue.
@@ -90,7 +115,8 @@ impl<T> Queue<T> {
             len += 1;
         }
 
-        unsafe { self.push_inner(first, tail, len) };
+        let pointers = self.pointers.lock();
+        unsafe { self.push_inner(pointers, first, tail, len) };
     }
 
     /// Appends a batch of nodes to the queue.
@@ -99,9 +125,13 @@ impl<T> Queue<T> {
     ///
     /// `head` must be the start of the batch, and `tail` must point to the end
     /// of the batch. The batch must be `len` nodes long.
-    unsafe fn push_inner(&self, head: NonNull<Node<T>>, tail: NonNull<Node<T>>, len: usize) {
-        let mut pointers = self.pointers.lock();
-
+    unsafe fn push_inner(
+        &self,
+        mut pointers: MutexGuard<'_, Pointers<T>, F>,
+        head: NonNull<Node<T>>,
+        tail: NonNull<Node<T>>,
+        len: usize,
+    ) {
         if let Some(mut tail_pointer) = pointers.tail {
             // SAFETY: The only other pointer to the tail is stored in the second-to-last
             // node. We hold the lock to pointers, hence we own all the nodes, hence that
@@ -156,10 +186,11 @@ mod tests {
         sync::atomic::{AtomicBool, Ordering},
         thread,
     };
+    use sync_spin::Spin;
 
     #[test]
     fn test_spsc() {
-        static QUEUE: Queue<i32> = Queue::new();
+        static QUEUE: Queue<Spin, i32> = Queue::new();
 
         for i in 0..100 {
             QUEUE.push(i);
@@ -181,7 +212,7 @@ mod tests {
         const FALSE: AtomicBool = AtomicBool::new(false);
 
         static RECEIVED: [AtomicBool; AMOUNT * NUM_THREADS] = [FALSE; AMOUNT * NUM_THREADS];
-        static QUEUE: Queue<usize> = Queue::new();
+        static QUEUE: Queue<Spin, usize> = Queue::new();
 
         let mut receivers = Vec::with_capacity(NUM_THREADS);
         for _ in 0..NUM_THREADS {

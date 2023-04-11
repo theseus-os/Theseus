@@ -18,6 +18,5 @@ path = "../task"
 [dependencies.lockable]
 path = "../../libs/lockable"
 
-
 [lib]
 crate-type = ["rlib"]

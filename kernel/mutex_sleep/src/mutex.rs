@@ -70,9 +70,7 @@ impl<T: ?Sized> MutexSleep<T> {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the lock.
-        self.queue
-            .wait_until(&|| self.try_lock())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_lock()))
     }
 
     /// Tries to lock the MutexSleep. If it is already locked, it will return `None`.

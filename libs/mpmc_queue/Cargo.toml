@@ -6,4 +6,7 @@ description = "A growable FIFO MPMC queue"
 edition = "2021"
 
 [dependencies]
-spin = "0.9"
+sync = { path = "../sync" }
+
+[dev-dependencies]
+sync_spin = { path = "../sync_spin"}
