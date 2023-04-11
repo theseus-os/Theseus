@@ -79,8 +79,7 @@ var sourcesIndex = JSON.parse('{\
 "libterm":["",[],["cursor.rs","lib.rs"]],\
 "lockable":["",[],["lib.rs"]],\
 "locked_idt":["",[],["lib.rs"]],\
-"logger_aarch64":["",[],["lib.rs"]],\
-"logger_x86_64":["",[],["lib.rs"]],\
+"logger":["",[],["lib.rs"]],\
 "madt":["",[],["lib.rs"]],\
 "memfs":["",[],["lib.rs"]],\
 "memory":["",[["paging",[],["mapper.rs","mod.rs","table.rs","temporary_page.rs"]]],["lib.rs"]],\
@@ -140,7 +139,7 @@ var sourcesIndex = JSON.parse('{\
 "scheduler_round_robin":["",[],["lib.rs"]],\
 "sdt":["",[],["lib.rs"]],\
 "serial_port":["",[],["lib.rs"]],\
-"serial_port_basic":["",[],["x86_64.rs"]],\
+"serial_port_basic":["",[],["lib.rs","x86_64.rs"]],\
 "shapes":["",[],["lib.rs"]],\
 "signal_handler":["",[],["lib.rs"]],\
 "simd_personality":["",[],["lib.rs"]],\

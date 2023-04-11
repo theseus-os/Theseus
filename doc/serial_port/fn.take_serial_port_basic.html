@@ -2,5 +2,7 @@
 <p>This function initializes the given serial port if it has not yet been initialized.
 If the serial port has already been initialized and taken by another crate,
 this returns <code>None</code>.</p>
+<p>On aarch64, initializing a serial port includes mapping memory pages; Make sure to have
+called <code>memory::init()</code> ahead of calling this function.</p>
 <p>The returned <a href="struct.SerialPortBasic.html" title="SerialPort"><code>SerialPort</code></a> will be restored to this crate upon being dropped.</p>
 </div></details></section></div></main><div id="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="serial_port" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

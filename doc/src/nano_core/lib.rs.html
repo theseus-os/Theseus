@@ -286,6 +286,16 @@
 <a href="#286" id="286">286</a>
 <a href="#287" id="287">287</a>
 <a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //!
 //! The `nano_core` is very simple, and only does the following things:
@@ -383,7 +393,7 @@
         <span class="kw">let </span>logger_ports = [
             serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
         ];
-        logger_x86_64::early_init(
+        logger::early_init(
             <span class="prelude-val">None</span>,
             IntoIterator::into_iter(logger_ports).flatten(),
         ).unwrap_or_else(|_e|
@@ -417,9 +427,19 @@
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)<span class="question-mark">?</span>;
 
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-        logger_aarch64::init()<span class="question-mark">?</span>;
-        <span class="macro">log::info!</span>(<span class="string">&quot;Initialized logger_aarch64&quot;</span>);
+    <span class="comment">// On aarch64, take_serial_port allocates; memory mgmt must be initialized first.
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        <span class="kw">let </span>logger_ports = [
+            serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
+        ];
+        logger::early_init(
+            <span class="prelude-val">None</span>,
+            IntoIterator::into_iter(logger_ports).flatten(),
+        ).unwrap_or_else(|_e|
+            <span class="macro">println!</span>(<span class="string">&quot;Failed to initialize early logger; proceeding with init. Error: {:?}&quot;</span>, _e)
+        );
+        <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized early logger.&quot;</span>);
+        <span class="macro">log::info!</span>(<span class="string">&quot;initialized early logger&quot;</span>);
     }
 
     <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized memory subsystem.&quot;</span>);

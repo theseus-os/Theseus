@@ -51,6 +51,7 @@
 <a href="#51" id="51">51</a>
 <a href="#52" id="52">52</a>
 <a href="#53" id="53">53</a>
+<a href="#54" id="54">54</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Configuration and definitions for specific boards on aarch64 systems.
 //!
 //! | Board Name | Num CPUs  | Interrupt Controller | Secondary CPU Startup Method |
@@ -69,7 +70,7 @@
 <span class="attr">#[derive(Debug, Copy, Clone)]
 </span><span class="kw">pub struct </span>GicV3InterruptControllerConfig {
     <span class="kw">pub </span>distributor_base_address: PhysicalAddress,
-    <span class="kw">pub </span>redistributor_base_addresses: [PhysicalAddress; board::NUM_CPUS],
+    <span class="kw">pub </span>redistributor_base_addresses: [PhysicalAddress; NUM_CPUS],
 }
 
 <span class="attr">#[derive(Debug, Copy, Clone)]
@@ -86,8 +87,9 @@ pub enum SecondaryCoresStartup {
 
 </span><span class="attr">#[derive(Debug, Clone)]
 </span><span class="kw">pub struct </span>BoardConfig {
-    <span class="kw">pub </span>cpu_ids: [mpidr::DefinedMpidrValue; board::NUM_CPUS],
+    <span class="kw">pub </span>cpu_ids: [mpidr::DefinedMpidrValue; NUM_CPUS],
     <span class="kw">pub </span>interrupt_controller: InterruptControllerConfig,
+    <span class="kw">pub </span>pl011_base_addresses: [PhysicalAddress; NUM_PL011_UARTS],
 }
 
 <span class="comment">// by default &amp; on x86_64, the default.rs file is used
@@ -99,7 +101,7 @@ pub enum SecondaryCoresStartup {
 
 <span class="kw">pub mod </span>mpidr;
 
-<span class="kw">pub use </span>board::{NUM_CPUS, BOARD_CONFIG};
+<span class="kw">pub use </span>board::{NUM_CPUS, NUM_PL011_UARTS, BOARD_CONFIG};
 
 
 } <span class="comment">// end of cfg(target_arch = &quot;aarch64&quot;)

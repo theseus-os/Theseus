@@ -275,138 +275,9 @@
 <a href="#275" id="275">275</a>
 <a href="#276" id="276">276</a>
 <a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a>
-<a href="#282" id="282">282</a>
-<a href="#283" id="283">283</a>
-<a href="#284" id="284">284</a>
-<a href="#285" id="285">285</a>
-<a href="#286" id="286">286</a>
-<a href="#287" id="287">287</a>
-<a href="#288" id="288">288</a>
-<a href="#289" id="289">289</a>
-<a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
-<a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a>
-<a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a>
-<a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
-<a href="#319" id="319">319</a>
-<a href="#320" id="320">320</a>
-<a href="#321" id="321">321</a>
-<a href="#322" id="322">322</a>
-<a href="#323" id="323">323</a>
-<a href="#324" id="324">324</a>
-<a href="#325" id="325">325</a>
-<a href="#326" id="326">326</a>
-<a href="#327" id="327">327</a>
-<a href="#328" id="328">328</a>
-<a href="#329" id="329">329</a>
-<a href="#330" id="330">330</a>
-<a href="#331" id="331">331</a>
-<a href="#332" id="332">332</a>
-<a href="#333" id="333">333</a>
-<a href="#334" id="334">334</a>
-<a href="#335" id="335">335</a>
-<a href="#336" id="336">336</a>
-<a href="#337" id="337">337</a>
-<a href="#338" id="338">338</a>
-<a href="#339" id="339">339</a>
-<a href="#340" id="340">340</a>
-<a href="#341" id="341">341</a>
-<a href="#342" id="342">342</a>
-<a href="#343" id="343">343</a>
-<a href="#344" id="344">344</a>
-<a href="#345" id="345">345</a>
-<a href="#346" id="346">346</a>
-<a href="#347" id="347">347</a>
-<a href="#348" id="348">348</a>
-<a href="#349" id="349">349</a>
-<a href="#350" id="350">350</a>
-<a href="#351" id="351">351</a>
-<a href="#352" id="352">352</a>
-<a href="#353" id="353">353</a>
-<a href="#354" id="354">354</a>
-<a href="#355" id="355">355</a>
-<a href="#356" id="356">356</a>
-<a href="#357" id="357">357</a>
-<a href="#358" id="358">358</a>
-<a href="#359" id="359">359</a>
-<a href="#360" id="360">360</a>
-<a href="#361" id="361">361</a>
-<a href="#362" id="362">362</a>
-<a href="#363" id="363">363</a>
-<a href="#364" id="364">364</a>
-<a href="#365" id="365">365</a>
-<a href="#366" id="366">366</a>
-<a href="#367" id="367">367</a>
-<a href="#368" id="368">368</a>
-<a href="#369" id="369">369</a>
-<a href="#370" id="370">370</a>
-<a href="#371" id="371">371</a>
-<a href="#372" id="372">372</a>
-<a href="#373" id="373">373</a>
-</pre><pre class="rust"><code><span class="doccomment">//! Support for basic serial port access, including initialization, transmit, and receive.
-//!
-//! This is a near-standalone crate with very minimal dependencies and a basic feature set
-//! intended for use during early Theseus boot up and initialization.
-//! For a more featureful serial port driver, use the `serial_port` crate.
-//!
-//! # Notes
-//! Some serial port drivers use special cases for transmitting some byte values,
-//! specifically `0x08` and `0x7F`, which are ASCII &quot;backspace&quot; and &quot;delete&quot;, respectively.
-//! They do so by writing them as three distinct values (with proper busy waiting in between):
-//! 1. `0x08`
-//! 2. `0x20` (an ascii space character)
-//! 3. `0x08` again. 
-//!
-//! This isn&#39;t necessarily a bad idea, as it &quot;clears out&quot; whatever character was there before,
-//! presumably to prevent rendering/display issues for a deleted character. 
-//! But, this isn&#39;t required, and I personally believe it should be handled by a higher layer,
-//! such as a shell or TTY program. 
-//! We don&#39;t do anything like that here, in case a user of this crate wants to send binary data
-//! across the serial port, rather than &quot;smartly-interpreted&quot; ASCII characters.
-//!
-//! # Resources
-//! * &lt;https://en.wikibooks.org/wiki/Serial_Programming/8250_UART_Programming&gt;
-//! * &lt;https://tldp.org/HOWTO/Modem-HOWTO-4.html&gt;
-//! * &lt;https://wiki.osdev.org/Serial_Ports&gt;
-//! * &lt;https://www.sci.muni.cz/docs/pc/serport.txt&gt;
-
-</span><span class="attr">#![no_std]
-
-</span><span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>port_io;
-<span class="kw">extern crate </span>irq_safety;
-
-<span class="kw">use </span>core::{convert::TryFrom, fmt, str::FromStr};
+</pre><pre class="rust"><code><span class="kw">use </span>core::{convert::TryFrom, fmt, str::FromStr};
+<span class="kw">use super</span>::{TriState, SerialPortInterruptEvent};
 <span class="kw">use </span>port_io::Port;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
 
 <span class="doccomment">/// The base port I/O addresses for COM serial ports.
 </span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -421,17 +292,7 @@
     <span class="doccomment">/// The base port I/O address for the COM4 serial port.
     </span>COM4 = <span class="number">0x2E8</span>,
 }
-<span class="kw">impl </span>SerialPortAddress {
-    <span class="doccomment">/// Returns a reference to the static instance of this serial port.
-    </span><span class="kw">fn </span>to_static_port(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; {
-        <span class="kw">match </span><span class="self">self </span>{
-            SerialPortAddress::COM1 =&gt; <span class="kw-2">&amp;</span>COM1_SERIAL_PORT,
-            SerialPortAddress::COM2 =&gt; <span class="kw-2">&amp;</span>COM2_SERIAL_PORT,
-            SerialPortAddress::COM3 =&gt; <span class="kw-2">&amp;</span>COM3_SERIAL_PORT,
-            SerialPortAddress::COM4 =&gt; <span class="kw-2">&amp;</span>COM4_SERIAL_PORT,
-        }
-    }
-}
+
 <span class="kw">impl </span>TryFrom&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>SerialPortAddress {
     <span class="kw">type </span>Error = ();
     <span class="kw">fn </span>try_from(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
@@ -444,12 +305,14 @@
         }
     }
 }
+
 <span class="kw">impl </span>FromStr <span class="kw">for </span>SerialPortAddress {
     <span class="kw">type </span><span class="prelude-val">Err </span>= ();
     <span class="kw">fn </span>from_str(s: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Err&gt; {
         <span class="self">Self</span>::try_from(s)
     }
 }
+
 <span class="kw">impl </span>TryFrom&lt;u16&gt; <span class="kw">for </span>SerialPortAddress {
     <span class="kw">type </span>Error = ();
     <span class="kw">fn </span>try_from(port: u16) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>, <span class="self">Self</span>::Error&gt; {
@@ -463,54 +326,9 @@
     }
 }
 
-<span class="doccomment">/// This type is used to ensure that an object of type `T` is only initialized once,
-/// but still allows for a caller to take ownership of the object `T`. 
-</span><span class="kw">enum </span>TriState&lt;T&gt; {
-    Uninited,
-    Inited(T),
-    Taken,
-}
-<span class="kw">impl</span>&lt;T&gt; TriState&lt;T&gt; {
-    <span class="kw">fn </span>take(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; {
-        <span class="kw">if let </span><span class="self">Self</span>::Inited(<span class="kw">_</span>) = <span class="self">self </span>{
-            <span class="kw">if let </span><span class="self">Self</span>::Inited(v) = core::mem::replace(<span class="self">self</span>, <span class="self">Self</span>::Taken) {
-                <span class="kw">return </span><span class="prelude-val">Some</span>(v);
-            }
-        }
-        <span class="prelude-val">None
-    </span>}
-}
-
-<span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,
-// we ensure they are exposed safely as singletons through the below static instances.
-</span><span class="kw">static </span>COM1_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-<span class="kw">static </span>COM2_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-<span class="kw">static </span>COM3_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-<span class="kw">static </span>COM4_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-
-
-<span class="doccomment">/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
-///
-/// This function initializes the given serial port if it has not yet been initialized.
-/// If the serial port has already been initialized and taken by another crate,
-/// this returns `None`.
-///
-/// The returned [`SerialPort`] will be restored to this crate upon being dropped.
-</span><span class="kw">pub fn </span>take_serial_port(
-    serial_port_address: SerialPortAddress
-) -&gt; <span class="prelude-ty">Option</span>&lt;SerialPort&gt; {
-    <span class="kw">let </span>sp = serial_port_address.to_static_port();
-    <span class="kw">let </span><span class="kw-2">mut </span>locked = sp.lock();
-    <span class="kw">if let </span>TriState::Uninited = <span class="kw-2">&amp;*</span>locked {
-        <span class="kw-2">*</span>locked = TriState::Inited(SerialPort::new(serial_port_address <span class="kw">as </span>u16));
-    }
-    locked.take()
-}
-
 <span class="comment">// The E9 port can be used with the Bochs emulator for extra debugging info.
 // const PORT_E9: u16 = 0xE9; // for use with bochs
 // static E9: Port&lt;u8&gt; = Port::new(PORT_E9); // see Bochs&#39;s port E9 hack
-
 
 </span><span class="doccomment">/// A serial port and its various data and control registers.
 ///
@@ -733,16 +551,6 @@
         <span class="self">self</span>.out_str(s); 
         <span class="prelude-val">Ok</span>(())
     }
-}
-
-<span class="doccomment">/// The types of events that can trigger an interrupt on a serial port.
-</span><span class="attr">#[derive(Debug)]
-#[repr(u8)]
-</span><span class="kw">pub enum </span>SerialPortInterruptEvent {
-    DataReceived     = <span class="number">1 </span>&lt;&lt; <span class="number">0</span>,
-    TransmitterEmpty = <span class="number">1 </span>&lt;&lt; <span class="number">1</span>,
-    ErrorOrBreak     = <span class="number">1 </span>&lt;&lt; <span class="number">2</span>,
-    StatusChange     = <span class="number">1 </span>&lt;&lt; <span class="number">3</span>,
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="serial_port_basic" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

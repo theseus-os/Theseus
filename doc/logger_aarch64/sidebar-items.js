@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the internal global “LOGGER” singleton and sets it as the system-wide logger for the `log` crate."]],"struct":[["UartLogger","This wraps a UART channel handle."]]};
