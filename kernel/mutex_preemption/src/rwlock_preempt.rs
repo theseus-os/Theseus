@@ -2,7 +2,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 use core::{fmt, ops::{Deref, DerefMut}};
-use preemption::{PreemptionGuard, hold_preemption};
+use cpu_local_preemption::{PreemptionGuard, hold_preemption};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use lockable::{Lockable, LockableSized};
 

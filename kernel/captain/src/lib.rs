@@ -121,7 +121,6 @@ pub fn init(
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
-    #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     per_cpu::init(bsp_id)?;
 
     // Initialize the scheduler and create the initial `Task`,
@@ -156,8 +155,6 @@ pub fn init(
 
     // Now that other CPUs are fully booted, init TLB shootdowns,
     // which rely on Local APICs to broadcast an IPI to all running CPUs.
-    // arch-gate: no multicore support on aarch64 at the moment
-    #[cfg(target_arch = "x86_64")]
     tlb_shootdown::init();
     
     // Initialize the per-core heaps.
