@@ -2284,7 +2284,6 @@ dependencies = [
  "lockable",
  "log",
  "spin 0.9.4",
- "sync_spin",
  "task",
  "wait_queue",
 ]
@@ -3715,7 +3714,6 @@ name = "sync_block"
 version = "0.1.0"
 dependencies = [
  "sync",
- "sync_spin",
  "wait_queue",
 ]
 
