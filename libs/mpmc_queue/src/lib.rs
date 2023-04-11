@@ -16,11 +16,11 @@ use core::{
 use sync::{Flavour, Mutex, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
-pub struct Queue<F, T>
+pub struct Queue<T, F>
 where
     F: Flavour,
 {
-    pointers: Mutex<F, Pointers<T>>,
+    pointers: Mutex<Pointers<T>, F>,
     /// Prevents unnecessary locking in the fast path.
     len: AtomicUsize,
 }
@@ -43,7 +43,7 @@ impl<T> Node<T> {
     }
 }
 
-impl<F, T> Queue<F, T>
+impl<T, F> Queue<T, F>
 where
     F: Flavour,
 {
@@ -127,7 +127,7 @@ where
     /// of the batch. The batch must be `len` nodes long.
     unsafe fn push_inner(
         &self,
-        mut pointers: MutexGuard<'_, F, Pointers<T>>,
+        mut pointers: MutexGuard<'_, Pointers<T>, F>,
         head: NonNull<Node<T>>,
         tail: NonNull<Node<T>>,
         len: usize,

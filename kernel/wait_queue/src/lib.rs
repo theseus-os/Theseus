@@ -25,7 +25,7 @@ pub struct WaitQueue<P = Spin>
 where
     P: DeadlockPrevention,
 {
-    inner: Queue<P, TaskRef>,
+    inner: Queue<TaskRef, P>,
 }
 
 impl<P> WaitQueue<P>

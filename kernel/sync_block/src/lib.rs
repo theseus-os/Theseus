@@ -4,6 +4,9 @@
 use sync::{mutex, Flavour};
 use wait_queue::WaitQueue;
 
+pub type Mutex<T> = sync::Mutex<T, Block>;
+pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, Block>;
+
 /// A synchronisation flavour that blocks the current thread while waiting for
 /// the lock to become available.
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

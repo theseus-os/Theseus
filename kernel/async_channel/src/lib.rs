@@ -57,7 +57,7 @@ pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T, Spin>, Receiv
 /// deadlock prevention type parameter. By default it is set to [`Spin`]. See
 /// [`WaitQueue`]'s documentation for more information on when to change this
 /// type parameter.
-pub fn new_channel_with<P: DeadlockPrevention, T: Send>(
+pub fn new_channel_with<T: Send, P: DeadlockPrevention>(
     minimum_capacity: usize,
 ) -> (Sender<T, P>, Receiver<T, P>) {
     let channel = Arc::new(Channel {

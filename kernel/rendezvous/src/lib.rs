@@ -146,7 +146,7 @@ pub fn new_channel<T: Send>() -> (Sender<T, Spin>, Receiver<T, Spin>) {
 /// The rendezvous channel uses a wait queue internally and hence exposes a
 /// deadlock prevention type parameter. See [`WaitQueue`]'s documentation for
 /// more information on when to change this type parameter.
-pub fn new_channel_with<P: DeadlockPrevention, T: Send>() -> (Sender<T, P>, Receiver<T, P>) {
+pub fn new_channel_with<T: Send, P: DeadlockPrevention>() -> (Sender<T, P>, Receiver<T, P>) {
     let channel = Arc::new(Channel {
         slot: ExchangeSlot::new(),
         waiting_senders: WaitQueue::new(),
