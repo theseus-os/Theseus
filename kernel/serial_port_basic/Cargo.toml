@@ -15,3 +15,4 @@ git = "https://github.com/theseus-os/irq_safety"
 
 [lib]
 crate-type = ["rlib"]
+path = "src/x86_64.rs"
