@@ -3789,7 +3789,6 @@ name = "task_struct"
 version = "0.1.0"
 dependencies = [
  "cpu",
- "cpu_local_preemption",
  "crossbeam-utils",
  "environment",
  "irq_safety",

@@ -44,7 +44,6 @@ use core::{
     task::Waker,
 };
 use cpu::CpuId;
-use cpu_local_preemption::{CpuLocalField, PerCpuField};
 use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::{hold_interrupts, MutexIrqSafe};
 use log::error;
@@ -90,34 +89,6 @@ pub fn all_tasks() -> Vec<(usize, WeakTaskRef)> {
 
 /// The signature of a Task's failure cleanup function.
 pub type FailureCleanupFunction = fn(ExitableTaskRef, KillReason) -> !;
-
-
-/// A type wrapper used to hold a CPU-local `PreemptionGuard` 
-/// on the current CPU during a task switch operation.
-#[derive(Default)]
-pub struct TaskSwitchPreemptionGuard(Option<PreemptionGuard>);
-impl TaskSwitchPreemptionGuard {
-    pub const fn new() -> Self { Self(None) }
-}
-// SAFETY: The `TaskSwitchPreemptionGuard` type corresponds to a field in `PerCpuData`
-//         with the offset specified by `PerCpuField::TaskSwitchPreemptionGuard`.
-unsafe impl CpuLocalField for TaskSwitchPreemptionGuard {
-    const FIELD: PerCpuField = PerCpuField::TaskSwitchPreemptionGuard;
-}
-
-
-/// A type wrapper used to hold CPU-local data that should be dropped
-/// after switching away from a task that has exited.
-#[derive(Default)]
-pub struct DropAfterTaskSwitch(Option<TaskRef>);
-impl DropAfterTaskSwitch {
-    pub const fn new() -> Self { Self(None) }
-}
-// SAFETY: The `DropAfterTaskSwitch` type corresponds to a field in `PerCpuData`
-//         with the offset specified by `PerCpuField::DropAfterTaskSwitch`.
-unsafe impl CpuLocalField for DropAfterTaskSwitch {
-    const FIELD: PerCpuField = PerCpuField::DropAfterTaskSwitch;
-}
 
 
 /// A shareable, cloneable reference to a `Task` that exposes more methods
@@ -303,30 +274,6 @@ impl TaskRef {
     /// to point to this task's TLS data image.
     fn set_as_current_task(&self) {
         self.0.task.tls_area().set_as_current_tls_base();
-    }
-
-    /// Perform any actions needed after a context switch.
-    /// 
-    /// Currently this only does two things:
-    /// 1. Drops any data that the original previous task (before the context switch)
-    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
-    /// 2. Obtains the preemption guard such that preemption can be re-enabled
-    ///    when it is appropriate to do so.
-    fn post_context_switch_action(&self) -> PreemptionGuard {
-        let inner = self.0.task.inner();
-        // Step 1: drop data from previously running task
-        {
-            let prev_task_data_to_drop = inner.lock().drop_after_task_switch.take();
-            drop(prev_task_data_to_drop);
-        }
-
-        // Step 2: retake ownership of preemption guard in order to re-enable preemption.
-        {
-            inner.lock()
-                .preemption_guard
-                .take()
-                .expect("BUG: post_context_switch_action: no PreemptionGuard existed")
-        }
     }
 }
 
@@ -579,15 +526,15 @@ impl ExitableTaskRef {
     /// 
     /// Currently this only does two things:
     /// 1. Drops any data that the original previous task (before the context switch)
-    ///    prepared for us to drop, as specified by `TaskInner::drop_after_task_switch`.
+    ///    prepared for us to drop after the context switch has completed.
     /// 2. Obtains the preemption guard such that preemption can be re-enabled
     ///    when it is appropriate to do so.
     ///
-    /// Note: this publicly re-exports the private `TaskRef::post_context_switch_action()`
+    /// Note: this publicly re-exports the private `post_context_switch_action()`
     ///       function for use in the early `spawn::task_wrapper` functions,
     ///       which is the only place where an `ExitableTaskRef` can be obtained. 
     pub fn post_context_switch_action(&self) -> PreemptionGuard {
-        self.task.post_context_switch_action()
+        post_context_switch_action()
     }
 
     /// Allows the unwinder to use the current task to obtain its `ExitableTaskRef`
@@ -845,10 +792,7 @@ pub fn task_switch(
     // and are easy to replicate in `task_wrapper()`.
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    let recovered_preemption_guard = with_current_task(
-        |t| t.post_context_switch_action()
-    ).expect("BUG: task_switch(): failed to get current task for post_context_switch_action");
-
+    let recovered_preemption_guard = post_context_switch_action();
     (true, recovered_preemption_guard)
 }
 
@@ -961,12 +905,12 @@ fn task_switch_inner(
     // Thus, we need to remove or "deinit" the `TaskRef` in its TLS area
     // in order to ensure that its `TaskRef` reference count will be decremented properly
     // and thus its task struct will eventually be dropped.
-    // We store the removed `TaskRef` in the next Task struct so that it remains accessible
+    // We store the removed `TaskRef` in CPU-local storage so that it remains accessible
     // until *after* the context switch.
     if curr_task_has_exited {
         // trace!("task_switch(): deiniting current task TLS for: {:?}, next: {}", curr_task_tls_slot.as_deref(), next.deref());
-        let _prev_taskref = curr_task_tls_slot.take();
-        next.0.task.inner().lock().drop_after_task_switch = Some(Box::new(_prev_taskref));
+        let prev_taskref = curr_task_tls_slot.take();
+        DROP_AFTER_TASK_SWITCH.with_mut(|d| d.0 = prev_taskref);
     }
 
     // Now, set the next task as the current task running on this CPU.
@@ -985,11 +929,9 @@ fn task_switch_inner(
         drop(_held_interrupts);
     }
 
-    // Move the preemption guard into the next task such that we can use retrieve it
+    // Move the preemption guard into CPU-local storage such that we can retrieve it
     // after the actual context switch operation has completed.
-    //
-    // TODO: this should be moved into per-CPU storage areas rather than the task struct.
-    next.0.task.inner().lock().preemption_guard = Some(preemption_guard);
+    TASK_SWITCH_PREEMPTION_GUARD.with_mut(|p| p.0 = Some(preemption_guard));
 
     #[cfg(not(simd_personality))]
     return Ok((prev_task_saved_sp, next_task_saved_sp));
@@ -997,9 +939,79 @@ fn task_switch_inner(
     return Ok((prev_task_saved_sp, next_task_saved_sp, curr_simd, next.simd));
 }
 
+/// Perform any actions needed after a context switch.
+///
+/// Currently this only does two things:
+/// 1. Drops any data that the original previous task (before the context switch)
+///    prepared for us to drop.
+/// 2. Obtains the preemption guard such that preemption can be re-enabled
+///    when it is appropriate to do so.
+fn post_context_switch_action() -> PreemptionGuard {
+    // Step 1: drop data from previously running task
+    {
+        let prev_task_data_to_drop = DROP_AFTER_TASK_SWITCH.with_mut(|d| d.0.take());
+        drop(prev_task_data_to_drop);
+    }
+
+    // Step 2: retake ownership of preemption guard in order to re-enable preemption.
+    {
+        TASK_SWITCH_PREEMPTION_GUARD.with_mut(|p| p.0.take())
+            .expect("BUG: post_context_switch_action: no PreemptionGuard existed")
+    }
+}
+
+
+pub use cpu_local_task_switch::*;
+/// CPU-local data related to task switching.
+mod cpu_local_task_switch {
+    use cpu_local_preemption::{CpuLocal, CpuLocalField, PerCpuField, PreemptionGuard};
+
+    /// The preemption guard that was used for safe task switching on each CPU.
+    ///
+    /// The `PreemptionGuard` is stored here right before a context switch begins
+    /// and then retrieved from here right after the context switch ends.
+    /// It is stored in a CPU-local variable because it's only related to
+    /// a task switching operation on a particular CPU.
+    pub(crate) static TASK_SWITCH_PREEMPTION_GUARD: CpuLocal<TaskSwitchPreemptionGuard> =
+        CpuLocal::new(PerCpuField::TaskSwitchPreemptionGuard);
+
+    /// Data that should be dropped after switching away from a task that has exited.
+    ///
+    /// Currently, this contains the previous Task's `TaskRef` removed from its TLS area;
+    /// it is stored in a CPU-local variable because it's only related to
+    /// a task switching operation on a particular CPU.
+    pub(crate) static DROP_AFTER_TASK_SWITCH: CpuLocal<DropAfterTaskSwitch> =
+        CpuLocal::new(PerCpuField::DropAfterTaskSwitch);
+
+    /// A type wrapper used to hold a CPU-local `PreemptionGuard` 
+    /// on the current CPU during a task switch operation.
+    #[derive(Default)]
+    pub struct TaskSwitchPreemptionGuard(pub(crate) Option<PreemptionGuard>);
+    impl TaskSwitchPreemptionGuard {
+        pub const fn new() -> Self { Self(None) }
+    }
+    // SAFETY: The `TaskSwitchPreemptionGuard` type corresponds to a field in `PerCpuData`
+    //         with the offset specified by `PerCpuField::TaskSwitchPreemptionGuard`.
+    unsafe impl CpuLocalField for TaskSwitchPreemptionGuard {
+        const FIELD: PerCpuField = PerCpuField::TaskSwitchPreemptionGuard;
+    }
+
+    /// A type wrapper used to hold CPU-local data that should be dropped
+    /// after switching away from a task that has exited.
+    #[derive(Default)]
+    pub struct DropAfterTaskSwitch(pub(crate) Option<super::TaskRef>);
+    impl DropAfterTaskSwitch {
+        pub const fn new() -> Self { Self(None) }
+    }
+    // SAFETY: The `DropAfterTaskSwitch` type corresponds to a field in `PerCpuData`
+    //         with the offset specified by `PerCpuField::DropAfterTaskSwitch`.
+    unsafe impl CpuLocalField for DropAfterTaskSwitch {
+        const FIELD: PerCpuField = PerCpuField::DropAfterTaskSwitch;
+    }
+}
+
 
 pub use tls_current_task::*;
-
 /// A private module to ensure the below TLS variables aren't modified directly.
 mod tls_current_task {
     use core::{cell::{Cell, RefCell}, ops::Deref};

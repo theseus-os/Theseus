@@ -104,6 +104,8 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
 ///
 /// This type does not implement `Send` because it is invalid
 /// to move it across a "thread" boundary (into a different task).
+/// More specifically, it is invalid to move a `PreemptionGuard` across
+/// CPUs; this error condition is checked for when dropping it.
 pub struct PreemptionGuard {
     /// The ID of the CPU on which preemption was held.
     ///
@@ -113,13 +115,7 @@ pub struct PreemptionGuard {
     /// Whether preemption was enabled when this guard was created.
     preemption_was_enabled: bool,
 }
-
-// TODO FIXME: currently we transfer a `PreemptionGuard` between tasks
-//             during a task switch (right before and right after the context switch).
-//             Thus, this type needs to impl `Send`, even though it doesn't make sense
-//             to move it across a thread boundary in the general case.
-// // Similar guard types in Rust `std` are not `Send`.
-// impl !Send for PreemptionGuard { }
+impl !Send for PreemptionGuard { }
 
 impl PreemptionGuard {
     /// Returns whether preemption was originally enabled when this guard was created.
