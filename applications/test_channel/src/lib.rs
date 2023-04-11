@@ -280,7 +280,7 @@ fn rendezvous_sender_task ((sender, iterations, panic_point): (rendezvous::Sende
 fn asynchronous_test_oneshot() -> Result<(), &'static str> {
     let my_cpu = cpu::current_cpu();
 
-    let (sender, receiver): (async_channel::Sender<_>, _) = async_channel::new_channel(2);
+    let (sender, receiver) = async_channel::new_channel(2);
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         warn!("asynchronous_test_oneshot(): Entered sender task!");
