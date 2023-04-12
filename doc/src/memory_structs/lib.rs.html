@@ -475,6 +475,24 @@
 <a href="#475" id="475">475</a>
 <a href="#476" id="476">476</a>
 <a href="#477" id="477">477</a>
+<a href="#478" id="478">478</a>
+<a href="#479" id="479">479</a>
+<a href="#480" id="480">480</a>
+<a href="#481" id="481">481</a>
+<a href="#482" id="482">482</a>
+<a href="#483" id="483">483</a>
+<a href="#484" id="484">484</a>
+<a href="#485" id="485">485</a>
+<a href="#486" id="486">486</a>
+<a href="#487" id="487">487</a>
+<a href="#488" id="488">488</a>
+<a href="#489" id="489">489</a>
+<a href="#490" id="490">490</a>
+<a href="#491" id="491">491</a>
+<a href="#492" id="492">492</a>
+<a href="#493" id="493">493</a>
+<a href="#494" id="494">494</a>
+<a href="#495" id="495">495</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -945,6 +963,24 @@
                 <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
                     <span class="self">self</span>.<span class="number">0
                 </span>}
+            }
+
+            
+            <span class="attr">#[doc = <span class="string">&quot;A `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;` that implements `Copy`&quot;</span>]
+            #[derive(Clone, Copy)]
+            </span><span class="kw">pub struct </span>[&lt;Copyable <span class="macro-nonterminal">$TypeName</span>&gt;] {
+                start: <span class="macro-nonterminal">$chunk</span>,
+                end: <span class="macro-nonterminal">$chunk</span>,
+            }
+            <span class="kw">impl </span>From&lt;<span class="macro-nonterminal">$TypeName</span>&gt; <span class="kw">for </span>[&lt;Copyable <span class="macro-nonterminal">$TypeName</span>&gt;] {
+                <span class="kw">fn </span>from(r: <span class="macro-nonterminal">$TypeName</span>) -&gt; <span class="self">Self </span>{
+                    <span class="self">Self </span>{ start: <span class="kw-2">*</span>r.start(), end: <span class="kw-2">*</span>r.end() }
+                }
+            }
+            <span class="kw">impl </span>From&lt;[&lt;Copyable <span class="macro-nonterminal">$TypeName</span>&gt;]&gt; <span class="kw">for </span><span class="macro-nonterminal">$TypeName </span>{
+                <span class="kw">fn </span>from(cr: [&lt;Copyable <span class="macro-nonterminal">$TypeName</span>&gt;]) -&gt; <span class="self">Self </span>{
+                    <span class="self">Self</span>::new(cr.start, cr.end)
+                }
             }
         }
     };

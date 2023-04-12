@@ -439,9 +439,6 @@
 <a href="#439" id="439">439</a>
 <a href="#440" id="440">440</a>
 <a href="#441" id="441">441</a>
-<a href="#442" id="442">442</a>
-<a href="#443" id="443">443</a>
-<a href="#444" id="444">444</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Exception handlers that are task-aware, and will kill a task on an exception.
 
 </span><span class="attr">#![no_std]
@@ -707,7 +704,9 @@
     <span class="comment">// don&#39;t halt here, this isn&#39;t a fatal/permanent failure, just a brief pause.
 </span>}
 
-<span class="doccomment">/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts.
+<span class="doccomment">/// Exception 0x02 is a Non-Maskable Interrupt (NMI).
+///
+/// Theseus uses this for TLB Shootdown IPIs and sampling interrupts.
 ///
 /// # Important Note
 /// Acquiring ANY locks in this function, even irq-safe ones, could cause a deadlock
@@ -715,16 +714,11 @@
 /// another regular interrupt. 
 /// This includes printing to the log (e.g., `debug!()`) or the screen.
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>nmi_handler(stack_frame: InterruptStackFrame) {
-    <span class="kw">let </span><span class="kw-2">mut </span>expected_nmi = <span class="bool-val">false</span>;
+    <span class="comment">// trace!(&quot;nmi_handler (CPU {})&quot;, cpu::current_cpu());
+    </span><span class="kw">let </span><span class="kw-2">mut </span>expected_nmi = <span class="bool-val">false</span>;
 
-    <span class="comment">// currently we&#39;re using NMIs to send TLB shootdown IPIs
-    </span>{
-        <span class="kw">let </span>pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(pages) = pages_to_invalidate {
-            <span class="comment">// trace!(&quot;nmi_handler (AP {})&quot;, cpu::current_cpu());
-            </span>tlb_shootdown::handle_tlb_shootdown_ipi(pages);
-            expected_nmi = <span class="bool-val">true</span>;
-        }
+    <span class="kw">if </span>tlb_shootdown::handle_tlb_shootdown_ipi() {
+        <span class="kw">return</span>;
     }
 
     <span class="comment">// Performance monitoring hardware uses NMIs to trigger a sampling interrupt.

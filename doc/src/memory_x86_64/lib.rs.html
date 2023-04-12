@@ -555,7 +555,7 @@
 
 <span class="doccomment">/// Flushes the specific virtual address in TLB. 
 </span><span class="kw">pub fn </span>tlb_flush_virt_addr(vaddr: VirtualAddress) {
-    tlb::flush(x86_64::VirtAddr::new(vaddr.value() <span class="kw">as </span>u64));
+    tlb::flush(x86_64::VirtAddr::new_truncate(vaddr.value() <span class="kw">as </span>u64));
 }
 
 <span class="doccomment">/// Flushes the whole TLB. 
