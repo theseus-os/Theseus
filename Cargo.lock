@@ -4145,6 +4145,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "cpu",
+ "crossbeam-utils",
  "interrupts",
  "irq_safety",
  "log",

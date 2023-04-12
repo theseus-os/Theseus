@@ -275,10 +275,8 @@ extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
 
     // currently we're using NMIs to send TLB shootdown IPIs
     {
-        let pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
-        if let Some(pages) = pages_to_invalidate {
-            // trace!("nmi_handler (AP {})", cpu::current_cpu());
-            tlb_shootdown::handle_tlb_shootdown_ipi(pages);
+        // trace!("nmi_handler (AP {})", cpu::current_cpu());
+        if tlb_shootdown::handle_tlb_shootdown_ipi() {
             expected_nmi = true;
         }
     }
