@@ -14,16 +14,15 @@ use memory_x86_64::tlb_flush_virt_addr;
 #[cfg(target_arch = "aarch64")]
 use memory_aarch64::tlb_flush_virt_addr;
 
-/// The number of remaining cores that still need to handle the current TLB shootdown IPI
+/// The number of remaining CPUs that still need to handle the current TLB shootdown IPI.
 static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
-/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
+/// This lock ensures only one round of TLB shootdown IPIs can occur concurrently.
 static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
-/// The range of pages for a TLB shootdown IPI.
+/// The range of virtual pages to be flushed for a TLB shootdown IPI.
 static TLB_SHOOTDOWN_IPI_PAGES: RwLockIrqSafe<Option<PageRange>> = RwLockIrqSafe::new(None);
 
 
 /// Initializes data, functions, and structures for the TLB shootdown. 
-/// TODO: redesign this, it's weird and silly just to set one callback.
 pub fn init() {
     memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
 

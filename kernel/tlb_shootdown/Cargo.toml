@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.8"
-crossbeam-utils = { version = "0.8.12", default-features = false }
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 memory = { path = "../memory" }
