@@ -18,6 +18,3 @@ apic = { path = "../apic" }
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 memory_aarch64 = { path = "../memory_aarch64" }
 interrupts = { path = "../interrupts" }
-
-[lib]
-crate-type = ["rlib"]
