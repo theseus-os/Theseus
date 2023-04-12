@@ -39,7 +39,7 @@ pub fn init() {
 pub fn handle_tlb_shootdown_ipi() -> bool {
     let pages_to_invalidate = TLB_SHOOTDOWN_IPI_PAGES.read().clone();
     if let Some(pages) = pages_to_invalidate {
-        // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::current_cpu(), pages);
+        // log::trace!("handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}", apic::current_cpu(), pages);
         for page in pages {
             tlb_flush_virt_addr(page.start_address());
         }
@@ -51,13 +51,10 @@ pub fn handle_tlb_shootdown_ipi() -> bool {
 }
 
 
-/// Broadcasts TLB shootdown IPI to all other AP cores.
+/// Broadcasts a TLB shootdown IPI to all other CPUs, causing them to flush (invalidate)
+/// the given virtual pages in their TLBs.
 ///
-/// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
-/// which will invoke it as needed (on remap/unmap operations).
-///
-/// Sends an IPI to all other cores (except me) to trigger 
-/// a TLB flush of the given pages' virtual addresses.
+/// This is invoked by the memory subsystem as needed, e.g., on remap/unmap operations.
 fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {        
     // skip sending IPIs if there are no other cores running
     let cpu_count = cpu_count();
