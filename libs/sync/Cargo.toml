@@ -3,3 +3,9 @@ name = "sync"
 version = "0.1.0"
 description = "Synchronisation primitive building blocks"
 edition = "2021"
+
+[dependencies.spin_rs]
+package = "spin"
+git = "https://github.com/mvdnes/spin-rs"
+default-features = false
+features = ["spin_mutex", "rwlock"]
