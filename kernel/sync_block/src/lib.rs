@@ -1,7 +1,7 @@
 #![feature(negative_impls)]
 #![no_std]
 
-use sync::{mutex, Flavour};
+use sync::{spin, Flavour};
 use wait_queue::WaitQueue;
 
 pub type Mutex<T> = sync::Mutex<T, Block>;
@@ -22,17 +22,17 @@ impl Flavour for Block {
 
     #[inline]
     fn try_lock_mutex<'a, T>(
-        mutex: &'a mutex::SpinMutex<T>,
+        mutex: &'a spin::Mutex<T>,
         _: &'a Self::LockData,
-    ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
         mutex.try_lock().map(|guard| (guard, ()))
     }
 
     #[inline]
     fn lock_mutex<'a, T>(
-        mutex: &'a mutex::SpinMutex<T>,
+        mutex: &'a spin::Mutex<T>,
         data: &'a Self::LockData,
-    ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard) {
         // This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
         if let Some(guards) = Self::try_lock_mutex(mutex, data) {

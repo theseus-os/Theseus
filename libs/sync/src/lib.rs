@@ -13,6 +13,13 @@ pub mod mutex;
 
 pub use mutex::{Mutex, MutexGuard};
 
+pub mod spin {
+    pub use spin_rs::{
+        mutex::spin::{SpinMutex as Mutex, SpinMutexGuard as MutexGuard},
+        rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+    };
+}
+
 /// A synchronisation flavour.
 pub trait Flavour {
     /// Initial value for the lock data.
@@ -26,17 +33,17 @@ pub trait Flavour {
 
     /// Tries to acquire the given mutex.
     fn try_lock_mutex<'a, T>(
-        mutex: &'a mutex::SpinMutex<T>,
+        mutex: &'a spin::Mutex<T>,
         data: &'a Self::LockData,
-    ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)>
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>
     where
         Self: Sized;
 
     /// Acquires the given mutex.
     fn lock_mutex<'a, T>(
-        mutex: &'a mutex::SpinMutex<T>,
+        mutex: &'a spin::Mutex<T>,
         data: &'a Self::LockData,
-    ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard)
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard)
     where
         Self: Sized;
 
@@ -73,9 +80,9 @@ where
 
     #[inline]
     fn try_lock_mutex<'a, T>(
-        mutex: &'a mutex::SpinMutex<T>,
+        mutex: &'a spin::Mutex<T>,
         _: &'a Self::LockData,
-    ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
         if Self::EXPENSIVE && mutex.is_locked() {
             return None;
         }
@@ -91,9 +98,9 @@ where
 
     #[inline]
     fn lock_mutex<'a, T>(
-        mutex: &'a mutex::SpinMutex<T>,
+        mutex: &'a spin::Mutex<T>,
         _: &'a Self::LockData,
-    ) -> (mutex::SpinMutexGuard<'a, T>, Self::Guard) {
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard) {
         loop {
             let deadlock_guard = Self::enter();
             if let Some(guard) = mutex.try_lock_weak() {

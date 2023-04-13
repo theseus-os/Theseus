@@ -3558,6 +3558,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "spin"
+version = "0.9.8"
+source = "git+https://github.com/mvdnes/spin-rs#1f2e06c9f9d22b234776849c65e313f583ddfade"
+
+[[package]]
 name = "stable_deref_trait"
 version = "1.1.1"
 source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
@@ -3699,6 +3704,9 @@ dependencies = [
 [[package]]
 name = "sync"
 version = "0.1.0"
+dependencies = [
+ "spin 0.9.8",
+]
 
 [[package]]
 name = "sync_block"
