@@ -14,16 +14,15 @@ use memory_x86_64::tlb_flush_virt_addr;
 #[cfg(target_arch = "aarch64")]
 use memory_aarch64::tlb_flush_virt_addr;
 
-/// The number of remaining cores that still need to handle the current TLB shootdown IPI
-pub static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
-/// The lock that makes sure only one set of TLB shootdown IPIs is concurrently happening
-pub static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
-/// The range of pages for a TLB shootdown IPI.
-pub static TLB_SHOOTDOWN_IPI_PAGES: RwLockIrqSafe<Option<PageRange>> = RwLockIrqSafe::new(None);
+/// The number of remaining CPUs that still need to handle the current TLB shootdown IPI.
+static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
+/// This lock ensures only one round of TLB shootdown IPIs can occur concurrently.
+static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
+/// The range of virtual pages to be flushed for a TLB shootdown IPI.
+static TLB_SHOOTDOWN_IPI_PAGES: RwLockIrqSafe<Option<PageRange>> = RwLockIrqSafe::new(None);
 
 
 /// Initializes data, functions, and structures for the TLB shootdown. 
-/// TODO: redesign this, it's weird and silly just to set one callback.
 pub fn init() {
     memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
 
@@ -31,28 +30,31 @@ pub fn init() {
     interrupts::setup_ipi_handler(tlb_shootdown_ipi_handler, interrupts::TLB_SHOOTDOWN_IPI).unwrap();
 }
 
-/// Handles a TLB shootdown ipi by flushing the `VirtualAddress`es 
-/// covered by the given range of `pages_to_invalidate`.
-/// 
+/// Handles a TLB shootdown IPI requested by another CPU.
+///
 /// There is no need to invoke this directly, it will be called by an IPI interrupt handler.
-pub fn handle_tlb_shootdown_ipi(pages_to_invalidate: PageRange) {
-    // log::trace!("handle_tlb_shootdown_ipi(): AP {}, pages: {:?}", apic::current_cpu(), pages_to_invalidate);
-
-    for page in pages_to_invalidate {
-        tlb_flush_virt_addr(page.start_address());
+///
+/// ## Return
+/// Returns `true` if virtual addresses were actually flushed, `false` otherwise.
+pub fn handle_tlb_shootdown_ipi() -> bool {
+    let pages_to_invalidate = TLB_SHOOTDOWN_IPI_PAGES.read().clone();
+    if let Some(pages) = pages_to_invalidate {
+        // log::trace!("handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}", apic::current_cpu(), pages);
+        for page in pages {
+            tlb_flush_virt_addr(page.start_address());
+        }
+        TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::Relaxed);
+        true
+    } else {
+        false
     }
-
-    TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::SeqCst);
 }
 
 
-/// Broadcasts TLB shootdown IPI to all other AP cores.
+/// Broadcasts a TLB shootdown IPI to all other CPUs, causing them to flush (invalidate)
+/// the given virtual pages in their TLBs.
 ///
-/// Do not invoke this directly, but rather pass it as a callback to the memory subsystem,
-/// which will invoke it as needed (on remap/unmap operations).
-///
-/// Sends an IPI to all other cores (except me) to trigger 
-/// a TLB flush of the given pages' virtual addresses.
+/// This is invoked by the memory subsystem as needed, e.g., on remap/unmap operations.
 fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {        
     // skip sending IPIs if there are no other cores running
     let cpu_count = cpu_count();
@@ -70,17 +72,20 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 
     // acquire lock
     // TODO: add timeout!!
-    let mut old_lock_val = TLB_SHOOTDOWN_IPI_LOCK.load(Ordering::Relaxed);
     loop {
-        match TLB_SHOOTDOWN_IPI_LOCK.compare_exchange_weak(old_lock_val, true, Ordering::AcqRel, Ordering::Relaxed) { 
-            Ok(_) => break,
-            Err(v) => old_lock_val = v,
+        if TLB_SHOOTDOWN_IPI_LOCK.compare_exchange_weak(
+            false,
+            true,
+            Ordering::AcqRel,
+            Ordering::Relaxed,
+        ).is_ok() {
+            break;
         }
         spin_loop();
     }
 
     *TLB_SHOOTDOWN_IPI_PAGES.write() = Some(pages_to_invalidate);
-    TLB_SHOOTDOWN_IPI_COUNT.store(cpu_count - 1, Ordering::SeqCst); // -1 to exclude this core 
+    TLB_SHOOTDOWN_IPI_COUNT.store(cpu_count - 1, Ordering::Relaxed); // -1 to exclude this core 
 
     #[cfg(target_arch = "x86_64")] {
         let my_lapic = apic::get_my_apic()
@@ -110,12 +115,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 /// Interrupt Handler for TLB Shootdowns on aarch64
 #[cfg(target_arch = "aarch64")]
 extern "C" fn tlb_shootdown_ipi_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
-    if let Some(pages_to_invalidate) = TLB_SHOOTDOWN_IPI_PAGES.read().clone() {
-        // trace!("nmi_handler (AP {})", cpu::current_cpu());
-        handle_tlb_shootdown_ipi(pages_to_invalidate);
-    } else {
-        panic!("Unexpected TLB Shootdown IPI!");
-    }
-
+    let expected = handle_tlb_shootdown_ipi();
+    assert!(expected, "Unexpected TLB Shootdown IPI!");
     interrupts::EoiBehaviour::CallerMustSignalEoi
 }

@@ -22,7 +22,7 @@ pub use self::paging::{
     translate,
 };
 
-pub use memory_structs::{Frame, Page, FrameRange, PageRange, VirtualAddress, PhysicalAddress};
+pub use memory_structs::*;
 pub use page_allocator::{
     AllocatedPages, allocate_pages, allocate_pages_at,
     allocate_pages_by_bytes, allocate_pages_by_bytes_at,

@@ -263,7 +263,9 @@ extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
     // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
 }
 
-/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts.
+/// Exception 0x02 is a Non-Maskable Interrupt (NMI).
+///
+/// Theseus uses this for TLB Shootdown IPIs and sampling interrupts.
 ///
 /// # Important Note
 /// Acquiring ANY locks in this function, even irq-safe ones, could cause a deadlock
@@ -271,16 +273,11 @@ extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
 /// another regular interrupt. 
 /// This includes printing to the log (e.g., `debug!()`) or the screen.
 extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
+    // trace!("nmi_handler (CPU {})", cpu::current_cpu());
     let mut expected_nmi = false;
 
-    // currently we're using NMIs to send TLB shootdown IPIs
-    {
-        let pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
-        if let Some(pages) = pages_to_invalidate {
-            // trace!("nmi_handler (AP {})", cpu::current_cpu());
-            tlb_shootdown::handle_tlb_shootdown_ipi(pages);
-            expected_nmi = true;
-        }
+    if tlb_shootdown::handle_tlb_shootdown_ipi() {
+        return;
     }
 
     // Performance monitoring hardware uses NMIs to trigger a sampling interrupt.

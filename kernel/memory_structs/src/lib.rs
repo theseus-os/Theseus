@@ -469,6 +469,24 @@ macro_rules! implement_page_frame_range {
                     self.0
                 }
             }
+
+            
+            #[doc = "A `" $TypeName "` that implements `Copy`"]
+            #[derive(Clone, Copy)]
+            pub struct [<Copyable $TypeName>] {
+                start: $chunk,
+                end: $chunk,
+            }
+            impl From<$TypeName> for [<Copyable $TypeName>] {
+                fn from(r: $TypeName) -> Self {
+                    Self { start: *r.start(), end: *r.end() }
+                }
+            }
+            impl From<[<Copyable $TypeName>]> for $TypeName {
+                fn from(cr: [<Copyable $TypeName>]) -> Self {
+                    Self::new(cr.start, cr.end)
+                }
+            }
         }
     };
 }

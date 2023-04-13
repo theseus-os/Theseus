@@ -1,4 +1,4 @@
-use crate::Flavour;
+use crate::{spin, Flavour};
 use core::ops::{Deref, DerefMut};
 
 pub struct RwLock<T, F>
@@ -118,103 +118,5 @@ where
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner.deref_mut()
-    }
-}
-
-pub mod spin {
-    use core::{
-        cell::UnsafeCell,
-        ops::{Deref, DerefMut},
-        sync::atomic::AtomicUsize,
-    };
-
-    const READER: usize = 1 << 1;
-    const WRITER: usize = 1;
-
-    pub struct RwLock<T> {
-        lock: AtomicUsize,
-        data: UnsafeCell<T>,
-    }
-
-    unsafe impl<T> Send for RwLock<T> where T: Send {}
-    unsafe impl<T> Sync for RwLock<T> where T: Send + Sync {}
-
-    // FIXME: impls for guards
-
-    impl<T> RwLock<T> {
-        #[inline]
-        pub const fn new(value: T) -> Self {
-            Self {
-                lock: AtomicUsize::new(0),
-                data: UnsafeCell::new(value),
-            }
-        }
-
-        #[inline]
-        pub fn try_read(&self) -> Option<RwLockReadGuard<T>> {
-            todo!();
-        }
-
-        #[inline]
-        pub fn try_read_weak(&self) -> Option<RwLockReadGuard<T>> {
-            todo!();
-        }
-
-        #[inline]
-        pub fn try_write(&self) -> Option<RwLockWriteGuard<T>> {
-            todo!();
-        }
-
-        #[inline]
-        pub fn try_write_weak(&self) -> Option<RwLockWriteGuard<T>> {
-            todo!();
-        }
-    }
-
-    pub struct RwLockReadGuard<'a, T>
-    where
-        T: 'a,
-    {
-        lock: &'a AtomicUsize,
-        data: *const T,
-    }
-
-    impl<'a, T> Deref for RwLockReadGuard<'a, T>
-    where
-        T: 'a,
-    {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            unsafe { &*self.data }
-        }
-    }
-
-    pub struct RwLockWriteGuard<'a, T>
-    where
-        T: 'a,
-    {
-        inner: &'a RwLock<T>,
-        data: *mut T,
-    }
-
-    impl<'a, T> Deref for RwLockWriteGuard<'a, T>
-    where
-        T: 'a,
-    {
-        type Target = T;
-
-        fn deref(&self) -> &Self::Target {
-            unsafe { &*self.data }
-        }
-    }
-
-    impl<'a, T> DerefMut for RwLockWriteGuard<'a, T>
-    where
-        T: 'a,
-    {
-        fn deref_mut(&mut self) -> &mut Self::Target {
-            unsafe { &mut *self.data }
-        }
     }
 }
