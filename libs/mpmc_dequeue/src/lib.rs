@@ -1,4 +1,4 @@
-//! A growable, first-in first-out, multi-producer, multi-consumer, queue.
+//! A growable, first-in first-out, multi-producer, multi-consumer, dequeue.
 //!
 //! The implementation is **heavily** inspired by the [Tokio inject queue].
 //!
@@ -16,7 +16,7 @@ use core::{
 use sync::{Flavour, Mutex, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
-pub struct Queue<T, F>
+pub struct Dequeue<T, F>
 where
     F: Flavour,
 {
@@ -43,7 +43,7 @@ impl<T> Node<T> {
     }
 }
 
-impl<T, F> Queue<T, F>
+impl<T, F> Dequeue<T, F>
 where
     F: Flavour,
 {
@@ -74,6 +74,13 @@ where
         unsafe { self.push_inner(pointers, node, node, 1) };
     }
 
+    /// Prepends an item to the queue.
+    pub fn push_front(&self, item: T) {
+        let node = box_pointer(Node::new(item));
+        let pointers = self.pointers.lock();
+        unsafe { self.push_front_inner(pointers, node, node) };
+    }
+
     /// Appends an item to the queue if a condition fails.
     ///
     /// The condition will be tested while the internal lock is held.
@@ -87,6 +94,21 @@ where
             Err(e) => {
                 let node = box_pointer(Node::new(item));
                 unsafe { self.push_inner(pointers, node, node, 1) };
+                Err(e)
+            }
+        }
+    }
+
+    pub fn push_front_if_fail<C, R, E>(&self, item: T, condition: C) -> Result<R, E>
+    where
+        C: FnOnce() -> Result<R, E>
+    {
+        let pointers = self.pointers.lock();
+        match condition() {
+            Ok(value) => Ok(value),
+            Err(e) => {
+                let node = box_pointer(Node::new(item));
+                unsafe { self.push_front_inner(pointers, node, node) };
                 Err(e)
             }
         }
@@ -145,6 +167,21 @@ where
         pointers.tail = Some(tail);
 
         self.len.fetch_add(len, Ordering::Release);
+    }
+
+    unsafe fn push_front_inner(
+        &self,
+        mut pointers: MutexGuard<'_, Pointers<T>, F>,
+        head: NonNull<Node<T>>,
+        mut tail: NonNull<Node<T>>,
+    ) {
+        if let Some(head_pointer) = pointers.head {
+            // SAFETY: We hold exclusive access of the head.
+            unsafe { tail.as_mut().next = Some(head_pointer) };
+        }
+        pointers.head = Some(head);
+
+        self.len.fetch_add(1, Ordering::Release);
     }
 
     /// Pops a node from the front of the queue.

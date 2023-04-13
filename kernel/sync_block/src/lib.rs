@@ -43,7 +43,7 @@ impl Flavour for Block {
     }
 
     #[inline]
-    fn post_unlock(data: &Self::LockData) {
+    fn post_mutex_unlock(data: &Self::LockData) {
         data.notify_one();
     }
 }

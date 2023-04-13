@@ -10,12 +10,13 @@
 #![no_std]
 
 pub mod mutex;
+pub mod rw_lock;
 
 pub use mutex::{Mutex, MutexGuard};
+pub use rw_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 /// A synchronisation flavour.
 pub trait Flavour {
-    /// Initial value for the lock data.
     const INIT: Self::LockData;
 
     /// Additional data stored in the lock.
@@ -41,9 +42,31 @@ pub trait Flavour {
         Self: Sized;
 
     /// Performs any necessary actions after unlocking the mutex.
-    fn post_unlock(mutex: &Self::LockData)
+    fn post_mutex_unlock(data: &Self::LockData)
     where
         Self: Sized;
+
+    fn try_read_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> Option<(rw_lock::spin::RwLockReadGuard<'a, T>, Self::Guard)>;
+
+    fn try_write_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> Option<(rw_lock::spin::RwLockWriteGuard<'a, T>, Self::Guard)>;
+
+    fn read_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> (rw_lock::spin::RwLockReadGuard<'a, T>, Self::Guard);
+
+    fn rite_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> (rw_lock::spin::RwLockWriteGuard<'a, T>, Self::Guard);
+
+    fn post_rw_lock_unlock(data: &Self::LockData, is_last_reader: bool);
 }
 
 /// A deadlock prevention method.
@@ -76,17 +99,13 @@ where
         mutex: &'a mutex::SpinMutex<T>,
         _: &'a Self::LockData,
     ) -> Option<(mutex::SpinMutexGuard<'a, T>, Self::Guard)> {
+        // FIXME: Use `is_locked_acquire`.
         if Self::EXPENSIVE && mutex.is_locked() {
             return None;
         }
 
         let deadlock_guard = Self::enter();
-
-        if let Some(guard) = mutex.try_lock() {
-            Some((guard, deadlock_guard))
-        } else {
-            None
-        }
+        mutex.try_lock().map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
@@ -108,5 +127,37 @@ where
     }
 
     #[inline]
-    fn post_unlock(_: &Self::LockData) {}
+    fn post_mutex_unlock(_: &Self::LockData) {}
+
+    #[inline]
+    fn try_read_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        _: &'a Self::LockData,
+    ) -> Option<(rw_lock::spin::RwLockReadGuard<'a, T>, Self::Guard)> {
+        // TODO: Fastpath?
+
+        let deadlock_guard = Self::enter();
+        rw_lock.try_read().map(|guard| (guard, deadlock_guard))
+    }
+
+    #[inline]
+    fn try_write_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        _: &'a Self::LockData,
+    ) -> Option<(rw_lock::spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
+        // TODO: Fastpath?
+
+        let deadlock_guard = Self::enter();
+        rw_lock.try_write().map(|guard| (guard, deadlock_guard))
+    }
+
+    #[inline]
+    fn read_rw_lock<'a, T>(
+        rw_lock: &'a rw_lock::spin::RwLock<T>,
+        _: &'a Self::LockData,
+    ) -> Option<(rw_lock::spin::RwLockReadGuard<'a, T>, Self::Guard)> {
+    }
+
+    #[inline]
+    fn post_rw_lock_unlock(_: &Self::LockData, _: bool) {}
 }

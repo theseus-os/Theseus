@@ -50,9 +50,7 @@ where
     /// Attempts to acquire this mutex.
     #[inline]
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T, F>> {
-        let (inner, guard) = F::try_lock_mutex(&self.inner, &self.data)?;
-
-        Some(MutexGuard {
+        F::try_lock_mutex(&self.inner, &self.data).map(|(inner, guard)| MutexGuard {
             inner: ManuallyDrop::new(inner),
             data: &self.data,
             _guard: guard,
@@ -139,7 +137,7 @@ where
     #[inline]
     fn drop(&mut self) {
         unsafe { ManuallyDrop::drop(&mut self.inner) };
-        F::post_unlock(self.data);
+        F::post_mutex_unlock(self.data);
     }
 }
 
@@ -234,7 +232,7 @@ where
 #[derive(Debug)]
 pub struct SpinMutexGuard<'a, T>
 where
-    T: ?Sized,
+    T: 'a + ?Sized,
 {
     lock: &'a AtomicBool,
     data: *mut T,

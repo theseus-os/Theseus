@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-mpmc_queue = { path = "../../libs/mpmc_queue" }
+mpmc_dequeue = { path = "../../libs/mpmc_dequeue" }
 cpu_local_preemption = { path = "../cpu_local_preemption" }
 scheduler = { path = "../scheduler" }
 sync = { path = "../../libs/sync" }

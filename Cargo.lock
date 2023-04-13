@@ -2195,7 +2195,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf78b1242a953be96e01b5f8ed8ffdfc8055c0a2b779899b3835e5d27a69dced"
 
 [[package]]
-name = "mpmc_queue"
+name = "mpmc_dequeue"
 version = "0.1.0"
 dependencies = [
  "sync",
@@ -4425,7 +4425,7 @@ name = "wait_queue"
 version = "0.1.0"
 dependencies = [
  "cpu_local_preemption",
- "mpmc_queue",
+ "mpmc_dequeue",
  "scheduler",
  "sync",
  "sync_spin",
