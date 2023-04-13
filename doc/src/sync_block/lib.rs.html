@@ -50,7 +50,7 @@
 </pre><pre class="rust"><code><span class="attr">#![feature(negative_impls)]
 #![no_std]
 
-</span><span class="kw">use </span>sync::{mutex, Flavour};
+</span><span class="kw">use </span>sync::{spin, Flavour};
 <span class="kw">use </span>wait_queue::WaitQueue;
 
 <span class="kw">pub type </span>Mutex&lt;T&gt; = sync::Mutex&lt;T, Block&gt;;
@@ -71,17 +71,17 @@
 
     <span class="attr">#[inline]
     </span><span class="kw">fn </span>try_lock_mutex&lt;<span class="lifetime">&#39;a</span>, T&gt;(
-        mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>mutex::SpinMutex&lt;T&gt;,
+        mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::Mutex&lt;T&gt;,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(mutex::SpinMutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt; {
         mutex.try_lock().map(|guard| (guard, ()))
     }
 
     <span class="attr">#[inline]
     </span><span class="kw">fn </span>lock_mutex&lt;<span class="lifetime">&#39;a</span>, T&gt;(
-        mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>mutex::SpinMutex&lt;T&gt;,
+        mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::Mutex&lt;T&gt;,
         data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; (mutex::SpinMutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard) {
+    ) -&gt; (spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard) {
         <span class="comment">// This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock_mutex(mutex, data) {
