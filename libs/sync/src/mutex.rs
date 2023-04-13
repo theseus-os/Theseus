@@ -11,7 +11,7 @@ where
     F: Flavour,
 {
     inner: spin::Mutex<T>,
-    data: F::LockData,
+    data: F::MutexData,
 }
 
 impl<T, F> Mutex<T, F>
@@ -23,7 +23,7 @@ where
     pub const fn new(value: T) -> Self {
         Self {
             inner: spin::Mutex::new(value),
-            data: F::INIT,
+            data: F::MUTEX_INIT,
         }
     }
 
@@ -102,7 +102,7 @@ where
     F: Flavour,
 {
     inner: ManuallyDrop<spin::MutexGuard<'a, T>>,
-    data: &'a F::LockData,
+    data: &'a F::MutexData,
     _guard: F::Guard,
 }
 

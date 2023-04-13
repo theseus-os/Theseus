@@ -1,12 +1,15 @@
 use crate::{spin, Flavour};
-use core::ops::{Deref, DerefMut};
+use core::{
+    mem::ManuallyDrop,
+    ops::{Deref, DerefMut},
+};
 
 pub struct RwLock<T, F>
 where
     F: Flavour,
 {
     inner: spin::RwLock<T>,
-    data: F::LockData,
+    data: F::RwLockData,
 }
 
 impl<T, F> RwLock<T, F>
@@ -17,7 +20,7 @@ where
     pub const fn new(value: T) -> Self {
         Self {
             inner: spin::RwLock::new(value),
-            data: F::INIT,
+            data: F::RW_LOCK_INIT,
         }
     }
 
@@ -44,7 +47,7 @@ where
     #[inline]
     pub fn try_read(&self) -> Option<RwLockReadGuard<'_, T, F>> {
         F::try_read_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockReadGuard {
-            inner,
+            inner: ManuallyDrop::new(inner),
             data: &self.data,
             _guard: guard,
         })
@@ -53,7 +56,7 @@ where
     #[inline]
     pub fn try_write(&self) -> Option<RwLockWriteGuard<'_, T, F>> {
         F::try_write_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockWriteGuard {
-            inner,
+            inner: ManuallyDrop::new(inner),
             data: &self.data,
             _guard: guard,
         })
@@ -73,8 +76,8 @@ pub struct RwLockReadGuard<'a, T, F>
 where
     F: Flavour,
 {
-    inner: spin::RwLockReadGuard<'a, T>,
-    data: &'a F::LockData,
+    inner: ManuallyDrop<spin::RwLockReadGuard<'a, T>>,
+    data: &'a F::RwLockData,
     _guard: F::Guard,
 }
 
@@ -90,12 +93,23 @@ where
     }
 }
 
+impl<'a, T, F> Drop for RwLockReadGuard<'a, T, F>
+where
+    F: Flavour,
+{
+    fn drop(&mut self) {
+        let reader_count = self.inner.lock().reader_count();
+        unsafe { ManuallyDrop::drop(&mut self.inner) };
+        F::post_rw_lock_unlock(self.data, true);
+    }
+}
+
 pub struct RwLockWriteGuard<'a, T, F>
 where
     F: Flavour,
 {
-    inner: spin::RwLockWriteGuard<'a, T>,
-    data: &'a F::LockData,
+    inner: ManuallyDrop<spin::RwLockWriteGuard<'a, T>>,
+    data: &'a F::RwLockData,
     _guard: F::Guard,
 }
 
@@ -118,5 +132,15 @@ where
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.inner.deref_mut()
+    }
+}
+
+impl<'a, T, F> Drop for RwLockWriteGuard<'a, T, F>
+where
+    F: Flavour,
+{
+    fn drop(&mut self) {
+        unsafe { ManuallyDrop::drop(&mut self.inner) };
+        F::post_rw_lock_unlock(self.data, true);
     }
 }
