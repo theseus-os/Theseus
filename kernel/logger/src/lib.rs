@@ -19,7 +19,7 @@ use log::{Record, Level, SetLoggerError, Metadata, Log};
 use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
 use irq_safety::MutexIrqSafe;
 use serial_port_basic::SerialPort;
-use alloc::{sync::Arc, vec::Vec};
+use alloc::{sync::Arc, vec::Vec, str::from_utf8};
 
 #[cfg(mirror_log_to_vga)]
 pub use mirror_log::set_log_mirror_function;
@@ -65,8 +65,79 @@ pub fn take_early_log_writers() -> [Option<SerialPort>; LOG_MAX_WRITERS] {
     list
 }
 
+/// A buffer for log messages
+struct LoggerBuffer<const SIZE: usize> {
+    array: [u8; SIZE],
+    length: usize,
+    truncated: bool,
+}
+
+impl<const SIZE: usize> LoggerBuffer<SIZE> {
+    /// Create a new empty buffer
+    pub const fn new() -> Self {
+        Self {
+            array: [0; SIZE],
+            length: 0,
+            truncated: false,
+        }
+    }
+
+    /// Reverts the length of this buffer to a previous, shorter value.
+    pub fn truncate(&mut self, length: usize) {
+        assert!(length <= self.length);
+        self.length = length;
+        self.truncated = true;
+    }
+
+    /// Try to flush the content to the current loggers.
+    ///
+    /// If no logger was available, the content is left untouched
+    /// If at least one logger was available, the content is reset
+    /// to an empty buffer.
+    pub fn try_flush(&mut self) -> Result<(), &'static str> {
+        let as_str = from_utf8(&self.array[..self.length])
+            .unwrap_or("[Invalid UTF8 in log message]");
+
+        DUMMY_LOGGER.try_write_fmt(format_args!("{}", as_str))?;
+        if self.truncated {
+            let msg = "[log output was truncated; try increasing BUFSIZE]";
+            DUMMY_LOGGER.try_write_fmt(format_args!("{}", msg))?;
+        }
+
+        self.length = 0;
+        self.truncated = false;
+
+        Ok(())
+    }
+}
+
+impl<const SIZE: usize> fmt::Write for LoggerBuffer<SIZE> {
+    /// Appends a string to the buffer.
+    ///
+    /// If one or more write fail, please truncate the buffer
+    /// to its last correct length using [`LoggerBuffer::truncate`].
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        if self.length + s.len() > SIZE {
+            Err(fmt::Error)
+        } else {
+            self.array[self.length..][..s.len()].copy_from_slice(s.as_bytes());
+            self.length += s.len();
+            Ok(())
+        }
+    }
+}
+
+// On x86_64, there should always be at least one logger available.
+#[cfg(target_arch = "x86_64")]
+const LOGGER_BUF_SIZE: usize = 0;
+
+#[cfg(target_arch = "aarch64")]
+const LOGGER_BUF_SIZE: usize = 16384;
+
 /// The static instance of the dummy logger, as required by the `log` crate.
-static DUMMY_LOGGER: DummyLogger = DummyLogger;
+static DUMMY_LOGGER: DummyLogger<LOGGER_BUF_SIZE> = DummyLogger {
+    buffer: MutexIrqSafe::new(LoggerBuffer::new())
+};
 
 /// An empty logger struct used to satisfy the requirements of the `log` crate.
 ///
@@ -75,31 +146,65 @@ static DUMMY_LOGGER: DummyLogger = DummyLogger;
 /// To get around that limitation, we store the actual logger states
 /// **outside** of the logger struct, such that we can modify them later 
 /// after the `log` crate has already been initialized.
-struct DummyLogger;
+struct DummyLogger<const BUFSIZE: usize> {
+    buffer: MutexIrqSafe<LoggerBuffer<BUFSIZE>>,
+}
 
-impl DummyLogger {
+impl<const BUFSIZE: usize> DummyLogger<BUFSIZE> {
+    /// Faillible equivalent for [`DummyLogger::write_fmt`]
+    ///
+    /// This function writes to the real (fully-featured) [`LOGGER`] if it has been initialized;
+    /// otherwise, it falls back to writing to the [`EARLY_LOGGER`] instead.
+    /// If none of these is available, returns an error
+    fn try_write_fmt(&self, arguments: fmt::Arguments) -> Result<(), &'static str> {
+        let mut total_writers = 0;
+
+        if let Some(logger) = &*LOGGER.lock() {
+            for writer in logger.writers.iter() {
+                let _result = writer.deref().borrow().lock().write_fmt(arguments);
+                total_writers += 1;
+            }
+        } else {
+            for serial_port in EARLY_LOGGER.lock().0.iter_mut().flatten() {
+                let _result = serial_port.write_fmt(arguments);
+                total_writers += 1;
+            }
+        }
+
+        match total_writers {
+            0 => Err("No logger available"),
+            _ => Ok(()),
+        }
+    }
+
     /// A re-implementation of [`core::fmt::Write::write_fmt()`]
     /// that doesn't require `&mut self`.
     ///
     /// This function writes to the real (fully-featured) [`LOGGER`] if it has been initialized;
     /// otherwise, it falls back to writing to the [`EARLY_LOGGER`] instead.
+    /// If none of these is available, the message is written to the internal buffer.
     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
-        if let Some(logger) = &*LOGGER.lock() {
-            for writer in logger.writers.iter() {
-                let _result = writer.deref().borrow().lock().write_fmt(arguments);
-            }
-        } else {
-            for serial_port in EARLY_LOGGER.lock().0.iter_mut().flatten() {
-                let _result = serial_port.write_fmt(arguments);
+        if let Err(_) = self.try_write_fmt(arguments) {
+            let mut buffer = self.buffer.lock();
+            let length_backup = buffer.length;
+            if let Err(_) = buffer.write_fmt(arguments) {
+                buffer.truncate(length_backup);
             }
         }
+
         // If there was an error above, there's literally nothing we can do but ignore it,
         // because there is no other lower-level way to log errors than this logger.
         Ok(())
     }
 }
 
-impl Log for DummyLogger {
+/// Calls `try_flush` on the buffer of `DUMMY_LOGGER`.
+fn try_flush_buffered_messages() -> Result<(), &'static str> {
+    let mut buffer = DUMMY_LOGGER.buffer.lock();
+    buffer.try_flush()
+}
+
+impl<const BUFSIZE: usize> Log for DummyLogger<BUFSIZE> {
     #[inline(always)]
     fn enabled(&self, metadata: &Metadata) -> bool {
         metadata.level() <= log::max_level()
@@ -174,8 +279,10 @@ pub fn early_init(
     }
 
     // Once the early logger has been initialized, tell the `log` crate to use our dummy logger instance.
-    log::set_logger(&DUMMY_LOGGER)?;
+    let _ = log::set_logger(&DUMMY_LOGGER);
     set_log_level(log_level.unwrap_or(DEFAULT_LOG_LEVEL));
+    let _ = try_flush_buffered_messages();
+
     Ok(())
 }
 
