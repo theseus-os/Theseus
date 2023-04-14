@@ -265,7 +265,7 @@ pub fn get_vga_mem_addr(
 
 /// Flushes the specific virtual address in TLB. 
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
-    tlb::flush(x86_64::VirtAddr::new(vaddr.value() as u64));
+    tlb::flush(x86_64::VirtAddr::new_truncate(vaddr.value() as u64));
 }
 
 /// Flushes the whole TLB. 

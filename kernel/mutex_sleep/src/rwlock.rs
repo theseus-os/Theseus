@@ -6,7 +6,6 @@ use core::ops::{Deref, DerefMut};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use wait_queue::WaitQueue;
 use lockable::{Lockable, LockableSized};
-use sync_spin::Spin;
 
 /// A multi-reader, single-writer mutual exclusion wrapper that puts a `Task` to sleep
 /// while waiting for the lock to become available. 
@@ -17,7 +16,7 @@ use sync_spin::Spin;
 /// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
 /// will be notified (woken up) so they can attempt to acquire the lock again.
 pub struct RwLockSleep<T: ?Sized> {
-    queue: WaitQueue<Spin>,
+    queue: WaitQueue,
     rwlock: RwLock<T>,
 }
 
@@ -28,7 +27,7 @@ pub struct RwLockSleep<T: ?Sized> {
 /// which then notifies any `Task`s waiting on the lock.
 pub struct RwLockSleepReadGuard<'a, T: ?Sized + 'a> {
     guard: RwLockReadGuard<'a, T>,
-    queue: &'a WaitQueue<Spin>,
+    queue: &'a WaitQueue,
 }
 
 /// A guard that allows the locked data to be mutably accessed,
@@ -38,7 +37,7 @@ pub struct RwLockSleepReadGuard<'a, T: ?Sized + 'a> {
 /// which then notifies any `Task`s waiting on the lock.
 pub struct RwLockSleepWriteGuard<'a, T: ?Sized + 'a> {
     guard: RwLockWriteGuard<'a, T>,
-    queue: &'a WaitQueue<Spin>,
+    queue: &'a WaitQueue,
 }
 
 // Same unsafe impls as `std::sync::RwLock`

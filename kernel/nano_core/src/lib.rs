@@ -95,7 +95,7 @@ where
         let logger_ports = [
             serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
         ];
-        logger_x86_64::early_init(
+        logger::early_init(
             None,
             IntoIterator::into_iter(logger_ports).flatten(),
         ).unwrap_or_else(|_e|
@@ -129,9 +129,19 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
+    // On aarch64, take_serial_port allocates; memory mgmt must be initialized first.
     #[cfg(target_arch = "aarch64")] {
-        logger_aarch64::init()?;
-        log::info!("Initialized logger_aarch64");
+        let logger_ports = [
+            serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
+        ];
+        logger::early_init(
+            None,
+            IntoIterator::into_iter(logger_ports).flatten(),
+        ).unwrap_or_else(|_e|
+            println!("Failed to initialize early logger; proceeding with init. Error: {:?}", _e)
+        );
+        println!("nano_core(): initialized early logger.");
+        log::info!("initialized early logger");
     }
 
     println!("nano_core(): initialized memory subsystem.");

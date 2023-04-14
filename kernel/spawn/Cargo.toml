@@ -18,6 +18,7 @@ debugit = { path = "../../libs/debugit" }
 memory = { path = "../memory" }
 stack = { path = "../stack" }
 cpu = { path = "../cpu" }
+cpu_local_preemption = { path = "../cpu_local_preemption" }
 task = { path = "../task" }
 runqueue = { path = "../runqueue" }
 scheduler = { path = "../scheduler" }
@@ -26,7 +27,6 @@ context_switch = { path = "../context_switch" }
 path = { path = "../path" }
 fs_node = { path = "../fs_node" }
 thread_local_macro = { path = "../thread_local_macro" }
-preemption = { path = "../preemption" }
 no_drop = { path = "../no_drop" }
 early_tls = { path = "../early_tls" }
 

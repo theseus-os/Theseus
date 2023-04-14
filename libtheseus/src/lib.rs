@@ -11,7 +11,7 @@ extern crate heap;
 
 #[macro_use] extern crate alloc;
 // #[macro_use] extern crate terminal_print;
-extern crate logger_x86_64 as logger;
+extern crate logger;
 
 use alloc::vec::Vec;
 use alloc::string::String;

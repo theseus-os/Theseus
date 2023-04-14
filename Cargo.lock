@@ -135,7 +135,7 @@ dependencies = [
  "core2",
  "hashbrown",
  "lazy_static",
- "logger_x86_64",
+ "logger",
  "mutex_sleep",
  "stdio",
  "task",
@@ -381,7 +381,7 @@ dependencies = [
  "irq_safety",
  "kernel_config",
  "log",
- "logger_x86_64",
+ "logger",
  "memory",
  "mod_mgmt",
  "multicore_bringup",
@@ -651,15 +651,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu_local"
+name = "cpu_local_preemption"
 version = "0.1.0"
 dependencies = [
- "crossbeam-utils",
+ "apic",
+ "cortex-a",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
- "preemption",
+ "no_drop",
  "spin 0.9.4",
+ "tock-registers",
  "x86_64",
 ]
 
@@ -910,7 +913,7 @@ dependencies = [
  "ixgbe",
  "keyboard",
  "log",
- "logger_x86_64",
+ "logger",
  "memory",
  "mlx5",
  "mouse",
@@ -1877,18 +1880,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "logger_aarch64"
-version = "0.1.0"
-dependencies = [
- "irq_safety",
- "log",
- "memory",
- "pl011_qemu",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "logger_x86_64"
+name = "logger"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
@@ -2293,8 +2285,8 @@ dependencies = [
 name = "mutex_preemption"
 version = "0.1.0"
 dependencies = [
+ "cpu_local_preemption",
  "lockable",
- "preemption",
  "spin 0.9.4",
 ]
 
@@ -2305,7 +2297,6 @@ dependencies = [
  "lockable",
  "log",
  "spin 0.9.4",
- "sync_spin",
  "task",
  "wait_queue",
 ]
@@ -2324,8 +2315,7 @@ dependencies = [
  "kernel_config",
  "libm",
  "log",
- "logger_aarch64",
- "logger_x86_64",
+ "logger",
  "memory",
  "memory_initialization",
  "mod_mgmt",
@@ -2657,10 +2647,10 @@ name = "per_cpu"
 version = "0.1.0"
 dependencies = [
  "cpu",
- "cpu_local",
+ "cpu_local_preemption",
  "log",
  "memoffset 0.8.0",
- "preemption",
+ "no_drop",
  "task",
 ]
 
@@ -2809,15 +2799,6 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
-
-[[package]]
-name = "preemption"
-version = "0.1.0"
-dependencies = [
- "apic",
- "cpu",
- "log",
-]
 
 [[package]]
 name = "print_fault_log"
@@ -3244,9 +3225,9 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cpu",
+ "cpu_local_preemption",
  "interrupts",
  "log",
- "preemption",
  "scheduler_priority",
  "scheduler_realtime",
  "scheduler_round_robin",
@@ -3388,7 +3369,10 @@ dependencies = [
 name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
+ "arm_boards",
  "irq_safety",
+ "memory",
+ "pl011_qemu",
  "port_io",
  "spin 0.9.4",
 ]
@@ -3561,6 +3545,7 @@ dependencies = [
  "catch_unwind",
  "context_switch",
  "cpu",
+ "cpu_local_preemption",
  "debugit",
  "early_tls",
  "fault_crate_swap",
@@ -3573,7 +3558,6 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "preemption",
  "runqueue",
  "scheduler",
  "spin 0.9.4",
@@ -3596,6 +3580,11 @@ checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spin"
+version = "0.9.8"
+source = "git+https://github.com/mvdnes/spin-rs#1f2e06c9f9d22b234776849c65e313f583ddfade"
 
 [[package]]
 name = "stable_deref_trait"
@@ -3750,13 +3739,15 @@ dependencies = [
 [[package]]
 name = "sync"
 version = "0.1.0"
+dependencies = [
+ "spin 0.9.8",
+]
 
 [[package]]
 name = "sync_block"
 version = "0.1.0"
 dependencies = [
  "sync",
- "sync_spin",
  "wait_queue",
 ]
 
@@ -3764,7 +3755,7 @@ dependencies = [
 name = "sync_preemption"
 version = "0.1.0"
 dependencies = [
- "preemption",
+ "cpu_local_preemption",
  "sync",
 ]
 
@@ -3798,7 +3789,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
- "cpu_local",
+ "cpu_local_preemption",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3806,7 +3797,6 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "no_drop",
- "preemption",
  "spin 0.9.4",
  "stack",
  "static_assertions",
@@ -3840,7 +3830,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "preemption",
  "spin 0.9.4",
  "stack",
 ]
@@ -4485,8 +4474,8 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
+ "cpu_local_preemption",
  "mpmc_queue",
- "preemption",
  "scheduler",
  "sync",
  "sync_spin",
@@ -4506,7 +4495,7 @@ dependencies = [
 name = "waker_generic"
 version = "0.1.0"
 dependencies = [
- "preemption",
+ "cpu_local_preemption",
  "spin 0.9.4",
 ]
 

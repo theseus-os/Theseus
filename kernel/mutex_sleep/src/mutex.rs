@@ -3,7 +3,6 @@ use core::ops::{Deref, DerefMut};
 use spin::{Mutex, MutexGuard};
 use wait_queue::WaitQueue;
 use lockable::{Lockable, LockableSized};
-use sync_spin::Spin;
 
 /// A mutual exclusion wrapper that puts a `Task` to sleep while waiting for the lock to become available. 
 /// 
@@ -11,7 +10,7 @@ use sync_spin::Spin;
 /// Once the lock becomes available, `Task`s that are sleeping while waiting for the lock
 /// will be notified (woken up) so they can attempt to acquire the lock again.
 pub struct MutexSleep<T: ?Sized> {
-    queue: WaitQueue<Spin>,
+    queue: WaitQueue,
     lock: Mutex<T>,
 }
 
@@ -21,7 +20,7 @@ pub struct MutexSleep<T: ?Sized> {
 /// which then notifies any `Task`s waiting on the lock.
 pub struct MutexSleepGuard<'a, T: ?Sized + 'a> {
     guard: MutexGuard<'a, T>,
-    queue: &'a WaitQueue<Spin>,
+    queue: &'a WaitQueue,
 }
 
 // Same unsafe impls as `std::sync::Mutex`

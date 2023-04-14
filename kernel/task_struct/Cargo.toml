@@ -17,5 +17,4 @@ environment = { path = "../environment" }
 kernel_config = { path = "../kernel_config" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
-preemption = { path = "../preemption" }
 stack = { path = "../stack" }

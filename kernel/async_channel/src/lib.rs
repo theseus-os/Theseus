@@ -6,8 +6,8 @@
 //! 
 //! Only `Send` types can be sent or received through the channel.
 //! 
-//! This is not a zero-copy channel; 
-//! to avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! This is not a zero-copy channel; to avoid copying large messages,
+//! use a reference type like `Box` or another layer of indirection.
 
 #![no_std]
 
@@ -41,13 +41,25 @@ use sync_spin::Spin;
 /// Depending on whether a non-blocking or blocking send function is invoked,
 /// future attempts to send another message will either block or return a `Full` error 
 /// until the channel's buffer is drained by a receiver and space in the buffer becomes available.
-/// 
+///
+/// For the vast majority of use cases, this function is recommended way to create
+/// a new channel, because there is no need to specify a deadlock prevention method.
+/// To create a channel with different deadlock prevention, see [`new_channel_with()`].
+pub fn new_channel<T: Send>(minimum_capacity: usize) -> (Sender<T>, Receiver<T>) {
+    new_channel_with(minimum_capacity)
+}
+
+/// Creates a new asynchronous channel with the specified deadlock prevention method.
+///
+/// See [`new_channel()`] for more details.
+///
 /// The asynchronous channel uses a wait queue internally and hence exposes a
-/// deadlock prevention type parameter. By default it is set to [`Spin`]. See
-/// [`WaitQueue`]'s documentation for more information on when to change this
-/// type parameter.
-pub fn new_channel<T: Send, P: DeadlockPrevention>(minimum_capacity: usize) -> (Sender<T, P>, Receiver<T, P>) {
-    let channel = Arc::new(Channel::<T, P> {
+/// deadlock prevention type parameter `P` that is [`Spin`] by default.
+/// See [`WaitQueue`]'s documentation for more info on setting this type parameter.
+pub fn new_channel_with<T: Send, P: DeadlockPrevention>(
+    minimum_capacity: usize,
+) -> (Sender<T, P>, Receiver<T, P>) {
+    let channel = Arc::new(Channel {
         queue: MpmcQueue::with_capacity(minimum_capacity),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
@@ -56,8 +68,8 @@ pub fn new_channel<T: Send, P: DeadlockPrevention>(minimum_capacity: usize) -> (
         receiver_count: AtomicUsize::new(1),
     });
     (
-        Sender   { channel: channel.clone() },
-        Receiver { channel }
+        Sender { channel: channel.clone() },
+        Receiver { channel },
     )
 }
 
@@ -102,7 +114,7 @@ impl From<Error> for core2::io::Error {
 /// 
 /// This channel object is not Send/Sync or cloneable itself;
 /// it can be shared across tasks using an `Arc`.
-struct Channel<T: Send, P: DeadlockPrevention> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     queue: MpmcQueue<T>,
     waiting_senders: WaitQueue<P>,
     waiting_receivers: WaitQueue<P>,
@@ -216,10 +228,10 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
             });
 
             if self.channel.is_disconnected() {
-                 // trace!("Receiver Endpoint is dropped");
-                 // Here the receiver end has dropped. 
-                 // So we don't wait anymore in the waitqueue
-                 Some(Err(Error::ChannelDisconnected))
+                // trace!("Receiver Endpoint is dropped");
+                // Here the receiver end has dropped. 
+                // So we don't wait anymore in the waitqueue
+                Some(Err(Error::ChannelDisconnected))
             } else {
                 result
             }

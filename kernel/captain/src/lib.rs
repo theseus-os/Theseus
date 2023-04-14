@@ -81,7 +81,7 @@ pub fn init(
 ) -> Result<(), &'static str> {
     #[cfg(all(mirror_log_to_vga, target_arch = "x86_64"))] {
         // Enable early mirroring of logger output to VGA buffer (for real hardware)
-        logger_x86_64::set_log_mirror_function(mirror_log_callbacks::mirror_to_early_vga);
+        logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_early_vga);
     }
 
     // calculate TSC period and initialize it
@@ -121,7 +121,6 @@ pub fn init(
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
-    #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     per_cpu::init(bsp_id)?;
     #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     cls::init(bsp_id).unwrap();
@@ -153,7 +152,7 @@ pub fn init(
         // Currently, handling the AP cores also siwtches the graphics mode
         // (from text mode VGA to a graphical framebuffer).
         // Thus, we can now use enable the function that mirrors logger output to the terminal.
-        logger_x86_64::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
+        logger::set_log_mirror_function(mirror_log_callbacks::mirror_to_terminal);
     }
 
     // Now that other CPUs are fully booted, init TLB shootdowns,

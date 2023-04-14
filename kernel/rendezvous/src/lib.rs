@@ -7,8 +7,8 @@
 //! 
 //! Only `Send` types can be sent or received through the channel.
 //! 
-//! This is not a zero-copy channel; 
-//! To avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! This is not a zero-copy channel; to avoid copying large messages,
+//! use a reference type like `Box` or another layer of indirection.
 //! 
 //! TODO: add support for a queue of pending senders and receivers 
 //!       so that we can enable MPMC (multi-producer multi-consumer) behavior
@@ -132,16 +132,24 @@ impl<T> fmt::Debug for ExchangeState<T> {
 // }
 
 
-/// Create a new channel that requires the sender and receiver to rendezvous
-/// when exchanging a message.
+/// Creates a new rendezvous channel with the default deadlock prevention method.
+///
+/// For the vast majority of use cases, this function is recommended way to create
+/// a new channel, because there is no need to specify a deadlock prevention method.
+/// To create a channel with different deadlock prevention, see [`new_channel_with()`].
+pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
+    new_channel_with()
+}
+
+/// Creates a new rendezvous channel with the specified deadlock prevention method.
+///
+/// See [`new_channel()`] for more details.
 ///
 /// The rendezvous channel uses a wait queue internally and hence exposes a
-/// deadlock prevention type parameter. By default it is set to [`Spin`]. See
-/// [`WaitQueue`]'s documentation for more information on when to change this
-/// type parameter.
-#[allow(invalid_type_param_default)]
-pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Receiver<T, P>) {
-    let channel = Arc::new(Channel::<T, P> {
+/// deadlock prevention type parameter `P` that is [`Spin`] by default.
+/// See [`WaitQueue`]'s documentation for more info on setting this type parameter.
+pub fn new_channel_with<T: Send, P: DeadlockPrevention>() -> (Sender<T, P>, Receiver<T, P>) {
+    let channel = Arc::new(Channel {
         slot: ExchangeSlot::new(),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
@@ -152,8 +160,6 @@ pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Re
     )
 }
 
-
-
 /// The inner channel for synchronous rendezvous-based communication
 /// between `Sender`s and `Receiver`s. 
 ///
@@ -163,7 +169,7 @@ pub fn new_channel<T: Send, P: DeadlockPrevention = Spin>() -> (Sender<T, P>, Re
 /// Sender-side and Receiver-side references to an exchange slot can be obtained in both 
 /// a blocking and non-blocking fashion, 
 /// which supports both synchronous (rendezvous-based) and asynchronous channels.
-struct Channel<T: Send, P: DeadlockPrevention> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     /// In a zero-capacity synchronous channel, there is only a single slot,
     /// but senders and receivers perform a blocking wait on it until the slot becomes available.
     /// In contrast, a synchronous channel with a capacity of 1 would return a "channel full" error

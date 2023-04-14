@@ -16,7 +16,7 @@ use memory_structs::PhysicalAddress;
 #[derive(Debug, Copy, Clone)]
 pub struct GicV3InterruptControllerConfig {
     pub distributor_base_address: PhysicalAddress,
-    pub redistributor_base_addresses: [PhysicalAddress; board::NUM_CPUS],
+    pub redistributor_base_addresses: [PhysicalAddress; NUM_CPUS],
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -33,8 +33,9 @@ pub enum SecondaryCoresStartup {
 
 #[derive(Debug, Clone)]
 pub struct BoardConfig {
-    pub cpu_ids: [mpidr::DefinedMpidrValue; board::NUM_CPUS],
+    pub cpu_ids: [mpidr::DefinedMpidrValue; NUM_CPUS],
     pub interrupt_controller: InterruptControllerConfig,
+    pub pl011_base_addresses: [PhysicalAddress; NUM_PL011_UARTS],
 }
 
 // by default & on x86_64, the default.rs file is used
@@ -46,7 +47,7 @@ mod board;
 
 pub mod mpidr;
 
-pub use board::{NUM_CPUS, BOARD_CONFIG};
+pub use board::{NUM_CPUS, NUM_PL011_UARTS, BOARD_CONFIG};
 
 
 } // end of cfg(target_arch = "aarch64")
