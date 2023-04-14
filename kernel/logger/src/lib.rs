@@ -98,10 +98,10 @@ impl<const SIZE: usize> LoggerBuffer<SIZE> {
         let as_str = from_utf8(&self.array[..self.length])
             .unwrap_or("[Invalid UTF8 in log message]\r\n");
 
-        DUMMY_LOGGER.try_write_fmt(format_args!("{}", as_str))?;
+        DUMMY_LOGGER.try_write_fmt(format_args!("{as_str}"))?;
         if self.truncated {
             let msg = "[log output was truncated; try increasing BUFSIZE]\r\n";
-            DUMMY_LOGGER.try_write_fmt(format_args!("{}", msg))?;
+            DUMMY_LOGGER.try_write_fmt(format_args!("{msg}"))?;
         }
 
         self.length = 0;
@@ -184,10 +184,10 @@ impl<const BUFSIZE: usize> DummyLogger<BUFSIZE> {
     /// otherwise, it falls back to writing to the [`EARLY_LOGGER`] instead.
     /// If none of these is available, the message is written to the internal buffer.
     fn write_fmt(&self, arguments: fmt::Arguments) -> fmt::Result {
-        if let Err(_) = self.try_write_fmt(arguments) {
+        if self.try_write_fmt(arguments).is_err() {
             let mut buffer = self.buffer.lock();
             let length_backup = buffer.length;
-            if let Err(_) = buffer.write_fmt(arguments) {
+            if buffer.write_fmt(arguments).is_err() {
                 buffer.truncate(length_backup);
             }
         }
