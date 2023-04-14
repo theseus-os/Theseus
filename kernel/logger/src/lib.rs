@@ -96,11 +96,11 @@ impl<const SIZE: usize> LoggerBuffer<SIZE> {
     /// to an empty buffer.
     pub fn try_flush(&mut self) -> Result<(), &'static str> {
         let as_str = from_utf8(&self.array[..self.length])
-            .unwrap_or("[Invalid UTF8 in log message]");
+            .unwrap_or("[Invalid UTF8 in log message]\r\n");
 
         DUMMY_LOGGER.try_write_fmt(format_args!("{}", as_str))?;
         if self.truncated {
-            let msg = "[log output was truncated; try increasing BUFSIZE]";
+            let msg = "[log output was truncated; try increasing BUFSIZE]\r\n";
             DUMMY_LOGGER.try_write_fmt(format_args!("{}", msg))?;
         }
 
