@@ -119,6 +119,35 @@ pub fn init<F, R, P>(
 
     let mut changed = true;
     while changed {
+        let mut temp_free_list: [Option<Chunk>; 32] = Default::default();
+        changed = false;
+
+        let mut temp_free_list_idx = 0;
+        for i in 0..temp_free_list.len() {
+            if let Some(mut current) = free_list[i].clone() {
+                for maybe_other in &mut free_list[i + 1..] {
+                    if let Some(other) = maybe_other {
+                        if current.overlap(other).is_some() {
+                            current.frames = FrameRange::new(
+                                min(*current.start(), *other.start()),
+                                max(*current.end(), *other.end()),
+                            );
+
+                            changed = true;
+                            *maybe_other = None;
+                        }
+                    }
+                }
+                temp_free_list[temp_free_list_idx] = Some(current);
+                temp_free_list_idx += 1;
+            }
+        }
+
+        free_list = temp_free_list;
+    }
+
+    let mut changed = true;
+    while changed {
         let mut temp_reserved_list: [Option<Chunk>; 32] = Default::default();
         changed = false;
 
@@ -146,6 +175,8 @@ pub fn init<F, R, P>(
         reserved_list = temp_reserved_list;
     }
 
+    debug!("{:?}", reserved_list);
+    debug!("{:?}", free_list);
 
     // Finally, one last sanity check -- ensure no two regions overlap. 
     let all_areas = free_list[..free_list_idx].iter().flatten()

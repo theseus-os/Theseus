@@ -1,4 +1,4 @@
-%include "defines.asm"
+%include "/home/ramla/Theseus/kernel/nano_core/src/asm/defines.asm"
 
 %ifdef BIOS
 ABSOLUTE 0x5000

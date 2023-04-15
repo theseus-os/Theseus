@@ -1,4 +1,4 @@
-%include "defines.asm"
+%include "/home/ramla/Theseus/kernel/nano_core/src/asm/defines.asm"
 
 section .init.text32ap progbits alloc exec nowrite
 bits 32 ;We are still in protected mode

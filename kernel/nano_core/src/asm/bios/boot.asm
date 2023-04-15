@@ -7,7 +7,7 @@
 ; This file may not be copied, modified, or distributed
 ; except according to those terms.
 
-%include "defines.asm"
+%include "/home/ramla/Theseus/kernel/nano_core/src/asm/defines.asm"
 
 global _start
 
