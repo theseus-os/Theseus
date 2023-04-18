@@ -291,13 +291,121 @@
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
 <a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A basic logger implementation for system-wide logging in Theseus. 
 //!
-//! This enables Theseus crates to use the `log` crate&#39;s macros anywhere,
+//! This enables Theseus crates to use the [`log`] crate&#39;s macros anywhere,
 //! such as `error!()`, `warn!()`, `info!()`, `debug!()`, and `trace!()`.
 //!
 //! Currently, log statements are written to one or more **writers**, 
 //! which are objects that implement the [`core::fmt::Write`] trait.
+//!
+//! Early log messages (before memory management is initialized) are saved
+//! to a static fixed-sized buffer such that they are not lost and
+//! can be retrieved once logging sinks are ready to be used.
 
 </span><span class="attr">#![no_std]
 #![feature(trait_alias)]
@@ -308,7 +416,7 @@
 <span class="kw">extern crate </span>irq_safety;
 <span class="kw">extern crate </span>serial_port_basic;
 
-<span class="kw">use </span>log::{Record, Level, SetLoggerError, Metadata, Log};
+<span class="kw">use </span>log::{Record, Level, Metadata, Log};
 <span class="kw">use </span>core::{borrow::Borrow, fmt::{<span class="self">self</span>, Write}, ops::Deref};
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>serial_port_basic::SerialPort;
@@ -323,10 +431,11 @@
 <span class="doccomment">/// The maximum number of output streams that a logger can write to.
 </span><span class="kw">pub const </span>LOG_MAX_WRITERS: usize = <span class="number">2</span>;
 
+<span class="comment">// The size of the buffer used to save early log messages.
+</span><span class="kw">pub const </span>EARLY_LOG_BUFFER_SIZE: usize = <span class="number">16 </span>* <span class="number">1024</span>;
+
 <span class="doccomment">/// The early logger used before dynamic heap allocation is available.
-</span><span class="kw">static </span>EARLY_LOGGER: MutexIrqSafe&lt;EarlyLogger&lt;LOG_MAX_WRITERS&gt;&gt; = MutexIrqSafe::new(
-    EarlyLogger([<span class="prelude-val">None</span>, <span class="prelude-val">None</span>])
-);
+</span><span class="kw">static </span>EARLY_LOGGER: MutexIrqSafe&lt;EarlyLogger&gt; = MutexIrqSafe::new(EarlyLogger::new());
 
 <span class="doccomment">/// The real logger instance where log states are kept.
 ///
@@ -337,10 +446,61 @@
 
 <span class="doccomment">/// An early logger that can only write to a fixed number of [`SerialPort`]s,
 /// intended for basic use before dynamic heap allocation is available.
-</span><span class="kw">struct </span>EarlyLogger&lt;<span class="kw">const </span>N: usize&gt;([<span class="prelude-ty">Option</span>&lt;SerialPort&gt;; N]);
+</span><span class="kw">struct </span>EarlyLogger {
+    loggers: [<span class="prelude-ty">Option</span>&lt;SerialPort&gt;; LOG_MAX_WRITERS],
+    buffer: EarlyLogBuffer&lt;EARLY_LOG_BUFFER_SIZE&gt;,
+}
+<span class="kw">impl </span>EarlyLogger {
+    <span class="kw">const fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            loggers: [<span class="prelude-val">None</span>, <span class="prelude-val">None</span>],
+            buffer: EarlyLogBuffer::new(),
+        }
+    }
+
+    <span class="doccomment">/// Initializes this early logger with the given serial port writers.
+    ///
+    /// Flushes the early log buffer to the newly-added serial ports, if any.
+    </span><span class="kw">fn </span>init(<span class="kw-2">&amp;mut </span><span class="self">self</span>, serial_ports: <span class="kw">impl </span>IntoIterator&lt;Item = SerialPort&gt;) {
+        <span class="kw">let </span><span class="kw-2">mut </span>added_new_loggers = <span class="bool-val">false</span>;
+        <span class="kw">for </span>(<span class="kw-2">mut </span>sp, logger_writer) <span class="kw">in </span>serial_ports.into_iter().take(LOG_MAX_WRITERS).zip(<span class="kw-2">&amp;mut </span><span class="self">self</span>.loggers) {
+            sp.out_bytes(<span class="self">self</span>.buffer.get_buf());
+            <span class="kw-2">*</span>logger_writer = <span class="prelude-val">Some</span>(sp);
+            added_new_loggers = <span class="bool-val">true</span>;
+        }
+
+        <span class="kw">if </span><span class="self">self</span>.buffer.truncated {
+            <span class="kw">let _ </span>= <span class="macro">write!</span>(
+                <span class="self">self</span>,
+                <span class="string">&quot;\n\n{} \
+                ---- (early log was truncated; try increasing logger::EARLY_LOG_BUFFER_SIZE) ----\
+                \n{}&quot;</span>,
+                LogColor::Yellow.as_terminal_string(),
+                LogColor::Reset.as_terminal_string(),
+            );
+        }
+
+        <span class="kw">if </span>added_new_loggers {
+            <span class="self">self</span>.buffer.truncate(<span class="number">0</span>);
+        }
+    }
+}
+<span class="kw">impl </span>fmt::Write <span class="kw">for </span>EarlyLogger {
+    <span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
+        <span class="kw">let </span><span class="kw-2">mut </span>written = <span class="bool-val">false</span>;
+        <span class="kw">for </span>serial_port <span class="kw">in </span><span class="self">self</span>.loggers.iter_mut().flatten() {
+            <span class="kw">let _ </span>= serial_port.write_str(s);
+            written = <span class="bool-val">true</span>;
+        }
+        <span class="kw">if </span>!written {
+            <span class="kw">let _ </span>= <span class="self">self</span>.buffer.write_str(s);
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+}
 
 <span class="doccomment">/// The fully-featured logger that can be dynamically initialized with arbitrary output streams.
-/// 
+///
 /// This is the &quot;backend&quot; for the `log` crate that allows Theseus to use its `log!()` macros.
 </span><span class="kw">struct </span>Logger {
     writers: Vec&lt;Arc&lt;MutexIrqSafe&lt;<span class="kw">dyn </span>Write + Send&gt;&gt;&gt;,
@@ -352,11 +512,65 @@
 /// such that they can switch to initializing the full logger.
 </span><span class="kw">pub fn </span>take_early_log_writers() -&gt; [<span class="prelude-ty">Option</span>&lt;SerialPort&gt;; LOG_MAX_WRITERS] {
     <span class="kw">let </span><span class="kw-2">mut </span>list = [<span class="prelude-val">None</span>, <span class="prelude-val">None</span>];
-    <span class="kw">for </span>(opt, ret) <span class="kw">in </span>EARLY_LOGGER.lock().<span class="number">0</span>.iter_mut().zip(<span class="kw-2">&amp;mut </span>list) {
+    <span class="kw">for </span>(opt, ret) <span class="kw">in </span>EARLY_LOGGER.lock().loggers.iter_mut().zip(<span class="kw-2">&amp;mut </span>list) {
         <span class="kw-2">*</span>ret = opt.take();
     }
     list
 }
+
+<span class="doccomment">/// A statically-sized buffer for storing early log messages
+/// before memory management is initialized.
+</span><span class="kw">struct </span>EarlyLogBuffer&lt;<span class="kw">const </span>SIZE: usize&gt; {
+    array: [u8; SIZE],
+    length: usize,
+    truncated: bool,
+}
+
+<span class="kw">impl</span>&lt;<span class="kw">const </span>SIZE: usize&gt; EarlyLogBuffer&lt;SIZE&gt; {
+    <span class="kw">const fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            array: [<span class="number">0</span>; SIZE],
+            length: <span class="number">0</span>,
+            truncated: <span class="bool-val">false</span>,
+        }
+    }
+
+    <span class="doccomment">/// Shortens this buffer to the given new `length` in bytes.
+    ///
+    /// If the new `length` exceeds the current buffer length, this does nothing.
+    </span><span class="kw">pub fn </span>truncate(<span class="kw-2">&amp;mut </span><span class="self">self</span>, length: usize) {
+        <span class="kw">if </span>length &lt;= <span class="self">self</span>.length {
+            <span class="self">self</span>.length = length;
+            <span class="self">self</span>.truncated = <span class="bool-val">true</span>;
+        }
+    }
+
+    <span class="kw">fn </span>get_buf(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>[u8] {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.array[<span class="number">0</span>..<span class="self">self</span>.length]
+    }
+}
+
+<span class="kw">impl</span>&lt;<span class="kw">const </span>SIZE: usize&gt; fmt::Write <span class="kw">for </span>EarlyLogBuffer&lt;SIZE&gt; {
+    <span class="doccomment">/// Appends the given string to the buffer.
+    ///
+    /// Returns an error if there is insufficient space in the buffer.
+    ///
+    /// Upon a failed write, the caller can truncate the buffer
+    /// to its last correct length using [`EarlyLogBuffer::truncate()`].
+    </span><span class="kw">fn </span>write_str(<span class="kw-2">&amp;mut </span><span class="self">self</span>, s: <span class="kw-2">&amp;</span>str) -&gt; fmt::Result {
+        <span class="kw">let </span>new_length = <span class="self">self</span>.length + s.len();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(arr) = <span class="self">self</span>.array.get_mut(<span class="self">self</span>.length .. new_length) {
+            arr.copy_from_slice(s.as_bytes());
+            <span class="self">self</span>.length = new_length;
+            <span class="prelude-val">Ok</span>(())
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.length = SIZE;
+            <span class="self">self</span>.truncated = <span class="bool-val">true</span>;
+            <span class="prelude-val">Err</span>(fmt::Error)
+        }
+    }
+}
+
 
 <span class="doccomment">/// The static instance of the dummy logger, as required by the `log` crate.
 </span><span class="kw">static </span>DUMMY_LOGGER: DummyLogger = DummyLogger;
@@ -379,12 +593,10 @@
     </span><span class="kw">fn </span>write_fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, arguments: fmt::Arguments) -&gt; fmt::Result {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(logger) = <span class="kw-2">&amp;*</span>LOGGER.lock() {
             <span class="kw">for </span>writer <span class="kw">in </span>logger.writers.iter() {
-                <span class="kw">let </span>_result = writer.deref().borrow().lock().write_fmt(arguments);
+                <span class="kw">let _ </span>= writer.deref().borrow().lock().write_fmt(arguments);
             }
         } <span class="kw">else </span>{
-            <span class="kw">for </span>serial_port <span class="kw">in </span>EARLY_LOGGER.lock().<span class="number">0</span>.iter_mut().flatten() {
-                <span class="kw">let </span>_result = serial_port.write_fmt(arguments);
-            }
+            <span class="kw">let _ </span>= EARLY_LOGGER.lock().write_fmt(arguments);
         }
         <span class="comment">// If there was an error above, there&#39;s literally nothing we can do but ignore it,
         // because there is no other lower-level way to log errors than this logger.
@@ -444,7 +656,10 @@
 }
 
 
-<span class="doccomment">/// Initializes Theseus&#39;s early system logger, which only supports logging to basic serial ports.
+<span class="doccomment">/// Initializes Theseus&#39;s early system logger for use before memory management is set up.
+///
+/// The early logger can save log messages to a statically-sized buffer
+/// and can also write log messages to a list of basic serial ports.
 ///
 /// # Arguments
 /// * `log_level`: the log level that should be used.
@@ -457,19 +672,15 @@
 </span><span class="kw">pub fn </span>early_init(
     log_level: <span class="prelude-ty">Option</span>&lt;Level&gt;,
     serial_ports: <span class="kw">impl </span>IntoIterator&lt;Item = SerialPort&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), SetLoggerError&gt; {
-    <span class="comment">// Populate the fields of the early logger instance
-    </span>{
-        <span class="kw">let </span><span class="kw-2">mut </span>logger = EARLY_LOGGER.lock();
-        <span class="kw">for </span>(sp, logger_writer) <span class="kw">in </span>serial_ports.into_iter().take(LOG_MAX_WRITERS).zip(<span class="kw-2">&amp;mut </span>logger.<span class="number">0</span>) {
-            <span class="kw-2">*</span>logger_writer = <span class="prelude-val">Some</span>(sp);
-        }
-    }
+) {
+    <span class="comment">// Initialize the early logger. This can be called multiple times,
+    // and will flush the saved early log buffer to the new `serial_ports` each time.
+    </span>EARLY_LOGGER.lock().init(serial_ports);
 
-    <span class="comment">// Once the early logger has been initialized, tell the `log` crate to use our dummy logger instance.
-    </span>log::set_logger(<span class="kw-2">&amp;</span>DUMMY_LOGGER)<span class="question-mark">?</span>;
+    <span class="comment">// Tell the `log` crate to use our early logger via the dummy logger.
+    // We ignore any errors returned to allow `early_init` to be called multiple times.
+    </span><span class="kw">let _ </span>= log::set_logger(<span class="kw-2">&amp;</span>DUMMY_LOGGER); 
     set_log_level(log_level.unwrap_or(DEFAULT_LOG_LEVEL));
-    <span class="prelude-val">Ok</span>(())
 }
 
 
@@ -481,12 +692,10 @@
 /// * `writers`: an iterator over the backends that the system logger 
 ///    will write log messages to.
 ///    Typically this is just a single writer, such as the COM1 serial port.
-</span><span class="kw">pub fn </span>init&lt;I, W&gt;(
-    log_level: <span class="prelude-ty">Option</span>&lt;Level&gt;,
-    writers: <span class="kw">impl </span>IntoIterator&lt;Item = I&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), SetLoggerError&gt;
-    <span class="kw">where </span>W: Write + Send + <span class="lifetime">&#39;static</span>,
-          I: Into&lt;Arc&lt;MutexIrqSafe&lt;W&gt;&gt;&gt;,
+</span><span class="kw">pub fn </span>init&lt;I, W&gt;(log_level: <span class="prelude-ty">Option</span>&lt;Level&gt;, writers: <span class="kw">impl </span>IntoIterator&lt;Item = I&gt;)
+<span class="kw">where
+    </span>W: Write + Send + <span class="lifetime">&#39;static</span>,
+    I: Into&lt;Arc&lt;MutexIrqSafe&lt;W&gt;&gt;&gt;,
 {
     <span class="comment">// Populate the fields of the real logger instance
     </span><span class="kw">let </span>logger = Logger {
@@ -501,7 +710,6 @@
     // if `early_init()` has already been called, `set_logger()` will return an Error, which is okay.
     </span><span class="kw">let _ </span>= log::set_logger(<span class="kw-2">&amp;</span>DUMMY_LOGGER);
     set_log_level(log_level.unwrap_or(DEFAULT_LOG_LEVEL));
-    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="doccomment">/// Set the log level, which determines whether a given log message is actually logged. 

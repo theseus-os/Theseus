@@ -396,7 +396,7 @@
             .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
         ).cloned();
 
-    logger::init(<span class="prelude-val">None</span>, logger_writers).map_err(|_e| <span class="string">&quot;BUG: logger::init() failed&quot;</span>)<span class="question-mark">?</span>;
+    logger::init(<span class="prelude-val">None</span>, logger_writers);
     <span class="macro">info!</span>(<span class="string">&quot;Initialized full logger.&quot;</span>);
 
     <span class="comment">// Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
