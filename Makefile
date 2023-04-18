@@ -963,6 +963,11 @@ gdb:
 		-ex "symbol-file $(DEBUG_SYMBOLS_DIR)/`basename $(nano_core_binary)`.dbg" \
 		-ex "target remote :1234"
 
+gdb_aarch64 : override nano_core_binary=$(NANO_CORE_BUILD_DIR)/nano_core-aarch64.bin
+gdb_aarch64:
+	@gdb-multiarch "$(nano_core_binary)" \
+		-ex "symbol-file $(DEBUG_SYMBOLS_DIR)/`basename $(nano_core_binary)`.dbg" \
+		-ex "target remote :1234"
 
 
 ### builds and runs Theseus in Bochs
