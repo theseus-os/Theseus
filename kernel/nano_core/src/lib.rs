@@ -130,8 +130,8 @@ where
     #[cfg(target_arch = "aarch64")] {
         let logger_ports = [take_serial_port(SerialPortAddress::COM1)];
         logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten());
-        log::info!("initialized early logger");
-        println!("nano_core(): initialized early logger.");
+        log::info!("initialized early logger with aarch64 serial ports.");
+        println!("nano_core(): initialized early logger  with aarch64 serial ports.");
     }
 
     println!("nano_core(): initialized memory subsystem.");

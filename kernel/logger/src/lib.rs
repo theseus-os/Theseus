@@ -67,15 +67,19 @@ impl EarlyLogger {
     fn init(&mut self, serial_ports: impl IntoIterator<Item = SerialPort>) {
         let mut added_new_loggers = false;
         for (mut sp, logger_writer) in serial_ports.into_iter().take(LOG_MAX_WRITERS).zip(&mut self.loggers) {
-            let buf = self.buffer.get_buf();
             sp.out_bytes(self.buffer.get_buf());
             *logger_writer = Some(sp);
             added_new_loggers = true;
         }
 
         if self.buffer.truncated {
-            let _ = self.write_str(
-                "[log output was truncated; try increasing EARLY_LOG_BUFFER_SIZE]\r\n"
+            let _ = write!(
+                self,
+                "\n\n{} \
+                ---- (early log was truncated; try increasing logger::EARLY_LOG_BUFFER_SIZE) ----\
+                \n{}",
+                LogColor::Yellow.as_terminal_string(),
+                LogColor::Reset.as_terminal_string(),
             );
         }
 
@@ -163,6 +167,8 @@ impl<const SIZE: usize> fmt::Write for EarlyLogBuffer<SIZE> {
             self.length = new_length;
             Ok(())
         } else {
+            self.length = SIZE;
+            self.truncated = true;
             Err(fmt::Error)
         }
     }
