@@ -221,10 +221,10 @@ impl super::ArmGic {
             };
 
             v3.dist_extended.write_volatile_64(offset::P6IROUTER, value);
+        } else {
+            // If we're on gicv2 then affinity routing is off
+            // so we landed in the first block
+            unreachable!()
         }
-
-        // If we're on gicv2 then affinity routing is off
-        // so we landed in the first block
-        unreachable!()
     }
 }
