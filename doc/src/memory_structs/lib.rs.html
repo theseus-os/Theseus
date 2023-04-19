@@ -487,12 +487,6 @@
 <a href="#487" id="487">487</a>
 <a href="#488" id="488">488</a>
 <a href="#489" id="489">489</a>
-<a href="#490" id="490">490</a>
-<a href="#491" id="491">491</a>
-<a href="#492" id="492">492</a>
-<a href="#493" id="493">493</a>
-<a href="#494" id="494">494</a>
-<a href="#495" id="495">495</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -657,10 +651,7 @@
     /// the 16 most significant bits cleared.
     </span><span class="attr">#[inline]
     </span><span class="kw">pub fn </span>is_canonical_virtual_address(virt_addr: usize) -&gt; bool {
-        <span class="kw">match </span>virt_addr.get_bits(<span class="number">48</span>..<span class="number">64</span>) {
-            <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
-            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-        }
+        <span class="macro">matches!</span>(virt_addr.get_bits(<span class="number">48</span>..<span class="number">64</span>), <span class="number">0</span>)
     }
 
     <span class="doccomment">/// On aarch64, VAs are composed of an ASID
@@ -679,10 +670,7 @@
     /// have the 16 most significant bits cleared.
     </span><span class="attr">#[inline]
     </span><span class="kw">pub fn </span>is_canonical_physical_address(phys_addr: usize) -&gt; bool {
-        <span class="kw">match </span>phys_addr.get_bits(<span class="number">48</span>..<span class="number">64</span>) {
-            <span class="number">0 </span>=&gt; <span class="bool-val">true</span>,
-            <span class="kw">_ </span>=&gt; <span class="bool-val">false</span>,
-        }
+        <span class="macro">matches!</span>(phys_addr.get_bits(<span class="number">48</span>..<span class="number">64</span>), <span class="number">0</span>)
     }
 
     <span class="doccomment">/// On aarch64, we configure the MMU to use 48-bit

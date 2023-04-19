@@ -1103,9 +1103,9 @@
 ///
 /// ## Arguments
 /// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.
-</span><span class="kw">pub fn </span>cleanup_bootstrap_tasks(num_tasks: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>cleanup_bootstrap_tasks(num_tasks: u32) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     new_task_builder(
-        |total_tasks: usize| {
+        |total_tasks: u32| {
             <span class="kw">let </span><span class="kw-2">mut </span>num_tasks_cleaned = <span class="number">0</span>;
             <span class="kw">while </span>num_tasks_cleaned &lt; total_tasks {
                 <span class="kw">if let </span><span class="prelude-val">Some</span>(task) = BOOTSTRAP_TASKS.lock().pop() {
