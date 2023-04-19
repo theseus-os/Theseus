@@ -79,6 +79,7 @@ impl Iterator for TargetListIterator {
 }
 
 /// Target of a shared-peripheral interrupt
+#[derive(Copy, Clone, Debug)]
 pub enum SpiDestination {
     /// The interrupt must be delivered to a specific CPU.
     Specific(CpuId),
@@ -90,6 +91,7 @@ pub enum SpiDestination {
 }
 
 /// Target of an inter-processor interrupt
+#[derive(Copy, Clone, Debug)]
 pub enum IpiTargetCpu {
     /// The interrupt will be delivered to a specific CPU.
     Specific(CpuId),
