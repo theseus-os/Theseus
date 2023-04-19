@@ -165,7 +165,7 @@ pub fn handle_ap_cores(
 ///
 /// Note: handle_ap_cores expects this code to be equal to or shorter than one page.
 #[naked]
-unsafe extern "C" fn ap_entry_point(_ap_data_ptr_in_x0: *mut ApTrampolineData) -> () {
+unsafe extern "C" fn ap_entry_point(_ap_data_ptr_in_x0: *mut ApTrampolineData) {
     asm!(
         // unpack stack pointer
         "ldr x1, [x0, 0]",

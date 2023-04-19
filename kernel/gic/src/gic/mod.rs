@@ -245,6 +245,7 @@ pub struct ArmGicV3 {
 /// The GIC is an extension to ARMv8 which
 /// allows routing and filtering interrupts
 /// in a single or multi-core system.
+#[allow(clippy::large_enum_variant)]
 pub enum ArmGic {
     V2(ArmGicV2),
     V3(ArmGicV3),

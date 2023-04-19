@@ -162,10 +162,7 @@ mod canonical_address {
     /// the 16 most significant bits cleared.
     #[inline]
     pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-        match virt_addr.get_bits(48..64) {
-            0 => true,
-            _ => false,
-        }
+        matches!(virt_addr.get_bits(48..64), 0)
     }
 
     /// On aarch64, VAs are composed of an ASID
@@ -184,10 +181,7 @@ mod canonical_address {
     /// have the 16 most significant bits cleared.
     #[inline]
     pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
-        match phys_addr.get_bits(48..64) {
-            0 => true,
-            _ => false,
-        }
+        matches!(phys_addr.get_bits(48..64), 0)
     }
 
     /// On aarch64, we configure the MMU to use 48-bit

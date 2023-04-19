@@ -19,7 +19,7 @@ impl DefinedMpidrValue {
         let aff3 = (aff3 as u64) << 32;
         let aff2 = (aff2 as u64) << 16;
         let aff1 = (aff1 as u64) <<  8;
-        let aff0 = (aff0 as u64) <<  0;
+        let aff0 =  aff0 as u64;
         Self(aff3 | aff2 | aff1 | aff0)
     }
 }
