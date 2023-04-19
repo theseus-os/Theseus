@@ -378,7 +378,7 @@ impl fmt::Debug for EsrEL1 {
             Some(ESR_EL1::EC::Value::DataAbortCurrentEL) => "Data Abort, current EL",
             _ => "N/A",
         };
-        writeln!(f, "\r - {}", ec_translation)?;
+        writeln!(f, "\r - {ec_translation}")?;
 
         // Raw print of instruction specific syndrome.
         write!(f, "\r      Instr Specific Syndrome (ISS): {:#x}", self.0.read(ESR_EL1::ISS))

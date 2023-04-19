@@ -221,7 +221,7 @@ pub fn init(
     // 2. Create the idle task for this CPU.
     spawn::create_idle_task()?;
     // 3. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
-    spawn::cleanup_bootstrap_tasks(cpu_count as usize)?;
+    spawn::cleanup_bootstrap_tasks(cpu_count)?;
     // 4. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
     bootstrap_task.finish();
     // 5. Enable interrupts such that other tasks can be scheduled in.

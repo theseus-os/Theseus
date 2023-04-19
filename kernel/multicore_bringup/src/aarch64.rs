@@ -39,7 +39,7 @@ pub struct MulticoreBringupInfo;
 pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     _multicore_info: MulticoreBringupInfo,
-) -> Result<usize, &'static str> {
+) -> Result<u32, &'static str> {
     let mut online_cores = 0;
 
     // This ApTrampolineData & MmuConfig will be read and written-to
@@ -165,7 +165,7 @@ pub fn handle_ap_cores(
 ///
 /// Note: handle_ap_cores expects this code to be equal to or shorter than one page.
 #[naked]
-unsafe extern "C" fn ap_entry_point(_ap_data_ptr_in_x0: *mut ApTrampolineData) -> () {
+unsafe extern "C" fn ap_entry_point(_ap_data_ptr_in_x0: *mut ApTrampolineData) {
     asm!(
         // unpack stack pointer
         "ldr x1, [x0, 0]",

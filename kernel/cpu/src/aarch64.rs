@@ -60,7 +60,7 @@ pub fn is_bootstrap_cpu() -> bool {
 
 /// Returns the ID of the currently executing CPU.
 pub fn current_cpu() -> CpuId {
-    MpidrValue(MPIDR_EL1.get() as u64).into()
+    MpidrValue(MPIDR_EL1.get()).into()
 }
 
 /// A unique identifier for a CPU, read from the `MPIDR_EL1` register on aarch64.

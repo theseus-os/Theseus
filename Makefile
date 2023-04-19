@@ -151,7 +151,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
-		gdb \
+		gdb gdb_aarch64 \
 		clippy doc docs view-doc view-docs book view-book
 
 
@@ -595,7 +595,11 @@ preserve_old_modules:
 ##
 ## We allow building with THESEUS_CONFIG options, but not with any other RUSTFLAGS,
 ## because the default RUSTFLAGS used to build Theseus aren't compatible with clippy.
+ifeq ($(ARCH),x86_64)
 clippy : export override FEATURES += --features theseus_features/everything
+else ifeq ($(ARCH),aarch64)
+clippy : export override FEATURES := $(subst --workspace,,$(FEATURES))
+endif
 clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 clippy:
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
