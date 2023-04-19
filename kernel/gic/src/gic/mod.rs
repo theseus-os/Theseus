@@ -375,26 +375,46 @@ impl ArmGic {
 
     /// Will that interrupt be forwarded by the distributor?
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
-        match int {
-            0..=31 => if let Self::V3(v3) = self {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
                 let i = get_current_cpu_redist_index();
                 redist_interface::is_sgippi_enabled(&v3.redistributors[i].redist_sgippi, int)
-            } else {
-                true
             },
-            _ => dist_interface::is_spi_enabled(self.distributor(), int),
+            (_, this) => dist_interface::is_spi_enabled(this.distributor(), int),
         }
     }
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
-        match int {
-            0..=31 => if let Self::V3(v3) = self {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
                 let i = get_current_cpu_redist_index();
                 redist_interface::enable_sgippi(&mut v3.redistributors[i].redist_sgippi, int, enabled);
             },
-            _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
+            (_, this) => dist_interface::enable_spi(this.distributor_mut(), int, enabled),
+        };
+    }
+
+    /// Returns the priority of an interrupt
+    pub fn get_interrupt_priority(&self, int: InterruptNumber) -> Priority {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
+                let i = get_current_cpu_redist_index();
+                redist_interface::get_sgippi_priority(&v3.redistributors[i].redist_sgippi, int)
+            },
+            (_, this) => dist_interface::get_spi_priority(this.distributor(), int),
+        }
+    }
+
+    /// Sets the priority of an interrupt (0-255)
+    pub fn set_interrupt_priority(&mut self, int: InterruptNumber, enabled: Priority) {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
+                let i = get_current_cpu_redist_index();
+                redist_interface::set_sgippi_priority(&mut v3.redistributors[i].redist_sgippi, int, enabled);
+            },
+            (_, this) => dist_interface::set_spi_priority(this.distributor_mut(), int, enabled),
         };
     }
 

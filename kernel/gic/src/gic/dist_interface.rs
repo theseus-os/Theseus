@@ -9,7 +9,8 @@
 //! Included functionality:
 //! - Initializing the interface
 //! - Enabling or disabling the forwarding of SPIs based on their numbers
-//! - Setting the target of SPIs based on their numbers
+//! - Getting or setting the priority of SPIs based on their numbers
+//! - Getting or setting the target of SPIs based on their numbers
 //! - Generating software interrupts (GICv2 style)
 
 use super::GicRegisters;
@@ -17,20 +18,22 @@ use super::IpiTargetCpu;
 use super::SpiDestination;
 use super::InterruptNumber;
 use super::Enabled;
+use super::Priority;
 use super::TargetList;
 
 use cpu::MpidrValue;
 
 mod offset {
     use crate::{Offset32, Offset64};
-    pub(crate) const CTLR:      Offset32 = Offset32::from_byte_offset(0x000);
-    pub(crate) const IGROUPR:   Offset32 = Offset32::from_byte_offset(0x080);
-    pub(crate) const ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
-    pub(crate) const ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
-    pub(crate) const ITARGETSR: Offset32 = Offset32::from_byte_offset(0x800);
-    pub(crate) const SGIR:      Offset32 = Offset32::from_byte_offset(0xf00);
+    pub(crate) const CTLR:       Offset32 = Offset32::from_byte_offset(0x000);
+    pub(crate) const IGROUPR:    Offset32 = Offset32::from_byte_offset(0x080);
+    pub(crate) const ISENABLER:  Offset32 = Offset32::from_byte_offset(0x100);
+    pub(crate) const ICENABLER:  Offset32 = Offset32::from_byte_offset(0x180);
+    pub(crate) const IPRIORITYR: Offset32 = Offset32::from_byte_offset(0x400);
+    pub(crate) const ITARGETSR:  Offset32 = Offset32::from_byte_offset(0x800);
+    pub(crate) const SGIR:       Offset32 = Offset32::from_byte_offset(0xf00);
     /// This one is on the 6th page
-    pub(crate) const P6IROUTER: Offset64 = Offset64::from_byte_offset(0x100);
+    pub(crate) const P6IROUTER:  Offset64 = Offset64::from_byte_offset(0x100);
 }
 
 // enable group 0
@@ -101,6 +104,16 @@ pub fn enable_spi(registers: &mut GicRegisters, int: InterruptNumber, enabled: E
     // whether we're enabling or disabling,
     // set as part of group 1
     registers.write_array_volatile::<32>(reg_base, int, GROUP_1);
+}
+
+/// Returns the priority of an SPI.
+pub fn get_spi_priority(registers: &GicRegisters, int: InterruptNumber) -> Priority {
+    u8::MAX - (registers.read_array_volatile::<4>(offset::IPRIORITYR, int) as u8)
+}
+
+/// Sets the priority of an SPI.
+pub fn set_spi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio: Priority) {
+    registers.write_array_volatile::<4>(offset::IPRIORITYR, int, (u8::MAX - prio) as u32);
 }
 
 /// Sends an Inter-Processor-Interrupt
