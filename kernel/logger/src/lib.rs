@@ -34,11 +34,21 @@ pub const DEFAULT_LOG_LEVEL: Level = Level::Trace;
 /// The maximum number of output streams that a logger can write to.
 pub const LOG_MAX_WRITERS: usize = 2;
 
-// The size of the buffer used to save early log messages.
-pub const EARLY_LOG_BUFFER_SIZE: usize = 16 * 1024;
+/// The size of the buffer used to save early log messages.
+pub const EARLY_LOG_BUFFER_SIZE: usize = {
+    #[cfg(target_arch = "x86_64")]  { 0 }
+    #[cfg(target_arch = "aarch64")] { 16 * 1024 }
+};
 
 /// The early logger used before dynamic heap allocation is available.
 static EARLY_LOGGER: MutexIrqSafe<EarlyLogger> = MutexIrqSafe::new(EarlyLogger::new());
+
+/// The early log buffer.
+///
+/// This is separate from the `EARLY_LOGGER` in order for it to be placed
+/// in `.bss` instead of `.data`, saving space in the executable.
+static EARLY_LOG_BUFFER: MutexIrqSafe<EarlyLogBuffer<EARLY_LOG_BUFFER_SIZE>> =
+    MutexIrqSafe::new(EarlyLogBuffer::new());
 
 /// The real logger instance where log states are kept.
 ///
@@ -49,30 +59,38 @@ static LOGGER: MutexIrqSafe<Option<Logger>> = MutexIrqSafe::new(None);
 
 /// An early logger that can only write to a fixed number of [`SerialPort`]s,
 /// intended for basic use before dynamic heap allocation is available.
-struct EarlyLogger {
-    loggers: [Option<SerialPort>; LOG_MAX_WRITERS],
-    buffer: EarlyLogBuffer<EARLY_LOG_BUFFER_SIZE>,
-}
+struct EarlyLogger([Option<SerialPort>; LOG_MAX_WRITERS]);
 impl EarlyLogger {
     const fn new() -> Self {
-        Self {
-            loggers: [None, None],
-            buffer: EarlyLogBuffer::new(),
-        }
+        const INIT: Option<SerialPort> = None;
+        Self([INIT; LOG_MAX_WRITERS])
     }
 
     /// Initializes this early logger with the given serial port writers.
     ///
     /// Flushes the early log buffer to the newly-added serial ports, if any.
     fn init(&mut self, serial_ports: impl IntoIterator<Item = SerialPort>) {
-        let mut added_new_loggers = false;
-        for (mut sp, logger_writer) in serial_ports.into_iter().take(LOG_MAX_WRITERS).zip(&mut self.loggers) {
-            sp.out_bytes(self.buffer.get_buf());
-            *logger_writer = Some(sp);
-            added_new_loggers = true;
+        let buffer_was_truncated: bool;
+        {
+            let mut buffer = EARLY_LOG_BUFFER.lock();
+            buffer_was_truncated = buffer.truncated;
+
+            let mut added_new_loggers = false;
+            for (mut sp, logger_writer) in serial_ports.into_iter()
+                .take(LOG_MAX_WRITERS)
+                .zip(&mut self.0)
+            {
+                sp.out_bytes(buffer.get_buf());
+                *logger_writer = Some(sp);
+                added_new_loggers = true;
+            }
+
+            if added_new_loggers {
+                buffer.truncate(0);
+            }
         }
 
-        if self.buffer.truncated {
+        if buffer_was_truncated {
             let _ = write!(
                 self,
                 "\n\n{} \
@@ -82,21 +100,17 @@ impl EarlyLogger {
                 LogColor::Reset.as_terminal_string(),
             );
         }
-
-        if added_new_loggers {
-            self.buffer.truncate(0);
-        }
     }
 }
 impl fmt::Write for EarlyLogger {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let mut written = false;
-        for serial_port in self.loggers.iter_mut().flatten() {
+        for serial_port in self.0.iter_mut().flatten() {
             let _ = serial_port.write_str(s);
             written = true;
         }
         if !written {
-            let _ = self.buffer.write_str(s);
+            let _ = EARLY_LOG_BUFFER.lock().write_str(s);
         }
         Ok(())
     }
@@ -115,7 +129,7 @@ struct Logger {
 /// such that they can switch to initializing the full logger.
 pub fn take_early_log_writers() -> [Option<SerialPort>; LOG_MAX_WRITERS] {
     let mut list = [None, None];
-    for (opt, ret) in EARLY_LOGGER.lock().loggers.iter_mut().zip(&mut list) {
+    for (opt, ret) in EARLY_LOGGER.lock().0.iter_mut().zip(&mut list) {
         *ret = opt.take();
     }
     list
