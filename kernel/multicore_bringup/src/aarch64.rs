@@ -39,7 +39,7 @@ pub struct MulticoreBringupInfo;
 pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     _multicore_info: MulticoreBringupInfo,
-) -> Result<usize, &'static str> {
+) -> Result<u32, &'static str> {
     let mut online_cores = 0;
 
     // This ApTrampolineData & MmuConfig will be read and written-to

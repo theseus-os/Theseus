@@ -78,9 +78,9 @@ static BOOTSTRAP_TASKS: Mutex<Vec<JoinableTaskRef>> = Mutex::new(Vec::new());
 ///
 /// ## Arguments
 /// * `num_tasks`: the number of bootstrap tasks that must be cleaned up.
-pub fn cleanup_bootstrap_tasks(num_tasks: usize) -> Result<(), &'static str> {
+pub fn cleanup_bootstrap_tasks(num_tasks: u32) -> Result<(), &'static str> {
     new_task_builder(
-        |total_tasks: usize| {
+        |total_tasks: u32| {
             let mut num_tasks_cleaned = 0;
             while num_tasks_cleaned < total_tasks {
                 if let Some(task) = BOOTSTRAP_TASKS.lock().pop() {
