@@ -134,7 +134,10 @@ pub fn init_ap() {
     // Enable the CPU-local timer
     let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
     let int_ctrl = int_ctrl.as_mut().expect("BUG: init_ap(): INTERRUPT_CONTROLLER was uninitialized");
+    int_ctrl.init_secondary_cpu_interface();
     int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+    int_ctrl.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
+    int_ctrl.set_minimum_priority(0);
 
     enable_timer(true);
 }
@@ -171,6 +174,7 @@ pub fn init() -> Result<(), &'static str> {
                 )?;
 
                 inner.set_minimum_priority(0);
+                inner.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
                 *int_ctrl = Some(inner);
             },
         }

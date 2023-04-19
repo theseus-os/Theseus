@@ -338,6 +338,13 @@ impl ArmGic {
         }
     }
 
+    pub fn init_secondary_cpu_interface(&mut self) {
+        match self {
+            Self::V2(v2) => cpu_interface_gicv2::init(v2.processor.as_mut()),
+            Self::V3( _) => cpu_interface_gicv3::init(),
+        }
+    }
+
     fn affinity_routing(&self) -> Enabled {
         match self {
             Self::V2( _) => false,
