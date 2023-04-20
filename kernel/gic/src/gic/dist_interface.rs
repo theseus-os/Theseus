@@ -203,7 +203,7 @@ impl super::ArmGic {
                     SpiDestination::Specific(cpu) => 1 << cpu.value(),
                     SpiDestination::AnyCpuAvailable => {
                         let list = TargetList::new_all_cpus()
-                            .expect("This is invalid: CpuId > 8 AND GICv2 interrupt controller");
+                            .expect("This is invalid: CpuId > 8 AND affinity routing is disabled");
                         list.0 as u32
                     },
                     SpiDestination::GICv2TargetList(list) => list.0 as u32,
@@ -218,7 +218,7 @@ impl super::ArmGic {
                     // value of 1 to target any available cpu
                     SpiDestination::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,
                     SpiDestination::GICv2TargetList(_) => {
-                        panic!("Cannot use SpiDestination::GICv2TargetList with GICv3!");
+                        panic!("Cannot use SpiDestination::GICv2TargetList with affinity routing enabled");
                     },
                 };
 
