@@ -184,7 +184,7 @@ impl super::ArmGic {
                 } else {
                     let mpidr = reg & 0xff00ffffff;
                     let cpu_id = MpidrValue::try_from(mpidr)?.into();
-                    return Ok(SpiDestination::Specific(cpu_id));
+                    Ok(SpiDestination::Specific(cpu_id))
                 }
             }
         }
