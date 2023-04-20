@@ -20,6 +20,7 @@ use super::InterruptNumber;
 use super::Enabled;
 use super::Priority;
 use super::TargetList;
+use super::ArmGicV3;
 
 use cpu::MpidrValue;
 
@@ -157,74 +158,72 @@ impl super::ArmGic {
     /// of that destination is not checked.
     pub fn get_spi_target(&self, int: InterruptNumber) -> Result<SpiDestination, &'static str> {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
-        if !self.affinity_routing() {
-            let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
+        match self {
+            Self::V2(_) | Self::V3(ArmGicV3 { affinity_routing: false, .. }) => {
+                let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
 
-            for i in 0..8 {
-                let target = 1 << i;
-                if target & flags == flags {
-                    let mpidr = i;
+                for i in 0..8 {
+                    let target = 1 << i;
+                    if target & flags == flags {
+                        let mpidr = i;
+                        let cpu_id = MpidrValue::try_from(mpidr)?.into();
+                        return Ok(SpiDestination::Specific(cpu_id));
+                    }
+                }
+
+                Ok(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
+            },
+            Self::V3(ArmGicV3 { affinity_routing: true, dist_extended, .. }) => {
+                let reg = dist_extended.read_volatile_64(offset::P6IROUTER);
+
+                // bit 31: Interrupt Routing Mode
+                // value of 1 to target any available cpu
+                // value of 0 to target a specific cpu
+                if reg & P6IROUTER_ANY_AVAILABLE_PE > 0 {
+                    Ok(SpiDestination::AnyCpuAvailable)
+                } else {
+                    let mpidr = reg & 0xff00ffffff;
                     let cpu_id = MpidrValue::try_from(mpidr)?.into();
                     return Ok(SpiDestination::Specific(cpu_id));
                 }
             }
-
-            Ok(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
-        } else if let Self::V3(v3) = self {
-            let reg = v3.dist_extended.read_volatile_64(offset::P6IROUTER);
-
-            // bit 31: Interrupt Routing Mode
-            // value of 1 to target any available cpu
-            // value of 0 to target a specific cpu
-            if reg & P6IROUTER_ANY_AVAILABLE_PE > 0 {
-                Ok(SpiDestination::AnyCpuAvailable)
-            } else {
-                let mpidr = reg & 0xff00ffffff;
-                let cpu_id = MpidrValue::try_from(mpidr)?.into();
-                return Ok(SpiDestination::Specific(cpu_id));
-            }
-        } else {
-            // If we're on gicv2 then affinity routing is off
-            // so we landed in the first block
-            unreachable!()
         }
     }
 
     /// Sets the destination of an SPI.
     pub fn set_spi_target(&mut self, int: InterruptNumber, target: SpiDestination) {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
-        if !self.affinity_routing() {
-            if let SpiDestination::Specific(cpu) = &target {
-                assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
+        match self {
+            Self::V2(_) | Self::V3(ArmGicV3 { affinity_routing: false, .. }) => {
+                if let SpiDestination::Specific(cpu) = &target {
+                    assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
+                }
+
+                let value = match target {
+                    SpiDestination::Specific(cpu) => 1 << cpu.value(),
+                    SpiDestination::AnyCpuAvailable => {
+                        let list = TargetList::new_all_cpus()
+                            .expect("This is invalid: CpuId > 8 AND GICv2 interrupt controller");
+                        list.0 as u32
+                    },
+                    SpiDestination::GICv2TargetList(list) => list.0 as u32,
+                };
+
+                self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
+            },
+            Self::V3(ArmGicV3 { affinity_routing: true, dist_extended, .. }) => {
+                let value = match target {
+                    SpiDestination::Specific(cpu) => MpidrValue::from(cpu).value(),
+                    // bit 31: Interrupt Routing Mode
+                    // value of 1 to target any available cpu
+                    SpiDestination::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,
+                    SpiDestination::GICv2TargetList(_) => {
+                        panic!("Cannot use SpiDestination::GICv2TargetList with GICv3!");
+                    },
+                };
+
+                dist_extended.write_volatile_64(offset::P6IROUTER, value);
             }
-
-            let value = match target {
-                SpiDestination::Specific(cpu) => 1 << cpu.value(),
-                SpiDestination::AnyCpuAvailable => {
-                    let list = TargetList::new_all_cpus()
-                        .expect("This is invalid: CpuId > 8 AND GICv2 interrupt controller");
-                    list.0 as u32
-                },
-                SpiDestination::GICv2TargetList(list) => list.0 as u32,
-            };
-
-            self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
-        } else if let Self::V3(v3) = self {
-            let value = match target {
-                SpiDestination::Specific(cpu) => MpidrValue::from(cpu).value(),
-                // bit 31: Interrupt Routing Mode
-                // value of 1 to target any available cpu
-                SpiDestination::AnyCpuAvailable => P6IROUTER_ANY_AVAILABLE_PE,
-                SpiDestination::GICv2TargetList(_) => {
-                    panic!("Cannot use SpiDestination::GICv2TargetList with GICv3!");
-                },
-            };
-
-            v3.dist_extended.write_volatile_64(offset::P6IROUTER, value);
-        } else {
-            // If we're on gicv2 then affinity routing is off
-            // so we landed in the first block
-            unreachable!()
         }
     }
 }

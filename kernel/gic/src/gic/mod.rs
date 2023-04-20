@@ -345,13 +345,6 @@ impl ArmGic {
         }
     }
 
-    fn affinity_routing(&self) -> Enabled {
-        match self {
-            Self::V2( _) => false,
-            Self::V3(v3) => v3.affinity_routing,
-        }
-    }
-
     /// Sends an inter processor interrupt (IPI),
     /// also called software generated interrupt (SGI).
     ///
