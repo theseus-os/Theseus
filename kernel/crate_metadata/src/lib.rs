@@ -45,6 +45,7 @@
 
 extern crate alloc;
 
+use core::convert::TryInto;
 use core::{convert::TryFrom, mem::size_of};
 use core::fmt;
 use core::ops::Range;
@@ -1036,12 +1037,25 @@ pub fn write_relocation(
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
 ) -> Result<(), &'static str> {
+    /// An internal function for handling unsupported relocation types.
+    fn unsupported(relocation_type: u32) -> Result<(), &'static str> {
+        error!("found unsupported relocation type {}\n    \
+            --> Compile with 'relocation-model=static', 'code-model=large', and 'tls-model=local-exec'",
+            relocation_type
+        );
+        Err("found unsupported relocation type. \
+            --> Compile with 'relocation-model=static', 'code-model=large', and 'tls-model=local-exec'",
+        )
+    }
+
     // Calculate exactly where we should write the relocation data to.
     let target_sec_offset = target_sec_offset + relocation_entry.offset;
 
-    // Perform the actual writing of relocation data here.
     // There is a great, succint table of relocation types here:
     // <https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html>
+
+    // Handle x86_64 relocation types.
+    #[cfg(target_arch = "x86_64")]
     match relocation_entry.typ {
         R_X86_64_32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
@@ -1057,8 +1071,8 @@ pub fn write_relocation(
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
-        R_X86_64_PC32 |
-        R_X86_64_PLT32 => {
+        R_X86_64_PC32
+        | R_X86_64_PLT32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
@@ -1093,15 +1107,138 @@ pub fn write_relocation(
         // R_X86_64_GOTPCREL => { 
         //     unimplemented!(); // if we stop using the large code model, we need to create a Global Offset Table
         // }
-        _ => {
-            error!("found unsupported relocation type {}\n    \
-                --> Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?",
-                relocation_entry.typ
-            );
-            return Err("found unsupported relocation type. \
-                Are you compiling crates with 'code-model=large' and 'tls-model=local-exec'?"
-            );
+        other => return unsupported(other),
+    }
+
+    // Handle aarch64 relocation types.
+    // Details here: <https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types>
+    #[cfg(target_arch = "aarch64")]
+    match relocation_entry.typ {
+        R_AARCH64_ABS64 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
+        R_AARCH64_ABS32 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
+        }
+        R_AARCH64_ABS16 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u16>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u16;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
+        }
+        R_AARCH64_PREL64 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u64;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
+        }
+        R_AARCH64_PREL32 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
+        }
+        R_AARCH64_PREL16 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u16>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u16;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            target_ref.copy_from_slice(&source_val.to_ne_bytes());
+        }
+        R_AARCH64_ADR_PREL_PG_HI21 => {
+            // This is a "page" relocation, in which values used for relocation calculations
+            // are "page-aligned", i.e., the least-significant 12 bits are cleared.
+            // It is always 12 bits, regardless of the hardware's actual page size.
+            fn page_mask(val: u64) -> u64 {
+                val & !0xFFF
+            }
+
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = page_mask(source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64)
+                .wrapping_sub(page_mask(target_ref.as_ptr() as u64));
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            // set the ADRP immediate value to bits [32:12] of `source_val`.
+            const MASK_21_BITS: u64 = 0x001F_FFFF;
+            let existing_target_val = u64::from_ne_bytes(target_ref.try_into().map_err(|_| "BUG: R_AARCH64_ADR_PREL_PG_HI21 relocation target val was not a u64")?);
+            let new_source_val = (existing_target_val & !MASK_21_BITS) | ((source_val >> 12) & MASK_21_BITS);
+            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+        }
+        R_AARCH64_CALL26 
+        | R_AARCH64_JUMP26 => {
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            // set the CALL immediate field to bits [27:2] of `source_val`.
+            const MASK_26_BITS: u32 = 0x03FF_FFFF;
+            let existing_target_val = u32::from_ne_bytes(target_ref.try_into().map_err(|_| "BUG: R_AARCH64_CALL26/JUMP26 relocation target val was not a u32")?);
+            let new_source_val = (existing_target_val & !MASK_26_BITS) | ((source_val >> 2) & MASK_26_BITS);
+            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+        }
+        // These relocation types all use the same logic, but have different bit masks
+        // for the range of the immediate value (`source_val`) that gets used.
+        R_AARCH64_ADD_ABS_LO12_NC
+        | R_AARCH64_LDST8_ABS_LO12_NC
+        | R_AARCH64_LDST16_ABS_LO12_NC
+        | R_AARCH64_LDST32_ABS_LO12_NC
+        | R_AARCH64_LDST64_ABS_LO12_NC
+        | R_AARCH64_LDST128_ABS_LO12_NC => {
+            /// The immediate field is from bits [21:10] in a typical load instruction.
+            /// TODO: is this the same for ALL instructions that these relocation types apply to??
+            const IMMEMDIATE_FIELD_LSB_LOCATION: u8 = 10;
+            let (mask, shift) = match relocation_entry.typ {
+                R_AARCH64_LDST128_ABS_LO12_NC => (0b1111_1111_0000, 4),
+                R_AARCH64_LDST64_ABS_LO12_NC  => (0b1111_1111_1000, 3),
+                R_AARCH64_LDST32_ABS_LO12_NC  => (0b1111_1111_1100, 2),
+                R_AARCH64_LDST16_ABS_LO12_NC  => (0b1111_1111_1110, 1),
+                _both_add_and_ldst8           => (0b1111_1111_1111, 0),
+            };
+    
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            // set the immediate value to the bit range of `source_val` defined by `mask`.
+            let existing_target_val = u32::from_ne_bytes(
+                target_ref.try_into()
+                    .map_err(|_| "BUG: R_AARCH64_ADD_ABS_LO12_NC relocation target val was not a u32")?
+            );
+            // TODO: does this need to be shifted to be placed at the location of the immediate field?
+            let new_source_val = (existing_target_val & !mask) | ((source_val & mask) >> shift);
+            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+        }
+        R_AARCH64_TLSLE_ADD_TPREL_HI12
+        | R_AARCH64_TLSLE_ADD_TPREL_LO12
+        | R_AARCH64_TLSLE_ADD_TPREL_LO12_NC => {
+            let (mask, shift) = match relocation_entry.typ {
+                R_AARCH64_TLSLE_ADD_TPREL_HI12 => (0xFFF000, 12),
+                _tlsle_add_tprel_lo12_nc       => (0x000FFF, 0),
+            };
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            let existing_target_val = u32::from_ne_bytes(
+                target_ref.try_into()
+                    .map_err(|_| "BUG: R_AARCH64_TLSLS_ADD_* relocation target val was not a u32")?
+            );
+            // TODO: does this need to be shifted to be placed at the location of the ADD immediate field?
+            let new_source_val = (existing_target_val & !mask) | ((source_val & mask) >> shift);
+            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+        }
+        other => return unsupported(other),
     }
 
     Ok(())
