@@ -40,7 +40,7 @@ pub fn handle_ap_cores(
     kernel_mmi_ref: &MmiRef,
     _multicore_info: MulticoreBringupInfo,
 ) -> Result<u32, &'static str> {
-    let mut online_cores = 0;
+    let mut online_secondary_cpus = 0;
 
     // This ApTrampolineData & MmuConfig will be read and written-to
     // by all detected CPU cores, via both its physical
@@ -102,7 +102,7 @@ pub fn handle_ap_cores(
         let stack = if let Some(stack) = ap_stack.take() {
             stack
         } else {
-            // Create a new stack
+            // Create a new stack for the CPU to use upon boot.
             let stack = stack::alloc_stack(
                 KERNEL_STACK_SIZE_IN_PAGES,
                 &mut kernel_mmi_ref.lock().page_table,
@@ -114,44 +114,38 @@ pub fn handle_ap_cores(
             stack
         };
 
-        // Associate the stack to this CpuId
+        // Make the stack available for use by the target CPU.
         ap_start::insert_ap_stack(cpu_id.value(), stack);
 
-        if let Err(kind) = cpu_on(mpidr.value(), entry_point_phys_addr.value() as _, ap_data_phys_addr.value() as _) {
-            let msg = match kind {
-                InvalidParameters => Some("InvalidParameters"),
-                AlreadyOn => Some("AlreadyOn"),
-                NotPresent => Some("NotPresent"),
-                Disabled => Some("Disabled"),
-                NotSupported => Some("NotSupported"),
-                Denied => Some("Denied"),
-                OnPending => Some("OnPending"),
-                InternalFailure => Some("InternalFailure"),
-                InvalidAddress => Some("InvalidAddress"),
-                _ => Some("Unknown"),
-            };
+        match cpu_on(
+            mpidr.value(),
+            entry_point_phys_addr.value() as u64,
+            ap_data_phys_addr.value() as u64)
+        {
+            Ok(()) => {
+                // Wait for the CPU to boot and enter Rust code.
+                while ap_data.ap_ready.read() != 1 {}
 
-            // Re-take the stack we allocated for this CPU
-            // so we can reuse it the next CPU.
-            ap_stack = ap_start::take_ap_stack(cpu_id.value()).map(|s| s.into_inner());
+                // Here, `ap_stack` is None, indicating the `stack` is being used by
+                // the CPU being booted. A new stack will be allocated for the next CPU.
 
-            if let Some(msg) = msg {
-                log::error!("Tried to start CPU core {} but got PSCI error: {}", cpu_id, msg);
+                // Treat this CPU as booted and online.
+                online_secondary_cpus += 1;
             }
-        } else {
-            // Wait for the core to take note of the stack boundaries
-            while ap_data.ap_ready.read() != 1 {}
+            Err(psci_error) => {
+                // Re-take the stack we allocated for this CPU
+                // so we can reuse it the next CPU.
+                ap_stack = ap_start::take_ap_stack(cpu_id.value()).map(|s| s.into_inner());
 
-            // ap_stack is None because the stack will be used by
-            // the booting core; a new one will be created for the
-            // next core
-
-            // remember this CpuId
-            online_cores += 1;
+                match psci_error {
+                    AlreadyOn => log::info!("CPU {} was already on.", cpu_id),
+                    other => log::error!("Failed to boot CPU {}, PSCI error: {:?}", cpu_id, other),
+                }
+            }
         }
     }
 
-    Ok(online_cores)
+    Ok(online_secondary_cpus)
 }
 
 /// The entry point for all secondary CPU cores, where they
