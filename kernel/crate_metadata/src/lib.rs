@@ -45,10 +45,7 @@
 
 extern crate alloc;
 
-use core::convert::TryInto;
-use core::{convert::TryFrom, mem::size_of};
-use core::fmt;
-use core::ops::Range;
+use core::{fmt, mem::size_of, ops::Range};
 use log::{error, debug, trace};
 use spin::{Mutex, RwLock, Once};
 use alloc::{
@@ -1087,6 +1084,7 @@ pub fn write_relocation(
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
         }
         R_X86_64_TPOFF32 => {
+            use core::convert::TryFrom;
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<i32>());
             let target_ref = &mut target_sec_slice[target_range];
             // Here we treat the `source_sec_vaddr` value as a signed value 
@@ -1112,6 +1110,10 @@ pub fn write_relocation(
 
     // Handle aarch64 relocation types.
     // Details here: <https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types>
+    //
+    // TODO: insert overflow checks for all relocation types that don't end in `_NC`.
+    #[cfg(target_arch = "aarch64")]
+    use core::convert::TryInto;
     #[cfg(target_arch = "aarch64")]
     match relocation_entry.typ {
         R_AARCH64_ABS64 => {
@@ -1159,32 +1161,63 @@ pub fn write_relocation(
         R_AARCH64_ADR_PREL_PG_HI21 => {
             // This is a "page" relocation, in which values used for relocation calculations
             // are "page-aligned", i.e., the least-significant 12 bits are cleared.
-            // It is always 12 bits, regardless of the hardware's actual page size.
+            // It is always 12 bits, regardless of the hardware's actual page size.R
             fn page_mask(val: u64) -> u64 {
                 val & !0xFFF
             }
 
-            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
+            // The immediate field is a total of 21 bits, split into two ranges:
+            // * The highest (most-significant) 19 bits occupy bits [23:5] of the instruction.
+            // * The lowest (least-significant) 2 bits occupy bits [30:29] of the instruction.
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADRP--Form-PC-relative-address-to-4KB-page->
+            const IMMEDIATE_FIELD_SHIFT_HI: u8 = 5;
+            const IMMEDIATE_FIELD_MASK_HI: u32 = 0x7FFFF;
+            const IMMEDIATE_FIELD_SHIFT_LO: u8 = 29;
+            const IMMEDIATE_FIELD_MASK_LO: u32 = 0x3;
+            const SOURCE_VALUE_SHIFT:       u8 = 12;
+
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
             let source_val = page_mask(source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64)
                 .wrapping_sub(page_mask(target_ref.as_ptr() as u64));
-            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
-            // set the ADRP immediate value to bits [32:12] of `source_val`.
-            const MASK_21_BITS: u64 = 0x001F_FFFF;
-            let existing_target_val = u64::from_ne_bytes(target_ref.try_into().map_err(|_| "BUG: R_AARCH64_ADR_PREL_PG_HI21 relocation target val was not a u64")?);
-            let new_source_val = (existing_target_val & !MASK_21_BITS) | ((source_val >> 12) & MASK_21_BITS);
+            let shifted_source_val = source_val >> SOURCE_VALUE_SHIFT;
+            // now that we've shifted the source value, it's okay to truncate it into a `u32`.
+            let shifted_source_val = shifted_source_val as u32;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
+            let existing_target_val = u32::from_ne_bytes(
+                target_ref.try_into()
+                    .map_err(|_| "BUG: R_AARCH64_ADR_PREL_PG_HI21 relocation target val was not a u32")?
+            );
+            // Set the instruction's two immediate value ranges to the proper ranges of the shifted source value.
+            let new_source_val =
+                  (existing_target_val & !(IMMEDIATE_FIELD_MASK_LO << IMMEDIATE_FIELD_SHIFT_LO))
+                | (existing_target_val & !(IMMEDIATE_FIELD_MASK_HI << IMMEDIATE_FIELD_SHIFT_HI))
+                | ((shifted_source_val & IMMEDIATE_FIELD_MASK_LO) << IMMEDIATE_FIELD_SHIFT_LO)
+                | ((shifted_source_val & IMMEDIATE_FIELD_MASK_HI) << IMMEDIATE_FIELD_SHIFT_HI);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
         R_AARCH64_CALL26 
         | R_AARCH64_JUMP26 => {
+            // The immediate field occupies 26 bits [25:0] in call/jump instructions. 
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch->
+            const IMMEDIATE_FIELD_SHIFT: u8 = 0;
+            const IMMEDIATE_FIELD_MASK: u32 = 0x03FF_FFFF;
+            const SOURCE_VALUE_SHIFT: u8    = 2;
+
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
-            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
-            // set the CALL immediate field to bits [27:2] of `source_val`.
-            const MASK_26_BITS: u32 = 0x03FF_FFFF;
-            let existing_target_val = u32::from_ne_bytes(target_ref.try_into().map_err(|_| "BUG: R_AARCH64_CALL26/JUMP26 relocation target val was not a u32")?);
-            let new_source_val = (existing_target_val & !MASK_26_BITS) | ((source_val >> 2) & MASK_26_BITS);
+            let shifted_source_val = source_val >> SOURCE_VALUE_SHIFT;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
+            let existing_target_val = u32::from_ne_bytes(
+                target_ref.try_into()
+                    .map_err(|_| "BUG: R_AARCH64_CALL26/JUMP26 relocation target val was not a u32")?
+            );
+            // Set the instruction's immediate value to the shifted source value.
+            let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
+                | ((shifted_source_val & IMMEDIATE_FIELD_MASK) << IMMEDIATE_FIELD_SHIFT);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
         // These relocation types all use the same logic, but have different bit masks
@@ -1195,47 +1228,65 @@ pub fn write_relocation(
         | R_AARCH64_LDST32_ABS_LO12_NC
         | R_AARCH64_LDST64_ABS_LO12_NC
         | R_AARCH64_LDST128_ABS_LO12_NC => {
-            /// The immediate field is from bits [21:10] in a typical load instruction.
-            /// TODO: is this the same for ALL instructions that these relocation types apply to??
-            const IMMEMDIATE_FIELD_LSB_LOCATION: u8 = 10;
-            let (mask, shift) = match relocation_entry.typ {
-                R_AARCH64_LDST128_ABS_LO12_NC => (0b1111_1111_0000, 4),
-                R_AARCH64_LDST64_ABS_LO12_NC  => (0b1111_1111_1000, 3),
-                R_AARCH64_LDST32_ABS_LO12_NC  => (0b1111_1111_1100, 2),
-                R_AARCH64_LDST16_ABS_LO12_NC  => (0b1111_1111_1110, 1),
-                _both_add_and_ldst8           => (0b1111_1111_1111, 0),
+            // The immediate field occupies 12 bits [21:10] in instructions
+            // that these relocation types apply to.
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADD--immediate---Add--immediate-->
+            const IMMEDIATE_FIELD_SHIFT: u8 = 10;
+            const IMMEDIATE_FIELD_MASK: u32 = 0xFFF;
+            let source_value_shift = match relocation_entry.typ {
+                // Set immediate value to bits [11:4] of the source_val --> 4-bit right shift.
+                R_AARCH64_LDST128_ABS_LO12_NC => 4,
+                // Set immediate value to bits [11:3] of the source_val --> 3-bit right shift.
+                R_AARCH64_LDST64_ABS_LO12_NC  => 3,
+                // Set immediate value to bits [11:2] of the source_val --> 2-bit right shift.
+                R_AARCH64_LDST32_ABS_LO12_NC  => 2,
+                // Set immediate value to bits [11:1] of the source_val --> 1-bit right shift.
+                R_AARCH64_LDST16_ABS_LO12_NC  => 1,
+                // Set immediate value to bits [11:0] of the source_val --> 0-bit right shift.
+                _both_add_and_ldst8           => 0,
             };
     
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
-            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
-            // set the immediate value to the bit range of `source_val` defined by `mask`.
+            let shifted_source_val = source_val >> source_value_shift;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
             let existing_target_val = u32::from_ne_bytes(
                 target_ref.try_into()
-                    .map_err(|_| "BUG: R_AARCH64_ADD_ABS_LO12_NC relocation target val was not a u32")?
+                    .map_err(|_| "BUG: R_AARCH64_ADD/LDST*_ABS_LO12_NC relocation target val was not a u32")?
             );
-            // TODO: does this need to be shifted to be placed at the location of the immediate field?
-            let new_source_val = (existing_target_val & !mask) | ((source_val & mask) >> shift);
+            // Set the instruction's immediate value to the shifted source value.
+            let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
+                | ((shifted_source_val & IMMEDIATE_FIELD_MASK) << IMMEDIATE_FIELD_SHIFT);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
         R_AARCH64_TLSLE_ADD_TPREL_HI12
         | R_AARCH64_TLSLE_ADD_TPREL_LO12
         | R_AARCH64_TLSLE_ADD_TPREL_LO12_NC => {
-            let (mask, shift) = match relocation_entry.typ {
-                R_AARCH64_TLSLE_ADD_TPREL_HI12 => (0xFFF000, 12),
-                _tlsle_add_tprel_lo12_nc       => (0x000FFF, 0),
+            // The immediate field occupies 12 bits [21:10] in the ADD instruction
+            // that these relocation types apply to.
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADD--immediate---Add--immediate-->
+            const IMMEDIATE_FIELD_SHIFT: u8 = 10;
+            const IMMEDIATE_FIELD_MASK: u32 = 0xFFF;
+            let source_value_shift = match relocation_entry.typ {
+                R_AARCH64_TLSLE_ADD_TPREL_HI12 => 12,
+                _lo_12                         => 0,
             };
+            
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
             let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
-            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
+            let shifted_source_val = source_val >> source_value_shift;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
             let existing_target_val = u32::from_ne_bytes(
                 target_ref.try_into()
-                    .map_err(|_| "BUG: R_AARCH64_TLSLS_ADD_* relocation target val was not a u32")?
+                    .map_err(|_| "BUG: R_AARCH64_TLSLE_ADD_TPREL_* relocation target val was not a u32")?
             );
-            // TODO: does this need to be shifted to be placed at the location of the ADD immediate field?
-            let new_source_val = (existing_target_val & !mask) | ((source_val & mask) >> shift);
+            // Set the instruction's immediate value to the shifted source value.
+            let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
+                | ((shifted_source_val & IMMEDIATE_FIELD_MASK) << IMMEDIATE_FIELD_SHIFT);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
         other => return unsupported(other),
