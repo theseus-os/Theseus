@@ -84,7 +84,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
         ).cloned();
 
-    logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
+    logger::init(None, logger_writers);
     info!("Initialized full logger.");
 
     // Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.

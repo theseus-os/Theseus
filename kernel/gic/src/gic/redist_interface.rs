@@ -7,19 +7,22 @@
 //! Included functionality:
 //! - Initializing the interface
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
+//! - Getting or setting the priority of PPIs & SGIs based on their numbers
 
 use super::GicRegisters;
 use super::InterruptNumber;
 use super::Enabled;
+use super::Priority;
 
 mod offset {
     use crate::{Offset32, Offset64};
-    pub(crate) const CTLR:             Offset32 = Offset32::from_byte_offset(0x00);
-    pub(crate) const TYPER:            Offset64 = Offset64::from_byte_offset(0x08);
-    pub(crate) const WAKER:            Offset32 = Offset32::from_byte_offset(0x14);
-    pub(crate) const IGROUPR:          Offset32 = Offset32::from_byte_offset(0x80);
-    pub(crate) const SGIPPI_ISENABLER: Offset32 = Offset32::from_byte_offset(0x100);
-    pub(crate) const SGIPPI_ICENABLER: Offset32 = Offset32::from_byte_offset(0x180);
+    pub(crate) const CTLR:              Offset32 = Offset32::from_byte_offset(0x00);
+    pub(crate) const TYPER:             Offset64 = Offset64::from_byte_offset(0x08);
+    pub(crate) const WAKER:             Offset32 = Offset32::from_byte_offset(0x14);
+    pub(crate) const IGROUPR:           Offset32 = Offset32::from_byte_offset(0x80);
+    pub(crate) const SGIPPI_ISENABLER:  Offset32 = Offset32::from_byte_offset(0x100);
+    pub(crate) const SGIPPI_ICENABLER:  Offset32 = Offset32::from_byte_offset(0x180);
+    pub(crate) const SGIPPI_IPRIORITYR: Offset32 = Offset32::from_byte_offset(0x400);
 }
 
 const WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
@@ -119,4 +122,14 @@ pub fn enable_sgippi(registers: &mut GicRegisters, int: InterruptNumber, enabled
     // whether we're enabling or disabling,
     // set as part of group 1
     registers.write_array_volatile::<32>(offset::IGROUPR, int, GROUP_1);
+}
+
+/// Returns the priority of an SGI/PPI.
+pub fn get_sgippi_priority(registers: &GicRegisters, int: InterruptNumber) -> Priority {
+    u8::MAX - (registers.read_array_volatile::<4>(offset::SGIPPI_IPRIORITYR, int) as u8)
+}
+
+/// Sets the priority of an SGI/PPI.
+pub fn set_sgippi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio: Priority) {
+    registers.write_array_volatile::<4>(offset::SGIPPI_IPRIORITYR, int, (u8::MAX - prio) as u32);
 }

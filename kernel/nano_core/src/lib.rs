@@ -25,6 +25,7 @@ use core::ops::DerefMut;
 use captain::MulticoreBringupInfo;
 use memory::VirtualAddress;
 use mod_mgmt::parse_nano_core::NanoCoreItems;
+use serial_port_basic::{take_serial_port, SerialPortAddress};
 
 #[cfg(target_arch = "x86_64")]
 use {
@@ -89,21 +90,17 @@ where
     irq_safety::disable_interrupts();
     println!("nano_core(): Entered early setup. Interrupts disabled.");
 
-    // The early logger is only available on x86_64,
-    // as the aarch64 logger relies on memory-mapped I/O.
-    #[cfg(target_arch = "x86_64")] {
-        let logger_ports = [
-            serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
-        ];
-        logger::early_init(
-            None,
-            IntoIterator::into_iter(logger_ports).flatten(),
-        ).unwrap_or_else(|_e|
-            println!("Failed to initialize early logger; proceeding with init. Error: {:?}", _e)
-        );
-        println!("nano_core(): initialized early logger.");
-        log::info!("initialized early logger");
-    }
+    #[cfg(target_arch = "x86_64")]
+    let logger_ports = [take_serial_port(SerialPortAddress::COM1)];
+
+    // On aarch64, we must init memory management before mapping serial ports.
+    // Before that, we can log messages to a static buffer.
+    #[cfg(target_arch = "aarch64")]
+    let logger_ports: [[serial_port_basic::SerialPort; 0]; 0] = [];
+
+    logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten());
+    log::info!("initialized early logger");
+    println!("nano_core(): initialized early logger.");
 
     #[cfg(target_arch = "x86_64")] {
         exceptions_early::init(Some(double_fault_stack_top));
@@ -129,19 +126,12 @@ where
         identity_mapped_pages
     ) = memory_initialization::init_memory_management(boot_info, kernel_stack_start)?;
 
-    // On aarch64, take_serial_port allocates; memory mgmt must be initialized first.
+    // On aarch64, serial port access requires memory mapping.
     #[cfg(target_arch = "aarch64")] {
-        let logger_ports = [
-            serial_port_basic::take_serial_port(serial_port_basic::SerialPortAddress::COM1),
-        ];
-        logger::early_init(
-            None,
-            IntoIterator::into_iter(logger_ports).flatten(),
-        ).unwrap_or_else(|_e|
-            println!("Failed to initialize early logger; proceeding with init. Error: {:?}", _e)
-        );
-        println!("nano_core(): initialized early logger.");
-        log::info!("initialized early logger");
+        let logger_ports = [take_serial_port(SerialPortAddress::COM1)];
+        logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten());
+        log::info!("initialized early logger with aarch64 serial ports.");
+        println!("nano_core(): initialized early logger  with aarch64 serial ports.");
     }
 
     println!("nano_core(): initialized memory subsystem.");

@@ -134,7 +134,10 @@ pub fn init_ap() {
     // Enable the CPU-local timer
     let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
     let int_ctrl = int_ctrl.as_mut().expect("BUG: init_ap(): INTERRUPT_CONTROLLER was uninitialized");
+    int_ctrl.init_secondary_cpu_interface();
     int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+    int_ctrl.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
+    int_ctrl.set_minimum_priority(0);
 
     enable_timer(true);
 }
@@ -171,6 +174,7 @@ pub fn init() -> Result<(), &'static str> {
                 )?;
 
                 inner.set_minimum_priority(0);
+                inner.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
                 *int_ctrl = Some(inner);
             },
         }
@@ -378,7 +382,7 @@ impl fmt::Debug for EsrEL1 {
             Some(ESR_EL1::EC::Value::DataAbortCurrentEL) => "Data Abort, current EL",
             _ => "N/A",
         };
-        writeln!(f, "\r - {}", ec_translation)?;
+        writeln!(f, "\r - {ec_translation}")?;
 
         // Raw print of instruction specific syndrome.
         write!(f, "\r      Instr Specific Syndrome (ISS): {:#x}", self.0.read(ESR_EL1::ISS))
