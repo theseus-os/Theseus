@@ -1,8 +1,8 @@
 [package]
-name = "mpmc_dequeue"
+name = "mpmc_queue"
 version = "0.1.0"
 authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
-description = "A growable FIFO MPMC dequeue"
+description = "A growable FIFO MPMC queue"
 edition = "2021"
 
 [dependencies]
