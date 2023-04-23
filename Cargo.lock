@@ -3560,7 +3560,7 @@ dependencies = [
 [[package]]
 name = "spin"
 version = "0.9.8"
-source = "git+https://github.com/mvdnes/spin-rs#1f2e06c9f9d22b234776849c65e313f583ddfade"
+source = "git+https://github.com/tsoutsman/spin-rs?branch=rw-lock-guard-counts#4c973478562a37e297f27033d8a9afab9f191260"
 
 [[package]]
 name = "stable_deref_trait"

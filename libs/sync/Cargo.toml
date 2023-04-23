@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies.spin_rs]
 package = "spin"
-git = "https://github.com/mvdnes/spin-rs"
+git = "https://github.com/tsoutsman/spin-rs"
+branch = "rw-lock-guard-counts"
 default-features = false
 features = ["spin_mutex", "rwlock"]

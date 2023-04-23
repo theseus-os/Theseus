@@ -98,9 +98,8 @@ where
     F: Flavour,
 {
     fn drop(&mut self) {
-        let reader_count = self.inner.lock().reader_count();
-        unsafe { ManuallyDrop::drop(&mut self.inner) };
-        F::post_rw_lock_unlock(self.data, true);
+        let reader_count = unsafe { ManuallyDrop::take(&mut self.inner) }.release();
+        F::post_rw_lock_unlock(self.data, reader_count == 0);
     }
 }
 

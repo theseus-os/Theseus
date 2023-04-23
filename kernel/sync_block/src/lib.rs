@@ -7,6 +7,10 @@ use wait_queue::WaitQueue;
 pub type Mutex<T> = sync::Mutex<T, Block>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, Block>;
 
+pub type RwLock<T> = sync::RwLock<T, Block>;
+pub type RwLockReadGuard<'a, T> = sync::RwLockReadGuard<'a, T, Block>;
+pub type RwLockWriteGuard<'a, T> = sync::RwLockWriteGuard<'a, T, Block>;
+
 /// A synchronisation flavour that blocks the current thread while waiting for
 /// the lock to become available.
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -99,13 +103,14 @@ impl Flavour for Block {
 
     #[inline]
     fn post_rw_lock_unlock(data: &Self::RwLockData, is_writer_or_last_reader: bool) {
-        if writer_or_last_reader && !data.writers.notify_one() {
+        if is_writer_or_last_reader && !data.writers.notify_one() {
             data.readers.notify_all();
         }
     }
 }
 
-struct RwLockData {
+#[doc(hidden)]
+pub struct RwLockData {
     readers: WaitQueue,
     writers: WaitQueue,
 }
