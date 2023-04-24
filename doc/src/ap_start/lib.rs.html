@@ -189,8 +189,8 @@
 ) -&gt; ! {
     irq_safety::disable_interrupts();
 
-    <span class="macro">info!</span>(<span class="string">&quot;Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
-        processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
+    <span class="macro">info!</span>(<span class="string">&quot;Booted CPU {}, proc: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
+        cpu_id, processor_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
     <span class="comment">// set a flag telling the BSP that this AP has entered Rust code
