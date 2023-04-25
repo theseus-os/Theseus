@@ -52,7 +52,7 @@ pub fn set_minimum_priority(registers: &mut GicRegisters, priority: Priority) {
 /// been fully handled, by zeroing the current priority level of this CPU.
 /// This implies that the CPU is ready to process interrupts again.
 pub fn end_of_interrupt(registers: &mut GicRegisters, int: InterruptNumber) {
-    registers.write_volatile(offset::EOIR, int as u32);
+    registers.write_volatile(offset::EOIR, int);
 }
 
 /// Acknowledge the currently serviced interrupt
