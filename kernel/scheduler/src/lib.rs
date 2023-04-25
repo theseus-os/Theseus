@@ -24,7 +24,7 @@ cfg_if::cfg_if! {
     }
 }
 
-use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi};
+use interrupts::{self, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
 use task::{self, TaskRef};
 
 /// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
@@ -46,7 +46,7 @@ pub fn init() -> Result<(), &'static str> {
     #[cfg(target_arch = "x86_64")] {
         interrupts::register_interrupt(
             CPU_LOCAL_TIMER_IRQ,
-            lapic_timer_handler,
+            timer_tick_handler,
         ).map_err(|_handler| {
             log::error!("BUG: interrupt {CPU_LOCAL_TIMER_IRQ} was already registered to handler {_handler:#X}");
             "BUG: CPU-local timer interrupt was already registered to a handler"
@@ -54,28 +54,17 @@ pub fn init() -> Result<(), &'static str> {
     }
 
     #[cfg(target_arch = "aarch64")] {
-        interrupts::init_timer(aarch64_timer_handler)?;
+        interrupts::init_timer(timer_tick_handler)?;
         interrupts::enable_timer(true);
         Ok(())
     }
 }
 
-/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
-#[cfg(target_arch = "aarch64")]
-extern "C" fn aarch64_timer_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
-    interrupts::schedule_next_timer_tick();
-    cpu_local_timer_tick_handler();
-    interrupts::EoiBehaviour::HandlerHasSignaledEoi
-}
-
-/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
-#[cfg(target_arch = "x86_64")]
-extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
-    cpu_local_timer_tick_handler()
-}
-
 // Cross platform scheduling code
-fn cpu_local_timer_tick_handler() {
+interrupt_handler!(timer_tick_handler, None, _stack_frame, {
+    #[cfg(target_arch = "aarch64")]
+    interrupts::schedule_next_timer_tick();
+
     // tick count, only used for debugging
     if false {
         use core::sync::atomic::{AtomicUsize, Ordering};
@@ -99,7 +88,9 @@ fn cpu_local_timer_tick_handler() {
     }
 
     schedule();
-}
+
+    EoiBehaviour::HandlerHasSignaledEoi
+});
 
 /// Changes the priority of the given task with the given priority level.
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
