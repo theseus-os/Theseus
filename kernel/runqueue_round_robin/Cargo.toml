@@ -3,6 +3,7 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "runqueue_round_robin"
 description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
@@ -15,6 +16,9 @@ path = "../../libs/atomic_linked_list"
 
 [dependencies.task]
 path = "../task"
+
+[dependencies.cpu]
+path = "../cpu"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.

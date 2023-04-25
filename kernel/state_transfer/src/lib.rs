@@ -52,7 +52,7 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
     // lazy_static! { static ref RQEMPTY: AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>> = AtomicMap::new(); }
     let rq_ptr = &runqueue_round_robin::RUNQUEUES as *const _ as usize;
     let once_rq = core::mem::replace(
-        unsafe { &mut *(rq_ptr as *mut AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>>) }, 
+        unsafe { &mut *(rq_ptr as *mut AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunqueueRoundRobin>>) }, 
         AtomicMap::new()
     );
 

@@ -638,6 +638,7 @@ mod scheduler {
     /// meaning that no scheduling will occur until it is initialized.
     /// Currently, this is initialized from within `scheduler::init()`.
     static SELECT_NEXT_TASK_FUNC: AtomicCell<SchedulerFunc> = AtomicCell::new(|_| None);
+    const _: () = assert!(AtomicCell::<SchedulerFunc>::is_lock_free());
 
     /// Sets the active scheduler policy used by [`schedule()`] to select the next task.
     ///

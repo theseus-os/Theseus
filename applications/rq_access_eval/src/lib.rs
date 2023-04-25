@@ -38,7 +38,7 @@ pub fn main(args: Vec<String>) -> isize {
     let duration = if least_busy {
         run(
             |_| {
-                runqueue::get_least_busy_core();
+                runqueue::get_least_busy_runqueue();
             },
             num,
         )

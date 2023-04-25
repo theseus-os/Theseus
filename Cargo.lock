@@ -3159,6 +3159,7 @@ name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
+ "cpu",
  "log",
  "mutex_preemption",
  "single_simd_task_optimization",

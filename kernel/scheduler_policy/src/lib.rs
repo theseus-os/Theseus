@@ -132,26 +132,3 @@ pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static s
         Err("no scheduler that supports periodic tasks is currently loaded")
     }
 }
-
-pub trait SchedulerPolicy {
-    type Runqueue;
-    type RunqueueId;
-    type PolicyTaskRef;
-
-    fn select_next_task(rq_id: Self::RunqueueId) -> Option<TaskRef>;
-
-    /// Iterates over all runqueues to remove the given task from each one.
-    fn remove_task_from_all_runqueues(task: &TaskRef) -> Result<(), &'static str> {
-
-    /// Returns the requested runqueue.
-    fn get_runqueue(rq_id: Self::RunqueueId) -> Option<&'static RwLockPreempt<Self::Runqueue>>;
-
-    /// Returns the "least busy" runqueue, currently based only on runqueue size.
-    fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<Self::Runqueue>> {
-    
-    /// Adds the given task to the "least busy" runqueue.
-    fn add_task_to_any_runqueue(task: impl Into<Self::PolicyTaskRef>) -> Result<(), &'static str>;
-
-    /// Adds the given task to the given runqueue.
-    fn add_task_to_specific_runqueue(rq_id: Self::RunqueueId, task: impl Into<Self::PolicyTaskRef>) -> Result<(), &'static str>;
-}
