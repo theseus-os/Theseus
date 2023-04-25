@@ -9,3 +9,10 @@
 mod arch;
 
 pub use arch::*;
+
+#[derive(Debug, PartialEq, Eq)]
+#[repr(C)]
+pub enum EoiBehaviour {
+    CallerMustSignalEoi,
+    HandlerHasSignaledEoi,
+}

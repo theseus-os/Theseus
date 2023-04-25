@@ -8,7 +8,7 @@ use log::{error, warn, info, debug};
 use memory::VirtualAddress;
 use spin::Once;
 use early_printer::println;
-use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
+pub use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -30,6 +30,19 @@ static RESERVED_IRQ_LIST: [u8; 3] = [
     CPU_LOCAL_TIMER_IRQ,
     apic::APIC_SPURIOUS_INTERRUPT_IRQ,
 ];
+
+
+#[macro_export]
+macro_rules! interrupt_handler {
+    ($name:ident, $x86_64_interrupt_number:expr, $stack_frame:ident, $code:block) => {
+        extern "x86-interrupt" fn $name(sf: $crate::InterruptStackFrame) {
+            let $stack_frame = &sf;
+            if let CallerMustSignalEoi = $code {
+                $crate::eoi($x86_64_interrupt_number);
+            }
+        }
+    }
+}
 
 
 /// Returns `true` if the given address is the exception handler in the current `IDT`

@@ -2,6 +2,8 @@ use core::arch::global_asm;
 use core::ops::DerefMut;
 use core::fmt;
 
+use crate::EoiBehaviour;
+
 use cortex_a::registers::*;
 
 use tock_registers::interfaces::Writeable;
@@ -53,6 +55,14 @@ struct SpsrEL1(InMemoryRegister<u64, SPSR_EL1::Register>);
 #[repr(transparent)]
 struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
 
+#[cfg(target_arch = "aarch64")]
+#[macro_export]
+macro_rules! interrupt_handler {
+    ($name:ident, $x86_64_interrupt_number:expr, $context:ident, $code:block) => {
+        extern "C" fn $name($context: &$crate::InterruptStackFrame) -> $crate::EoiBehaviour $code
+    }
+}
+
 /// The exception context as it is stored on the stack on exception entry.
 ///
 /// Warning: `table.s` assumes this exact layout. If you modify this,
@@ -75,14 +85,8 @@ pub struct ExceptionContext {
     esr_el1: EsrEL1,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[repr(C)]
-pub enum EoiBehaviour {
-    CallerMustSignalEoi,
-    HandlerHasSignaledEoi,
-}
-
-type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
+pub type HandlerFunc = extern "C" fn(&InterruptStackFrame) -> EoiBehaviour;
+pub type InterruptStackFrame = ExceptionContext;
 
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
