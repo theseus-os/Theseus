@@ -375,13 +375,17 @@ static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 // IRQ 0x24: COM1 and COM3 serial port interrupt handler.
 interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
     // trace!("COM1/COM3 serial handler");
-    INTERRUPT_ACTION_COM1_COM3.get().map(|func| func());
+    if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
+        func()
+    }
     EoiBehaviour::CallerMustSignalEoi
 });
 
 // IRQ 0x23: COM2 and COM4 serial port interrupt handler.
 interrupt_handler!(com2_com4_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x3), _stack_frame, {
     // trace!("COM2/COM4 serial handler");
-    INTERRUPT_ACTION_COM2_COM4.get().map(|func| func());
+    if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
+        func()
+    }
     EoiBehaviour::CallerMustSignalEoi
 });
