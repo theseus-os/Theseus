@@ -3338,7 +3338,6 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.4",
- "x86_64",
 ]
 
 [[package]]

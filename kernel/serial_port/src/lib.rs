@@ -22,7 +22,6 @@ extern crate irq_safety;
 extern crate interrupts;
 extern crate deferred_interrupt_tasks;
 extern crate core2;
-extern crate x86_64;
 extern crate serial_port_basic;
 
 use deferred_interrupt_tasks::InterruptRegistrationError;
@@ -37,8 +36,7 @@ use alloc::{boxed::Box, sync::Arc};
 use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
-use interrupts::IRQ_BASE_OFFSET;
-use x86_64::structures::idt::{HandlerFunc, InterruptStackFrame};
+use interrupts::{HandlerFunc, EoiBehaviour, interrupt_handler};
 
 // Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -110,6 +108,7 @@ fn static_port_of(
 fn interrupt_number_handler(
     serial_port_address: &SerialPortAddress
 ) -> (u8, HandlerFunc) {
+    use interrupts::IRQ_BASE_OFFSET;
     match serial_port_address {
         SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_com3_interrupt_handler),
         SerialPortAddress::COM2 | SerialPortAddress::COM4 => (IRQ_BASE_OFFSET + 0x03, com2_com4_interrupt_handler),
@@ -373,20 +372,16 @@ static INTERRUPT_ACTION_COM1_COM3: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new();
 
 
-/// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
-extern "x86-interrupt" fn com1_com3_interrupt_handler(_stack_frame: InterruptStackFrame) {
+// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
+interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
     // trace!("COM1/COM3 serial handler");
-    if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
-        func();
-    }
-    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x4));
-}
+    INTERRUPT_ACTION_COM1_COM3.get().map(|func| func());
+    EoiBehaviour::CallerMustSignalEoi
+});
 
-/// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
-extern "x86-interrupt" fn com2_com4_interrupt_handler(_stack_frame: InterruptStackFrame) {
+// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
+interrupt_handler!(com2_com4_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x3), _stack_frame, {
     // trace!("COM2/COM4 serial handler");
-    if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
-        func();
-    }
-    interrupts::eoi(Some(IRQ_BASE_OFFSET + 0x3));
-}
+    INTERRUPT_ACTION_COM2_COM4.get().map(|func| func());
+    EoiBehaviour::CallerMustSignalEoi
+});
