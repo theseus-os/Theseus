@@ -7,23 +7,30 @@
 extern crate alloc;
 
 use atomic_linked_list::atomic_map::AtomicMap;
+use cpu::CpuId;
+use log::{error, trace};
 use mutex_preemption::RwLockPreempt;
+use runqueue_round_robin::{RunqueueRoundRobin, RoundRobinTaskRef};
+use scheduler_policy::{SchedulerPolicy, RunqueueError};
 use task::TaskRef;
-use runqueue_round_robin::RunqueueRoundRobin;
 
 
 /// Each CPU has its own private runqueue instance;
 /// there is currently no migration of tasks across CPUs.
 ///
 /// TODO: move this into per-CPU data regions.
-static RUNQUEUES: AtomicMap<CpuId, RwLockPreempt<RunqueueRoundRobin>> = AtomicMap::new();
+pub static RUNQUEUES: AtomicMap<CpuId, RwLockPreempt<RunqueueRoundRobin>> = AtomicMap::new();
 
 
 pub struct SchedulerRoundRobin;
 
-impl SchedulerRoundRobin {
+impl SchedulerPolicy for SchedulerRoundRobin {
+    type Runqueue = RunqueueRoundRobin;
+    type RunqueueId = CpuId;
+    type RunqueueTaskRef = RoundRobinTaskRef;
+    
     /// Creates a new runqueue for the given `cpu`.
-    pub fn init(cpu: CpuId) -> Result<(), &'static str> {
+    fn init_runqueue(&self, cpu: CpuId) -> Result<(), RunqueueError> {
         let new_rq = RwLockPreempt::new(RunqueueRoundRobin::new(cpu));
         
         if RUNQUEUES.insert(cpu, new_rq).is_none() {
@@ -31,14 +38,14 @@ impl SchedulerRoundRobin {
             Ok(())
         } else {
             error!("BUG: SchedulerRoundRobin::init(): runqueue already exists for CPU {}!", cpu);
-            Err("BUG: SchedulerRoundRobin::init(): runqueue already exists for CPU {}!")
+            Err(RunqueueError::RunqueueAlreadyExists)
         }
     }
 
     /// This defines the round robin scheduler policy.
     /// Returns None if there is no schedule-able task
-    pub fn select_next_task(cpu: CpuId) -> Option<TaskRef> {
-        let mut runqueue_locked = match Self::get_runqueue(cpu) {
+    fn select_next_task(&self, cpu: CpuId) -> Option<TaskRef> {
+        let mut runqueue_locked = match self.get_runqueue(cpu) {
             Some(rq) => rq.write(),
             None => {
                 error!("BUG: select_next_task (round robin): couldn't get runqueue for CPU {}", cpu); 
@@ -77,7 +84,7 @@ impl SchedulerRoundRobin {
     /// Removes the given task from all runqueues.
     ///
     /// This is a brute force approach that iterates over all runqueues. 
-    pub fn remove_task_from_all_runqueues(task: &TaskRef) -> Result<(), &'static str> {
+    fn remove_task_from_all_runqueues(&self, task: &TaskRef) -> Result<(), RunqueueError> {
         for (_cpu, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
         }
@@ -85,15 +92,15 @@ impl SchedulerRoundRobin {
     }
 
     /// Returns the runqueue for the given CPU.
-    pub fn get_runqueue(cpu: CpuId) -> Option<&'static RwLockPreempt<RunqueueRoundRobin>> {
+    fn get_runqueue(&self, cpu: CpuId) -> Option<&'static RwLockPreempt<RunqueueRoundRobin>> {
         RUNQUEUES.get(&cpu)
     }
 
     /// Returns the "least busy" runqueue, currently based only on runqueue size.
-    pub fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<RunqueueRoundRobin>> {
-        let mut min_rq = None;
+    fn get_least_busy_runqueue(&self) -> Option<&'static RwLockPreempt<RunqueueRoundRobin>> {
+        let mut min_rq: Option<(&RwLockPreempt<RunqueueRoundRobin>, usize)> = None;
         for (_, rq) in RUNQUEUES.iter() {
-            let rq_size = rq.read().queue.len();
+            let rq_size = rq.read().len();
             if let Some(min) = min_rq {
                 if rq_size < min.1 {
                     min_rq = Some((rq, rq_size));
@@ -108,18 +115,18 @@ impl SchedulerRoundRobin {
     }
 
     /// Adds the given task to the "least busy" runqueue.
-    pub fn add_task_to_any_runqueue(task: impl Into<RoundRobinTaskRef>) -> Result<(), &'static str> {
-        let rq = Self::get_least_busy_runqueue()
+    fn add_task_to_any_runqueue(&self, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
+        let rq = self.get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
-            .ok_or("couldn't find any runqueues to add the task to!")?;
+            .ok_or(RunqueueError::RunqueueNotFound)?;
 
         rq.write().add_task(task)
     }
 
     /// Adds the given task to the given CPU's runqueue.
-    pub fn add_task_to_specific_runqueue(cpu: CpuId, task: impl Into<RoundRobinTaskRef>) -> Result<(), &'static str> {
-        Self::get_runqueue(cpu)
-            .ok_or("Couldn't get runqueue for the given CPU")?
+    fn add_task_to_specific_runqueue(&self, rq_id: Self::RunqueueId, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
+        self.get_runqueue(rq_id)
+            .ok_or(RunqueueError::RunqueueNotFound)?
             .write()
             .add_task(task)
     }

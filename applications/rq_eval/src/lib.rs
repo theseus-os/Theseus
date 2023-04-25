@@ -18,8 +18,8 @@ extern crate alloc;
 #[macro_use] extern crate app_io;
 extern crate task;
 extern crate cpu;
+extern crate scheduler;
 extern crate spawn;
-extern crate runqueue;
 extern crate getopts;
 extern crate hpet;
 extern crate libtest;
@@ -158,8 +158,8 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _ in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(cpu::current_cpu().into_u8(), taskref.clone())?;
-        runqueue::remove_task_from_all(&taskref)?;
+        scheduler::current_scheduler().add_task_to_specific_runqueue(cpu::current_cpu(), taskref.clone())?;
+        scheduler::current_scheduler().remove_task_from_all(&taskref)?;
     }
 
     let end = hpet.get_counter();

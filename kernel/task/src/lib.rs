@@ -611,7 +611,7 @@ mod scheduler {
 
         let cpu_id = preemption_guard.cpu_id();
 
-        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
+        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) else {
             return false; // keep running the same current task
         };
 
@@ -630,7 +630,7 @@ mod scheduler {
     /// The signature for the function that selects the next task for the given CPU.
     ///
     /// This is used when the [`schedule()`] function is invoked.
-    pub type SchedulerFunc = fn(u8) -> Option<TaskRef>;
+    pub type SchedulerFunc = fn(CpuId) -> Option<TaskRef>;
 
     /// The function currently registered as the system-wide scheduler policy.
     ///

@@ -4,7 +4,6 @@ extern crate alloc;
 // #[macro_use] extern crate debugit;
 
 extern crate task;
-extern crate runqueue;
 extern crate getopts;
 
 use getopts::Options;

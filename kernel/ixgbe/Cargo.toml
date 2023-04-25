@@ -56,9 +56,6 @@ features = [ "alloc", "small_rng" ]
 [dependencies.hpet]
 path = "../acpi/hpet"
 
-[dependencies.runqueue]
-path = "../runqueue"
-
 [dependencies.network_interface_card]
 path = "../network_interface_card"
 

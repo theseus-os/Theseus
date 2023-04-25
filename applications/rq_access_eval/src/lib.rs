@@ -4,6 +4,7 @@ extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
 use app_io::println;
+use cpu::CpuId;
 use time::{now, Duration, Monotonic};
 
 pub fn main(args: Vec<String>) -> isize {
@@ -11,9 +12,9 @@ pub fn main(args: Vec<String>) -> isize {
     let mut options = getopts::Options::new();
     options
         .optflag("h", "help", "Display this message")
-        .optflag("l", "least-busy", "Get the least busy core")
-        .optopt("c", "core", "Get <core>'s runqueue", "<core>")
-        .optopt("n", "num", "Perform <num> iterations", "<num>");
+        .optflag("l", "least-busy", "Get the least busy CPU")
+        .optopt("c", "core", "Get <CPU>'s runqueue", "<CPU>")
+        .optopt("n", "num", "Perform <NUM> iterations", "<NUM>");
 
     let matches = match options.parse(args) {
         Ok(matches) => matches,
@@ -25,10 +26,10 @@ pub fn main(args: Vec<String>) -> isize {
     };
 
     let least_busy = matches.opt_present("l");
-    let core = matches.opt_get::<u8>("c").expect("failed to parse core");
+    let cpu = matches.opt_get::<u8>("c").expect("failed to parse CPU");
 
     if least_busy && core.is_some() {
-        panic!("both the least-busy and core flags can't be specified");
+        panic!("both the least-busy and CPU flags can't be specified");
     }
 
     let num = matches
@@ -38,14 +39,15 @@ pub fn main(args: Vec<String>) -> isize {
     let duration = if least_busy {
         run(
             |_| {
-                runqueue::get_least_busy_runqueue();
+                scheduler::current_scheduler().get_least_busy_runqueue();
             },
             num,
         )
-    } else if let Some(core) = core {
+    } else if let Some(cpu) = cpu {
+        let cpu_id = CpuId::try_from(cpu).expect("specified CPU did not exist");
         run(
             |_| {
-                runqueue::get_runqueue(core);
+                scheduler::current_scheduler().get_runqueue(cpu_id);
             },
             num,
         )
@@ -53,7 +55,9 @@ pub fn main(args: Vec<String>) -> isize {
         let cpu_count = cpu::cpu_count();
         run(
             |count| {
-                runqueue::get_runqueue((count % cpu_count) as u8);
+                scheduler::current_scheduler().get_runqueue(
+                    CpuId::try_from(count % cpu_count).expect("CPU IDs aren't sequential")
+                );
             },
             num,
         )

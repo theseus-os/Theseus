@@ -1,12 +1,12 @@
 #![no_std]
 
 extern crate alloc;
+extern crate scheduler;
 extern crate task;
 extern crate memory;
 extern crate apic;
 extern crate cpu;
 extern crate hpet;
-extern crate runqueue;
 extern crate pmu_x86;
 extern crate libm;
 #[macro_use] extern crate log;
@@ -35,14 +35,10 @@ pub fn hpet_2_us(hpet: u64) -> u64 {
 	hpet * hpet_period as u64 / MICRO_TO_FEMTO
 }
 
-#[macro_export]
-macro_rules! CPU_ID {
-	() => (cpu::current_cpu())
-}
 
 /// Helper function return the tasks in a given `cpu`'s runqueue
 pub fn nr_tasks_in_rq(cpu: CpuId) -> Option<usize> {
-	match runqueue::get_runqueue(cpu.into_u8()).map(|rq| rq.read()) {
+	match scheduler::current_scheduler().get_runqueue(cpu).map(|rq| rq.read()) {
 		Some(rq) => { Some(rq.len()) }
 		_ => { None }
 	}
@@ -52,7 +48,7 @@ pub fn nr_tasks_in_rq(cpu: CpuId) -> Option<usize> {
 /// True if only two tasks are running in the current runqueue.
 /// Used to verify if there are any other tasks than the current task and idle task in the runqueue
 pub fn check_myrq() -> bool {
-	match nr_tasks_in_rq(CPU_ID!()) {
+	match nr_tasks_in_rq(cpu::current_cpu()) {
 		Some(2) => { true }
 		_ => { false }
 	}

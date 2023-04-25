@@ -20,7 +20,6 @@ stack = { path = "../stack" }
 cpu = { path = "../cpu" }
 cpu_local_preemption = { path = "../cpu_local_preemption" }
 task = { path = "../task" }
-runqueue = { path = "../runqueue" }
 scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }
 context_switch = { path = "../context_switch" }

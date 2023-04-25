@@ -324,7 +324,6 @@ dependencies = [
  "path",
  "pmu_x86",
  "rendezvous",
- "runqueue",
  "scheduler",
  "simple_ipc",
  "spawn",
@@ -1089,7 +1088,6 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
  "signal_handler",
  "stack_trace",
  "task",
@@ -1433,7 +1431,6 @@ dependencies = [
  "libtest",
  "log",
  "qp-trie",
- "runqueue",
  "spawn",
 ]
 
@@ -1669,7 +1666,6 @@ dependencies = [
  "pic",
  "pit_clock_basic",
  "rand",
- "runqueue",
  "spin 0.9.4",
  "virtual_nic",
  "volatile 0.2.7",
@@ -1717,7 +1713,6 @@ dependencies = [
  "app_io",
  "debugit",
  "getopts",
- "runqueue",
  "task",
 ]
 
@@ -1793,7 +1788,7 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
+ "scheduler",
  "spin 0.9.4",
  "task",
 ]
@@ -2576,7 +2571,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "runqueue",
  "stack_trace",
  "stack_trace_frame_pointers",
  "task",
@@ -3055,7 +3049,7 @@ dependencies = [
  "apic",
  "app_io",
  "getopts",
- "runqueue",
+ "scheduler",
  "task",
 ]
 
@@ -3067,7 +3061,7 @@ dependencies = [
  "cpu",
  "getopts",
  "irq_safety",
- "runqueue",
+ "scheduler",
  "time",
 ]
 
@@ -3081,7 +3075,7 @@ dependencies = [
  "hpet",
  "libtest",
  "log",
- "runqueue",
+ "scheduler",
  "spawn",
  "task",
 ]
@@ -3118,22 +3112,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "runqueue"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "cfg-if 1.0.0",
- "lazy_static",
- "log",
- "mutex_preemption",
- "runqueue_priority",
- "runqueue_realtime",
- "runqueue_round_robin",
- "single_simd_task_optimization",
- "task",
-]
-
-[[package]]
 name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
@@ -3158,10 +3136,10 @@ dependencies = [
 name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
- "atomic_linked_list",
  "cpu",
  "log",
  "mutex_preemption",
+ "scheduler_policy",
  "single_simd_task_optimization",
  "task",
 ]
@@ -3203,10 +3181,10 @@ dependencies = [
  "cfg-if 1.0.0",
  "cpu",
  "cpu_local_preemption",
+ "crossbeam-utils",
  "interrupts",
  "log",
- "scheduler_priority",
- "scheduler_realtime",
+ "scheduler_policy",
  "scheduler_round_robin",
  "sleep",
  "task",
@@ -3226,22 +3204,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "scheduler_priority"
+name = "scheduler_policy"
 version = "0.1.0"
 dependencies = [
- "log",
- "runqueue",
- "runqueue_priority",
- "spin 0.9.4",
- "task",
-]
-
-[[package]]
-name = "scheduler_realtime"
-version = "0.1.0"
-dependencies = [
- "log",
- "runqueue_realtime",
+ "mutex_preemption",
  "task",
 ]
 
@@ -3249,9 +3215,12 @@ dependencies = [
 name = "scheduler_round_robin"
 version = "0.1.0"
 dependencies = [
+ "atomic_linked_list",
+ "cpu",
  "log",
- "runqueue",
+ "mutex_preemption",
  "runqueue_round_robin",
+ "scheduler_policy",
  "spin 0.9.4",
  "task",
 ]
@@ -3384,7 +3353,6 @@ dependencies = [
  "log",
  "path",
  "root",
- "runqueue",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -3535,7 +3503,6 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "runqueue",
  "scheduler",
  "spin 0.9.4",
  "stack",
@@ -3629,7 +3596,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "runqueue_priority",
- "runqueue_round_robin",
+ "scheduler_round_robin",
  "spin 0.9.4",
  "task",
 ]

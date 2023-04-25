@@ -30,6 +30,10 @@ default-members = [
 
 
 exclude = [
+	## TODO: remove, temporary until we rewrite those two scheduler policies
+	"kernel/scheduler_priority",
+	"kernel/scheduler_realtime",
+
 	## Exclude the build directories
 	"build",
 	"target",

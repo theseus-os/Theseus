@@ -30,8 +30,8 @@ path = "../memory"
 [dependencies.mod_mgmt]
 path = "../mod_mgmt"
 
-[dependencies.runqueue_round_robin]
-path = "../runqueue_round_robin"
+[dependencies.scheduler_round_robin]
+path = "../scheduler_round_robin"
 
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"

@@ -10,5 +10,5 @@ app_io = { path = "../../kernel/app_io" }
 cpu = { path = "../../kernel/cpu" }
 getopts = "0.2"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
-runqueue = { path = "../../kernel/runqueue" }
+scheduler = { path = "../../kernel/scheduler" }
 time = { path = "../../kernel/time" }

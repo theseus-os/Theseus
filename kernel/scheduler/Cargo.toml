@@ -3,21 +3,21 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "scheduler"
 description = "Implement preemptive task scheduling via timer interrupts"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
 cfg-if = "1.0.0"
+crossbeam-utils = { version = "0.8.12", default-features = false }
 
 cpu = { path = "../cpu" }
 cpu_local_preemption = { path = "../cpu_local_preemption" }
 interrupts = { path = "../interrupts" }
+scheduler_policy = { path = "../scheduler_policy" }
 sleep = { path = "../sleep" }
 task = { path = "../task" }
 
 scheduler_round_robin = { path = "../scheduler_round_robin" }
-scheduler_priority = { path = "../scheduler_priority" }
-scheduler_realtime = { path = "../scheduler_realtime" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"

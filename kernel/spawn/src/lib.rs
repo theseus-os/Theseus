@@ -49,14 +49,13 @@ pub fn init(
     cpu_id: CpuId,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    let cpu_id_as_u8: u8 = cpu_id.into_u8();
-    runqueue::init(cpu_id_as_u8)?;
+    scheduler::init(cpu_id)?;
     
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
         task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
-    runqueue::add_task_to_specific_runqueue(
-        cpu_id_as_u8,
+    scheduler::current_scheduler().add_task_to_specific_runqueue(
+        cpu_id,
         exitable_bootstrap_task.clone(),
     )?;
     Ok(BootstrapTaskRef {
@@ -426,9 +425,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         fence(Ordering::Release);
         
         if let Some(cpu) = self.pin_on_cpu {
-            runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+            scheduler::current_scheduler().add_task_to_specific_runqueue(cpu, task_ref.clone())?;
         } else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            scheduler::current_scheduler().add_task_to_any_runqueue(task_ref.clone())?;
         }
 
         Ok(task_ref)
@@ -984,13 +983,13 @@ where
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     // Special behavior when evaluating runqueues
     #[cfg(rq_eval)] {
-        runqueue::remove_task_from_all(current_task).unwrap();
+        scheduler::current_scheduler().remove_task_from_all(current_task).unwrap();
     }
 
     // In the regular case, we do not perform task migration between cores,
     // so we can use the heuristic that the task is only on the current core's runqueue.
     #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
+        if let Err(e) = scheduler::current_scheduler().get_runqueue(cpu::current_cpu())
             .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
             .and_then(|rq| rq.write().remove_task(current_task)) 
         {

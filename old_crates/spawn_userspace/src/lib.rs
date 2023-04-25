@@ -12,7 +12,6 @@ extern crate atomic_linked_list;
 extern crate memory;
 extern crate kernel_config;
 extern crate task;
-extern crate runqueue;
 extern crate scheduler;
 extern crate mod_mgmt;
 extern crate gdt;

@@ -21,9 +21,6 @@ path = "../memory"
 [dependencies.task]
 path = "../task"
 
-[dependencies.runqueue]
-path = "../runqueue"
-
 [dependencies.unwind]
 path = "../unwind"
 

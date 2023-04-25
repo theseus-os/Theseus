@@ -1,134 +1,94 @@
-//! Offers the ability to control or configure the active task scheduling policy.
-//!
-//! ## What is and isn't in this crate?
-//! This crate also defines the timer interrupt handler used for preemptive
-//! task switching on each CPU. In [`init()`], it registers that handler
-//! with the [`interrupts`] subsystem.
-//!
-//! The actual task switching logic is implemented in the [`task`] crate.
-//! This crate re-exports that main [`schedule()`] function for convenience,
-//! legacy compatbility, and to act as an easy landing page for code search.
-//! That means that a caller need only depend on [`task`], not this crate,
-//! to invoke the scheduler (yield the CPU) to switch to another task.
+//! Defines the [`SchedulerPolicy`] trait, an abstraction of scheduler policies.
 
 #![no_std]
-#![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
-cfg_if::cfg_if! {
-    if #[cfg(priority_scheduler)] {
-        extern crate scheduler_priority as scheduler;
-    } else if #[cfg(realtime_scheduler)] {
-        extern crate scheduler_realtime as scheduler;
-    } else {
-        extern crate scheduler_round_robin as scheduler;
-    }
+use mutex_preemption::RwLockPreempt;
+use task::TaskRef;
+
+pub trait AsSchedulerPolicy: Send + Sync {
+    fn as_scheduler_policy<A, B, C>(&self) -> &dyn SchedulerPolicy<Runqueue = A, RunqueueId = B, RunqueueTaskRef = C>;
 }
 
-use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi};
-use task::{self, TaskRef};
-
-/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
-pub use task::schedule;
-
-
-/// Initializes the scheduler on this system using the policy set at compiler time.
+/// An abstraction of a scheduler policy.
 ///
-/// Also registers a timer interrupt handler for preemptive scheduling.
-///
-/// Currently, there is a single scheduler policy for the whole system.
-/// The policy is selected by specifying a Rust `cfg` value at build time, like so:
-/// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
-/// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
-/// * `make` --> basic round-robin scheduler, the default.
-pub fn init() -> Result<(), &'static str> {
-    task::set_scheduler_policy(scheduler::select_next_task);
+/// A scheduler policy can be registered using [`task::set_scheduler_policy()`]
+/// and will be used by future invocations of the `schedule()` routine.
+pub trait SchedulerPolicy {
+    /// The type of the runqueue(s) stored in this scheduler.
+    type Runqueue;
+    /// A unique identifier for a runqueue in this scheduler, e.g.,
+    /// a CPU ID if there is one runqueue per CPU.
+    type RunqueueId;
+    /// The type of task reference stored in this scheduler's runqueue(s).
+    ///
+    /// This is typically a wrapper around a [`TaskRef`]
+    /// and should implement a simple conversion from a [`TaskRef`].
+    type RunqueueTaskRef: From<TaskRef>;
 
-    #[cfg(target_arch = "x86_64")] {
-        interrupts::register_interrupt(
-            CPU_LOCAL_TIMER_IRQ,
-            lapic_timer_handler,
-        ).map_err(|_handler| {
-            log::error!("BUG: interrupt {CPU_LOCAL_TIMER_IRQ} was already registered to handler {_handler:#X}");
-            "BUG: CPU-local timer interrupt was already registered to a handler"
-        })
-    }
+    /// Initializes a runqueue with the given runqueue ID in this scheduler.
+    fn init_runqueue(&self, rq_id: Self::RunqueueId) -> Result<(), RunqueueError>;
 
-    #[cfg(target_arch = "aarch64")] {
-        interrupts::init_timer(aarch64_timer_handler)?;
-        interrupts::enable_timer(true);
-        Ok(())
-    }
+    /// Returns the next task that should be scheduled in,
+    /// or `None` if there are no runnable tasks.
+    ///
+    /// This function effectively defines the policy of this scheduler.
+    fn select_next_task(&self, rq_id: Self::RunqueueId) -> Option<TaskRef>;
+
+    /// Iterates over all runqueues to remove the given task from each one.
+    fn remove_task_from_all_runqueues(&self, task: &TaskRef) -> Result<(), RunqueueError>;
+
+    /// Returns the requested runqueue.
+    fn get_runqueue(&self, rq_id: Self::RunqueueId) -> Option<&'static RwLockPreempt<Self::Runqueue>>;
+
+    /// Returns the "least busy" runqueue, currently based only on runqueue size.
+    fn get_least_busy_runqueue(&self) -> Option<&'static RwLockPreempt<Self::Runqueue>>;
+    
+    /// Adds the given task to the "least busy" runqueue.
+    fn add_task_to_any_runqueue(&self, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError>;
+
+    /// Adds the given task to the given runqueue.
+    fn add_task_to_specific_runqueue(&self, rq_id: Self::RunqueueId, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError>;
 }
 
-/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
-#[cfg(target_arch = "aarch64")]
-extern "C" fn aarch64_timer_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
-    interrupts::schedule_next_timer_tick();
-    cpu_local_timer_tick_handler();
-    interrupts::EoiBehaviour::HandlerHasSignaledEoi
+/// The set of errors that may occur in [`SchedulerPolicy`] functions.
+#[derive(Debug)]
+pub enum RunqueueError {
+    /// A runqueue already existed for the 
+    RunqueueAlreadyExists,
+    /// When trying to get access a specific runqueue, that runqueue could not be found.
+    RunqueueNotFound,
+    /// When trying to add a task to a runqueue, that task was already present.
+    TaskAlreadyExists,
+    /// When trying to remove a task from a runqueue, that task was not found.
+    TaskNotFound,
 }
 
-/// The handler for each CPU's local timer interrupt, used for preemptive task switching.
-#[cfg(target_arch = "x86_64")]
-extern "x86-interrupt" fn lapic_timer_handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
-    cpu_local_timer_tick_handler()
-}
+/// A dummy scheduler policy that does nothing and returns errors for all funcitons.
+pub struct DummyScheduler;
+impl SchedulerPolicy for DummyScheduler {
+    type Runqueue = ();
+    type RunqueueId = ();
+    type RunqueueTaskRef = TaskRef;
 
-// Cross platform scheduling code
-fn cpu_local_timer_tick_handler() {
-    // tick count, only used for debugging
-    if false {
-        use core::sync::atomic::{AtomicUsize, Ordering};
-        static CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
-        let _ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-        log::info!("(CPU {}) CPU-LOCAL TIMER HANDLER! TICKS = {}", cpu::current_cpu(), _ticks);
+    fn init_runqueue(&self, _rq_id: Self::RunqueueId) -> Result<(), RunqueueError> {
+        Err(RunqueueError::RunqueueAlreadyExists)
     }
-
-    // Inform the `sleep` crate that it should update its inner tick count
-    // in order to unblock any tasks that are done sleeping.
-    sleep::unblock_sleeping_tasks();
-
-    // We must acknowledge the interrupt before the end of this handler
-    // because we switch tasks here, which doesn't return.
-    {
-        #[cfg(target_arch = "x86_64")]
-        eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
-
-        #[cfg(target_arch = "aarch64")]
-        eoi(CPU_LOCAL_TIMER_IRQ);
-    }
-
-    schedule();
-}
-
-/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
-/// This function returns an error when a scheduler without priority is loaded. 
-pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::set_priority(_task, _priority)
-    }
-    #[cfg(not(priority_scheduler))] {
-        Err("no scheduler that uses task priority is currently loaded")
-    }
-}
-
-/// Returns the priority of a given task.
-/// This function returns None when a scheduler without priority is loaded.
-pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::get_priority(_task)
-    }
-    #[cfg(not(priority_scheduler))] {
+    fn select_next_task(&self, _rq_id: Self::RunqueueId) -> Option<TaskRef> {
         None
     }
-}
-
-pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
-    #[cfg(realtime_scheduler)] {
-        scheduler_realtime::set_periodicity(_task, _period)
+    fn remove_task_from_all_runqueues(&self, _task: &TaskRef) -> Result<(), RunqueueError> {
+        Err(RunqueueError::TaskNotFound)
     }
-    #[cfg(not(realtime_scheduler))] {
-        Err("no scheduler that supports periodic tasks is currently loaded")
+    fn get_runqueue(&self, _rq_id: Self::RunqueueId) -> Option<&'static RwLockPreempt<Self::Runqueue>> {
+        None
+    }
+    fn get_least_busy_runqueue(&self) -> Option<&'static RwLockPreempt<Self::Runqueue>> {
+        None
+    }
+    fn add_task_to_any_runqueue(&self, _task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
+        Err(RunqueueError::RunqueueNotFound)
+    }
+    fn add_task_to_specific_runqueue(&self, _rq_id: Self::RunqueueId, _task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
+        Err(RunqueueError::RunqueueNotFound)
     }
 }

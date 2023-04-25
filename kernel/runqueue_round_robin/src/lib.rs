@@ -8,9 +8,10 @@
 extern crate alloc;
 
 use alloc::collections::VecDeque;
-use cpu::CpuId;
-use task::TaskRef;
 use core::ops::{Deref, DerefMut};
+use cpu::CpuId;
+use scheduler_policy::RunqueueError;
+use task::TaskRef;
 
 /// A cloneable reference to a `Taskref` that exposes more methods
 /// related to task scheduling
@@ -125,7 +126,7 @@ impl RunqueueRoundRobin {
     }
 
     /// Adds a `TaskRef` to this RunQueue.
-    pub fn add_task(&mut self, taskref: impl Into<RoundRobinTaskRef>) -> Result<(), &'static str> {        
+    pub fn add_task(&mut self, taskref: impl Into<RoundRobinTaskRef>) -> Result<(), RunqueueError> {
         let rr_taskref = taskref.into();
         #[cfg(not(rq_eval))]
         log::debug!("Adding task to runqueue_round_robin {}, {:?}", self.cpu, rr_taskref.taskref);
@@ -145,7 +146,7 @@ impl RunqueueRoundRobin {
     }
 
     /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), RunqueueError> {
         #[cfg(not(rq_eval))]
         log::debug!("Removing task from runqueue_round_robin {}, {:?}", self.cpu, task);
         self.retain(|x| &x.taskref != task);

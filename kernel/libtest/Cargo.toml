@@ -21,11 +21,11 @@ version = "0.4.8"
 [dependencies.memory]
 path = "../memory"
 
+[dependencies.scheduler]
+path = "../scheduler"
+
 [dependencies.task]
 path = "../task"
-
-[dependencies.runqueue]
-path = "../runqueue"
 
 [dependencies.hpet]
 path = "../acpi/hpet"

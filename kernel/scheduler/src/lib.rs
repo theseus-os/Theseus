@@ -14,34 +14,48 @@
 #![no_std]
 #![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
-cfg_if::cfg_if! {
-    if #[cfg(priority_scheduler)] {
-        extern crate scheduler_priority as scheduler;
-    } else if #[cfg(realtime_scheduler)] {
-        extern crate scheduler_realtime as scheduler;
-    } else {
-        extern crate scheduler_round_robin as scheduler;
-    }
-}
+extern crate alloc;
 
+use cpu::CpuId;
 use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi};
+use scheduler_round_robin::SchedulerRoundRobin;
 use task::{self, TaskRef};
 
 /// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
 pub use task::schedule;
 
+pub use current_scheduler_policy::{current_scheduler, set_current_scheduler};
+mod current_scheduler_policy {
+    use crossbeam_utils::atomic::AtomicCell;
+    use scheduler_policy::SchedulerPolicy;
+    use scheduler_round_robin::SchedulerRoundRobin;
 
-/// Initializes the scheduler on this system using the policy set at compiler time.
+    static CURRENT_SCHEDULER: AtomicCell<&SchedulerRoundRobin> =
+        AtomicCell::new(&SchedulerRoundRobin);
+    const _: () = assert!(AtomicCell::<&SchedulerRoundRobin>::is_lock_free());
+
+    pub fn current_scheduler() -> &'static SchedulerRoundRobin {
+        CURRENT_SCHEDULER.load()
+    }
+
+    pub fn set_current_scheduler(new_policy: &SchedulerRoundRobin) {
+        task::set_scheduler_policy(|cpu_id| new_policy.select_next_task(cpu_id));
+        CURRENT_SCHEDULER.store(new_policy);
+    }
+}
+
+/// Initializes the scheduler on this CPU using the policy set at compiler time.
 ///
 /// Also registers a timer interrupt handler for preemptive scheduling.
 ///
 /// Currently, there is a single scheduler policy for the whole system.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
+/// * `make` --> basic round-robin scheduler, the default.
 /// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
 /// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
-/// * `make` --> basic round-robin scheduler, the default.
-pub fn init() -> Result<(), &'static str> {
-    task::set_scheduler_policy(scheduler::select_next_task);
+pub fn init(cpu: CpuId) -> Result<(), &'static str> {
+    // TODO: temporary fix this
+    // task::set_scheduler_policy(scheduler::select_next_task);
 
     #[cfg(target_arch = "x86_64")] {
         interrupts::register_interrupt(
@@ -105,9 +119,9 @@ fn cpu_local_timer_tick_handler() {
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 /// This function returns an error when a scheduler without priority is loaded. 
 pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::set_priority(_task, _priority)
-    }
+    // #[cfg(priority_scheduler)] {
+    //     scheduler_priority::set_priority(_task, _priority)
+    // }
     #[cfg(not(priority_scheduler))] {
         Err("no scheduler that uses task priority is currently loaded")
     }
@@ -116,42 +130,19 @@ pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> 
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
 pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::get_priority(_task)
-    }
+    // #[cfg(priority_scheduler)] {
+    //     scheduler_priority::get_priority(_task)
+    // }
     #[cfg(not(priority_scheduler))] {
         None
     }
 }
 
 pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
-    #[cfg(realtime_scheduler)] {
-        scheduler_realtime::set_periodicity(_task, _period)
-    }
+    // #[cfg(realtime_scheduler)] {
+    //     scheduler_realtime::set_periodicity(_task, _period)
+    // }
     #[cfg(not(realtime_scheduler))] {
         Err("no scheduler that supports periodic tasks is currently loaded")
     }
-}
-
-pub trait SchedulerPolicy {
-    type Runqueue;
-    type RunqueueId;
-    type PolicyTaskRef;
-
-    fn select_next_task(rq_id: Self::RunqueueId) -> Option<TaskRef>;
-
-    /// Iterates over all runqueues to remove the given task from each one.
-    fn remove_task_from_all_runqueues(task: &TaskRef) -> Result<(), &'static str> {
-
-    /// Returns the requested runqueue.
-    fn get_runqueue(rq_id: Self::RunqueueId) -> Option<&'static RwLockPreempt<Self::Runqueue>>;
-
-    /// Returns the "least busy" runqueue, currently based only on runqueue size.
-    fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<Self::Runqueue>> {
-    
-    /// Adds the given task to the "least busy" runqueue.
-    fn add_task_to_any_runqueue(task: impl Into<Self::PolicyTaskRef>) -> Result<(), &'static str>;
-
-    /// Adds the given task to the given runqueue.
-    fn add_task_to_specific_runqueue(rq_id: Self::RunqueueId, task: impl Into<Self::PolicyTaskRef>) -> Result<(), &'static str>;
 }

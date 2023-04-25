@@ -1,23 +1,10 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "scheduler"
-description = "Provides scheduling functionality for selecting the next task and causing a task switch"
+name = "scheduler_policy"
+description = "An abstraction of a scheduler policy"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-log = "0.4.8"
-cfg-if = "1.0.0"
-
-cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
-interrupts = { path = "../interrupts" }
-sleep = { path = "../sleep" }
+mutex_preemption = { path = "../mutex_preemption" }
 task = { path = "../task" }
-
-scheduler_round_robin = { path = "../scheduler_round_robin" }
-scheduler_priority = { path = "../scheduler_priority" }
-scheduler_realtime = { path = "../scheduler_realtime" }
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-x86_64 = "0.14.8"
