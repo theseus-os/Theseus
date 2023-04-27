@@ -60,7 +60,7 @@ pub fn init() -> Result<(), &'static str> {
     }
 }
 
-// Cross platform scheduling code
+// Architecture-independent timer interrupt handler for preemptive scheduling.
 interrupt_handler!(timer_tick_handler, None, _stack_frame, {
     #[cfg(target_arch = "aarch64")]
     interrupts::schedule_next_timer_tick();
