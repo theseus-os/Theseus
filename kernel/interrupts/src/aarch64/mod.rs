@@ -456,7 +456,7 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
         false => default_irq_handler,
     };
 
-    if handler(exc) == EoiBehaviour::CallerMustSignalEoi {
+    if handler(exc) == EoiBehaviour::HandlerDidNotSendEoi {
         // handler has returned, we can lock again
         let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
         int_ctrl.as_mut().unwrap().end_of_interrupt(irq_num);

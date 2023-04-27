@@ -89,7 +89,7 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 
     schedule();
 
-    EoiBehaviour::HandlerHasSignaledEoi
+    EoiBehaviour::HandlerSentEoi
 });
 
 /// Changes the priority of the given task with the given priority level.

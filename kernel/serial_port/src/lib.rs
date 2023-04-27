@@ -378,7 +378,7 @@ interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET
     if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
         func()
     }
-    EoiBehaviour::CallerMustSignalEoi
+    EoiBehaviour::HandlerDidNotSendEoi
 });
 
 // IRQ 0x23: COM2 and COM4 serial port interrupt handler.
@@ -387,5 +387,5 @@ interrupt_handler!(com2_com4_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func()
     }
-    EoiBehaviour::CallerMustSignalEoi
+    EoiBehaviour::HandlerDidNotSendEoi
 });
