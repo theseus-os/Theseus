@@ -37,7 +37,7 @@ macro_rules! interrupt_handler {
     ($name:ident, $x86_64_interrupt_number:expr, $stack_frame:ident, $code:block) => {
         extern "x86-interrupt" fn $name(sf: $crate::InterruptStackFrame) {
             let $stack_frame = &sf;
-            if let CallerMustSignalEoi = $code {
+            if let $crate::EoiBehavior::CallerMustSignalEoi = $code {
                 $crate::eoi($x86_64_interrupt_number);
             }
         }
