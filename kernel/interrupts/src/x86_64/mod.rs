@@ -33,12 +33,13 @@ static RESERVED_IRQ_LIST: [u8; 3] = [
 
 
 #[macro_export]
+#[doc = include_str!("../macro-doc.md")]
 macro_rules! interrupt_handler {
-    ($name:ident, $x86_64_interrupt_number:expr, $stack_frame:ident, $code:block) => {
+    ($name:ident, $x86_64_eoi_param:expr, $stack_frame:ident, $code:block) => {
         extern "x86-interrupt" fn $name(sf: $crate::InterruptStackFrame) {
             let $stack_frame = &sf;
             if let $crate::EoiBehaviour::HandlerDidNotSendEoi = $code {
-                $crate::eoi($x86_64_interrupt_number);
+                $crate::eoi($x86_64_eoi_param);
             }
         }
     }

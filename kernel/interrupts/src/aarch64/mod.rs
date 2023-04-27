@@ -57,9 +57,10 @@ struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
 
 #[cfg(target_arch = "aarch64")]
 #[macro_export]
+#[doc = include_str!("../macro-doc.md")]
 macro_rules! interrupt_handler {
-    ($name:ident, $x86_64_interrupt_number:expr, $context:ident, $code:block) => {
-        extern "C" fn $name($context: &$crate::InterruptStackFrame) -> $crate::EoiBehaviour $code
+    ($name:ident, $x86_64_eoi_param:expr, $stack_frame:ident, $code:block) => {
+        extern "C" fn $name($stack_frame: &$crate::InterruptStackFrame) -> $crate::EoiBehaviour $code
     }
 }
 
