@@ -36,7 +36,7 @@ use alloc::{boxed::Box, sync::Arc};
 use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
-use interrupts::{HandlerFunc, EoiBehaviour, interrupt_handler};
+use interrupts::{InterruptHandler, EoiBehaviour, interrupt_handler};
 
 // Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -107,7 +107,7 @@ fn static_port_of(
 /// and the interrupt handler function for this serial port.
 fn interrupt_number_handler(
     serial_port_address: &SerialPortAddress
-) -> (u8, HandlerFunc) {
+) -> (u8, InterruptHandler) {
     use interrupts::IRQ_BASE_OFFSET;
     match serial_port_address {
         SerialPortAddress::COM1 | SerialPortAddress::COM3 => (IRQ_BASE_OFFSET + 0x04, com1_com3_interrupt_handler),
@@ -156,7 +156,7 @@ impl SerialPort {
     pub fn register_interrupt_handler(
         serial_port: Arc<MutexIrqSafe<SerialPort>>,
         interrupt_number: u8,
-        interrupt_handler: HandlerFunc,
+        interrupt_handler: InterruptHandler,
     ) -> Result<(), &'static str> {
         let base_port = { 
             let sp = serial_port.lock();

@@ -8,7 +8,7 @@ use log::{error, warn, info, debug};
 use memory::VirtualAddress;
 use spin::Once;
 use early_printer::println;
-pub use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
+pub use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc as InterruptHandler};
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -37,7 +37,7 @@ macro_rules! interrupt_handler {
     ($name:ident, $x86_64_interrupt_number:expr, $stack_frame:ident, $code:block) => {
         extern "x86-interrupt" fn $name(sf: $crate::InterruptStackFrame) {
             let $stack_frame = &sf;
-            if let $crate::EoiBehavior::HandlerDidNotSendEoi = $code {
+            if let $crate::EoiBehaviour::HandlerDidNotSendEoi = $code {
                 $crate::eoi($x86_64_interrupt_number);
             }
         }
@@ -204,7 +204,7 @@ fn _enable_pic() {
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
-pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), usize> {
+pub fn register_interrupt(interrupt_num: u8, func: InterruptHandler) -> Result<(), usize> {
     let mut idt = IDT.lock();
 
     // If the existing handler stored in the IDT is either missing (has an address of `0`)
@@ -226,7 +226,7 @@ pub fn register_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), us
 ///
 /// # Arguments
 /// * `func`: the handler for the assigned interrupt number.
-pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
+pub fn register_msi_interrupt(func: InterruptHandler) -> Result<u8, &'static str> {
     let mut idt = IDT.lock();
 
     // try to find an unused interrupt number in the IDT
@@ -250,7 +250,7 @@ pub fn register_msi_interrupt(func: HandlerFunc) -> Result<u8, &'static str> {
 /// # Arguments
 /// * `interrupt_num`: the IRQ that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
-pub fn deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -> Result<(), &'static str> {
+pub fn deregister_interrupt(interrupt_num: u8, func: InterruptHandler) -> Result<(), &'static str> {
     let mut idt = IDT.lock();
 
     if RESERVED_IRQ_LIST.contains(&interrupt_num) {
