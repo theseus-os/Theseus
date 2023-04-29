@@ -552,18 +552,18 @@ simd_personality_avx: clean-old-build build_avx build
 
 ### build_sse builds the kernel and applications with the x86_64-unknown-theseus-sse target.
 ### It can serve as part of the simd_personality_sse target.
-build_sse : export override TARGET := x86_64-unknown-theseus-sse
+build_sse : export override TARGET \:= x86_64-unknown-theseus-sse
 build_sse : export override RUSTFLAGS += -C no-vectorize-loops
 build_sse : export override RUSTFLAGS += -C no-vectorize-slp
-build_sse : export KERNEL_PREFIX := ksse\#
-build_sse : export APP_PREFIX := asse\#
+build_sse : export KERNEL_PREFIX \:= ksse\#
+build_sse : export APP_PREFIX \:= asse\#
 build_sse:
 	$(MAKE) build
 
 
 ### build_avx builds the kernel and applications with the x86_64-unknown-theseus-avx target.
 ### It can serve as part of the simd_personality_avx target.
-build_avx : export override TARGET := x86_64-unknown-theseus-avx
+build_avx : export override TARGET \:= x86_64-unknown-theseus-avx
 build_avx : export override RUSTFLAGS += -C no-vectorize-loops
 build_avx : export override RUSTFLAGS += -C no-vectorize-slp
 build_avx : export KERNEL_PREFIX := kavx\#
@@ -616,7 +616,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
-doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
+doc: export override RUSTDOCFLAGS += -A rustdoc\:\:private_intra_doc_links
 doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
 doc:
