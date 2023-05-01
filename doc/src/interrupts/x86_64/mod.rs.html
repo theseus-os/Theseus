@@ -368,6 +368,20 @@
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
 <a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
 </pre><pre class="rust"><code><span class="kw">pub use </span>pic::IRQ_BASE_OFFSET;
 
 <span class="comment">// use rtc;
@@ -378,7 +392,7 @@
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>early_printer::println;
-<span class="kw">use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc};
+<span class="kw">pub use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc <span class="kw">as </span>InterruptHandler};
 
 <span class="doccomment">/// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -400,6 +414,20 @@
     CPU_LOCAL_TIMER_IRQ,
     apic::APIC_SPURIOUS_INTERRUPT_IRQ,
 ];
+
+
+<span class="attr">#[macro_export]
+#[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../macro-doc.md&quot;</span>)]
+</span><span class="macro">macro_rules! </span>interrupt_handler {
+    (<span class="macro-nonterminal">$name</span>:ident, <span class="macro-nonterminal">$x86_64_eoi_param</span>:expr, <span class="macro-nonterminal">$stack_frame</span>:ident, <span class="macro-nonterminal">$code</span>:block) =&gt; {
+        <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span><span class="macro-nonterminal">$name</span>(sf: <span class="macro-nonterminal">$crate::InterruptStackFrame</span>) {
+            <span class="kw">let </span><span class="macro-nonterminal">$stack_frame </span>= <span class="kw-2">&amp;</span>sf;
+            <span class="kw">if let </span><span class="macro-nonterminal">$crate::EoiBehaviour::HandlerDidNotSendEoi </span>= <span class="macro-nonterminal">$code </span>{
+                <span class="macro-nonterminal">$crate::eoi</span>(<span class="macro-nonterminal">$x86_64_eoi_param</span>);
+            }
+        }
+    }
+}
 
 
 <span class="doccomment">/// Returns `true` if the given address is the exception handler in the current `IDT`
@@ -561,7 +589,7 @@
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `interrupt_num` was already in use.
-</span><span class="kw">pub fn </span>register_interrupt(interrupt_num: u8, func: HandlerFunc) -&gt; <span class="prelude-ty">Result</span>&lt;(), usize&gt; {
+</span><span class="kw">pub fn </span>register_interrupt(interrupt_num: u8, func: InterruptHandler) -&gt; <span class="prelude-ty">Result</span>&lt;(), usize&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>idt = IDT.lock();
 
     <span class="comment">// If the existing handler stored in the IDT is either missing (has an address of `0`)
@@ -583,7 +611,7 @@
 ///
 /// # Arguments
 /// * `func`: the handler for the assigned interrupt number.
-</span><span class="kw">pub fn </span>register_msi_interrupt(func: HandlerFunc) -&gt; <span class="prelude-ty">Result</span>&lt;u8, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>register_msi_interrupt(func: InterruptHandler) -&gt; <span class="prelude-ty">Result</span>&lt;u8, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>idt = IDT.lock();
 
     <span class="comment">// try to find an unused interrupt number in the IDT
@@ -607,7 +635,7 @@
 /// # Arguments
 /// * `interrupt_num`: the IRQ that needs to be deregistered
 /// * `func`: the handler that should currently be stored for &#39;interrupt_num&#39;
-</span><span class="kw">pub fn </span>deregister_interrupt(interrupt_num: u8, func: HandlerFunc) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>deregister_interrupt(interrupt_num: u8, func: InterruptHandler) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>idt = IDT.lock();
 
     <span class="kw">if </span>RESERVED_IRQ_LIST.contains(<span class="kw-2">&amp;</span>interrupt_num) {

@@ -176,9 +176,6 @@
 <a href="#176" id="176">176</a>
 <a href="#177" id="177">177</a>
 <a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Abstractions for deferred interrupt tasks, a companion to regular interrupt handlers.
 //!
 //! Deferred interrupt tasks are similar to the concept of &quot;top half&quot; and &quot;bottom half&quot;
@@ -229,7 +226,6 @@
 
 </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>x86_64;
 <span class="kw">extern crate </span>task;
 <span class="kw">extern crate </span>spawn;
 <span class="kw">extern crate </span>scheduler;
@@ -238,9 +234,7 @@
 
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>task::{get_my_current_task, JoinableTaskRef};
-
-<span class="kw">pub type </span>InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
-
+<span class="kw">use </span>interrupts::InterruptHandler;
 
 <span class="doccomment">/// The errors that may occur in [`register_interrupt_handler()`].
 </span><span class="attr">#[derive(Debug)]
@@ -290,7 +284,7 @@
 /// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.
 </span><span class="kw">pub fn </span>register_interrupt_handler&lt;DIA, Arg, Success, Failure, S&gt;(
     interrupt_number: u8,
-    interrupt_handler: InterruptHandlerFunction,
+    interrupt_handler: InterruptHandler,
     deferred_interrupt_action: DIA,
     deferred_action_argument: Arg,
     deferred_task_name: <span class="prelude-ty">Option</span>&lt;S&gt;,

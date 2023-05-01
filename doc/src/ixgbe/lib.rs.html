@@ -1332,8 +1332,6 @@
 <a href="#1332" id="1332">1332</a>
 <a href="#1333" id="1333">1333</a>
 <a href="#1334" id="1334">1334</a>
-<a href="#1335" id="1335">1335</a>
-<a href="#1336" id="1336">1336</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.
 //! 
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
@@ -1357,7 +1355,6 @@
 <span class="kw">extern crate </span>pit_clock_basic;
 <span class="kw">extern crate </span>bit_field;
 <span class="kw">extern crate </span>interrupts;
-<span class="kw">extern crate </span>x86_64;
 <span class="kw">extern crate </span>pic;
 <span class="kw">extern crate </span>acpi;
 <span class="kw">extern crate </span>volatile;
@@ -1393,8 +1390,7 @@
 <span class="kw">use </span>memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages};
 <span class="kw">use </span>pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
 <span class="kw">use </span>bit_field::BitField;
-<span class="kw">use </span>interrupts::register_msi_interrupt;
-<span class="kw">use </span>x86_64::structures::idt::HandlerFunc;
+<span class="kw">use </span>interrupts::{register_msi_interrupt, InterruptHandler};
 <span class="kw">use </span>hpet::get_hpet;
 <span class="kw">use </span>network_interface_card::NetworkInterfaceCard;
 <span class="kw">use </span>nic_initialization::<span class="kw-2">*</span>;
@@ -1598,7 +1594,7 @@
         ixgbe_pci_dev: <span class="kw-2">&amp;</span>PciDevice,
         dev_id: PciLocation,
         enable_virtualization: bool,
-        interrupts: <span class="prelude-ty">Option</span>&lt;Vec&lt;HandlerFunc&gt;&gt;,
+        interrupts: <span class="prelude-ty">Option</span>&lt;Vec&lt;InterruptHandler&gt;&gt;,
         enable_rss: bool,
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
@@ -2468,7 +2464,7 @@
         regs: <span class="kw-2">&amp;mut </span>IntelIxgbeRegisters1, 
         rxq: <span class="kw-2">&amp;mut </span>Vec&lt;RxQueue&lt;IxgbeRxQueueRegisters,AdvancedRxDescriptor&gt;&gt;, 
         vector_table: <span class="kw-2">&amp;mut </span>MsixVectorTable, 
-        interrupt_handlers: <span class="kw-2">&amp;</span>[HandlerFunc]
+        interrupt_handlers: <span class="kw-2">&amp;</span>[InterruptHandler]
     ) -&gt; <span class="prelude-ty">Result</span>&lt;HashMap&lt;u8,u8&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
         <span class="kw">let </span>num_msi_vec_enabled = interrupt_handlers.len();

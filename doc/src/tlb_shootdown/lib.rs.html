@@ -238,7 +238,7 @@
 </span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>tlb_shootdown_ipi_handler(_exc: <span class="kw-2">&amp;</span>interrupts::ExceptionContext) -&gt; interrupts::EoiBehaviour {
     <span class="kw">let </span>expected = handle_tlb_shootdown_ipi();
     <span class="macro">assert!</span>(expected, <span class="string">&quot;Unexpected TLB Shootdown IPI!&quot;</span>);
-    interrupts::EoiBehaviour::CallerMustSignalEoi
+    interrupts::EoiBehaviour::HandlerDidNotSendEoi
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="tlb_shootdown" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

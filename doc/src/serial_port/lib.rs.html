@@ -389,7 +389,6 @@
 <a href="#389" id="389">389</a>
 <a href="#390" id="390">390</a>
 <a href="#391" id="391">391</a>
-<a href="#392" id="392">392</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.
 //!
 //! This crate builds on  [`serial_port_basic`], which provides the lower-level types
@@ -414,7 +413,6 @@
 <span class="kw">extern crate </span>interrupts;
 <span class="kw">extern crate </span>deferred_interrupt_tasks;
 <span class="kw">extern crate </span>core2;
-<span class="kw">extern crate </span>x86_64;
 <span class="kw">extern crate </span>serial_port_basic;
 
 <span class="kw">use </span>deferred_interrupt_tasks::InterruptRegistrationError;
@@ -429,8 +427,7 @@
 <span class="kw">use </span>core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>interrupts::IRQ_BASE_OFFSET;
-<span class="kw">use </span>x86_64::structures::idt::{HandlerFunc, InterruptStackFrame};
+<span class="kw">use </span>interrupts::{InterruptHandler, EoiBehaviour, interrupt_handler};
 
 <span class="comment">// Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -501,7 +498,8 @@
 /// and the interrupt handler function for this serial port.
 </span><span class="kw">fn </span>interrupt_number_handler(
     serial_port_address: <span class="kw-2">&amp;</span>SerialPortAddress
-) -&gt; (u8, HandlerFunc) {
+) -&gt; (u8, InterruptHandler) {
+    <span class="kw">use </span>interrupts::IRQ_BASE_OFFSET;
     <span class="kw">match </span>serial_port_address {
         SerialPortAddress::COM1 | SerialPortAddress::COM3 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x04</span>, com1_com3_interrupt_handler),
         SerialPortAddress::COM2 | SerialPortAddress::COM4 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x03</span>, com2_com4_interrupt_handler),
@@ -549,7 +547,7 @@
     </span><span class="kw">pub fn </span>register_interrupt_handler(
         serial_port: Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;,
         interrupt_number: u8,
-        interrupt_handler: HandlerFunc,
+        interrupt_handler: InterruptHandler,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>base_port = { 
             <span class="kw">let </span>sp = serial_port.lock();
@@ -765,22 +763,22 @@
 </span><span class="kw">static </span>INTERRUPT_ACTION_COM2_COM4: Once&lt;Box&lt;<span class="kw">dyn </span>Fn() + Send + Sync&gt;&gt; = Once::new();
 
 
-<span class="doccomment">/// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
-</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>com1_com3_interrupt_handler(_stack_frame: InterruptStackFrame) {
+<span class="comment">// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
+</span><span class="macro">interrupt_handler!</span>(com1_com3_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x4</span>), _stack_frame, {
     <span class="comment">// trace!(&quot;COM1/COM3 serial handler&quot;);
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM1_COM3.get() {
-        func();
+        func()
     }
-    interrupts::eoi(<span class="prelude-val">Some</span>(IRQ_BASE_OFFSET + <span class="number">0x4</span>));
-}
+    EoiBehaviour::HandlerDidNotSendEoi
+});
 
-<span class="doccomment">/// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
-</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>com2_com4_interrupt_handler(_stack_frame: InterruptStackFrame) {
+<span class="comment">// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
+</span><span class="macro">interrupt_handler!</span>(com2_com4_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x3</span>), _stack_frame, {
     <span class="comment">// trace!(&quot;COM2/COM4 serial handler&quot;);
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM2_COM4.get() {
-        func();
+        func()
     }
-    interrupts::eoi(<span class="prelude-val">Some</span>(IRQ_BASE_OFFSET + <span class="number">0x3</span>));
-}
+    EoiBehaviour::HandlerDidNotSendEoi
+});
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="serial_port" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

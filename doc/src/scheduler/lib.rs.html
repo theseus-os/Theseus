@@ -123,15 +123,6 @@
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
 <a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Offers the ability to control or configure the active task scheduling policy.
 //!
 //! ## What is and isn&#39;t in this crate?
@@ -158,7 +149,7 @@
     }
 }
 
-<span class="kw">use </span>interrupts::{<span class="self">self</span>, CPU_LOCAL_TIMER_IRQ, eoi};
+<span class="kw">use </span>interrupts::{<span class="self">self</span>, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
 <span class="kw">use </span>task::{<span class="self">self</span>, TaskRef};
 
 <span class="doccomment">/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
@@ -180,7 +171,7 @@
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
         interrupts::register_interrupt(
             CPU_LOCAL_TIMER_IRQ,
-            lapic_timer_handler,
+            timer_tick_handler,
         ).map_err(|_handler| {
             <span class="macro">log::error!</span>(<span class="string">&quot;BUG: interrupt {CPU_LOCAL_TIMER_IRQ} was already registered to handler {_handler:#X}&quot;</span>);
             <span class="string">&quot;BUG: CPU-local timer interrupt was already registered to a handler&quot;
@@ -188,28 +179,17 @@
     }
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-        interrupts::init_timer(aarch64_timer_handler)<span class="question-mark">?</span>;
+        interrupts::init_timer(timer_tick_handler)<span class="question-mark">?</span>;
         interrupts::enable_timer(<span class="bool-val">true</span>);
         <span class="prelude-val">Ok</span>(())
     }
 }
 
-<span class="doccomment">/// The handler for each CPU&#39;s local timer interrupt, used for preemptive task switching.
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-</span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>aarch64_timer_handler(_exc: <span class="kw-2">&amp;</span>interrupts::ExceptionContext) -&gt; interrupts::EoiBehaviour {
-    interrupts::schedule_next_timer_tick();
-    cpu_local_timer_tick_handler();
-    interrupts::EoiBehaviour::HandlerHasSignaledEoi
-}
+<span class="comment">// Architecture-independent timer interrupt handler for preemptive scheduling.
+</span><span class="macro">interrupt_handler!</span>(timer_tick_handler, <span class="prelude-val">None</span>, _stack_frame, {
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span>interrupts::schedule_next_timer_tick();
 
-<span class="doccomment">/// The handler for each CPU&#39;s local timer interrupt, used for preemptive task switching.
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>lapic_timer_handler(_stack_frame: x86_64::structures::idt::InterruptStackFrame) {
-    cpu_local_timer_tick_handler()
-}
-
-<span class="comment">// Cross platform scheduling code
-</span><span class="kw">fn </span>cpu_local_timer_tick_handler() {
     <span class="comment">// tick count, only used for debugging
     </span><span class="kw">if </span><span class="bool-val">false </span>{
         <span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
@@ -233,7 +213,9 @@
     }
 
     schedule();
-}
+
+    EoiBehaviour::HandlerSentEoi
+});
 
 <span class="doccomment">/// Changes the priority of the given task with the given priority level.
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
