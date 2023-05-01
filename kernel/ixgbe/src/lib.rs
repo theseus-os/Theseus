@@ -21,7 +21,6 @@ extern crate pci;
 extern crate pit_clock_basic;
 extern crate bit_field;
 extern crate interrupts;
-extern crate x86_64;
 extern crate pic;
 extern crate acpi;
 extern crate volatile;
@@ -57,8 +56,7 @@ use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages};
 use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
 use bit_field::BitField;
-use interrupts::register_msi_interrupt;
-use x86_64::structures::idt::HandlerFunc;
+use interrupts::{register_msi_interrupt, InterruptHandler};
 use hpet::get_hpet;
 use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
@@ -262,7 +260,7 @@ impl IxgbeNic {
         ixgbe_pci_dev: &PciDevice,
         dev_id: PciLocation,
         enable_virtualization: bool,
-        interrupts: Option<Vec<HandlerFunc>>,
+        interrupts: Option<Vec<InterruptHandler>>,
         enable_rss: bool,
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
@@ -1132,7 +1130,7 @@ impl IxgbeNic {
         regs: &mut IntelIxgbeRegisters1, 
         rxq: &mut Vec<RxQueue<IxgbeRxQueueRegisters,AdvancedRxDescriptor>>, 
         vector_table: &mut MsixVectorTable, 
-        interrupt_handlers: &[HandlerFunc]
+        interrupt_handlers: &[InterruptHandler]
     ) -> Result<HashMap<u8,u8>, &'static str> {
 
         let num_msi_vec_enabled = interrupt_handlers.len();

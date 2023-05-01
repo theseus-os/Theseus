@@ -48,7 +48,6 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate x86_64;
 extern crate task;
 extern crate spawn;
 extern crate scheduler;
@@ -57,9 +56,7 @@ extern crate interrupts;
 
 use alloc::string::String;
 use task::{get_my_current_task, JoinableTaskRef};
-
-pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
-
+use interrupts::InterruptHandler;
 
 /// The errors that may occur in [`register_interrupt_handler()`].
 #[derive(Debug)]
@@ -109,7 +106,7 @@ pub enum InterruptRegistrationError {
 /// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.
 pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
     interrupt_number: u8,
-    interrupt_handler: InterruptHandlerFunction,
+    interrupt_handler: InterruptHandler,
     deferred_interrupt_action: DIA,
     deferred_action_argument: Arg,
     deferred_task_name: Option<S>,
