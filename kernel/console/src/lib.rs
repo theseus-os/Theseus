@@ -15,7 +15,7 @@ use task::{JoinableTaskRef, KillReason};
 
 /// The serial port being used for the default system logger can optionally
 /// ignore inputs.
-static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(0);
+static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(u16::MAX);
 
 /// Configures the console connection listener to ignore inputs from the given
 /// serial port.
