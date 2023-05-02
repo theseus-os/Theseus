@@ -1,17 +1,16 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "runqueue_round_robin"
-description = "Functions and types for handling runqueues, i.e., lists of tasks for scheduling purposes"
+description = "A runqueue implementation for the round robin scheduler"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 log = "0.4.8"
 
-mutex_preemption = { path = "../mutex_preemption" }
-
 cpu = { path = "../cpu" }
-scheduler_policy = { path = "../scheduler_policy" }
+mutex_preemption = { path = "../mutex_preemption" }
+runqueue_trait = { path = "../runqueue_trait" }
 task = { path = "../task" }
 
 

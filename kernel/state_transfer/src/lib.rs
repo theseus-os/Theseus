@@ -13,12 +13,11 @@ extern crate hpet;
 extern crate scheduler_round_robin;
 extern crate runqueue_priority;
 
-use core::ops::Deref;
 use alloc::sync::Arc;
 use mod_mgmt::CrateNamespace;
 // use lazy_static::lazy::Lazy;
-use irq_safety::RwLockIrqSafe;
-use atomic_linked_list::atomic_map::AtomicMap;
+// use irq_safety::RwLockIrqSafe;
+// use atomic_linked_list::atomic_map::AtomicMap;
 // use task::TaskRef;
 
 
@@ -50,6 +49,10 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
 
     // __lazy_static_create!(RQEMPTY, AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>>);
     // lazy_static! { static ref RQEMPTY: AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunQueue>> = AtomicMap::new(); }
+
+    /*
+     * TODO: with the new runqueue/scheduler design, this needs to be re-done.
+     *
     let rq_ptr = &scheduler_round_robin::RUNQUEUES as *const _ as usize;
     let once_rq = core::mem::replace(
         unsafe { &mut *(rq_ptr as *mut AtomicMap<u8, RwLockIrqSafe<runqueue_round_robin::RunqueueRoundRobin>>) }, 
@@ -81,6 +84,8 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
     #[cfg(not(loscd_eval))]
     warn!("REPLACED LAZY_STATIC RUNQUEUES...");
 
+    *
+    */
 
     Ok(())
 }

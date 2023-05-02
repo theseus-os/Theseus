@@ -13,3 +13,4 @@ cpu = { path = "../cpu" }
 cpu_local_preemption = { path = "../cpu_local_preemption" }
 no_drop = { path = "../no_drop" }
 task = { path = "../task" }
+scheduler = { path = "../scheduler" }

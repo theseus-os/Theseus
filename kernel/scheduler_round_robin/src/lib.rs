@@ -6,49 +6,41 @@
 
 extern crate alloc;
 
+use alloc::boxed::Box;
 use atomic_linked_list::atomic_map::AtomicMap;
-use cpu::CpuId;
 use log::{error, trace};
 use mutex_preemption::RwLockPreempt;
-use runqueue_round_robin::{RunqueueRoundRobin, RoundRobinTaskRef};
-use scheduler_policy::{SchedulerPolicy, RunqueueError};
+use runqueue_round_robin::RunqueueRoundRobin;
+use scheduler_policy::{SchedulerPolicy, RunqueueError, RunqueueId, AllRunqueuesIterator, GenericSchedulerPolicy, ErasedGenericSchedulerPolicy, SimpleRunqueueTrait};
 use task::TaskRef;
 
 
-/// Each CPU has its own private runqueue instance;
-/// there is currently no migration of tasks across CPUs.
+/// A basic round robin scheduler.
 ///
-/// TODO: move this into per-CPU data regions.
-pub static RUNQUEUES: AtomicMap<CpuId, RwLockPreempt<RunqueueRoundRobin>> = AtomicMap::new();
-
-
-pub struct SchedulerRoundRobin;
+/// Currently, each CPU has its own runqueue;
+/// there is no migration of tasks across CPUs/runqueues.
+pub struct SchedulerRoundRobin {
+    runqueues: AtomicMap<RunqueueId, RwLockPreempt<RunqueueRoundRobin>>,
+}
 
 impl SchedulerPolicy for SchedulerRoundRobin {
-    type Runqueue = RunqueueRoundRobin;
-    type RunqueueId = CpuId;
-    type RunqueueTaskRef = RoundRobinTaskRef;
-    
-    /// Creates a new runqueue for the given `cpu`.
-    fn init_runqueue(&self, cpu: CpuId) -> Result<(), RunqueueError> {
-        let new_rq = RwLockPreempt::new(RunqueueRoundRobin::new(cpu));
+    fn init_runqueue(&self, rq_id: RunqueueId) -> Result<(), RunqueueError> {
+        let new_rq = RwLockPreempt::new(RunqueueRoundRobin::new(rq_id));
         
-        if RUNQUEUES.insert(cpu, new_rq).is_none() {
-            trace!("Created runqueue (round robin) for CPU {}", cpu);
+        if self.runqueues.insert(rq_id, new_rq).is_none() {
+            trace!("Created runqueue (round robin) for {:?}", rq_id);
             Ok(())
         } else {
-            error!("BUG: SchedulerRoundRobin::init(): runqueue already exists for CPU {}!", cpu);
+            error!("BUG: SchedulerRoundRobin::init(): runqueue already exists with {:?}!", rq_id);
             Err(RunqueueError::RunqueueAlreadyExists)
         }
     }
 
-    /// This defines the round robin scheduler policy.
-    /// Returns None if there is no schedule-able task
-    fn select_next_task(&self, cpu: CpuId) -> Option<TaskRef> {
-        let mut runqueue_locked = match self.get_runqueue(cpu) {
+    fn select_next_task(&self, rq_id: RunqueueId) -> Option<TaskRef> {
+        let mut runqueue_locked = match self.get_runqueue(rq_id) {
             Some(rq) => rq.write(),
             None => {
-                error!("BUG: select_next_task (round robin): couldn't get runqueue for CPU {}", cpu); 
+                error!("BUG: select_next_task (round robin): couldn't get runqueue with {:?}", rq_id); 
                 return None;
             }
         };
@@ -81,25 +73,41 @@ impl SchedulerPolicy for SchedulerRoundRobin {
     }
 
 
-    /// Removes the given task from all runqueues.
-    ///
-    /// This is a brute force approach that iterates over all runqueues. 
-    fn remove_task_from_all_runqueues(&self, task: &TaskRef) -> Result<(), RunqueueError> {
-        for (_cpu, rq) in RUNQUEUES.iter() {
+    fn add_task(&self, task: TaskRef, rq_id: Option<RunqueueId>) -> Result<(), RunqueueError> {
+        if let Some(id) = rq_id {
+            self.add_task_to_specific_runqueue(id, task)
+        } else {
+            self.add_task_to_any_runqueue(task)
+        }
+    }
+
+    fn remove_task(&self, task: &TaskRef) -> Result<(), RunqueueError> {
+        for (_id, rq) in self.runqueues.iter() {
             rq.write().remove_task(task)?;
         }
         Ok(())
     }
 
-    /// Returns the runqueue for the given CPU.
-    fn get_runqueue(&self, cpu: CpuId) -> Option<&'static RwLockPreempt<RunqueueRoundRobin>> {
-        RUNQUEUES.get(&cpu)
+    fn runqueue_iter(&self) -> scheduler_policy::AllRunqueuesIterator {
+        AllRunqueuesIterator::from(self.runqueues.iter())
+    }
+}
+
+impl SchedulerRoundRobin {
+    /// Returns a new scheduler with no runqueues.
+    pub fn new() -> Self {
+        Self { runqueues: AtomicMap::new(), }
+    }
+
+    /// Returns the runqueue with the given ID.
+    fn get_runqueue(&self, rq_id: RunqueueId) -> Option<&RwLockPreempt<RunqueueRoundRobin>> {
+        self.runqueues.get(&rq_id)
     }
 
     /// Returns the "least busy" runqueue, currently based only on runqueue size.
-    fn get_least_busy_runqueue(&self) -> Option<&'static RwLockPreempt<RunqueueRoundRobin>> {
+    fn get_least_busy_runqueue(&self) -> Option<&RwLockPreempt<RunqueueRoundRobin>> {
         let mut min_rq: Option<(&RwLockPreempt<RunqueueRoundRobin>, usize)> = None;
-        for (_, rq) in RUNQUEUES.iter() {
+        for (_, rq) in self.runqueues.iter() {
             let rq_size = rq.read().len();
             if let Some(min) = min_rq {
                 if rq_size < min.1 {
@@ -115,19 +123,58 @@ impl SchedulerPolicy for SchedulerRoundRobin {
     }
 
     /// Adds the given task to the "least busy" runqueue.
-    fn add_task_to_any_runqueue(&self, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
+    pub fn add_task_to_any_runqueue(&self, task: TaskRef) -> Result<(), RunqueueError> {
         let rq = self.get_least_busy_runqueue()
-            .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
+            .or_else(|| self.runqueues.iter().next().map(|r| r.1))
             .ok_or(RunqueueError::RunqueueNotFound)?;
 
         rq.write().add_task(task)
     }
 
-    /// Adds the given task to the given CPU's runqueue.
-    fn add_task_to_specific_runqueue(&self, rq_id: Self::RunqueueId, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
+    /// Adds the given task to the given runqueue.
+    pub fn add_task_to_specific_runqueue(&self, rq_id: RunqueueId, task: TaskRef) -> Result<(), RunqueueError> {
         self.get_runqueue(rq_id)
             .ok_or(RunqueueError::RunqueueNotFound)?
             .write()
             .add_task(task)
     }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////////////////
+//////////////////  Attempt at an erased object-safe trait ////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////
+
+impl<'a> GenericSchedulerPolicy<'a> for SchedulerRoundRobin {
+    // NOTE: i'd like to this to be a normal associated type:
+    // 
+    // type RunqueueType = RwLockPreempt<RunqueueRoundRobin>;
+
+    type RunqueueType = dyn SimpleRunqueueTrait + 'a;
+
+    fn with_runqueue(&'a self, rq_id: RunqueueId) -> Option<&'a Self::RunqueueType> {
+        self.runqueues.get(&rq_id).map(|r| r as &Self::RunqueueType)
+    }
+}
+
+// impl<'a> ErasedGenericSchedulerPolicy<'a> for SchedulerRoundRobin {
+//     fn erased_with_runqueue(&self, rq_id: RunqueueId) -> Option<&dyn scheduler_policy::SimpleRunqueueTrait> {
+//         self.with_runqueue(rq_id)
+//     }
+// }
+
+pub fn do_work() {
+    let id = RunqueueId::from(16u64);
+    let sched_rr = SchedulerRoundRobin::new();
+    sched_rr.init_runqueue(id).unwrap();
+
+    let rq = sched_rr.with_runqueue(id).unwrap();
+    log::debug!("rq {:?} has len {:?}", rq.id(), rq.len());
+
+    let trait_obj: &dyn ErasedGenericSchedulerPolicy = &sched_rr; // as &dyn ErasedGenericSchedulerPolicy;
+    // let trait_obj: Box<dyn ErasedGenericSchedulerPolicy> = Box::new(sched_rr); // as &dyn ErasedGenericSchedulerPolicy;
+    
+    let rq_ref = trait_obj.with_runqueue(id).unwrap();
+    log::debug!("trait obj rq_ref {:?} has len {:?}", rq_ref.id(), rq_ref.len());
+
 }

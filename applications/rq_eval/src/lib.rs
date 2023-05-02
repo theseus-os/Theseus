@@ -32,6 +32,7 @@ use getopts::{Matches, Options};
 use hpet::get_hpet;
 use task::{Task, TaskRef};
 use libtest::{hpet_timing_overhead, hpet_2_us};
+use scheduler::SchedulerPolicy;
 
 
 const CONFIG: &'static str = "WITHOUT state spill";
@@ -158,8 +159,10 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     let start = hpet.get_counter();
     
     for _ in 0..iterations {
-        scheduler::current_scheduler().add_task_to_specific_runqueue(cpu::current_cpu(), taskref.clone())?;
-        scheduler::current_scheduler().remove_task_from_all(&taskref)?;
+        scheduler::with_scheduler(|sched| {
+            sched.add_task(taskref.clone(), Some(cpu::current_cpu().into())).unwrap();
+            sched.remove_task(&taskref).unwrap();
+        });
     }
 
     let end = hpet.get_counter();

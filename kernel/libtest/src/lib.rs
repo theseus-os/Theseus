@@ -19,6 +19,7 @@ use hashbrown::HashMap;
 use core::fmt;
 use apic::get_lapics;
 use cpu::CpuId;
+use scheduler::{RunqueueTrait, SchedulerPolicy};
 
 const MICRO_TO_FEMTO: u64 = 1_000_000_000;
 const NANO_TO_FEMTO: u64 = 1_000_000;
@@ -38,10 +39,10 @@ pub fn hpet_2_us(hpet: u64) -> u64 {
 
 /// Helper function return the tasks in a given `cpu`'s runqueue
 pub fn nr_tasks_in_rq(cpu: CpuId) -> Option<usize> {
-	match scheduler::current_scheduler().get_runqueue(cpu).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.len()) }
-		_ => { None }
-	}
+	scheduler::with_scheduler(|sched| 
+		sched.get_runqueue(cpu.into())
+			.map(|rq| rq.len())
+	)
 }
 
 

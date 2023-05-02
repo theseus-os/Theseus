@@ -1,94 +1,128 @@
 //! Defines the [`SchedulerPolicy`] trait, an abstraction of scheduler policies.
 
 #![no_std]
+#![feature(trait_alias)]
 
+extern crate alloc;
+
+use atomic_linked_list::atomic_map::AtomicMapIter;
 use mutex_preemption::RwLockPreempt;
+use runqueue_round_robin::RunqueueRoundRobin;
 use task::TaskRef;
 
-pub trait AsSchedulerPolicy: Send + Sync {
-    fn as_scheduler_policy<A, B, C>(&self) -> &dyn SchedulerPolicy<Runqueue = A, RunqueueId = B, RunqueueTaskRef = C>;
-}
+pub use runqueue_trait::*;
+
 
 /// An abstraction of a scheduler policy.
 ///
 /// A scheduler policy can be registered using [`task::set_scheduler_policy()`]
 /// and will be used by future invocations of the `schedule()` routine.
 pub trait SchedulerPolicy {
-    /// The type of the runqueue(s) stored in this scheduler.
-    type Runqueue;
-    /// A unique identifier for a runqueue in this scheduler, e.g.,
-    /// a CPU ID if there is one runqueue per CPU.
-    type RunqueueId;
-    /// The type of task reference stored in this scheduler's runqueue(s).
+    /// Initializes a new runqueue with the given runqueue RunqueueId in this scheduler.
     ///
-    /// This is typically a wrapper around a [`TaskRef`]
-    /// and should implement a simple conversion from a [`TaskRef`].
-    type RunqueueTaskRef: From<TaskRef>;
-
-    /// Initializes a runqueue with the given runqueue ID in this scheduler.
-    fn init_runqueue(&self, rq_id: Self::RunqueueId) -> Result<(), RunqueueError>;
+    /// Returns [`RunqueueError::RunqueueAlreadyExists`] if a runqueue with the
+    /// given `rq_id` already exists in this scheduler.
+    fn init_runqueue(&self, rq_id: RunqueueId) -> Result<(), RunqueueError>;
 
     /// Returns the next task that should be scheduled in,
     /// or `None` if there are no runnable tasks.
     ///
     /// This function effectively defines the policy of this scheduler.
-    fn select_next_task(&self, rq_id: Self::RunqueueId) -> Option<TaskRef>;
+    fn select_next_task(&self, rq_id: RunqueueId) -> Option<TaskRef>;
 
-    /// Iterates over all runqueues to remove the given task from each one.
-    fn remove_task_from_all_runqueues(&self, task: &TaskRef) -> Result<(), RunqueueError>;
+    /// Adds the given task to an optionally-specified runqueue in this scheduler.
+    ///
+    /// If `rq_id` is `None`, this scheduler will add the given task
+    /// to a runqueue of its choice, e.g., the "least busy" one.
+    ///
+    /// Returns [`RunqueueError::RunqueueAlreadyExists`] if a runqueue with the
+    /// given `rq_id` already exists in this scheduler.
+    fn add_task(&self, task: TaskRef, rq_id: Option<RunqueueId>) -> Result<(), RunqueueError>;
 
-    /// Returns the requested runqueue.
-    fn get_runqueue(&self, rq_id: Self::RunqueueId) -> Option<&'static RwLockPreempt<Self::Runqueue>>;
+    /// Removes the given task from this scheduler's runqueue(s).
+    fn remove_task(&self, task: &TaskRef) -> Result<(), RunqueueError>;
 
-    /// Returns the "least busy" runqueue, currently based only on runqueue size.
-    fn get_least_busy_runqueue(&self) -> Option<&'static RwLockPreempt<Self::Runqueue>>;
-    
-    /// Adds the given task to the "least busy" runqueue.
-    fn add_task_to_any_runqueue(&self, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError>;
+    /// Returns an iterator over all runqueues in this scheduler.
+    fn runqueue_iter(&self) -> AllRunqueuesIterator;
 
-    /// Adds the given task to the given runqueue.
-    fn add_task_to_specific_runqueue(&self, rq_id: Self::RunqueueId, task: Self::RunqueueTaskRef) -> Result<(), RunqueueError>;
+    /// Returns a reference to the runqueue with the given `RunqueueId`.
+    ///
+    /// This is a provided method that iterates over all runqueues until
+    /// it finds one with the matching runqueue ID.
+    /// However, each scheduler may re-implement it more efficiently, e.g.,
+    /// via a direct lookup on runqueues stored in a map-like structure.
+    fn get_runqueue(&self, rq_id: RunqueueId) -> Option<RunqueueRef> {
+        self.runqueue_iter()
+            .find(|r| r.id() == rq_id)
+            .map(Into::into)
+    }
 }
 
-/// The set of errors that may occur in [`SchedulerPolicy`] functions.
-#[derive(Debug)]
-pub enum RunqueueError {
-    /// A runqueue already existed for the 
-    RunqueueAlreadyExists,
-    /// When trying to get access a specific runqueue, that runqueue could not be found.
-    RunqueueNotFound,
-    /// When trying to add a task to a runqueue, that task was already present.
-    TaskAlreadyExists,
-    /// When trying to remove a task from a runqueue, that task was not found.
-    TaskNotFound,
-}
-
-/// A dummy scheduler policy that does nothing and returns errors for all funcitons.
+/// A dummy scheduler policy that does nothing and returns errors for all functions.
 pub struct DummyScheduler;
+impl DummyScheduler {
+    pub const fn new() -> Self {
+        Self
+    }
+}
 impl SchedulerPolicy for DummyScheduler {
-    type Runqueue = ();
-    type RunqueueId = ();
-    type RunqueueTaskRef = TaskRef;
-
-    fn init_runqueue(&self, _rq_id: Self::RunqueueId) -> Result<(), RunqueueError> {
+    fn init_runqueue(&self, _: RunqueueId) -> Result<(), RunqueueError> {
         Err(RunqueueError::RunqueueAlreadyExists)
     }
-    fn select_next_task(&self, _rq_id: Self::RunqueueId) -> Option<TaskRef> {
+    fn select_next_task(&self, _: RunqueueId) -> Option<TaskRef> {
         None
     }
-    fn remove_task_from_all_runqueues(&self, _task: &TaskRef) -> Result<(), RunqueueError> {
+    fn add_task(&self, _task: TaskRef, _: Option<RunqueueId>) -> Result<(), RunqueueError> {
+        Err(RunqueueError::RunqueueNotFound)            
+    }
+    fn remove_task(&self, _task: &TaskRef) -> Result<(), RunqueueError> {
         Err(RunqueueError::TaskNotFound)
     }
-    fn get_runqueue(&self, _rq_id: Self::RunqueueId) -> Option<&'static RwLockPreempt<Self::Runqueue>> {
-        None
-    }
-    fn get_least_busy_runqueue(&self) -> Option<&'static RwLockPreempt<Self::Runqueue>> {
-        None
-    }
-    fn add_task_to_any_runqueue(&self, _task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
-        Err(RunqueueError::RunqueueNotFound)
-    }
-    fn add_task_to_specific_runqueue(&self, _rq_id: Self::RunqueueId, _task: Self::RunqueueTaskRef) -> Result<(), RunqueueError> {
-        Err(RunqueueError::RunqueueNotFound)
+    fn runqueue_iter(&self) -> AllRunqueuesIterator {
+        todo!()
+        // AllRunqueuesIterator(&mut core::iter::empty::<&RunqueueRef>()) // { id: RunqueueId(0), _phantom: PhantomData }
     }
 }
+
+/// An iterator over all runqueues in a given scheduler.
+pub struct AllRunqueuesIterator<'a>(AtomicMapIter<'a, RunqueueId, RwLockPreempt<RunqueueRoundRobin>>);
+impl<'a> From<AtomicMapIter<'a, RunqueueId, RwLockPreempt<RunqueueRoundRobin>>> for AllRunqueuesIterator<'a> {
+    fn from(iter: AtomicMapIter<'a, RunqueueId, RwLockPreempt<RunqueueRoundRobin>>) -> Self {
+        Self(iter)
+    }
+}
+impl<'a> Iterator for AllRunqueuesIterator<'a> {
+    type Item = &'a RwLockPreempt<RunqueueRoundRobin>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(|(_id, r)| r)
+    }
+}
+
+// /// An iterator over all runqueues in a given scheduler.
+// pub struct AllRunqueuesIterator<'a, R, I>
+// where
+//     R: RunqueueTrait,
+//     I: Iterator<Item = &'a R>,
+// {
+//     iter: I,
+// }
+
+// impl<'a, R, I> From<I> for AllRunqueuesIterator<'a, R, I>
+// where
+//     R: RunqueueTrait,
+//     I: Iterator<Item = &'a R>,
+// {
+//     fn from(iter: I) -> Self {
+//         Self { iter }
+//     }
+// }
+// impl<'a, R, I> Iterator for AllRunqueuesIterator<'a, R, I> {
+//     type Item = &'a R;
+//     fn next(&mut self) -> Option<Self::Item> {
+//         self.0.next()
+//     }
+// }
+
+
+////////////////////////////////////////////
+

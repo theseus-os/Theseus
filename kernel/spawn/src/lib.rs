@@ -27,6 +27,7 @@ use alloc::{
 use log::{error, info, debug};
 use cpu::CpuId;
 use debugit::debugit;
+use scheduler::{SchedulerPolicy, RunqueueError};
 use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
@@ -42,22 +43,21 @@ use no_drop::NoDrop;
 use task::SimdExt;
 
 
-/// Initializes tasking for this CPU, including creating a runqueue for it
-/// and creating its initial task bootstrapped from the current execution context.
+/// Initializes the task management subsystem for this CPU.
+///
+/// This does the following:
+/// 1. Creates an initial task bootstrapped from this CPU's current execution context.
+/// 2. Initializes the scheduler on this CPU, which creates one or more runqueues for
+///    this CPU and selects an initial scheduling policy (see [`scheduler::init()`]).
 pub fn init(
     kernel_mmi_ref: MmiRef,
     cpu_id: CpuId,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    scheduler::init(cpu_id)?;
-    
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
         task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
-    scheduler::current_scheduler().add_task_to_specific_runqueue(
-        cpu_id,
-        exitable_bootstrap_task.clone(),
-    )?;
+    scheduler::init(cpu_id, &exitable_bootstrap_task)?;
     Ok(BootstrapTaskRef {
         cpu_id,
         exitable_taskref: exitable_bootstrap_task,
@@ -424,10 +424,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        if let Some(cpu) = self.pin_on_cpu {
-            scheduler::current_scheduler().add_task_to_specific_runqueue(cpu, task_ref.clone())?;
-        } else {
-            scheduler::current_scheduler().add_task_to_any_runqueue(task_ref.clone())?;
+        // Add the newly-spawned task to scheduler runqueue.
+        {
+            let task_ref2 = task_ref.clone();
+            let pinned = self.pin_on_cpu.clone().map(Into::into);
+            scheduler::with_scheduler(|sched| sched.add_task(task_ref2, pinned))
+                .map_err(RunqueueError::into_static_str)?;
         }
 
         Ok(task_ref)
@@ -981,21 +983,7 @@ where
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
-    // Special behavior when evaluating runqueues
-    #[cfg(rq_eval)] {
-        scheduler::current_scheduler().remove_task_from_all(current_task).unwrap();
-    }
-
-    // In the regular case, we do not perform task migration between cores,
-    // so we can use the heuristic that the task is only on the current core's runqueue.
-    #[cfg(not(rq_eval))] {
-        if let Err(e) = scheduler::current_scheduler().get_runqueue(cpu::current_cpu())
-            .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
-        {
-            error!("BUG: couldn't remove exited task from runqueue: {}", e);
-        }
-    }
+    scheduler::with_scheduler(|sched| sched.remove_task(current_task)).unwrap();
 }
 
 /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.

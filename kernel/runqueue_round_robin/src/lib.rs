@@ -7,10 +7,9 @@
 
 extern crate alloc;
 
-use alloc::collections::VecDeque;
+use alloc::{collections::VecDeque, vec::Vec};
 use core::ops::{Deref, DerefMut};
-use cpu::CpuId;
-use scheduler_policy::RunqueueError;
+use runqueue_trait::{RunqueueError, RunqueueId, RunqueueTrait, ErasedGenericSchedulerPolicy, GenericSchedulerPolicy};
 use task::TaskRef;
 
 /// A cloneable reference to a `Taskref` that exposes more methods
@@ -80,7 +79,7 @@ impl RoundRobinTaskRef {
 /// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.
 #[derive(Debug)]
 pub struct RunqueueRoundRobin {
-    cpu: CpuId,
+    id: RunqueueId,
     queue: VecDeque<RoundRobinTaskRef>,
 }
 // impl Drop for RunQueue {
@@ -88,6 +87,20 @@ pub struct RunqueueRoundRobin {
 //         warn!("DROPPING Round Robing Runqueue for core {}", self.core);
 //     }
 // }
+
+impl RunqueueTrait for RunqueueRoundRobin {
+    fn id(&self) -> runqueue_trait::RunqueueId {
+        self.id
+    }
+    fn len(&self) -> usize {
+        self.queue.len()
+    }
+    fn task_iter(&self) -> runqueue_trait::TaskIter {
+        runqueue_trait::TaskIter::from(
+            self.queue.iter().map(Deref::deref).cloned().collect::<Vec<_>>()
+        )
+    }
+}
 
 impl Deref for RunqueueRoundRobin {
     type Target = VecDeque<RoundRobinTaskRef>;
@@ -103,18 +116,14 @@ impl DerefMut for RunqueueRoundRobin {
 }
 
 impl RunqueueRoundRobin {
-    pub const fn new(cpu: CpuId) -> Self {
+    pub const fn new(id: RunqueueId) -> Self {
         Self {
-            cpu,
+            id,
             queue: VecDeque::new(),
         }
 
     }
 
-    pub fn cpu_id(&self) -> CpuId {
-        self.cpu
-    }
-    
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
@@ -129,7 +138,7 @@ impl RunqueueRoundRobin {
     pub fn add_task(&mut self, taskref: impl Into<RoundRobinTaskRef>) -> Result<(), RunqueueError> {
         let rr_taskref = taskref.into();
         #[cfg(not(rq_eval))]
-        log::debug!("Adding task to runqueue_round_robin {}, {:?}", self.cpu, rr_taskref.taskref);
+        log::debug!("Adding task to runqueue_round_robin {:?}, {:?}", self.id, rr_taskref.taskref);
 
         self.push_back(rr_taskref);
         
@@ -138,7 +147,7 @@ impl RunqueueRoundRobin {
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::ADD_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
             if rr_taskref.task.simd {
-                single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.cpu);
+                single_simd_task_optimization::simd_tasks_added_to_core(self.iter(), self.id);
             }
         }
 
@@ -148,17 +157,32 @@ impl RunqueueRoundRobin {
     /// Removes a `TaskRef` from this RunQueue.
     pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), RunqueueError> {
         #[cfg(not(rq_eval))]
-        log::debug!("Removing task from runqueue_round_robin {}, {:?}", self.cpu, task);
+        log::debug!("Removing task from runqueue_round_robin {:?}, {:?}", self.id, task);
         self.retain(|x| &x.taskref != task);
 
         #[cfg(single_simd_task_optimization)] {   
             warn!("USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK");
             // notify simd_personality crate about runqueue change, but only for SIMD tasks
             if task.simd {
-                single_simd_task_optimization::simd_tasks_removed_from_core(self.iter(), self.cpu);
+                single_simd_task_optimization::simd_tasks_removed_from_core(self.iter(), self.id);
             }
         }
 
         Ok(())
+    }
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////
+//////////////////  Attempt at an erased object-safe trait ////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////
+
+impl runqueue_trait::SimpleRunqueueTrait for RunqueueRoundRobin {
+    fn id(&self) -> RunqueueId {
+        self.id
+    }
+    fn len(&self) -> usize {
+        self.queue.len()
     }
 }

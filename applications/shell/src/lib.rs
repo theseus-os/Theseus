@@ -408,8 +408,9 @@ impl Shell {
                     if task_ref.has_exited() { continue; }
                     match task_ref.kill(KillReason::Requested) {
                         Ok(_) => {
-                            if let Err(e) = scheduler::current_scheduler().remove_task_from_all(task_ref) {
-                                error!("Killed task but could not remove it from runqueue: {}", e);
+                            use scheduler::SchedulerPolicy;
+                            if let Err(e) = scheduler::with_scheduler(|sched| sched.remove_task(task_ref)) {
+                                error!("Killed task but could not remove it from runqueue: {:?}", e);
                             }
                         }
                         Err(e) => error!("Could not kill task, error: {}", e),

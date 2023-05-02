@@ -61,7 +61,7 @@ pub fn main(args: Vec<String>) -> isize {
 fn kill_task(task_id: usize, reap: bool) -> Result<(), String> {
     if let Some(task_ref) = task::get_task(task_id) {
         if task_ref.kill(task::KillReason::Requested)
-            .and_then(|_| runqueue::remove_task_from_all(&task_ref))
+            .and_then(|_| runqueue::remove_task(&task_ref))
             .is_ok() 
         {
             println!("Killed task {}", &*task_ref);

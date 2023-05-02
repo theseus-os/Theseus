@@ -35,9 +35,9 @@
 
 use core::ops::Deref;
 use cpu::CpuId;
-use cpu_local_preemption::PerCpuField;
+use cpu_local_preemption::{PerCpuField, PreemptionCount};
 use task::{DropAfterTaskSwitch, TaskSwitchPreemptionGuard};
-use cpu_local_preemption::PreemptionCount;
+use scheduler::{BoxedSchedulerPolicy, DummyScheduler};
 
 /// The data stored on a per-CPU basis in Theseus.
 ///
@@ -81,6 +81,8 @@ pub struct PerCpuData {
     /// Currently, this contains the previous task's `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
     drop_after_task_switch: DropAfterTaskSwitch,
+    /// The scheduler policy currently in use on this CPU.
+    scheduler: BoxedSchedulerPolicy,
 }
 
 impl PerCpuData {
@@ -92,6 +94,7 @@ impl PerCpuData {
             preemption_count: PreemptionCount::new(),
             task_switch_preemption_guard: TaskSwitchPreemptionGuard::new(),
             drop_after_task_switch: DropAfterTaskSwitch::new(),
+            scheduler: BoxedSchedulerPolicy::new(DummyScheduler::new()),
         }
     }
 }
@@ -135,4 +138,5 @@ mod const_assertions {
     const _: () = assert!(PerCpuField::PreemptionCount.offset() == offset_of!(PerCpuData, preemption_count));
     const _: () = assert!(PerCpuField::TaskSwitchPreemptionGuard.offset() == offset_of!(PerCpuData, task_switch_preemption_guard));
     const _: () = assert!(PerCpuField::DropAfterTaskSwitch.offset() == offset_of!(PerCpuData, drop_after_task_switch));
+    const _: () = assert!(PerCpuField::BoxedSchedulerPolicy.offset() == offset_of!(PerCpuData, scheduler));
 } 

@@ -123,9 +123,8 @@ pub fn init(
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
     per_cpu::init(bsp_id)?;
 
-    // Initialize the scheduler and create the initial `Task`,
-    // which is bootstrapped from this current execution context.
-    scheduler::init()?;
+    // Initialize the task management subsystem, including task spawning and scheduling,
+    // and create the initial `Task` that is bootstrapped from this current execution context.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_id, bsp_initial_stack)?;
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 

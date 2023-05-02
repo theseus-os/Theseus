@@ -113,7 +113,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
 	if !check_myrq() {
-		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, CPU_ID!());
+		printlninfo!("{} cannot run on a busy core (#{}). Pin me on an idle core.", prog, cpu::current_cpu());
 		return 0;
 	}
 
@@ -529,7 +529,7 @@ fn do_memory_map_inner(overhead_ct: u64, th: usize, nr: usize) -> Result<u64, &'
 /// Calls `do_ipc_rendezvous_inner` multiple times to perform the actual operation
 fn do_ipc_rendezvous(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
-		Some(CPU_ID!())
+		Some(cpu::current_cpu())
 	} else {
 		None
 	};
@@ -726,7 +726,7 @@ fn rendezvous_task_receiver((sender, receiver): (rendezvous::Sender<u8>, rendezv
 /// Calls `do_ipc_async_inner` multiple times to perform the actual operation
 fn do_ipc_async(pinned: bool, blocking: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
-		Some(CPU_ID!())
+		Some(cpu::current_cpu())
 	} else {
 		None
 	};
@@ -963,7 +963,7 @@ fn async_task_receiver_nonblocking((sender, receiver): (async_channel::Sender<u8
 /// Calls `do_ipc_simple_inner` multiple times to perform the actual operation
 fn do_ipc_simple(pinned: bool, cycles: bool) -> Result<(), &'static str> {
 	let child_core = if pinned {
-		Some(CPU_ID!())
+		Some(cpu::current_cpu())
 	} else {
 		None
 	};
@@ -1685,7 +1685,7 @@ fn print_header(tries: usize, iterations: usize) {
 	printlninfo!("Time unit : {}", T_UNIT);
 	printlninfo!("Iterations: {}", iterations);
 	printlninfo!("Tries     : {}", tries);
-	printlninfo!("Core      : {}", CPU_ID!());
+	printlninfo!("Core      : {}", cpu::current_cpu());
 	printlninfo!("========================================");
 }
 

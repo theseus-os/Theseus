@@ -2621,6 +2621,7 @@ dependencies = [
  "log",
  "memoffset 0.8.0",
  "no_drop",
+ "scheduler",
  "task",
 ]
 
@@ -3123,24 +3124,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "runqueue_realtime"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "mutex_preemption",
- "task",
-]
-
-[[package]]
 name = "runqueue_round_robin"
 version = "0.1.0"
 dependencies = [
  "cpu",
  "log",
  "mutex_preemption",
- "scheduler_policy",
+ "runqueue_trait",
  "single_simd_task_optimization",
+ "task",
+]
+
+[[package]]
+name = "runqueue_trait"
+version = "0.1.0"
+dependencies = [
+ "mutex_preemption",
  "task",
 ]
 
@@ -3207,7 +3206,10 @@ dependencies = [
 name = "scheduler_policy"
 version = "0.1.0"
 dependencies = [
+ "atomic_linked_list",
  "mutex_preemption",
+ "runqueue_round_robin",
+ "runqueue_trait",
  "task",
 ]
 

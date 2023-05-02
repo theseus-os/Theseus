@@ -35,6 +35,7 @@ pub enum PerCpuField {
     PreemptionCount,
     TaskSwitchPreemptionGuard,
     DropAfterTaskSwitch,
+    BoxedSchedulerPolicy,
 }
 impl PerCpuField {
     /// Returns the offset of this field in the `per_cpu::PerCpuData` struct.
@@ -44,6 +45,7 @@ impl PerCpuField {
             Self::PreemptionCount => 12,
             Self::TaskSwitchPreemptionGuard => 16,
             Self::DropAfterTaskSwitch => 24,
+            Self::BoxedSchedulerPolicy => 32,
         }
     }
 }

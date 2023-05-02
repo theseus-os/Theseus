@@ -6,5 +6,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+### TODO: temp, remove these
+atomic_linked_list = { path = "../../libs/atomic_linked_list" }
 mutex_preemption = { path = "../mutex_preemption" }
+runqueue_round_robin = { path = "../runqueue_round_robin" }
+###
+
+runqueue_trait = { path = "../runqueue_trait" }
 task = { path = "../task" }

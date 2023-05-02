@@ -59,6 +59,17 @@ impl TryFrom<u32> for ApicId {
     }
 }
 
+impl From<ApicId> for u32 {
+    fn from(value: ApicId) -> Self {
+        value.0
+    }
+}
+impl From<ApicId> for u64 {
+    fn from(value: ApicId) -> Self {
+        value.0.into()
+    }
+}
+
 
 /// The interrupt chip that is currently configured on this machine. 
 /// The default is `InterruptChip::PIC`, but the typical case is `APIC` or `X2APIC`,

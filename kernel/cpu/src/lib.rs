@@ -38,11 +38,28 @@ impl CpuId {
         self.0
     }
 
+    /// Returns `true` if this `CpuId` is the ID of the bootstrap CPU,
+    /// the first CPU to boot.
+    pub fn is_bootstrap_cpu(&self) -> bool {
+        Some(self) == arch::bootstrap_cpu().as_ref()
+    }
+
     /// A temporary function (will be removed later) that converts the given `CpuId`
     /// into a `u8`, panicking if its inner `u32` value does not fit into a `u8`.
     pub fn into_u8(self) -> u8 {
         self.0
             .try_into()
             .unwrap_or_else(|_| panic!("couldn't convert CpuId {self} into a u8"))
+    }
+}
+
+impl From<CpuId> for u32 {
+    fn from(value: CpuId) -> Self {
+        value.0
+    }
+}
+impl From<CpuId> for u64 {
+    fn from(value: CpuId) -> Self {
+        value.0.into()
     }
 }

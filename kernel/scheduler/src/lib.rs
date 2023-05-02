@@ -12,50 +12,135 @@
 //! to invoke the scheduler (yield the CPU) to switch to another task.
 
 #![no_std]
+#![feature(trait_alias)]
 #![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
 extern crate alloc;
 
+use alloc::boxed::Box;
+use scheduler_policy::RunqueueId;
+use core::ops::Deref;
 use cpu::CpuId;
-use interrupts::{self, CPU_LOCAL_TIMER_IRQ, eoi};
-use scheduler_round_robin::SchedulerRoundRobin;
-use task::{self, TaskRef};
+use cpu_local_preemption::{CpuLocal, CpuLocalField, PerCpuField, PreemptionGuard};
+use interrupts::{CPU_LOCAL_TIMER_IRQ, eoi};
+use task::{TaskRef, ExitableTaskRef};
+
+pub use scheduler_policy::*;
 
 /// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
 pub use task::schedule;
 
-pub use current_scheduler_policy::{current_scheduler, set_current_scheduler};
-mod current_scheduler_policy {
-    use crossbeam_utils::atomic::AtomicCell;
-    use scheduler_policy::SchedulerPolicy;
-    use scheduler_round_robin::SchedulerRoundRobin;
+/// A scheduler policy that can be stored in a static variable.
+pub trait StaticSchedulerPolicy = SchedulerPolicy + Send + Sync + 'static;
 
-    static CURRENT_SCHEDULER: AtomicCell<&SchedulerRoundRobin> =
-        AtomicCell::new(&SchedulerRoundRobin);
-    const _: () = assert!(AtomicCell::<&SchedulerRoundRobin>::is_lock_free());
+/// The scheduler policy in use for the current CPU.
+static CURRENT_SCHEDULER_POLICY: CpuLocal<BoxedSchedulerPolicy> =
+    CpuLocal::new(PerCpuField::BoxedSchedulerPolicy);
 
-    pub fn current_scheduler() -> &'static SchedulerRoundRobin {
-        CURRENT_SCHEDULER.load()
-    }
+/// Sets the scheduler policy on this CPU.
+///
+/// Note that this must be called individually on each CPU that you want
+/// the given `new_policy` to be used.
+fn set_current_scheduler_policy<P: StaticSchedulerPolicy>(new_policy: P) {
+    // With the current design, we don't need to repeatedly set this callback,
+    // we only need to do it once per CPU.
+    // task::set_scheduler_policy(select_next_task_callback);
 
-    pub fn set_current_scheduler(new_policy: &SchedulerRoundRobin) {
-        task::set_scheduler_policy(|cpu_id| new_policy.select_next_task(cpu_id));
-        CURRENT_SCHEDULER.store(new_policy);
-    }
+    CURRENT_SCHEDULER_POLICY.with_mut(
+        |sched| *sched = BoxedSchedulerPolicy::new(new_policy)
+    );
 }
 
-/// Initializes the scheduler on this CPU using the policy set at compiler time.
+/// A callback that can be registered with the `task` crate for scheduling.
+fn select_next_task_callback(cpu_id: CpuId, guard: &PreemptionGuard) -> Option<TaskRef> {
+    CURRENT_SCHEDULER_POLICY.with_preempt(
+        guard,
+        |sched| sched.select_next_task(cpu_id.into()),
+    )
+}
+
+pub fn with_scheduler<F, R>(func: F) -> R
+where
+    F: FnOnce(&BoxedSchedulerPolicy) -> R
+{
+    CURRENT_SCHEDULER_POLICY.with(func)
+}
+
+/// A scheduler policy boxed up as a trait object.
+///
+/// The [`SchedulerPolicy`] trait is forwarded through this struct.
+pub struct BoxedSchedulerPolicy(Box<dyn StaticSchedulerPolicy>);
+impl BoxedSchedulerPolicy {
+    /// Boxes up the given `scheduler_policy` as a trait object within this struct.
+    pub fn new<P: StaticSchedulerPolicy>(scheduler_policy: P) -> Self {
+        Self(Box::new(scheduler_policy))
+    }
+}
+impl SchedulerPolicy for BoxedSchedulerPolicy {
+    fn init_runqueue(&self, rq_id: RunqueueId) -> Result<(), RunqueueError> {
+        self.0.init_runqueue(rq_id)
+    }
+    fn select_next_task(&self, rq_id: RunqueueId) -> Option<TaskRef> {
+        self.0.select_next_task(rq_id)
+    }
+    fn add_task(&self, task: TaskRef, rq_id: Option<RunqueueId>) -> Result<(), RunqueueError> {
+        self.0.add_task(task, rq_id)
+    }
+    fn remove_task(&self, task: &TaskRef) -> Result<(), RunqueueError> {
+        self.0.remove_task(task)
+    }
+    fn runqueue_iter(&self) -> scheduler_policy::AllRunqueuesIterator {
+        self.0.runqueue_iter()
+    }
+}
+// SAFETY: The `BoxedSchedulerPolicy` type corresponds to a field in `PerCpuData`
+//         with the offset specified by `PerCpuField::BoxedSchedulerPolicy`.
+unsafe impl CpuLocalField for BoxedSchedulerPolicy {
+    const FIELD: PerCpuField = PerCpuField::BoxedSchedulerPolicy;
+}
+
+
+/// Initializes the scheduler on this CPU with the scheduler policy selected at compiler time.
 ///
 /// Also registers a timer interrupt handler for preemptive scheduling.
 ///
-/// Currently, there is a single scheduler policy for the whole system.
+/// ## Arguments
+/// * `cpu`: the CPU on which this init routine is running.
+/// * `bootstrap_task`: a reference to the currently-running task,
+///    which was bootstrapped from this `cpu`'s initial thread of execution
+///    and will be added to this scheduler's runqueue for this `cpu`.
+///
+/// ## Scheduler Policy behavior
+/// Currently, a single scheduler policy is set for the whole system by default,
+/// but it can be explicitly set on each CPU as desired.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
 /// * `make` --> basic round-robin scheduler, the default.
 /// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
 /// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
-pub fn init(cpu: CpuId) -> Result<(), &'static str> {
-    // TODO: temporary fix this
-    // task::set_scheduler_policy(scheduler::select_next_task);
+pub fn init(cpu: CpuId, bootstrap_task: &ExitableTaskRef) -> Result<(), &'static str> {
+    // This must be done on every CPU.
+    let scheduler_policy = {
+        cfg_if::cfg_if! {
+            if #[cfg(priority_scheduler)] {
+                scheduler_priority::SchedulerPriority
+            } else if #[cfg(realtime_scheduler)] {
+                scheduler_realtime::SchedulerRealtime
+            } else {
+                scheduler_round_robin::SchedulerRoundRobin::new()
+            }
+        }
+    };
+
+    scheduler_policy.add_task(bootstrap_task.deref().clone(), Some(cpu.into()))
+        .map_err(RunqueueError::into_static_str)?;
+    set_current_scheduler_policy(BoxedSchedulerPolicy::new(scheduler_policy));
+
+    // The rest of this function only needs to be done once, system-wide.
+    if !cpu.is_bootstrap_cpu() {
+        return Ok(());
+    }
+
+    task::set_scheduler_policy(select_next_task_callback);
 
     #[cfg(target_arch = "x86_64")] {
         interrupts::register_interrupt(

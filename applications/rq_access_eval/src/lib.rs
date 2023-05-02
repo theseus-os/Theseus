@@ -5,6 +5,7 @@ extern crate alloc;
 use alloc::{string::String, vec::Vec};
 use app_io::println;
 use cpu::CpuId;
+use scheduler::{RunqueueTrait, SchedulerPolicy};
 use time::{now, Duration, Monotonic};
 
 pub fn main(args: Vec<String>) -> isize {
@@ -26,9 +27,9 @@ pub fn main(args: Vec<String>) -> isize {
     };
 
     let least_busy = matches.opt_present("l");
-    let cpu = matches.opt_get::<u8>("c").expect("failed to parse CPU");
+    let cpu = matches.opt_get::<u32>("c").expect("failed to parse CPU");
 
-    if least_busy && core.is_some() {
+    if least_busy && cpu.is_some() {
         panic!("both the least-busy and CPU flags can't be specified");
     }
 
@@ -39,7 +40,11 @@ pub fn main(args: Vec<String>) -> isize {
     let duration = if least_busy {
         run(
             |_| {
-                scheduler::current_scheduler().get_least_busy_runqueue();
+                scheduler::with_scheduler(|sched| {
+                    let rq = sched.runqueue_iter()
+                        .min_by(|x, y| x.len().cmp(&y.len()));
+                    drop(rq);
+                });
             },
             num,
         )
@@ -47,7 +52,10 @@ pub fn main(args: Vec<String>) -> isize {
         let cpu_id = CpuId::try_from(cpu).expect("specified CPU did not exist");
         run(
             |_| {
-                scheduler::current_scheduler().get_runqueue(cpu_id);
+                scheduler::with_scheduler(|sched| {
+                    let rq = sched.get_runqueue(cpu_id.into());
+                    drop(rq);
+                });
             },
             num,
         )
@@ -55,9 +63,14 @@ pub fn main(args: Vec<String>) -> isize {
         let cpu_count = cpu::cpu_count();
         run(
             |count| {
-                scheduler::current_scheduler().get_runqueue(
-                    CpuId::try_from(count % cpu_count).expect("CPU IDs aren't sequential")
-                );
+                scheduler::with_scheduler(|sched| {
+                    let rq = sched.get_runqueue(
+                    CpuId::try_from(count % cpu_count)
+                        .expect("CPU IDs aren't sequential")
+                        .into()
+                    );
+                    drop(rq);
+                });
             },
             num,
         )

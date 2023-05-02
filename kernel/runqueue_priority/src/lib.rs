@@ -234,7 +234,7 @@ impl RunQueue {
     /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
     /// 
     /// This is a brute force approach that iterates over all runqueues. 
-    pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_task_from_all_runqueues(task: &TaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
         }

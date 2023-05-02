@@ -611,7 +611,7 @@ mod scheduler {
 
         let cpu_id = preemption_guard.cpu_id();
 
-        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id) else {
+        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id, &preemption_guard) else {
             return false; // keep running the same current task
         };
 
@@ -630,21 +630,21 @@ mod scheduler {
     /// The signature for the function that selects the next task for the given CPU.
     ///
     /// This is used when the [`schedule()`] function is invoked.
-    pub type SchedulerFunc = fn(CpuId) -> Option<TaskRef>;
+    pub type SchedulerFunc = fn(CpuId, &PreemptionGuard) -> Option<TaskRef>;
 
     /// The function currently registered as the system-wide scheduler policy.
     ///
     /// This is initialized to a dummy function that returns no "next" task,
     /// meaning that no scheduling will occur until it is initialized.
     /// Currently, this is initialized from within `scheduler::init()`.
-    static SELECT_NEXT_TASK_FUNC: AtomicCell<SchedulerFunc> = AtomicCell::new(|_| None);
+    static SELECT_NEXT_TASK_FUNC: AtomicCell<SchedulerFunc> = AtomicCell::new(|_, _| None);
     const _: () = assert!(AtomicCell::<SchedulerFunc>::is_lock_free());
 
     /// Sets the active scheduler policy used by [`schedule()`] to select the next task.
     ///
     /// Currently, we only support one scheduler policy for the whole system,
     /// but supporting different policies on a per-CPU, per-namespace, or per-arbitrary domain basis
-    /// would be a relatively simple immprovement.
+    /// would be a relatively simple improvement.
     pub fn set_scheduler_policy(select_next_task_func: SchedulerFunc) {
         SELECT_NEXT_TASK_FUNC.store(select_next_task_func);
     }

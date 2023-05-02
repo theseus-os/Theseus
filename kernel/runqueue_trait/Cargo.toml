@@ -1,0 +1,10 @@
+[package]
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+name = "runqueue_trait"
+description = "An abstraction of a scheduler runqueue"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mutex_preemption = { path = "../mutex_preemption"}
+task = { path = "../task" }

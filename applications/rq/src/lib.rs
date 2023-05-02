@@ -7,7 +7,6 @@ extern crate getopts;
 extern crate scheduler;
 extern crate task;
 
-use getopts::Options;
 use alloc::{
     fmt::Write,
     string::{
@@ -17,6 +16,8 @@ use alloc::{
     vec::Vec,
 };
 use apic::get_lapics;
+use getopts::Options;
+use scheduler::{RunqueueTrait, SchedulerPolicy};
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -42,20 +43,24 @@ pub fn main(args: Vec<String>) -> isize {
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
         
-        if let Some(runqueue) = scheduler::current_scheduler().get_runqueue(apic_id.into()).map(|rq| rq.read()) {
-            let mut runqueue_contents = String::new();
-            for task in runqueue.iter() {
-                writeln!(runqueue_contents, "    {} ({}) {}", 
-                    task.name, 
-                    task.id,
-                    if task.is_running() { "*" } else { "" }
-                )
-                .expect("Failed to write to runqueue_contents");
+        let result = scheduler::with_scheduler(|sched| {
+            if let Some(runqueue) = sched.get_runqueue(apic_id.into()) {
+                let mut runqueue_contents = String::new();
+                for task in runqueue.task_iter() {
+                    writeln!(runqueue_contents, "    {} ({}) {}", 
+                        task.name, 
+                        task.id,
+                        if task.is_running() { "*" } else { "" }
+                    )
+                    .expect("Failed to write to runqueue_contents");
+                }
+                print!("{}", runqueue_contents);
+                Ok(())
+            } else {
+                Err(())
             }
-            print!("{}", runqueue_contents);
-        }
-        
-        else {
+        });
+        if result.is_err() {
             println!("Can't retrieve runqueue for core {}", apic_id);
             return -1;
         }
