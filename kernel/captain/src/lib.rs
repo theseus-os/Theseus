@@ -203,9 +203,6 @@ pub fn init(
     drop_after_init.drop_all();
 
     // 2. Spawn various system tasks/daemons,
-    // arch-gate: no windowing/input support on aarch64 at the moment,
-    // which prevent using any graphical apps such as the console
-    #[cfg(target_arch = "x86_64")]
     console::start_connection_detection()?;
 
     // 3. Start the first application(s).

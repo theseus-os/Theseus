@@ -7,41 +7,23 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.8"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 
-[dependencies.core2]
-version = "0.4.0"
-default-features = false
-features = ["alloc", "nightly"]
+async_channel = { path = "../async_channel" }
+serial_port = { path = "../serial_port" }
+app_io = { path = "../app_io" }
+spawn = { path = "../spawn" }
+task = { path = "../task" }
+tty = { path = "../tty" }
+io = { path = "../io" }
 
-[dependencies.async_channel]
-path = "../async_channel"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+path = { path = "../path" }
+mod_mgmt = { path = "../mod_mgmt" }
 
-[dependencies.app_io]
-path = "../app_io"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.io]
-path = "../io"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.spawn]
-path = "../spawn"
-
-[dependencies.tty]
-path = "../tty"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.path]
-path = "../path"
-
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+hull = { path = "../../applications/hull" }
 
 [lib]
 crate-type = ["rlib"]
