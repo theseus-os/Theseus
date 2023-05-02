@@ -4,14 +4,12 @@
 extern crate alloc;
 
 use log::info;
-use serial_port::SerialPortAddress;
 
 #[cfg(target_arch = "x86_64")]
 use {
     log::{error, debug, warn},
     mpmc::Queue,
     event_types::Event,
-    core::convert::TryFrom,
     memory::MemoryManagementInfo,
     ethernet_smoltcp_device::EthernetNetworkInterface,
     network_manager::add_to_network_interfaces,
@@ -19,7 +17,7 @@ use {
     io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter},
     storage_manager::StorageDevice,
     memory::PhysicalAddress,
-    serial_port::{init_serial_port, take_serial_port_basic},
+    serial_port::{SerialPortAddress, init_serial_port, take_serial_port_basic},
 };
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
@@ -70,11 +68,8 @@ pub fn init(
     let serial_ports = logger::take_early_log_writers();
     let logger_writers = IntoIterator::into_iter(serial_ports)
         .flatten()
-        .filter_map(|sp| {
-            SerialPortAddress::try_from(sp.base_port_address())
-                .ok()
-                .and_then(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        }).cloned();
+        .filter_map(|sp| serial_port::init_serial_port(sp.base_port_address(), sp))
+        .cloned();
 
     logger::init(None, logger_writers);
     info!("Initialized full logger.");
