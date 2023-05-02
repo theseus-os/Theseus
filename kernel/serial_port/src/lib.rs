@@ -29,7 +29,7 @@ pub use serial_port_basic::{
 };
 
 use alloc::{boxed::Box, sync::Arc};
-use core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
+use core::{fmt, ops::{Deref, DerefMut}};
 use irq_safety::MutexIrqSafe;
 use spin::Once;
 use interrupts::{InterruptHandler, EoiBehaviour, InterruptNumber, interrupt_handler};
@@ -196,8 +196,8 @@ impl SerialPort {
                 info!("Registered interrupt handler at IRQ {:#X} for serial port {:?}.",
                     interrupt_number, base_port,
                 );
-                match SerialPortAddress::try_from(base_port) {
-                    Ok(SerialPortAddress::COM1 | SerialPortAddress::COM3) => {
+                match base_port {
+                    SerialPortAddress::COM1 | SerialPortAddress::COM3 => {
                         INTERRUPT_ACTION_COM1_COM3.call_once(|| 
                             Box::new(move || {
                                 deferred_task.unblock()
@@ -205,7 +205,7 @@ impl SerialPort {
                             })
                         );
                     }
-                    Ok(SerialPortAddress::COM2 | SerialPortAddress::COM4) => {
+                    SerialPortAddress::COM2 | SerialPortAddress::COM4 => {
                         INTERRUPT_ACTION_COM2_COM4.call_once(|| 
                             Box::new(move || {
                                 deferred_task.unblock()
@@ -213,7 +213,6 @@ impl SerialPort {
                             })
                         );
                     }
-                    Err(_) => warn!("Registering interrupt handler for unknown serial port at {:?}", base_port),
                 };                
             }
             Err(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) => {
@@ -344,14 +343,10 @@ fn serial_port_receive_deferred(
     if input_was_ignored {
         if let Some(sender) = NEW_CONNECTION_NOTIFIER.get() {
             // info!("Requesting new console to be spawned for this serial port ({:#X})", base_port);
-            if let Ok(serial_port_address) = SerialPortAddress::try_from(base_port) {
-                if let Err(err) = sender.try_send(serial_port_address) {
-                    error!("Error sending request for new console to be spawned for this serial port ({:?}): {:?}",
-                        base_port, err
-                    );
-                }
-            } else {
-                error!("Error: base port {:?} was not a known serial port address.", base_port);
+            if let Err(err) = sender.try_send(base_port) {
+                error!("Error sending request for new console to be spawned for this serial port ({:?}): {:?}",
+                    base_port, err
+                );
             }
         } else {
             warn!("Warning: no connection detector; ignoring {}-byte input read from serial port {:?}.",
