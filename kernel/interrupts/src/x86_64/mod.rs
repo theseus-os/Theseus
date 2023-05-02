@@ -9,6 +9,7 @@ use memory::VirtualAddress;
 use spin::Once;
 use early_printer::println;
 pub use x86_64::structures::idt::{InterruptStackFrame, HandlerFunc as InterruptHandler};
+pub use core::primitive::u8 as InterruptNumber;
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.

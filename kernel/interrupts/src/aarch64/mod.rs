@@ -11,7 +11,7 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
-use gic::{ArmGic, InterruptNumber, IpiTargetCpu, Version as GicVersion};
+use gic::{ArmGic, IpiTargetCpu, Version as GicVersion};
 use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
@@ -19,6 +19,8 @@ use log::{info, error};
 use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
+
+pub use gic::InterruptNumber;
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
