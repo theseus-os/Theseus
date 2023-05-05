@@ -49,11 +49,11 @@ pub type RtcInterruptFunction = fn(Option<usize>);
 // /// and the given closure that will run on each RTC interrupt.
 // /// The closure is provided with the current number of RTC ticks since boot,
 // /// in the form of an `Option<usize>` because it is not guaranteed that the number of ticks can be retrieved.
-// pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(HandlerFunc), ()> {
+// pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(InterruptHandler), ()> {
 //     RTC_INTERRUPT_FUNC.call_once(|| interrupt_func);
 //     enable_rtc_interrupt();
 //     let res = set_rtc_frequency(rtc_freq);
-//     res.map( |_| rtc_interrupt_handler as HandlerFunc )
+//     res.map( |_| rtc_interrupt_handler as InterruptHandler )
 // }
 
 
