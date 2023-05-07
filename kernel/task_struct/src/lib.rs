@@ -125,7 +125,7 @@ pub enum RunState {
     /// in the midst of setting up the task
     Initing,
     /// able to be scheduled in, but not necessarily currently running. 
-    /// To check whether it is currently running, use [`is_running`](#method.is_running)
+    /// To check whether it is currently running, use [`Task::is_running`]
     Runnable,
     /// blocked on something, like I/O or a wait event
     Blocked,
