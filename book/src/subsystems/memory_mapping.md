@@ -80,7 +80,7 @@ In comparison, other OSes typically return raw virtual address values from a mem
 With raw addresses, there is no lifetime guarantee to ensure that the mapping persists for as long as those virtual addresses are used. 
 As such, Theseus removes at compile time the potential to easily cause unsafe, undefined behavior by using a raw virtual address after it has been unmapped.
 
-For more details, see the Theseus paper from OSDI 2020, or Kevin Boos's dissertation, both [available here](../misc/papers_presentations.md#selected-papers-and-theses).
+For more details, see the Theseus paper from OSDI 2020, or Kevin Boos' dissertation, both [available here](../misc/papers_presentations.md#selected-papers-and-theses).
 
 
 The `MappedPages` type also exposes other convenient utility methods:
