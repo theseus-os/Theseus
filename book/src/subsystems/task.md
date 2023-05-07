@@ -132,7 +132,7 @@ This scheduling function is the same function that is invoked by the aforementio
 
 Theseus tasks follow a typical task lifecycle, which is in-part demonstrated by the possible variants of the [`RunState`] enum. 
 
-* **Initing**: the task is being created.
+* **Initializing**: the task is being created.
 * **Running**: the task is executing.
     * A runnable task may be *blocked* to temporarily prevent it from being scheduled in.
     * A blocked task may be *unblocked* to mark it as runnable again.
