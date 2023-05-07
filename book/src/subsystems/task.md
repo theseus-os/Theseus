@@ -22,7 +22,7 @@ In this way, tasks in Theseus are effectively a combination of the concept of la
 
 There is one instance of the `Task` struct for each task that currently exists in the system.
 A task is often thought of as an *execution context*, and the task struct includes key information about the execution of a given program's code.
-Compare to that of other OSes, the [`Task`] struct in Theseus is quite minimal in size and scope,
+Compared to that of other OSes, the [`Task`] struct in Theseus is quite minimal in size and scope,
 because our state management philosophy strives to keep only states relevant to a given subsystem in that subsystem. 
 For example, scheduler-related states are not present in Theseus's task struct; rather, they are found in the relevant scheduler crate in which they are used.
 In other words, Theseus's task struct is not monolithic and all-encompassing.
@@ -91,7 +91,7 @@ In OS terminology, the term "context switch" is often incorrectly overloaded and
 Only number 1 above is what we consider to be a true context switch, and that is what we refer to here when we say "context switch." 
 Number 2 above is an *address space switch*, e.g., switching page tables, a different action that could potentially occur when switching to a different task, if the next task is in a different process/address space than the current task.
 Number 3 above is a *mode switch* that generally does not result in the full execution context being saved or restored; only some registers may be pushed or popped onto the stack, depending on the calling convention employed by a given platform's system calls.
-Number 4 above is similar to number 3, but is trigger by the hardware rather than userspace software, so more execution context states may need to be saved/restored. 
+Number 4 above is similar to number 3, but is triggered by the hardware rather than userspace software, so more execution context states may need to be saved/restored. 
 
 One key aspect of context switching is that it is transparent to the actual code that is currently executing, as the lower layers of the OS kernel will save and restore execution context as needed before resuming.
 Thus, context switching (with preemption) allows for multiple untrusted and uncooperative tasks to transparently share the CPU, while maintaining the idealistic model that they each are the only task executing in the entire system and have exclusive access to the CPU.
@@ -132,7 +132,7 @@ This scheduling function is the same function that is invoked by the aforementio
 
 Theseus tasks follow a typical task lifecycle, which is in-part demonstrated by the possible variants of the [`RunState`] enum. 
 
-* **Spawning**: the task is being created.
+* **Initing**: the task is being created.
 * **Running**: the task is executing.
     * A runnable task may be *blocked* to temporarily prevent it from being scheduled in.
     * A blocked task may be *unblocked* to mark it as runnable again.
@@ -200,7 +200,7 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`TaskLocalData`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/task/src/lib.rs#L1085
 [`context_switch`]: https://theseus-os.github.io/Theseus/doc/context_switch/index.html
 [`context_switch()`]: https://theseus-os.github.io/Theseus/doc/context_switch_regular/fn.context_switch_regular.html
-[`task_switch()`]: https://theseus-os.github.io/Theseus/doc/task/struct.Task.html#method.task_switch
+[`task_switch()`]: https://theseus-os.github.io/Theseus/doc/task//fn.task_switch.html
 [`new_task_builder()`]: https://theseus-os.github.io/Theseus/doc/spawn/fn.new_task_builder.html
 [`task_wrapper()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L500
 [`task_cleanup_success()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L547
