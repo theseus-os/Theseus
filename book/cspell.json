@@ -83,6 +83,7 @@
         "linkcheck",
         "manycore",
         "MMIO",
+        "OSDI",
         "Phalereus",
         "reinterpretive",
         "rodata",
