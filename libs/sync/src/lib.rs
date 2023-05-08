@@ -113,7 +113,6 @@ where
         mutex: &'a spin::Mutex<T>,
         _: &'a Self::MutexData,
     ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
-        // NOTE: is_locked uses a relaxed load hence this can spuriosly fail.
         if Self::EXPENSIVE && mutex.is_locked() {
             return None;
         }

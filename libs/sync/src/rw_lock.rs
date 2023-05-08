@@ -52,7 +52,7 @@ where
 
     /// Attempts to acquire this lock with shared read access.
     ///
-    /// This method may spuriosly fail.
+    /// This method may spuriously fail.
     #[inline]
     pub fn try_read(&self) -> Option<RwLockReadGuard<'_, T, F>> {
         F::try_read_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockReadGuard {
@@ -64,7 +64,7 @@ where
 
     /// Attempts to acquire this lock with exclusive write access.
     ///
-    /// This method may spuriosly fail.
+    /// This method may spuriously fail.
     #[inline]
     pub fn try_write(&self) -> Option<RwLockWriteGuard<'_, T, F>> {
         F::try_write_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockWriteGuard {
