@@ -2,6 +2,8 @@ use core::arch::global_asm;
 use core::ops::DerefMut;
 use core::fmt;
 
+use crate::EoiBehaviour;
+
 use cortex_a::registers::*;
 
 use tock_registers::interfaces::Writeable;
@@ -43,7 +45,7 @@ const MAX_IRQ_NUM: usize = 256;
 // it's an array of function pointers which are meant to handle IRQs.
 // Synchronous Exceptions (including syscalls) are not IRQs on aarch64;
 // this crate doesn't expose any way to handle them at the moment.
-static IRQ_HANDLERS: RwLockIrqSafe<[HandlerFunc; MAX_IRQ_NUM]> = RwLockIrqSafe::new([default_irq_handler; MAX_IRQ_NUM]);
+static IRQ_HANDLERS: RwLockIrqSafe<[InterruptHandler; MAX_IRQ_NUM]> = RwLockIrqSafe::new([default_irq_handler; MAX_IRQ_NUM]);
 
 /// The Saved Program Status Register at the time of the exception.
 #[repr(transparent)]
@@ -52,6 +54,15 @@ struct SpsrEL1(InMemoryRegister<u64, SPSR_EL1::Register>);
 /// The Exception Syndrome Register at the time of the exception.
 #[repr(transparent)]
 struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
+
+#[cfg(target_arch = "aarch64")]
+#[macro_export]
+#[doc = include_str!("../macro-doc.md")]
+macro_rules! interrupt_handler {
+    ($name:ident, $x86_64_eoi_param:expr, $stack_frame:ident, $code:block) => {
+        extern "C" fn $name($stack_frame: &$crate::InterruptStackFrame) -> $crate::EoiBehaviour $code
+    }
+}
 
 /// The exception context as it is stored on the stack on exception entry.
 ///
@@ -75,14 +86,8 @@ pub struct ExceptionContext {
     esr_el1: EsrEL1,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-#[repr(C)]
-pub enum EoiBehaviour {
-    CallerMustSignalEoi,
-    HandlerHasSignaledEoi,
-}
-
-type HandlerFunc = extern "C" fn(&ExceptionContext) -> EoiBehaviour;
+pub type InterruptHandler = extern "C" fn(&InterruptStackFrame) -> EoiBehaviour;
+pub type InterruptStackFrame = ExceptionContext;
 
 // called for all exceptions other than interrupts
 fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
@@ -187,10 +192,10 @@ pub fn init() -> Result<(), &'static str> {
 
 /// This function registers an interrupt handler for the CPU-local
 /// timer and handles interrupt controller configuration for the timer interrupt.
-pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
+pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
     if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
-        if timer_tick_handler as *const HandlerFunc != existing_handler {
+        if timer_tick_handler as *const InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for the timer IRQ number");
         }
     }
@@ -209,12 +214,12 @@ pub fn init_timer(timer_tick_handler: HandlerFunc) -> Result<(), &'static str> {
 
 /// This function registers an interrupt handler for an inter-processor interrupt
 /// and handles interrupt controller configuration for that interrupt.
-pub fn setup_ipi_handler(handler: HandlerFunc, irq_num: InterruptNumber) -> Result<(), &'static str> {
+pub fn setup_ipi_handler(handler: InterruptHandler, irq_num: InterruptNumber) -> Result<(), &'static str> {
     assert!(irq_num < 16, "Inter-processor interrupts must have a number in the range 0..16");
 
     // register the handler
     if let Err(existing_handler) = register_interrupt(irq_num, handler) {
-        if handler as *const HandlerFunc != existing_handler {
+        if handler as *const InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for that IPI");
         }
     }
@@ -269,12 +274,12 @@ pub fn enable_timer(enable: bool) {
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `irq_num` was already in use.
-pub fn register_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Result<(), *const HandlerFunc> {
+pub fn register_interrupt(irq_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = irq_num as usize;
 
-    let value = handlers[index] as *const HandlerFunc;
-    let default = default_irq_handler as *const HandlerFunc;
+    let value = handlers[index] as *const InterruptHandler;
+    let default = default_irq_handler as *const InterruptHandler;
 
     if value == default {
         handlers[index] = func;
@@ -294,12 +299,12 @@ pub fn register_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Result
 /// # Arguments
 /// * `interrupt_num`: the IRQ that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
-pub fn deregister_interrupt(irq_num: InterruptNumber, func: HandlerFunc) -> Result<(), *const HandlerFunc> {
+pub fn deregister_interrupt(irq_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = irq_num as usize;
 
-    let value = handlers[index] as *const HandlerFunc;
-    let func = func as *const HandlerFunc;
+    let value = handlers[index] as *const InterruptHandler;
+    let func = func as *const InterruptHandler;
 
     if value == func {
         handlers[index] = default_irq_handler;
@@ -452,7 +457,7 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
         false => default_irq_handler,
     };
 
-    if handler(exc) == EoiBehaviour::CallerMustSignalEoi {
+    if handler(exc) == EoiBehaviour::HandlerDidNotSendEoi {
         // handler has returned, we can lock again
         let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
         int_ctrl.as_mut().unwrap().end_of_interrupt(irq_num);

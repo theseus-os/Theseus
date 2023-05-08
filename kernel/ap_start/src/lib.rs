@@ -52,8 +52,8 @@ pub fn kstart_ap(
 ) -> ! {
     irq_safety::disable_interrupts();
 
-    info!("Booting AP: proc: {}, CPU: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
-        processor_id, cpu_id, _stack_start, _stack_end, nmi_lint, nmi_flags
+    info!("Booted CPU {}, proc: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
+        cpu_id, processor_id, _stack_start, _stack_end, nmi_lint, nmi_flags
     );
 
     // set a flag telling the BSP that this AP has entered Rust code

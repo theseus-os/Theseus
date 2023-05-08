@@ -9,3 +9,14 @@
 mod arch;
 
 pub use arch::*;
+
+#[derive(Debug, PartialEq, Eq)]
+#[repr(C)]
+pub enum EoiBehaviour {
+    /// The interrupt handler hasn't called the [`eoi`] function,
+    /// in which case it will be called automatically once the
+    /// handler returns.
+    HandlerDidNotSendEoi,
+    /// The interrupt handler has called the [`eoi`] function.
+    HandlerSentEoi,
+}

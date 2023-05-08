@@ -798,7 +798,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "task",
- "x86_64",
 ]
 
 [[package]]
@@ -1673,7 +1672,6 @@ dependencies = [
  "spin 0.9.4",
  "virtual_nic",
  "volatile 0.2.7",
- "x86_64",
  "zerocopy",
 ]
 
@@ -3338,7 +3336,6 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.4",
- "x86_64",
 ]
 
 [[package]]
