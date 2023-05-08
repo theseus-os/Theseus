@@ -16,7 +16,6 @@ use core::{
 use sync::{Flavour, Mutex, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
-#[derive(Debug)]
 pub struct Queue<T, F>
 where
     F: Flavour,
@@ -26,7 +25,6 @@ where
     len: AtomicUsize,
 }
 
-#[derive(Debug)]
 struct Pointers<T> {
     head: Option<NonNull<Node<T>>>,
     tail: Option<NonNull<Node<T>>>,
@@ -173,23 +171,6 @@ where
         // SAFETY: current_head is a valid pointer and it was created from a box which
         // ensures the correct layout.
         Some(unsafe { Box::from_raw(current_head.as_ptr()) }.item)
-    }
-
-    pub fn retain<Fn>(&self, mut f: Fn)
-    where
-        Fn: FnMut(&T) -> bool
-    {
-        let mut pointers = self.pointers.lock();
-
-        let mut previous = &mut pointers.head;
-
-        while let Some(pointer) = previous {
-            let current = unsafe { pointer.as_mut() };
-            if !f(&current.item) {
-                *previous = current.next;
-            }
-            previous = &mut current.next;
-        }
     }
 }
 
