@@ -64,11 +64,21 @@ where
 
     #[inline]
     pub fn read(&self) -> RwLockReadGuard<'_, T, F> {
-        todo!();
+        let (inner, guard) = F::read_rw_lock(&self.inner, &self.data);
+        RwLockReadGuard {
+            inner: ManuallyDrop::new(inner),
+            data: &self.data,
+            _guard: guard,
+        }
     }
 
     pub fn write(&self) -> RwLockWriteGuard<'_, T, F> {
-        todo!();
+        let (inner, guard) = F::write_rw_lock(&self.inner, &self.data);
+        RwLockWriteGuard {
+            inner: ManuallyDrop::new(inner),
+            data: &self.data,
+            _guard: guard,
+        }
     }
 }
 
