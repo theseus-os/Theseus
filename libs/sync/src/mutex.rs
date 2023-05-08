@@ -33,6 +33,12 @@ where
         self.inner.into_inner()
     }
 
+    /// Returns a mutable reference to the underlying data.
+    #[inline]
+    pub fn get_mut(&mut self) -> &mut T {
+        self.inner.get_mut()
+    }
+
     /// Acquires this mutex.
     #[inline]
     pub fn lock(&self) -> MutexGuard<'_, T, F> {
@@ -46,6 +52,8 @@ where
     }
 
     /// Attempts to acquire this mutex.
+    ///
+    /// This method may spuriosly fail.
     #[inline]
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T, F>> {
         F::try_lock_mutex(&self.inner, &self.data).map(|(inner, guard)| MutexGuard {
@@ -53,12 +61,6 @@ where
             data: &self.data,
             _guard: guard,
         })
-    }
-
-    /// Returns a mutable reference to the underlying data.
-    #[inline]
-    pub fn get_mut(&mut self) -> &mut T {
-        self.inner.get_mut()
     }
 
     /// Checks whether the mutex is currently locked.

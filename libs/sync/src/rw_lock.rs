@@ -4,6 +4,7 @@ use core::{
     ops::{Deref, DerefMut},
 };
 
+/// A reader-writer lock.
 pub struct RwLock<T, F>
 where
     F: Flavour,
@@ -16,6 +17,7 @@ impl<T, F> RwLock<T, F>
 where
     F: Flavour,
 {
+    /// Creates a new reader-writer lock.
     #[inline]
     pub const fn new(value: T) -> Self {
         Self {
@@ -24,26 +26,33 @@ where
         }
     }
 
+    /// Consumes this lock, returning the underlying data.
     #[inline]
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
 
+    /// Returns a mutable reference to the underlying data.
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
         self.inner.get_mut()
     }
 
+    /// Returns the number of readers that currently hold the lock.
     #[inline]
     pub fn reader_count(&self) -> usize {
         self.inner.reader_count()
     }
 
+    /// Returns the number of writers that currently hold the lock.
     #[inline]
     pub fn writer_count(&self) -> usize {
         self.inner.writer_count()
     }
 
+    /// Attempts to acquire this lock with shared read access.
+    ///
+    /// This method may spuriosly fail.
     #[inline]
     pub fn try_read(&self) -> Option<RwLockReadGuard<'_, T, F>> {
         F::try_read_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockReadGuard {
@@ -53,6 +62,9 @@ where
         })
     }
 
+    /// Attempts to acquire this lock with exclusive write access.
+    ///
+    /// This method may spuriosly fail.
     #[inline]
     pub fn try_write(&self) -> Option<RwLockWriteGuard<'_, T, F>> {
         F::try_write_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockWriteGuard {
@@ -62,6 +74,7 @@ where
         })
     }
 
+    /// Locks theis lock with shared read access.
     #[inline]
     pub fn read(&self) -> RwLockReadGuard<'_, T, F> {
         let (inner, guard) = F::read_rw_lock(&self.inner, &self.data);
@@ -72,6 +85,7 @@ where
         }
     }
 
+    /// Locks this lock with exclusive write access.
     pub fn write(&self) -> RwLockWriteGuard<'_, T, F> {
         let (inner, guard) = F::write_rw_lock(&self.inner, &self.data);
         RwLockWriteGuard {
@@ -82,6 +96,8 @@ where
     }
 }
 
+/// RAII structure used to release the shared read access of a lock when
+/// dropped.
 pub struct RwLockReadGuard<'a, T, F>
 where
     F: Flavour,
@@ -113,6 +129,8 @@ where
     }
 }
 
+/// RAII structure used to release the exclusive write access of a lock when
+/// dropped.
 pub struct RwLockWriteGuard<'a, T, F>
 where
     F: Flavour,

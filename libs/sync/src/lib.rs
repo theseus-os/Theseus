@@ -113,13 +113,13 @@ where
         mutex: &'a spin::Mutex<T>,
         _: &'a Self::MutexData,
     ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
-        // FIXME: Use `is_locked_acquire`.
+        // NOTE: is_locked uses a relaxed load hence this can spuriosly fail.
         if Self::EXPENSIVE && mutex.is_locked() {
             return None;
         }
 
         let deadlock_guard = Self::enter();
-        mutex.try_lock().map(|guard| (guard, deadlock_guard))
+        mutex.try_lock_weak().map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
@@ -148,7 +148,9 @@ where
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::RwLockData,
     ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)> {
-        // TODO: Fastpath?
+        if Self::EXPENSIVE && rw_lock.writer_count() != 0 {
+            return None;
+        }
 
         let deadlock_guard = Self::enter();
         rw_lock.try_read().map(|guard| (guard, deadlock_guard))
@@ -159,10 +161,12 @@ where
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::RwLockData,
     ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
-        // TODO: Fastpath?
+        if Self::EXPENSIVE && (rw_lock.reader_count() != 0 || rw_lock.writer_count() != 0){
+            return None;
+        }
 
         let deadlock_guard = Self::enter();
-        rw_lock.try_write().map(|guard| (guard, deadlock_guard))
+        rw_lock.try_write_weak().map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
