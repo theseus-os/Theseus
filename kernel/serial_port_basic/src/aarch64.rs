@@ -92,7 +92,7 @@ impl SerialPort {
 
     /// Enable or disable interrupts on this serial port for various events.
     ///
-    /// Note: currently unimplemented on `aarch64`.
+    /// Note: only [`SerialPortInterruptEvent::DataReceived`] is supported on `aarch64`.
     pub fn enable_interrupt(&mut self, event: SerialPortInterruptEvent, enable: bool) {
         if matches!(event, SerialPortInterruptEvent::DataReceived) {
             self.inner.as_mut().unwrap().enable_rx_interrupt(enable);
