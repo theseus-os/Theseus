@@ -5,7 +5,7 @@ extern crate alloc;
 
 use log::*;
 use core::fmt;
-use core::ops::{Deref, DerefMut, Index, IndexMut};
+use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
@@ -562,6 +562,7 @@ pub enum PciConfigSpaceAccessMechanism {
     IoPort = 1,
 }
 
+/// A memory-mapped array of [`MsixVectorEntry`]
 pub struct MsixVectorTable {
     inner: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>,
 }
@@ -574,17 +575,16 @@ impl MsixVectorTable {
     }
 }
 
-impl Index<usize> for MsixVectorTable {
-    type Output = MsixVectorEntry;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.inner[index]
+impl Deref for MsixVectorTable {
+    type Target = [MsixVectorEntry];
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
-impl IndexMut<usize> for MsixVectorTable {
-    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
-        &mut self.inner[index]
+impl DerefMut for MsixVectorTable {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 
@@ -595,16 +595,17 @@ impl IndexMut<usize> for MsixVectorTable {
 pub struct MsixVectorEntry {
     /// The lower portion of the address for the memory write transaction.
     /// This part contains the CPU ID which the interrupt will be redirected to.
-    pub msg_lower_addr:         Volatile<u32>,
+    msg_lower_addr:         Volatile<u32>,
     /// The upper portion of the address for the memory write transaction.
-    pub msg_upper_addr:         Volatile<u32>,
+    msg_upper_addr:         Volatile<u32>,
     /// The data portion of the msi vector which contains the interrupt number.
-    pub msg_data:               Volatile<u32>,
+    msg_data:               Volatile<u32>,
     /// The control portion which contains the interrupt mask bit.
-    pub vector_control:         Volatile<u32>,
+    vector_control:         Volatile<u32>,
 }
 
 impl MsixVectorEntry {
+    /// Sets interrupt destination & number for this entry
     pub fn configure(&mut self, cpu_id: CpuId, int_num: InterruptNumber) {
         // unmask the interrupt
         self.vector_control.write(MSIX_UNMASK_INT);
