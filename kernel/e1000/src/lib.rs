@@ -35,7 +35,7 @@ use spin::Once;
 use alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_mmio_range};
-use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
+use pci::{PciDevice, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use interrupts::eoi;
 use x86_64::structures::idt::InterruptStackFrame;
@@ -181,7 +181,7 @@ impl E1000Nic {
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + IRQ_BASE_OFFSET;
+        let interrupt_num = e1000_pci_dev.pci_get_interrupt_line() + IRQ_BASE_OFFSET;
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];

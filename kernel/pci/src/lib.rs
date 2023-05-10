@@ -534,6 +534,11 @@ impl PciDevice {
         let mem_size = self.determine_mem_size(bar_index);
         map_mmio_range(mem_base, mem_size as usize)
     }
+
+    /// Reads the `PCI_INTERRUPT_LINE` register
+    pub fn pci_get_interrupt_line(&self) -> InterruptNumber {
+        self.pci_read_8(PCI_INTERRUPT_LINE) as InterruptNumber
+    }
 }
 
 impl Deref for PciDevice {
