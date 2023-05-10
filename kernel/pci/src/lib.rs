@@ -500,14 +500,14 @@ impl PciDevice {
         Ok(())  
     }
 
-    /// Allocates memory for the NIC registers
+    /// Maps device memory specified by a Base Address Register.
     /// 
     /// # Arguments 
-    /// * `dev`: reference to pci device 
-    /// * `mem_base`: starting physical address of the device's memory mapped registers
-    pub fn pci_map_bar(&self, bar_index: usize, offset: usize) -> Result<MappedPages, &'static str> {
-        let mem_base = self.determine_mem_base(bar_index)? + offset;
-        map_mmio_range(mem_base, self.determine_mem_size(bar_index) as usize)
+    /// * `bar_index`: index of the Base Address Register to use
+    pub fn pci_map_bar_mem(&self, bar_index: usize) -> Result<MappedPages, &'static str> {
+        let mem_base = self.determine_mem_base(bar_index)?;
+        let mem_size = self.determine_mem_size(bar_index);
+        map_mmio_range(mem_base, mem_size as usize)
     }
 }
 
