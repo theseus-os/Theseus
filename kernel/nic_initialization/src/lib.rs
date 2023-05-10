@@ -8,7 +8,6 @@ extern crate alloc;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate mpmc;
-extern crate pci;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate volatile;
@@ -16,47 +15,9 @@ extern crate nic_queues;
 
 use alloc::vec::Vec;
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
-use memory::{
-    allocate_frames_by_bytes_at, allocate_pages_by_bytes, create_contiguous_mapping,
-    get_kernel_mmi_ref, BorrowedSliceMappedPages, MappedPages, Mutable, PhysicalAddress,
-};
+use memory::{BorrowedSliceMappedPages, Mutable, create_contiguous_mapping, MMIO_FLAGS};
 use nic_buffers::ReceiveBuffer;
 use nic_queues::{RxQueueRegisters, TxQueueRegisters};
-use pci::PciDevice;
-
-pub use nic_queues::NIC_MAPPING_FLAGS;
-
-/// Allocates memory for the NIC registers
-/// 
-/// # Arguments 
-/// * `dev`: reference to pci device 
-/// * `mem_base`: starting physical address of the device's memory mapped registers
-pub fn allocate_device_register_memory(dev: &PciDevice, mem_base: PhysicalAddress) -> Result<MappedPages, &'static str> {
-    //find out amount of space needed
-    let mem_size_in_bytes = dev.determine_mem_size(0) as usize;
-
-    allocate_memory(mem_base, mem_size_in_bytes)
-}
-
-/// Helper function to allocate memory at required address
-/// 
-/// # Arguments
-/// * `mem_base`: starting physical address of the region that need to be allocated
-/// * `mem_size_in_bytes`: size of the region that needs to be allocated 
-pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-    // set up virtual pages and physical frames to be mapped
-    let pages_nic = allocate_pages_by_bytes(mem_size_in_bytes)
-        .ok_or("NicInit::mem_map(): couldn't allocate virtual page!")?;
-    let frames_nic = allocate_frames_by_bytes_at(mem_base, mem_size_in_bytes)
-        .map_err(|_e| "NicInit::mem_map(): couldn't allocate physical frames!")?;
-
-    // debug!("NicInit: memory base: {:#X}, memory size: {}", mem_base, mem_size_in_bytes);
-
-    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("NicInit::mem_map(): KERNEL_MMI was not yet initialized!")?;
-    let nic_mapped_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS)?;
-
-    Ok(nic_mapped_page)
-}
 
 /// Initialize the receive buffer pool from where receive buffers are taken and returned
 /// 
@@ -67,7 +28,7 @@ pub fn allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> R
 pub fn init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>) -> Result<(), &'static str> {
     let length = buffer_size;
     for _i in 0..num_rx_buffers {
-        let (mp, phys_addr) = create_contiguous_mapping(length as usize, NIC_MAPPING_FLAGS)?; 
+        let (mp, phys_addr) = create_contiguous_mapping(length as usize, MMIO_FLAGS)?; 
         let rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool)?;
         if rx_buffer_pool.push(rx_buf).is_err() {
             // if the queue is full, it returns an Err containing the object trying to be pushed
@@ -92,7 +53,7 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
     let size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::<T>();
     
     // Rx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-    let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, NIC_MAPPING_FLAGS)?;
+    let (rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, MMIO_FLAGS)?;
 
     // cast our physically-contiguous MappedPages into a slice of receive descriptors
     let mut rx_descs = rx_descs_mapped_pages.into_borrowed_slice_mut::<T>(0, num_desc)
@@ -106,7 +67,7 @@ pub fn init_rx_queue<T: RxDescriptor, S:RxQueueRegisters>(num_desc: usize, rx_bu
         let rx_buf = rx_buffer_pool.pop()
             .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
             .or_else(|_e| {
-                create_contiguous_mapping(buffer_size, NIC_MAPPING_FLAGS)
+                create_contiguous_mapping(buffer_size, MMIO_FLAGS)
                     .and_then(|(buf_mapped, buf_paddr)|
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, rx_buffer_pool)
                     )
@@ -147,7 +108,7 @@ pub fn init_tx_queue<T: TxDescriptor, S: TxQueueRegisters>(num_desc: usize, txq_
     let size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::<T>();
     
     // Tx descriptors must be 128 byte-aligned, which is satisfied below because it's aligned to a page boundary.
-    let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, NIC_MAPPING_FLAGS)?;
+    let (tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, MMIO_FLAGS)?;
 
     // cast our physically-contiguous MappedPages into a slice of transmit descriptors
     let mut tx_descs = tx_descs_mapped_pages.into_borrowed_slice_mut::<T>(0, num_desc)

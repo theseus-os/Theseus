@@ -20,7 +20,6 @@ extern crate volatile;
 extern crate bit_field;
 extern crate zerocopy;
 extern crate byteorder;
-extern crate nic_initialization;
 extern crate kernel_config;
 extern crate libm;
 extern crate num_enum;

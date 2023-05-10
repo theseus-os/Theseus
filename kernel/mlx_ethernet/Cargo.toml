@@ -19,9 +19,6 @@ default-features = false
 [dependencies.memory]
 path = "../memory"
 
-[dependencies.nic_initialization]
-path = "../nic_initialization"
-
 [dependencies.kernel_config]
 path = "../kernel_config"
 
