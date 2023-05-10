@@ -54,7 +54,7 @@ use alloc::{
 };
 use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages, map_mmio_range};
-use pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
+use pci::{PciDevice, MsixVectorTable, PciConfigSpaceAccessMechanism, PciLocation};
 use bit_field::BitField;
 use interrupts::{register_msi_interrupt, InterruptHandler};
 use hpet::get_hpet;
@@ -165,7 +165,7 @@ pub struct IxgbeNic {
     /// Memory-mapped control registers
     regs_mac: BorrowedMappedPages<IntelIxgbeMacRegisters, Mutable>,
     /// Memory-mapped msi-x vector table
-    msix_vector_table: BorrowedMappedPages<MsixVectorTable, Mutable>,
+    msix_vector_table: MsixVectorTable,
     /// Array to store which L3/L4 5-tuple filters have been used.
     /// There are 128 such filters available.
     l34_5_tuple_filters: [bool; 128],
@@ -316,7 +316,7 @@ impl IxgbeNic {
             mut rx_mapped_registers, mut tx_mapped_registers) = Self::mapped_reg(mem_base)?;
 
         // map the msi-x vector table to an address found from the pci space
-        let mut vector_table = Self::mem_map_msix(ixgbe_pci_dev)?;
+        let mut vector_table = ixgbe_pci_dev.pci_mem_map_msix(IXGBE_MAX_MSIX_VECTORS)?;
 
         // link initialization
         Self::start_link(&mut mapped_registers1, &mut mapped_registers2, &mut mapped_registers3, &mut mapped_registers_mac)?;
@@ -540,29 +540,6 @@ impl IxgbeNic {
             );
         }
         pointers_to_queues
-    }
-
-    /// Returns the memory mapped msix vector table
-    pub fn mem_map_msix(dev: &PciDevice) -> Result<BorrowedMappedPages<MsixVectorTable, Mutable>, &'static str> {
-        // retreive the address in the pci config space for the msi-x capability
-        let cap_addr = dev.find_pci_capability(MSIX_CAPABILITY).ok_or("ixgbe: device does not have MSI-X capability")?;
-        // find the BAR used for msi-x
-        let vector_table_offset = 4;
-        let table_offset = dev.pci_read_32(cap_addr + vector_table_offset);
-        let bar = table_offset & 0x7;
-        let offset = table_offset >> 3;
-        // find the memory base address and size of the area for the vector table
-        let mem_base = PhysicalAddress::new((dev.bars[bar as usize] + offset) as usize)
-            .ok_or("ixgbe: the mem_base physical address specified in the BAR was invalid")?;
-        let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * IXGBE_MAX_MSIX_VECTORS;
-
-        // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
-
-        let msix_mapped_pages = map_mmio_range(mem_base, mem_size_in_bytes)?;
-        let vector_table = BorrowedMappedPages::from_mut(msix_mapped_pages, 0)
-            .map_err(|(_mp, err)| err)?;
-
-        Ok(vector_table)
     }
 
     pub fn spoof_mac(&mut self, spoofed_mac_addr: [u8; 6]) {
@@ -1197,18 +1174,11 @@ impl IxgbeNic {
             // find core to redirect interrupt to
             // we assume that the number of msi vectors are equal to the number of rx queues
             // TODO: choose a better default value
-            let cpu_id = match rxq.cpu_id.into() {
+            let cpu_id = match rxq[i].cpu_id.into() {
                 Some(cpu_id) => cpu_id,
                 None => cpu::bootstrap_cpu().expect("Couldn't read BSP CpuId"),
-            }.into_u8() as u32;
-            // unmask the interrupt
-            vector_table.msi_vector[i].vector_control.write(MSIX_UNMASK_INT);
-            let lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
-            // set the core to which this interrupt will be sent
-            vector_table.msi_vector[i].msg_lower_addr.write((lower_addr & !MSIX_ADDRESS_BITS) | MSIX_INTERRUPT_REGION | (core_id << MSIX_DEST_ID_SHIFT)); 
-            //allocate an interrupt to msix vector            
-            vector_table.msi_vector[i].msg_data.write(msi_int_num as u32);
-            // debug!("Created MSI vector: control: {}, core: {}, int: {}", vector_table.msi_vector[i].vector_control.read(), core_id, interrupt_nums[i]);
+            };
+            vector_table[i].configure(cpu_id, msi_int_num);
         }
 
         Ok(interrupt_nums)

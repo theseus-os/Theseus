@@ -550,36 +550,3 @@ pub const EIMS_INTERRUPT_ENABLE:        u32 = 1;
 /// The number of msi-x vectors this device can have. 
 /// It can be set from PCI space, but we took the value from the data sheet.
 pub const IXGBE_MAX_MSIX_VECTORS:     usize = 64;
-
-/// Table that contains msi-x vector entries. 
-/// It is mapped to a physical memory region specified by the BAR from the PCI space.
-#[derive(FromBytes)]
-#[repr(C)]
-pub struct MsixVectorTable {
-    pub msi_vector:     [MsixVectorEntry; IXGBE_MAX_MSIX_VECTORS],
-}
-
-/// A single Message Signaled Interrupt entry.
-/// It contains the interrupt number for this vector and the core this interrupt is redirected to.
-#[derive(FromBytes)]
-#[repr(C)]
-pub struct MsixVectorEntry {
-    /// The lower portion of the address for the memory write transaction.
-    /// This part contains the CPU ID which the interrupt will be redirected to.
-    pub msg_lower_addr:         Volatile<u32>,
-    /// The upper portion of the address for the memory write transaction.
-    pub msg_upper_addr:         Volatile<u32>,
-    /// The data portion of the msi vector which contains the interrupt number.
-    pub msg_data:               Volatile<u32>,
-    /// The control portion which contains the interrupt mask bit.
-    pub vector_control:         Volatile<u32>,
-}
-
-/// A constant which indicates the region that is reserved for interrupt messages
-pub const MSIX_INTERRUPT_REGION:    u32 = 0xFEE << 20;
-/// The location in the lower address register where the destination core id is written
-pub const MSIX_DEST_ID_SHIFT:       u32 = 12;
-/// The bits in the lower address register that need to be cleared and set
-pub const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
-/// Clear the vector control field to unmask the interrupt
-pub const MSIX_UNMASK_INT:          u32 = 0;

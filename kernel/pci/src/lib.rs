@@ -1,21 +1,20 @@
 #![no_std]
-
 #![allow(dead_code)]
 
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate spin;
-extern crate port_io;
-extern crate memory;
-extern crate bit_field;
 
+use log::*;
 use core::fmt;
-use core::ops::{Deref, DerefMut};
+use core::ops::{Deref, DerefMut, Index, IndexMut};
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
-use memory::{PhysicalAddress, MappedPages, map_mmio_range};
+use memory::{PhysicalAddress, BorrowedSliceMappedPages, Mutable, MappedPages, map_mmio_range};
 use bit_field::BitField;
+use volatile::Volatile;
+use zerocopy::FromBytes;
+use cpu::CpuId;
+use interrupts::InterruptNumber;
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
@@ -288,7 +287,7 @@ impl PciLocation {
     /// with each capability storing the pointer to the next capability right after its ID.
     /// The function returns a None value if capabilities are not valid for this device 
     /// or if the requested capability is not present. 
-    pub fn find_pci_capability(&self, pci_capability: u8) -> Option<u8> {
+    fn find_pci_capability(&self, pci_capability: u8) -> Option<u8> {
         let status = self.pci_read_16(PCI_STATUS);
 
         // capabilities are only valid if bit 4 of status register is set
@@ -500,6 +499,32 @@ impl PciDevice {
         Ok(())  
     }
 
+    /// Returns the memory mapped msix vector table
+    ///
+    /// - returns `Err("Device not MSI-X capable")` if the device doesn't have the MSI-X capability
+    /// - returns `Err("Invalid BAR content")` if the Base Address Register contains an invalid address
+    pub fn pci_mem_map_msix(&self, max_vectors: usize) -> Result<MsixVectorTable, &'static str> {
+        // retreive the address in the pci config space for the msi-x capability
+        let cap_addr = self.find_pci_capability(MSIX_CAPABILITY).ok_or("Device not MSI-X capable")?;
+        // find the BAR used for msi-x
+        let vector_table_offset = 4;
+        let table_offset = self.pci_read_32(cap_addr + vector_table_offset);
+        let bar = table_offset & 0x7;
+        let offset = table_offset >> 3;
+        // find the memory base address and size of the area for the vector table
+        let mem_base = PhysicalAddress::new((self.bars[bar as usize] + offset) as usize)
+            .ok_or("Invalid BAR content")?;
+        let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * max_vectors;
+
+        // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
+
+        let msix_mapped_pages = map_mmio_range(mem_base, mem_size_in_bytes)?;
+        let vector_table = BorrowedSliceMappedPages::from_mut(msix_mapped_pages, 0, max_vectors)
+            .map_err(|(_mp, err)| err)?;
+
+        Ok(MsixVectorTable::new(vector_table))
+    }
+
     /// Maps device memory specified by a Base Address Register.
     /// 
     /// # Arguments 
@@ -531,3 +556,75 @@ pub enum PciConfigSpaceAccessMechanism {
     MemoryMapped = 0,
     IoPort = 1,
 }
+
+pub struct MsixVectorTable {
+    inner: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>,
+}
+
+impl MsixVectorTable {
+    pub fn new(inner: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>) -> Self {
+        Self {
+            inner,
+        }
+    }
+}
+
+impl Index<usize> for MsixVectorTable {
+    type Output = MsixVectorEntry;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.inner[index]
+    }
+}
+
+impl IndexMut<usize> for MsixVectorTable {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.inner[index]
+    }
+}
+
+/// A single Message Signaled Interrupt entry.
+/// It contains the interrupt number for this vector and the core this interrupt is redirected to.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct MsixVectorEntry {
+    /// The lower portion of the address for the memory write transaction.
+    /// This part contains the CPU ID which the interrupt will be redirected to.
+    pub msg_lower_addr:         Volatile<u32>,
+    /// The upper portion of the address for the memory write transaction.
+    pub msg_upper_addr:         Volatile<u32>,
+    /// The data portion of the msi vector which contains the interrupt number.
+    pub msg_data:               Volatile<u32>,
+    /// The control portion which contains the interrupt mask bit.
+    pub vector_control:         Volatile<u32>,
+}
+
+impl MsixVectorEntry {
+    pub fn configure(&mut self, cpu_id: CpuId, int_num: InterruptNumber) {
+        // unmask the interrupt
+        self.vector_control.write(MSIX_UNMASK_INT);
+        let lower_addr = self.msg_lower_addr.read();
+
+        // set the core to which this interrupt will be sent
+        let dest_id = (cpu_id.into_u8() as u32) << MSIX_DEST_ID_SHIFT;
+        let address = lower_addr & !MSIX_ADDRESS_BITS;
+        self.msg_lower_addr.write(address | MSIX_INTERRUPT_REGION | dest_id); 
+
+        // allocate an interrupt to msix vector
+        self.msg_data.write(int_num as u32);
+
+        if false {
+            let control = self.vector_control.read();
+            debug!("Created MSI vector: control: {}, core: {}, int: {}", control, cpu_id, int_num);
+        }
+    }
+}
+
+/// A constant which indicates the region that is reserved for interrupt messages
+const MSIX_INTERRUPT_REGION:    u32 = 0xFEE << 20;
+/// The location in the lower address register where the destination core id is written
+const MSIX_DEST_ID_SHIFT:       u32 = 12;
+/// The bits in the lower address register that need to be cleared and set
+const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
+/// Clear the vector control field to unmask the interrupt
+const MSIX_UNMASK_INT:          u32 = 0;
