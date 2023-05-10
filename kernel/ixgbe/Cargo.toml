@@ -38,8 +38,8 @@ path = "../pic"
 [dependencies.pci]
 path = "../pci"
 
-[dependencies.acpi]
-path = "../acpi"
+[dependencies.cpu]
+path = "../cpu"
 
 [dependencies.pit_clock_basic]
 path = "../pit_clock_basic"

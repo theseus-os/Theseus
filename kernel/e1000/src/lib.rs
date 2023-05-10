@@ -224,7 +224,7 @@ impl E1000Nic {
             rx_buffer_size_bytes: E1000_RX_BUFFER_SIZE_IN_BYTES,
             received_frames: VecDeque::new(),
             // here the cpu id is irrelevant because there's no DCA or MSI 
-            cpu_id: None,
+            cpu_id: None.into(),
             rx_buffer_pool: &RX_BUFFER_POOL,
             filter_num: None
         };
@@ -236,7 +236,7 @@ impl E1000Nic {
             tx_descs,
             num_tx_descs: E1000_NUM_TX_DESC,
             tx_cur: 0,
-            cpu_id: None,
+            cpu_id: None.into(),
         };
 
         let e1000_nic = E1000Nic {
