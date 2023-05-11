@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies.spin_rs]
 package = "spin"
-git = "https://github.com/theseus-os/spin-rs"
+# git = "https://github.com/theseus-os/spin-rs"
+path = "../../../spin-rs"
 default-features = false
 features = ["spin_mutex", "rwlock"]

@@ -46,19 +46,17 @@ where
 
         MutexGuard {
             inner: ManuallyDrop::new(inner),
-            data: &self.data,
+            lock: self,
             _guard: guard,
         }
     }
 
     /// Attempts to acquire this mutex.
-    ///
-    /// This method may spuriously fail.
     #[inline]
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T, F>> {
         F::try_lock_mutex(&self.inner, &self.data).map(|(inner, guard)| MutexGuard {
             inner: ManuallyDrop::new(inner),
-            data: &self.data,
+            lock: self,
             _guard: guard,
         })
     }
@@ -104,8 +102,29 @@ where
     F: Flavour,
 {
     inner: ManuallyDrop<spin::MutexGuard<'a, T>>,
-    data: &'a F::MutexData,
+    lock: &'a Mutex<T, F>,
     _guard: F::Guard,
+}
+
+impl<'a, T, F> MutexGuard<'a, T, F>
+where
+    F: Flavour,
+{
+    /// Leaks the guard, returning a mutable reference to the underlying data.
+    ///
+    /// This function will permanently lock the associated mutex.
+    #[inline]
+    pub fn leak(mut self) -> &'a mut T {
+        // SAFETY: We forget self immediately after, so self.inner is never used again.
+        let inner = unsafe { core::ptr::read(&mut self.inner) };
+        core::mem::forget(self);
+        spin_rs::mutex::SpinMutexGuard::<_, _>::leak(ManuallyDrop::into_inner(inner))
+    }
+
+    #[doc(hidden)]
+    pub fn mutex(&self) -> &'a Mutex<T, F> {
+        self.lock
+    }
 }
 
 impl<'a, T, F> Deref for MutexGuard<'a, T, F>
@@ -137,6 +156,6 @@ where
     #[inline]
     fn drop(&mut self) {
         unsafe { ManuallyDrop::drop(&mut self.inner) };
-        F::post_mutex_unlock(self.data);
+        F::post_mutex_unlock(&self.lock.data);
     }
 }

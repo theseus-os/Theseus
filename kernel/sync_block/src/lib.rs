@@ -1,8 +1,12 @@
 #![feature(negative_impls)]
 #![no_std]
 
+mod condvar;
+
 use sync::{spin, Flavour};
 use wait_queue::WaitQueue;
+
+pub use condvar::Condvar;
 
 pub type Mutex<T> = sync::Mutex<T, Block>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, Block>;
@@ -93,6 +97,7 @@ impl Flavour for Block {
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::RwLockData,
     ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard) {
+        // We must not use try_write_weak because that could lead to us waiting forever.
         if let Some(guards) = Self::try_write_rw_lock(rw_lock, data) {
             guards
         } else {
