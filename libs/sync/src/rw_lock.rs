@@ -5,32 +5,40 @@ use core::{
 };
 
 pub trait RwLockFlavor {
+    /// Initial state of the additional data.
     const INIT: Self::LockData;
 
+    /// Additional data stored in the lock.
     type LockData;
 
+    /// Additional guard stored in the synchronisation guards.
     type Guard;
 
+    /// Attempts to acquire the given lock with shared access.
     fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
     ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>;
 
+    /// Attempts to acquire the given lock with exclusive access.
     fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
     ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>;
 
+    /// Acquires the given lock with shared access.
     fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
     ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard);
 
+    /// Acquires the given lock with exclusive access.
     fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
     ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard);
 
+    /// Performs any necessary actions after unlocking the lock.
     fn post_unlock(data: &Self::LockData, is_writer_or_last_reader: bool);
 }
 
