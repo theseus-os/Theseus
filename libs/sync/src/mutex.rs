@@ -118,7 +118,7 @@ where
         // SAFETY: We forget self immediately after, so self.inner is never used again.
         let inner = unsafe { core::ptr::read(&mut self.inner) };
         core::mem::forget(self);
-        spin_rs::mutex::SpinMutexGuard::<_, _>::leak(ManuallyDrop::into_inner(inner))
+        spin_rs::mutex::SpinMutexGuard::<_>::leak(ManuallyDrop::into_inner(inner))
     }
 
     #[doc(hidden)]
