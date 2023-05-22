@@ -6,8 +6,10 @@ use core::{
 };
 
 pub trait MutexFlavor {
+    /// Initial state of the additional data.
     const INIT: Self::LockData;
 
+    /// Additional data stored in the lock.
     type LockData;
 
     /// Additional guard stored in the synchronisation guards.
