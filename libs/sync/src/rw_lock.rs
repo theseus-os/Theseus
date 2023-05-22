@@ -1,8 +1,38 @@
-use crate::{spin, RwLockFlavor};
+use crate::spin;
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
+
+pub trait RwLockFlavor {
+    const INIT: Self::LockData;
+
+    type LockData;
+
+    type Guard;
+
+    fn try_read<'a, T>(
+        rw_lock: &'a spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>;
+
+    fn try_write<'a, T>(
+        rw_lock: &'a spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>;
+
+    fn read<'a, T>(
+        rw_lock: &'a spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard);
+
+    fn write<'a, T>(
+        rw_lock: &'a spin::RwLock<T>,
+        data: &'a Self::LockData,
+    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard);
+
+    fn post_unlock(data: &Self::LockData, is_writer_or_last_reader: bool);
+}
 
 /// A reader-writer lock.
 pub struct RwLock<T, F>

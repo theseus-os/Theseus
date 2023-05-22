@@ -12,68 +12,14 @@
 pub mod mutex;
 pub mod rw_lock;
 
-pub use mutex::{Mutex, MutexGuard};
-pub use rw_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+pub use mutex::{Mutex, MutexFlavor, MutexGuard};
+pub use rw_lock::{RwLock, RwLockFlavor, RwLockReadGuard, RwLockWriteGuard};
 
 pub mod spin {
     pub use spin_rs::{
         mutex::spin::{SpinMutex as Mutex, SpinMutexGuard as MutexGuard},
         rwlock::{RwLock, RwLockReadGuard, RwLockWriteGuard},
     };
-}
-
-pub trait MutexFlavor {
-    const INIT: Self::LockData;
-
-    type LockData;
-
-    /// Additional guard stored in the synchronisation guards.
-    type Guard;
-
-    /// Tries to acquire the given mutex.
-    fn try_lock<'a, T>(
-        mutex: &'a spin::Mutex<T>,
-        data: &'a Self::LockData,
-    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>;
-
-    /// Acquires the given mutex.
-    fn lock<'a, T>(
-        mutex: &'a spin::Mutex<T>,
-        data: &'a Self::LockData,
-    ) -> (spin::MutexGuard<'a, T>, Self::Guard);
-
-    /// Performs any necessary actions after unlocking the mutex.
-    fn post_unlock(data: &Self::LockData);
-}
-
-pub trait RwLockFlavor {
-    const INIT: Self::LockData;
-
-    type LockData;
-
-    type Guard;
-
-    fn try_read<'a, T>(
-        rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::LockData,
-    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>;
-
-    fn try_write<'a, T>(
-        rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::LockData,
-    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>;
-
-    fn read<'a, T>(
-        rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::LockData,
-    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard);
-
-    fn write<'a, T>(
-        rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::LockData,
-    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard);
-
-    fn post_unlock(data: &Self::LockData, is_writer_or_last_reader: bool);
 }
 
 /// A deadlock prevention method.

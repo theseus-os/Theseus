@@ -1,9 +1,33 @@
-use crate::{spin, MutexFlavor};
+use crate::spin;
 use core::{
     fmt,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
+
+pub trait MutexFlavor {
+    const INIT: Self::LockData;
+
+    type LockData;
+
+    /// Additional guard stored in the synchronisation guards.
+    type Guard;
+
+    /// Tries to acquire the given mutex.
+    fn try_lock<'a, T>(
+        mutex: &'a spin::Mutex<T>,
+        data: &'a Self::LockData,
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>;
+
+    /// Acquires the given mutex.
+    fn lock<'a, T>(
+        mutex: &'a spin::Mutex<T>,
+        data: &'a Self::LockData,
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard);
+
+    /// Performs any necessary actions after unlocking the mutex.
+    fn post_unlock(data: &Self::LockData);
+}
 
 /// A mutual exclusion primitive.
 pub struct Mutex<T, F>
