@@ -1,4 +1,4 @@
-use crate::{spin, Flavour};
+use crate::{spin, RwLockFlavour};
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -7,22 +7,22 @@ use core::{
 /// A reader-writer lock.
 pub struct RwLock<T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     inner: spin::RwLock<T>,
-    data: F::RwLockData,
+    data: F::LockData,
 }
 
 impl<T, F> RwLock<T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     /// Creates a new reader-writer lock.
     #[inline]
     pub const fn new(value: T) -> Self {
         Self {
             inner: spin::RwLock::new(value),
-            data: F::RW_LOCK_INIT,
+            data: F::INIT,
         }
     }
 
@@ -55,7 +55,7 @@ where
     /// This method may spuriously fail.
     #[inline]
     pub fn try_read(&self) -> Option<RwLockReadGuard<'_, T, F>> {
-        F::try_read_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockReadGuard {
+        F::try_read(&self.inner, &self.data).map(|(inner, guard)| RwLockReadGuard {
             inner: ManuallyDrop::new(inner),
             data: &self.data,
             _guard: guard,
@@ -67,7 +67,7 @@ where
     /// This method may spuriously fail.
     #[inline]
     pub fn try_write(&self) -> Option<RwLockWriteGuard<'_, T, F>> {
-        F::try_write_rw_lock(&self.inner, &self.data).map(|(inner, guard)| RwLockWriteGuard {
+        F::try_write(&self.inner, &self.data).map(|(inner, guard)| RwLockWriteGuard {
             inner: ManuallyDrop::new(inner),
             data: &self.data,
             _guard: guard,
@@ -77,7 +77,7 @@ where
     /// Locks theis lock with shared read access.
     #[inline]
     pub fn read(&self) -> RwLockReadGuard<'_, T, F> {
-        let (inner, guard) = F::read_rw_lock(&self.inner, &self.data);
+        let (inner, guard) = F::read(&self.inner, &self.data);
         RwLockReadGuard {
             inner: ManuallyDrop::new(inner),
             data: &self.data,
@@ -87,7 +87,7 @@ where
 
     /// Locks this lock with exclusive write access.
     pub fn write(&self) -> RwLockWriteGuard<'_, T, F> {
-        let (inner, guard) = F::write_rw_lock(&self.inner, &self.data);
+        let (inner, guard) = F::write(&self.inner, &self.data);
         RwLockWriteGuard {
             inner: ManuallyDrop::new(inner),
             data: &self.data,
@@ -100,16 +100,16 @@ where
 /// dropped.
 pub struct RwLockReadGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     inner: ManuallyDrop<spin::RwLockReadGuard<'a, T>>,
-    data: &'a F::RwLockData,
+    data: &'a F::LockData,
     _guard: F::Guard,
 }
 
 impl<'a, T, F> Deref for RwLockReadGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     type Target = T;
 
@@ -121,11 +121,11 @@ where
 
 impl<'a, T, F> Drop for RwLockReadGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     fn drop(&mut self) {
         let reader_count = unsafe { ManuallyDrop::take(&mut self.inner) }.release();
-        F::post_rw_lock_unlock(self.data, reader_count == 0);
+        F::post_unlock(self.data, reader_count == 0);
     }
 }
 
@@ -133,16 +133,16 @@ where
 /// dropped.
 pub struct RwLockWriteGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     inner: ManuallyDrop<spin::RwLockWriteGuard<'a, T>>,
-    data: &'a F::RwLockData,
+    data: &'a F::LockData,
     _guard: F::Guard,
 }
 
 impl<'a, T, F> Deref for RwLockWriteGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     type Target = T;
 
@@ -154,7 +154,7 @@ where
 
 impl<'a, T, F> DerefMut for RwLockWriteGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -164,10 +164,10 @@ where
 
 impl<'a, T, F> Drop for RwLockWriteGuard<'a, T, F>
 where
-    F: Flavour,
+    F: RwLockFlavour,
 {
     fn drop(&mut self) {
         unsafe { ManuallyDrop::drop(&mut self.inner) };
-        F::post_rw_lock_unlock(self.data, true);
+        F::post_unlock(self.data, true);
     }
 }

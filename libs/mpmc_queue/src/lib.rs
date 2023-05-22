@@ -13,12 +13,12 @@ use core::{
     ptr::NonNull,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use sync::{Flavour, Mutex, MutexGuard};
+use sync::{Mutex, MutexFlavour, MutexGuard};
 
 /// A growable, first-in first-out, multi-producer, multi-consumer, queue.
 pub struct Queue<T, F>
 where
-    F: Flavour,
+    F: MutexFlavour,
 {
     pointers: Mutex<Pointers<T>, F>,
     /// Prevents unnecessary locking in the fast path.
@@ -45,7 +45,7 @@ impl<T> Node<T> {
 
 impl<T, F> Queue<T, F>
 where
-    F: Flavour,
+    F: MutexFlavour,
 {
     pub const fn new() -> Self {
         Self {

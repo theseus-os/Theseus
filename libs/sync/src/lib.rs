@@ -22,61 +22,58 @@ pub mod spin {
     };
 }
 
-/// A synchronisation flavour.
-pub trait Flavour {
-    const MUTEX_INIT: Self::MutexData;
+pub trait MutexFlavour {
+    const INIT: Self::LockData;
 
-    const RW_LOCK_INIT: Self::RwLockData;
-
-    type MutexData;
-
-    type RwLockData;
+    type LockData;
 
     /// Additional guard stored in the synchronisation guards.
     type Guard;
 
     /// Tries to acquire the given mutex.
-    fn try_lock_mutex<'a, T>(
+    fn try_lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
-        data: &'a Self::MutexData,
-    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>
-    where
-        Self: Sized;
+        data: &'a Self::LockData,
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>;
 
     /// Acquires the given mutex.
-    fn lock_mutex<'a, T>(
+    fn lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
-        data: &'a Self::MutexData,
-    ) -> (spin::MutexGuard<'a, T>, Self::Guard)
-    where
-        Self: Sized;
+        data: &'a Self::LockData,
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard);
 
     /// Performs any necessary actions after unlocking the mutex.
-    fn post_mutex_unlock(data: &Self::MutexData)
-    where
-        Self: Sized;
+    fn post_unlock(data: &Self::LockData);
+}
 
-    fn try_read_rw_lock<'a, T>(
+pub trait RwLockFlavour {
+    const INIT: Self::LockData;
+
+    type LockData;
+
+    type Guard;
+
+    fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::RwLockData,
+        data: &'a Self::LockData,
     ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>;
 
-    fn try_write_rw_lock<'a, T>(
+    fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::RwLockData,
+        data: &'a Self::LockData,
     ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>;
 
-    fn read_rw_lock<'a, T>(
+    fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::RwLockData,
+        data: &'a Self::LockData,
     ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard);
 
-    fn write_rw_lock<'a, T>(
+    fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::RwLockData,
+        data: &'a Self::LockData,
     ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard);
 
-    fn post_rw_lock_unlock(data: &Self::RwLockData, is_writer_or_last_reader: bool);
+    fn post_unlock(data: &Self::LockData, is_writer_or_last_reader: bool);
 }
 
 /// A deadlock prevention method.
@@ -94,24 +91,20 @@ pub trait DeadlockPrevention {
     fn enter() -> Self::Guard;
 }
 
-impl<P> Flavour for P
+impl<P> MutexFlavour for P
 where
     P: DeadlockPrevention,
 {
-    const MUTEX_INIT: Self::MutexData = ();
+    const INIT: Self::LockData = ();
 
-    const RW_LOCK_INIT: Self::RwLockData = ();
-
-    type MutexData = ();
-
-    type RwLockData = ();
+    type LockData = ();
 
     type Guard = <Self as DeadlockPrevention>::Guard;
 
     #[inline]
-    fn try_lock_mutex<'a, T>(
+    fn try_lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
-        _: &'a Self::MutexData,
+        _: &'a Self::LockData,
     ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
         if Self::EXPENSIVE && mutex.is_locked() {
             return None;
@@ -122,9 +115,9 @@ where
     }
 
     #[inline]
-    fn lock_mutex<'a, T>(
+    fn lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
-        _: &'a Self::MutexData,
+        _: &'a Self::LockData,
     ) -> (spin::MutexGuard<'a, T>, Self::Guard) {
         loop {
             let deadlock_guard = Self::enter();
@@ -140,12 +133,23 @@ where
     }
 
     #[inline]
-    fn post_mutex_unlock(_: &Self::MutexData) {}
+    fn post_unlock(_: &Self::LockData) {}
+}
+
+impl<P> RwLockFlavour for P
+where
+    P: DeadlockPrevention,
+{
+    const INIT: Self::LockData = ();
+
+    type LockData = ();
+
+    type Guard = <Self as DeadlockPrevention>::Guard;
 
     #[inline]
-    fn try_read_rw_lock<'a, T>(
+    fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        _: &'a Self::RwLockData,
+        _: &'a Self::LockData,
     ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)> {
         if Self::EXPENSIVE && rw_lock.writer_count() != 0 {
             return None;
@@ -156,22 +160,24 @@ where
     }
 
     #[inline]
-    fn try_write_rw_lock<'a, T>(
+    fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        _: &'a Self::RwLockData,
+        _: &'a Self::LockData,
     ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
-        if Self::EXPENSIVE && (rw_lock.reader_count() != 0 || rw_lock.writer_count() != 0){
+        if Self::EXPENSIVE && (rw_lock.reader_count() != 0 || rw_lock.writer_count() != 0) {
             return None;
         }
 
         let deadlock_guard = Self::enter();
-        rw_lock.try_write_weak().map(|guard| (guard, deadlock_guard))
+        rw_lock
+            .try_write_weak()
+            .map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
-    fn read_rw_lock<'a, T>(
+    fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        _: &'a Self::RwLockData,
+        _: &'a Self::LockData,
     ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard) {
         loop {
             let deadlock_guard = Self::enter();
@@ -187,9 +193,9 @@ where
     }
 
     #[inline]
-    fn write_rw_lock<'a, T>(
+    fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        _: &'a Self::RwLockData,
+        _: &'a Self::LockData,
     ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard) {
         loop {
             let deadlock_guard = Self::enter();
@@ -205,5 +211,5 @@ where
     }
 
     #[inline]
-    fn post_rw_lock_unlock(_: &Self::RwLockData, _: bool) {}
+    fn post_unlock(_: &Self::LockData, _: bool) {}
 }

@@ -1,7 +1,7 @@
 #![feature(negative_impls)]
 #![no_std]
 
-use sync::{spin, Flavour};
+use sync::{spin, MutexFlavour, RwLockFlavour};
 use wait_queue::WaitQueue;
 
 pub type Mutex<T> = sync::Mutex<T, Block>;
@@ -16,93 +16,95 @@ pub type RwLockWriteGuard<'a, T> = sync::RwLockWriteGuard<'a, T, Block>;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Block {}
 
-impl Flavour for Block {
+impl MutexFlavour for Block {
     #[allow(clippy::declare_interior_mutable_const)]
-    const MUTEX_INIT: Self::MutexData = WaitQueue::new();
+    const INIT: Self::LockData = WaitQueue::new();
 
-    #[allow(clippy::declare_interior_mutable_const)]
-    const RW_LOCK_INIT: Self::RwLockData = RwLockData {
-        readers: WaitQueue::new(),
-        writers: WaitQueue::new(),
-    };
-
-    type MutexData = WaitQueue;
-
-    type RwLockData = RwLockData;
+    type LockData = WaitQueue;
 
     type Guard = ();
 
     #[inline]
-    fn try_lock_mutex<'a, T>(
+    fn try_lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
-        _: &'a Self::MutexData,
+        _: &'a Self::LockData,
     ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
         mutex.try_lock().map(|guard| (guard, ()))
     }
 
     #[inline]
-    fn lock_mutex<'a, T>(
+    fn lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
-        data: &'a Self::MutexData,
+        data: &'a Self::LockData,
     ) -> (spin::MutexGuard<'a, T>, Self::Guard) {
         // This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
-        if let Some(guards) = Self::try_lock_mutex(mutex, data) {
+        if let Some(guards) = Self::try_lock(mutex, data) {
             guards
         } else {
-            data.wait_until(|| Self::try_lock_mutex(mutex, data))
+            data.wait_until(|| Self::try_lock(mutex, data))
         }
     }
 
     #[inline]
-    fn post_mutex_unlock(data: &Self::MutexData) {
+    fn post_unlock(data: &Self::LockData) {
         data.notify_one();
     }
+}
+
+impl RwLockFlavour for Block {
+    #[allow(clippy::declare_interior_mutable_const)]
+    const INIT: Self::LockData = RwLockData {
+        readers: WaitQueue::new(),
+        writers: WaitQueue::new(),
+    };
+
+    type LockData = RwLockData;
+
+    type Guard = ();
 
     #[inline]
-    fn try_read_rw_lock<'a, T>(
+    fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        _: &'a Self::RwLockData,
+        _: &'a Self::LockData,
     ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)> {
         rw_lock.try_read().map(|guard| (guard, ()))
     }
 
     #[inline]
-    fn try_write_rw_lock<'a, T>(
+    fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        _: &'a Self::RwLockData,
+        _: &'a Self::LockData,
     ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
         rw_lock.try_write().map(|guard| (guard, ()))
     }
 
     #[inline]
-    fn read_rw_lock<'a, T>(
+    fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::RwLockData,
+        data: &'a Self::LockData,
     ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard) {
-        if let Some(guards) = Self::try_read_rw_lock(rw_lock, data) {
+        if let Some(guards) = Self::try_read(rw_lock, data) {
             guards
         } else {
-            data.readers
-                .wait_until(|| Self::try_read_rw_lock(rw_lock, data))
+            data.readers.wait_until(|| Self::try_read(rw_lock, data))
         }
     }
 
     #[inline]
-    fn write_rw_lock<'a, T>(
+    fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
-        data: &'a Self::RwLockData,
+        data: &'a Self::LockData,
     ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard) {
-        if let Some(guards) = Self::try_write_rw_lock(rw_lock, data) {
+        if let Some(guards) = Self::try_write(rw_lock, data) {
             guards
         } else {
-            data.writers
-                .wait_until(|| Self::try_write_rw_lock(rw_lock, data))
+            data.writers.wait_until(|| Self::try_write(rw_lock, data))
         }
     }
 
     #[inline]
-    fn post_rw_lock_unlock(data: &Self::RwLockData, is_writer_or_last_reader: bool) {
+    fn post_unlock(data: &Self::LockData, is_writer_or_last_reader: bool) {
         if is_writer_or_last_reader && !data.writers.notify_one() {
             data.readers.notify_all();
         }
