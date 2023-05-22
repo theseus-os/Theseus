@@ -1,4 +1,4 @@
-use crate::{spin, MutexFlavour};
+use crate::{spin, MutexFlavor};
 use core::{
     fmt,
     mem::ManuallyDrop,
@@ -8,7 +8,7 @@ use core::{
 /// A mutual exclusion primitive.
 pub struct Mutex<T, F>
 where
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     inner: spin::Mutex<T>,
     data: F::LockData,
@@ -16,7 +16,7 @@ where
 
 impl<T, F> Mutex<T, F>
 where
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     /// Creates a new mutex.
     #[inline]
@@ -73,7 +73,7 @@ where
 impl<T, F> fmt::Debug for Mutex<T, F>
 where
     T: fmt::Debug,
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Mutex");
@@ -101,7 +101,7 @@ where
 #[derive(Debug)]
 pub struct MutexGuard<'a, T, F>
 where
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     inner: ManuallyDrop<spin::MutexGuard<'a, T>>,
     data: &'a F::LockData,
@@ -110,7 +110,7 @@ where
 
 impl<'a, T, F> Deref for MutexGuard<'a, T, F>
 where
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     type Target = T;
 
@@ -122,7 +122,7 @@ where
 
 impl<'a, T, F> DerefMut for MutexGuard<'a, T, F>
 where
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -132,7 +132,7 @@ where
 
 impl<'a, T, F> Drop for MutexGuard<'a, T, F>
 where
-    F: MutexFlavour,
+    F: MutexFlavor,
 {
     #[inline]
     fn drop(&mut self) {

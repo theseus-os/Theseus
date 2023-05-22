@@ -1,4 +1,4 @@
-use crate::{spin, RwLockFlavour};
+use crate::{spin, RwLockFlavor};
 use core::{
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
@@ -7,7 +7,7 @@ use core::{
 /// A reader-writer lock.
 pub struct RwLock<T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     inner: spin::RwLock<T>,
     data: F::LockData,
@@ -15,7 +15,7 @@ where
 
 impl<T, F> RwLock<T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     /// Creates a new reader-writer lock.
     #[inline]
@@ -100,7 +100,7 @@ where
 /// dropped.
 pub struct RwLockReadGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     inner: ManuallyDrop<spin::RwLockReadGuard<'a, T>>,
     data: &'a F::LockData,
@@ -109,7 +109,7 @@ where
 
 impl<'a, T, F> Deref for RwLockReadGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     type Target = T;
 
@@ -121,7 +121,7 @@ where
 
 impl<'a, T, F> Drop for RwLockReadGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     fn drop(&mut self) {
         let reader_count = unsafe { ManuallyDrop::take(&mut self.inner) }.release();
@@ -133,7 +133,7 @@ where
 /// dropped.
 pub struct RwLockWriteGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     inner: ManuallyDrop<spin::RwLockWriteGuard<'a, T>>,
     data: &'a F::LockData,
@@ -142,7 +142,7 @@ where
 
 impl<'a, T, F> Deref for RwLockWriteGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     type Target = T;
 
@@ -154,7 +154,7 @@ where
 
 impl<'a, T, F> DerefMut for RwLockWriteGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -164,7 +164,7 @@ where
 
 impl<'a, T, F> Drop for RwLockWriteGuard<'a, T, F>
 where
-    F: RwLockFlavour,
+    F: RwLockFlavor,
 {
     fn drop(&mut self) {
         unsafe { ManuallyDrop::drop(&mut self.inner) };

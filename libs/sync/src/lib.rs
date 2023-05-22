@@ -22,7 +22,7 @@ pub mod spin {
     };
 }
 
-pub trait MutexFlavour {
+pub trait MutexFlavor {
     const INIT: Self::LockData;
 
     type LockData;
@@ -46,7 +46,7 @@ pub trait MutexFlavour {
     fn post_unlock(data: &Self::LockData);
 }
 
-pub trait RwLockFlavour {
+pub trait RwLockFlavor {
     const INIT: Self::LockData;
 
     type LockData;
@@ -91,7 +91,7 @@ pub trait DeadlockPrevention {
     fn enter() -> Self::Guard;
 }
 
-impl<P> MutexFlavour for P
+impl<P> MutexFlavor for P
 where
     P: DeadlockPrevention,
 {
@@ -136,7 +136,7 @@ where
     fn post_unlock(_: &Self::LockData) {}
 }
 
-impl<P> RwLockFlavour for P
+impl<P> RwLockFlavor for P
 where
     P: DeadlockPrevention,
 {

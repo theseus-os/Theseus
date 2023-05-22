@@ -1,7 +1,7 @@
 #![feature(negative_impls)]
 #![no_std]
 
-use sync::{spin, MutexFlavour, RwLockFlavour};
+use sync::{spin, MutexFlavor, RwLockFlavor};
 use wait_queue::WaitQueue;
 
 pub type Mutex<T> = sync::Mutex<T, Block>;
@@ -16,7 +16,7 @@ pub type RwLockWriteGuard<'a, T> = sync::RwLockWriteGuard<'a, T, Block>;
 #[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Block {}
 
-impl MutexFlavour for Block {
+impl MutexFlavor for Block {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self::LockData = WaitQueue::new();
 
@@ -52,7 +52,7 @@ impl MutexFlavour for Block {
     }
 }
 
-impl RwLockFlavour for Block {
+impl RwLockFlavor for Block {
     #[allow(clippy::declare_interior_mutable_const)]
     const INIT: Self::LockData = RwLockData {
         readers: WaitQueue::new(),
