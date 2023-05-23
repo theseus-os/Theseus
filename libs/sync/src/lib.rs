@@ -97,7 +97,7 @@ where
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
     ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)> {
-        if Self::EXPENSIVE && rw_lock.writer_count_acquire() != 0 {
+        if Self::EXPENSIVE && rw_lock.writer_count() != 0 {
             return None;
         }
 
@@ -110,9 +110,7 @@ where
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
     ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
-        if Self::EXPENSIVE
-            && (rw_lock.reader_count_acquire() != 0 || rw_lock.writer_count_acquire() != 0)
-        {
+        if Self::EXPENSIVE && (rw_lock.reader_count() != 0 || rw_lock.writer_count() != 0) {
             return None;
         }
 
