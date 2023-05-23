@@ -117,5 +117,5 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 extern "C" fn tlb_shootdown_ipi_handler(_exc: &interrupts::ExceptionContext) -> interrupts::EoiBehaviour {
     let expected = handle_tlb_shootdown_ipi();
     assert!(expected, "Unexpected TLB Shootdown IPI!");
-    interrupts::EoiBehaviour::CallerMustSignalEoi
+    interrupts::EoiBehaviour::HandlerDidNotSendEoi
 }

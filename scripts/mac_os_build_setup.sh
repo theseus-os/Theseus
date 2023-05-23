@@ -4,67 +4,60 @@ set -e
 ### This script sets up the build environment of tools required for building Thesesus on macOS.
 ### Adapted from here: https://gist.github.com/emkay/a1214c753e8c975d95b4
 
-
 #### Check if `brew` is installed
 command -v brew >/dev/null 2>&1 || { echo >&2 "Missing homebrew (\`brew\`). Install it from http://brew.sh/."; exit 1; }
-# brew install wget gettext git pkg-config gmp mpfr libmpc autoconf automake nasm xorriso mtools qemu
-#brew link --force gettext
-#### force re-fetch our own gcc cross compilers tap recipe
-#brew untap theseus-os/gcc_cross_compilers || true
-#brew tap theseus-os/gcc_cross_compilers
-#brew install x86_64-elf-binutils x86_64-elf-gcc
 
-
-### Using mac ports instead of our own x86_64-elf-gcc homebrew tap recipe
-which port || { echo >&2 "Missing installation of MacPorts (\`port\`)."; exit 1; }
-sudo port install gmake wget coreutils findutils nasm pkgconfig x86_64-elf-gcc
-sudo ln -s /opt/local/bin/gmake /opt/local/bin/make
-### Macports doesn't have xorriso
-brew install xorriso
+brew install make wget coreutils findutils nasm pkgconfig x86_64-elf-gcc x86_64-elf-binutils xorriso
 ### Install dependencies needed to cross-compile grub for macOS
 brew install autoconf automake libtool pkg-config
 
+src="/tmp/theseus_tools_src"
+prefix="/usr/local"
+target=x86_64-elf
 
-export SRC_DIR="$HOME/theseus_tools_src"
-export PREFIX="$HOME/theseus_tools_opt/"
-export TARGET=x86_64-elf
-export PATH="$PREFIX/bin:$PATH"
-
-mkdir -p "$SRC_DIR"
-mkdir -p "$PREFIX/bin/"
-
-
+mkdir -p "$src"
 
 ### Download and cross-compile objconv
-cd "$SRC_DIR"
-if [ ! -d "objconv" ]; then
+cd "$src"
+if ! command -v objconv &> /dev/null
+then
   echo "Installing \`objconv\`"
   echo ""
-  wget http://www.agner.org/optimize/objconv.zip
+  wget http://www.agner.org/optimize/objconv.zip -O objconv.zip
   mkdir -p build-objconv
-  unzip objconv.zip -d build-objconv
+  unzip -o objconv.zip -d build-objconv
   cd build-objconv
-  unzip source.zip -d src
-  g++ -o objconv -O2 src/*.cpp --prefix="$PREFIX"
-  cp objconv "$PREFIX/bin/"
+  unzip -o source.zip -d src
+  g++ -o objconv -O2 src/*.cpp --prefix="$prefix"
+  echo "Copying objconv binary to $prefix/bin requires sudo privileges"
+  sudo cp objconv "$prefix/bin"
 fi
 
 
 ### Download and cross-compile grub, which we need for the grub-mkrescue tool
-cd "$SRC_DIR"
-if [ ! -d "grub" ]; then
+cd "$src"
+if ! command -v grub-mkrescue &> /dev/null
+then
   echo "Installing \`grub\`"
   echo ""
-  git clone --depth 1 https://github.com/theseus-os/grub.git
+
+  if [ ! -d "grub" ]
+  then
+    git clone --depth 1 https://github.com/theseus-os/grub.git
+  fi
+
   cd grub
-  sh autogen.sh
+
+  PYTHON="python3" sh autogen.sh
   mkdir -p build-grub
   cd build-grub
-  ../configure --disable-werror TARGET_CC=$TARGET-gcc TARGET_OBJCOPY=$TARGET-objcopy \
-    TARGET_STRIP=$TARGET-strip TARGET_NM=$TARGET-nm TARGET_RANLIB=$TARGET-ranlib --target=$TARGET --prefix="$PREFIX"
+  ../configure --disable-werror TARGET_CC=$target-gcc TARGET_OBJCOPY=$target-objcopy \
+    TARGET_STRIP=$target-strip TARGET_NM=$target-nm TARGET_RANLIB=$target-ranlib \
+  --target=$target --prefix="$prefix"
   make -j4
-  make install
+  echo "Installing grub tools to $prefix requires sudo privileges"
+  sudo make install
 fi
 
-### install qemu using Homebrew 
+### Install qemu
 brew install qemu 
