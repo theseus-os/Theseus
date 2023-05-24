@@ -233,8 +233,6 @@
 <a href="#233" id="233">233</a>
 <a href="#234" id="234">234</a>
 <a href="#235" id="235">235</a>
-<a href="#236" id="236">236</a>
-<a href="#237" id="237">237</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -414,11 +412,12 @@
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span><span class="kw">let </span>(key_producer, mouse_producer) = window_manager::init()<span class="question-mark">?</span>;
 
-    <span class="comment">// initialize the rest of our drivers
-    // arch-gate: device_manager currently detects PCI &amp; PS2 devices,
-    // which are unsupported on aarch64 at this point
-    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-    </span>device_manager::init(key_producer, mouse_producer)<span class="question-mark">?</span>;
+    device_manager::init(
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span>key_producer,
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span>mouse_producer,
+    )<span class="question-mark">?</span>;
 
     task_fs::init()<span class="question-mark">?</span>;
 
@@ -439,9 +438,6 @@
     </span>drop_after_init.drop_all();
 
     <span class="comment">// 2. Spawn various system tasks/daemons,
-    // arch-gate: no windowing/input support on aarch64 at the moment,
-    // which prevent using any graphical apps such as the console
-    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>console::start_connection_detection()<span class="question-mark">?</span>;
 
     <span class="comment">// 3. Start the first application(s).

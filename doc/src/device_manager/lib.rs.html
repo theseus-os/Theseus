@@ -310,53 +310,37 @@
 <a href="#310" id="310">310</a>
 <a href="#311" id="311">311</a>
 <a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
-#![feature(trait_alias)]
+#![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(trait_alias))]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>event_types;
-<span class="kw">extern crate </span>e1000;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>apic;
-<span class="kw">extern crate </span>acpi;
-<span class="kw">extern crate </span>serial_port;
-<span class="kw">extern crate </span>console;
-<span class="kw">extern crate </span>logger;
-<span class="kw">extern crate </span>keyboard;
-<span class="kw">extern crate </span>pci;
-<span class="kw">extern crate </span>mouse;
-<span class="kw">extern crate </span>storage_manager;
-<span class="kw">extern crate </span>network_manager;
-<span class="kw">extern crate </span>ethernet_smoltcp_device;
-<span class="kw">extern crate </span>mpmc;
-<span class="kw">extern crate </span>ixgbe;
-<span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>fatfs;
-<span class="kw">extern crate </span>io;
-<span class="kw">extern crate </span>core2;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>derive_more;
-<span class="kw">extern crate </span>mlx5;
-<span class="kw">extern crate </span>net;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>core::convert::TryFrom;
-<span class="kw">use </span>mpmc::Queue;
-<span class="kw">use </span>event_types::Event;
-<span class="kw">use </span>memory::MemoryManagementInfo;
-<span class="kw">use </span>ethernet_smoltcp_device::EthernetNetworkInterface;
-<span class="kw">use </span>network_manager::add_to_network_interfaces;
-<span class="kw">use </span>alloc::vec::Vec;
-<span class="kw">use </span>io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
-<span class="kw">use </span>serial_port::{SerialPortAddress, take_serial_port_basic};
-<span class="kw">use </span>storage_manager::StorageDevice;
-<span class="kw">use </span>memory::PhysicalAddress;
+<span class="kw">use </span>log::info;
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>{
+    log::{error, debug, warn},
+    mpmc::Queue,
+    event_types::Event,
+    memory::MemoryManagementInfo,
+    ethernet_smoltcp_device::EthernetNetworkInterface,
+    network_manager::add_to_network_interfaces,
+    alloc::vec::Vec,
+    io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter},
+    storage_manager::StorageDevice,
+    memory::PhysicalAddress,
+    serial_port::{SerialPortAddress, init_serial_port, take_serial_port_basic},
+};
 
 <span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">const </span>DEFAULT_LOCAL_IP: <span class="kw-2">&amp;</span>str = <span class="string">&quot;10.0.2.15/24&quot;</span>; <span class="comment">// the default QEMU user-slirp network gives IP addresses of &quot;10.0.2.*&quot;
 
 </span><span class="doccomment">/// Standard home router address.
 /// TODO: use DHCP to acquire gateway IP
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">const </span>DEFAULT_GATEWAY_IP: [u8; <span class="number">4</span>] = [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the default QEMU user-slirp networking gateway IP
 
 </span><span class="doccomment">/// Performs early-stage initialization for simple devices needed during early boot.
@@ -364,6 +348,7 @@
 /// This includes:
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">pub fn </span>early_init(
     rsdp_address: <span class="prelude-ty">Option</span>&lt;PhysicalAddress&gt;,
     kernel_mmi: <span class="kw-2">&amp;mut </span>MemoryManagementInfo
@@ -386,41 +371,52 @@
 /// * The fully-featured system [`logger`],
 /// * The legacy PS2 controller and any connected devices: [`keyboard`] and [`mouse`],
 /// * All other devices discovered on the [`pci`] bus.
-</span><span class="kw">pub fn </span>init(key_producer: Queue&lt;Event&gt;, mouse_producer: Queue&lt;Event&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;  {
+</span><span class="kw">pub fn </span>init(
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span>key_producer: Queue&lt;Event&gt;,
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span>mouse_producer: Queue&lt;Event&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;  {
 
     <span class="kw">let </span>serial_ports = logger::take_early_log_writers();
     <span class="kw">let </span>logger_writers = IntoIterator::into_iter(serial_ports)
         .flatten()
-        .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
-            .ok()
-            .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        ).cloned();
+        .filter_map(|sp| serial_port::init_serial_port(sp.base_port_address(), sp))
+        .cloned();
 
     logger::init(<span class="prelude-val">None</span>, logger_writers);
     <span class="macro">info!</span>(<span class="string">&quot;Initialized full logger.&quot;</span>);
 
-    <span class="comment">// Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
-    // If a serial port was used for logging (as configured in [`logger::early_init()`]),
-    // ignore its inputs for purposes of starting new console instances.
-    </span><span class="kw">let </span>init_serial_port = |spa: SerialPortAddress| {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(sp) = take_serial_port_basic(spa) {
-            serial_port::init_serial_port(spa, sp);
-        } <span class="kw">else </span>{
-            console::ignore_serial_port_input(spa <span class="kw">as </span>u16);
-            <span class="macro">info!</span>(<span class="string">&quot;Ignoring input on {:?} because it is being used for logging.&quot;</span>, spa);
-        }
-    };
-    init_serial_port(SerialPortAddress::COM1);
-    init_serial_port(SerialPortAddress::COM2);
+    <span class="comment">// COM1 is the only UART on aarch64; it&#39;s used for logging as well as for the console.
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="comment">// Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
+        // If a serial port was used for logging (as configured in [`logger::early_init()`]),
+        // ignore its inputs for purposes of starting new console instances.
+        </span><span class="kw">let </span>init_serial_port = |spa: SerialPortAddress| {
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(sp) = take_serial_port_basic(spa) {
+                init_serial_port(spa, sp);
+            } <span class="kw">else </span>{
+                console::ignore_serial_port_input(spa <span class="kw">as </span>u16);
+                <span class="macro">info!</span>(<span class="string">&quot;Ignoring input on {:?} because it is being used for logging.&quot;</span>, spa);
+            }
+        };
+        init_serial_port(SerialPortAddress::COM1);
+        init_serial_port(SerialPortAddress::COM2);
+    }
 
-    <span class="kw">let </span>ps2_controller = ps2::init()<span class="question-mark">?</span>;
-    keyboard::init(ps2_controller.keyboard_ref(), key_producer)<span class="question-mark">?</span>;
-    mouse::init(ps2_controller.mouse_ref(), mouse_producer)<span class="question-mark">?</span>;
+    <span class="comment">// PS/2 is x86_64 only
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="kw">let </span>ps2_controller = ps2::init()<span class="question-mark">?</span>;
+        keyboard::init(ps2_controller.keyboard_ref(), key_producer)<span class="question-mark">?</span>;
+        mouse::init(ps2_controller.mouse_ref(), mouse_producer)<span class="question-mark">?</span>;
+    }
 
+    <span class="comment">// No PCI support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
     <span class="comment">// Initialize/scan the PCI bus to discover PCI devices
     </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {
         <span class="macro">debug!</span>(<span class="string">&quot;Found pci device: {:X?}&quot;</span>, dev);
-    } 
+    }
 
     <span class="comment">// store all the initialized ixgbe NICs here to be added to the network interface list
     </span><span class="kw">let </span><span class="kw-2">mut </span>ixgbe_devs = Vec::new();
@@ -523,7 +519,7 @@
     // and mount each filesystem to the root directory by default.
     </span><span class="kw">if </span><span class="bool-val">false </span>{
         <span class="kw">for </span>storage_device <span class="kw">in </span>storage_manager::storage_devices() {
-            <span class="kw">let </span>disk = FatFsAdapter(
+            <span class="kw">let </span>disk = fatfs_adapter::FatFsAdapter::new(
                 ReaderWriter::new(
                     ByteReaderWriterWrapper::from(
                         LockableIo::&lt;<span class="kw">dyn </span>StorageDevice + Send, spin::Mutex&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;::from(storage_device)
@@ -555,13 +551,18 @@
             }
         }
     }
+    }
 
     <span class="prelude-val">Ok</span>(())
 }
 
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">mod </span>fatfs_adapter {
 <span class="comment">// TODO: move the following `FatFsAdapter` stuff into a separate crate. 
 
-</span><span class="doccomment">/// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate
+</span><span class="kw">use </span>derive_more::{From, Into};
+
+<span class="doccomment">/// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate
 /// for any I/O device that wants to be usable by [`fatfs`].
 ///
 /// To meet [`fatfs`]&#39;s requirements, the underlying I/O stream must be able to 
@@ -621,6 +622,7 @@
     <span class="kw">fn </span>new_write_zero_error() -&gt; <span class="self">Self </span>{
         FatFsIoErrorAdapter(core2::io::ErrorKind::WriteZero.into())
     }
+}
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="device_manager" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

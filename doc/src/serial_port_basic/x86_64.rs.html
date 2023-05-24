@@ -275,6 +275,7 @@
 <a href="#275" id="275">275</a>
 <a href="#276" id="276">276</a>
 <a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
 </pre><pre class="rust"><code><span class="kw">use </span>core::{convert::TryFrom, fmt, str::FromStr};
 <span class="kw">use super</span>::{TriState, SerialPortInterruptEvent};
 <span class="kw">use </span>port_io::Port;
@@ -540,8 +541,9 @@
         <span class="self">self</span>.line_status.read() &amp; <span class="number">0x01 </span>== <span class="number">0x01
     </span>}
 
-    <span class="kw">pub fn </span>base_port_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; u16 {
-        <span class="self">self</span>.data.port_address()
+    <span class="kw">pub fn </span>base_port_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SerialPortAddress {
+        SerialPortAddress::try_from(<span class="self">self</span>.data.port_address())
+            .expect(<span class="string">&quot;Invalid port base address&quot;</span>)
     }
 
 }

@@ -389,6 +389,24 @@
 <a href="#389" id="389">389</a>
 <a href="#390" id="390">390</a>
 <a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.
 //!
 //! This crate builds on  [`serial_port_basic`], which provides the lower-level types
@@ -406,16 +424,12 @@
 </span><span class="attr">#![no_std]
 #![feature(abi_x86_interrupt)]
 
-#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>irq_safety;
-<span class="kw">extern crate </span>interrupts;
-<span class="kw">extern crate </span>deferred_interrupt_tasks;
-<span class="kw">extern crate </span>core2;
-<span class="kw">extern crate </span>serial_port_basic;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>deferred_interrupt_tasks::InterruptRegistrationError;
+<span class="kw">use </span>log::{info, error, warn};
+<span class="kw">use </span>alloc::format;
+
+<span class="kw">use </span>deferred_interrupt_tasks::{InterruptRegistrationError};
 <span class="kw">pub use </span>serial_port_basic::{
     SerialPortAddress,
     SerialPortInterruptEvent,
@@ -424,10 +438,13 @@
 };
 
 <span class="kw">use </span>alloc::{boxed::Box, sync::Arc};
-<span class="kw">use </span>core::{convert::TryFrom, fmt, ops::{Deref, DerefMut}};
+<span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>interrupts::{InterruptHandler, EoiBehaviour, interrupt_handler};
+<span class="kw">use </span>interrupts::{InterruptHandler, EoiBehaviour, InterruptNumber, interrupt_handler};
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">use </span>interrupts::{PL011_RX_SPI, init_pl011_rx_interrupt};
 
 <span class="comment">// Dependencies below here are temporary and will be removed
 // after we have support for separate interrupt handling tasks.
@@ -473,13 +490,28 @@
 </span><span class="kw">pub fn </span>init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
-) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt; {
-    static_port_of(<span class="kw-2">&amp;</span>serial_port_address).call_once(|| {
+) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; {
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span><span class="kw">if </span>serial_port_address != SerialPortAddress::COM1 {
+        <span class="kw">return </span><span class="prelude-val">None</span>;
+    }
+
+    <span class="prelude-val">Some</span>(static_port_of(<span class="kw-2">&amp;</span>serial_port_address).call_once(|| {
         <span class="kw">let </span>sp = Arc::new(MutexIrqSafe::new(SerialPort::new(serial_port)));
-        <span class="kw">let </span>(int_num, int_handler) = interrupt_number_handler(<span class="kw-2">&amp;</span>serial_port_address);
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+        </span><span class="kw">let </span>(int_num, int_handler) = interrupt_number_handler(<span class="kw-2">&amp;</span>serial_port_address);
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+        </span><span class="kw">let </span>(int_num, int_handler) = (PL011_RX_SPI, com1_com3_interrupt_handler);
+
         SerialPort::register_interrupt_handler(sp.clone(), int_num, int_handler).unwrap();
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+        </span>init_pl011_rx_interrupt().unwrap();
+
         sp
-    })
+    }))
 }
 
 <span class="doccomment">/// Returns a reference to the static instance of this serial port.
@@ -496,9 +528,10 @@
 
 <span class="doccomment">/// Returns the interrupt number (IRQ vector)
 /// and the interrupt handler function for this serial port.
+</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">fn </span>interrupt_number_handler(
     serial_port_address: <span class="kw-2">&amp;</span>SerialPortAddress
-) -&gt; (u8, InterruptHandler) {
+) -&gt; (InterruptNumber, InterruptHandler) {
     <span class="kw">use </span>interrupts::IRQ_BASE_OFFSET;
     <span class="kw">match </span>serial_port_address {
         SerialPortAddress::COM1 | SerialPortAddress::COM3 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x04</span>, com1_com3_interrupt_handler),
@@ -546,7 +579,7 @@
     /// and spawn a deferrent interrupt task to handle its data receival. 
     </span><span class="kw">pub fn </span>register_interrupt_handler(
         serial_port: Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;,
-        interrupt_number: u8,
+        interrupt_number: InterruptNumber,
         interrupt_handler: InterruptHandler,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>base_port = { 
@@ -569,11 +602,11 @@
                 // a deferred interrupt task, save some information for the 
                 // immediate interrupt handler to use when it fires
                 // such that it triggers the deferred task to act. 
-                </span><span class="macro">info!</span>(<span class="string">&quot;Registered interrupt handler at IRQ {:#X} for serial port {:#X}.&quot;</span>, 
+                </span><span class="macro">info!</span>(<span class="string">&quot;Registered interrupt handler at IRQ {:#X} for serial port {:?}.&quot;</span>,
                     interrupt_number, base_port,
                 );
-                <span class="kw">match </span>SerialPortAddress::try_from(base_port) {
-                    <span class="prelude-val">Ok</span>(SerialPortAddress::COM1 | SerialPortAddress::COM3) =&gt; {
+                <span class="kw">match </span>base_port {
+                    SerialPortAddress::COM1 | SerialPortAddress::COM3 =&gt; {
                         INTERRUPT_ACTION_COM1_COM3.call_once(|| 
                             Box::new(<span class="kw">move </span>|| {
                                 deferred_task.unblock()
@@ -581,7 +614,7 @@
                             })
                         );
                     }
-                    <span class="prelude-val">Ok</span>(SerialPortAddress::COM2 | SerialPortAddress::COM4) =&gt; {
+                    SerialPortAddress::COM2 | SerialPortAddress::COM4 =&gt; {
                         INTERRUPT_ACTION_COM2_COM4.call_once(|| 
                             Box::new(<span class="kw">move </span>|| {
                                 deferred_task.unblock()
@@ -589,12 +622,11 @@
                             })
                         );
                     }
-                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">warn!</span>(<span class="string">&quot;Registering interrupt handler for unknown serial port at {:#X}&quot;</span>, base_port),
                 };                
             }
             <span class="prelude-val">Err</span>(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) =&gt; {
                 <span class="kw">if </span>existing_handler_address != interrupt_handler <span class="kw">as </span>usize {
-                    <span class="macro">error!</span>(<span class="string">&quot;Failed to register interrupt handler at IRQ {:#X} for serial port {:#X}. \
+                    <span class="macro">error!</span>(<span class="string">&quot;Failed to register interrupt handler at IRQ {:#X} for serial port {:?}. \
                         Existing interrupt handler was a different handler, at address {:#X}.&quot;</span>,
                         irq, base_port, existing_handler_address,
                     );
@@ -708,26 +740,25 @@
             // other than data being received, which is the only one we currently care about.
             </span><span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
+
+        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+        </span>sp.enable_interrupt(SerialPortInterruptEvent::DataReceived, <span class="bool-val">true</span>);
     }
 
     <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = send_result {
-        <span class="macro">error!</span>(<span class="string">&quot;Failed to send data received for serial port at {:#X}: {:?}.&quot;</span>, base_port, e.<span class="number">1</span>);
+        <span class="macro">error!</span>(<span class="string">&quot;Failed to send data received for serial port at {:?}: {:?}.&quot;</span>, base_port, e.<span class="number">1</span>);
     }
 
     <span class="kw">if </span>input_was_ignored {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = NEW_CONNECTION_NOTIFIER.get() {
             <span class="comment">// info!(&quot;Requesting new console to be spawned for this serial port ({:#X})&quot;, base_port);
-            </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(serial_port_address) = SerialPortAddress::try_from(base_port) {
-                <span class="kw">if let </span><span class="prelude-val">Err</span>(err) = sender.try_send(serial_port_address) {
-                    <span class="macro">error!</span>(<span class="string">&quot;Error sending request for new console to be spawned for this serial port ({:#X}): {:?}&quot;</span>,
-                        base_port, err
-                    );
-                }
-            } <span class="kw">else </span>{
-                <span class="macro">error!</span>(<span class="string">&quot;Error: base port {:#X} was not a known serial port address.&quot;</span>, base_port);
+            </span><span class="kw">if let </span><span class="prelude-val">Err</span>(err) = sender.try_send(base_port) {
+                <span class="macro">error!</span>(<span class="string">&quot;Error sending request for new console to be spawned for this serial port ({:?}): {:?}&quot;</span>,
+                    base_port, err
+                );
             }
         } <span class="kw">else </span>{
-            <span class="macro">warn!</span>(<span class="string">&quot;Warning: no connection detector; ignoring {}-byte input read from serial port {:#X}.&quot;</span>,
+            <span class="macro">warn!</span>(<span class="string">&quot;Warning: no connection detector; ignoring {}-byte input read from serial port {:?}.&quot;</span>,
                 bytes_read, base_port
             );
         }
@@ -763,16 +794,21 @@
 </span><span class="kw">static </span>INTERRUPT_ACTION_COM2_COM4: Once&lt;Box&lt;<span class="kw">dyn </span>Fn() + Send + Sync&gt;&gt; = Once::new();
 
 
-<span class="comment">// IRQ 0x24: COM1 and COM3 serial port interrupt handler.
+<span class="comment">// Cross-platform interrupt handler for COM1 and COM3 (IRQ 0x24 on x86_64).
 </span><span class="macro">interrupt_handler!</span>(com1_com3_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x4</span>), _stack_frame, {
     <span class="comment">// trace!(&quot;COM1/COM3 serial handler&quot;);
-    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM1_COM3.get() {
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>sp = COM1_SERIAL_PORT.get().unwrap().as_ref().lock();
+        sp.enable_interrupt(SerialPortInterruptEvent::DataReceived, <span class="bool-val">false</span>);
+    }
+
+    <span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM1_COM3.get() {
         func()
     }
     EoiBehaviour::HandlerDidNotSendEoi
 });
 
-<span class="comment">// IRQ 0x23: COM2 and COM4 serial port interrupt handler.
+<span class="comment">// Cross-platform interrupt handler for COM2 and COM4 (IRQ 0x24 on 0x23).
 </span><span class="macro">interrupt_handler!</span>(com2_com4_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x3</span>), _stack_frame, {
     <span class="comment">// trace!(&quot;COM2/COM4 serial handler&quot;);
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM2_COM4.get() {

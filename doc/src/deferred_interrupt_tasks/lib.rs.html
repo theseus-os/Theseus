@@ -175,7 +175,6 @@
 <a href="#175" id="175">175</a>
 <a href="#176" id="176">176</a>
 <a href="#177" id="177">177</a>
-<a href="#178" id="178">178</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Abstractions for deferred interrupt tasks, a companion to regular interrupt handlers.
 //!
 //! Deferred interrupt tasks are similar to the concept of &quot;top half&quot; and &quot;bottom half&quot;
@@ -222,19 +221,15 @@
 //!
 
 </span><span class="attr">#![no_std]
-#![feature(abi_x86_interrupt)]
+#![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(abi_x86_interrupt))]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>spawn;
-<span class="kw">extern crate </span>scheduler;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>debugit;
-<span class="kw">extern crate </span>interrupts;
 
+<span class="kw">use </span>log::error;
+<span class="kw">use </span>debugit::debugit;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>task::{get_my_current_task, JoinableTaskRef};
-<span class="kw">use </span>interrupts::InterruptHandler;
+<span class="kw">use </span>interrupts::{InterruptHandler, InterruptNumber};
 
 <span class="doccomment">/// The errors that may occur in [`register_interrupt_handler()`].
 </span><span class="attr">#[derive(Debug)]
@@ -242,7 +237,7 @@
     <span class="doccomment">/// The given `irq` number was already in use and is registered to 
     /// the interrupt handler at the given `existing_handler_address`.
     </span>IrqInUse {
-        irq: u8,
+        irq: InterruptNumber,
         existing_handler_address: usize
     },
     <span class="doccomment">/// The given error occurred when spawning the deferred interrupt task.
@@ -283,7 +278,7 @@
 ///    long-running loop that repeatedly invokes the given `deferred_interrupt_action`.
 /// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.
 </span><span class="kw">pub fn </span>register_interrupt_handler&lt;DIA, Arg, Success, Failure, S&gt;(
-    interrupt_number: u8,
+    interrupt_number: InterruptNumber,
     interrupt_handler: InterruptHandler,
     deferred_interrupt_action: DIA,
     deferred_action_argument: Arg,
@@ -294,8 +289,11 @@
           S: Into&lt;String&gt;,
 {
     <span class="comment">// First, attempt to register the interrupt handler.
-    </span>interrupts::register_interrupt(interrupt_number, interrupt_handler)
+    </span>interrupts::register_interrupt(interrupt_number <span class="kw">as _</span>, interrupt_handler)
         .map_err(|existing_handler_address| {
+            <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+            </span><span class="kw">let </span>existing_handler_address = existing_handler_address <span class="kw">as </span>usize;
+
             <span class="macro">error!</span>(<span class="string">&quot;Interrupt number {:#X} was already taken by handler at {:#X}! Sharing IRQs is currently unsupported.&quot;</span>,
                 interrupt_number, existing_handler_address
             );

@@ -185,6 +185,16 @@
 <a href="#185" id="185">185</a>
 <a href="#186" id="186">186</a>
 <a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Creation and management of virtual consoles or terminals atop Theseus.
 
 </span><span class="attr">#![no_std]
@@ -202,7 +212,7 @@
 
 <span class="doccomment">/// The serial port being used for the default system logger can optionally
 /// ignore inputs.
-</span><span class="kw">static </span>IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(<span class="number">0</span>);
+</span><span class="kw">static </span>IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(u16::MAX);
 
 <span class="doccomment">/// Configures the console connection listener to ignore inputs from the given
 /// serial port.
@@ -296,17 +306,27 @@
         .name(<span class="macro">format!</span>(<span class="string">&quot;{address:?}_to_tty&quot;</span>))
         .spawn()<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>new_app_ns = mod_mgmt::create_application_namespace(<span class="prelude-val">None</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>(app_file, _ns) =
-        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(<span class="kw-2">&amp;</span>new_app_ns, <span class="string">&quot;hull-&quot;</span>)
-            .expect(<span class="string">&quot;Couldn&#39;t find shell in default app namespace&quot;</span>);
+    <span class="kw">let </span>task;
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="kw">let </span>new_app_ns = mod_mgmt::create_application_namespace(<span class="prelude-val">None</span>)<span class="question-mark">?</span>;
 
-    <span class="kw">let </span>path = path::Path::new(app_file.lock().get_absolute_path());
-    <span class="kw">let </span>task = spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_ns))<span class="question-mark">?
-        </span>.name(<span class="macro">format!</span>(<span class="string">&quot;{address:?}_shell&quot;</span>))
-        .block()
-        .spawn()<span class="question-mark">?</span>;
+        <span class="kw">let </span>(app_file, _ns) =
+            mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(<span class="kw-2">&amp;</span>new_app_ns, <span class="string">&quot;hull-&quot;</span>)
+                .expect(<span class="string">&quot;Couldn&#39;t find shell in default app namespace&quot;</span>);
+
+        <span class="kw">let </span>path = path::Path::new(app_file.lock().get_absolute_path());
+        task = spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_ns))<span class="question-mark">?
+            </span>.name(<span class="macro">format!</span>(<span class="string">&quot;{address:?}_shell&quot;</span>))
+            .block()
+            .spawn()<span class="question-mark">?</span>;
+    }
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        task = spawn::new_task_builder(hull::main, alloc::vec::Vec::new())
+            .name(<span class="macro">alloc::format!</span>(<span class="string">&quot;{address:?}_shell&quot;</span>))
+            .block()
+            .spawn()<span class="question-mark">?</span>;
+    }
 
     <span class="kw">let </span>id = task.id;
     <span class="kw">let </span>stream = Arc::new(tty.slave());
