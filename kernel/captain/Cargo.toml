@@ -11,6 +11,7 @@ log = "0.4.8"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 dfqueue = { path = "../../libs/dfqueue", version = "0.1.0" }
 multicore_bringup = { path = "../multicore_bringup" }
+device_manager = { path = "../device_manager" }
 early_printer = { path = "../early_printer" }
 tlb_shootdown = { path = "../tlb_shootdown" }
 kernel_config = { path = "../kernel_config" }
@@ -18,6 +19,7 @@ interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
+console = { path = "../console" }
 task_fs = { path = "../task_fs" }
 memory = { path = "../memory" }
 logger = { path = "../logger" }
@@ -35,9 +37,7 @@ multiple_heaps = { path = "../multiple_heaps" }
 tsc = { path = "../tsc" }
 acpi = { path = "../acpi" }
 page_attribute_table = { path = "../page_attribute_table" }
-device_manager = { path = "../device_manager" }
 e1000 = { path = "../e1000" }
-console = { path = "../console" }
 app_io = { path = "../app_io" }
 network_manager = { path = "../network_manager" }
 ota_update_client = { path = "../ota_update_client" }
