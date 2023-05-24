@@ -3557,7 +3557,7 @@ dependencies = [
 [[package]]
 name = "spin"
 version = "0.9.8"
-source = "git+https://github.com/mvdnes/spin-rs#1f2e06c9f9d22b234776849c65e313f583ddfade"
+source = "git+https://github.com/theseus-os/spin-rs#9ff19059efbb4297d9e7752bce15bd9a27abeb90"
 
 [[package]]
 name = "stable_deref_trait"
