@@ -5,8 +5,8 @@ description = "Mutex and RwLock types that auto-disable/enable preemption while 
 version = "0.1.0"
 edition = "2018"
 
-[dependencies.cpu_local_preemption]
-path = "../cpu_local_preemption"
+[dependencies.preemption]
+path = "../preemption"
 
 [dependencies.lockable]
 path = "../../libs/lockable"

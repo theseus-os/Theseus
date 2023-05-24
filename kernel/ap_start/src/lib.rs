@@ -105,10 +105,6 @@ pub fn kstart_ap(
         cpu::register_cpu(false).unwrap();
     }
 
-    // Now that the Local APIC has been initialized for this CPU, we can initialize the
-    // per-CPU storage, tasking, and create the idle task for this CPU.
-    per_cpu::init(cpu_id).unwrap();
-
     #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     cls::init(cpu_id).unwrap();
 

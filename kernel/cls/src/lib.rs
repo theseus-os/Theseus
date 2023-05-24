@@ -1,12 +1,16 @@
 #![no_std]
+#![feature(negative_impls)]
 
 extern crate alloc;
 
 mod arch;
 
+use core::{cell::UnsafeCell, marker::PhantomData, mem};
+
 use alloc::collections::BTreeMap;
 use cpu::CpuId;
 use memory::{MappedPages, PteFlags};
+use sync::DeadlockPrevention;
 use sync_spin::Mutex;
 
 pub use cls_proc::cpu_local;
@@ -37,7 +41,6 @@ pub fn init(cpu_id: CpuId) -> Result<(), ()> {
     // TODO: Support custom initialisers.
     unsafe { core::ptr::write_bytes::<u8>(pointer, 0, CLS_SIZE) };
 
-
     let mut state = STATE.lock();
     assert_eq!(state.bytes_used, 0);
     // TODO: Check CLS isn't being initialised twice.
@@ -67,3 +70,66 @@ pub fn allocate(size: usize) -> Result<usize, ()> {
 
     Ok(offset)
 }
+
+pub struct CpuLocalCell<T, P>
+where
+    P: DeadlockPrevention,
+{
+    value: UnsafeCell<T>,
+    prevention: PhantomData<*const P>,
+}
+
+impl<T, P> CpuLocalCell<T, P>
+where
+    P: DeadlockPrevention,
+{
+    #[inline]
+    pub const unsafe fn new(value: T) -> Self {
+        Self {
+            value: UnsafeCell::new(value),
+            prevention: PhantomData,
+        }
+    }
+
+    #[inline]
+    pub fn set(&self, value: T) {
+        let guard = P::enter();
+        self.replace(value);
+        drop(guard);
+    }
+
+    #[inline]
+    pub fn replace(&self, value: T) -> T {
+        let guard = P::enter();
+        let old_value = mem::replace(unsafe { &mut *self.value.get() }, value);
+        drop(guard);
+        old_value
+    }
+}
+
+impl<T, P> CpuLocalCell<T, P>
+where
+    T: Copy,
+    P: DeadlockPrevention,
+{
+    pub fn get(&self) -> T {
+        unsafe { *self.value.get() }
+    }
+
+    pub fn update<F>(&self, f: F) -> T
+    where
+        F: FnOnce(T) -> T,
+    {
+        let old = self.get();
+        let new = f(old);
+        self.set(new);
+        new
+    }
+}
+
+impl<T, P> !Send for CpuLocalCell<T, P> where P: DeadlockPrevention {}
+
+// TODO: Should T: Sync? I don't think so, because we aren't actually sharing
+// the T across threads.
+// SAFETY
+unsafe impl<T, P> Sync for CpuLocalCell<T, P> where P: DeadlockPrevention {}

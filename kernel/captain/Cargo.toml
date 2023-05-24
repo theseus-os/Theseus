@@ -25,7 +25,6 @@ spawn = { path = "../spawn" }
 stack = { path = "../stack" }
 task = { path = "../task" }
 cpu = { path = "../cpu" }
-per_cpu = { path = "../per_cpu" }
 cls = { path = "../cls" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

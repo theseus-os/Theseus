@@ -1,5 +1,5 @@
 use core::{fmt, ops::{Deref, DerefMut}};
-use cpu_local_preemption::{PreemptionGuard, hold_preemption};
+use preemption::{PreemptionGuard, hold_preemption};
 use spin::{Mutex, MutexGuard};
 use lockable::{Lockable, LockableSized};
 

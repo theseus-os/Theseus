@@ -121,7 +121,6 @@ pub fn init(
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
-    per_cpu::init(bsp_id)?;
     #[cfg(target_arch = "x86_64")] // not yet supported on aarch64
     cls::init(bsp_id).unwrap();
 
