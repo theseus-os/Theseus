@@ -211,7 +211,7 @@ pub fn init(
     // arch-gate: many subsystems required by applications are missing
     // on aarch64: windowing, user input, app loading (relocation code
     // is x86_64-specific at the moment)
-    #[cfg(target_arch = "x86_64")]
+    // #[cfg(target_arch = "x86_64")]
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_id);
