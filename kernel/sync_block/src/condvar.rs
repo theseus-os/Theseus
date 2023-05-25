@@ -6,6 +6,9 @@ use sync_spin::Spin;
 use task::{get_my_current_task, TaskRef};
 
 /// A condition variable.
+///
+/// Condition variables represent the ability to block a thread such that it
+/// consumes no CPU time while waiting for an event to occur.
 // TODO: Is there even a point to exposing this generic?
 pub struct Condvar<P = Spin>
 where
@@ -18,6 +21,7 @@ impl<P> Condvar<P>
 where
     P: DeadlockPrevention,
 {
+    /// Returns a new condition variable.
     pub const fn new() -> Self {
         Self {
             inner: Queue::new(),
@@ -50,8 +54,8 @@ where
             scheduler::schedule();
 
             match self.inner.push_if_fail(task.clone(), || {
-                if let Some(temporary_guard) = mutex.try_lock() {
-                    Ok(temporary_guard)
+                if let Some(mutex_guard) = mutex.try_lock() {
+                    Ok(mutex_guard)
                 } else {
                     let preemption_guard = hold_preemption();
                     task.block().unwrap();
