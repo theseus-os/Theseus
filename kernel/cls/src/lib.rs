@@ -113,7 +113,10 @@ where
     P: DeadlockPrevention,
 {
     pub fn get(&self) -> T {
-        unsafe { *self.value.get() }
+        let guard = P::enter();
+        let value = unsafe { *self.value.get() };
+        drop(guard);
+        value
     }
 
     pub fn update<F>(&self, f: F) -> T
