@@ -13,7 +13,7 @@ spin = "0.9.4"
 port_io = { path = "../../libs/port_io" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-pl011_qemu = { git = "https://github.com/theseus-os/pl011/", branch = "aarch64-qemu-virt-test" }
+pl011 = { git = "https://github.com/theseus-os/pl011/", rev = "464dbf22" }
 arm_boards = { path = "../arm_boards" }
 memory = { path = "../memory" }
 

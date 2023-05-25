@@ -78,6 +78,8 @@ where
     }
 
     /// Attempts to acquire this mutex.
+    ///
+    /// This method may spuriously fail.
     #[inline]
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T, F>> {
         F::try_lock(&self.inner, &self.data).map(|(inner, guard)| MutexGuard {

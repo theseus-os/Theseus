@@ -11,7 +11,7 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
-use gic::{ArmGic, InterruptNumber, IpiTargetCpu, Version as GicVersion};
+use gic::{ArmGic, IpiTargetCpu, Version as GicVersion, SpiDestination};
 use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
 use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
 use memory::get_kernel_mmi_ref;
@@ -19,6 +19,8 @@ use log::{info, error};
 use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
+
+pub use gic::InterruptNumber;
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
@@ -31,6 +33,12 @@ static INTERRUPT_CONTROLLER: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(No
 //
 // aarch64 manuals define the default timer IRQ number to be 30.
 pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
+
+/// The IRQ number reserved for the PL011 Single-Serial-Port Controller
+/// which Theseus currently uses for logging and UART console.
+//
+// Qemu attributes number 33 to this interrupt.
+pub const PL011_RX_SPI: InterruptNumber = 33;
 
 /// The IRQ/IPI number for TLB Shootdowns
 ///
@@ -180,6 +188,7 @@ pub fn init() -> Result<(), &'static str> {
 
                 inner.set_minimum_priority(0);
                 inner.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
+                inner.set_interrupt_state(PL011_RX_SPI, true);
                 *int_ctrl = Some(inner);
             },
         }
@@ -232,6 +241,18 @@ pub fn setup_ipi_handler(handler: InterruptHandler, irq_num: InterruptNumber) ->
         // enable routing of this interrupt
         int_ctrl.set_interrupt_state(irq_num, true);
     }
+
+    Ok(())
+}
+
+/// Enables the PL011 "RX" SPI and routes it to the current CPU.
+pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
+    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
+    let int_ctrl = int_ctrl.as_mut().ok_or("INTERRUPT_CONTROLLER is uninitialized")?;
+
+    // enable routing of this interrupt
+    int_ctrl.set_interrupt_state(PL011_RX_SPI, true);
+    int_ctrl.set_spi_target(PL011_RX_SPI, SpiDestination::Specific(cpu::current_cpu()));
 
     Ok(())
 }

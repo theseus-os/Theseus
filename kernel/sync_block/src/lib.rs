@@ -100,7 +100,8 @@ impl RwLockFlavor for Block {
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
     ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard) {
-        // We must not use try_write_weak because that could lead to us waiting forever.
+        // This must be a strong compare exchange, otherwise we could block ourselves
+        // when the lock is unlocked and never be unblocked.
         if let Some(guards) = Self::try_write(rw_lock, data) {
             guards
         } else {
