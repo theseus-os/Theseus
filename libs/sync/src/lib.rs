@@ -57,7 +57,7 @@ where
         }
 
         let deadlock_guard = Self::enter();
-        mutex.try_lock().map(|guard| (guard, deadlock_guard))
+        mutex.try_lock_weak().map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
@@ -115,7 +115,9 @@ where
         }
 
         let deadlock_guard = Self::enter();
-        rw_lock.try_write().map(|guard| (guard, deadlock_guard))
+        rw_lock
+            .try_write_weak()
+            .map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]

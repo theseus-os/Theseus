@@ -138,17 +138,6 @@ impl<'a, T, F> MutexGuard<'a, T, F>
 where
     F: MutexFlavor,
 {
-    /// Leaks the guard, returning a mutable reference to the underlying data.
-    ///
-    /// This function will permanently lock the associated mutex.
-    #[inline]
-    pub fn leak(mut self) -> &'a mut T {
-        // SAFETY: We forget self immediately after, so self.inner is never used again.
-        let inner = unsafe { core::ptr::read(&mut self.inner) };
-        core::mem::forget(self);
-        spin_rs::mutex::SpinMutexGuard::<_>::leak(ManuallyDrop::into_inner(inner))
-    }
-
     #[doc(hidden)]
     pub fn mutex(&self) -> &'a Mutex<T, F> {
         self.lock
