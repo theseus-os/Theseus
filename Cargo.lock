@@ -486,6 +486,7 @@ dependencies = [
  "app_io",
  "async_channel",
  "core2",
+ "hull",
  "io",
  "irq_safety",
  "log",
@@ -2708,13 +2709,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "pl011_qemu"
-version = "0.2.0"
-source = "git+https://github.com/theseus-os/pl011/?branch=aarch64-qemu-virt-test#2c2cec84ca9653efa9e370460e7e0e1c94140080"
+name = "pl011"
+version = "1.0.0"
+source = "git+https://github.com/theseus-os/pl011/?rev=464dbf22#464dbf2288a5d9e7445b0b1f404ddd41b1fd1c1e"
 dependencies = [
- "cortex-m",
- "embedded-hal",
- "nb 1.0.0",
+ "log",
  "volatile-register",
 ]
 
@@ -3345,7 +3344,7 @@ dependencies = [
  "arm_boards",
  "irq_safety",
  "memory",
- "pl011_qemu",
+ "pl011",
  "port_io",
  "spin 0.9.4",
 ]
@@ -3557,6 +3556,7 @@ dependencies = [
 [[package]]
 name = "spin"
 version = "0.9.8"
+source = "git+https://github.com/theseus-os/spin-rs#9ff19059efbb4297d9e7752bce15bd9a27abeb90"
 
 [[package]]
 name = "stable_deref_trait"
