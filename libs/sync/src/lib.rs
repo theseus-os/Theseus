@@ -55,12 +55,12 @@ where
     where
         T: ?Sized,
     {
-        if Self::EXPENSIVE && mutex.is_locked() {
+        if Self::EXPENSIVE && mutex.is_locked_acquire() {
             return None;
         }
 
         let deadlock_guard = Self::enter();
-        mutex.try_lock_weak().map(|guard| (guard, deadlock_guard))
+        mutex.try_lock().map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
@@ -106,7 +106,7 @@ where
     where
         T: ?Sized,
     {
-        if Self::EXPENSIVE && rw_lock.writer_count() != 0 {
+        if Self::EXPENSIVE && rw_lock.writer_count_acquire() != 0 {
             return None;
         }
 
@@ -122,14 +122,14 @@ where
     where
         T: ?Sized,
     {
-        if Self::EXPENSIVE && (rw_lock.reader_count() != 0 || rw_lock.writer_count() != 0) {
+        if Self::EXPENSIVE
+            && (rw_lock.reader_count_acquire() != 0 || rw_lock.writer_count_acquire() != 0)
+        {
             return None;
         }
 
         let deadlock_guard = Self::enter();
-        rw_lock
-            .try_write_weak()
-            .map(|guard| (guard, deadlock_guard))
+        rw_lock.try_write().map(|guard| (guard, deadlock_guard))
     }
 
     #[inline]
