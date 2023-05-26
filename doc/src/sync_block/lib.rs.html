@@ -116,6 +116,26 @@
 <a href="#116" id="116">116</a>
 <a href="#117" id="117">117</a>
 <a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(negative_impls)]
 #![no_std]
 
@@ -146,7 +166,10 @@
     </span><span class="kw">fn </span>try_lock&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::Mutex&lt;T&gt;,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt;
+    <span class="kw">where
+        </span>T: <span class="question-mark">?</span>Sized,
+    {
         mutex.try_lock().map(|guard| (guard, ()))
     }
 
@@ -154,7 +177,10 @@
     </span><span class="kw">fn </span>lock&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::Mutex&lt;T&gt;,
         data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; (spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard) {
+    ) -&gt; (spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)
+    <span class="kw">where
+        </span>T: <span class="question-mark">?</span>Sized,
+    {
         <span class="comment">// This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock(mutex, data) {
@@ -185,7 +211,10 @@
     </span><span class="kw">fn </span>try_read&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         rw_lock: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::RwLock&lt;T&gt;,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt;
+    <span class="kw">where
+        </span>T: <span class="question-mark">?</span>Sized,
+    {
         rw_lock.try_read().map(|guard| (guard, ()))
     }
 
@@ -193,7 +222,10 @@
     </span><span class="kw">fn </span>try_write&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         rw_lock: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::RwLock&lt;T&gt;,
         <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt; {
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt;
+    <span class="kw">where
+        </span>T: <span class="question-mark">?</span>Sized,
+    {
         rw_lock.try_write().map(|guard| (guard, ()))
     }
 
@@ -201,7 +233,10 @@
     </span><span class="kw">fn </span>read&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         rw_lock: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::RwLock&lt;T&gt;,
         data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; (spin::RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard) {
+    ) -&gt; (spin::RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)
+    <span class="kw">where
+        </span>T: <span class="question-mark">?</span>Sized,
+    {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_read(rw_lock, data) {
             guards
         } <span class="kw">else </span>{
@@ -213,8 +248,13 @@
     </span><span class="kw">fn </span>write&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         rw_lock: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::RwLock&lt;T&gt;,
         data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
-    ) -&gt; (spin::RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard) {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_write(rw_lock, data) {
+    ) -&gt; (spin::RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)
+    <span class="kw">where
+        </span>T: <span class="question-mark">?</span>Sized,
+    {
+        <span class="comment">// This must be a strong compare exchange, otherwise we could block ourselves
+        // when the lock is unlocked and never be unblocked.
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_write(rw_lock, data) {
             guards
         } <span class="kw">else </span>{
             data.writers.wait_until(|| <span class="self">Self</span>::try_write(rw_lock, data))
