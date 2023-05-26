@@ -1,4 +1,4 @@
-use memory::{MappedPages, PAGE_SIZE, map_mmio_range};
+use memory::{MappedPages, PAGE_SIZE, map_frame_range, MMIO_FLAGS};
 use super::{TriState, SerialPortInterruptEvent};
 use arm_boards::BOARD_CONFIG;
 use pl011_qemu::PL011;
@@ -57,7 +57,7 @@ impl SerialPort {
             None => panic!("Board doesn't have {:?}", serial_port_address),
         };
 
-        let mapped_pages = map_mmio_range(*mmio_base, PAGE_SIZE)
+        let mapped_pages = map_frame_range(*mmio_base, PAGE_SIZE, MMIO_FLAGS)
             .expect("serial_port_basic: couldn't map the UART interface");
         let addr = mapped_pages.start_address().value();
 
