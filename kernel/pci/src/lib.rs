@@ -47,9 +47,11 @@ const PCI_INTERRUPT_PIN:         u8 = 0x3D;
 const PCI_MIN_GRANT:             u8 = 0x3E;
 const PCI_MAX_LATENCY:           u8 = 0x3F;
 
-// PCI Capability IDs
-const MSI_CAPABILITY:           u8 = 0x05;
-const MSIX_CAPABILITY:          u8 = 0x11;
+#[repr(u8)]
+pub enum PciCapability {
+    Msi  = 0x05,
+    Msix = 0x11,
+}
 
 /// If a BAR's bits [2:1] equal this value, that BAR describes a 64-bit address.
 /// If not, that BAR describes a 32-bit address.
@@ -294,7 +296,8 @@ impl PciLocation {
     /// with each capability storing the pointer to the next capability right after its ID.
     /// The function returns a None value if capabilities are not valid for this device 
     /// or if the requested capability is not present. 
-    fn find_pci_capability(&self, pci_capability: u8) -> Option<u8> {
+    fn find_pci_capability(&self, pci_capability: PciCapability) -> Option<u8> {
+        let pci_capability = pci_capability as u8;
         let status = self.pci_read_16(PCI_STATUS);
 
         // capabilities are only valid if bit 4 of status register is set
@@ -455,7 +458,7 @@ impl PciDevice {
     pub fn pci_enable_msi(&self, core_id: u8, int_num: u8) -> Result<(), &'static str> {
 
         // find out if the device is msi capable
-        let cap_addr = self.find_pci_capability(MSI_CAPABILITY).ok_or("Device not MSI capable")?;
+        let cap_addr = self.find_pci_capability(PciCapability::Msi).ok_or("Device not MSI capable")?;
 
         // offset in the capability space where the message address register is located 
         const MESSAGE_ADDRESS_REGISTER_OFFSET: u8 = 4;
@@ -490,7 +493,7 @@ impl PciDevice {
     pub fn pci_enable_msix(&self) -> Result<(), &'static str> {
 
         // find out if the device is msi-x capable
-        let cap_addr = self.find_pci_capability(MSIX_CAPABILITY).ok_or("Device not MSI-X capable")?;
+        let cap_addr = self.find_pci_capability(PciCapability::Msix).ok_or("Device not MSI-X capable")?;
 
         // offset in the capability space where the message control register is located 
         const MESSAGE_CONTROL_REGISTER_OFFSET: u8 = 2;
@@ -512,7 +515,7 @@ impl PciDevice {
     /// - returns `Err("Invalid BAR content")` if the Base Address Register contains an invalid address
     pub fn pci_mem_map_msix(&self, max_vectors: usize) -> Result<MsixVectorTable, &'static str> {
         // retreive the address in the pci config space for the msi-x capability
-        let cap_addr = self.find_pci_capability(MSIX_CAPABILITY).ok_or("Device not MSI-X capable")?;
+        let cap_addr = self.find_pci_capability(PciCapability::Msix).ok_or("Device not MSI-X capable")?;
         // find the BAR used for msi-x
         let vector_table_offset = 4;
         let table_offset = self.pci_read_32(cap_addr + vector_table_offset);
