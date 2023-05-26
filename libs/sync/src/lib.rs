@@ -51,7 +51,10 @@ where
     fn try_lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
         _: &'a Self::LockData,
-    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized,
+    {
         if Self::EXPENSIVE && mutex.is_locked_acquire() {
             return None;
         }
@@ -64,7 +67,10 @@ where
     fn lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
         _: &'a Self::LockData,
-    ) -> (spin::MutexGuard<'a, T>, Self::Guard) {
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized,
+    {
         loop {
             let deadlock_guard = Self::enter();
             if let Some(guard) = mutex.try_lock_weak() {
@@ -96,7 +102,10 @@ where
     fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
-    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized,
+    {
         if Self::EXPENSIVE && rw_lock.writer_count_acquire() != 0 {
             return None;
         }
@@ -109,7 +118,10 @@ where
     fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
-    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized,
+    {
         if Self::EXPENSIVE
             && (rw_lock.reader_count_acquire() != 0 || rw_lock.writer_count_acquire() != 0)
         {
@@ -124,7 +136,10 @@ where
     fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
-    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard) {
+    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized,
+    {
         loop {
             let deadlock_guard = Self::enter();
             if let Some(guard) = rw_lock.try_read() {
@@ -142,7 +157,10 @@ where
     fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
-    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard) {
+    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized,
+    {
         loop {
             let deadlock_guard = Self::enter();
             if let Some(guard) = rw_lock.try_write_weak() {
