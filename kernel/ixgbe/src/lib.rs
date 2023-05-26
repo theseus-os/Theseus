@@ -1178,7 +1178,7 @@ impl IxgbeNic {
                 Some(cpu_id) => cpu_id,
                 None => cpu::bootstrap_cpu().ok_or("Couldn't read BSP CpuId")?,
             };
-            vector_table[i].configure(cpu_id, msi_int_num);
+            vector_table[i].init(cpu_id, msi_int_num);
         }
 
         Ok(interrupt_nums)

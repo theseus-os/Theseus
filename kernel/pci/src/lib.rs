@@ -631,8 +631,9 @@ pub struct MsixVectorEntry {
 }
 
 impl MsixVectorEntry {
-    /// Sets interrupt destination & number for this entry
-    pub fn configure(&mut self, cpu_id: CpuId, int_num: InterruptNumber) {
+    /// Sets interrupt destination & number for this entry and makes sure the
+    /// interrupt is unmasked (PCI Controller side).
+    pub fn init(&mut self, cpu_id: CpuId, int_num: InterruptNumber) {
         // unmask the interrupt
         self.vector_control.write(MSIX_UNMASK_INT);
         let lower_addr = self.msg_lower_addr.read();
@@ -642,7 +643,7 @@ impl MsixVectorEntry {
         let address = lower_addr & !MSIX_ADDRESS_BITS;
         self.msg_lower_addr.write(address | MSIX_INTERRUPT_REGION | dest_id); 
 
-        // allocate an interrupt to msix vector
+        // write interrupt number
         self.msg_data.write(int_num as u32);
 
         if false {
