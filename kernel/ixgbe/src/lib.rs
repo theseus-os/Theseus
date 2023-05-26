@@ -346,7 +346,7 @@ impl IxgbeNic {
                 rx_bufs_in_use: rx_buffers.remove(0),  
                 rx_buffer_size_bytes: rx_buffer_size_kbytes as u16 * 1024,
                 received_frames: VecDeque::new(),
-                cpu_id: None.into(),
+                cpu_id: None,
                 rx_buffer_pool: &RX_BUFFER_POOL,
                 filter_num: None
             };
@@ -368,7 +368,7 @@ impl IxgbeNic {
                 tx_descs: tx_descs.remove(0),
                 num_tx_descs: num_tx_descriptors,
                 tx_cur: 0,
-                cpu_id: None.into(),
+                cpu_id: None,
             };
             tx_queues.push(tx_queue);
             id += 1;
@@ -992,7 +992,7 @@ impl IxgbeNic {
         for rxq in rx_queues {            
             // the cpu id will tell which cache the data will need to be written to
             // TODO: choose a better default value
-            let cpu_id = match rxq.cpu_id.into() {
+            let cpu_id = match rxq.cpu_id {
                 Some(cpu_id) => cpu_id,
                 None => cpu::bootstrap_cpu().expect("Couldn't read BSP CpuId"),
             }.into_u8() as u32;
@@ -1174,7 +1174,7 @@ impl IxgbeNic {
             // find core to redirect interrupt to
             // we assume that the number of msi vectors are equal to the number of rx queues
             // TODO: choose a better default value
-            let cpu_id = match rxq[i].cpu_id.into() {
+            let cpu_id = match rxq[i].cpu_id {
                 Some(cpu_id) => cpu_id,
                 None => cpu::bootstrap_cpu().expect("Couldn't read BSP CpuId"),
             };
