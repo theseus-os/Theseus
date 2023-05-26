@@ -994,7 +994,7 @@ impl IxgbeNic {
             // TODO: choose a better default value
             let cpu_id = match rxq.cpu_id {
                 Some(cpu_id) => cpu_id,
-                None => cpu::bootstrap_cpu().expect("Couldn't read BSP CpuId"),
+                None => cpu::bootstrap_cpu().ok_or("Couldn't read BSP CpuId")?,
             }.into_u8() as u32;
             
             // currently allowing only write of rx descriptors to cache since packet payloads are very large
@@ -1176,7 +1176,7 @@ impl IxgbeNic {
             // TODO: choose a better default value
             let cpu_id = match rxq[i].cpu_id {
                 Some(cpu_id) => cpu_id,
-                None => cpu::bootstrap_cpu().expect("Couldn't read BSP CpuId"),
+                None => cpu::bootstrap_cpu().ok_or("Couldn't read BSP CpuId")?,
             };
             vector_table[i].configure(cpu_id, msi_int_num);
         }
