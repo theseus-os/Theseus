@@ -35,7 +35,7 @@ where
     /// variables normally have a boolean predicate associated with them, and
     /// the predicate must always be checked each time this function returns to
     /// protect against spurious wakeups.
-    pub fn wait<'a, T>(&self, guard: MutexGuard<'a, T>) -> MutexGuard<'a, T> {
+    pub fn wait<'a, T: ?Sized>(&self, guard: MutexGuard<'a, T>) -> MutexGuard<'a, T> {
         let task = get_my_current_task().unwrap();
         let mutex = guard.mutex();
 
