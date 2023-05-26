@@ -131,7 +131,7 @@ pub struct E1000Nic {
     /// MMIO Base Address
     mem_base: PhysicalAddress,
     ///interrupt number
-    interrupt_num: u8,
+    interrupt_num: Option<u8>,
     /// The actual MAC address burnt into the hardware of this E1000 NIC.
     mac_hardware: [u8; 6],
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
@@ -181,7 +181,8 @@ impl E1000Nic {
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = e1000_pci_dev.pci_get_interrupt_line() + IRQ_BASE_OFFSET;
+        let (interrupt_line, _) = e1000_pci_dev.pci_get_interrupt_info()?;
+        let interrupt_num = interrupt_line.map(|int_line| int_line + IRQ_BASE_OFFSET);
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
@@ -265,19 +266,21 @@ impl E1000Nic {
         &mut self,
         interface: Arc<net::NetworkInterface>,
     ) -> Result<(), &'static str> {
-        self.enable_interrupts();
-        let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
-            self.interrupt_num,
-            e1000_handler,
-            poll_interface,
-            interface,
-            Some(format!("e1000_deferred_task_irq_{:#X}", self.interrupt_num)),
-        )
-        .map_err(|error| {
-            error!("error registering e1000 handler: {:?}", error);
-            "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
-        })?;
-        self.deferred_task = Some(deferred_task);
+        if let Some(interrupt_num) = self.interrupt_num {
+            self.enable_interrupts();
+            let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
+                interrupt_num,
+                e1000_handler,
+                poll_interface,
+                interface,
+                Some(format!("e1000_deferred_task_irq_{:?}", self.interrupt_num)),
+            )
+            .map_err(|error| {
+                error!("error registering e1000 handler: {:?}", error);
+                "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
+            })?;
+            self.deferred_task = Some(deferred_task);
+        }
 
         Ok(())
     }
@@ -490,7 +493,11 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }
-        eoi(Some(e1000_nic.interrupt_num));
+
+        let interrupt_num = e1000_nic.interrupt_num
+            .expect("If this code was reached, then that E1000 NIC must have an interrupt number");
+
+        eoi(Some(interrupt_num));
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }

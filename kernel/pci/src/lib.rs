@@ -75,6 +75,13 @@ static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_A
 /// specified by a previous write to the `PCI_CONFIG_ADDRESS_PORT`.
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA));
 
+pub enum InterruptPin {
+    A,
+    B,
+    C,
+    D,
+}
+
 
 
 /// Returns a list of all PCI buses in this system.
@@ -518,7 +525,7 @@ impl PciDevice {
 
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
 
-        let msix_mapped_pages = map_mmio_range(mem_base, mem_size_in_bytes)?;
+        let msix_mapped_pages = map_frame_range(mem_base, mem_size_in_bytes, MMIO_FLAGS)?;
         let vector_table = BorrowedSliceMappedPages::from_mut(msix_mapped_pages, 0, max_vectors)
             .map_err(|(_mp, err)| err)?;
 
@@ -535,9 +542,25 @@ impl PciDevice {
         map_frame_range(mem_base, mem_size as usize, MMIO_FLAGS)
     }
 
-    /// Reads the `PCI_INTERRUPT_LINE` register
-    pub fn pci_get_interrupt_line(&self) -> InterruptNumber {
-        self.pci_read_8(PCI_INTERRUPT_LINE) as InterruptNumber
+    /// Reads the `PCI_INTERRUPT_LINE` & `PCI_INTERRUPT_PIN` registers
+    ///
+    /// Returns an error if PCI_INTERRUPT_PIN contains a value > 4.
+    pub fn pci_get_interrupt_info(&self) -> Result<(Option<u8>, Option<InterruptPin>), &'static str> {
+        let int_line = match self.pci_read_8(PCI_INTERRUPT_LINE) {
+            0xff => None,
+            other => Some(other),
+        };
+
+        let int_pin = match self.pci_read_8(PCI_INTERRUPT_PIN) {
+            0 => None,
+            1 => Some(InterruptPin::A),
+            2 => Some(InterruptPin::B),
+            3 => Some(InterruptPin::C),
+            4 => Some(InterruptPin::D),
+            _ => return Err("pci_get_interrupt_info: Invalid Register Value for Interrupt Pin"),
+        };
+
+        Ok((int_line, int_pin))
     }
 }
 
