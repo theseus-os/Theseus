@@ -120,7 +120,7 @@ pub fn map_frame_range<F: Into<PteFlagsArch>>(
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("map_range(): KERNEL_MMI was not yet initialized!")?;
     let num_frames = range.size_in_frames();
     let allocated_pages = allocate_pages(num_frames).ok_or("memory::map_range(): couldn't allocate contiguous pages!")?;
-    let allocated_frames = allocate_frames_by_bytes_at(range.start_address(), num_frames)
+    let allocated_frames = allocate_frames_at(range.start_address(), num_frames)
         .map_err(|_| "memory::map_range(): couldn't allocate contiguous frames!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)
 }
