@@ -29,7 +29,7 @@ extern crate mpmc;
 use spin::Once; 
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, map_mmio_range, BorrowedMappedPages, Mutable, MMIO_FLAGS};
+use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, map_frame_range, BorrowedMappedPages, Mutable, MMIO_FLAGS};
 use pci::PciDevice;
 use nic_initialization::init_rx_buf_pool;
 use mlx_ethernet::{
@@ -481,7 +481,7 @@ impl ConnectX5Nic {
         // Allocate page for UAR. 
         // For the given uar number i, the page is the ith page from the memory base retrieved from the PCI BAR
         let uar_mem_base = mem_base + ((uar as usize) * PAGE_SIZE);
-        let uar_page = map_mmio_range(uar_mem_base, PAGE_SIZE)?;
+        let uar_page = map_frame_range(uar_mem_base, PAGE_SIZE, MMIO_FLAGS)?;
         debug!("mmio: {:?}, uar: {:?}", mem_base, uar_mem_base);
 
         // Create the SQ
@@ -642,7 +642,7 @@ impl ConnectX5Nic {
     
     /// Returns the memory-mapped initialization segment of the NIC
     fn map_init_segment(mem_base: PhysicalAddress) -> Result<BorrowedMappedPages<InitializationSegment, Mutable>, &'static str> {
-        map_mmio_range(mem_base, core::mem::size_of::<InitializationSegment>())?
+        map_frame_range(mem_base, core::mem::size_of::<InitializationSegment>(), MMIO_FLAGS)?
             .into_borrowed_mut(0)
             .map_err(|(_mp, err)| err)
     }

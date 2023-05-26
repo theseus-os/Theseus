@@ -14,7 +14,7 @@ use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
-use memory::{PhysicalAddress, MappedPages, map_mmio_range};
+use memory::{PhysicalAddress, MappedPages, map_frame_range, MMIO_FLAGS};
 use bit_field::BitField;
 
 // The below constants define the PCI configuration space. 
@@ -507,7 +507,7 @@ impl PciDevice {
     pub fn pci_map_bar_mem(&self, bar_index: usize) -> Result<MappedPages, &'static str> {
         let mem_base = self.determine_mem_base(bar_index)?;
         let mem_size = self.determine_mem_size(bar_index);
-        map_mmio_range(mem_base, mem_size as usize)
+        map_frame_range(mem_base, mem_size as usize, MMIO_FLAGS)
     }
 }
 

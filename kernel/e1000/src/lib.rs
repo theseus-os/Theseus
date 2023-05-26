@@ -34,7 +34,7 @@ use regs::*;
 use spin::Once; 
 use alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_mmio_range};
+use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_frame_range, MMIO_FLAGS};
 use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use interrupts::eoi;
@@ -303,14 +303,21 @@ impl E1000Nic {
         const TX_REGISTERS_SIZE_BYTES: usize = 4096;
         const MAC_REGISTERS_SIZE_BYTES: usize = 114_688;
 
-        let nic_regs_mapped_page     = map_mmio_range(mem_base, GENERAL_REGISTERS_SIZE_BYTES)?;
-        let nic_rx_regs_mapped_page  = map_mmio_range(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
-        let nic_tx_regs_mapped_page  = map_mmio_range(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
-        let nic_mac_regs_mapped_page = map_mmio_range(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES, MAC_REGISTERS_SIZE_BYTES)?;
+        let mut offset = mem_base;
 
-        let regs     = nic_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
-        let rx_regs  = nic_rx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
-        let tx_regs  = nic_tx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let nic_regs_mapped_page = map_frame_range(offset, GENERAL_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        let regs = nic_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        offset += GENERAL_REGISTERS_SIZE_BYTES;
+
+        let nic_rx_regs_mapped_page = map_frame_range(offset, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        let rx_regs = nic_rx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        offset += RX_REGISTERS_SIZE_BYTES;
+
+        let nic_tx_regs_mapped_page = map_frame_range(offset, TX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        let tx_regs = nic_tx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        offset += TX_REGISTERS_SIZE_BYTES;
+
+        let nic_mac_regs_mapped_page = map_frame_range(offset, MAC_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
         let mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
 
         Ok((regs, rx_regs, tx_regs, mac_regs))

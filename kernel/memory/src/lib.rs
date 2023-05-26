@@ -121,27 +121,15 @@ pub fn create_contiguous_mapping<F: Into<PteFlagsArch>>(
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
 /// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
 pub fn map_frame_range<F: Into<PteFlagsArch>>(
-    range: FrameRange,
+    start_address: PhysicalAddress,
+    size_in_bytes: usize,
     flags: F,
 ) -> Result<MappedPages, &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("map_range(): KERNEL_MMI was not yet initialized!")?;
-    let num_frames = range.size_in_frames();
-    let allocated_pages = allocate_pages(num_frames).ok_or("memory::map_range(): couldn't allocate contiguous pages!")?;
-    let allocated_frames = allocate_frames_at(range.start_address(), num_frames)
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::map_range(): couldn't allocate contiguous pages!")?;
+    let allocated_frames = allocate_frames_by_bytes_at(start_address, size_in_bytes)
         .map_err(|_| "memory::map_range(): couldn't allocate contiguous frames!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)
-}
-
-
-/// A convenience function that creates a new memory mapping by allocating specific frames from physical memory
-/// with [`MMIO_FLAGS`] as flags.
-/// Returns the new `MappedPages`.
-/// 
-/// # Locking / Deadlock
-/// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
-/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
-pub fn map_mmio_range(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -> Result<MappedPages, &'static str> {
-    map_frame_range(FrameRange::from_phys_addr(mem_base, mem_size_in_bytes), MMIO_FLAGS)
 }
 
 
