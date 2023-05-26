@@ -1,5 +1,5 @@
 use crate::MutexGuard;
-use cpu_local_preemption::hold_preemption;
+use cpu_local_preemption::hold_preemption_no_timer_disable;
 use mpmc_queue::Queue;
 use sync::DeadlockPrevention;
 use sync_spin::Spin;
@@ -43,7 +43,7 @@ where
             .inner
             .push_if_fail(task.clone(), || {
                 drop(guard);
-                let preemption_guard = hold_preemption();
+                let preemption_guard = hold_preemption_no_timer_disable();
                 task.block().unwrap();
                 Result::<(), _>::Err(preemption_guard)
             })
@@ -57,7 +57,7 @@ where
                 if let Some(mutex_guard) = mutex.try_lock() {
                     Ok(mutex_guard)
                 } else {
-                    let preemption_guard = hold_preemption();
+                    let preemption_guard = hold_preemption_no_timer_disable();
                     task.block().unwrap();
                     Err(preemption_guard)
                 }
