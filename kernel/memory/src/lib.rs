@@ -85,6 +85,13 @@ pub const MMIO_FLAGS: PteFlags = PteFlags::from_bits_truncate(
     | PteFlags::DEVICE_MEMORY.bits()
 );
 
+/// Mapping flags that can be used to map DMA (Direct Memory Access) memory.
+pub const DMA_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+);
+
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
 /// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).
