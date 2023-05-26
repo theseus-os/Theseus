@@ -263,8 +263,9 @@ impl SerialPort {
         self.line_status.read() & 0x01 == 0x01
     }
 
-    pub fn base_port_address(&self) -> u16 {
-        self.data.port_address()
+    pub fn base_port_address(&self) -> SerialPortAddress {
+        SerialPortAddress::try_from(self.data.port_address())
+            .expect("Invalid port base address")
     }
 
 }
