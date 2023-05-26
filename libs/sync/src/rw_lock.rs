@@ -18,25 +18,33 @@ pub trait RwLockFlavor {
     fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
-    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>;
+    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized;
 
     /// Attempts to acquire the given lock with exclusive access.
     fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
-    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>;
+    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized;
 
     /// Acquires the given lock with shared access.
     fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
-    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard);
+    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized;
 
     /// Acquires the given lock with exclusive access.
     fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
-    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard);
+    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized;
 
     /// Performs any necessary actions after unlocking the lock.
     fn post_unlock(data: &Self::LockData, is_writer_or_last_reader: bool);
@@ -45,10 +53,11 @@ pub trait RwLockFlavor {
 /// A reader-writer lock.
 pub struct RwLock<T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
-    inner: spin::RwLock<T>,
     data: F::LockData,
+    inner: spin::RwLock<T>,
 }
 
 impl<T, F> RwLock<T, F>
@@ -69,7 +78,13 @@ where
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
+}
 
+impl<T, F> RwLock<T, F>
+where
+    T: ?Sized,
+    F: RwLockFlavor,
+{
     /// Returns a mutable reference to the underlying data.
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
@@ -138,6 +153,7 @@ where
 /// dropped.
 pub struct RwLockReadGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     inner: ManuallyDrop<spin::RwLockReadGuard<'a, T>>,
@@ -147,6 +163,7 @@ where
 
 impl<'a, T, F> Deref for RwLockReadGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     type Target = T;
@@ -159,6 +176,7 @@ where
 
 impl<'a, T, F> Drop for RwLockReadGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     fn drop(&mut self) {
@@ -171,6 +189,7 @@ where
 /// dropped.
 pub struct RwLockWriteGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     inner: ManuallyDrop<spin::RwLockWriteGuard<'a, T>>,
@@ -180,6 +199,7 @@ where
 
 impl<'a, T, F> Deref for RwLockWriteGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     type Target = T;
@@ -192,6 +212,7 @@ where
 
 impl<'a, T, F> DerefMut for RwLockWriteGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     #[inline]
@@ -202,6 +223,7 @@ where
 
 impl<'a, T, F> Drop for RwLockWriteGuard<'a, T, F>
 where
+    T: ?Sized,
     F: RwLockFlavor,
 {
     fn drop(&mut self) {

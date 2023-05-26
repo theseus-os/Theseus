@@ -32,7 +32,10 @@ impl MutexFlavor for Block {
     fn try_lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
         _: &'a Self::LockData,
-    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized,
+    {
         mutex.try_lock().map(|guard| (guard, ()))
     }
 
@@ -40,7 +43,10 @@ impl MutexFlavor for Block {
     fn lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
         data: &'a Self::LockData,
-    ) -> (spin::MutexGuard<'a, T>, Self::Guard) {
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized,
+    {
         // This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
         if let Some(guards) = Self::try_lock(mutex, data) {
@@ -71,7 +77,10 @@ impl RwLockFlavor for Block {
     fn try_read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
-    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::RwLockReadGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized,
+    {
         rw_lock.try_read().map(|guard| (guard, ()))
     }
 
@@ -79,7 +88,10 @@ impl RwLockFlavor for Block {
     fn try_write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         _: &'a Self::LockData,
-    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)> {
+    ) -> Option<(spin::RwLockWriteGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized,
+    {
         rw_lock.try_write().map(|guard| (guard, ()))
     }
 
@@ -87,7 +99,10 @@ impl RwLockFlavor for Block {
     fn read<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
-    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard) {
+    ) -> (spin::RwLockReadGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized,
+    {
         if let Some(guards) = Self::try_read(rw_lock, data) {
             guards
         } else {
@@ -99,7 +114,10 @@ impl RwLockFlavor for Block {
     fn write<'a, T>(
         rw_lock: &'a spin::RwLock<T>,
         data: &'a Self::LockData,
-    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard) {
+    ) -> (spin::RwLockWriteGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized,
+    {
         // This must be a strong compare exchange, otherwise we could block ourselves
         // when the lock is unlocked and never be unblocked.
         if let Some(guards) = Self::try_write(rw_lock, data) {
