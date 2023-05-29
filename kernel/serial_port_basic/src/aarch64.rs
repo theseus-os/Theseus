@@ -1,7 +1,7 @@
 use memory::{MappedPages, PAGE_SIZE, map_frame_range, MMIO_FLAGS};
 use super::{TriState, SerialPortInterruptEvent};
 use arm_boards::BOARD_CONFIG;
-use pl011_qemu::PL011;
+use pl011::PL011;
 use core::fmt;
 
 /// The base port I/O addresses for COM serial ports.
@@ -9,13 +9,13 @@ use core::fmt;
 #[repr(usize)]
 pub enum SerialPortAddress {
     /// The base MMIO address for the COM1 serial port.
-    COM1,
+    COM1 = 0,
     /// The base MMIO address for the COM2 serial port.
-    COM2,
+    COM2 = 1,
     /// The base MMIO address for the COM3 serial port.
-    COM3,
+    COM3 = 2,
     /// The base MMIO address for the COM4 serial port.
-    COM4,
+    COM4 = 3,
 }
 
 /// A serial port and its various data and control registers.
@@ -60,19 +60,28 @@ impl SerialPort {
         let mapped_pages = map_frame_range(*mmio_base, PAGE_SIZE, MMIO_FLAGS)
             .expect("serial_port_basic: couldn't map the UART interface");
         let addr = mapped_pages.start_address().value();
+        let mut pl011 = PL011::new(addr as *mut _);
+
+        pl011.enable_rx_interrupt(true);
+        pl011.set_fifo_mode(false);
+        // pl011.log_status();
 
         SerialPort {
             port_address: serial_port_address,
-            inner: Some(PL011::new(addr as *mut _)),
+            inner: Some(pl011),
             _mapped_pages: Some(mapped_pages),
         }
     }
 
     /// Enable or disable interrupts on this serial port for various events.
     ///
-    /// Note: currently unimplemented on `aarch64`.
-    pub fn enable_interrupt(&mut self, _event: SerialPortInterruptEvent, _enable: bool) {
-        unimplemented!()
+    /// Note: only [`SerialPortInterruptEvent::DataReceived`] is supported on `aarch64`.
+    pub fn enable_interrupt(&mut self, event: SerialPortInterruptEvent, enable: bool) {
+        if matches!(event, SerialPortInterruptEvent::DataReceived) {
+            self.inner.as_mut().unwrap().enable_rx_interrupt(enable);
+        } else {
+            unimplemented!()
+        }
     }
 
     /// Write the given string to the serial port, blocking until data can be transmitted.
@@ -81,14 +90,7 @@ impl SerialPort {
     /// Because this function writes strings, it will transmit a carriage return `'\r'`
     /// after transmitting a line feed (new line) `'\n'` to ensure a proper new line.
     pub fn out_str(&mut self, s: &str) {
-        for byte in s.bytes() {
-            self.out_byte(byte);
-            if byte == b'\n' {
-                self.out_byte(b'\r');
-            } else if byte == b'\r' {
-                self.out_byte(b'\n');
-            }
-        }
+        self.out_bytes(s.as_bytes())
     }
 
     /// Write the given byte to the serial port, blocking until data can be transmitted.
@@ -122,15 +124,7 @@ impl SerialPort {
     ///
     /// Returns the number of bytes read into the given `buffer`.
     pub fn in_bytes(&mut self, buffer: &mut [u8]) -> usize {
-        let mut bytes_read = 0;
-        for byte in buffer {
-            if !self.data_available() {
-                break;
-            }
-            *byte = self.inner.as_mut().unwrap().read_byte();
-            bytes_read += 1;
-        }
-        bytes_read
+        self.inner.as_mut().unwrap().read_bytes(buffer)
     }
 
     /// Returns `true` if the serial port is ready to transmit a byte.
