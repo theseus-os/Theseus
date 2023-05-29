@@ -62,6 +62,7 @@ THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES             := $(ROOT_DIR)/extra_files
 LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
+TOOLS_BUILD_DIR			:= $(BUILD_DIR)/tools
 
 
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
@@ -114,6 +115,7 @@ nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
 efi_firmware := $(BUILD_DIR)/$(OVMF_FILE)
+cls_parser_bin := $(TOOLS_BUILD_DIR)/cls_parser
 
 ifeq ($(ARCH),x86_64)
 ## The assembly files compiled by the nano_core build script.
@@ -150,7 +152,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb gdb_aarch64 \
-		clippy doc docs view-doc view-docs book view-book
+		clippy doc docs view-doc view-docs book view-book $(cls_parser_bin)
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -212,7 +214,7 @@ copy_kernel:
 ## -- a kernel crate is any crate in the `kernel/` directory, or any other crates that are used by kernel crates.
 ## Obviously, if a crate is used by both other application crates and by kernel crates, it is still a kernel crate. 
 ## Then, we give all kernel crate object files the KERNEL_PREFIX and all application crate object files the APP_PREFIX.
-build: $(nano_core_binary)
+build: $(nano_core_binary) $(cls_parser_bin)
 ## Here, the main Rust build has just occurred.
 ##
 ## First, if an .rlib archive contains multiple object files, we need to extract them all out of the archive
@@ -297,15 +299,15 @@ endif
 
 ## Sixth, parse CPU local sections.
 ## TODO: nano core binary
-	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do \
-		cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/cls_parser/Cargo.toml -- $${f} & \
-	done; wait
+	@echo -e "Parsing CPU local sections"
+	@for f in $(OBJECT_FILES_BUILD_DIR)/*.o ; do $(cls_parser_bin) $${f} ; done
 
 #############################
 ### end of "build" target ###
 #############################
 
-
+$(cls_parser_bin):
+	cargo build --release -Zunstable-options --out-dir $(TOOLS_BUILD_DIR) --manifest-path $(ROOT_DIR)/tools/cls_parser/Cargo.toml
 
 ## This target invokes the actual Rust build process via `cargo`.
 cargo:
