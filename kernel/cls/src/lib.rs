@@ -1,16 +1,18 @@
 #![no_std]
-#![feature(negative_impls)]
+#![feature(allocator_api, error_in_core, negative_impls)]
 
 extern crate alloc;
 
 mod arch;
+mod cell;
+mod error;
 
-use core::{cell::UnsafeCell, marker::PhantomData, mem};
+pub use cell::CpuLocalCell;
+pub use error::{AllocError, MappingError};
 
 use alloc::collections::BTreeMap;
 use cpu::CpuId;
 use memory::{MappedPages, PteFlags};
-use sync::DeadlockPrevention;
 use sync_spin::Mutex;
 
 pub use cls_proc::cpu_local;
@@ -33,9 +35,9 @@ impl State {
     }
 }
 
-pub fn init(cpu_id: CpuId) -> Result<(), ()> {
+pub fn init(cpu_id: CpuId) -> Result<(), MappingError> {
     let data_region = memory::create_mapping(CLS_SIZE, PteFlags::new().writable(true).valid(true))
-        .map_err(|_| ())?;
+        .map_err(|_| MappingError)?;
     let pointer = data_region.start_address().value() as *mut u8;
 
     // TODO: Support custom initialisers.
@@ -53,12 +55,12 @@ pub fn init(cpu_id: CpuId) -> Result<(), ()> {
 /// Allocates a region in the CLS.
 ///
 /// Returns the offset into the CLS at which the regions starts.
-pub fn allocate(size: usize) -> Result<usize, ()> {
+pub fn allocate(size: usize) -> Result<usize, AllocError> {
     let mut state = STATE.lock();
     let offset = state.bytes_used;
 
     if offset + size > CLS_SIZE {
-        return Err(());
+        return Err(AllocError);
     }
     state.bytes_used += size;
 
@@ -70,69 +72,3 @@ pub fn allocate(size: usize) -> Result<usize, ()> {
 
     Ok(offset)
 }
-
-pub struct CpuLocalCell<T, P>
-where
-    P: DeadlockPrevention,
-{
-    value: UnsafeCell<T>,
-    prevention: PhantomData<*const P>,
-}
-
-impl<T, P> CpuLocalCell<T, P>
-where
-    P: DeadlockPrevention,
-{
-    #[inline]
-    pub const unsafe fn new(value: T) -> Self {
-        Self {
-            value: UnsafeCell::new(value),
-            prevention: PhantomData,
-        }
-    }
-
-    #[inline]
-    pub fn set(&self, value: T) {
-        let guard = P::enter();
-        self.replace(value);
-        drop(guard);
-    }
-
-    #[inline]
-    pub fn replace(&self, value: T) -> T {
-        let guard = P::enter();
-        let old_value = mem::replace(unsafe { &mut *self.value.get() }, value);
-        drop(guard);
-        old_value
-    }
-}
-
-impl<T, P> CpuLocalCell<T, P>
-where
-    T: Copy,
-    P: DeadlockPrevention,
-{
-    pub fn get(&self) -> T {
-        let guard = P::enter();
-        let value = unsafe { *self.value.get() };
-        drop(guard);
-        value
-    }
-
-    pub fn update<F>(&self, f: F) -> T
-    where
-        F: FnOnce(T) -> T,
-    {
-        let old = self.get();
-        let new = f(old);
-        self.set(new);
-        new
-    }
-}
-
-impl<T, P> !Send for CpuLocalCell<T, P> where P: DeadlockPrevention {}
-
-// TODO: Should T: Sync? I don't think so, because we aren't actually sharing
-// the T across threads.
-// SAFETY
-unsafe impl<T, P> Sync for CpuLocalCell<T, P> where P: DeadlockPrevention {}
