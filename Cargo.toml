@@ -79,6 +79,7 @@ exclude = [
 
 	## Exclude application crates used for testing specific Theseus functionality.
 	## TODO: move these to a specific "tests" folder so we can exclude that entire folder.
+	"applications/test_async",
 	"applications/test_backtrace",
 	"applications/test_block_io",
 	"applications/test_channel",
@@ -90,22 +91,29 @@ exclude = [
 	"applications/test_panic",
 	"applications/test_realtime",
 	"applications/test_restartable",
+	"applications/test_scheduler",
 	"applications/test_serial_echo",
 	"applications/test_std_fs",
+	"applications/test_task_cancel",
 	"applications/test_wait_queue",
 	"applications/test_wasmtime",
 	"applications/tls_test",
 	"applications/unwind_test",
+
+	## Exclude application crates used for one specific feature.
+	"applications/run_rhai",
 ]
 
 
 [patch.crates-io]
 ### use our own version of volatile which supports zerocopy
 volatile = { git = "https://github.com/theseus-os/volatile" }
-### use our own no_std-compatilbe getopts
+### use our own no_std-compatible getopts
 getopts = { git = "https://github.com/theseus-os/getopts" }
 ### use the latest version of smoltcp from github; the one on crates.io is out of date
 smoltcp = { git = "https://github.com/m-labs/smoltcp" }
+### num-traits 0.2.15 doesn't support u128/i128 by default, but the latest github version does.
+num-traits = { git = "https://github.com/rust-num/num-traits" }
 
 ### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
 libc = { git = "https://github.com/theseus-os/libc", branch = "theseus" }

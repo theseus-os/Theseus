@@ -35,6 +35,8 @@ swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
 wasm = { path = "../applications/wasm", optional = true }
 
+## Applications not included by default.
+run_rhai = { path = "../applications/run_rhai", optional = true }
 
 ## Kernel crates used for only testing purposes.
 libtest = { path = "../kernel/libtest", optional = true } 
@@ -100,6 +102,11 @@ everything = [
     "theseus_tests",
     "wasmtime",
 ]
+
+## Includes `rhai`, a scripting environment and interpreter.
+## Currently this is not included in any featureset by default,
+## because rhai is very slow to build.
+rhai = [ "run_rhai" ]
 
 ## Includes `wasmtime`, the WebAssembly (WASM) runtime, in the build.
 wasmtime = [ "test_wasmtime" ]

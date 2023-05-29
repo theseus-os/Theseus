@@ -1,0 +1,15 @@
+[package]
+name = "run_rhai"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+getopts = "0.2.21"
+log = "0.4.8"
+rhai = { git = "https://github.com/rhaiscript/rhai", features = [ "no_std" ], default_features = false }
+spin = "0.9.4"
+
+app_io = { path = "../../kernel/app_io" }
+path =  { path = "../../kernel/path" }
+task =  { path = "../../kernel/task" }
