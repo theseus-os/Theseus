@@ -114,8 +114,7 @@ pub fn create_contiguous_mapping<F: Into<PteFlagsArch>>(
 }
 
 
-/// A convenience function that creates a new memory mapping by allocating specific frames from physical memory.
-/// Returns the new `MappedPages`.
+/// A convenience function that maps randomly-allocated pages to the given range of frames.
 /// 
 /// # Locking / Deadlock
 /// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
