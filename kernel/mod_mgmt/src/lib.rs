@@ -1518,21 +1518,19 @@ impl CrateNamespace {
                     typ = SectionType::TlsData;
                     mapped_pages_offset = cls_offset + sec_value;
                     virt_addr = VirtualAddress::zero();
+                } else if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
+                    typ = SectionType::TlsData;
+                    mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
+                    virt_addr = tdata_sec.virt_addr + sec_value;
+                } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
+                    typ = SectionType::TlsBss;
+                    // Here: a TLS .tbss section has no actual content, so we use a max-value offset
+                    // as a canary value to ensure it cannot be used to index into a MappedPages.
+                    mapped_pages_offset = usize::MAX;
+                    virt_addr = tbss_sec.virt_addr + sec_value;
                 } else {
-                    if let Some((tdata_shndx, ref tdata_sec)) = tdata_shndx_and_section && sym_shndx == tdata_shndx {
-                        typ = SectionType::TlsData;
-                        mapped_pages_offset = tdata_sec.mapped_pages_offset + sec_value;
-                        virt_addr = tdata_sec.virt_addr + sec_value;
-                    } else if let Some((tbss_shndx, ref tbss_sec)) = tbss_shndx_and_section && sym_shndx == tbss_shndx {
-                        typ = SectionType::TlsBss;
-                        // Here: a TLS .tbss section has no actual content, so we use a max-value offset
-                        // as a canary value to ensure it cannot be used to index into a MappedPages.
-                        mapped_pages_offset = usize::MAX;
-                        virt_addr = tbss_sec.virt_addr + sec_value;
-                    } else {
-                        error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
-                        return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
-                    };
+                    error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
+                    return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
                 }
                 mapped_pages = rp_ref;
             }
