@@ -445,26 +445,26 @@ impl IxgbeNic {
         const GENERAL_REGISTERS_3_SIZE_BYTES:   usize = 18 * 4096;
 
         // Allocate memory for the registers, making sure each successive memory region begins where the previous region ended.
-        let mut offset = mem_base;
-        let nic_regs1_mapped_page = map_frame_range(offset, GENERAL_REGISTERS_1_SIZE_BYTES, MMIO_FLAGS)?;
+        let mut physical_addr = mem_base;
+        let nic_regs1_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_1_SIZE_BYTES, MMIO_FLAGS)?;
 
-        offset += GENERAL_REGISTERS_1_SIZE_BYTES;
-        let nic_rx_regs1_mapped_page = map_frame_range(offset, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        physical_addr += GENERAL_REGISTERS_1_SIZE_BYTES;
+        let nic_rx_regs1_mapped_page = map_frame_range(physical_addr, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
 
-        offset += RX_REGISTERS_SIZE_BYTES;
-        let nic_regs2_mapped_page = map_frame_range(offset, GENERAL_REGISTERS_2_SIZE_BYTES, MMIO_FLAGS)?;
+        physical_addr += RX_REGISTERS_SIZE_BYTES;
+        let nic_regs2_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_2_SIZE_BYTES, MMIO_FLAGS)?;
 
-        offset += GENERAL_REGISTERS_2_SIZE_BYTES;
-        let nic_tx_regs_mapped_page = map_frame_range(offset, TX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        physical_addr += GENERAL_REGISTERS_2_SIZE_BYTES;
+        let nic_tx_regs_mapped_page = map_frame_range(physical_addr, TX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
 
-        offset += TX_REGISTERS_SIZE_BYTES;
-        let nic_mac_regs_mapped_page = map_frame_range(offset, MAC_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        physical_addr += TX_REGISTERS_SIZE_BYTES;
+        let nic_mac_regs_mapped_page = map_frame_range(physical_addr, MAC_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
 
-        offset += MAC_REGISTERS_SIZE_BYTES;
-        let nic_rx_regs2_mapped_page = map_frame_range(offset, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        physical_addr += MAC_REGISTERS_SIZE_BYTES;
+        let nic_rx_regs2_mapped_page = map_frame_range(physical_addr, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
 
-        offset += RX_REGISTERS_SIZE_BYTES;
-        let nic_regs3_mapped_page = map_frame_range(offset, GENERAL_REGISTERS_3_SIZE_BYTES, MMIO_FLAGS)?;
+        physical_addr += RX_REGISTERS_SIZE_BYTES;
+        let nic_regs3_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_3_SIZE_BYTES, MMIO_FLAGS)?;
 
         // Map the memory as the register struct and tie the lifetime of the struct with its backing mapped pages
         let regs1    = nic_regs1_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;

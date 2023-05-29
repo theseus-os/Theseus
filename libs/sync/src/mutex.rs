@@ -19,13 +19,17 @@ pub trait MutexFlavor {
     fn try_lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
         data: &'a Self::LockData,
-    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>;
+    ) -> Option<(spin::MutexGuard<'a, T>, Self::Guard)>
+    where
+        T: ?Sized;
 
     /// Acquires the given mutex.
     fn lock<'a, T>(
         mutex: &'a spin::Mutex<T>,
         data: &'a Self::LockData,
-    ) -> (spin::MutexGuard<'a, T>, Self::Guard);
+    ) -> (spin::MutexGuard<'a, T>, Self::Guard)
+    where
+        T: ?Sized;
 
     /// Performs any necessary actions after unlocking the mutex.
     fn post_unlock(data: &Self::LockData);
@@ -34,10 +38,11 @@ pub trait MutexFlavor {
 /// A mutual exclusion primitive.
 pub struct Mutex<T, F>
 where
+    T: ?Sized,
     F: MutexFlavor,
 {
-    inner: spin::Mutex<T>,
     data: F::LockData,
+    inner: spin::Mutex<T>,
 }
 
 impl<T, F> Mutex<T, F>
@@ -58,7 +63,13 @@ where
     pub fn into_inner(self) -> T {
         self.inner.into_inner()
     }
+}
 
+impl<T, F> Mutex<T, F>
+where
+    T: ?Sized,
+    F: MutexFlavor,
+{
     /// Returns a mutable reference to the underlying data.
     #[inline]
     pub fn get_mut(&mut self) -> &mut T {
@@ -98,7 +109,7 @@ where
 
 impl<T, F> fmt::Debug for Mutex<T, F>
 where
-    T: fmt::Debug,
+    T: ?Sized + fmt::Debug,
     F: MutexFlavor,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -124,9 +135,9 @@ where
 /// A RAII implementation of a "scoped lock" of a mutex.
 ///
 /// When this structure is dropped, the lock will be unlocked.
-#[derive(Debug)]
 pub struct MutexGuard<'a, T, F>
 where
+    T: ?Sized,
     F: MutexFlavor,
 {
     inner: ManuallyDrop<spin::MutexGuard<'a, T>>,
@@ -134,8 +145,19 @@ where
     _guard: F::Guard,
 }
 
+impl<'a, T, F> fmt::Debug for MutexGuard<'a, T, F>
+where
+    T: ?Sized + fmt::Debug,
+    F: MutexFlavor,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Debug::fmt(&**self, f)
+    }
+}
+
 impl<'a, T, F> Deref for MutexGuard<'a, T, F>
 where
+    T: ?Sized,
     F: MutexFlavor,
 {
     type Target = T;
@@ -148,6 +170,7 @@ where
 
 impl<'a, T, F> DerefMut for MutexGuard<'a, T, F>
 where
+    T: ?Sized,
     F: MutexFlavor,
 {
     #[inline]
@@ -158,6 +181,7 @@ where
 
 impl<'a, T, F> Drop for MutexGuard<'a, T, F>
 where
+    T: ?Sized,
     F: MutexFlavor,
 {
     #[inline]

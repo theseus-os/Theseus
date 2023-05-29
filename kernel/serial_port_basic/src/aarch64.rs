@@ -1,8 +1,8 @@
-use memory::{MappedPages, PteFlags, get_kernel_mmi_ref, allocate_pages, allocate_frames_at};
-use core::{fmt, ops::DerefMut};
+use memory::{map_frame_range, MappedPages, PAGE_SIZE, MMIO_FLAGS};
 use super::{TriState, SerialPortInterruptEvent};
 use arm_boards::BOARD_CONFIG;
 use pl011::PL011;
+use core::fmt;
 
 /// The base port I/O addresses for COM serial ports.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -57,23 +57,7 @@ impl SerialPort {
             None => panic!("Board doesn't have {:?}", serial_port_address),
         };
 
-        let kernel_mmi_ref = get_kernel_mmi_ref()
-            .expect("serial_port_basic: couldn't get kernel MMI ref");
-
-        let mut locked = kernel_mmi_ref.lock();
-        let page_table = &mut locked.deref_mut().page_table;
-
-        let mmio_flags = PteFlags::DEVICE_MEMORY
-                       | PteFlags::NOT_EXECUTABLE
-                       | PteFlags::WRITABLE;
-
-        let pages = allocate_pages(1)
-            .expect("serial_port_basic: couldn't allocate pages for the UART interface");
-
-        let frames = allocate_frames_at(*mmio_base, 1)
-            .expect("serial_port_basic: couldn't allocate frames for the UART interface");
-
-        let mapped_pages = page_table.map_allocated_pages_to(pages, frames, mmio_flags)
+        let mapped_pages = map_frame_range(*mmio_base, PAGE_SIZE, MMIO_FLAGS)
             .expect("serial_port_basic: couldn't map the UART interface");
 
         let addr = mapped_pages.start_address().value();
