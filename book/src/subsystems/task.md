@@ -11,7 +11,7 @@ One could also consider the entirety of Theseus to be a single "process" in that
 In general, the interfaces exposed by the task management subsystem in Theseus follows the Rust standard library's [model for threading](https://doc.rust-lang.org/std/thread/), with several similarities:
 * You can spawn (create) a new task with a function or a closure as the entry point.
 * You can customize a new task using a convenient builder pattern.
-* You can wait on a task to exit by *joining* it.
+* You can wait on a task to exit by [`join`]ing it.
 * You can use any standard synchronization types for inter-task communication, e.g., shared memory or channels.
 * You can catch the action of stack unwinding after a panic or exception occurs in a task.
 
@@ -132,16 +132,24 @@ This scheduling function is the same function that is invoked by the aforementio
 
 Theseus tasks follow a typical task lifecycle, which is in-part demonstrated by the possible variants of the [`RunState`] enum. 
 
-* **Initializing**: the task is being created.
-* **Running**: the task is executing.
-    * A runnable task may be *blocked* to temporarily prevent it from being scheduled in.
-    * A blocked task may be *unblocked* to mark it as runnable again.
+* **Initing**: the task is being created.
+    * After the task is finished being created and is fully spawned, its runstate will be set to Runnable.
+* **Runnable**: the task is able to be scheduled in (but is not necessarily currently executing).
+    * A runnable task may be *blocked* to prevent it from being scheduled in until it is subsequently unblocked.
     > Note: "running" and "runnable" are not the same thing.
     > * A task is considering runnable after it has spawned and before it has exited, as long as it is not blocked.
     > * A task is only said to be *running* while it is currently executing on a given CPU core, and is merely considered runnable when it is waiting to be scheduled in whilst other tasks execute.
+* **Blocked**: the task is blocked on some other condition and is not able to be scheduled in.
+    * A blocked task may be *unblocked* to mark it as runnable again.
 * **Exited**: the task is no longer executing and will never execute again.
-    * Completed: the task ran to completion normally and finished as expected.
-    * Failed: the task stopped executing prematurely as a result of a crash (language-level panic or machine-level exception) or as a result of a kill request.
+    * An exited task has an [`ExitValue`], which is one of:
+        * Completed -- the task ran to completion normally and finished as expected.
+        * Killed -- the task stopped executing prematurely as a result of a crash (language-level panic or machine-level exception) or as a result of a kill request.
+    * An exited task must not cleaned up until ist has been "reaped" (see below).
+* **Reaped**: the task has exited and its [`ExitValue`] has been taken by another `Task`.
+    * A task is cleaned up and removed from the system once it has been reaped.
+    * An exited task will be auto-reaped by the system if no other task is waiting on it to exit.
+      See [`JoinableTaskRef`] for more info on how this works.
 
 
 ### Spawning new Tasks
@@ -185,6 +193,8 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`Task`]: https://theseus-os.github.io/Theseus/doc/task/struct.Task.html
 [`TaskInner`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/task/src/lib.rs#L237
 [`TaskRef`]: https://theseus-os.github.io/Theseus/doc/task/struct.TaskRef.html
+[`JoinableTaskRef`]: https://www.theseus-os.com/Theseus/doc/task/struct.JoinableTaskRef.html
+[`join`]: https://www.theseus-os.com/Theseus/doc/task/struct.JoinableTaskRef.html#method.join
 [environment]: https://theseus-os.github.io/Theseus/doc/environment/struct.Environment.html
 [`schedule()`]: https://theseus-os.github.io/Theseus/doc/scheduler/fn.schedule.html
 [`LocalApic`]: https://theseus-os.github.io/Theseus/doc/apic/struct.LocalApic.html
@@ -200,7 +210,7 @@ Note that the procedure of stack unwinding accomplishes the release of most reso
 [`TaskLocalData`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/task/src/lib.rs#L1085
 [`context_switch`]: https://theseus-os.github.io/Theseus/doc/context_switch/index.html
 [`context_switch()`]: https://theseus-os.github.io/Theseus/doc/context_switch_regular/fn.context_switch_regular.html
-[`task_switch()`]: https://theseus-os.github.io/Theseus/doc/task//fn.task_switch.html
+[`task_switch()`]: https://theseus-os.github.io/Theseus/doc/task/fn.task_switch.html
 [`new_task_builder()`]: https://theseus-os.github.io/Theseus/doc/spawn/fn.new_task_builder.html
 [`task_wrapper()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L500
 [`task_cleanup_success()`]: https://github.com/theseus-os/Theseus/blob/d6b86b6c46004513735079bed47ae21fc5d4b29d/kernel/spawn/src/lib.rs#L547

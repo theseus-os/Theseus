@@ -73,14 +73,14 @@ These access methods ensure the aforementioned invariants of the `MappedPages` t
     * The same is true for slices: the number of elements of a sized type `T: Sized` plus the offset must not exceed the region's bounds.
 2. If a mutable reference is requested, the underlying memory region must have been mapped as writable.
     * The same is true for functions and executable memory regions.
-3. These methods all return *references* to the requested type or slice, in which the lifetime of the returned reference (`&T`) is dependent upon the lifetime of the `MappedPages` object, in order to prevent use-after-free errors.
+3. These methods all return *references* to the requested type or slice, in which the lifetime of the returned reference (`&T`) is dependent upon the lifetime of the `MappedPages` object, in order to statically prevent use-after-free errors.
     * One cannot obtain an owned instance of a type `T` from an underlying `MappedPages` memory region, because that would remove the semantic connection between the type `T` and the existence of the underlying memory mapping.
 
 In comparison, other OSes typically return raw virtual address values from a memory mapping operation, which you must then unsafely cast to a typed pointer of your choice. 
 With raw addresses, there is no lifetime guarantee to ensure that the mapping persists for as long as those virtual addresses are used. 
 As such, Theseus removes at compile time the potential to easily cause unsafe, undefined behavior by using a raw virtual address after it has been unmapped.
 
-For more details, see the Theseus paper from OSDI 2020, or Kevin Boos' dissertation, both [available here](../misc/papers_presentations.md#selected-papers-and-theses).
+For more details, see the Theseus paper from OSDI 2020, or Kevin Boos's dissertation, both [available here](../misc/papers_presentations.md#selected-papers-and-theses).
 
 
 The `MappedPages` type also exposes other convenient utility methods:
