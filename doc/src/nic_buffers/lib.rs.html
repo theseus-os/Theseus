@@ -178,15 +178,6 @@
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
-<a href="#186" id="186">186</a>
-<a href="#187" id="187">187</a>
-<a href="#188" id="188">188</a>
-<a href="#189" id="189">189</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines buffers that are used to send and receive packets.
 
 </span><span class="attr">#![no_std]
@@ -199,15 +190,6 @@
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>memory::{PhysicalAddress, MappedPages, PteFlags, create_contiguous_mapping};
-
-<span class="doccomment">/// The mapping flags used to map NIC device memory,
-/// e.g., MMIO registers, buffers, queues, etc.
-</span><span class="kw">pub const </span>NIC_MAPPING_FLAGS: PteFlags = PteFlags::from_bits_truncate(
-    PteFlags::new().bits()
-    | PteFlags::VALID.bits()
-    | PteFlags::WRITABLE.bits()
-    | PteFlags::DEVICE_MEMORY.bits()
-);
 
 <span class="doccomment">/// A buffer that stores a packet to be transmitted through the NIC
 /// and is guaranteed to be contiguous in physical memory. 

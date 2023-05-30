@@ -137,45 +137,6 @@
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
 <a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
-<a href="#144" id="144">144</a>
-<a href="#145" id="145">145</a>
-<a href="#146" id="146">146</a>
-<a href="#147" id="147">147</a>
-<a href="#148" id="148">148</a>
-<a href="#149" id="149">149</a>
-<a href="#150" id="150">150</a>
-<a href="#151" id="151">151</a>
-<a href="#152" id="152">152</a>
-<a href="#153" id="153">153</a>
-<a href="#154" id="154">154</a>
-<a href="#155" id="155">155</a>
-<a href="#156" id="156">156</a>
-<a href="#157" id="157">157</a>
-<a href="#158" id="158">158</a>
-<a href="#159" id="159">159</a>
-<a href="#160" id="160">160</a>
-<a href="#161" id="161">161</a>
-<a href="#162" id="162">162</a>
-<a href="#163" id="163">163</a>
-<a href="#164" id="164">164</a>
-<a href="#165" id="165">165</a>
-<a href="#166" id="166">166</a>
-<a href="#167" id="167">167</a>
-<a href="#168" id="168">168</a>
-<a href="#169" id="169">169</a>
-<a href="#170" id="170">170</a>
-<a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
-<a href="#176" id="176">176</a>
-<a href="#177" id="177">177</a>
-<a href="#178" id="178">178</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Functions that are used in a NIC initialization procedure.
 //! 
 //! They include allocating memory space for the device&#39;s registers, and initializing its receive and transmit queues.
@@ -186,7 +147,6 @@
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>mpmc;
-<span class="kw">extern crate </span>pci;
 <span class="kw">extern crate </span>intel_ethernet;
 <span class="kw">extern crate </span>nic_buffers;
 <span class="kw">extern crate </span>volatile;
@@ -194,47 +154,9 @@
 
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
-<span class="kw">use </span>memory::{
-    allocate_frames_by_bytes_at, allocate_pages_by_bytes, create_contiguous_mapping,
-    get_kernel_mmi_ref, BorrowedSliceMappedPages, MappedPages, Mutable, PhysicalAddress,
-};
+<span class="kw">use </span>memory::{BorrowedSliceMappedPages, Mutable, create_contiguous_mapping, MMIO_FLAGS};
 <span class="kw">use </span>nic_buffers::ReceiveBuffer;
 <span class="kw">use </span>nic_queues::{RxQueueRegisters, TxQueueRegisters};
-<span class="kw">use </span>pci::PciDevice;
-
-<span class="kw">pub use </span>nic_queues::NIC_MAPPING_FLAGS;
-
-<span class="doccomment">/// Allocates memory for the NIC registers
-/// 
-/// # Arguments 
-/// * `dev`: reference to pci device 
-/// * `mem_base`: starting physical address of the device&#39;s memory mapped registers
-</span><span class="kw">pub fn </span>allocate_device_register_memory(dev: <span class="kw-2">&amp;</span>PciDevice, mem_base: PhysicalAddress) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">//find out amount of space needed
-    </span><span class="kw">let </span>mem_size_in_bytes = dev.determine_mem_size(<span class="number">0</span>) <span class="kw">as </span>usize;
-
-    allocate_memory(mem_base, mem_size_in_bytes)
-}
-
-<span class="doccomment">/// Helper function to allocate memory at required address
-/// 
-/// # Arguments
-/// * `mem_base`: starting physical address of the region that need to be allocated
-/// * `mem_size_in_bytes`: size of the region that needs to be allocated 
-</span><span class="kw">pub fn </span>allocate_memory(mem_base: PhysicalAddress, mem_size_in_bytes: usize) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="comment">// set up virtual pages and physical frames to be mapped
-    </span><span class="kw">let </span>pages_nic = allocate_pages_by_bytes(mem_size_in_bytes)
-        .ok_or(<span class="string">&quot;NicInit::mem_map(): couldn&#39;t allocate virtual page!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>frames_nic = allocate_frames_by_bytes_at(mem_base, mem_size_in_bytes)
-        .map_err(|_e| <span class="string">&quot;NicInit::mem_map(): couldn&#39;t allocate physical frames!&quot;</span>)<span class="question-mark">?</span>;
-
-    <span class="comment">// debug!(&quot;NicInit: memory base: {:#X}, memory size: {}&quot;, mem_base, mem_size_in_bytes);
-
-    </span><span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;NicInit::mem_map(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>nic_mapped_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(pages_nic, frames_nic, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
-
-    <span class="prelude-val">Ok</span>(nic_mapped_page)
-}
 
 <span class="doccomment">/// Initialize the receive buffer pool from where receive buffers are taken and returned
 /// 
@@ -245,7 +167,7 @@
 </span><span class="kw">pub fn </span>init_rx_buf_pool(num_rx_buffers: usize, buffer_size: u16, rx_buffer_pool: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>mpmc::Queue&lt;ReceiveBuffer&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>length = buffer_size;
     <span class="kw">for </span>_i <span class="kw">in </span><span class="number">0</span>..num_rx_buffers {
-        <span class="kw">let </span>(mp, phys_addr) = create_contiguous_mapping(length <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>; 
+        <span class="kw">let </span>(mp, phys_addr) = create_contiguous_mapping(length <span class="kw">as </span>usize, MMIO_FLAGS)<span class="question-mark">?</span>; 
         <span class="kw">let </span>rx_buf = ReceiveBuffer::new(mp, phys_addr, length, rx_buffer_pool)<span class="question-mark">?</span>;
         <span class="kw">if </span>rx_buffer_pool.push(rx_buf).is_err() {
             <span class="comment">// if the queue is full, it returns an Err containing the object trying to be pushed
@@ -270,7 +192,7 @@
     <span class="kw">let </span>size_in_bytes_of_all_rx_descs_per_queue = num_desc * core::mem::size_of::&lt;T&gt;();
     
     <span class="comment">// Rx descriptors must be 128 byte-aligned, which is satisfied below because it&#39;s aligned to a page boundary.
-    </span><span class="kw">let </span>(rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>(rx_descs_mapped_pages, rx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_rx_descs_per_queue, MMIO_FLAGS)<span class="question-mark">?</span>;
 
     <span class="comment">// cast our physically-contiguous MappedPages into a slice of receive descriptors
     </span><span class="kw">let </span><span class="kw-2">mut </span>rx_descs = rx_descs_mapped_pages.into_borrowed_slice_mut::&lt;T&gt;(<span class="number">0</span>, num_desc)
@@ -284,7 +206,7 @@
         </span><span class="kw">let </span>rx_buf = rx_buffer_pool.pop()
             .ok_or(<span class="string">&quot;Couldn&#39;t obtain a ReceiveBuffer from the pool&quot;</span>)
             .or_else(|_e| {
-                create_contiguous_mapping(buffer_size, NIC_MAPPING_FLAGS)
+                create_contiguous_mapping(buffer_size, MMIO_FLAGS)
                     .and_then(|(buf_mapped, buf_paddr)|
                         ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size <span class="kw">as </span>u16, rx_buffer_pool)
                     )
@@ -325,7 +247,7 @@
     <span class="kw">let </span>size_in_bytes_of_all_tx_descs = num_desc * core::mem::size_of::&lt;T&gt;();
     
     <span class="comment">// Tx descriptors must be 128 byte-aligned, which is satisfied below because it&#39;s aligned to a page boundary.
-    </span><span class="kw">let </span>(tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>(tx_descs_mapped_pages, tx_descs_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_all_tx_descs, MMIO_FLAGS)<span class="question-mark">?</span>;
 
     <span class="comment">// cast our physically-contiguous MappedPages into a slice of transmit descriptors
     </span><span class="kw">let </span><span class="kw-2">mut </span>tx_descs = tx_descs_mapped_pages.into_borrowed_slice_mut::&lt;T&gt;(<span class="number">0</span>, num_desc)

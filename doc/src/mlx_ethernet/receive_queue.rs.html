@@ -243,7 +243,6 @@
 <a href="#243" id="243">243</a>
 <a href="#244" id="244">244</a>
 <a href="#245" id="245">245</a>
-<a href="#246" id="246">246</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The Receive Queue (RQ) object holds the descriptor ring used to hold incoming packets.
 //! The descriptor ring is referred to as a Work Queue Buffer.
 //! This module defines the layout of an RQ and the context used to initialize a RQ.
@@ -253,13 +252,12 @@
 </span><span class="kw">use </span>zerocopy::{U32, FromBytes};
 <span class="kw">use </span>volatile::Volatile;
 <span class="kw">use </span>byteorder::BigEndian;
-<span class="kw">use </span>memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+<span class="kw">use </span>memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 <span class="kw">use </span>core::fmt;
 <span class="kw">use </span>num_enum::TryFromPrimitive;
 <span class="kw">use </span>core::convert::TryFrom;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>nic_buffers::ReceiveBuffer;
-<span class="kw">use </span>nic_initialization::NIC_MAPPING_FLAGS;
 
 <span class="attr">#[allow(unused_imports)]
 </span><span class="kw">use crate</span>::{Rqn, Lkey, CQN_MASK, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
@@ -475,7 +473,7 @@
             </span><span class="kw">let </span>rx_buf = <span class="self">self</span>.pool.pop()
                 .ok_or(<span class="string">&quot;Couldn&#39;t obtain a ReceiveBuffer from the pool&quot;</span>)
                 .or_else(|_e| {
-                    create_contiguous_mapping(buffer_size <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)
+                    create_contiguous_mapping(buffer_size <span class="kw">as </span>usize, MMIO_FLAGS)
                         .and_then(|(buf_mapped, buf_paddr)|
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size <span class="kw">as </span>u16, mem_pool)
                         )

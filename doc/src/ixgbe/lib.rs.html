@@ -1387,7 +1387,7 @@
     vec::Vec,
 };
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
-<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages};
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages, map_frame_range, MMIO_FLAGS};
 <span class="kw">use </span>pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>interrupts::{register_msi_interrupt, InterruptHandler};
@@ -1779,26 +1779,26 @@
         <span class="kw">const </span>GENERAL_REGISTERS_3_SIZE_BYTES:   usize = <span class="number">18 </span>* <span class="number">4096</span>;
 
         <span class="comment">// Allocate memory for the registers, making sure each successive memory region begins where the previous region ended.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>offset = mem_base;
-        <span class="kw">let </span>nic_regs1_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_1_SIZE_BYTES)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span><span class="kw-2">mut </span>physical_addr = mem_base;
+        <span class="kw">let </span>nic_regs1_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_1_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
-        offset += GENERAL_REGISTERS_1_SIZE_BYTES;
-        <span class="kw">let </span>nic_rx_regs1_mapped_page = allocate_memory(offset, RX_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
+        physical_addr += GENERAL_REGISTERS_1_SIZE_BYTES;
+        <span class="kw">let </span>nic_rx_regs1_mapped_page = map_frame_range(physical_addr, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
-        offset += RX_REGISTERS_SIZE_BYTES;
-        <span class="kw">let </span>nic_regs2_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_2_SIZE_BYTES)<span class="question-mark">?</span>;  
+        physical_addr += RX_REGISTERS_SIZE_BYTES;
+        <span class="kw">let </span>nic_regs2_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_2_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
-        offset += GENERAL_REGISTERS_2_SIZE_BYTES;
-        <span class="kw">let </span>nic_tx_regs_mapped_page = allocate_memory(offset, TX_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
+        physical_addr += GENERAL_REGISTERS_2_SIZE_BYTES;
+        <span class="kw">let </span>nic_tx_regs_mapped_page = map_frame_range(physical_addr, TX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
-        offset += TX_REGISTERS_SIZE_BYTES;
-        <span class="kw">let </span>nic_mac_regs_mapped_page = allocate_memory(offset, MAC_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
+        physical_addr += TX_REGISTERS_SIZE_BYTES;
+        <span class="kw">let </span>nic_mac_regs_mapped_page = map_frame_range(physical_addr, MAC_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
-        offset += MAC_REGISTERS_SIZE_BYTES;
-        <span class="kw">let </span>nic_rx_regs2_mapped_page = allocate_memory(offset, RX_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;   
+        physical_addr += MAC_REGISTERS_SIZE_BYTES;
+        <span class="kw">let </span>nic_rx_regs2_mapped_page = map_frame_range(physical_addr, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
-        offset += RX_REGISTERS_SIZE_BYTES;
-        <span class="kw">let </span>nic_regs3_mapped_page = allocate_memory(offset, GENERAL_REGISTERS_3_SIZE_BYTES)<span class="question-mark">?</span>;
+        physical_addr += RX_REGISTERS_SIZE_BYTES;
+        <span class="kw">let </span>nic_regs3_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_3_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
 
         <span class="comment">// Map the memory as the register struct and tie the lifetime of the struct with its backing mapped pages
         </span><span class="kw">let </span>regs1    = nic_regs1_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
@@ -1892,7 +1892,7 @@
 
         <span class="comment">// debug!(&quot;msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes&quot;, bar, mem_base, mem_size_in_bytes);
 
-        </span><span class="kw">let </span>msix_mapped_pages = allocate_memory(mem_base, mem_size_in_bytes)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>msix_mapped_pages = map_frame_range(mem_base, mem_size_in_bytes, MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="kw">let </span>vector_table = BorrowedMappedPages::from_mut(msix_mapped_pages, <span class="number">0</span>)
             .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
 

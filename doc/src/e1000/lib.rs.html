@@ -496,6 +496,13 @@
 <a href="#496" id="496">496</a>
 <a href="#497" id="497">497</a>
 <a href="#498" id="498">498</a>
+<a href="#499" id="499">499</a>
+<a href="#500" id="500">500</a>
+<a href="#501" id="501">501</a>
+<a href="#502" id="502">502</a>
+<a href="#503" id="503">503</a>
+<a href="#504" id="504">504</a>
+<a href="#505" id="505">505</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 #![allow(clippy::type_complexity)]
@@ -532,13 +539,13 @@
 <span class="kw">use </span>spin::Once; 
 <span class="kw">use </span>alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
-<span class="kw">use </span>memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable};
+<span class="kw">use </span>memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_frame_range, MMIO_FLAGS};
 <span class="kw">use </span>pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
 <span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
 <span class="kw">use </span>interrupts::eoi;
 <span class="kw">use </span>x86_64::structures::idt::InterruptStackFrame;
 <span class="kw">use </span>network_interface_card:: NetworkInterfaceCard;
-<span class="kw">use </span>nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+<span class="kw">use </span>nic_initialization::{init_rx_buf_pool, init_rx_queue, init_tx_queue};
 <span class="kw">use </span>intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
 <span class="kw">use </span>nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 <span class="kw">use </span>nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
@@ -787,7 +794,7 @@
     /// * `device`: reference to the nic device
     /// * `mem_base`: the physical address where the NIC&#39;s memory starts.
     </span><span class="kw">fn </span>map_e1000_regs(
-        _device: <span class="kw-2">&amp;</span>PciDevice, 
+        _device: <span class="kw-2">&amp;</span>PciDevice,
         mem_base: PhysicalAddress,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(
         BorrowedMappedPages&lt;E1000Registers, Mutable&gt;, 
@@ -801,14 +808,21 @@
         <span class="kw">const </span>TX_REGISTERS_SIZE_BYTES: usize = <span class="number">4096</span>;
         <span class="kw">const </span>MAC_REGISTERS_SIZE_BYTES: usize = <span class="number">114_688</span>;
 
-        <span class="kw">let </span>nic_regs_mapped_page     = allocate_memory(mem_base, GENERAL_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
-        <span class="kw">let </span>nic_rx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
-        <span class="kw">let </span>nic_tx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
-        <span class="kw">let </span>nic_mac_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES, MAC_REGISTERS_SIZE_BYTES)<span class="question-mark">?</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>physical_addr = mem_base;
 
-        <span class="kw">let </span>regs     = nic_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
-        <span class="kw">let </span>rx_regs  = nic_rx_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
-        <span class="kw">let </span>tx_regs  = nic_tx_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        <span class="kw">let </span>nic_regs_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
+        <span class="kw">let </span>regs = nic_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        physical_addr += GENERAL_REGISTERS_SIZE_BYTES;
+
+        <span class="kw">let </span>nic_rx_regs_mapped_page = map_frame_range(physical_addr, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
+        <span class="kw">let </span>rx_regs = nic_rx_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        physical_addr += RX_REGISTERS_SIZE_BYTES;
+
+        <span class="kw">let </span>nic_tx_regs_mapped_page = map_frame_range(physical_addr, TX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
+        <span class="kw">let </span>tx_regs = nic_tx_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
+        physical_addr += TX_REGISTERS_SIZE_BYTES;
+
+        <span class="kw">let </span>nic_mac_regs_mapped_page = map_frame_range(physical_addr, MAC_REGISTERS_SIZE_BYTES, MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="kw">let </span>mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(<span class="number">0</span>).map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>((regs, rx_regs, tx_regs, mac_regs))

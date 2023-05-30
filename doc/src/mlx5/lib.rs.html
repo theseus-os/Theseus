@@ -710,9 +710,9 @@
 <span class="kw">use </span>spin::Once; 
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
-<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, map_frame_range, BorrowedMappedPages, Mutable, MMIO_FLAGS};
 <span class="kw">use </span>pci::PciDevice;
-<span class="kw">use </span>nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
+<span class="kw">use </span>nic_initialization::init_rx_buf_pool;
 <span class="kw">use </span>mlx_ethernet::{
     command_queue::{AccessRegisterOpMod, CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, HCACapabilities, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
     completion_queue::{CompletionQueue, CompletionQueueEntry, CompletionQueueDoorbellRecord}, 
@@ -856,7 +856,7 @@
         <span class="macro">trace!</span>(<span class="string">&quot;total size in bytes of cmdq = {}&quot;</span>, size_in_bytes_of_cmdq);
     
         <span class="comment">// allocate mapped pages for the command queue
-        </span><span class="kw">let </span>(cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>(cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="macro">trace!</span>(<span class="string">&quot;cmdq mem base = {}&quot;</span>, cmdq_starting_phys_addr);
     
         <span class="comment">// cast our physically-contiguous MappedPages into a slice of command queue entries
@@ -1045,7 +1045,7 @@
         <span class="comment">// execute CREATE_EQ for page request event
         // 1. Allocate pages for EQ
         </span><span class="kw">let </span>num_eq_entries = <span class="number">64</span>;
-        <span class="kw">let </span>(eq_mp, eq_pa) = create_contiguous_mapping(num_eq_entries * core::mem::size_of::&lt;EventQueueEntry&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(eq_mp, eq_pa) = create_contiguous_mapping(num_eq_entries * core::mem::size_of::&lt;EventQueueEntry&gt;(), MMIO_FLAGS)<span class="question-mark">?</span>;
     
         <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateEq)
@@ -1091,10 +1091,10 @@
         <span class="comment">// execute CREATE_CQ for SQ 
 
         // 1. Allocate pages for CQ
-        </span><span class="kw">let </span>(cq_mp, cq_pa) = create_contiguous_mapping(NUM_CQ_ENTRIES_SEND * core::mem::size_of::&lt;CompletionQueueEntry&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>(cq_mp, cq_pa) = create_contiguous_mapping(NUM_CQ_ENTRIES_SEND * core::mem::size_of::&lt;CompletionQueueEntry&gt;(), MMIO_FLAGS)<span class="question-mark">?</span>;
 
         <span class="comment">// 2. Allocate page for doorbell
-        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), MMIO_FLAGS)<span class="question-mark">?</span>;
         
         <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
@@ -1120,9 +1120,9 @@
 
         // 1. Allocate pages for CQ
         </span><span class="kw">let </span>cq_entries_r = num_rx_descs; 
-        <span class="kw">let </span>(cq_mp, cq_pa) = create_contiguous_mapping(cq_entries_r * core::mem::size_of::&lt;CompletionQueueEntry&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        <span class="kw">let </span>(cq_mp, cq_pa) = create_contiguous_mapping(cq_entries_r * core::mem::size_of::&lt;CompletionQueueEntry&gt;(), MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="comment">// 2. Allocate page for doorbell
-        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;CompletionQueueDoorbellRecord&gt;(), MMIO_FLAGS)<span class="question-mark">?</span>;
         
         <span class="kw">let </span>completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
@@ -1148,7 +1148,7 @@
         <span class="macro">trace!</span>(<span class="string">&quot;CreateTis: {:?}, tisn: {:?}&quot;</span>, status, tisn);
 
         <span class="comment">// Allocate pages for RQ and SQ, they have to be contiguous      
-        </span><span class="kw">let </span>(q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>(q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="kw">let </span>vaddr = q_mp.start_address();
         <span class="kw">let </span>(rq_mp, sq_mp) = q_mp.split(memory_structs::Page::containing_address(vaddr + rq_size_in_bytes))
             .map_err(|_e| <span class="string">&quot;Could not split MappedPages&quot;</span>)<span class="question-mark">?</span>;
@@ -1156,13 +1156,13 @@
         <span class="macro">debug!</span>(<span class="string">&quot;RQ paddr: {:?}, SQ paddr: {:?}, RQ vaddr: {:?}, SQ vaddr: {:?}&quot;</span>, q_pa, sq_pa, rq_mp.start_address(), sq_mp.start_address());
 
         <span class="comment">// Allocate page for SQ/RQ doorbell
-        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;DoorbellRecord&gt;(), NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span>(db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::&lt;DoorbellRecord&gt;(), MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="macro">debug!</span>(<span class="string">&quot;doorbell: {:#x}&quot;</span>, db_pa);
 
         <span class="comment">// Allocate page for UAR. 
         // For the given uar number i, the page is the ith page from the memory base retrieved from the PCI BAR
         </span><span class="kw">let </span>uar_mem_base = mem_base + ((uar <span class="kw">as </span>usize) * PAGE_SIZE);
-        <span class="kw">let </span>uar_page = allocate_memory(uar_mem_base, PAGE_SIZE)<span class="question-mark">?</span>;
+        <span class="kw">let </span>uar_page = map_frame_range(uar_mem_base, PAGE_SIZE, MMIO_FLAGS)<span class="question-mark">?</span>;
         <span class="macro">debug!</span>(<span class="string">&quot;mmio: {:?}, uar: {:?}&quot;</span>, mem_base, uar_mem_base);
 
         <span class="comment">// Create the SQ
@@ -1323,7 +1323,7 @@
     
     <span class="doccomment">/// Returns the memory-mapped initialization segment of the NIC
     </span><span class="kw">fn </span>map_init_segment(mem_base: PhysicalAddress) -&gt; <span class="prelude-ty">Result</span>&lt;BorrowedMappedPages&lt;InitializationSegment, Mutable&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        allocate_memory(mem_base, core::mem::size_of::&lt;InitializationSegment&gt;())<span class="question-mark">?
+        map_frame_range(mem_base, core::mem::size_of::&lt;InitializationSegment&gt;(), MMIO_FLAGS)<span class="question-mark">?
             </span>.into_borrowed_mut(<span class="number">0</span>)
             .map_err(|(_mp, err)| err)
     }
@@ -1334,7 +1334,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>mp = Vec::with_capacity(num_pages);
         <span class="kw">let </span><span class="kw-2">mut </span>paddr = Vec::with_capacity(num_pages);
         <span class="kw">for _ in </span><span class="number">0</span>..num_pages {
-            <span class="kw">let </span>(page, pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+            <span class="kw">let </span>(page, pa) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)<span class="question-mark">?</span>;
             mp.push(page);
             paddr.push(pa);
         }

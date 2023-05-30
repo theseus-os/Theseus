@@ -272,6 +272,39 @@
 <a href="#272" id="272">272</a>
 <a href="#273" id="273">273</a>
 <a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -351,6 +384,21 @@
     </span><span class="kw">pub </span>extra_mapped_pages: Vec&lt;MappedPages&gt;,
 }
 
+<span class="doccomment">/// Mapping flags that can be used to map MMIO registers.
+</span><span class="kw">pub const </span>MMIO_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+    | PteFlags::DEVICE_MEMORY.bits()
+);
+
+<span class="doccomment">/// Mapping flags that can be used to map DMA (Direct Memory Access) memory.
+</span><span class="kw">pub const </span>DMA_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+);
+
 
 <span class="doccomment">/// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
 /// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).
@@ -370,6 +418,24 @@
     <span class="kw">let </span>starting_phys_addr = allocated_frames.start_address();
     <span class="kw">let </span>mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)<span class="question-mark">?</span>;
     <span class="prelude-val">Ok</span>((mp, starting_phys_addr))
+}
+
+
+<span class="doccomment">/// A convenience function that maps randomly-allocated pages to the given range of frames.
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the frame allocator and the kernel&#39;s `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+</span><span class="kw">pub fn </span>map_frame_range&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
+    start_address: PhysicalAddress,
+    size_in_bytes: usize,
+    flags: F,
+) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;map_range(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or(<span class="string">&quot;memory::map_range(): couldn&#39;t allocate contiguous pages!&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>allocated_frames = allocate_frames_by_bytes_at(start_address, size_in_bytes)
+        .map_err(|<span class="kw">_</span>| <span class="string">&quot;memory::map_range(): couldn&#39;t allocate contiguous frames!&quot;</span>)<span class="question-mark">?</span>;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)
 }
 
 

@@ -1922,19 +1922,17 @@
 <a href="#1922" id="1922">1922</a>
 <a href="#1923" id="1923">1923</a>
 <a href="#1924" id="1924">1924</a>
-<a href="#1925" id="1925">1925</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
 //! Also defines multiple enums that specify the valid input and output values for different commands.
 
 </span><span class="attr">#![allow(clippy::upper_case_acronyms)]
 
 </span><span class="kw">use </span>alloc::{vec::Vec, boxed::Box};
-<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+<span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 <span class="kw">use </span>volatile::{ReadOnly,Volatile};
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>zerocopy::{U32, FromBytes};
 <span class="kw">use </span>byteorder::BigEndian;
-<span class="kw">use </span>nic_initialization::NIC_MAPPING_FLAGS;
 <span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
 <span class="kw">use </span>core::fmt;
 <span class="kw">use </span>num_enum::TryFromPrimitive;
@@ -2645,7 +2643,7 @@
         <span class="comment">// start off by pre-allocating one page per entry
         </span><span class="kw">let </span><span class="kw-2">mut </span>mailbox_buffers= Vec::with_capacity(num_cmdq_entries);
         <span class="kw">for _ in </span><span class="number">0</span>..num_cmdq_entries {
-            <span class="kw">let </span>(mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+            <span class="kw">let </span>(mp, addr) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)<span class="question-mark">?</span>;
             mailbox_buffers.push(MailboxBuffer{mp, addr});
         }
 
@@ -2899,7 +2897,7 @@
             <span class="kw">if let </span><span class="prelude-val">Some</span>(mb_buffer) = <span class="self">self</span>.mailbox_buffers.pop() {
                 command_mailbox_buffers.push(mb_buffer);
             } <span class="kw">else </span>{
-                <span class="kw">let </span>(mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)
+                <span class="kw">let </span>(mp, addr) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)
                     .map_err(|_e| CommandQueueError::PageAllocationFailed)<span class="question-mark">?</span>;
                 command_mailbox_buffers.push(MailboxBuffer{mp, addr});
             }

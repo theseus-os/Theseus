@@ -172,7 +172,6 @@
 <a href="#172" id="172">172</a>
 <a href="#173" id="173">173</a>
 <a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.
 //! 
 //! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.
@@ -193,10 +192,9 @@
     vec::Vec,
     collections::VecDeque
 };
-<span class="kw">use </span>memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+<span class="kw">use </span>memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 <span class="kw">use </span>intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 <span class="kw">use </span>nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
-<span class="kw">pub use </span>nic_buffers::NIC_MAPPING_FLAGS;
 
 <span class="doccomment">/// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
@@ -274,7 +272,7 @@
                     <span class="macro">warn!</span>(<span class="string">&quot;NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.&quot;</span>);
                     <span class="comment">// if the pool was empty, then we allocate a new receive buffer
                     </span><span class="kw">let </span>len = <span class="self">self</span>.rx_buffer_size_bytes;
-                    <span class="kw">let </span>(mp, phys_addr) = create_contiguous_mapping(len <span class="kw">as </span>usize, NIC_MAPPING_FLAGS)<span class="question-mark">?</span>;
+                    <span class="kw">let </span>(mp, phys_addr) = create_contiguous_mapping(len <span class="kw">as </span>usize, MMIO_FLAGS)<span class="question-mark">?</span>;
                     ReceiveBuffer::new(mp, phys_addr, len, <span class="self">self</span>.rx_buffer_pool)<span class="question-mark">?
                 </span>}
             };
