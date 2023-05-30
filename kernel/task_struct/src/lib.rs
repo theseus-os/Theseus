@@ -124,7 +124,7 @@ pub enum ExitValue {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RunState {
     /// This task is in the midst of being initialized/spawned.
-    Initializing,
+    Initing,
     /// This task is able to be scheduled in, but not necessarily currently running.
     /// To check whether it is currently running, use [`Task::is_running()`].
     Runnable,
