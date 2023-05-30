@@ -136,11 +136,19 @@
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
 </pre><pre class="rust"><code><span class="attr">#![feature(negative_impls)]
 #![no_std]
 
-</span><span class="kw">use </span>sync::{spin, MutexFlavor, RwLockFlavor};
+</span><span class="kw">mod </span>condvar;
+
+<span class="kw">use </span>sync::{spin, MutexFlavor, RwLockFlavor};
 <span class="kw">use </span>wait_queue::WaitQueue;
+
+<span class="kw">pub use </span>condvar::Condvar;
 
 <span class="kw">pub type </span>Mutex&lt;T&gt; = sync::Mutex&lt;T, Block&gt;;
 <span class="kw">pub type </span>MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T, Block&gt;;
