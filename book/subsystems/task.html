@@ -153,7 +153,7 @@ One could also consider the entirety of Theseus to be a single &quot;process&quo
 <ul>
 <li>You can spawn (create) a new task with a function or a closure as the entry point.</li>
 <li>You can customize a new task using a convenient builder pattern.</li>
-<li>You can wait on a task to exit by <em>joining</em> it.</li>
+<li>You can wait on a task to exit by <a href="https://www.theseus-os.com/Theseus/doc/task/struct.JoinableTaskRef.html#method.join"><code>join</code></a>ing it.</li>
 <li>You can use any standard synchronization types for inter-task communication, e.g., shared memory or channels.</li>
 <li>You can catch the action of stack unwinding after a panic or exception occurs in a task.</li>
 </ul>
@@ -161,7 +161,7 @@ One could also consider the entirety of Theseus to be a single &quot;process&quo
 <h2 id="the-task-struct"><a class="header" href="#the-task-struct">The <code>Task</code> struct</a></h2>
 <p>There is one instance of the <code>Task</code> struct for each task that currently exists in the system.
 A task is often thought of as an <em>execution context</em>, and the task struct includes key information about the execution of a given program's code.
-Compare to that of other OSes, the <a href="https://theseus-os.github.io/Theseus/doc/task/struct.Task.html"><code>Task</code></a> struct in Theseus is quite minimal in size and scope,
+Compared to that of other OSes, the <a href="https://theseus-os.github.io/Theseus/doc/task/struct.Task.html"><code>Task</code></a> struct in Theseus is quite minimal in size and scope,
 because our state management philosophy strives to keep only states relevant to a given subsystem in that subsystem. 
 For example, scheduler-related states are not present in Theseus's task struct; rather, they are found in the relevant scheduler crate in which they are used.
 In other words, Theseus's task struct is not monolithic and all-encompassing.</p>
@@ -249,7 +249,7 @@ A task is only removed from the task list once it has been <em>reaped</em>, i.e.
 <p>Only number 1 above is what we consider to be a true context switch, and that is what we refer to here when we say &quot;context switch.&quot; 
 Number 2 above is an <em>address space switch</em>, e.g., switching page tables, a different action that could potentially occur when switching to a different task, if the next task is in a different process/address space than the current task.
 Number 3 above is a <em>mode switch</em> that generally does not result in the full execution context being saved or restored; only some registers may be pushed or popped onto the stack, depending on the calling convention employed by a given platform's system calls.
-Number 4 above is similar to number 3, but is trigger by the hardware rather than userspace software, so more execution context states may need to be saved/restored. </p>
+Number 4 above is similar to number 3, but is triggered by the hardware rather than userspace software, so more execution context states may need to be saved/restored. </p>
 <p>One key aspect of context switching is that it is transparent to the actual code that is currently executing, as the lower layers of the OS kernel will save and restore execution context as needed before resuming.
 Thus, context switching (with preemption) allows for multiple untrusted and uncooperative tasks to transparently share the CPU, while maintaining the idealistic model that they each are the only task executing in the entire system and have exclusive access to the CPU.</p>
 <h3 id="implementing-context-switching"><a class="header" href="#implementing-context-switching">Implementing context switching</a></h3>
@@ -264,7 +264,7 @@ This tells the compiler to generate soft floating-point instructions instead of 
 Thus, disabling SIMD results in the simplest and fastest version of context switching, as only the basic set of general-purpose CPU registers must be saved and restored; all SIMD registers can be ignored.</p>
 <p>Context switching is inherently an unsafe operation, hence why the standard <a href="https://theseus-os.github.io/Theseus/doc/context_switch_regular/fn.context_switch_regular.html"><code>context_switch()</code></a> function is marked unsafe.
 It must be implemented in assembly in order to ensure that the compiler doesn't insert any instructions that modify register values in between our instructions that save/restore them.
-It is only invoked by the <a href="https://theseus-os.github.io/Theseus/doc/task/struct.Task.html#method.task_switch"><code>task_switch()</code></a> function, as only that function has the proper information — saved register values and the destination for the restored register values — to correctly invoke it.</p>
+It is only invoked by the <a href="https://theseus-os.github.io/Theseus/doc/task/fn.task_switch.html"><code>task_switch()</code></a> function, as only that function has the proper information — saved register values and the destination for the restored register values — to correctly invoke it.</p>
 <h2 id="pre-emptive-vs-cooperative-multitasking"><a class="header" href="#pre-emptive-vs-cooperative-multitasking">Pre-emptive vs. Cooperative Multitasking</a></h2>
 <p>Theseus implements full support for preemptive multitasking, in which a given task is interrupted at a certain periodic time interval in order to allow other tasks to take over execution.
 This prevents one greedy task from hogging all system resources and/or starving other tasks from execution time.
@@ -278,11 +278,14 @@ This scheduling function is the same function that is invoked by the aforementio
 <h2 id="the-task-lifecycle"><a class="header" href="#the-task-lifecycle">The Task lifecycle</a></h2>
 <p>Theseus tasks follow a typical task lifecycle, which is in-part demonstrated by the possible variants of the <a href="https://theseus-os.github.io/Theseus/doc/task/enum.RunState.html"><code>RunState</code></a> enum. </p>
 <ul>
-<li><strong>Spawning</strong>: the task is being created.</li>
-<li><strong>Running</strong>: the task is executing.
+<li><strong>Initializing</strong>: the task is being created.
 <ul>
-<li>A runnable task may be <em>blocked</em> to temporarily prevent it from being scheduled in.</li>
-<li>A blocked task may be <em>unblocked</em> to mark it as runnable again.</li>
+<li>After the task is finished being created and is fully spawned, its runstate will be set to Runnable.</li>
+</ul>
+</li>
+<li><strong>Runnable</strong>: the task is able to be scheduled in (but is not necessarily currently executing).
+<ul>
+<li>A runnable task may be <em>blocked</em> to prevent it from being scheduled in until it is subsequently unblocked.</li>
 </ul>
 <blockquote>
 <p>Note: &quot;running&quot; and &quot;runnable&quot; are not the same thing.</p>
@@ -292,10 +295,27 @@ This scheduling function is the same function that is invoked by the aforementio
 </ul>
 </blockquote>
 </li>
+<li><strong>Blocked</strong>: the task is blocked on some other condition and is not able to be scheduled in.
+<ul>
+<li>A blocked task may be <em>unblocked</em> to mark it as runnable again.</li>
+</ul>
+</li>
 <li><strong>Exited</strong>: the task is no longer executing and will never execute again.
 <ul>
-<li>Completed: the task ran to completion normally and finished as expected.</li>
-<li>Failed: the task stopped executing prematurely as a result of a crash (language-level panic or machine-level exception) or as a result of a kill request.</li>
+<li>An exited task has an <a href="https://theseus-os.github.io/Theseus/doc/task/enum.ExitValue.html"><code>ExitValue</code></a>, which is one of:
+<ul>
+<li>Completed -- the task ran to completion normally and finished as expected.</li>
+<li>Killed -- the task stopped executing prematurely as a result of a crash (language-level panic or machine-level exception) or as a result of a kill request.</li>
+</ul>
+</li>
+<li>An exited task must not cleaned up until ist has been &quot;reaped&quot; (see below).</li>
+</ul>
+</li>
+<li><strong>Reaped</strong>: the task has exited and its <a href="https://theseus-os.github.io/Theseus/doc/task/enum.ExitValue.html"><code>ExitValue</code></a> has been taken by another <code>Task</code>.
+<ul>
+<li>A task is cleaned up and removed from the system once it has been reaped.</li>
+<li>An exited task will be auto-reaped by the system if no other task is waiting on it to exit.
+See <a href="https://www.theseus-os.com/Theseus/doc/task/struct.JoinableTaskRef.html"><code>JoinableTaskRef</code></a> for more info on how this works.</li>
 </ul>
 </li>
 </ul>

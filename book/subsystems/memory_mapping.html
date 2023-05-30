@@ -226,7 +226,7 @@ Reinterpretive casting is sometimes also referred to as &quot;struct overlay&quo
 <li>The same is true for functions and executable memory regions.</li>
 </ul>
 </li>
-<li>These methods all return <em>references</em> to the requested type or slice, in which the lifetime of the returned reference (<code>&amp;T</code>, `in order to prevent use-after-free errors. 
+<li>These methods all return <em>references</em> to the requested type or slice, in which the lifetime of the returned reference (<code>&amp;T</code>) is dependent upon the lifetime of the <code>MappedPages</code> object, in order to statically prevent use-after-free errors.
 <ul>
 <li>One cannot obtain an owned instance of a type <code>T</code> from an underlying <code>MappedPages</code> memory region, because that would remove the semantic connection between the type <code>T</code> and the existence of the underlying memory mapping.</li>
 </ul>
@@ -265,7 +265,7 @@ We refer to this as exclusive mappings, and they are realized via a combination 
 </li>
 <li>Using strong type safety, the <a href="https://theseus-os.github.io/Theseus/doc/frame_allocator/index.html"><code>frame_allocator</code></a> is able to accept a set of <code>UnmappedFrames</code> as a trusted &quot;token&quot; stating that the included frames cannot possibly still be mapped by any pages. It can therefore safely deallocate them.
 <ul>
-<li>Deallocation occurs seamlessly because an <code>UnmappedFrames</code> object can be converted into an <code>AllocatedFrames</code> object, <a href="https://theseus-os.github.io/Theseus/doc/src/frame_allocator/lib.rs.html#393">see here for details</a>.</li>
+<li>Deallocation occurs seamlessly because an <code>UnmappedFrames</code> object can be converted into an <code>AllocatedFrames</code> object, <a href="https://www.theseus-os.com/Theseus/doc/frame_allocator/fn.init.html#return">see here for details and source</a>.</li>
 </ul>
 </li>
 </ol>

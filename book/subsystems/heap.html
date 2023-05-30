@@ -149,8 +149,7 @@
 <p>Note: One can request a large allocation from the heap, but in Theseus it will be backed by an individually-created <code>MappedPages</code> object of newly-allocated pages and frames that are mapped to one another, so it's generally less efficient to use the heap for large allocations.</p>
 </blockquote>
 <p>In Theseus, the primary purpose of the heap is to enable the usage of Rust's <a href="https://doc.rust-lang.org/alloc/"><code>alloc</code></a> types, e.g., <code>Box</code>, <code>Arc</code>, <code>Vec</code>, and other dynamically-allocated collections types.
-Heap allocators must implement Rust's <a href="https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code></a> trait in order to be used as the backing allocator behind these <code>alloc</code> types.
-how we integrate that with Rust's (old) requirement of a single global allocator.</p>
+Heap allocators must implement Rust's <a href="https://doc.rust-lang.org/alloc/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code></a> trait in order to be used as the backing allocator behind these <code>alloc</code> types.</p>
 <h2 id="overview-of-relevant-crates"><a class="header" href="#overview-of-relevant-crates">Overview of Relevant Crates</a></h2>
 <ul>
 <li><a href="https://theseus-os.github.io/Theseus/doc/heap/index.html"><code>heap</code></a>: the default heap implementation that offers a static singleton fixed-size block allocator.
@@ -172,8 +171,8 @@ how we integrate that with Rust's (old) requirement of a single global allocator
 </ul>
 </li>
 </ul>
-<p>One unique aspect of Theseus's &quot;combination&quot; heap design is that the early heap, fully-featured heap, and per-core dedicated heaps are all combined into a single heap abstraction that can be accessed via singleton global heap instance.
-It starts out with the simple block allocator described above, and then once more key system functionality has been initialized during OS boot, the <a href="https://theseus-os.github.io/Theseus/doc/multiple_heaps/fn.switch_to_multiple_heaps.html"><code>switch_to_multiple_heaps()</code></a> function is invoked to transparently activate the more complex, per-core heap allocators.</p>
+<p>One unique aspect of Theseus's &quot;combination&quot; heap design is that the early heap, fully-featured heap, and per-core dedicated heaps are all combined into a single heap abstraction that can be accessed via a singleton global heap instance.
+It starts out with the simple block allocator described above, and then, once more key system functionality has been initialized during OS boot, the <a href="https://theseus-os.github.io/Theseus/doc/multiple_heaps/fn.switch_to_multiple_heaps.html"><code>switch_to_multiple_heaps()</code></a> function is invoked to transparently activate the more complex, per-core heap allocators.</p>
 <p>Another unique aspect of heaps in Theseus is that all entities across the system use and share the same set of global heaps. This allows allocations to seamlessly flow and be passed among applications, libraries, and kernel entities without the need for inefficient and complex <a href="https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/EuroSys2007_SealedProcesses.pdf">exchange heaps</a> used in other SAS OSes. </p>
 <blockquote>
 <p>Note: Theseus's combination heap design was implemented before Rust's <code>alloc</code> types supported non-global allocators and placement constructors.</p>
