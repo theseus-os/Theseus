@@ -1,8 +1,12 @@
 #![feature(negative_impls)]
 #![no_std]
 
+mod condvar;
+
 use sync::{spin, MutexFlavor, RwLockFlavor};
 use wait_queue::WaitQueue;
+
+pub use condvar::Condvar;
 
 pub type Mutex<T> = sync::Mutex<T, Block>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, Block>;

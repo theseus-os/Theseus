@@ -3706,7 +3706,12 @@ dependencies = [
 name = "sync_block"
 version = "0.1.0"
 dependencies = [
+ "cpu_local_preemption",
+ "mpmc_queue",
+ "scheduler",
  "sync",
+ "sync_spin",
+ "task",
  "wait_queue",
 ]
 

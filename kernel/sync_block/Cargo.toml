@@ -5,5 +5,10 @@ description = "Blocking synchronisation primitives"
 edition = "2021"
 
 [dependencies]
+cpu_local_preemption = { path = "../cpu_local_preemption" }
+mpmc_queue = { path = "../../libs/mpmc_queue" }
+scheduler = { path = "../scheduler" }
 sync = { path = "../../libs/sync" }
+task = { path = "../task" }
+sync_spin = { path = "../../libs/sync_spin" }
 wait_queue = { path = "../wait_queue" }
