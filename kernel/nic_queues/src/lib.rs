@@ -18,10 +18,9 @@ use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+use memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
-pub use nic_buffers::NIC_MAPPING_FLAGS;
 
 /// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
@@ -99,7 +98,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
                     warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = self.rx_buffer_size_bytes;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
+                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, MMIO_FLAGS)?;
                     ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)?
                 }
             };

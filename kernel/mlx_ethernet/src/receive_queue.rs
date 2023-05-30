@@ -7,13 +7,12 @@
 use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
-use memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+use memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
 use alloc::vec::Vec;
 use nic_buffers::ReceiveBuffer;
-use nic_initialization::NIC_MAPPING_FLAGS;
 
 #[allow(unused_imports)]
 use crate::{Rqn, Lkey, CQN_MASK, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
@@ -229,7 +228,7 @@ impl ReceiveQueue {
             let rx_buf = self.pool.pop()
                 .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
                 .or_else(|_e| {
-                    create_contiguous_mapping(buffer_size as usize, NIC_MAPPING_FLAGS)
+                    create_contiguous_mapping(buffer_size as usize, MMIO_FLAGS)
                         .and_then(|(buf_mapped, buf_paddr)|
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, mem_pool)
                         )

@@ -3,8 +3,8 @@ use core::convert::AsMut;
 use cpu::{CpuId, MpidrValue};
 use arm_boards::{BOARD_CONFIG, NUM_CPUS};
 use memory::{
-    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
-    allocate_pages, allocate_frames_at
+    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress,
+    allocate_pages, allocate_frames_at, MMIO_FLAGS,
 };
 
 use static_assertions::const_assert_eq;
@@ -266,14 +266,10 @@ pub enum Version {
 
 impl ArmGic {
     pub fn init(page_table: &mut PageTable, version: Version) -> Result<Self, &'static str> {
-        let mmio_flags = PteFlags::DEVICE_MEMORY
-                       | PteFlags::NOT_EXECUTABLE
-                       | PteFlags::WRITABLE;
-
         let mut map_dist = |gicd_base| -> Result<BorrowedMappedPages<GicRegisters, Mutable>, &'static str>  {
             let pages = allocate_pages(1).ok_or("couldn't allocate pages for the distributor interface")?;
             let frames = allocate_frames_at(gicd_base, 1)?;
-            let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+            let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
             mapped.into_borrowed_mut(0).map_err(|(_, e)| e)
         };
 
@@ -284,7 +280,7 @@ impl ArmGic {
                 let mut processor: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the CPU interface")?;
                     let frames = allocate_frames_at(cpu, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                    let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
@@ -299,7 +295,7 @@ impl ArmGic {
                 let dist_extended: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended distributor interface")?;
                     let frames = allocate_frames_at(dist + DIST_P6_OFFSET, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                    let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
@@ -309,7 +305,7 @@ impl ArmGic {
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
                         let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
                         let frames = allocate_frames_at(phys_addr, 1)?;
-                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                         mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                     };
 
@@ -318,7 +314,7 @@ impl ArmGic {
                     let redist_sgippi = {
                         let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
                         let frames = allocate_frames_at(phys_addr + REDIST_SGIPPI_OFFSET, 1)?;
-                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                         mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                     };
 

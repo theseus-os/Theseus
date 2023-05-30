@@ -14,7 +14,7 @@ use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
-use memory::PhysicalAddress;
+use memory::{PhysicalAddress, MappedPages, map_frame_range, MMIO_FLAGS};
 use bit_field::BitField;
 
 // The below constants define the PCI configuration space. 
@@ -498,6 +498,16 @@ impl PciDevice {
         // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
         Ok(())  
+    }
+
+    /// Maps device memory specified by a Base Address Register.
+    /// 
+    /// # Arguments 
+    /// * `bar_index`: index of the Base Address Register to use
+    pub fn pci_map_bar_mem(&self, bar_index: usize) -> Result<MappedPages, &'static str> {
+        let mem_base = self.determine_mem_base(bar_index)?;
+        let mem_size = self.determine_mem_size(bar_index);
+        map_frame_range(mem_base, mem_size as usize, MMIO_FLAGS)
     }
 }
 

@@ -29,9 +29,9 @@ extern crate mpmc;
 use spin::Once; 
 use alloc::vec::Vec;
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedMappedPages, Mutable};
+use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, map_frame_range, BorrowedMappedPages, Mutable, MMIO_FLAGS};
 use pci::PciDevice;
-use nic_initialization::{NIC_MAPPING_FLAGS, allocate_memory, init_rx_buf_pool};
+use nic_initialization::init_rx_buf_pool;
 use mlx_ethernet::{
     command_queue::{AccessRegisterOpMod, CommandBuilder, CommandOpcode, CommandQueue, CommandQueueEntry, HCACapabilities, ManagePagesOpMod, QueryHcaCapCurrentOpMod, QueryHcaCapMaxOpMod, QueryPagesOpMod}, 
     completion_queue::{CompletionQueue, CompletionQueueEntry, CompletionQueueDoorbellRecord}, 
@@ -175,7 +175,7 @@ impl ConnectX5Nic {
         trace!("total size in bytes of cmdq = {}", size_in_bytes_of_cmdq);
     
         // allocate mapped pages for the command queue
-        let (cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, NIC_MAPPING_FLAGS)?;
+        let (cmdq_mapped_pages, cmdq_starting_phys_addr) = create_contiguous_mapping(size_in_bytes_of_cmdq, MMIO_FLAGS)?;
         trace!("cmdq mem base = {}", cmdq_starting_phys_addr);
     
         // cast our physically-contiguous MappedPages into a slice of command queue entries
@@ -364,7 +364,7 @@ impl ConnectX5Nic {
         // execute CREATE_EQ for page request event
         // 1. Allocate pages for EQ
         let num_eq_entries = 64;
-        let (eq_mp, eq_pa) = create_contiguous_mapping(num_eq_entries * core::mem::size_of::<EventQueueEntry>(), NIC_MAPPING_FLAGS)?;
+        let (eq_mp, eq_pa) = create_contiguous_mapping(num_eq_entries * core::mem::size_of::<EventQueueEntry>(), MMIO_FLAGS)?;
     
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateEq)
@@ -410,10 +410,10 @@ impl ConnectX5Nic {
         // execute CREATE_CQ for SQ 
 
         // 1. Allocate pages for CQ
-        let (cq_mp, cq_pa) = create_contiguous_mapping(NUM_CQ_ENTRIES_SEND * core::mem::size_of::<CompletionQueueEntry>(), NIC_MAPPING_FLAGS)?;
+        let (cq_mp, cq_pa) = create_contiguous_mapping(NUM_CQ_ENTRIES_SEND * core::mem::size_of::<CompletionQueueEntry>(), MMIO_FLAGS)?;
 
         // 2. Allocate page for doorbell
-        let (db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::<CompletionQueueDoorbellRecord>(), NIC_MAPPING_FLAGS)?;
+        let (db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::<CompletionQueueDoorbellRecord>(), MMIO_FLAGS)?;
         
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
@@ -439,9 +439,9 @@ impl ConnectX5Nic {
 
         // 1. Allocate pages for CQ
         let cq_entries_r = num_rx_descs; 
-        let (cq_mp, cq_pa) = create_contiguous_mapping(cq_entries_r * core::mem::size_of::<CompletionQueueEntry>(), NIC_MAPPING_FLAGS)?;
+        let (cq_mp, cq_pa) = create_contiguous_mapping(cq_entries_r * core::mem::size_of::<CompletionQueueEntry>(), MMIO_FLAGS)?;
         // 2. Allocate page for doorbell
-        let (db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::<CompletionQueueDoorbellRecord>(), NIC_MAPPING_FLAGS)?;
+        let (db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::<CompletionQueueDoorbellRecord>(), MMIO_FLAGS)?;
         
         let completed_cmd = cmdq.create_and_execute_command(
             CommandBuilder::new(CommandOpcode::CreateCq) 
@@ -467,7 +467,7 @@ impl ConnectX5Nic {
         trace!("CreateTis: {:?}, tisn: {:?}", status, tisn);
 
         // Allocate pages for RQ and SQ, they have to be contiguous      
-        let (q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, NIC_MAPPING_FLAGS)?;
+        let (q_mp, q_pa) = create_contiguous_mapping(rq_size_in_bytes + sq_size_in_bytes, MMIO_FLAGS)?;
         let vaddr = q_mp.start_address();
         let (rq_mp, sq_mp) = q_mp.split(memory_structs::Page::containing_address(vaddr + rq_size_in_bytes))
             .map_err(|_e| "Could not split MappedPages")?;
@@ -475,13 +475,13 @@ impl ConnectX5Nic {
         debug!("RQ paddr: {:?}, SQ paddr: {:?}, RQ vaddr: {:?}, SQ vaddr: {:?}", q_pa, sq_pa, rq_mp.start_address(), sq_mp.start_address());
 
         // Allocate page for SQ/RQ doorbell
-        let (db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::<DoorbellRecord>(), NIC_MAPPING_FLAGS)?;
+        let (db_page, db_pa) = create_contiguous_mapping(core::mem::size_of::<DoorbellRecord>(), MMIO_FLAGS)?;
         debug!("doorbell: {:#x}", db_pa);
 
         // Allocate page for UAR. 
         // For the given uar number i, the page is the ith page from the memory base retrieved from the PCI BAR
         let uar_mem_base = mem_base + ((uar as usize) * PAGE_SIZE);
-        let uar_page = allocate_memory(uar_mem_base, PAGE_SIZE)?;
+        let uar_page = map_frame_range(uar_mem_base, PAGE_SIZE, MMIO_FLAGS)?;
         debug!("mmio: {:?}, uar: {:?}", mem_base, uar_mem_base);
 
         // Create the SQ
@@ -642,7 +642,7 @@ impl ConnectX5Nic {
     
     /// Returns the memory-mapped initialization segment of the NIC
     fn map_init_segment(mem_base: PhysicalAddress) -> Result<BorrowedMappedPages<InitializationSegment, Mutable>, &'static str> {
-        allocate_memory(mem_base, core::mem::size_of::<InitializationSegment>())?
+        map_frame_range(mem_base, core::mem::size_of::<InitializationSegment>(), MMIO_FLAGS)?
             .into_borrowed_mut(0)
             .map_err(|(_mp, err)| err)
     }
@@ -653,7 +653,7 @@ impl ConnectX5Nic {
         let mut mp = Vec::with_capacity(num_pages);
         let mut paddr = Vec::with_capacity(num_pages);
         for _ in 0..num_pages {
-            let (page, pa) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+            let (page, pa) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)?;
             mp.push(page);
             paddr.push(pa);
         }

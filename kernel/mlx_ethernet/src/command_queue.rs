@@ -4,12 +4,11 @@
 #![allow(clippy::upper_case_acronyms)]
 
 use alloc::{vec::Vec, boxed::Box};
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 use volatile::{ReadOnly,Volatile};
 use bit_field::BitField;
 use zerocopy::{U32, FromBytes};
 use byteorder::BigEndian;
-use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 use num_enum::TryFromPrimitive;
@@ -720,7 +719,7 @@ impl CommandQueue {
         // start off by pre-allocating one page per entry
         let mut mailbox_buffers= Vec::with_capacity(num_cmdq_entries);
         for _ in 0..num_cmdq_entries {
-            let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+            let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)?;
             mailbox_buffers.push(MailboxBuffer{mp, addr});
         }
 
@@ -974,7 +973,7 @@ impl CommandQueue {
             if let Some(mb_buffer) = self.mailbox_buffers.pop() {
                 command_mailbox_buffers.push(mb_buffer);
             } else {
-                let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)
+                let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)
                     .map_err(|_e| CommandQueueError::PageAllocationFailed)?;
                 command_mailbox_buffers.push(MailboxBuffer{mp, addr});
             }

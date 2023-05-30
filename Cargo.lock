@@ -2100,7 +2100,6 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "nic_initialization",
  "num_enum",
  "volatile 0.2.7",
  "zerocopy",
@@ -2377,7 +2376,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "pci",
  "volatile 0.2.7",
 ]
 
