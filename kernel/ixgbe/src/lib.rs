@@ -986,12 +986,11 @@ impl IxgbeNic {
     /// Sets up DCA for the rx queues that have been enabled.
     /// You can optionally choose to have the descriptor, header and payload copied to the cache for each received packet
     fn enable_rx_dca(
-        rx_queues: &mut Vec<RxQueue<IxgbeRxQueueRegisters,AdvancedRxDescriptor>>
+        rx_queues: &mut Vec<RxQueue<IxgbeRxQueueRegisters, AdvancedRxDescriptor>>
     ) -> Result<(), &'static str> {
 
         for rxq in rx_queues {            
             // the cpu id will tell which cache the data will need to be written to
-            // TODO: choose a better default value
             let cpu_id = match rxq.cpu_id {
                 Some(cpu_id) => cpu_id,
                 None => cpu::bootstrap_cpu().ok_or("Couldn't read BSP CpuId")?,
@@ -1173,7 +1172,6 @@ impl IxgbeNic {
 
             // find core to redirect interrupt to
             // we assume that the number of msi vectors are equal to the number of rx queues
-            // TODO: choose a better default value
             let cpu_id = match rxq[i].cpu_id {
                 Some(cpu_id) => cpu_id,
                 None => cpu::bootstrap_cpu().ok_or("Couldn't read BSP CpuId")?,

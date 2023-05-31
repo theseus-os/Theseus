@@ -274,7 +274,7 @@ impl E1000Nic {
             e1000_handler,
             poll_interface,
             interface,
-            Some(format!("e1000_deferred_task_irq_{:?}", self.interrupt_num)),
+            Some(format!("e1000_deferred_task_irq_{:#X}", self.interrupt_num)),
         )
         .map_err(|error| {
             error!("error registering e1000 handler: {:?}", error);
@@ -493,7 +493,6 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }
-
         eoi(Some(e1000_nic.interrupt_num));
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");

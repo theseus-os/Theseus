@@ -536,7 +536,7 @@ impl PciDevice {
     }
 
     /// Maps device memory specified by a Base Address Register.
-    /// 
+    ///
     /// # Arguments 
     /// * `bar_index`: index of the Base Address Register to use
     pub fn pci_map_bar_mem(&self, bar_index: usize) -> Result<MappedPages, &'static str> {
@@ -545,9 +545,9 @@ impl PciDevice {
         map_frame_range(mem_base, mem_size as usize, MMIO_FLAGS)
     }
 
-    /// Reads the `PCI_INTERRUPT_LINE` & `PCI_INTERRUPT_PIN` registers
+    /// Reads and returns this PCI device's interrupt line and interrupt pin registers.
     ///
-    /// Returns an error if PCI_INTERRUPT_PIN contains a value > 4.
+    /// Returns an error if this PCI device's interrupt pin value is invalid (greater than 4).
     pub fn pci_get_interrupt_info(&self) -> Result<(Option<u8>, Option<InterruptPin>), &'static str> {
         let int_line = match self.pci_read_8(PCI_INTERRUPT_LINE) {
             0xff => None,
@@ -590,32 +590,30 @@ pub enum PciConfigSpaceAccessMechanism {
 
 /// A memory-mapped array of [`MsixVectorEntry`]
 pub struct MsixVectorTable {
-    inner: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>,
+    entries: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>,
 }
 
 impl MsixVectorTable {
-    pub fn new(inner: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>) -> Self {
-        Self {
-            inner,
-        }
+    pub fn new(entries: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>) -> Self {
+        Self { entries }
     }
 }
-
 impl Deref for MsixVectorTable {
     type Target = [MsixVectorEntry];
     fn deref(&self) -> &Self::Target {
-        &self.inner
+        &self.entries
     }
 }
-
 impl DerefMut for MsixVectorTable {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.inner
+        &mut self.entries
     }
 }
 
 /// A single Message Signaled Interrupt entry.
-/// It contains the interrupt number for this vector and the core this interrupt is redirected to.
+///
+/// This entry contains the interrupt's IRQ vector number
+/// and the CPU to which the interrupt will be delivered.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct MsixVectorEntry {
@@ -638,7 +636,7 @@ impl MsixVectorEntry {
         self.vector_control.write(MSIX_UNMASK_INT);
         let lower_addr = self.msg_lower_addr.read();
 
-        // set the core to which this interrupt will be sent
+        // set the CPU to which this interrupt will be delivered.
         let dest_id = (cpu_id.into_u8() as u32) << MSIX_DEST_ID_SHIFT;
         let address = lower_addr & !MSIX_ADDRESS_BITS;
         self.msg_lower_addr.write(address | MSIX_INTERRUPT_REGION | dest_id); 
@@ -648,14 +646,14 @@ impl MsixVectorEntry {
 
         if false {
             let control = self.vector_control.read();
-            debug!("Created MSI vector: control: {}, core: {}, int: {}", control, cpu_id, int_num);
+            debug!("Created MSI vector: control: {}, CPU: {}, int: {}", control, cpu_id, int_num);
         }
     }
 }
 
 /// A constant which indicates the region that is reserved for interrupt messages
 const MSIX_INTERRUPT_REGION:    u32 = 0xFEE << 20;
-/// The location in the lower address register where the destination core id is written
+/// The location in the lower address register where the destination CPU ID is written
 const MSIX_DEST_ID_SHIFT:       u32 = 12;
 /// The bits in the lower address register that need to be cleared and set
 const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
