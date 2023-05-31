@@ -1,4 +1,4 @@
-use memory::{map_frame_range, MappedPages, PAGE_SIZE, MMIO_FLAGS};
+use memory::{MappedPages, PAGE_SIZE, map_frame_range, MMIO_FLAGS};
 use super::{TriState, SerialPortInterruptEvent};
 use arm_boards::BOARD_CONFIG;
 use pl011::PL011;
@@ -59,7 +59,6 @@ impl SerialPort {
 
         let mapped_pages = map_frame_range(*mmio_base, PAGE_SIZE, MMIO_FLAGS)
             .expect("serial_port_basic: couldn't map the UART interface");
-
         let addr = mapped_pages.start_address().value();
         let mut pl011 = PL011::new(addr as *mut _);
 
