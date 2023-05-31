@@ -172,6 +172,8 @@
 <a href="#172" id="172">172</a>
 <a href="#173" id="173">173</a>
 <a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Defines the receive and transmit queues that store a ring of DMA descriptors and related information.
 //! 
 //! Receive and transmit queues are used across all NICs to keep track of incoming and outgoing packets.
@@ -187,6 +189,7 @@
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>intel_ethernet;
 <span class="kw">extern crate </span>nic_buffers;
+<span class="kw">extern crate </span>cpu;
 
 <span class="kw">use </span>alloc::{
     vec::Vec,
@@ -195,6 +198,7 @@
 <span class="kw">use </span>memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 <span class="kw">use </span>intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 <span class="kw">use </span>nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
+<span class="kw">use </span>cpu::CpuId;
 
 <span class="doccomment">/// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
@@ -241,7 +245,7 @@
     </span><span class="kw">pub </span>received_frames: VecDeque&lt;ReceivedFrame&gt;,
     <span class="doccomment">/// The cpu which this queue is mapped to. 
     /// This in itself doesn&#39;t guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.
-    </span><span class="kw">pub </span>cpu_id: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    </span><span class="kw">pub </span>cpu_id: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
     <span class="doccomment">/// Pool where `ReceiveBuffer`s are stored.
     </span><span class="kw">pub </span>rx_buffer_pool: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>mpmc::Queue&lt;ReceiveBuffer&gt;,
     <span class="doccomment">/// The filter id for the physical NIC filter that is set for this queue
@@ -325,7 +329,7 @@
     </span><span class="kw">pub </span>tx_cur: u16,
     <span class="doccomment">/// The cpu which this queue is mapped to. 
     /// This in itself doesn&#39;t guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
-    </span><span class="kw">pub </span>cpu_id : <span class="prelude-ty">Option</span>&lt;u8&gt;
+    </span><span class="kw">pub </span>cpu_id: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
 }
 
 <span class="kw">impl</span>&lt;S: TxQueueRegisters, T: TxDescriptor&gt; TxQueue&lt;S,T&gt; {

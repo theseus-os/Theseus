@@ -383,6 +383,7 @@
 <a href="#383" id="383">383</a>
 <a href="#384" id="384">384</a>
 <a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
 </pre><pre class="rust"><code><span class="kw">pub use </span>pic::IRQ_BASE_OFFSET;
 
 <span class="comment">// use rtc;
@@ -393,8 +394,9 @@
 <span class="kw">use </span>memory::VirtualAddress;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>early_printer::println;
+
 <span class="kw">pub use </span>x86_64::structures::idt::{InterruptStackFrame, HandlerFunc <span class="kw">as </span>InterruptHandler};
-<span class="kw">pub use </span>core::primitive::u8 <span class="kw">as </span>InterruptNumber;
+<span class="kw">pub type </span>InterruptNumber = u8;
 
 <span class="doccomment">/// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.

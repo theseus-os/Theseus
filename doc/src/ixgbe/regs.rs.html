@@ -550,39 +550,6 @@
 <a href="#550" id="550">550</a>
 <a href="#551" id="551">551</a>
 <a href="#552" id="552">552</a>
-<a href="#553" id="553">553</a>
-<a href="#554" id="554">554</a>
-<a href="#555" id="555">555</a>
-<a href="#556" id="556">556</a>
-<a href="#557" id="557">557</a>
-<a href="#558" id="558">558</a>
-<a href="#559" id="559">559</a>
-<a href="#560" id="560">560</a>
-<a href="#561" id="561">561</a>
-<a href="#562" id="562">562</a>
-<a href="#563" id="563">563</a>
-<a href="#564" id="564">564</a>
-<a href="#565" id="565">565</a>
-<a href="#566" id="566">566</a>
-<a href="#567" id="567">567</a>
-<a href="#568" id="568">568</a>
-<a href="#569" id="569">569</a>
-<a href="#570" id="570">570</a>
-<a href="#571" id="571">571</a>
-<a href="#572" id="572">572</a>
-<a href="#573" id="573">573</a>
-<a href="#574" id="574">574</a>
-<a href="#575" id="575">575</a>
-<a href="#576" id="576">576</a>
-<a href="#577" id="577">577</a>
-<a href="#578" id="578">578</a>
-<a href="#579" id="579">579</a>
-<a href="#580" id="580">580</a>
-<a href="#581" id="581">581</a>
-<a href="#582" id="582">582</a>
-<a href="#583" id="583">583</a>
-<a href="#584" id="584">584</a>
-<a href="#585" id="585">585</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This file contains the structs that are used to access device registers and contains configuration values to write to registers.
 //! 
 //! The registers are divided into multiple structs because we need to separate out the 
@@ -1135,38 +1102,5 @@
 <span class="doccomment">/// The number of msi-x vectors this device can have. 
 /// It can be set from PCI space, but we took the value from the data sheet.
 </span><span class="kw">pub const </span>IXGBE_MAX_MSIX_VECTORS:     usize = <span class="number">64</span>;
-
-<span class="doccomment">/// Table that contains msi-x vector entries. 
-/// It is mapped to a physical memory region specified by the BAR from the PCI space.
-</span><span class="attr">#[derive(FromBytes)]
-#[repr(C)]
-</span><span class="kw">pub struct </span>MsixVectorTable {
-    <span class="kw">pub </span>msi_vector:     [MsixVectorEntry; IXGBE_MAX_MSIX_VECTORS],
-}
-
-<span class="doccomment">/// A single Message Signaled Interrupt entry.
-/// It contains the interrupt number for this vector and the core this interrupt is redirected to.
-</span><span class="attr">#[derive(FromBytes)]
-#[repr(C)]
-</span><span class="kw">pub struct </span>MsixVectorEntry {
-    <span class="doccomment">/// The lower portion of the address for the memory write transaction.
-    /// This part contains the CPU ID which the interrupt will be redirected to.
-    </span><span class="kw">pub </span>msg_lower_addr:         Volatile&lt;u32&gt;,
-    <span class="doccomment">/// The upper portion of the address for the memory write transaction.
-    </span><span class="kw">pub </span>msg_upper_addr:         Volatile&lt;u32&gt;,
-    <span class="doccomment">/// The data portion of the msi vector which contains the interrupt number.
-    </span><span class="kw">pub </span>msg_data:               Volatile&lt;u32&gt;,
-    <span class="doccomment">/// The control portion which contains the interrupt mask bit.
-    </span><span class="kw">pub </span>vector_control:         Volatile&lt;u32&gt;,
-}
-
-<span class="doccomment">/// A constant which indicates the region that is reserved for interrupt messages
-</span><span class="kw">pub const </span>MSIX_INTERRUPT_REGION:    u32 = <span class="number">0xFEE </span>&lt;&lt; <span class="number">20</span>;
-<span class="doccomment">/// The location in the lower address register where the destination core id is written
-</span><span class="kw">pub const </span>MSIX_DEST_ID_SHIFT:       u32 = <span class="number">12</span>;
-<span class="doccomment">/// The bits in the lower address register that need to be cleared and set
-</span><span class="kw">pub const </span>MSIX_ADDRESS_BITS:        u32 = <span class="number">0xFFFF_FFF0</span>;
-<span class="doccomment">/// Clear the vector control field to unmask the interrupt
-</span><span class="kw">pub const </span>MSIX_UNMASK_INT:          u32 = <span class="number">0</span>;
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="ixgbe" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

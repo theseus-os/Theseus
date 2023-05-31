@@ -1306,32 +1306,6 @@
 <a href="#1306" id="1306">1306</a>
 <a href="#1307" id="1307">1307</a>
 <a href="#1308" id="1308">1308</a>
-<a href="#1309" id="1309">1309</a>
-<a href="#1310" id="1310">1310</a>
-<a href="#1311" id="1311">1311</a>
-<a href="#1312" id="1312">1312</a>
-<a href="#1313" id="1313">1313</a>
-<a href="#1314" id="1314">1314</a>
-<a href="#1315" id="1315">1315</a>
-<a href="#1316" id="1316">1316</a>
-<a href="#1317" id="1317">1317</a>
-<a href="#1318" id="1318">1318</a>
-<a href="#1319" id="1319">1319</a>
-<a href="#1320" id="1320">1320</a>
-<a href="#1321" id="1321">1321</a>
-<a href="#1322" id="1322">1322</a>
-<a href="#1323" id="1323">1323</a>
-<a href="#1324" id="1324">1324</a>
-<a href="#1325" id="1325">1325</a>
-<a href="#1326" id="1326">1326</a>
-<a href="#1327" id="1327">1327</a>
-<a href="#1328" id="1328">1328</a>
-<a href="#1329" id="1329">1329</a>
-<a href="#1330" id="1330">1330</a>
-<a href="#1331" id="1331">1331</a>
-<a href="#1332" id="1332">1332</a>
-<a href="#1333" id="1333">1333</a>
-<a href="#1334" id="1334">1334</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An ixgbe driver for a 82599 10GbE Network Interface Card.
 //! 
 //! Currently we support basic send and receive, Receive Side Scaling (RSS), 5-tuple filters, and MSI interrupts. 
@@ -1356,7 +1330,7 @@
 <span class="kw">extern crate </span>bit_field;
 <span class="kw">extern crate </span>interrupts;
 <span class="kw">extern crate </span>pic;
-<span class="kw">extern crate </span>acpi;
+<span class="kw">extern crate </span>cpu;
 <span class="kw">extern crate </span>volatile;
 <span class="kw">extern crate </span>mpmc;
 <span class="kw">extern crate </span>rand;
@@ -1388,7 +1362,7 @@
 };
 <span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages, map_frame_range, MMIO_FLAGS};
-<span class="kw">use </span>pci::{PciDevice, MSIX_CAPABILITY, PciConfigSpaceAccessMechanism, PciLocation};
+<span class="kw">use </span>pci::{PciDevice, MsixVectorTable, PciConfigSpaceAccessMechanism, PciLocation};
 <span class="kw">use </span>bit_field::BitField;
 <span class="kw">use </span>interrupts::{register_msi_interrupt, InterruptHandler};
 <span class="kw">use </span>hpet::get_hpet;
@@ -1499,7 +1473,7 @@
     <span class="doccomment">/// Memory-mapped control registers
     </span>regs_mac: BorrowedMappedPages&lt;IntelIxgbeMacRegisters, Mutable&gt;,
     <span class="doccomment">/// Memory-mapped msi-x vector table
-    </span>msix_vector_table: BorrowedMappedPages&lt;MsixVectorTable, Mutable&gt;,
+    </span>msix_vector_table: MsixVectorTable,
     <span class="doccomment">/// Array to store which L3/L4 5-tuple filters have been used.
     /// There are 128 such filters available.
     </span>l34_5_tuple_filters: [bool; <span class="number">128</span>],
@@ -1650,7 +1624,7 @@
             <span class="kw-2">mut </span>rx_mapped_registers, <span class="kw-2">mut </span>tx_mapped_registers) = <span class="self">Self</span>::mapped_reg(mem_base)<span class="question-mark">?</span>;
 
         <span class="comment">// map the msi-x vector table to an address found from the pci space
-        </span><span class="kw">let </span><span class="kw-2">mut </span>vector_table = <span class="self">Self</span>::mem_map_msix(ixgbe_pci_dev)<span class="question-mark">?</span>;
+        </span><span class="kw">let </span><span class="kw-2">mut </span>vector_table = ixgbe_pci_dev.pci_mem_map_msix(IXGBE_MAX_MSIX_VECTORS)<span class="question-mark">?</span>;
 
         <span class="comment">// link initialization
         </span><span class="self">Self</span>::start_link(<span class="kw-2">&amp;mut </span>mapped_registers1, <span class="kw-2">&amp;mut </span>mapped_registers2, <span class="kw-2">&amp;mut </span>mapped_registers3, <span class="kw-2">&amp;mut </span>mapped_registers_mac)<span class="question-mark">?</span>;
@@ -1680,7 +1654,7 @@
                 rx_bufs_in_use: rx_buffers.remove(<span class="number">0</span>),  
                 rx_buffer_size_bytes: rx_buffer_size_kbytes <span class="kw">as </span>u16 * <span class="number">1024</span>,
                 received_frames: VecDeque::new(),
-                cpu_id : <span class="prelude-val">None</span>,
+                cpu_id: <span class="prelude-val">None</span>,
                 rx_buffer_pool: <span class="kw-2">&amp;</span>RX_BUFFER_POOL,
                 filter_num: <span class="prelude-val">None
             </span>};
@@ -1702,7 +1676,7 @@
                 tx_descs: tx_descs.remove(<span class="number">0</span>),
                 num_tx_descs: num_tx_descriptors,
                 tx_cur: <span class="number">0</span>,
-                cpu_id : <span class="prelude-val">None</span>,
+                cpu_id: <span class="prelude-val">None</span>,
             };
             tx_queues.push(tx_queue);
             id += <span class="number">1</span>;
@@ -1874,29 +1848,6 @@
             );
         }
         pointers_to_queues
-    }
-
-    <span class="doccomment">/// Returns the memory mapped msix vector table
-    </span><span class="kw">pub fn </span>mem_map_msix(dev: <span class="kw-2">&amp;</span>PciDevice) -&gt; <span class="prelude-ty">Result</span>&lt;BorrowedMappedPages&lt;MsixVectorTable, Mutable&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// retreive the address in the pci config space for the msi-x capability
-        </span><span class="kw">let </span>cap_addr = dev.find_pci_capability(MSIX_CAPABILITY).ok_or(<span class="string">&quot;ixgbe: device does not have MSI-X capability&quot;</span>)<span class="question-mark">?</span>;
-        <span class="comment">// find the BAR used for msi-x
-        </span><span class="kw">let </span>vector_table_offset = <span class="number">4</span>;
-        <span class="kw">let </span>table_offset = dev.pci_read_32(cap_addr + vector_table_offset);
-        <span class="kw">let </span>bar = table_offset &amp; <span class="number">0x7</span>;
-        <span class="kw">let </span>offset = table_offset &gt;&gt; <span class="number">3</span>;
-        <span class="comment">// find the memory base address and size of the area for the vector table
-        </span><span class="kw">let </span>mem_base = PhysicalAddress::new((dev.bars[bar <span class="kw">as </span>usize] + offset) <span class="kw">as </span>usize)
-            .ok_or(<span class="string">&quot;ixgbe: the mem_base physical address specified in the BAR was invalid&quot;</span>)<span class="question-mark">?</span>;
-        <span class="kw">let </span>mem_size_in_bytes = core::mem::size_of::&lt;MsixVectorEntry&gt;() * IXGBE_MAX_MSIX_VECTORS;
-
-        <span class="comment">// debug!(&quot;msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes&quot;, bar, mem_base, mem_size_in_bytes);
-
-        </span><span class="kw">let </span>msix_mapped_pages = map_frame_range(mem_base, mem_size_in_bytes, MMIO_FLAGS)<span class="question-mark">?</span>;
-        <span class="kw">let </span>vector_table = BorrowedMappedPages::from_mut(msix_mapped_pages, <span class="number">0</span>)
-            .map_err(|(_mp, err)| err)<span class="question-mark">?</span>;
-
-        <span class="prelude-val">Ok</span>(vector_table)
     }
 
     <span class="kw">pub fn </span>spoof_mac(<span class="kw-2">&amp;mut </span><span class="self">self</span>, spoofed_mac_addr: [u8; <span class="number">6</span>]) {
@@ -2343,13 +2294,15 @@
     <span class="doccomment">/// Sets up DCA for the rx queues that have been enabled.
     /// You can optionally choose to have the descriptor, header and payload copied to the cache for each received packet
     </span><span class="kw">fn </span>enable_rx_dca(
-        rx_queues: <span class="kw-2">&amp;mut </span>Vec&lt;RxQueue&lt;IxgbeRxQueueRegisters,AdvancedRxDescriptor&gt;&gt;
+        rx_queues: <span class="kw-2">&amp;mut </span>Vec&lt;RxQueue&lt;IxgbeRxQueueRegisters, AdvancedRxDescriptor&gt;&gt;
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
         <span class="kw">for </span>rxq <span class="kw">in </span>rx_queues {            
             <span class="comment">// the cpu id will tell which cache the data will need to be written to
-            // TODO: choose a better default value
-            </span><span class="kw">let </span>cpu_id = rxq.cpu_id.unwrap_or(<span class="number">0</span>) <span class="kw">as </span>u32;
+            </span><span class="kw">let </span>cpu_id = <span class="kw">match </span>rxq.cpu_id {
+                <span class="prelude-val">Some</span>(cpu_id) =&gt; cpu_id,
+                <span class="prelude-val">None </span>=&gt; cpu::bootstrap_cpu().ok_or(<span class="string">&quot;Couldn&#39;t read BSP CpuId&quot;</span>)<span class="question-mark">?</span>,
+            }.into_u8() <span class="kw">as </span>u32;
             
             <span class="comment">// currently allowing only write of rx descriptors to cache since packet payloads are very large
             // A note from linux ixgbe driver: 
@@ -2527,17 +2480,12 @@
 
             <span class="comment">// find core to redirect interrupt to
             // we assume that the number of msi vectors are equal to the number of rx queues
-            // TODO: choose a better default value
-            </span><span class="kw">let </span>core_id = rxq[i].cpu_id.unwrap_or(<span class="number">0</span>) <span class="kw">as </span>u32;
-            <span class="comment">// unmask the interrupt
-            </span>vector_table.msi_vector[i].vector_control.write(MSIX_UNMASK_INT);
-            <span class="kw">let </span>lower_addr = vector_table.msi_vector[i].msg_lower_addr.read();
-            <span class="comment">// set the core to which this interrupt will be sent
-            </span>vector_table.msi_vector[i].msg_lower_addr.write((lower_addr &amp; !MSIX_ADDRESS_BITS) | MSIX_INTERRUPT_REGION | (core_id &lt;&lt; MSIX_DEST_ID_SHIFT)); 
-            <span class="comment">//allocate an interrupt to msix vector            
-            </span>vector_table.msi_vector[i].msg_data.write(msi_int_num <span class="kw">as </span>u32);
-            <span class="comment">// debug!(&quot;Created MSI vector: control: {}, core: {}, int: {}&quot;, vector_table.msi_vector[i].vector_control.read(), core_id, interrupt_nums[i]);
-        </span>}
+            </span><span class="kw">let </span>cpu_id = <span class="kw">match </span>rxq[i].cpu_id {
+                <span class="prelude-val">Some</span>(cpu_id) =&gt; cpu_id,
+                <span class="prelude-val">None </span>=&gt; cpu::bootstrap_cpu().ok_or(<span class="string">&quot;Couldn&#39;t read BSP CpuId&quot;</span>)<span class="question-mark">?</span>,
+            };
+            vector_table[i].init(cpu_id, msi_int_num);
+        }
 
         <span class="prelude-val">Ok</span>(interrupt_nums)
     }
