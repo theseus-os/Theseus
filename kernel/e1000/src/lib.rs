@@ -37,7 +37,7 @@ use irq_safety::MutexIrqSafe;
 use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_frame_range, MMIO_FLAGS};
 use pci::{PciDevice, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
-use interrupts::eoi;
+use interrupts::{eoi, InterruptNumber};
 use x86_64::structures::idt::InterruptStackFrame;
 use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{init_rx_buf_pool, init_rx_queue, init_tx_queue};
@@ -128,14 +128,14 @@ impl TxQueueRegisters for E1000TxQueueRegisters {
 pub struct E1000Nic {
     /// Type of BAR0
     bar_type: u8,
-    /// MMIO Base Address
-    mem_base: PhysicalAddress,
-    ///interrupt number
-    interrupt_num: Option<u8>,
+    /// The interrupt vector number used by this device to trigger interrupts.
+    interrupt_num: InterruptNumber,
     /// The actual MAC address burnt into the hardware of this E1000 NIC.
     mac_hardware: [u8; 6],
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
+    /// MMIO Base Address
+    mem_base: PhysicalAddress,
     /// Receive queue with descriptors
     rx_queue: RxQueue<E1000RxQueueRegisters, LegacyRxDescriptor>,
     /// Transmit queue with descriptors
@@ -181,8 +181,10 @@ impl E1000Nic {
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let (interrupt_line, _) = e1000_pci_dev.pci_get_interrupt_info()?;
-        let interrupt_num = interrupt_line.map(|int_line| int_line + IRQ_BASE_OFFSET);
+        let interrupt_num = match e1000_pci_dev.pci_get_interrupt_info() {
+            Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
+            _ => return Err("e1000: PCI device had no interrupt number (IRQ vector)"),
+        };
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
@@ -266,21 +268,19 @@ impl E1000Nic {
         &mut self,
         interface: Arc<net::NetworkInterface>,
     ) -> Result<(), &'static str> {
-        if let Some(interrupt_num) = self.interrupt_num {
-            self.enable_interrupts();
-            let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
-                interrupt_num,
-                e1000_handler,
-                poll_interface,
-                interface,
-                Some(format!("e1000_deferred_task_irq_{:?}", self.interrupt_num)),
-            )
-            .map_err(|error| {
-                error!("error registering e1000 handler: {:?}", error);
-                "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
-            })?;
-            self.deferred_task = Some(deferred_task);
-        }
+        self.enable_interrupts();
+        let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
+            self.interrupt_num,
+            e1000_handler,
+            poll_interface,
+            interface,
+            Some(format!("e1000_deferred_task_irq_{:?}", self.interrupt_num)),
+        )
+        .map_err(|error| {
+            error!("error registering e1000 handler: {:?}", error);
+            "e1000 interrupt number was already in use! Sharing IRQs is currently unsupported."
+        })?;
+        self.deferred_task = Some(deferred_task);
 
         Ok(())
     }
@@ -494,14 +494,10 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }
 
-        let interrupt_num = e1000_nic.interrupt_num
-            .expect("If this code was reached, then that E1000 NIC must have an interrupt number");
-
-        eoi(Some(interrupt_num));
+        eoi(Some(e1000_nic.interrupt_num));
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }
-
 }
 
 /// This function is used as a deferred interrupt task.
