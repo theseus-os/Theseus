@@ -1647,8 +1647,8 @@ dependencies = [
 name = "ixgbe"
 version = "0.1.0"
 dependencies = [
- "acpi",
  "bit_field 0.7.0",
+ "cpu",
  "hashbrown",
  "hpet",
  "intel_ethernet",
@@ -2383,6 +2383,7 @@ dependencies = [
 name = "nic_queues"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "intel_ethernet",
  "log",
  "memory",
@@ -2609,10 +2610,14 @@ name = "pci"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
+ "cpu",
+ "interrupts",
  "log",
  "memory",
  "port_io",
  "spin 0.9.4",
+ "volatile 0.2.7",
+ "zerocopy",
 ]
 
 [[package]]
