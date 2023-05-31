@@ -7,8 +7,8 @@ version = "0.1.0"
 [dependencies.task]
 path = "../task"
 
-[dependencies.mutex_preemption]
-path = "../mutex_preemption"
+[dependencies.sync_preemption]
+path = "../sync_preemption"
 
 [dependencies.log]
 version = "0.4.8"

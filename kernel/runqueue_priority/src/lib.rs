@@ -7,7 +7,7 @@
 
 extern crate alloc;
 #[macro_use] extern crate log;
-extern crate mutex_preemption;
+extern crate sync_preemption;
 extern crate atomic_linked_list;
 extern crate task;
 
@@ -15,7 +15,7 @@ extern crate task;
 extern crate single_simd_task_optimization;
 
 use alloc::collections::VecDeque;
-use mutex_preemption::RwLockPreempt;
+use sync_preemption as preempt;
 use atomic_linked_list::atomic_map::AtomicMap;
 use task::TaskRef;
 use core::ops::{Deref, DerefMut};
@@ -82,7 +82,7 @@ impl PriorityTaskRef {
 
 /// There is one runqueue per core, each core only accesses its own private runqueue
 /// and allows the scheduler to select a task from that runqueue to schedule in.
-static RUNQUEUES: AtomicMap<u8, RwLockPreempt<RunQueue>> = AtomicMap::new();
+static RUNQUEUES: AtomicMap<u8, preempt::RwLock<RunQueue>> = AtomicMap::new();
 
 /// A list of references to `Task`s (`PriorityTaskRef`s) 
 /// that is used to store the `Task`s (and associated scheduler related data) 
@@ -130,7 +130,7 @@ impl RunQueue {
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
         trace!("Created runqueue (priority) for core {}", which_core);
-        let new_rq = RwLockPreempt::new(RunQueue {
+        let new_rq = preempt::RwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
@@ -146,7 +146,7 @@ impl RunQueue {
     }
 
     /// Returns `RunQueue` for the given core, which is an `apic_id`.
-    pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
+    pub fn get_runqueue(which_core: u8) -> Option<&'static preempt::RwLock<RunQueue>> {
         RUNQUEUES.get(&which_core)
     }
 
@@ -159,8 +159,8 @@ impl RunQueue {
 
     /// Returns the `RunQueue` for the "least busy" core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    fn get_least_busy_runqueue() -> Option<&'static RwLockPreempt<RunQueue>> {
-        let mut min_rq: Option<(&'static RwLockPreempt<RunQueue>, usize)> = None;
+    fn get_least_busy_runqueue() -> Option<&'static preempt::RwLock<RunQueue>> {
+        let mut min_rq: Option<(&'static preempt::RwLock<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
             let rq_size = rq.read().queue.len();
