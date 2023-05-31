@@ -1,0 +1,15 @@
+[package]
+name = "cls"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cfg-if = "1.0.0"
+cls_proc = { path = "cls_proc" }
+cpu = { path = "../cpu"}
+memory = { path = "../memory" }
+sync = { path = "../../libs/sync" }
+sync_spin = { path = "../../libs/sync_spin" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+x86_64 = "0.14.8"
