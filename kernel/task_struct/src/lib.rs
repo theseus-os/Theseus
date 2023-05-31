@@ -109,32 +109,35 @@ impl fmt::Display for KillReason {
 /// The two ways a `Task` can exit, including possible return values and conditions.
 #[derive(Debug)]
 pub enum ExitValue {
-    /// The `Task` ran to completion and returned the enclosed [`Any`] value.
+    /// The `Task` ran to completion
+    /// and returned the enclosed [`Any`] value from its entry point function.
     ///
-    /// The caller of this type should know what type this Task returned,
-    /// and should therefore be able to downcast it appropriately.
+    /// The caller of this task's entry point function should know which concrete type
+    /// this Task returned, and is thus able to downcast it appropriately.
     Completed(Box<dyn Any + Send>),
     /// The `Task` did NOT run to completion but was instead killed for the enclosed reason.
     Killed(KillReason),
 }
 
 
-/// The set of possible runstates that a `Task` can have.
+/// The set of possible runstates that a `Task` can be in.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RunState {
-    /// in the midst of setting up the task
+    /// This task is in the midst of being initialized/spawned.
     Initing,
-    /// able to be scheduled in, but not necessarily currently running. 
-    /// To check whether it is currently running, use [`is_running`](#method.is_running)
+    /// This task is able to be scheduled in, but not necessarily currently running.
+    /// To check whether it is currently running, use [`Task::is_running()`].
     Runnable,
-    /// blocked on something, like I/O or a wait event
+    /// This task is blocked on something and is *not* able to be scheduled in.
     Blocked,
-    /// The `Task` has exited and can no longer be run,
-    /// either by running to completion or being killed. 
+    /// This `Task` has exited and can no longer be run.
+    /// This covers both the case when a task ran to completion or was killed;
+    /// see [`ExitValue`] for more details.
     Exited,
-    /// This `Task` had already exited and its `ExitValue` has been taken;
-    /// its exit value can only be taken once, and consumed by another `Task`.
-    /// This `Task` is now useless, and can be deleted and removed from the Task list.
+    /// This `Task` had already exited, and now its [`ExitValue`] has been taken
+    /// (either by another task that `join`ed it, or by the system).
+    /// Because a task's exit value can only be taken once, a repaed task
+    /// is useless and will be cleaned up and removed from the system.
     Reaped,
 }
 

@@ -83,7 +83,7 @@ where
 
         MutexGuard {
             inner: ManuallyDrop::new(inner),
-            data: &self.data,
+            lock: self,
             _guard: guard,
         }
     }
@@ -95,7 +95,7 @@ where
     pub fn try_lock(&self) -> Option<MutexGuard<'_, T, F>> {
         F::try_lock(&self.inner, &self.data).map(|(inner, guard)| MutexGuard {
             inner: ManuallyDrop::new(inner),
-            data: &self.data,
+            lock: self,
             _guard: guard,
         })
     }
@@ -141,8 +141,19 @@ where
     F: MutexFlavor,
 {
     inner: ManuallyDrop<spin::MutexGuard<'a, T>>,
-    data: &'a F::LockData,
+    lock: &'a Mutex<T, F>,
     _guard: F::Guard,
+}
+
+impl<'a, T, F> MutexGuard<'a, T, F>
+where
+    T: ?Sized,
+    F: MutexFlavor,
+{
+    #[doc(hidden)]
+    pub fn mutex(&self) -> &'a Mutex<T, F> {
+        self.lock
+    }
 }
 
 impl<'a, T, F> fmt::Debug for MutexGuard<'a, T, F>
@@ -187,6 +198,6 @@ where
     #[inline]
     fn drop(&mut self) {
         unsafe { ManuallyDrop::drop(&mut self.inner) };
-        F::post_unlock(self.data);
+        F::post_unlock(&self.lock.data);
     }
 }

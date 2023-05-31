@@ -5,7 +5,6 @@ Heaps are used to dynamically allocate chunks of memory smaller than the granula
 
 In Theseus, the primary purpose of the heap is to enable the usage of Rust's [`alloc`] types, e.g., `Box`, `Arc`, `Vec`, and other dynamically-allocated collections types.
 Heap allocators must implement Rust's [`GlobalAlloc`] trait in order to be used as the backing allocator behind these `alloc` types.
- how we integrate that with Rust's (old) requirement of a single global allocator.
 
 ## Overview of Relevant Crates
 * [`heap`]: the default heap implementation that offers a static singleton fixed-size block allocator.
@@ -19,8 +18,8 @@ Heap allocators must implement Rust's [`GlobalAlloc`] trait in order to be used 
     * It is trivially easy to use `multiple_heaps` in a different way, such as per-task heaps or per-namespace heaps.
 
 
-One unique aspect of Theseus's "combination" heap design is that the early heap, fully-featured heap, and per-core dedicated heaps are all combined into a single heap abstraction that can be accessed via singleton global heap instance.
-It starts out with the simple block allocator described above, and then once more key system functionality has been initialized during OS boot, the [`switch_to_multiple_heaps()`] function is invoked to transparently activate the more complex, per-core heap allocators.
+One unique aspect of Theseus's "combination" heap design is that the early heap, fully-featured heap, and per-core dedicated heaps are all combined into a single heap abstraction that can be accessed via a singleton global heap instance.
+It starts out with the simple block allocator described above, and then, once more key system functionality has been initialized during OS boot, the [`switch_to_multiple_heaps()`] function is invoked to transparently activate the more complex, per-core heap allocators.
 
 Another unique aspect of heaps in Theseus is that all entities across the system use and share the same set of global heaps. This allows allocations to seamlessly flow and be passed among applications, libraries, and kernel entities without the need for inefficient and complex [exchange heaps] used in other SAS OSes. 
 

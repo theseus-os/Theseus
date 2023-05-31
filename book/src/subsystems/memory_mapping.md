@@ -73,7 +73,7 @@ These access methods ensure the aforementioned invariants of the `MappedPages` t
     * The same is true for slices: the number of elements of a sized type `T: Sized` plus the offset must not exceed the region's bounds.
 2. If a mutable reference is requested, the underlying memory region must have been mapped as writable.
     * The same is true for functions and executable memory regions.
-3. These methods all return *references* to the requested type or slice, in which the lifetime of the returned reference (`&T`, `in order to prevent use-after-free errors. 
+3. These methods all return *references* to the requested type or slice, in which the lifetime of the returned reference (`&T`) is dependent upon the lifetime of the `MappedPages` object, in order to statically prevent use-after-free errors.
     * One cannot obtain an owned instance of a type `T` from an underlying `MappedPages` memory region, because that would remove the semantic connection between the type `T` and the existence of the underlying memory mapping.
 
 In comparison, other OSes typically return raw virtual address values from a memory mapping operation, which you must then unsafely cast to a typed pointer of your choice. 
@@ -105,9 +105,9 @@ However, Theseus's design vastly simplifies the procedure of reclaiming unused p
 The single address space design and guaranteed bijective (1-to-1) mappings mean that a frame is mapped *exclusively* by a single page; when that page is no longer mapped to that frame, the frame can be deallocated.
 We refer to this as exclusive mappings, and they are realized via a combination of several crates:
 1. When frame(s) are unmapped in the [`page_table_entry`] crate, it creates an [`UnmapResult`] that may contain a set of [`UnmappedFrames`].
-    * The primary function of interest is [`PageTableEntry::set_unmapped()`](https://theseus-os.github.io/Theseus/doc/page_table_entry/struct.PageTableEntry.html#method.set_unmapped).
+    * The primary function of interest is [`PageTableEntry::set_unmapped()`].
 2. Using strong type safety, the [`frame_allocator`] is able to accept a set of `UnmappedFrames` as a trusted "token" stating that the included frames cannot possibly still be mapped by any pages. It can therefore safely deallocate them.
-    * Deallocation occurs seamlessly because an `UnmappedFrames` object can be converted into an `AllocatedFrames` object, [see here for details](https://theseus-os.github.io/Theseus/doc/src/frame_allocator/lib.rs.html#393).
+    * Deallocation occurs seamlessly because an `UnmappedFrames` object can be converted into an `AllocatedFrames` object, [see here for details and source].
 
 
 <!-- Links below -->
@@ -133,4 +133,6 @@ We refer to this as exclusive mappings, and they are realized via a combination 
 [`page_table_entry`]: https://theseus-os.github.io/Theseus/doc/page_table_entry/index.html
 [`UnmapResult`]: https://theseus-os.github.io/Theseus/doc/page_table_entry/enum.UnmapResult.html
 [`UnmappedFrames`]: https://theseus-os.github.io/Theseus/doc/page_table_entry/struct.UnmappedFrames.html
+[`PageTableEntry::set_unmapped()`]: https://theseus-os.github.io/Theseus/doc/page_table_entry/struct.PageTableEntry.html#method.set_unmapped
+[see here for details and source]: https://www.theseus-os.com/Theseus/doc/frame_allocator/fn.init.html#return
 [stacks]: https://theseus-os.github.io/Theseus/doc/stack/struct.Stack.html
