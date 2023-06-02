@@ -15,7 +15,7 @@
 //! [context]: SignalContext
 
 #![no_std]
-#![feature(trait_alias)]
+#![feature(trait_alias, variant_count)]
 
 extern crate alloc;
 
@@ -99,11 +99,8 @@ pub enum Signal {
     /// Bad arithmetic operation, e.g., divide by zero.
     /// Analogous to SIGFPE.
     ArithmeticError                 = 3,
-    //
-    // Note: if other signals are added, update `NUM_SIGNALS` below.
-    //
 }
-const NUM_SIGNALS: usize = 4;
+const NUM_SIGNALS: usize = core::mem::variant_count::<Signal>();
 
 
 /// Information that is passed to a registered [`SignalHandler`]
@@ -136,39 +133,39 @@ impl From<u64> for ErrorCode {
  * Note: this is currently unused, but I've left it in here in case
  *       we wish to allow tasks to register exception handlers in the future.
  *  
-bitflags::bitflags! {
-    /// The subset of machine exceptions that may occur on x86
-    /// that Theseus allows tasks to register callback handlers for.
-    pub struct Exceptions: u32 {
-        const DIVIDE_ERROR                  = 1 <<  0;
-        const OVERFLOW                      = 1 <<  1;
-        const BOUND_RANGE_EXCEEDED          = 1 <<  2;
-        const INVALID_OPCODE                = 1 <<  3;
-        const DEVICE_NOT_AVAILABLE          = 1 <<  4;
-        const DOUBLE_FAULT                  = 1 <<  5;
-        const INVALID_TSS                   = 1 <<  6;
-        const SEGMENT_NOT_PRESENT           = 1 <<  7;
-        const STACK_SEGMENT_FAULT           = 1 <<  8;
-        const GENERAL_PROTECTION_FAULT      = 1 <<  9;
-        const PAGE_FAULT                    = 1 << 10;
-        const X87_FLOATING_POINT            = 1 << 11;
-        const ALIGNMENT_CHECK               = 1 << 12;
-        const SIMD_FLOATING_POINT           = 1 << 13;
-        //
-        // Note: items below here are either reserved exceptions, or exceptions
-        //       that shouldn't ever be forwarded to other tasks for handling.
-        //
-        // const DEBUG                         = 1 << 0;
-        // const NON_MASKABLE_INTERRUPT        = 1 << 0;
-        // const BREAKPOINT                    = 1 << 0;
-        // reserved: 0x09
-        // reserved: 0x0F
-        // const MACHINE_CHECK                 = 1 << 0;
-        // const VIRTUALIZATION                = 1 << 0;
-        // reserved: 0x15 - 0x1C
-        // const VMM_COMMUNICATION_EXCEPTION   = 1 << 0;
-        // const SECURITY_EXCEPTION            = 1 << 0;
-        // reserved: 0x1F
-    }
+/// The subset of machine exceptions that may occur on x86
+/// that Theseus allows tasks to register callback handlers for.
+/// 
+/// Note: uncommented variants are either reserved exceptions, or exceptions
+///       that shouldn't ever be forwarded to other tasks for handling.
+enum ExceptionVectorNr {
+    DivisionError,
+    //Debug,
+    //NonMaskableInterrupt,
+    //Breakpoint,
+    Overflow = 0x4,
+    BoundRangeExceeded,
+    InvalidOpcode,
+    DeviceNotAvailable,
+    DoubleFault,
+    // Legacy, so reserved.
+    //CoprocessorSegmentOverrun,
+    InvalidTss = 0xA,
+    SegmentNotPresent,
+    StackSegmentFault,
+    GeneralProtectionFault,
+    PageFault,
+    //Reserved,
+    X87FloatingPoint = 0x10,
+    AlignmentCheck,
+    //MachineCheck,
+    SimdFloatingPoint = 0x13,
+    //Virtualization,
+    //ControlProtection,
+    // reserved: 0x15 - 0x1C
+    //HypervisorInjection = 0x1C,
+    //VmmCommunication,
+    //Security,
+    // reserved: 0x1F
 }
 */
