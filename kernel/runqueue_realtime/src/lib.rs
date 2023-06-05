@@ -25,7 +25,7 @@ extern crate alloc;
 extern crate atomic_linked_list;
 
 use task::TaskRef;
-use sync_preemption as preempt;
+use sync_preemption::PreemptionSafeRwLock;
 use alloc::collections::VecDeque;
 use core::ops::{Deref, DerefMut};
 use atomic_linked_list::atomic_map::AtomicMap;
@@ -95,7 +95,7 @@ impl RealtimeTaskRef {
 
 /// There is one runqueue per core, each core only accesses its own private runqueue
 /// and allows the scheduler to select a task from that runqueue to schedule in
-static RUNQUEUES: AtomicMap<u8, preempt::RwLock<RunQueue>> = AtomicMap::new();
+static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap::new();
 
 /// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
 ///
@@ -149,7 +149,7 @@ impl RunQueue {
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
         trace!("Created runqueue (realtime) for core {}", which_core);
-        let new_rq = preempt::RwLock::new(RunQueue {
+        let new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
@@ -165,7 +165,7 @@ impl RunQueue {
     }
 
     /// Returns `RunQueue` for the given core, which is an `apic_id`.
-    pub fn get_runqueue(which_core: u8) -> Option<&'static preempt::RwLock<RunQueue>> {
+    pub fn get_runqueue(which_core: u8) -> Option<&'static PreemptionSafeRwLock<RunQueue>> {
         RUNQUEUES.get(&which_core)
     } 
 
@@ -176,8 +176,8 @@ impl RunQueue {
 
     /// Returns the `RunQueue` for the "least busy" core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    fn get_least_busy_runqueue() -> Option<&'static preempt::RwLock<RunQueue>> {
-        let mut min_rq: Option<(&'static preempt::RwLock<RunQueue>, usize)> = None;
+    fn get_least_busy_runqueue() -> Option<&'static PreemptionSafeRwLock<RunQueue>> {
+        let mut min_rq: Option<(&'static PreemptionSafeRwLock<RunQueue>, usize)> = None;
 
         for (_, rq) in RUNQUEUES.iter() {
             let rq_size = rq.read().queue.len();
