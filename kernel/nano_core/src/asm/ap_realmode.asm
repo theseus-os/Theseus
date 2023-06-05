@@ -181,9 +181,10 @@ get_vbe_card_info:
     jne .next_mode          ; We failed to get info about this mode. Go back and try the next mode.
 
     ; Check whether the current mode is supported by the hardware.
+    ; If bit 0 is clear, the mode is unsupported, so continue on to the next mode.
     mov word ax, [VBEModeInfo.attributes]
     test word ax, 1
-    jz .next_mode ; if first bit is clear, mode is unsupported, so fall through.
+    jz .next_mode
 
     ; We only support modes with 32-bit pixel sizes
     cmp byte [VBEModeInfo.bitsperpixel], 32
