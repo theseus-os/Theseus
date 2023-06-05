@@ -173,16 +173,23 @@ get_vbe_card_info:
     ; Here, we attempt to get the mode info for the mode we just iterated to
     push esi
     mov [current.mode], cx  ; Store the current mode in `current.mode`
-    mov ax, 0x4F01          ; 0x4F01 is the argument fo the BIOS 0x10 interrupt used to get the currrent mode information
+    mov ax, 0x4F01          ; 0x4F01 is the argument for the BIOS 0x10 interrupt used to get the current mode information
     mov di, VBEModeInfo     ; Set `di` to the address where the mode information will be written
     int 0x10
     pop esi
     cmp al, 0x4F            ; The result is placed into `al`. A result of `0x4f` means the query was successful.
     jne .next_mode          ; We failed to get info about this mode. Go back and try the next mode.
 
+    ; Check whether the current mode is supported by the hardware.
+    ; If bit 0 is clear, the mode is unsupported, so continue on to the next mode.
+    mov word ax, [VBEModeInfo.attributes]
+    test word ax, 1
+    jz .next_mode
+
     ; We only support modes with 32-bit pixel sizes
     cmp byte [VBEModeInfo.bitsperpixel], 32
     jne .next_mode
+
     ; Check whether the current mode is higher resolution than our maximum resolution.
     ; If it is, then continue iterating through the modes.
     mov word ax, [VBEModeInfo.width]
@@ -191,6 +198,7 @@ get_vbe_card_info:
     mov word ax, [VBEModeInfo.height]
     cmp word ax, [es:AP_MAX_FB_HEIGHT]
     ja .next_mode
+
     ; Check whether the current mode is higher resolution than the "best" mode thus far.
     ; If not, continue iterating through the modes. 
     mov word ax, [best_mode.width]
