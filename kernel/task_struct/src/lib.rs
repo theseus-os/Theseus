@@ -308,7 +308,7 @@ impl Task {
         states_to_inherit: InheritedStates,
     ) -> Result<Task, &'static str> {
         /// The counter of task IDs
-        static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+        static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
         let (mmi, namespace, env, app_crate) = states_to_inherit.into_tuple();
         let kstack = stack
