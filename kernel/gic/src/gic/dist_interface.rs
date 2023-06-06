@@ -27,6 +27,7 @@ use cpu::MpidrValue;
 mod offset {
     use crate::{Offset32, Offset64};
     pub(crate) const CTLR:       Offset32 = Offset32::from_byte_offset(0x000);
+    pub(crate) const IIDR:       Offset32 = Offset32::from_byte_offset(0x008);
     pub(crate) const IGROUPR:    Offset32 = Offset32::from_byte_offset(0x080);
     pub(crate) const ISENABLER:  Offset32 = Offset32::from_byte_offset(0x100);
     pub(crate) const ICENABLER:  Offset32 = Offset32::from_byte_offset(0x180);
@@ -136,6 +137,12 @@ pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTar
     registers.write_volatile(offset::SGIR, value);
 }
 
+pub struct Implementer {
+    pub product_id: u8,
+    pub version: u8,
+    pub implementer_jep106: u16,
+}
+
 impl super::ArmGic {
     pub(crate) fn distributor(&self) -> &GicRegisters {
         match self {
@@ -148,6 +155,15 @@ impl super::ArmGic {
         match self {
             Self::V2(v2) => &mut v2.distributor,
             Self::V3(v3) => &mut v3.distributor,
+        }
+    }
+
+    pub fn implementer(&self) -> Implementer {
+        let raw = self.distributor().read_volatile(offset::IIDR);
+        Implementer {
+            product_id: (raw >> 24) as _,
+            version: ((raw >> 12) & 0xff) as _,
+            implementer_jep106: (raw & 0xfff) as _,
         }
     }
 
