@@ -169,9 +169,6 @@
 <a href="#169" id="169">169</a>
 <a href="#170" id="170">170</a>
 <a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
-<a href="#173" id="173">173</a>
-<a href="#174" id="174">174</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Signal handlers for CPU exceptions/errors, like POSIX-style signals, but safer and Rusty.
 //! 
 //! Instead of directly supporting POSIX signals like SIGSEGV, SIGILL, etc,
@@ -189,7 +186,7 @@
 //! [context]: SignalContext
 
 </span><span class="attr">#![no_std]
-#![feature(trait_alias)]
+#![feature(trait_alias, variant_count)]
 
 </span><span class="kw">extern crate </span>alloc;
 
@@ -273,11 +270,8 @@
     <span class="doccomment">/// Bad arithmetic operation, e.g., divide by zero.
     /// Analogous to SIGFPE.
     </span>ArithmeticError                 = <span class="number">3</span>,
-    <span class="comment">//
-    // Note: if other signals are added, update `NUM_SIGNALS` below.
-    //
-</span>}
-<span class="kw">const </span>NUM_SIGNALS: usize = <span class="number">4</span>;
+}
+<span class="kw">const </span>NUM_SIGNALS: usize = core::mem::variant_count::&lt;Signal&gt;();
 
 
 <span class="doccomment">/// Information that is passed to a registered [`SignalHandler`]
