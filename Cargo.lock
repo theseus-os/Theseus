@@ -3395,7 +3395,6 @@ dependencies = [
 name = "signal_handler"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "log",
  "memory",
  "spin 0.9.4",
