@@ -137,7 +137,7 @@ macro_rules! get_int_ctlr {
     };
 }
 
-/// The Cpu were this interrupt should be handled, as well as
+/// The Cpu where this interrupt should be handled, as well as
 /// the local interrupt number this gets translated to.
 ///
 /// On aarch64, the system interrupt number and the local interrupt
@@ -372,7 +372,7 @@ impl LocalInterruptController {
         }
     }
 
-    /// Tell the interrupt controller that the current interrupt handling as ended.
+    /// Tell the interrupt controller that the current interrupt has been handled.
     pub fn end_of_interrupt(&self, number: LocalInterruptNumber) {
         get_int_ctlr!(int_ctlr, end_of_interrupt);
 
