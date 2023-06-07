@@ -361,15 +361,9 @@ impl LocalInterruptController {
     pub fn acknowledge_interrupt(&self) -> (LocalInterruptNumber, Priority) {
         get_int_ctlr!(int_ctlr, acknowledge_interrupt);
 
-        #[cfg(target_arch = "aarch64")] {
-            let (num, prio) = int_ctlr.acknowledge_interrupt();
+        let (num, prio) = int_ctlr.acknowledge_interrupt();
 
-            (LocalInterruptNumber(num), prio)
-        }
-
-        #[cfg(target_arch = "x86_64")] {
-            panic!("This is an aarch64-only mechanism.");
-        }
+        (LocalInterruptNumber(num), prio)
     }
 
     /// Tell the interrupt controller that the current interrupt has been handled.
@@ -381,7 +375,7 @@ impl LocalInterruptController {
         }
 
         #[cfg(target_arch = "x86_64")] {
-            // what do we do with the IRQ number?
+            // On x86, passing the LocalInterruptNumber isn't required.
             int_ctlr.eoi();
         }
     }
