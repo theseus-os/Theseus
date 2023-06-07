@@ -137,9 +137,13 @@ pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTar
     registers.write_volatile(offset::SGIR, value);
 }
 
+/// Deserialized content of the `IIDR` distributor register
 pub struct Implementer {
+    /// Product Identifier of this distributor.
     pub product_id: u8,
+    /// An arbitrary revision number defined by the implementer.
     pub version: u8,
+    /// Contains the JEP106 code of the company that implemented the distributor.
     pub implementer_jep106: u16,
 }
 
