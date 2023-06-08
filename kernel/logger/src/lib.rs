@@ -37,7 +37,7 @@ pub const LOG_MAX_WRITERS: usize = 2;
 /// The size of the buffer used to save early log messages.
 pub const EARLY_LOG_BUFFER_SIZE: usize = {
     #[cfg(target_arch = "x86_64")]  { 0 }
-    #[cfg(target_arch = "aarch64")] { 16 * 1024 }
+    #[cfg(target_arch = "aarch64")] { 32 * 1024 }
 };
 
 /// The early logger used before dynamic heap allocation is available.
