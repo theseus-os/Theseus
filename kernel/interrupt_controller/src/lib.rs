@@ -21,11 +21,35 @@ use {
     ioapic::get_ioapic,
 };
 
-pub mod aarch64;
-pub mod x86_64;
+#[cfg(target_arch = "aarch64")]
+#[path = "aarch64.rs"]
+pub mod arch;
+
+#[cfg(target_arch = "x86_64")]
+#[path = "x86_64.rs"]
+pub mod arch;
+
+pub use arch::*;
 
 #[cfg(target_arch = "aarch64")]
-pub use aarch64::*;
+macro_rules! get_int_ctlr {
+    ($name:ident, $func:ident, $this:expr) => {
+        let mut $name = INTERRUPT_CONTROLLER.lock();
+        let $name = $name.as_mut().expect(concat!("BUG: ", stringify!($func), "(): INTERRUPT_CONTROLLER was uninitialized"));
+    };
+    ($name:ident, $func:ident) => ( get_int_ctlr!($name, $func, ()) );
+}
+
+#[cfg(target_arch = "x86_64")]
+macro_rules! get_int_ctlr {
+    ($name:ident, $func:ident, $this:expr) => {
+        let mut $name = get_ioapic($this.id).expect(concat!("BUG: ", stringify!($func), "(): get_ioapic() returned None"));
+    };
+    ($name:ident, $func:ident) => {
+        let mut $name = get_my_apic().expect(concat!("BUG: ", stringify!($func), "(): get_my_apic() returned None"));
+        let mut $name = $name.write();
+    };
+}
 
 /// The Cpu where this interrupt should be handled, as well as
 /// the local interrupt number this gets translated to.
@@ -269,27 +293,4 @@ impl LocalInterruptController {
             int_ctlr.eoi();
         }
     }
-}
-
-#[cfg(target_arch = "aarch64")]
-macro_rules! get_int_ctlr {
-    ($name:ident, $func:ident, $this:expr) => {
-        let mut $name = INTERRUPT_CONTROLLER.lock();
-        let $name = $name.as_mut().expect(concat!("BUG: ", stringify!($func), "(): INTERRUPT_CONTROLLER was uninitialized"));
-    };
-    ($name:ident, $func:ident) => ( get_int_ctlr!($name, $func, ()) );
-}
-
-#[cfg(target_arch = "x86_64")]
-pub use x86_64::*;
-
-#[cfg(target_arch = "x86_64")]
-macro_rules! get_int_ctlr {
-    ($name:ident, $func:ident, $this:expr) => {
-        let mut $name = get_ioapic($this.id).expect(concat!("BUG: ", stringify!($func), "(): get_ioapic() returned None"));
-    };
-    ($name:ident, $func:ident) => {
-        let mut $name = get_my_apic().expect(concat!("BUG: ", stringify!($func), "(): get_my_apic() returned None"));
-        let mut $name = $name.write();
-    };
 }
