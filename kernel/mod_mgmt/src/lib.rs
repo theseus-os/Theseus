@@ -2953,8 +2953,14 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
     // trace!("\n\texec_bytes: {exec_bytes} {exec_bytes:#X}\n\tro_bytes:   {ro_bytes} {ro_bytes:#X}\n\trw_bytes:   {rw_bytes} {rw_bytes:#X}");
 
     // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
-    // We must allocate these pages separately because they will have different flags later.
-    let executable_pages = if exec_bytes > 0 { Some(allocate_and_map_as_writable(exec_bytes, TEXT_SECTION_FLAGS,     kernel_mmi_ref)?) } else { None };
+    // We must allocate these pages separately because they use different flags.
+    let executable_pages = if exec_bytes > 0 {
+        let ap = allocate_pages_in_range(size_in_bytes)
+            .ok_or("Couldn't allocated page, out of virtual address space")?;
+        kernel_mmi_ref.lock().page_table.map_allocated_pages(
+            allocated_pages,
+            flags.valid(true).writable(true)
+         Some(allocate_and_map_as_writable(exec_bytes, TEXT_SECTION_FLAGS,     kernel_mmi_ref)?) } else { None };
     let read_only_pages  = if ro_bytes   > 0 { Some(allocate_and_map_as_writable(ro_bytes,   RODATA_SECTION_FLAGS,   kernel_mmi_ref)?) } else { None };
     let read_write_pages = if rw_bytes   > 0 { Some(allocate_and_map_as_writable(rw_bytes,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)?) } else { None };
 

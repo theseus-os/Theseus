@@ -682,15 +682,6 @@ pub fn allocate_pages_deferred(
 }
 
 
-/// Allocates the given number of pages with the constraint they they must be
-/// within the given inclusive `range` of pages.
-pub fn allocate_pages_in_range(
-	num_pages: usize,
-	range: &PageRange,
-) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
-	allocate_pages_deferred(None, num_pages, Some(range))
-}
-
 /// Similar to [`allocated_pages_deferred()`](fn.allocate_pages_deferred.html),
 /// but accepts a size value for the allocated pages in number of bytes instead of number of pages. 
 /// 
@@ -747,6 +738,27 @@ pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Re
 pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<AllocatedPages, &'static str> {
 	allocate_pages_deferred(Some(vaddr), num_pages, None)
 		.map(|(ap, _action)| ap)
+}
+
+
+/// Allocates the given number of pages with the constraint that
+/// they must be within the given inclusive `range` of pages.
+pub fn allocate_pages_in_range(
+	num_pages: usize,
+	range: &PageRange,
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
+	allocate_pages_deferred(None, num_pages, Some(range))
+}
+
+
+/// Allocates pages with a size given in number of bytes with the constraint that
+/// they must be within the given inclusive `range` of pages.
+pub fn allocate_pages_by_bytes_in_range(
+	num_bytes: usize,
+	range: &PageRange,
+) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
+	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
+	allocate_pages_deferred(None, num_pages, Some(range))
 }
 
 
