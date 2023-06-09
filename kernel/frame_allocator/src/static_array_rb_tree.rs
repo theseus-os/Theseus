@@ -42,6 +42,10 @@ impl <T: Ord> Wrapper<T> {
             inner: value,
         })
     }
+
+	pub(crate) fn into_inner(self) -> T {
+		self.inner
+	}
 }
 
 

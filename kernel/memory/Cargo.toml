@@ -24,6 +24,7 @@ page_allocator = { path = "../page_allocator" }
 frame_allocator = { path = "../frame_allocator" }
 no_drop = { path = "../no_drop" }
 owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
+mem_into_fns = { path = "../mem_into_fns" }
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 

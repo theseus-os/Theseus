@@ -223,12 +223,7 @@ pub fn get_current_p4() -> Frame {
 pub fn init(
     boot_info: &impl BootInformation,
     stack_start_virt: VirtualAddress,
-    into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
 ) -> Result<InitialMemoryMappings, &'static str> {
-    // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
-    // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
-    mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
-
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current()
         .map_err(|_| "Failed to allocate frame for initial page table; is it merged with another section?")?;

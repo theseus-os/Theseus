@@ -35,24 +35,6 @@ use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
 #[cfg(target_arch = "x86_64")]
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
-/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
-/// 
-/// This exists to break the cyclic dependency cycle between `page_table_entry` and
-/// `frame_allocator`, which depend on each other as such:
-/// * `frame_allocator` needs to `impl Into<AllocatedPages> for UnmappedFrames`
-///    in order to allow unmapped exclusive frames to be safely deallocated
-/// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow
-///   page table entry values to be set safely to a real physical frame that is owned and exists.
-/// 
-/// To get around that, the `frame_allocator::init()` function returns a callback
-/// to its function that allows converting a range of unmapped frames back into `AllocatedFrames`,
-/// which then allows them to be dropped and thus deallocated.
-/// 
-/// This is safe because the frame allocator can only be initialized once, and also because
-/// only this crate has access to that function callback and can thus guarantee
-/// that it is only invoked for `UnmappedFrames`.
-pub(super) static INTO_ALLOCATED_FRAMES_FUNC: Once<fn(FrameRange) -> AllocatedFrames> = Once::new();
-
 /// A convenience function to translate the given virtual address into a
 /// physical address using the currently-active page table.
 pub fn translate(virtual_address: VirtualAddress) -> Option<PhysicalAddress> {
@@ -631,9 +613,7 @@ impl MappedPages {
             // freed from the newly-unmapped P1 PTE entry above.
             match unmapped_frames {
                 UnmapResult::Exclusive(newly_unmapped_frames) => {
-                    let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
-                        .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
-                        .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
+                    let newly_unmapped_frames = mem_into_fns::from_unmapped(newly_unmapped_frames)?;
 
                     if let Some(mut curr_frames) = current_frame_range.take() {
                         match curr_frames.merge(newly_unmapped_frames) {

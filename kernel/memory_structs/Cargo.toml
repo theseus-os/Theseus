@@ -12,6 +12,7 @@ derive_more = "0.99.0"
 paste = "1.0.5"
 
 kernel_config = { path = "../kernel_config" }
+range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
 
 [lib]
 crate-type = ["rlib"]
