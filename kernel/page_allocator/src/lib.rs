@@ -54,7 +54,9 @@ static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 ///
 /// TODO: once the heap is fully dynamic and not dependent on static addresses,
 /// we can exclude the heap from the designated region.
-static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START));
+static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(
+	VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_P4_START)
+);
 
 const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
 const MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
@@ -70,45 +72,62 @@ static FREE_PAGE_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayR
 ///   lower designated region, which should be the ending address of the initial kernel image
 ///   (a lower-half identity address).
 /// 
-/// The page allocator will only allocate addresses lower than `end_vaddr_of_low_designated_region`
-/// if specifically requested.
-/// General allocation requests for any virtual address will not use any address lower than that,
-/// unless the rest of the entire virtual address space is already in use.
+/// The page allocator considers two regions as "designated" regions. It will only allocate pages
+/// within these designated regions if the specifically-requested address falls within them.
+/// 1. The lower designated region is for identity-mapped bootloader content
+///    and base kernel image sections, which is used during OS initialization.
+/// 2. The higher designated region is for the same content, mapped to the higher half
+///    of the address space. It also excludes the address ranges for the P4 entries that
+///    Theseus uses for recursive page table mapping.
+///    * See [`RECURSIVE_P4_INDEX`] and [`UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX`].
 ///
+/// General allocation requests for pages at any virtual address will not use
+/// addresses within designated regions unless the entire address space is already in use,
+/// which is an extraordinarily unlikely (i.e., basically impossible) situation.
 pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'static str> {
 	assert!(end_vaddr_of_low_designated_region < DESIGNATED_PAGES_HIGH_START.start_address());
-	let designated_low_end = DESIGNATED_PAGES_LOW_END.call_once(|| Page::containing_address(end_vaddr_of_low_designated_region));
-	let designated_low_end = *designated_low_end;
+	let designated_low_end_page = DESIGNATED_PAGES_LOW_END.call_once(
+		|| Page::containing_address(end_vaddr_of_low_designated_region)
+	);
+	let designated_low_end = *designated_low_end_page;
 
 	let initial_free_chunks = [
-		// The first region contains all pages *below* the beginning of the 510th entry of P4. 
-		// We split it up into three chunks just for ease, since it overlaps the designated regions.
-		Some(Chunk { 
+		// The first region contains all pages from address zero to the end of the low designated region,
+		// which is generally reserved for identity-mapped bootloader stuff and base kernel image sections.
+		Some(Chunk {
 			pages: PageRange::new(
 				Page::containing_address(VirtualAddress::zero()),
 				designated_low_end,
 			)
 		}),
-		Some(Chunk { 
+		// The second region contains the massive range from the end of the low designated region
+		// to the beginning of the high designated region, which comprises the majority of the address space.
+		// The beginning of the high designated region starts at the reserved P4 entry used to
+		// recursively map the "upcoming" page table (i.e., UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX).
+		Some(Chunk {
 			pages: PageRange::new(
 				designated_low_end + 1,
 				DESIGNATED_PAGES_HIGH_START - 1,
 			)
 		}),
-		Some(Chunk { 
+		// Here, we skip the addresses covered by the `UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX`.
+
+		// The third region contains the range of addresses reserved for the heap,
+		// which ends at the beginning of the addresses covered by the `RECURSIVE_P4_INDEX`,
+		Some(Chunk {
 			pages: PageRange::new(
-				DESIGNATED_PAGES_HIGH_START,
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START)),
 				// This is the page right below the beginning of the 510th entry of the top-level P4 page table.
-				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START - ADDRESSABILITY_PER_P4_ENTRY - 1)),
+				Page::containing_address(VirtualAddress::new_canonical(RECURSIVE_P4_START - 1)),
 			)
 		}),
+		// Here, we skip the addresses covered by the `RECURSIVE_P4_INDEX`.
 
-		// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.
-		// This is fully covered by the second (higher) designated region.
-		Some(Chunk { 
+		// The fourth region contains all pages in the 511th (last) entry of P4.
+		Some(Chunk {
 			pages: PageRange::new(
 				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
-				Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
+				MAX_PAGE,
 			)
 		}),
 		None, None, None, None,
@@ -513,7 +532,7 @@ fn find_any_chunk(
 		}
 	}
 
-	// If we failed to 
+	// If we failed to find suitable pages within the given range, return an error.
 	if let Some(range) = within_range {
 		return Err(AllocationError::OutOfAddressSpace(num_pages, Some(range.clone())));
 	}
@@ -544,8 +563,8 @@ fn find_any_chunk(
 			// for c in eligible_chunks { ... }
 			// ```
 			//
-			// However, RBTree doesn't have a `range_mut()` method, so we use two sets of cursors for manual iteration.
-			// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
+			// RBTree doesn't have a `range_mut()` method, so we use cursors for two round of iteration.
+			// The first iterates over the lower designated region, from higher addresses to lower, down to zero.
 			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
 				if num_pages < chunk.size_in_pages() {
@@ -554,7 +573,7 @@ fn find_any_chunk(
 				cursor.move_prev();
 			}
 
-			// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
+			// The second iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
 			let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
 				if chunk.start() < &DESIGNATED_PAGES_HIGH_START {
@@ -746,8 +765,9 @@ pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<Allo
 pub fn allocate_pages_in_range(
 	num_pages: usize,
 	range: &PageRange,
-) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
+) -> Result<AllocatedPages, &'static str> {
 	allocate_pages_deferred(None, num_pages, Some(range))
+		.map(|(ap, _action)| ap)
 }
 
 
@@ -756,9 +776,10 @@ pub fn allocate_pages_in_range(
 pub fn allocate_pages_by_bytes_in_range(
 	num_bytes: usize,
 	range: &PageRange,
-) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
+) -> Result<AllocatedPages, &'static str> {
 	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
 	allocate_pages_deferred(None, num_pages, Some(range))
+		.map(|(ap, _action)| ap)
 }
 
 

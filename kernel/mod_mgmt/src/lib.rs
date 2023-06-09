@@ -12,9 +12,10 @@ use alloc::{
     string::{String, ToString}, 
     sync::{Arc, Weak}, vec::Vec
 };
+use kernel_config::memory::KERNEL_OFFSET;
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range, Page};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -32,6 +33,16 @@ pub use crate_metadata::*;
 pub mod parse_nano_core;
 pub mod replace_nano_core_crates;
 mod serde;
+
+
+TODO docs
+pub const KERNEL_TEXT_ADDR_RANGE: PageRange = PageRange::new(
+    // the start of the base kernel image's .text section.
+    Page::containing_address(VirtualAddress::new_canonical(KERNEL_OFFSET + 0x10_0000)),
+    // the start of the base kernel image's .text section, plus 128 MiB.
+    Page::containing_address(VirtualAddress::new_canonical(KERNEL_OFFSET + 0x10_0000 + 0x800_0000 - 1)),
+);
+
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &str = "namespaces";
@@ -2955,12 +2966,17 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
     // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
     // We must allocate these pages separately because they use different flags.
     let executable_pages = if exec_bytes > 0 {
-        let ap = allocate_pages_in_range(size_in_bytes)
-            .ok_or("Couldn't allocated page, out of virtual address space")?;
-        kernel_mmi_ref.lock().page_table.map_allocated_pages(
-            allocated_pages,
-            flags.valid(true).writable(true)
-         Some(allocate_and_map_as_writable(exec_bytes, TEXT_SECTION_FLAGS,     kernel_mmi_ref)?) } else { None };
+        let ap = allocate_pages_by_bytes_in_range(exec_bytes, &KERNEL_TEXT_ADDR_RANGE)
+            .map_err(|_| "Couldn't allocated pages in text section address range")?;
+        Some(
+            kernel_mmi_ref.lock().page_table.map_allocated_pages(
+                ap,
+                TEXT_SECTION_FLAGS.valid(true).writable(true)
+            )?
+        )
+    } else {
+        None
+    };
     let read_only_pages  = if ro_bytes   > 0 { Some(allocate_and_map_as_writable(ro_bytes,   RODATA_SECTION_FLAGS,   kernel_mmi_ref)?) } else { None };
     let read_write_pages = if rw_bytes   > 0 { Some(allocate_and_map_as_writable(rw_bytes,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)?) } else { None };
 
