@@ -23,6 +23,13 @@
 <a href="#23" id="23">23</a>
 <a href="#24" id="24">24</a>
 <a href="#25" id="25">25</a>
+<a href="#26" id="26">26</a>
+<a href="#27" id="27">27</a>
+<a href="#28" id="28">28</a>
+<a href="#29" id="29">29</a>
+<a href="#30" id="30">30</a>
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
 </pre><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">use </span>cpu_local_preemption::{hold_preemption, PreemptionGuard};
@@ -30,9 +37,16 @@
 <span class="kw">pub type </span>Mutex&lt;T&gt; = sync::Mutex&lt;T, DisablePreemption&gt;;
 <span class="kw">pub type </span>MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T, DisablePreemption&gt;;
 
+<span class="kw">pub type </span>PreemptionSafeMutex&lt;T&gt; = Mutex&lt;T&gt;;
+<span class="kw">pub type </span>PreemptionSafeMutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;;
+
 <span class="kw">pub type </span>RwLock&lt;T&gt; = sync::RwLock&lt;T, DisablePreemption&gt;;
 <span class="kw">pub type </span>RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T, DisablePreemption&gt;;
 <span class="kw">pub type </span>RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T, DisablePreemption&gt;;
+
+<span class="kw">pub type </span>PreemptionSafeRwLock&lt;T&gt; = RwLock&lt;T&gt;;
+<span class="kw">pub type </span>PreemptionSafeRwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = RwLockReadGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;;
+<span class="kw">pub type </span>PreemptionSafeRwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = RwLockWriteGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;;
 
 <span class="doccomment">/// A deadlock prevention method that disables preemption.
 </span><span class="attr">#[derive(Copy, Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]

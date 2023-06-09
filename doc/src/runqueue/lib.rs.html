@@ -66,7 +66,7 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>mutex_preemption;
+<span class="kw">extern crate </span>sync_preemption;
 <span class="kw">extern crate </span>atomic_linked_list;
 <span class="kw">extern crate </span>task;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
@@ -83,7 +83,7 @@
 <span class="attr">#[cfg(single_simd_task_optimization)]
 </span><span class="kw">extern crate </span>single_simd_task_optimization;
 
-<span class="kw">use </span>mutex_preemption::RwLockPreempt;
+<span class="kw">use </span>sync_preemption::PreemptionSafeRwLock;
 <span class="kw">use </span>task::TaskRef;
 <span class="kw">use </span>runqueue::RunQueue;
 
@@ -94,7 +94,7 @@
 }
 
 <span class="doccomment">/// Returns the `RunQueue` of the given core, which is an `apic_id`.
-</span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;&gt; {
+</span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PreemptionSafeRwLock&lt;RunQueue&gt;&gt; {
     RunQueue::get_runqueue(which_core)
 }
 

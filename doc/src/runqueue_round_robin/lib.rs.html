@@ -246,7 +246,7 @@
 
 </span><span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>mutex_preemption;
+<span class="kw">extern crate </span>sync_preemption;
 <span class="kw">extern crate </span>atomic_linked_list;
 <span class="kw">extern crate </span>task;
 
@@ -254,7 +254,7 @@
 </span><span class="kw">extern crate </span>single_simd_task_optimization;
 
 <span class="kw">use </span>alloc::collections::VecDeque;
-<span class="kw">use </span>mutex_preemption::RwLockPreempt;
+<span class="kw">use </span>sync_preemption::PreemptionSafeRwLock;
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 <span class="kw">use </span>task::TaskRef;
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
@@ -316,7 +316,7 @@
 
 <span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue
 /// and allows the scheduler to select a task from that runqueue to schedule in.
-</span><span class="kw">pub static </span>RUNQUEUES: AtomicMap&lt;u8, RwLockPreempt&lt;RunQueue&gt;&gt; = AtomicMap::new();
+</span><span class="kw">pub static </span>RUNQUEUES: AtomicMap&lt;u8, PreemptionSafeRwLock&lt;RunQueue&gt;&gt; = AtomicMap::new();
 
 <span class="doccomment">/// A list of references to `Task`s (`RoundRobinTaskRef`s). 
 /// This is used to store the `Task`s (and associated scheduler related data) 
@@ -362,7 +362,7 @@
     <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`.
     </span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (round robin) for core {}&quot;</span>, which_core);
-        <span class="kw">let </span>new_rq = RwLockPreempt::new(RunQueue {
+        <span class="kw">let </span>new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
         });
@@ -378,7 +378,7 @@
     }
 
     <span class="doccomment">/// Returns the `RunQueue` for the given core, which is an `apic_id`.
-    </span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;&gt; {
+    </span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PreemptionSafeRwLock&lt;RunQueue&gt;&gt; {
         RUNQUEUES.get(<span class="kw-2">&amp;</span>which_core)
     }
 
@@ -391,8 +391,8 @@
 
     <span class="doccomment">/// Returns the `RunQueue` for the &quot;least busy&quot; core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
-    </span><span class="kw">fn </span>get_least_busy_runqueue() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>min_rq: <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockPreempt&lt;RunQueue&gt;, usize)&gt; = <span class="prelude-val">None</span>;
+    </span><span class="kw">fn </span>get_least_busy_runqueue() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PreemptionSafeRwLock&lt;RunQueue&gt;&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>min_rq: <span class="prelude-ty">Option</span>&lt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PreemptionSafeRwLock&lt;RunQueue&gt;, usize)&gt; = <span class="prelude-val">None</span>;
 
         <span class="kw">for </span>(<span class="kw">_</span>, rq) <span class="kw">in </span>RUNQUEUES.iter() {
             <span class="kw">let </span>rq_size = rq.read().queue.len();

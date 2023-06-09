@@ -94,7 +94,6 @@ var sourcesIndex = JSON.parse('{\
 "mouse_data":["",[],["lib.rs"]],\
 "multicore_bringup":["",[],["lib.rs","x86_64.rs"]],\
 "multiple_heaps":["",[],["lib.rs"]],\
-"mutex_preemption":["",[],["lib.rs","mutex_preempt.rs","rwlock_preempt.rs"]],\
 "mutex_sleep":["",[],["lib.rs","mutex.rs","rwlock.rs"]],\
 "nano_core":["",[],["bios.rs","lib.rs","libm.rs","stack_smash_protection.rs"]],\
 "net":["",[],["device.rs","error.rs","interface.rs","lib.rs","socket.rs"]],\
