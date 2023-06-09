@@ -2256,15 +2256,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mutex_preemption"
-version = "0.1.0"
-dependencies = [
- "cpu_local_preemption",
- "lockable",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
@@ -3125,11 +3116,11 @@ dependencies = [
  "cfg-if 1.0.0",
  "lazy_static",
  "log",
- "mutex_preemption",
  "runqueue_priority",
  "runqueue_realtime",
  "runqueue_round_robin",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -3139,8 +3130,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -3150,7 +3141,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
+ "sync_preemption",
  "task",
 ]
 
@@ -3160,8 +3151,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
