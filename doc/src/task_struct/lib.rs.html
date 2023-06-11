@@ -656,6 +656,7 @@
 <a href="#656" id="656">656</a>
 <a href="#657" id="657">657</a>
 <a href="#658" id="658">658</a>
+<a href="#659" id="659">659</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the basic [`Task`] structure, which holds contextual execution states
 //! needed to support safe multithreading.
 //! 
@@ -965,8 +966,9 @@
         stack: <span class="prelude-ty">Option</span>&lt;Stack&gt;,
         states_to_inherit: InheritedStates,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;Task, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="doccomment">/// The counter of task IDs
-        </span><span class="kw">static </span>TASKID_COUNTER: AtomicUsize = AtomicUsize::new(<span class="number">0</span>);
+        <span class="doccomment">/// The counter of task IDs. We start at `1` such that `0` can be used 
+        /// as a task ID that indicates the absence of a task, e.g., in sync primitives. 
+        </span><span class="kw">static </span>TASKID_COUNTER: AtomicUsize = AtomicUsize::new(<span class="number">1</span>);
 
         <span class="kw">let </span>(mmi, namespace, env, app_crate) = states_to_inherit.into_tuple();
         <span class="kw">let </span>kstack = stack

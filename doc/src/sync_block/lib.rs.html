@@ -140,11 +140,67 @@
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
 <a href="#142" id="142">142</a>
-</pre><pre class="rust"><code><span class="attr">#![feature(negative_impls)]
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
+<a href="#168" id="168">168</a>
+<a href="#169" id="169">169</a>
+<a href="#170" id="170">170</a>
+<a href="#171" id="171">171</a>
+<a href="#172" id="172">172</a>
+<a href="#173" id="173">173</a>
+<a href="#174" id="174">174</a>
+<a href="#175" id="175">175</a>
+<a href="#176" id="176">176</a>
+<a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
+<a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+</pre><pre class="rust"><code><span class="attr">#![feature(negative_impls, let_chains)]
 #![no_std]
 
 </span><span class="kw">mod </span>condvar;
 
+<span class="kw">use </span>core::sync::atomic::{AtomicUsize, Ordering};
 <span class="kw">use </span>sync::{spin, MutexFlavor, RwLockFlavor};
 <span class="kw">use </span>wait_queue::WaitQueue;
 
@@ -164,21 +220,39 @@
 
 <span class="kw">impl </span>MutexFlavor <span class="kw">for </span>Block {
     <span class="attr">#[allow(clippy::declare_interior_mutable_const)]
-    </span><span class="kw">const </span>INIT: <span class="self">Self</span>::LockData = WaitQueue::new();
+    </span><span class="kw">const </span>INIT: <span class="self">Self</span>::LockData = <span class="self">Self</span>::LockData {
+        queue: WaitQueue::new(),
+        holder: AtomicUsize::new(<span class="number">0</span>),
+    };
 
-    <span class="kw">type </span>LockData = WaitQueue;
+    <span class="kw">type </span>LockData = MutexData;
 
     <span class="kw">type </span>Guard = ();
 
     <span class="attr">#[inline]
     </span><span class="kw">fn </span>try_lock&lt;<span class="lifetime">&#39;a</span>, T&gt;(
         mutex: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>spin::Mutex&lt;T&gt;,
-        <span class="kw">_</span>: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
+        data: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">Self</span>::LockData,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;(spin::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt;, <span class="self">Self</span>::Guard)&gt;
     <span class="kw">where
         </span>T: <span class="question-mark">?</span>Sized,
     {
-        mutex.try_lock().map(|guard| (guard, ()))
+        <span class="kw">let </span>guard = mutex.try_lock()<span class="question-mark">?</span>;
+        <span class="comment">// There is an interleaving where we are here, the previous holder hasn&#39;t yet
+        // ran post_unlock, and another thread A acquires the holder_id for the middle
+        // path all at the same time. This will result in thread A waiting on the old
+        // holder of the lock. This isn&#39;t great, but it is still correct, as the thread
+        // would only do so for a short period of time. It does however mean that the
+        // middle path would be &quot;useless&quot; because as soon as the holder changes, thread
+        // A would enter the slow path.
+        //
+        // We can prevent this by using an atomic usize in the inner spin lock rather
+        // than an atomic bool. A non-zero value would represent the task ID of the
+        // holder, and a zero would represent the unlocked state. However, this
+        // would be very hard to integrate with the current sync API.
+        </span>data.holder
+            .store(task::get_my_current_task_id(), Ordering::Release);
+        <span class="prelude-val">Some</span>((guard, ()))
     }
 
     <span class="attr">#[inline]
@@ -189,19 +263,55 @@
     <span class="kw">where
         </span>T: <span class="question-mark">?</span>Sized,
     {
-        <span class="comment">// This must be a strong compare exchange, otherwise we could block ourselves
+        <span class="comment">// Fast path
+        // This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock(mutex, data) {
-            guards
-        } <span class="kw">else </span>{
-            data.wait_until(|| <span class="self">Self</span>::try_lock(mutex, data))
+            <span class="kw">return </span>guards;
         }
+
+        <span class="comment">// Middle path: Wait for one timeslice (see below) of the mutex holder to see if
+        // they release the lock.
+        </span><span class="kw">let </span>holder_id = data.holder.load(Ordering::Acquire);
+        <span class="kw">if </span>holder_id != <span class="number">0 </span>&amp;&amp; <span class="kw">let </span><span class="prelude-val">Some</span>(holder_task) = task::get_task(holder_id).and_then(|task| task.upgrade()) {
+            <span class="comment">// Hypothetically, if holder_task is running on another core and is perfectly in
+            // sync with us, we would only ever check if they are running when we are also
+            // running and so we wouldn&#39;t detect when their timeslice is over. However, the
+            // likelihood of this is infinitesimally small and the code, is still correct as
+            // once the lock is released the holder will still set data.holder to 0 and we
+            // will exit the loop.
+            </span><span class="kw">while </span>holder_task.is_running() &amp;&amp; data.holder.load(Ordering::Acquire) == holder_id {
+                core::hint::spin_loop();
+            }
+            <span class="comment">// Holder is either no longer running, or has released the lock.
+            // Either way we will try the fast path one more time before moving
+            // onto the slow path.
+        </span>} <span class="kw">else </span>{
+            <span class="comment">// Unlikely case that another thread just acquired the lock, but hasn&#39;t yet set
+            // data.holder.
+            </span><span class="macro">log::warn!</span>(<span class="string">&quot;could not get holder task for mutex middle path&quot;</span>);
+        }
+
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock(mutex, data) {
+            <span class="kw">return </span>guards;
+        }
+
+        <span class="comment">// Slow path
+        </span>data.queue.wait_until(|| <span class="self">Self</span>::try_lock(mutex, data))
     }
 
     <span class="attr">#[inline]
     </span><span class="kw">fn </span>post_unlock(data: <span class="kw-2">&amp;</span><span class="self">Self</span>::LockData) {
-        data.notify_one();
+        <span class="comment">// See comments in try_lock and lock on why this is necessary.
+        </span>data.holder.store(<span class="number">0</span>, Ordering::Release);
+        data.queue.notify_one();
     }
+}
+
+<span class="attr">#[doc(hidden)]
+</span><span class="kw">pub struct </span>MutexData {
+    queue: WaitQueue,
+    holder: AtomicUsize,
 }
 
 <span class="kw">impl </span>RwLockFlavor <span class="kw">for </span>Block {
