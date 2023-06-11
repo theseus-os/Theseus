@@ -83,7 +83,7 @@ impl MutexFlavor for Block {
             // likelihood of this is infinitesimally small and the code, is still correct as
             // once the lock is released the holder will still set data.holder to 0 and we
             // will exit the loop.
-            while holder_task.running_on_cpu().is_some()
+            while holder_task.is_running()
                 && data.holder.load(Ordering::Acquire) == holder_id
             {
                 core::hint::spin_loop();
