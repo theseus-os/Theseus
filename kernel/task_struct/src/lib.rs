@@ -307,7 +307,8 @@ impl Task {
         stack: Option<Stack>,
         states_to_inherit: InheritedStates,
     ) -> Result<Task, &'static str> {
-        /// The counter of task IDs
+        /// The counter of task IDs. We start at `1` such that `0` can be used 
+        /// as a task ID that indicates the absence of a task, e.g., in sync primitives. 
         static TASKID_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
         let (mmi, namespace, env, app_crate) = states_to_inherit.into_tuple();
