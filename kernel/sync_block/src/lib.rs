@@ -83,18 +83,20 @@ impl MutexFlavor for Block {
             // likelihood of this is infinitesimally small and the code, is still correct as
             // once the lock is released the holder will still set data.holder to 0 and we
             // will exit the loop.
-            while holder_task.is_running()
-                && data.holder.load(Ordering::Acquire) == holder_id
-            {
+            while holder_task.is_running() && data.holder.load(Ordering::Acquire) == holder_id {
                 core::hint::spin_loop();
             }
-            if let Some(guards) = Self::try_lock(mutex, data) {
-                return guards;
-            }
+            // Holder is either no longer running, or has released the lock.
+            // Either way we will try the fast path one more time before moving
+            // onto the slow path.
         } else {
             // Unlikely case that another thread just acquired the lock, but hasn't yet set
             // data.holder.
             log::warn!("could not get holder task for mutex middle path");
+        }
+
+        if let Some(guards) = Self::try_lock(mutex, data) {
+            return guards;
         }
 
         // Slow path
