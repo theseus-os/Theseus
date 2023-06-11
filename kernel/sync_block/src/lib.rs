@@ -1,4 +1,4 @@
-#![feature(negative_impls)]
+#![feature(negative_impls, let_chains)]
 #![no_std]
 
 mod condvar;
@@ -76,7 +76,7 @@ impl MutexFlavor for Block {
         // Middle path: Wait for one timeslice (see below) of the mutex holder to see if
         // they release the lock.
         let holder_id = data.holder.load(Ordering::Acquire);
-        if let Some(holder_task) = task::get_task(holder_id).and_then(|task| task.upgrade()) {
+        if holder_id != 0 && let Some(holder_task) = task::get_task(holder_id).and_then(|task| task.upgrade()) {
             // Hypothetically, if holder_task is running on another core and is perfectly in
             // sync with us, we would only ever check if they are running when we are also
             // running and so we wouldn't detect when their timeslice is over. However, the
