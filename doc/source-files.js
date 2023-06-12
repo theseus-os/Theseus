@@ -67,6 +67,7 @@ var sourcesIndex = JSON.parse('{\
 "http_client":["",[],["lib.rs"]],\
 "idle":["",[["arch",[["x86_64",[],["intel.rs","mod.rs"]]],["mod.rs"]]],["lib.rs"]],\
 "intel_ethernet":["",[],["descriptors.rs","lib.rs"]],\
+"interrupt_controller":["",[],["lib.rs","x86_64.rs"]],\
 "interrupts":["",[["x86_64",[],["mod.rs"]]],["lib.rs"]],\
 "io":["",[],["lib.rs"]],\
 "ioapic":["",[],["lib.rs"]],\

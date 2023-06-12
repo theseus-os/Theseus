@@ -67,6 +67,12 @@
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
 <a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Implements functions for accessing CPU-specific information on x86_64,
 //! which is primarily a simple wrapper around [`apic`]-provided features.
 
@@ -78,6 +84,12 @@
 <span class="kw">impl </span>From&lt;ApicId&gt; <span class="kw">for </span>CpuId {
     <span class="kw">fn </span>from(apic_id: ApicId) -&gt; <span class="self">Self </span>{
         CpuId(apic_id.value())
+    }
+}
+
+<span class="kw">impl </span>From&lt;CpuId&gt; <span class="kw">for </span>ApicId {
+    <span class="kw">fn </span>from(cpu_id: CpuId) -&gt; <span class="self">Self </span>{
+        ApicId::try_from(cpu_id.value()).expect(<span class="string">&quot;An invalid CpuId was encountered&quot;</span>)
     }
 }
 
