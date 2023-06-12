@@ -1553,6 +1553,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "interrupt_controller"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "arm_boards",
+ "cpu",
+ "gic",
+ "ioapic",
+ "irq_safety",
+ "log",
+ "memory",
+]
+
+[[package]]
 name = "interrupts"
 version = "0.1.0"
 dependencies = [
@@ -1564,6 +1578,7 @@ dependencies = [
  "exceptions_early",
  "gdt",
  "gic",
+ "interrupt_controller",
  "irq_safety",
  "kernel_config",
  "locked_idt",
