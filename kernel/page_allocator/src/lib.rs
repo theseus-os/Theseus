@@ -476,13 +476,15 @@ fn find_any_chunk(
 		Inner::Array(ref mut arr) => {
 			for elem in arr.iter_mut() {
 				if let Some(chunk) = elem {
-					let lowest_start_page = *max(chunk.start(), range.start());
-					let highest_end_page  = *min(chunk.end(), range.end());
-					warn!("Chunk: {:?}, low_start: {:?}, num_pages: {}, high_end: {:?}", chunk, lowest_start_page, num_pages, highest_end_page);
-					if lowest_start_page + num_pages <= highest_end_page {
+					// Use max and min below to ensure that the range of pages we allocate from
+					// is within *both* the current chunk's bounds and the range's bounds.
+					let lowest_possible_start_page = *max(chunk.start(), range.start());
+					let highest_possible_end_page  = *min(chunk.end(), range.end());
+					warn!("Chunk: {:?}, low_start: {:?}, num_pages: {}, high_end: {:?}", chunk, lowest_possible_start_page, num_pages, highest_possible_end_page);
+					if lowest_possible_start_page + num_pages <= highest_possible_end_page {
 						warn!("\t\t yes");
 						return adjust_chosen_chunk(
-							lowest_start_page,
+							lowest_possible_start_page,
 							num_pages,
 							&chunk.clone(),
 							ValueRefMut::Array(elem),
@@ -512,11 +514,13 @@ fn find_any_chunk(
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
 			let mut cursor = tree.upper_bound_mut(Bound::Included(range.end()));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				let lowest_start_page = *max(chunk.start(), range.start());
-				let highest_end_page  = *min(chunk.end(), range.end());
-				if lowest_start_page + num_pages <= highest_end_page {
+				// Use max and min below to ensure that the range of pages we allocate from
+				// is within *both* the current chunk's bounds and the range's bounds.
+				let lowest_possible_start_page = *max(chunk.start(), range.start());
+				let highest_possible_end_page  = *min(chunk.end(), range.end());
+				if lowest_possible_start_page + num_pages <= highest_possible_end_page {
 					return adjust_chosen_chunk(
-						lowest_start_page,
+						lowest_possible_start_page,
 						num_pages,
 						&chunk.clone(),
 						ValueRefMut::RBTree(cursor)
