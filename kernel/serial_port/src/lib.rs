@@ -186,7 +186,7 @@ impl SerialPort {
             interrupt_handler,
             serial_port_receive_deferred,
             serial_port,
-            Some(format!("serial_port_deferred_task_irq_{:#X}", int_num_usize)),
+            Some(format!("serial_port_deferred_task_irq_{int_num_usize:#X}")),
         );
 
         match registration_result {
