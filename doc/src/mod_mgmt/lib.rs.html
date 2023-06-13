@@ -3047,6 +3047,43 @@
 <a href="#3047" id="3047">3047</a>
 <a href="#3048" id="3048">3048</a>
 <a href="#3049" id="3049">3049</a>
+<a href="#3050" id="3050">3050</a>
+<a href="#3051" id="3051">3051</a>
+<a href="#3052" id="3052">3052</a>
+<a href="#3053" id="3053">3053</a>
+<a href="#3054" id="3054">3054</a>
+<a href="#3055" id="3055">3055</a>
+<a href="#3056" id="3056">3056</a>
+<a href="#3057" id="3057">3057</a>
+<a href="#3058" id="3058">3058</a>
+<a href="#3059" id="3059">3059</a>
+<a href="#3060" id="3060">3060</a>
+<a href="#3061" id="3061">3061</a>
+<a href="#3062" id="3062">3062</a>
+<a href="#3063" id="3063">3063</a>
+<a href="#3064" id="3064">3064</a>
+<a href="#3065" id="3065">3065</a>
+<a href="#3066" id="3066">3066</a>
+<a href="#3067" id="3067">3067</a>
+<a href="#3068" id="3068">3068</a>
+<a href="#3069" id="3069">3069</a>
+<a href="#3070" id="3070">3070</a>
+<a href="#3071" id="3071">3071</a>
+<a href="#3072" id="3072">3072</a>
+<a href="#3073" id="3073">3073</a>
+<a href="#3074" id="3074">3074</a>
+<a href="#3075" id="3075">3075</a>
+<a href="#3076" id="3076">3076</a>
+<a href="#3077" id="3077">3077</a>
+<a href="#3078" id="3078">3078</a>
+<a href="#3079" id="3079">3079</a>
+<a href="#3080" id="3080">3080</a>
+<a href="#3081" id="3081">3081</a>
+<a href="#3082" id="3082">3082</a>
+<a href="#3083" id="3083">3083</a>
+<a href="#3084" id="3084">3084</a>
+<a href="#3085" id="3085">3085</a>
+<a href="#3086" id="3086">3086</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(int_roundings)]
@@ -3063,7 +3100,7 @@
 };
 <span class="kw">use </span>spin::{Mutex, Once};
 <span class="kw">use </span>xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-<span class="kw">use </span>memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
+<span class="kw">use </span>memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range};
 <span class="kw">use </span>bootloader_modules::BootloaderModule;
 <span class="kw">use </span>cow_arc::CowArc;
 <span class="kw">use </span>rustc_demangle::demangle;
@@ -3081,6 +3118,7 @@
 <span class="kw">pub mod </span>parse_nano_core;
 <span class="kw">pub mod </span>replace_nano_core_crates;
 <span class="kw">mod </span>serde;
+
 
 <span class="doccomment">/// The name of the directory that contains all of the CrateNamespace files.
 </span><span class="kw">pub const </span>NAMESPACES_DIRECTORY_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;namespaces&quot;</span>;
@@ -5931,6 +5969,35 @@
 }
 
 
+<span class="doccomment">/// The range of virtual addresses from which we allocate pages for executable .text sections.
+///
+/// This is mostly an architecture-specific design choice (hopefully a temporary one):
+/// * On aarch64, even with the large code model, we are not (yet) able to generate
+///   code with branch instructions (call/jump) that can address instructions more than
+///   128 MiB away from the current instruction.
+///   Thus, we restrict the range of .text section locations to ensure they are within 128 MiB.
+///   At some point in the future, this will be a limitation, but not for a long, long time.
+/// * On x86_64, this is not necessary, so the range is `None`.
+</span><span class="kw">pub const </span>KERNEL_TEXT_ADDR_RANGE: <span class="prelude-ty">Option</span>&lt;PageRange&gt; = {
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+        <span class="prelude-val">None
+    </span>}
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
+        <span class="kw">use </span>{memory::Page, kernel_config::memory::KERNEL_OFFSET};
+
+        <span class="kw">const </span>ONE_MIB: usize = <span class="number">0x10_0000</span>;
+        <span class="kw">let </span>start_vaddr = VirtualAddress::new_canonical(KERNEL_OFFSET + ONE_MIB);
+        <span class="kw">let </span>end_vaddr = VirtualAddress::new_canonical(start_vaddr.value() + (<span class="number">128 </span>* ONE_MIB) - <span class="number">1</span>);
+        <span class="prelude-val">Some</span>(PageRange::new(
+            <span class="comment">// the start of the base kernel image&#39;s .text section.
+            </span>Page::containing_address(start_vaddr),
+            <span class="comment">// the start of the base kernel image&#39;s .text section, plus 128 MiB.
+            </span>Page::containing_address(end_vaddr),
+        ))
+    }
+};
+
+
 <span class="doccomment">/// Allocates and maps memory sufficient to hold the sections that are found in the given `ElfFile`.
 /// Only sections that are marked &quot;allocated&quot; (`ALLOC`) in the ELF object file will contribute to the mappings&#39; sizes.
 </span><span class="kw">fn </span>allocate_section_pages(elf_file: <span class="kw-2">&amp;</span>ElfFile, kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef) -&gt; <span class="prelude-ty">Result</span>&lt;SectionPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -6002,10 +6069,37 @@
     <span class="comment">// trace!(&quot;\n\texec_bytes: {exec_bytes} {exec_bytes:#X}\n\tro_bytes:   {ro_bytes} {ro_bytes:#X}\n\trw_bytes:   {rw_bytes} {rw_bytes:#X}&quot;);
 
     // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
-    // We must allocate these pages separately because they will have different flags later.
-    </span><span class="kw">let </span>executable_pages = <span class="kw">if </span>exec_bytes &gt; <span class="number">0 </span>{ <span class="prelude-val">Some</span>(allocate_and_map_as_writable(exec_bytes, TEXT_SECTION_FLAGS,     kernel_mmi_ref)<span class="question-mark">?</span>) } <span class="kw">else </span>{ <span class="prelude-val">None </span>};
-    <span class="kw">let </span>read_only_pages  = <span class="kw">if </span>ro_bytes   &gt; <span class="number">0 </span>{ <span class="prelude-val">Some</span>(allocate_and_map_as_writable(ro_bytes,   RODATA_SECTION_FLAGS,   kernel_mmi_ref)<span class="question-mark">?</span>) } <span class="kw">else </span>{ <span class="prelude-val">None </span>};
-    <span class="kw">let </span>read_write_pages = <span class="kw">if </span>rw_bytes   &gt; <span class="number">0 </span>{ <span class="prelude-val">Some</span>(allocate_and_map_as_writable(rw_bytes,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)<span class="question-mark">?</span>) } <span class="kw">else </span>{ <span class="prelude-val">None </span>};
+    // We must allocate these pages separately because they use different flags.
+    </span><span class="kw">let </span>alloc_sec = |size_in_bytes: usize, within_range: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>PageRange&gt;, flags: PteFlags| {
+        <span class="kw">let </span>allocated_pages = <span class="kw">if let </span><span class="prelude-val">Some</span>(range) = within_range {
+            allocate_pages_by_bytes_in_range(size_in_bytes, range)
+                .map_err(|<span class="kw">_</span>| <span class="string">&quot;Couldn&#39;t allocate pages in text section address range&quot;</span>)<span class="question-mark">?
+        </span>} <span class="kw">else </span>{
+            allocate_pages_by_bytes(size_in_bytes)
+                .ok_or(<span class="string">&quot;Couldn&#39;t allocate pages for new section&quot;</span>)<span class="question-mark">?
+        </span>};
+    
+        kernel_mmi_ref.lock().page_table.map_allocated_pages(
+            allocated_pages,
+            flags.valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>)
+        )
+    };
+
+    <span class="kw">let </span>executable_pages = <span class="kw">if </span>exec_bytes &gt; <span class="number">0 </span>{
+        <span class="prelude-val">Some</span>(alloc_sec(exec_bytes, KERNEL_TEXT_ADDR_RANGE.as_ref(), TEXT_SECTION_FLAGS)<span class="question-mark">?</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
+    <span class="kw">let </span>read_only_pages  = <span class="kw">if </span>ro_bytes &gt; <span class="number">0 </span>{
+        <span class="prelude-val">Some</span>(alloc_sec(ro_bytes, <span class="prelude-val">None</span>, RODATA_SECTION_FLAGS)<span class="question-mark">?</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
+    <span class="kw">let </span>read_write_pages = <span class="kw">if </span>rw_bytes &gt; <span class="number">0 </span>{
+        <span class="prelude-val">Some</span>(alloc_sec(rw_bytes, <span class="prelude-val">None</span>, DATA_BSS_SECTION_FLAGS)<span class="question-mark">?</span>)
+    } <span class="kw">else </span>{
+        <span class="prelude-val">None
+    </span>};
 
     <span class="kw">let </span>range_tuple = |mp: MappedPages, size_in_bytes: usize| {
         <span class="kw">let </span>start = mp.start_address();
@@ -6017,26 +6111,6 @@
         read_only_pages:  read_only_pages .map(|mp| range_tuple(mp, ro_bytes)),
         read_write_pages: read_write_pages.map(|mp| range_tuple(mp, rw_bytes)),
     })
-}
-
-
-<span class="doccomment">/// A convenience function for allocating virtual pages and mapping them to random physical frames. 
-/// 
-/// The returned `MappedPages` will be at least as large as `size_in_bytes`,
-/// rounded up to the nearest `Page` size, 
-/// and is mapped as writable along with the other specified `flags`
-/// to ensure we can copy content into it.
-</span><span class="kw">fn </span>allocate_and_map_as_writable(
-    size_in_bytes: usize,
-    flags: PteFlags,
-    kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
-) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes)
-        .ok_or(<span class="string">&quot;Couldn&#39;t allocate_pages_by_bytes, out of virtual address space&quot;</span>)<span class="question-mark">?</span>;
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(
-        allocated_pages,
-        flags.valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>)
-    )
 }
 
 

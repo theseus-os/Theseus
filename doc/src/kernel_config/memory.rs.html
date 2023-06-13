@@ -109,10 +109,7 @@
 <a href="#109" id="109">109</a>
 <a href="#110" id="110">110</a>
 <a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-</pre><pre class="rust"><code><span class="doccomment">//! The basic virtual memory map that Theseus assumes.
+</pre><pre class="rust"><code><span class="doccomment">//! The basic virtual address ranges (virtual memory map) defined by Theseus.
 //!
 //! Current P4 (top-level page table) mappings:
 //! * 511: kernel text sections.
@@ -167,15 +164,15 @@
 
 <span class="doccomment">/// Value: 512.
 </span><span class="kw">pub const </span>ENTRIES_PER_PAGE_TABLE: usize = PAGE_SIZE / BYTES_PER_ADDR;
-<span class="doccomment">/// Value: 511. The 511th entry is used for kernel text sections
+<span class="doccomment">/// Value: 511. The 511th entry is used (in part) for kernel text sections.
 </span><span class="kw">pub const </span>KERNEL_TEXT_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - <span class="number">1</span>;
 <span class="doccomment">/// Value: 510. The 510th entry is used to recursively map the current P4 root page table frame
-</span><span class="comment">//              such that it can be accessed and modified just like any other level of page table.
+///             such that it can be accessed and modified just like any other level of page table.
 </span><span class="kw">pub const </span>RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - <span class="number">2</span>;
-<span class="doccomment">/// Value: 509. The 509th entry is used for the kernel heap
+<span class="doccomment">/// Value: 509. The 509th entry is used for the kernel heap.
 </span><span class="kw">pub const </span>KERNEL_HEAP_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - <span class="number">3</span>;
 <span class="doccomment">/// Value: 508. The 508th entry is used to temporarily recursively map the P4 root page table frame
-</span><span class="comment">//              of an upcoming (new) page table such that it can be accessed and modified.
+///             of an upcoming (new) page table such that it can be accessed and modified.
 </span><span class="kw">pub const </span>UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX: usize = ENTRIES_PER_PAGE_TABLE - <span class="number">4</span>;
 
 
@@ -203,12 +200,9 @@
 /// Actual value on x86_64: 0o177777_777_000_000_000_0000, or 0xFFFF_FF80_0000_0000
 </span><span class="kw">pub const </span>KERNEL_TEXT_START: usize = canonicalize(KERNEL_TEXT_P4_INDEX &lt;&lt; (P4_INDEX_SHIFT + PAGE_SHIFT));
 
-<span class="doccomment">/// The size in bytes, not in pages.
-///
-/// the KERNEL_OFFSET starts at (MAX_ADDR - 2GiB),
-/// and .text contains nano_core, so this is the
-/// first 510GiB of the 511th P4 entry.
-</span><span class="kw">pub const </span>KERNEL_TEXT_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY - TWO_GIGABYTES;
+<span class="doccomment">/// The start of the virtual address range covered by the 510th P4 entry,
+/// i.e., [`RECURSIVE_P4_INDEX`];
+</span><span class="kw">pub const </span>RECURSIVE_P4_START: usize = canonicalize(RECURSIVE_P4_INDEX &lt;&lt; (P4_INDEX_SHIFT + PAGE_SHIFT));
 
 <span class="doccomment">/// The higher-half heap gets the 512GB address range starting at the 509th P4 entry,
 /// which is the slot right below the recursive P4 entry (510).
@@ -217,14 +211,14 @@
 
 <span class="attr">#[cfg(not(debug_assertions))]
 </span><span class="kw">pub const </span>KERNEL_HEAP_INITIAL_SIZE: usize = <span class="number">64 </span>* <span class="number">1024 </span>* <span class="number">1024</span>; <span class="comment">// 64 MiB
-
 </span><span class="attr">#[cfg(debug_assertions)]
 </span><span class="kw">pub const </span>KERNEL_HEAP_INITIAL_SIZE: usize = <span class="number">256 </span>* <span class="number">1024 </span>* <span class="number">1024</span>; <span class="comment">// 256 MiB, debug builds require more heap space.
 
-</span><span class="doccomment">/// the kernel heap gets the whole 509th P4 entry.
+</span><span class="doccomment">/// The kernel heap is allowed to grow to fill the entirety of its P4 entry.
 </span><span class="kw">pub const </span>KERNEL_HEAP_MAX_SIZE: usize = ADDRESSABILITY_PER_P4_ENTRY;
 
-<span class="doccomment">/// The system (page allocator) must not use addresses at or above this address.
-</span><span class="kw">pub const </span>UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START: usize = canonicalize(UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX &lt;&lt; (P4_INDEX_SHIFT + PAGE_SHIFT));
+<span class="doccomment">/// The start of the virtual address range covered by the 508th P4 entry,
+/// i.e., [`UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX`];
+</span><span class="kw">pub const </span>UPCOMING_PAGE_TABLE_RECURSIVE_P4_START: usize = canonicalize(UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX &lt;&lt; (P4_INDEX_SHIFT + PAGE_SHIFT));
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="kernel_config" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

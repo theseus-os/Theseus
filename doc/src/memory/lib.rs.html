@@ -298,13 +298,6 @@
 <a href="#298" id="298">298</a>
 <a href="#299" id="299">299</a>
 <a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a>
-<a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a>
-<a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -330,15 +323,8 @@
 };
 
 <span class="kw">pub use </span>memory_structs::<span class="kw-2">*</span>;
-<span class="kw">pub use </span>page_allocator::{
-    AllocatedPages, allocate_pages, allocate_pages_at,
-    allocate_pages_by_bytes, allocate_pages_by_bytes_at,
-};
-
-<span class="kw">pub use </span>frame_allocator::{
-    AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
-    allocate_frames, allocate_frames_at, allocate_frames_by_bytes_at, allocate_frames_by_bytes,
-};
+<span class="kw">pub use </span>page_allocator::<span class="kw-2">*</span>;
+<span class="kw">pub use </span>frame_allocator::<span class="kw-2">*</span>;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">use </span>memory_x86_64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr };
