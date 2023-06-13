@@ -82,6 +82,10 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
 
 impl LocalInterruptControllerApi for LocalInterruptController {
+    fn init_secondary_cpu_interface(&self) {
+        panic!("This must not be used on x86_64")
+    }
+
     fn id(&self) -> LocalInterruptControllerId {
         get_int_ctlr!(int_ctlr, id);
 
@@ -110,9 +114,12 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         todo!()
     }
 
-    fn send_ipi(&self, destination: InterruptDestination) {
+    fn send_ipi(&self, num: LocalInterruptNumber, dest: Option<CpuId>) {
         get_int_ctlr!(int_ctlr, send_ipi);
-        int_ctlr.send_ipi(destination.local_number.0, LapicIpiDestination::One(destination.cpu.into()))
+        int_ctlr.send_ipi(num.0, match dest {
+            Some(cpu) => LapicIpiDestination::One(cpu.into()),
+            None => LapicIpiDestination::AllButMe,
+        });
     }
 
     fn get_minimum_priority(&self) -> Priority {
@@ -129,14 +136,14 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         let _ = priority;
     }
 
-    fn acknowledge_interrupt(&self) -> (LocalInterruptNumber, Priority) {
+    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
         panic!("This must not be used on x86_64")
     }
 
-    fn end_of_interrupt(&self, _number: LocalInterruptNumber) {
+    fn end_of_interrupt(&self, _number: InterruptNumber) {
         get_int_ctlr!(int_ctlr, end_of_interrupt);
 
-        // On x86, passing the LocalInterruptNumber isn't required.
+        // On x86, passing the number isn't required.
         int_ctlr.eoi();
     }
 }

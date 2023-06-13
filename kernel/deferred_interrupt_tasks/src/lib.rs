@@ -117,9 +117,11 @@ pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
             #[cfg(target_arch = "aarch64")]
             let existing_handler_address = existing_handler_address as usize;
 
+            let interrupt_number_usize: usize = interrupt_number.into();
             error!("Interrupt number {:#X} was already taken by handler at {:#X}! Sharing IRQs is currently unsupported.",
-                interrupt_number, existing_handler_address
+                interrupt_number_usize, existing_handler_address
             );
+
             InterruptRegistrationError::IrqInUse {
                 irq: interrupt_number,
                 existing_handler_address,

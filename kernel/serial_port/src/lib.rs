@@ -94,7 +94,7 @@ pub fn init_serial_port(
         let (int_num, int_handler) = interrupt_number_handler(&serial_port_address);
 
         #[cfg(target_arch = "aarch64")]
-        let (int_num, int_handler) = (PL011_RX_SPI, com1_com3_interrupt_handler);
+        let (int_num, int_handler) = (PL011_RX_SPI.into(), com1_com3_interrupt_handler);
 
         SerialPort::register_interrupt_handler(sp.clone(), int_num, int_handler).unwrap();
 
@@ -178,13 +178,15 @@ impl SerialPort {
             sp.base_port_address()
         };
 
-        // Register the interrupt handler for this serial port. 
+        let int_num_usize: usize = interrupt_number.into();
+
+        // Register the interrupt handler for this serial port.
         let registration_result = deferred_interrupt_tasks::register_interrupt_handler(
             interrupt_number,
             interrupt_handler,
             serial_port_receive_deferred,
             serial_port,
-            Some(format!("serial_port_deferred_task_irq_{interrupt_number:#X}")),
+            Some(format!("serial_port_deferred_task_irq_{:#X}", int_num_usize)),
         );
 
         match registration_result {
@@ -194,7 +196,7 @@ impl SerialPort {
                 // immediate interrupt handler to use when it fires
                 // such that it triggers the deferred task to act. 
                 info!("Registered interrupt handler at IRQ {:#X} for serial port {:?}.",
-                    interrupt_number, base_port,
+                    int_num_usize, base_port,
                 );
                 match base_port {
                     SerialPortAddress::COM1 | SerialPortAddress::COM3 => {
@@ -216,10 +218,11 @@ impl SerialPort {
                 };                
             }
             Err(InterruptRegistrationError::IrqInUse { irq, existing_handler_address }) => {
+                let irq_usize: usize = irq.into();
                 if existing_handler_address != interrupt_handler as usize {
                     error!("Failed to register interrupt handler at IRQ {:#X} for serial port {:?}. \
                         Existing interrupt handler was a different handler, at address {:#X}.",
-                        irq, base_port, existing_handler_address,
+                        irq_usize, base_port, existing_handler_address,
                     );
                 }
             }

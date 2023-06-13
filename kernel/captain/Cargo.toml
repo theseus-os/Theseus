@@ -10,6 +10,7 @@ log = "0.4.8"
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 dfqueue = { path = "../../libs/dfqueue", version = "0.1.0" }
+interrupt_controller = { path = "../interrupt_controller" }
 multicore_bringup = { path = "../multicore_bringup" }
 device_manager = { path = "../device_manager" }
 early_printer = { path = "../early_printer" }

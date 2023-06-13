@@ -117,23 +117,18 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         get_int_ctlr!(int_ctlr, get_destination, self);
 
         let priority = int_ctlr.get_interrupt_priority(interrupt_num.0);
-        let local_number = LocalInterruptNumber(interrupt_num.0);
-
         let vec = match int_ctlr.get_spi_target(interrupt_num.0)?.canonicalize() {
             SpiDestination::Specific(cpu) => [InterruptDestination {
                 cpu,
-                local_number,
             }].to_vec(),
             SpiDestination::AnyCpuAvailable => BOARD_CONFIG.cpu_ids.map(|mpidr| InterruptDestination {
                 cpu: mpidr.into(),
-                local_number,
             }).to_vec(),
             SpiDestination::GICv2TargetList(list) => {
                 let mut vec = Vec::with_capacity(8);
                 for result in list.iter() {
                     vec.push(InterruptDestination {
                         cpu: result?,
-                        local_number,
                     });
                 }
                 vec
@@ -150,7 +145,6 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         priority: Priority,
     ) -> Result<(), &'static str> {
         get_int_ctlr!(int_ctlr, set_destination, self);
-        assert_eq!(sys_int_num.0, destination.local_number.0, "Local & System Interrupt Numbers cannot be different with GIC");
 
         int_ctlr.set_spi_target(sys_int_num.0, SpiDestination::Specific(destination.cpu));
         int_ctlr.set_interrupt_priority(sys_int_num.0, priority);
@@ -160,6 +154,11 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 }
 
 impl LocalInterruptControllerApi for LocalInterruptController {
+    fn init_secondary_cpu_interface(&self) {
+        get_int_ctlr!(int_ctlr, init_secondary_cpu_interface);
+        int_ctlr.init_secondary_cpu_interface();
+    }
+
     fn id(&self) -> LocalInterruptControllerId {
         get_int_ctlr!(int_ctlr, id);
         LocalInterruptControllerId(int_ctlr.get_cpu_interface_id())
@@ -185,9 +184,12 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         int_ctlr.set_interrupt_state(num.0, enabled);
     }
 
-    fn send_ipi(&self, destination: InterruptDestination) {
+    fn send_ipi(&self, num: LocalInterruptNumber, dest: Option<CpuId>) {
         get_int_ctlr!(int_ctlr, send_ipi);
-        int_ctlr.send_ipi(destination.local_number.0, IpiTargetCpu::Specific(destination.cpu));
+        int_ctlr.send_ipi(num.0, match dest {
+            Some(cpu) => IpiTargetCpu::Specific(cpu),
+            None => IpiTargetCpu::AllOtherCpus,
+        });
     }
 
     fn get_minimum_priority(&self) -> Priority {
@@ -200,16 +202,20 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         int_ctlr.set_minimum_priority(priority)
     }
 
-    fn acknowledge_interrupt(&self) -> (LocalInterruptNumber, Priority) {
+    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
         get_int_ctlr!(int_ctlr, acknowledge_interrupt);
 
         let (num, prio) = int_ctlr.acknowledge_interrupt();
 
-        (LocalInterruptNumber(num), prio)
+        (match num {
+            0..=31 => LocalInterruptNumber(num).into(),
+            _ => SystemInterruptNumber(num).into(),
+        }, prio)
     }
 
-    fn end_of_interrupt(&self, number: LocalInterruptNumber) {
+    fn end_of_interrupt(&self, number: InterruptNumber) {
         get_int_ctlr!(int_ctlr, end_of_interrupt);
-        int_ctlr.end_of_interrupt(number.0)
+        let num_usize: usize = number.into();
+        int_ctlr.end_of_interrupt(num_usize as _)
     }
 }
