@@ -1,4 +1,4 @@
-use crate::{Chunk, MemoryRegionType, frame_is_in_list, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST, RESERVED_REGIONS};
+use crate::{Chunk, MemoryRegionType, contains_any, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST, RESERVED_REGIONS};
 use memory_structs::{FrameRange, Frame};
 use core::{fmt, ops::{Deref, DerefMut}, marker::PhantomData};
 use trusted_chunk::trusted_chunk::TrustedChunk;
@@ -115,7 +115,7 @@ impl AllocatedFrames {
 /// the `page_table_entry` crate, since `page_table_entry` must depend on types
 /// from this crate in order to enforce safety when modifying page table entries.
 pub(crate) fn into_allocated_frames(tc: TrustedChunk, frames: FrameRange) -> AllocatedFrames {
-    let typ = if frame_is_in_list(&RESERVED_REGIONS.lock(), frames.start()) {
+    let typ = if contains_any(&RESERVED_REGIONS.lock(), &frames) {
         MemoryRegionType::Reserved
     } else {
         MemoryRegionType::Free
@@ -127,7 +127,7 @@ impl Drop for AllocatedFrames {
     fn drop(&mut self) {
         if self.size_in_frames() == 0 { return; }
 
-        let (list, typ) = if frame_is_in_list(&RESERVED_REGIONS.lock(), self.start()) {
+        let (list, typ) = if contains_any(&RESERVED_REGIONS.lock(), &self.frames) {
             (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
         } else {
             (&FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
