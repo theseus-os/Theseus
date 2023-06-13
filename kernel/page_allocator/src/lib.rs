@@ -560,7 +560,7 @@ fn find_any_chunk(
 			// for c in eligible_chunks { ... }
 			// ```
 			//
-			// RBTree doesn't have a `range_mut()` method, so we use cursors for two round of iteration.
+			// RBTree doesn't have a `range_mut()` method, so we use cursors for two rounds of iteration.
 			// The first iterates over the lower designated region, from higher addresses to lower, down to zero.
 			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {

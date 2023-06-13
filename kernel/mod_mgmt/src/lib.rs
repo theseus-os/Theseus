@@ -2987,10 +2987,10 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
     let alloc_sec = |size_in_bytes: usize, within_range: Option<&PageRange>, flags: PteFlags| {
         let allocated_pages = if let Some(range) = within_range {
             allocate_pages_by_bytes_in_range(size_in_bytes, range)
-                .map_err(|_| "Couldn't allocated pages in text section address range")?
+                .map_err(|_| "Couldn't allocate pages in text section address range")?
         } else {
             allocate_pages_by_bytes(size_in_bytes)
-                .ok_or("Couldn't allocate pages for new read-only or read-write section")?
+                .ok_or("Couldn't allocate pages for new section")?
         };
     
         kernel_mmi_ref.lock().page_table.map_allocated_pages(
