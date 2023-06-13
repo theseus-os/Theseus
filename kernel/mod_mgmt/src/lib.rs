@@ -12,10 +12,9 @@ use alloc::{
     string::{String, ToString}, 
     sync::{Arc, Weak}, vec::Vec
 };
-use kernel_config::memory::KERNEL_OFFSET;
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range, Page};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -2892,16 +2891,24 @@ struct SectionPages {
 ///   128 MiB away from the current instruction.
 ///   Thus, we restrict the range of .text section locations to ensure they are within 128 MiB.
 ///   At some point in the future, this will be a limitation, but not for a long, long time.
-/// * On x86_64, this is not strictly necessary, but likely improves cache locality.
-pub const KERNEL_TEXT_ADDR_RANGE: PageRange = {
-    const ONE_MIB: usize = 0x10_0000;
-    let start_vaddr = KERNEL_OFFSET + ONE_MIB;
-    PageRange::new(
-        // the start of the base kernel image's .text section.
-        Page::containing_address(VirtualAddress::new_canonical(start_vaddr)),
-        // the start of the base kernel image's .text section, plus 128 MiB.
-        Page::containing_address(VirtualAddress::new_canonical(start_vaddr + (128 * ONE_MIB) - 1)),
-    )
+/// * On x86_64, this is not necessary, so the range is `None`.
+pub const KERNEL_TEXT_ADDR_RANGE: Option<PageRange> = {
+    #[cfg(target_arch = "x86_64")] {
+        None
+    }
+    #[cfg(target_arch = "aarch64")] {
+        use {memory::Page, kernel_config::memory::KERNEL_OFFSET};
+
+        const ONE_MIB: usize = 0x10_0000;
+        let start_vaddr = VirtualAddress::new_canonical(KERNEL_OFFSET + ONE_MIB);
+        let end_vaddr = VirtualAddress::new_canonical(start_vaddr.value() + (128 * ONE_MIB) - 1);
+        Some(PageRange::new(
+            // the start of the base kernel image's .text section.
+            Page::containing_address(start_vaddr),
+            // the start of the base kernel image's .text section, plus 128 MiB.
+            Page::containing_address(end_vaddr),
+        ))
+    }
 };
 
 
@@ -2993,7 +3000,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
     };
 
     let executable_pages = if exec_bytes > 0 {
-        Some(alloc_sec(exec_bytes, Some(&KERNEL_TEXT_ADDR_RANGE), TEXT_SECTION_FLAGS)?)
+        Some(alloc_sec(exec_bytes, KERNEL_TEXT_ADDR_RANGE.as_ref(), TEXT_SECTION_FLAGS)?)
     } else {
         None
     };
