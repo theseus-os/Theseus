@@ -15,7 +15,6 @@
 //! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
 
 #![no_std]
-#![feature(result_option_inspect)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -467,8 +466,6 @@ fn find_any_chunk(
 	let full_range = PageRange::new(*designated_low_end + 1, DESIGNATED_PAGES_HIGH_START - 1);
 	let range = within_range.unwrap_or(&full_range);
 
-	trace!("Allocating {} pages within range {:?}", num_pages, range);
-
 	// During the first pass, we only search within the given range.
 	// If no range was given, we search from the end of the low designated region
 	// to the start of the high designated region.
@@ -480,17 +477,13 @@ fn find_any_chunk(
 					// is within *both* the current chunk's bounds and the range's bounds.
 					let lowest_possible_start_page = *max(chunk.start(), range.start());
 					let highest_possible_end_page  = *min(chunk.end(), range.end());
-					warn!("Chunk: {:?}, low_start: {:?}, num_pages: {}, high_end: {:?}", chunk, lowest_possible_start_page, num_pages, highest_possible_end_page);
 					if lowest_possible_start_page + num_pages <= highest_possible_end_page {
-						warn!("\t\t yes");
 						return adjust_chosen_chunk(
 							lowest_possible_start_page,
 							num_pages,
 							&chunk.clone(),
 							ValueRefMut::Array(elem),
 						);
-					} else {
-						warn!("\t\t no");
 					}
 
 					// The early static array is not sorted, so we must iterate over all elements.
@@ -530,7 +523,7 @@ fn find_any_chunk(
 				if chunk.start() <= range.start() {
 					break; // move on to searching through the designated regions
 				}
-				warn!("Page allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages in {:?}.", num_pages, range);
+				warn!("page_allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages in {:?}.", num_pages, range);
 				cursor.move_prev();
 			}
 		}
@@ -700,7 +693,6 @@ pub fn allocate_pages_deferred(
 	} else {
 		find_any_chunk(&mut locked_list, num_pages, within_range)
 	}
-	.inspect(|(ap, _)| trace!("--> allocated {} pages {:?}", num_pages, ap))
 	.map_err(From::from) // convert from AllocationError to &str
 }
 
