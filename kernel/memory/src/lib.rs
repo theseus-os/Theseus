@@ -24,15 +24,8 @@ pub use self::paging::{
 };
 
 pub use memory_structs::*;
-pub use page_allocator::{
-    AllocatedPages, allocate_pages, allocate_pages_at,
-    allocate_pages_by_bytes, allocate_pages_by_bytes_at,
-};
-
-pub use frame_allocator::{
-    AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
-    allocate_frames, allocate_frames_at, allocate_frames_by_bytes_at, allocate_frames_by_bytes,
-};
+pub use page_allocator::*;
+pub use frame_allocator::*;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr };
