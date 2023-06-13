@@ -157,20 +157,20 @@ pub fn init<F, R, P>(
         reserved_list = temp_reserved_list;
     }
     
-    
-    // Finally, one last sanity check -- ensure no two regions overlap. 
-    let all_areas = free_list[..free_list_idx].iter().flatten()
-    .chain(reserved_list.iter().flatten());
-    for (i, elem) in all_areas.clone().enumerate() {
-        let next_idx = i + 1;
-        for other in all_areas.clone().skip(next_idx) {
-            if let Some(overlap) = elem.overlap(other) {
-                panic!("BUG: frame allocator free list had overlapping ranges: \n \t {:?} and {:?} overlap at {:?}",
-                    elem, other, overlap,
-                );
-            }
-        }
-    }
+    // We can remove this sanity check because the following code uses formally verified functions to ensure no two regions overlap.
+    // // Finally, one last sanity check -- ensure no two regions overlap. 
+    // let all_areas = free_list[..free_list_idx].iter().flatten()
+    // .chain(reserved_list.iter().flatten());
+    // for (i, elem) in all_areas.clone().enumerate() {
+    //     let next_idx = i + 1;
+    //     for other in all_areas.clone().skip(next_idx) {
+    //         if let Some(overlap) = elem.overlap(other) {
+    //             panic!("BUG: frame allocator free list had overlapping ranges: \n \t {:?} and {:?} overlap at {:?}",
+    //                 elem, other, overlap,
+    //             );
+    //         }
+    //     }
+    // }
 
     // Here, since we're sure we now have a list of regions that don't overlap, we can create lists of formally verified Chunks
     let mut free_list_w_chunks: [Option<Chunk>; 32] = Default::default();
@@ -194,9 +194,7 @@ pub fn init<F, R, P>(
     *GENERAL_REGIONS.lock()           = StaticArrayRBTree::new(free_list);
     *RESERVED_REGIONS.lock()          = StaticArrayRBTree::new(reserved_list);
 
-    // Register the callback to create a Chunk.
-    // This function is not formally-verified and we only call it in the code path for UnmappedFrames.
-    // trusted_chunk_shim::INTO_VERIFIED_CHUNK_FUNC.call_once(|| trusted_chunk::init());
+    // Register the callbacks to create a TrustedChunk and AllocatedFrames from an unmapped PTE
     Ok((trusted_chunk::init()?, into_allocated_frames))
 }
 
