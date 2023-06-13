@@ -1,4 +1,10 @@
 #![no_std]
+//! This crate contains callbacks to create `TrustedChunk` objects and then `AllocatedFrames` objects from an `UnmappedFrames`.
+//! It's required to avoid a cyclic dependency between the `frame_allocator` and `page_table_entry` crates. 
+//! 
+//! The public `from_unmapped()` function ensures that an `UnmappedFrames` object has to be consumed to run the callbacks,
+/// making sure that it can only be called when a PTE has been unmapped.
+
 extern crate page_table_entry;
 extern crate frame_allocator;
 extern crate trusted_chunk;
@@ -13,6 +19,14 @@ use trusted_chunk::trusted_chunk::TrustedChunk;
 use memory_structs::FrameRange;
 use spin::Once;
 use range_inclusive::RangeInclusive;
+
+/// This is a private callback used to convert `UnmappedFrames` into a `TrustedChunk`.
+/// The `TrustedChunk` is then used to create an `AllocatedFrames`.
+/// 
+/// This is safe because the init function in the `trusted_chunk` crate returns this callback only once,
+/// and only this crate has access to the callback. The callback function has been verified with the 
+/// invariant that the new `TrustedChunk` has the same bounds as the range passed as an argument.
+static INTO_TRUSTED_CHUNK_FUNC: Once<fn(RangeInclusive<usize>) -> TrustedChunk> = Once::new();
 
 /// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
 /// 
@@ -31,7 +45,6 @@ use range_inclusive::RangeInclusive;
 /// only this crate has access to that function callback and can thus guarantee
 /// that it is only invoked for `UnmappedFrames`.
 static INTO_ALLOCATED_FRAMES_FUNC: Once<fn(TrustedChunk, FrameRange) -> AllocatedFrames> = Once::new();
-static INTO_TRUSTED_CHUNK_FUNC: Once<fn(RangeInclusive<usize>) -> TrustedChunk> = Once::new();
 
 pub fn init(into_trusted_chunk_fn: fn(RangeInclusive<usize>) -> TrustedChunk, into_alloc_frames_fn: fn(TrustedChunk, FrameRange) -> AllocatedFrames) {
     INTO_TRUSTED_CHUNK_FUNC.call_once(|| into_trusted_chunk_fn);
