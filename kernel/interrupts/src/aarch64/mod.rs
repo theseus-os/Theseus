@@ -164,8 +164,6 @@ pub fn init() -> Result<(), &'static str> {
     let int_ctrl = LocalInterruptController;
     int_ctrl.set_minimum_priority(0);
 
-    info!("Done Configuring the interrupt controller");
-
     Ok(())
 }
 
