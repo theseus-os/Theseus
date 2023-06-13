@@ -613,7 +613,7 @@ impl MappedPages {
             // freed from the newly-unmapped P1 PTE entry above.
             match unmapped_frames {
                 UnmapResult::Exclusive(newly_unmapped_frames) => {
-                    let newly_unmapped_frames = mem_into_fns::from_unmapped(newly_unmapped_frames)?;
+                    let newly_unmapped_frames = frame_range_callbacks::from_unmapped(newly_unmapped_frames)?;
 
                     if let Some(mut curr_frames) = current_frame_range.take() {
                         match curr_frames.merge(newly_unmapped_frames) {

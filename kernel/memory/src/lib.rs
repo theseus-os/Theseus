@@ -14,7 +14,7 @@
 #![feature(ptr_internals)]
 
 extern crate alloc;
-extern crate mem_into_fns;
+extern crate frame_range_callbacks;
 
 mod paging;
 pub use self::paging::{
@@ -271,7 +271,7 @@ pub fn init(
     debug!("Initialized new page allocator!");
     page_allocator::dump_page_allocator_state();
 
-    mem_into_fns::init(into_trusted_chunk_fn, into_alloc_frames_fn);
+    frame_range_callbacks::init(into_trusted_chunk_fn, into_alloc_frames_fn);
 
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
     paging::init(boot_info, kernel_stack_start)

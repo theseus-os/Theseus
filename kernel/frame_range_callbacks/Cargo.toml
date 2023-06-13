@@ -1,6 +1,6 @@
 [package]
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
-name = "mem_into_fns"
+name = "frame_range_callbacks"
 description = "trusted callbacks to recreate memory ranges from an unmapped PTE"
 version = "0.1.0"
 

@@ -1193,6 +1193,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "frame_range_callbacks"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "frame_allocator",
+ "log",
+ "memory_structs",
+ "page_table_entry",
+ "range_inclusive",
+ "spin 0.9.4",
+ "trusted_chunk",
+ "x86_64",
+]
+
+[[package]]
 name = "framebuffer"
 version = "0.1.0"
 dependencies = [
@@ -1921,21 +1936,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
 
 [[package]]
-name = "mem_into_fns"
-version = "0.1.0"
-dependencies = [
- "core2",
- "frame_allocator",
- "log",
- "memory_structs",
- "page_table_entry",
- "range_inclusive",
- "spin 0.9.4",
- "trusted_chunk",
- "x86_64",
-]
-
-[[package]]
 name = "memchr"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1989,11 +1989,11 @@ dependencies = [
  "bitflags",
  "boot_info",
  "frame_allocator",
+ "frame_range_callbacks",
  "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
- "mem_into_fns",
  "memory_aarch64",
  "memory_structs",
  "memory_x86_64",

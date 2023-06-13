@@ -43,6 +43,7 @@ impl <T: Ord> Wrapper<T> {
         })
     }
 
+	/// Returns the inner value, consuming this wrapper.
 	pub(crate) fn into_inner(self) -> T {
 		self.inner
 	}
