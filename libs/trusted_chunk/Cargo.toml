@@ -3,10 +3,7 @@ name = "trusted_chunk"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-# prusti-contracts = { git = "https://github.com/viperproject/prusti-dev.git" }
 prusti-contracts = "^0.1"
 cfg-if = "1.0.0"
 range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
