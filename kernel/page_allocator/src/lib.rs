@@ -649,6 +649,16 @@ fn adjust_chosen_chunk(
 }
 
 
+/// Possible options when requested pages from the page allocator.
+pub enum AllocationRequest<'r> {
+	/// The allocated pages can be located at any virtual address.
+	Any,
+	/// The allocated pages must start exactly at the given `VirtualAddress`.
+	AtVirtualAddress(VirtualAddress),
+	/// The allocated pages can be located anywhere within the given range.
+	WithinRange(&'r PageRange),
+}
+
 /// The core page allocation routine that allocates the given number of virtual pages,
 /// optionally at the requested starting `VirtualAddress`.
 /// 
@@ -660,9 +670,8 @@ fn adjust_chosen_chunk(
 /// Fragmentation isn't cleaned up until we're out of address space, but that's not really a big deal.
 /// 
 /// # Arguments
-/// * `requested_vaddr`: if `Some`, the returned `AllocatedPages` will start at the `Page`
-///   containing this `VirtualAddress`. 
-///   If `None`, the first available `Page` range will be used, starting at any random virtual address.
+/// * `request`: whether to allocate `num_pages` pages at any address,
+///    at a specific virtual address, or withing a specified range.
 /// * `num_pages`: the number of `Page`s to be allocated. 
 /// 
 /// # Return
@@ -672,9 +681,8 @@ fn adjust_chosen_chunk(
 ///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
 ///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
 pub fn allocate_pages_deferred(
-	requested_vaddr: Option<VirtualAddress>,
+	request: AllocationRequest,
 	num_pages: usize,
-	within_range: Option<&PageRange>,
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
 	if num_pages == 0 {
 		warn!("PageAllocator: requested an allocation of 0 pages... stupid!");
@@ -688,12 +696,18 @@ pub fn allocate_pages_deferred(
 	// - Can fit the requested size (starting at the requested address) within the chunk.
 	// - The chunk can only be within in a designated region if a specific address was requested, 
 	//   or all other non-designated chunks are already in use.
-	if let Some(vaddr) = requested_vaddr {
-		find_specific_chunk(&mut locked_list, Page::containing_address(vaddr), num_pages)
-	} else {
-		find_any_chunk(&mut locked_list, num_pages, within_range)
-	}
-	.map_err(From::from) // convert from AllocationError to &str
+	let res = match request {
+		AllocationRequest::AtVirtualAddress(vaddr) => {
+			find_specific_chunk(&mut locked_list, Page::containing_address(vaddr), num_pages)
+		}
+		AllocationRequest::Any => {
+			find_any_chunk(&mut locked_list, num_pages, None)
+		}
+		AllocationRequest::WithinRange(range) => {
+			find_any_chunk(&mut locked_list, num_pages, Some(range))
+		}
+	};
+	res.map_err(From::from) // convert from AllocationError to &str
 }
 
 
@@ -702,16 +716,16 @@ pub fn allocate_pages_deferred(
 /// 
 /// This function still allocates whole pages by rounding up the number of bytes. 
 pub fn allocate_pages_by_bytes_deferred(
-	requested_vaddr: Option<VirtualAddress>,
+	request: AllocationRequest,
 	num_bytes: usize,
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
-	let actual_num_bytes = if let Some(vaddr) = requested_vaddr {
+	let actual_num_bytes = if let AllocationRequest::AtVirtualAddress(vaddr) = request {
 		num_bytes + (vaddr.value() % PAGE_SIZE)
 	} else {
 		num_bytes
 	};
 	let num_pages = (actual_num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages_deferred(requested_vaddr, num_pages, None)
+	allocate_pages_deferred(request, num_pages)
 }
 
 
@@ -719,7 +733,7 @@ pub fn allocate_pages_by_bytes_deferred(
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
-	allocate_pages_deferred(None, num_pages, None)
+	allocate_pages_deferred(AllocationRequest::Any, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok()
 }
@@ -731,7 +745,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 /// This function still allocates whole pages by rounding up the number of bytes. 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
-	allocate_pages_by_bytes_deferred(None, num_bytes)
+	allocate_pages_by_bytes_deferred(AllocationRequest::Any, num_bytes)
 		.map(|(ap, _action)| ap)
 		.ok()
 }
@@ -742,7 +756,7 @@ pub fn allocate_pages_by_bytes(num_bytes: usize) -> Option<AllocatedPages> {
 /// This function still allocates whole pages by rounding up the number of bytes. 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Result<AllocatedPages, &'static str> {
-	allocate_pages_by_bytes_deferred(Some(vaddr), num_bytes)
+	allocate_pages_by_bytes_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_bytes)
 		.map(|(ap, _action)| ap)
 }
 
@@ -751,7 +765,7 @@ pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Re
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<AllocatedPages, &'static str> {
-	allocate_pages_deferred(Some(vaddr), num_pages, None)
+	allocate_pages_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_pages)
 		.map(|(ap, _action)| ap)
 }
 
@@ -762,7 +776,7 @@ pub fn allocate_pages_in_range(
 	num_pages: usize,
 	range: &PageRange,
 ) -> Result<AllocatedPages, &'static str> {
-	allocate_pages_deferred(None, num_pages, Some(range))
+	allocate_pages_deferred(AllocationRequest::WithinRange(range), num_pages)
 		.map(|(ap, _action)| ap)
 }
 
@@ -773,8 +787,7 @@ pub fn allocate_pages_by_bytes_in_range(
 	num_bytes: usize,
 	range: &PageRange,
 ) -> Result<AllocatedPages, &'static str> {
-	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages_deferred(None, num_pages, Some(range))
+	allocate_pages_by_bytes_deferred(AllocationRequest::WithinRange(range), num_bytes)
 		.map(|(ap, _action)| ap)
 }
 
