@@ -133,10 +133,3 @@ pub fn get_sgippi_priority(registers: &GicRegisters, int: InterruptNumber) -> Pr
 pub fn set_sgippi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio: Priority) {
     registers.write_array_volatile::<4>(offset::SGIPPI_IPRIORITYR, int, (u8::MAX - prio) as u32);
 }
-
-/// Returns the internal ID of the redistributor
-///
-/// Note: this is only provided for debugging purposes
-pub fn get_internal_id(registers: &GicRegisters) -> u16 {
-    (registers.read_volatile_64(offset::TYPER) >> 8) as _
-}

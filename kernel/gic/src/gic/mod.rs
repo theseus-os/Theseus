@@ -438,18 +438,6 @@ impl ArmGic {
             Self::V3( _) => cpu_interface_gicv3::set_minimum_priority(priority),
         }
     }
-
-    /// Returns the internal ID of the redistributor (GICv3)
-    ///
-    /// Note #2: this is only provided for debugging purposes
-    /// Note #1: as a compatibility feature, on GICv2, the CPU index is returned.
-    pub fn get_cpu_interface_id(&self) -> u16 {
-        let i = get_current_cpu_redist_index();
-        match self {
-            Self::V3(v3) => redist_interface::get_internal_id(&v3.redistributors[i].redistributor),
-            _ => i as _,
-        }
-    }
 }
 
 impl core::fmt::Debug for ArmGicV3RedistPages {
