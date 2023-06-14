@@ -2038,7 +2038,6 @@ dependencies = [
 name = "memory_structs"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0",
  "derive_more",
  "kernel_config",
  "paste",
