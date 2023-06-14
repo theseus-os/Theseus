@@ -68,8 +68,6 @@ LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
 	CROSS = x86_64-elf-
-	## The GRUB_CROSS variable must match the build output of "scripts/mac_os_build_setup.sh"
-	GRUB_CROSS = "$(HOME)"/theseus_tools_opt/bin/
 	## macOS uses a different unmounting utility
 	UNMOUNT = diskutil unmount
 	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
@@ -84,10 +82,10 @@ ifeq ($(boot_spec),uefi)
 	## A bootloader isn't required with UEFI.
 else ifeq ($(bootloader),grub)
 	## Look for `grub-mkrescue` (Debian-like distros) or `grub2-mkrescue` (Fedora)
-	ifneq (,$(shell command -v $(GRUB_CROSS)grub-mkrescue))
-		GRUB_MKRESCUE = $(GRUB_CROSS)grub-mkrescue
-	else ifneq (,$(shell command -v $(GRUB_CROSS)grub2-mkrescue))
-		GRUB_MKRESCUE = $(GRUB_CROSS)grub2-mkrescue
+	ifneq (,$(shell command -v grub-mkrescue))
+		GRUB_MKRESCUE = grub-mkrescue
+	else ifneq (,$(shell command -v grub2-mkrescue))
+		GRUB_MKRESCUE = grub2-mkrescue
 	else
 $(error Error: could not find 'grub-mkrescue' or 'grub2-mkrescue', please install 'grub' or 'grub2')
 	endif

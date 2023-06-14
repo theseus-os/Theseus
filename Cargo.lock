@@ -486,6 +486,7 @@ dependencies = [
  "app_io",
  "async_channel",
  "core2",
+ "hull",
  "io",
  "irq_safety",
  "log",
@@ -798,7 +799,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "task",
- "x86_64",
 ]
 
 [[package]]
@@ -1552,6 +1552,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "interrupt_controller"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "arm_boards",
+ "cpu",
+ "gic",
+ "ioapic",
+ "irq_safety",
+ "log",
+ "memory",
+]
+
+[[package]]
 name = "interrupts"
 version = "0.1.0"
 dependencies = [
@@ -1563,6 +1577,7 @@ dependencies = [
  "exceptions_early",
  "gdt",
  "gic",
+ "interrupt_controller",
  "irq_safety",
  "kernel_config",
  "locked_idt",
@@ -1646,8 +1661,8 @@ dependencies = [
 name = "ixgbe"
 version = "0.1.0"
 dependencies = [
- "acpi",
  "bit_field 0.7.0",
+ "cpu",
  "hashbrown",
  "hpet",
  "intel_ethernet",
@@ -1672,7 +1687,6 @@ dependencies = [
  "spin 0.9.4",
  "virtual_nic",
  "volatile 0.2.7",
- "x86_64",
  "zerocopy",
 ]
 
@@ -2100,7 +2114,6 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "nic_initialization",
  "num_enum",
  "volatile 0.2.7",
  "zerocopy",
@@ -2257,15 +2270,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mutex_preemption"
-version = "0.1.0"
-dependencies = [
- "cpu_local_preemption",
- "lockable",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "mutex_sleep"
 version = "0.1.0"
 dependencies = [
@@ -2377,7 +2381,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "pci",
  "volatile 0.2.7",
 ]
 
@@ -2385,6 +2388,7 @@ dependencies = [
 name = "nic_queues"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "intel_ethernet",
  "log",
  "memory",
@@ -2611,10 +2615,14 @@ name = "pci"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
+ "cpu",
+ "interrupts",
  "log",
  "memory",
  "port_io",
  "spin 0.9.4",
+ "volatile 0.2.7",
+ "zerocopy",
 ]
 
 [[package]]
@@ -2709,13 +2717,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "pl011_qemu"
-version = "0.2.0"
-source = "git+https://github.com/theseus-os/pl011/?branch=aarch64-qemu-virt-test#2c2cec84ca9653efa9e370460e7e0e1c94140080"
+name = "pl011"
+version = "1.0.0"
+source = "git+https://github.com/theseus-os/pl011/?rev=464dbf22#464dbf2288a5d9e7445b0b1f404ddd41b1fd1c1e"
 dependencies = [
- "cortex-m",
- "embedded-hal",
- "nb 1.0.0",
+ "log",
  "volatile-register",
 ]
 
@@ -3124,11 +3130,11 @@ dependencies = [
  "cfg-if 1.0.0",
  "lazy_static",
  "log",
- "mutex_preemption",
  "runqueue_priority",
  "runqueue_realtime",
  "runqueue_round_robin",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -3138,8 +3144,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -3149,7 +3155,7 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
+ "sync_preemption",
  "task",
 ]
 
@@ -3159,8 +3165,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -3337,7 +3343,6 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.4",
- "x86_64",
 ]
 
 [[package]]
@@ -3347,7 +3352,7 @@ dependencies = [
  "arm_boards",
  "irq_safety",
  "memory",
- "pl011_qemu",
+ "pl011",
  "port_io",
  "spin 0.9.4",
 ]
@@ -3395,7 +3400,6 @@ dependencies = [
 name = "signal_handler"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "log",
  "memory",
  "spin 0.9.4",
@@ -3559,7 +3563,7 @@ dependencies = [
 [[package]]
 name = "spin"
 version = "0.9.8"
-source = "git+https://github.com/mvdnes/spin-rs#1f2e06c9f9d22b234776849c65e313f583ddfade"
+source = "git+https://github.com/theseus-os/spin-rs#5c4470db034ad11f6cc7a8a5c400607c024e9392"
 
 [[package]]
 name = "stable_deref_trait"
@@ -3711,7 +3715,13 @@ dependencies = [
 name = "sync_block"
 version = "0.1.0"
 dependencies = [
+ "cpu_local_preemption",
+ "log",
+ "mpmc_queue",
+ "scheduler",
  "sync",
+ "sync_spin",
+ "task",
  "wait_queue",
 ]
 

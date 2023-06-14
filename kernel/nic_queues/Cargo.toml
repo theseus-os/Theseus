@@ -19,5 +19,8 @@ path = "../intel_ethernet"
 [dependencies.nic_buffers]
 path = "../nic_buffers"
 
+[dependencies.cpu]
+path = "../cpu"
+
 [lib]
 crate-type = ["rlib"]

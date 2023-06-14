@@ -23,15 +23,8 @@ pub use self::paging::{
 };
 
 pub use memory_structs::*;
-pub use page_allocator::{
-    AllocatedPages, allocate_pages, allocate_pages_at,
-    allocate_pages_by_bytes, allocate_pages_by_bytes_at,
-};
-
-pub use frame_allocator::{
-    AllocatedFrames, MemoryRegionType, PhysicalMemoryRegion,
-    allocate_frames, allocate_frames_at, allocate_frames_by_bytes_at, allocate_frames_by_bytes,
-};
+pub use page_allocator::*;
+pub use frame_allocator::*;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr };
@@ -77,6 +70,21 @@ pub struct MemoryManagementInfo {
     pub extra_mapped_pages: Vec<MappedPages>,
 }
 
+/// Mapping flags that can be used to map MMIO registers.
+pub const MMIO_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+    | PteFlags::DEVICE_MEMORY.bits()
+);
+
+/// Mapping flags that can be used to map DMA (Direct Memory Access) memory.
+pub const DMA_FLAGS: PteFlags = PteFlags::from_bits_truncate(
+    PteFlags::new().bits()
+    | PteFlags::VALID.bits()
+    | PteFlags::WRITABLE.bits()
+);
+
 
 /// A convenience function that creates a new memory mapping by allocating frames that are contiguous in physical memory.
 /// If contiguous frames are not required, then see [`create_mapping()`](fn.create_mapping.html).
@@ -96,6 +104,24 @@ pub fn create_contiguous_mapping<F: Into<PteFlagsArch>>(
     let starting_phys_addr = allocated_frames.start_address();
     let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
     Ok((mp, starting_phys_addr))
+}
+
+
+/// A convenience function that maps randomly-allocated pages to the given range of frames.
+/// 
+/// # Locking / Deadlock
+/// Currently, this function acquires the lock on the frame allocator and the kernel's `MemoryManagementInfo` instance.
+/// Thus, the caller should ensure that the locks on those two variables are not held when invoking this function.
+pub fn map_frame_range<F: Into<PteFlagsArch>>(
+    start_address: PhysicalAddress,
+    size_in_bytes: usize,
+    flags: F,
+) -> Result<MappedPages, &'static str> {
+    let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("map_range(): KERNEL_MMI was not yet initialized!")?;
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::map_range(): couldn't allocate contiguous pages!")?;
+    let allocated_frames = allocate_frames_by_bytes_at(start_address, size_in_bytes)
+        .map_err(|_| "memory::map_range(): couldn't allocate contiguous frames!")?;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)
 }
 
 

@@ -1,56 +1,57 @@
 #![no_std]
-
 #![allow(dead_code)]
 
-#[macro_use] extern crate log;
 extern crate alloc;
-extern crate spin;
-extern crate port_io;
-extern crate memory;
-extern crate bit_field;
 
+use log::*;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
 use port_io::Port;
 use spin::{Once, Mutex};
-use memory::PhysicalAddress;
+use memory::{PhysicalAddress, BorrowedSliceMappedPages, Mutable, MappedPages, map_frame_range, MMIO_FLAGS};
 use bit_field::BitField;
+use volatile::Volatile;
+use zerocopy::FromBytes;
+use cpu::CpuId;
+use interrupts::InterruptNumber;
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
-pub const PCI_VENDOR_ID:             u8 = 0x0;
-pub const PCI_DEVICE_ID:             u8 = 0x2;
-pub const PCI_COMMAND:               u8 = 0x4;
-pub const PCI_STATUS:                u8 = 0x6;
-pub const PCI_REVISION_ID:           u8 = 0x8;
-pub const PCI_PROG_IF:               u8 = 0x9;
-pub const PCI_SUBCLASS:              u8 = 0xA;
-pub const PCI_CLASS:                 u8 = 0xB;
-pub const PCI_CACHE_LINE_SIZE:       u8 = 0xC;
-pub const PCI_LATENCY_TIMER:         u8 = 0xD;
-pub const PCI_HEADER_TYPE:           u8 = 0xE;
-pub const PCI_BIST:                  u8 = 0xF;
-pub const PCI_BAR0:                  u8 = 0x10;
-pub const PCI_BAR1:                  u8 = 0x14;
-pub const PCI_BAR2:                  u8 = 0x18;
-pub const PCI_BAR3:                  u8 = 0x1C;
-pub const PCI_BAR4:                  u8 = 0x20;
-pub const PCI_BAR5:                  u8 = 0x24;
-pub const PCI_CARDBUS_CIS:           u8 = 0x28;
-pub const PCI_SUBSYSTEM_VENDOR_ID:   u8 = 0x2C;
-pub const PCI_SUBSYSTEM_ID:          u8 = 0x2E;
-pub const PCI_EXPANSION_ROM_BASE:    u8 = 0x30;
-pub const PCI_CAPABILITIES:          u8 = 0x34;
+const PCI_VENDOR_ID:             u8 = 0x0;
+const PCI_DEVICE_ID:             u8 = 0x2;
+const PCI_COMMAND:               u8 = 0x4;
+const PCI_STATUS:                u8 = 0x6;
+const PCI_REVISION_ID:           u8 = 0x8;
+const PCI_PROG_IF:               u8 = 0x9;
+const PCI_SUBCLASS:              u8 = 0xA;
+const PCI_CLASS:                 u8 = 0xB;
+const PCI_CACHE_LINE_SIZE:       u8 = 0xC;
+const PCI_LATENCY_TIMER:         u8 = 0xD;
+const PCI_HEADER_TYPE:           u8 = 0xE;
+const PCI_BIST:                  u8 = 0xF;
+const PCI_BAR0:                  u8 = 0x10;
+const PCI_BAR1:                  u8 = 0x14;
+const PCI_BAR2:                  u8 = 0x18;
+const PCI_BAR3:                  u8 = 0x1C;
+const PCI_BAR4:                  u8 = 0x20;
+const PCI_BAR5:                  u8 = 0x24;
+const PCI_CARDBUS_CIS:           u8 = 0x28;
+const PCI_SUBSYSTEM_VENDOR_ID:   u8 = 0x2C;
+const PCI_SUBSYSTEM_ID:          u8 = 0x2E;
+const PCI_EXPANSION_ROM_BASE:    u8 = 0x30;
+const PCI_CAPABILITIES:          u8 = 0x34;
 // 0x35 through 0x3B are reserved
-pub const PCI_INTERRUPT_LINE:        u8 = 0x3C;
-pub const PCI_INTERRUPT_PIN:         u8 = 0x3D;
-pub const PCI_MIN_GRANT:             u8 = 0x3E;
-pub const PCI_MAX_LATENCY:           u8 = 0x3F;
+const PCI_INTERRUPT_LINE:        u8 = 0x3C;
+const PCI_INTERRUPT_PIN:         u8 = 0x3D;
+const PCI_MIN_GRANT:             u8 = 0x3E;
+const PCI_MAX_LATENCY:           u8 = 0x3F;
 
-// PCI Capability IDs
-pub const MSI_CAPABILITY:           u8 = 0x05;
-pub const MSIX_CAPABILITY:          u8 = 0x11;
+#[repr(u8)]
+pub enum PciCapability {
+    Msi  = 0x05,
+    Msix = 0x11,
+}
 
 /// If a BAR's bits [2:1] equal this value, that BAR describes a 64-bit address.
 /// If not, that BAR describes a 32-bit address.
@@ -75,6 +76,13 @@ static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_A
 /// This port is used to transfer data to or from the PCI configuration space
 /// specified by a previous write to the `PCI_CONFIG_ADDRESS_PORT`.
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA));
+
+pub enum InterruptPin {
+    A,
+    B,
+    C,
+    D,
+}
 
 
 
@@ -122,7 +130,7 @@ pub struct PciBus {
 /// Scans all PCI Buses (brute force iteration) to enumerate PCI Devices on each bus.
 /// Initializes structures containing this information. 
 fn scan_pci() -> Vec<PciBus> {
-	let mut buses: Vec<PciBus> = Vec::new();
+    let mut buses: Vec<PciBus> = Vec::new();
 
     for bus in 0..MAX_PCI_BUSES {
         let bus = bus as u8;
@@ -190,7 +198,7 @@ fn scan_pci() -> Vec<PciBus> {
         }
     }
 
-    buses	
+    buses   
 }
 
 
@@ -221,7 +229,7 @@ impl PciLocation {
     }
 
     /// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.
-    pub fn pci_read_32(&self, offset: u8) -> u32 {
+    fn pci_read_32(&self, offset: u8) -> u32 {
         unsafe { 
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
         }
@@ -229,17 +237,17 @@ impl PciLocation {
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
-    pub fn pci_read_16(&self, offset: u8) -> u16 {
+    fn pci_read_16(&self, offset: u8) -> u16 {
         self.pci_read_32(offset) as u16
     } 
 
     /// Read 8-bit data at the specified `offset` from the PCI device.
-    pub fn pci_read_8(&self, offset: u8) -> u8 {
+    fn pci_read_8(&self, offset: u8) -> u8 {
         self.pci_read_32(offset) as u8
     }
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
-    pub fn pci_write(&self, offset: u8, value: u32) {
+    fn pci_write(&self, offset: u8, value: u32) {
         unsafe {
             PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
             Self::write_data_port((value) << ((offset & 2) * 8));
@@ -288,7 +296,8 @@ impl PciLocation {
     /// with each capability storing the pointer to the next capability right after its ID.
     /// The function returns a None value if capabilities are not valid for this device 
     /// or if the requested capability is not present. 
-    pub fn find_pci_capability(&self, pci_capability: u8) -> Option<u8> {
+    fn find_pci_capability(&self, pci_capability: PciCapability) -> Option<u8> {
+        let pci_capability = pci_capability as u8;
         let status = self.pci_read_16(PCI_STATUS);
 
         // capabilities are only valid if bit 4 of status register is set
@@ -449,7 +458,7 @@ impl PciDevice {
     pub fn pci_enable_msi(&self, core_id: u8, int_num: u8) -> Result<(), &'static str> {
 
         // find out if the device is msi capable
-        let cap_addr = self.find_pci_capability(MSI_CAPABILITY).ok_or("Device not MSI capable")?;
+        let cap_addr = self.find_pci_capability(PciCapability::Msi).ok_or("Device not MSI capable")?;
 
         // offset in the capability space where the message address register is located 
         const MESSAGE_ADDRESS_REGISTER_OFFSET: u8 = 4;
@@ -484,7 +493,7 @@ impl PciDevice {
     pub fn pci_enable_msix(&self) -> Result<(), &'static str> {
 
         // find out if the device is msi-x capable
-        let cap_addr = self.find_pci_capability(MSIX_CAPABILITY).ok_or("Device not MSI-X capable")?;
+        let cap_addr = self.find_pci_capability(PciCapability::Msix).ok_or("Device not MSI-X capable")?;
 
         // offset in the capability space where the message control register is located 
         const MESSAGE_CONTROL_REGISTER_OFFSET: u8 = 2;
@@ -498,6 +507,63 @@ impl PciDevice {
         // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
         Ok(())  
+    }
+
+    /// Returns the memory mapped msix vector table
+    ///
+    /// - returns `Err("Device not MSI-X capable")` if the device doesn't have the MSI-X capability
+    /// - returns `Err("Invalid BAR content")` if the Base Address Register contains an invalid address
+    pub fn pci_mem_map_msix(&self, max_vectors: usize) -> Result<MsixVectorTable, &'static str> {
+        // retreive the address in the pci config space for the msi-x capability
+        let cap_addr = self.find_pci_capability(PciCapability::Msix).ok_or("Device not MSI-X capable")?;
+        // find the BAR used for msi-x
+        let vector_table_offset = 4;
+        let table_offset = self.pci_read_32(cap_addr + vector_table_offset);
+        let bar = table_offset & 0x7;
+        let offset = table_offset >> 3;
+        // find the memory base address and size of the area for the vector table
+        let mem_base = PhysicalAddress::new((self.bars[bar as usize] + offset) as usize)
+            .ok_or("Invalid BAR content")?;
+        let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * max_vectors;
+
+        // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
+
+        let msix_mapped_pages = map_frame_range(mem_base, mem_size_in_bytes, MMIO_FLAGS)?;
+        let vector_table = BorrowedSliceMappedPages::from_mut(msix_mapped_pages, 0, max_vectors)
+            .map_err(|(_mp, err)| err)?;
+
+        Ok(MsixVectorTable::new(vector_table))
+    }
+
+    /// Maps device memory specified by a Base Address Register.
+    ///
+    /// # Arguments 
+    /// * `bar_index`: index of the Base Address Register to use
+    pub fn pci_map_bar_mem(&self, bar_index: usize) -> Result<MappedPages, &'static str> {
+        let mem_base = self.determine_mem_base(bar_index)?;
+        let mem_size = self.determine_mem_size(bar_index);
+        map_frame_range(mem_base, mem_size as usize, MMIO_FLAGS)
+    }
+
+    /// Reads and returns this PCI device's interrupt line and interrupt pin registers.
+    ///
+    /// Returns an error if this PCI device's interrupt pin value is invalid (greater than 4).
+    pub fn pci_get_interrupt_info(&self) -> Result<(Option<u8>, Option<InterruptPin>), &'static str> {
+        let int_line = match self.pci_read_8(PCI_INTERRUPT_LINE) {
+            0xff => None,
+            other => Some(other),
+        };
+
+        let int_pin = match self.pci_read_8(PCI_INTERRUPT_PIN) {
+            0 => None,
+            1 => Some(InterruptPin::A),
+            2 => Some(InterruptPin::B),
+            3 => Some(InterruptPin::C),
+            4 => Some(InterruptPin::D),
+            _ => return Err("pci_get_interrupt_info: Invalid Register Value for Interrupt Pin"),
+        };
+
+        Ok((int_line, int_pin))
     }
 }
 
@@ -521,3 +587,75 @@ pub enum PciConfigSpaceAccessMechanism {
     MemoryMapped = 0,
     IoPort = 1,
 }
+
+/// A memory-mapped array of [`MsixVectorEntry`]
+pub struct MsixVectorTable {
+    entries: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>,
+}
+
+impl MsixVectorTable {
+    pub fn new(entries: BorrowedSliceMappedPages<MsixVectorEntry, Mutable>) -> Self {
+        Self { entries }
+    }
+}
+impl Deref for MsixVectorTable {
+    type Target = [MsixVectorEntry];
+    fn deref(&self) -> &Self::Target {
+        &self.entries
+    }
+}
+impl DerefMut for MsixVectorTable {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.entries
+    }
+}
+
+/// A single Message Signaled Interrupt entry.
+///
+/// This entry contains the interrupt's IRQ vector number
+/// and the CPU to which the interrupt will be delivered.
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct MsixVectorEntry {
+    /// The lower portion of the address for the memory write transaction.
+    /// This part contains the CPU ID which the interrupt will be redirected to.
+    msg_lower_addr:         Volatile<u32>,
+    /// The upper portion of the address for the memory write transaction.
+    msg_upper_addr:         Volatile<u32>,
+    /// The data portion of the msi vector which contains the interrupt number.
+    msg_data:               Volatile<u32>,
+    /// The control portion which contains the interrupt mask bit.
+    vector_control:         Volatile<u32>,
+}
+
+impl MsixVectorEntry {
+    /// Sets interrupt destination & number for this entry and makes sure the
+    /// interrupt is unmasked (PCI Controller side).
+    pub fn init(&mut self, cpu_id: CpuId, int_num: InterruptNumber) {
+        // unmask the interrupt
+        self.vector_control.write(MSIX_UNMASK_INT);
+        let lower_addr = self.msg_lower_addr.read();
+
+        // set the CPU to which this interrupt will be delivered.
+        let dest_id = (cpu_id.into_u8() as u32) << MSIX_DEST_ID_SHIFT;
+        let address = lower_addr & !MSIX_ADDRESS_BITS;
+        self.msg_lower_addr.write(address | MSIX_INTERRUPT_REGION | dest_id); 
+
+        // write interrupt number
+        self.msg_data.write(int_num as u32);
+
+        if false {
+            let control = self.vector_control.read();
+            debug!("Created MSI vector: control: {}, CPU: {}, int: {}", control, cpu_id, int_num);
+        }
+    }
+}
+
+/// A constant which indicates the region that is reserved for interrupt messages
+const MSIX_INTERRUPT_REGION:    u32 = 0xFEE << 20;
+/// The location in the lower address register where the destination CPU ID is written
+const MSIX_DEST_ID_SHIFT:       u32 = 12;
+/// The bits in the lower address register that need to be cleared and set
+const MSIX_ADDRESS_BITS:        u32 = 0xFFFF_FFF0;
+/// Clear the vector control field to unmask the interrupt
+const MSIX_UNMASK_INT:          u32 = 0;

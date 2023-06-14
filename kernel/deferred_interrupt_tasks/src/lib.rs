@@ -44,22 +44,15 @@
 //!
 
 #![no_std]
-#![feature(abi_x86_interrupt)]
+#![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate x86_64;
-extern crate task;
-extern crate spawn;
-extern crate scheduler;
-#[macro_use] extern crate debugit;
-extern crate interrupts;
 
+use log::error;
+use debugit::debugit;
 use alloc::string::String;
 use task::{get_my_current_task, JoinableTaskRef};
-
-pub type InterruptHandlerFunction = x86_64::structures::idt::HandlerFunc;
-
+use interrupts::{InterruptHandler, InterruptNumber};
 
 /// The errors that may occur in [`register_interrupt_handler()`].
 #[derive(Debug)]
@@ -67,7 +60,7 @@ pub enum InterruptRegistrationError {
     /// The given `irq` number was already in use and is registered to 
     /// the interrupt handler at the given `existing_handler_address`.
     IrqInUse {
-        irq: u8,
+        irq: InterruptNumber,
         existing_handler_address: usize
     },
     /// The given error occurred when spawning the deferred interrupt task.
@@ -108,8 +101,8 @@ pub enum InterruptRegistrationError {
 ///    long-running loop that repeatedly invokes the given `deferred_interrupt_action`.
 /// * `Err(existing_handler_address)` if the given `interrupt_number` was already in use.
 pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
-    interrupt_number: u8,
-    interrupt_handler: InterruptHandlerFunction,
+    interrupt_number: InterruptNumber,
+    interrupt_handler: InterruptHandler,
     deferred_interrupt_action: DIA,
     deferred_action_argument: Arg,
     deferred_task_name: Option<S>,
@@ -119,8 +112,11 @@ pub fn register_interrupt_handler<DIA, Arg, Success, Failure, S>(
           S: Into<String>,
 {
     // First, attempt to register the interrupt handler.
-    interrupts::register_interrupt(interrupt_number, interrupt_handler)
+    interrupts::register_interrupt(interrupt_number as _, interrupt_handler)
         .map_err(|existing_handler_address| {
+            #[cfg(target_arch = "aarch64")]
+            let existing_handler_address = existing_handler_address as usize;
+
             error!("Interrupt number {:#X} was already taken by handler at {:#X}! Sharing IRQs is currently unsupported.",
                 interrupt_number, existing_handler_address
             );

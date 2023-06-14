@@ -15,7 +15,7 @@
 //! [context]: SignalContext
 
 #![no_std]
-#![feature(trait_alias)]
+#![feature(trait_alias, variant_count)]
 
 extern crate alloc;
 
@@ -99,11 +99,8 @@ pub enum Signal {
     /// Bad arithmetic operation, e.g., divide by zero.
     /// Analogous to SIGFPE.
     ArithmeticError                 = 3,
-    //
-    // Note: if other signals are added, update `NUM_SIGNALS` below.
-    //
 }
-const NUM_SIGNALS: usize = 4;
+const NUM_SIGNALS: usize = core::mem::variant_count::<Signal>();
 
 
 /// Information that is passed to a registered [`SignalHandler`]

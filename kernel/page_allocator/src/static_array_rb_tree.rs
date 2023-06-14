@@ -89,7 +89,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
     /// If the inner collection is an array, it is pushed onto the back of the array.
 	/// If there is no space left in the array, an `Err` containing the given `value` is returned.
 	///
-	/// If success
+	/// Upon success, a reference to the newly-inserted value is returned.
 	pub fn insert(&mut self, value: T) -> Result<ValueRefMut<T>, T> {
 		match &mut self.0 {
 			Inner::Array(arr) => {
@@ -135,7 +135,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 		let mut iter_a = None;
 		let mut iter_b = None;
 		match &self.0 {
-			Inner::Array(arr)     => iter_a = Some(arr.iter().flatten()),
+			Inner::Array(arr)   => iter_a = Some(arr.iter().flatten()),
 			Inner::RBTree(tree) => iter_b = Some(tree.iter()),
 		}
         iter_a.into_iter()

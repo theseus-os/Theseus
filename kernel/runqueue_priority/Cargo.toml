@@ -7,8 +7,8 @@ version = "0.1.0"
 [dependencies]
 log = "0.4.8"
 
-[dependencies.mutex_preemption]
-path = "../mutex_preemption"
+[dependencies.sync_preemption]
+path = "../sync_preemption"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"

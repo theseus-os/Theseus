@@ -177,11 +177,12 @@ pub fn init(
     #[cfg(target_arch = "x86_64")]
     let (key_producer, mouse_producer) = window_manager::init()?;
 
-    // initialize the rest of our drivers
-    // arch-gate: device_manager currently detects PCI & PS2 devices,
-    // which are unsupported on aarch64 at this point
-    #[cfg(target_arch = "x86_64")]
-    device_manager::init(key_producer, mouse_producer)?;
+    device_manager::init(
+        #[cfg(target_arch = "x86_64")]
+        key_producer,
+        #[cfg(target_arch = "x86_64")]
+        mouse_producer,
+    )?;
 
     task_fs::init()?;
 
@@ -202,9 +203,6 @@ pub fn init(
     drop_after_init.drop_all();
 
     // 2. Spawn various system tasks/daemons,
-    // arch-gate: no windowing/input support on aarch64 at the moment,
-    // which prevent using any graphical apps such as the console
-    #[cfg(target_arch = "x86_64")]
     console::start_connection_detection()?;
 
     // 3. Start the first application(s).

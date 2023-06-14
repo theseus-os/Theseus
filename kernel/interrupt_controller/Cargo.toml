@@ -1,0 +1,20 @@
+[package]
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
+description = "Cross-platform abstraction over interrupt controllers"
+version = "0.1.0"
+edition = "2021"
+name = "interrupt_controller"
+
+[dependencies]
+log = "0.4.8"
+cpu = { path = "../cpu" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+arm_boards = { path = "../arm_boards" }
+memory = { path = "../memory" }
+gic = { path = "../gic" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic" }
+ioapic = { path = "../ioapic" }

@@ -34,13 +34,13 @@ use regs::*;
 use spin::Once; 
 use alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
 use irq_safety::MutexIrqSafe;
-use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable};
-use pci::{PciDevice, PCI_INTERRUPT_LINE, PciConfigSpaceAccessMechanism};
+use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_frame_range, MMIO_FLAGS};
+use pci::{PciDevice, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
-use interrupts::eoi;
+use interrupts::{eoi, InterruptNumber};
 use x86_64::structures::idt::InterruptStackFrame;
 use network_interface_card:: NetworkInterfaceCard;
-use nic_initialization::{allocate_memory, init_rx_buf_pool, init_rx_queue, init_tx_queue};
+use nic_initialization::{init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
@@ -128,14 +128,14 @@ impl TxQueueRegisters for E1000TxQueueRegisters {
 pub struct E1000Nic {
     /// Type of BAR0
     bar_type: u8,
-    /// MMIO Base Address
-    mem_base: PhysicalAddress,
-    ///interrupt number
-    interrupt_num: u8,
+    /// The interrupt vector number used by this device to trigger interrupts.
+    interrupt_num: InterruptNumber,
     /// The actual MAC address burnt into the hardware of this E1000 NIC.
     mac_hardware: [u8; 6],
     /// The optional spoofed MAC address to use in place of `mac_hardware` when transmitting.  
     mac_spoofed: Option<[u8; 6]>,
+    /// MMIO Base Address
+    mem_base: PhysicalAddress,
     /// Receive queue with descriptors
     rx_queue: RxQueue<E1000RxQueueRegisters, LegacyRxDescriptor>,
     /// Transmit queue with descriptors
@@ -181,7 +181,10 @@ impl E1000Nic {
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
         
         // Get interrupt number
-        let interrupt_num = e1000_pci_dev.pci_read_8(PCI_INTERRUPT_LINE) + IRQ_BASE_OFFSET;
+        let interrupt_num = match e1000_pci_dev.pci_get_interrupt_info() {
+            Ok((Some(irq), _pin)) => (irq + IRQ_BASE_OFFSET) as InterruptNumber,
+            _ => return Err("e1000: PCI device had no interrupt number (IRQ vector)"),
+        };
         // debug!("e1000 IRQ number: {}", interrupt_num);
 
         let bar0 = e1000_pci_dev.bars[0];
@@ -289,7 +292,7 @@ impl E1000Nic {
     /// * `device`: reference to the nic device
     /// * `mem_base`: the physical address where the NIC's memory starts.
     fn map_e1000_regs(
-        _device: &PciDevice, 
+        _device: &PciDevice,
         mem_base: PhysicalAddress,
     ) -> Result<(
         BorrowedMappedPages<E1000Registers, Mutable>, 
@@ -303,14 +306,21 @@ impl E1000Nic {
         const TX_REGISTERS_SIZE_BYTES: usize = 4096;
         const MAC_REGISTERS_SIZE_BYTES: usize = 114_688;
 
-        let nic_regs_mapped_page     = allocate_memory(mem_base, GENERAL_REGISTERS_SIZE_BYTES)?;
-        let nic_rx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES, RX_REGISTERS_SIZE_BYTES)?;
-        let nic_tx_regs_mapped_page  = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES, TX_REGISTERS_SIZE_BYTES)?;
-        let nic_mac_regs_mapped_page = allocate_memory(mem_base + GENERAL_REGISTERS_SIZE_BYTES + RX_REGISTERS_SIZE_BYTES + TX_REGISTERS_SIZE_BYTES, MAC_REGISTERS_SIZE_BYTES)?;
+        let mut physical_addr = mem_base;
 
-        let regs     = nic_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
-        let rx_regs  = nic_rx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
-        let tx_regs  = nic_tx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        let nic_regs_mapped_page = map_frame_range(physical_addr, GENERAL_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        let regs = nic_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        physical_addr += GENERAL_REGISTERS_SIZE_BYTES;
+
+        let nic_rx_regs_mapped_page = map_frame_range(physical_addr, RX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        let rx_regs = nic_rx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        physical_addr += RX_REGISTERS_SIZE_BYTES;
+
+        let nic_tx_regs_mapped_page = map_frame_range(physical_addr, TX_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
+        let tx_regs = nic_tx_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
+        physical_addr += TX_REGISTERS_SIZE_BYTES;
+
+        let nic_mac_regs_mapped_page = map_frame_range(physical_addr, MAC_REGISTERS_SIZE_BYTES, MMIO_FLAGS)?;
         let mac_regs = nic_mac_regs_mapped_page.into_borrowed_mut(0).map_err(|(_mp, err)| err)?;
 
         Ok((regs, rx_regs, tx_regs, mac_regs))
@@ -487,7 +497,6 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }
-
 }
 
 /// This function is used as a deferred interrupt task.

@@ -13,15 +13,16 @@ extern crate alloc;
 extern crate memory;
 extern crate intel_ethernet;
 extern crate nic_buffers;
+extern crate cpu;
 
 use alloc::{
     vec::Vec,
     collections::VecDeque
 };
-use memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+use memory::{create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 use intel_ethernet::descriptors::{RxDescriptor, TxDescriptor};
 use nic_buffers::{ReceiveBuffer, ReceivedFrame, TransmitBuffer};
-pub use nic_buffers::NIC_MAPPING_FLAGS;
+use cpu::CpuId;
 
 /// The register trait that gives access to only those registers required for receiving a packet.
 /// The Rx queue control registers can only be accessed by the physical NIC.
@@ -68,7 +69,7 @@ pub struct RxQueue<S: RxQueueRegisters, T: RxDescriptor> {
     pub received_frames: VecDeque<ReceivedFrame>,
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything, but we use this value when setting the cpu id for interrupts and DCA.
-    pub cpu_id: Option<u8>,
+    pub cpu_id: Option<CpuId>,
     /// Pool where `ReceiveBuffer`s are stored.
     pub rx_buffer_pool: &'static mpmc::Queue<ReceiveBuffer>,
     /// The filter id for the physical NIC filter that is set for this queue
@@ -99,7 +100,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor> RxQueue<S,T> {
                     warn!("NIC RX BUF POOL WAS EMPTY.... reallocating! This means that no task is consuming the accumulated received ethernet frames.");
                     // if the pool was empty, then we allocate a new receive buffer
                     let len = self.rx_buffer_size_bytes;
-                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, NIC_MAPPING_FLAGS)?;
+                    let (mp, phys_addr) = create_contiguous_mapping(len as usize, MMIO_FLAGS)?;
                     ReceiveBuffer::new(mp, phys_addr, len, self.rx_buffer_pool)?
                 }
             };
@@ -152,7 +153,7 @@ pub struct TxQueue<S: TxQueueRegisters, T: TxDescriptor> {
     pub tx_cur: u16,
     /// The cpu which this queue is mapped to. 
     /// This in itself doesn't guarantee anything but we use this value when setting the cpu id for interrupts and DCA.
-    pub cpu_id : Option<u8>
+    pub cpu_id: Option<CpuId>,
 }
 
 impl<S: TxQueueRegisters, T: TxDescriptor> TxQueue<S,T> {

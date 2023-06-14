@@ -6,7 +6,7 @@
 #![no_std]
 
 extern crate alloc;
-extern crate mutex_preemption;
+extern crate sync_preemption;
 extern crate atomic_linked_list;
 extern crate task;
 #[macro_use] extern crate cfg_if;
@@ -23,7 +23,7 @@ cfg_if! {
 #[cfg(single_simd_task_optimization)]
 extern crate single_simd_task_optimization;
 
-use mutex_preemption::RwLockPreempt;
+use sync_preemption::PreemptionSafeRwLock;
 use task::TaskRef;
 use runqueue::RunQueue;
 
@@ -34,7 +34,7 @@ pub fn init(which_core: u8) -> Result<(), &'static str> {
 }
 
 /// Returns the `RunQueue` of the given core, which is an `apic_id`.
-pub fn get_runqueue(which_core: u8) -> Option<&'static RwLockPreempt<RunQueue>> {
+pub fn get_runqueue(which_core: u8) -> Option<&'static PreemptionSafeRwLock<RunQueue>> {
     RunQueue::get_runqueue(which_core)
 }
 

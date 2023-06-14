@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 log = "0.4.8"
 
+interrupt_controller = { path = "../interrupt_controller" }
 memory = { path = "../memory" }
 cpu = { path = "../cpu" }
 spin = "0.9.4"

@@ -15,7 +15,7 @@ use task::{JoinableTaskRef, KillReason};
 
 /// The serial port being used for the default system logger can optionally
 /// ignore inputs.
-static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(0);
+static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(u16::MAX);
 
 /// Configures the console connection listener to ignore inputs from the given
 /// serial port.
@@ -109,17 +109,27 @@ fn shell_loop(
         .name(format!("{address:?}_to_tty"))
         .spawn()?;
 
-    let new_app_ns = mod_mgmt::create_application_namespace(None)?;
 
-    let (app_file, _ns) =
-        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
-            .expect("Couldn't find shell in default app namespace");
+    let task;
+    #[cfg(target_arch = "x86_64")] {
+        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
 
-    let path = path::Path::new(app_file.lock().get_absolute_path());
-    let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-        .name(format!("{address:?}_shell"))
-        .block()
-        .spawn()?;
+        let (app_file, _ns) =
+            mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
+                .expect("Couldn't find shell in default app namespace");
+
+        let path = path::Path::new(app_file.lock().get_absolute_path());
+        task = spawn::new_application_task_builder(path, Some(new_app_ns))?
+            .name(format!("{address:?}_shell"))
+            .block()
+            .spawn()?;
+    }
+    #[cfg(target_arch = "aarch64")] {
+        task = spawn::new_task_builder(hull::main, alloc::vec::Vec::new())
+            .name(alloc::format!("{address:?}_shell"))
+            .block()
+            .spawn()?;
+    }
 
     let id = task.id;
     let stream = Arc::new(tty.slave());

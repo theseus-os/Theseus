@@ -3,8 +3,8 @@ use core::convert::AsMut;
 use cpu::{CpuId, MpidrValue};
 use arm_boards::{BOARD_CONFIG, NUM_CPUS};
 use memory::{
-    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress, PteFlags,
-    allocate_pages, allocate_frames_at
+    PageTable, BorrowedMappedPages, Mutable, PhysicalAddress,
+    allocate_pages, allocate_frames_at, MMIO_FLAGS,
 };
 
 use static_assertions::const_assert_eq;
@@ -79,6 +79,7 @@ impl Iterator for TargetListIterator {
 }
 
 /// Target of a shared-peripheral interrupt
+#[derive(Copy, Clone, Debug)]
 pub enum SpiDestination {
     /// The interrupt must be delivered to a specific CPU.
     Specific(CpuId),
@@ -90,6 +91,7 @@ pub enum SpiDestination {
 }
 
 /// Target of an inter-processor interrupt
+#[derive(Copy, Clone, Debug)]
 pub enum IpiTargetCpu {
     /// The interrupt will be delivered to a specific CPU.
     Specific(CpuId),
@@ -264,14 +266,10 @@ pub enum Version {
 
 impl ArmGic {
     pub fn init(page_table: &mut PageTable, version: Version) -> Result<Self, &'static str> {
-        let mmio_flags = PteFlags::DEVICE_MEMORY
-                       | PteFlags::NOT_EXECUTABLE
-                       | PteFlags::WRITABLE;
-
         let mut map_dist = |gicd_base| -> Result<BorrowedMappedPages<GicRegisters, Mutable>, &'static str>  {
             let pages = allocate_pages(1).ok_or("couldn't allocate pages for the distributor interface")?;
             let frames = allocate_frames_at(gicd_base, 1)?;
-            let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+            let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
             mapped.into_borrowed_mut(0).map_err(|(_, e)| e)
         };
 
@@ -282,7 +280,7 @@ impl ArmGic {
                 let mut processor: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the CPU interface")?;
                     let frames = allocate_frames_at(cpu, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                    let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
@@ -297,7 +295,7 @@ impl ArmGic {
                 let dist_extended: BorrowedMappedPages<GicRegisters, Mutable> = {
                     let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended distributor interface")?;
                     let frames = allocate_frames_at(dist + DIST_P6_OFFSET, 1)?;
-                    let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                    let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
@@ -307,7 +305,7 @@ impl ArmGic {
                     let mut redistributor: BorrowedMappedPages<GicRegisters, Mutable> = {
                         let pages = allocate_pages(1).ok_or("couldn't allocate pages for the redistributor interface")?;
                         let frames = allocate_frames_at(phys_addr, 1)?;
-                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                         mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                     };
 
@@ -316,7 +314,7 @@ impl ArmGic {
                     let redist_sgippi = {
                         let pages = allocate_pages(1).ok_or("couldn't allocate pages for the extended redistributor interface")?;
                         let frames = allocate_frames_at(phys_addr + REDIST_SGIPPI_OFFSET, 1)?;
-                        let mapped = page_table.map_allocated_pages_to(pages, frames, mmio_flags)?;
+                        let mapped = page_table.map_allocated_pages_to(pages, frames, MMIO_FLAGS)?;
                         mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                     };
 
@@ -337,10 +335,10 @@ impl ArmGic {
         }
     }
 
-    fn affinity_routing(&self) -> Enabled {
+    pub fn init_secondary_cpu_interface(&mut self) {
         match self {
-            Self::V2( _) => false,
-            Self::V3(v3) => v3.affinity_routing,
+            Self::V2(v2) => cpu_interface_gicv2::init(v2.processor.as_mut()),
+            Self::V3( _) => cpu_interface_gicv3::init(),
         }
     }
 
@@ -376,26 +374,46 @@ impl ArmGic {
 
     /// Will that interrupt be forwarded by the distributor?
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
-        match int {
-            0..=31 => if let Self::V3(v3) = self {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
                 let i = get_current_cpu_redist_index();
                 redist_interface::is_sgippi_enabled(&v3.redistributors[i].redist_sgippi, int)
-            } else {
-                true
             },
-            _ => dist_interface::is_spi_enabled(self.distributor(), int),
+            (_, this) => dist_interface::is_spi_enabled(this.distributor(), int),
         }
     }
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
-        match int {
-            0..=31 => if let Self::V3(v3) = self {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
                 let i = get_current_cpu_redist_index();
                 redist_interface::enable_sgippi(&mut v3.redistributors[i].redist_sgippi, int, enabled);
             },
-            _ => dist_interface::enable_spi(self.distributor_mut(), int, enabled),
+            (_, this) => dist_interface::enable_spi(this.distributor_mut(), int, enabled),
+        };
+    }
+
+    /// Returns the priority of an interrupt
+    pub fn get_interrupt_priority(&self, int: InterruptNumber) -> Priority {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
+                let i = get_current_cpu_redist_index();
+                redist_interface::get_sgippi_priority(&v3.redistributors[i].redist_sgippi, int)
+            },
+            (_, this) => dist_interface::get_spi_priority(this.distributor(), int),
+        }
+    }
+
+    /// Sets the priority of an interrupt (0-255)
+    pub fn set_interrupt_priority(&mut self, int: InterruptNumber, enabled: Priority) {
+        match (int, self) {
+            (0..=31, Self::V3(v3)) => {
+                let i = get_current_cpu_redist_index();
+                redist_interface::set_sgippi_priority(&mut v3.redistributors[i].redist_sgippi, int, enabled);
+            },
+            (_, this) => dist_interface::set_spi_priority(this.distributor_mut(), int, enabled),
         };
     }
 
@@ -418,6 +436,18 @@ impl ArmGic {
         match self {
             Self::V2(v2) => cpu_interface_gicv2::set_minimum_priority(&mut v2.processor, priority),
             Self::V3( _) => cpu_interface_gicv3::set_minimum_priority(priority),
+        }
+    }
+
+    /// Returns the internal ID of the redistributor (GICv3)
+    ///
+    /// Note #2: this is only provided for debugging purposes
+    /// Note #1: as a compatibility feature, on GICv2, the CPU index is returned.
+    pub fn get_cpu_interface_id(&self) -> u16 {
+        let i = get_current_cpu_redist_index();
+        match self {
+            Self::V3(v3) => redist_interface::get_internal_id(&v3.redistributors[i].redistributor),
+            _ => i as _,
         }
     }
 }
