@@ -512,6 +512,10 @@ impl<'f> IntoIterator for &'f AllocatedFrames {
 
 /// An iterator over each [`AllocatedFrame`] in a range of [`AllocatedFrames`].
 /// 
+/// To Do: Description is no longer valid, since we have an iterator for RangeInclusive now.
+/// but I still think it's useful to thave an `AllocatedFrames` iterator that ties the lifetime
+/// of the `AllocatedFrame` to the original object.
+/// 
 /// We must implement our own iterator type here in order to tie the lifetime `'f`
 /// of a returned `AllocatedFrame<'f>` type to the lifetime of its containing `AllocatedFrames`.
 /// This is because the underlying type of `AllocatedFrames` is a [`FrameRange`],
