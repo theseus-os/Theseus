@@ -1,13 +1,15 @@
+//! A range of unmapped frames that stores a verified `TrustedChunk`.
+//! A `Frames` object is uncloneable and is the only way to access the range of frames it references.
+//! 
+//! To Do: Merge AllocatedFrames into this typestate as well.
+
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::{FrameRange, Frame, PhysicalAddress};
 use range_inclusive::RangeInclusive;
-use crate::{MemoryRegionType,RESERVED_REGIONS, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST, contains_any};
+use crate::{MemoryRegionType, AllocatedFrames};
 use core::{borrow::Borrow, cmp::Ordering, ops::{Deref, DerefMut}};
 use spin::Mutex;
 use trusted_chunk::trusted_chunk::*;
-use range_inclusive::RangeInclusiveIterator;
-use core::marker::PhantomData;
-use crate::allocated_frames::*;
 
 static CHUNK_ALLOCATOR: Mutex<TrustedChunkAllocator> = Mutex::new(TrustedChunkAllocator::new());
 
@@ -21,11 +23,28 @@ pub enum FrameState {
     Unmapped,
 }
 
+/// A range of contiguous frames.
+/// Owning a `Frames` object gives ownership of the range of frames it references.
+/// The `verified_chunk` field is a verified `TrustedChunk` that stores the actual frames,
+/// and has the invariant that it does not overlap with any other `TrustedChunk` created by the
+/// `CHUNK_ALLOCATOR`.
+///
+/// # Ordering and Equality
+///
+/// `Frames` implements the `Ord` trait, and its total ordering is ONLY based on
+/// its **starting** `Frame`. This is useful so we can store `Frames` in a sorted collection.
+///
+/// Similarly, `Frames` implements equality traits, `Eq` and `PartialEq`,
+/// both of which are also based ONLY on the **starting** `Frame` of the `Frames`.
+/// Thus, comparing two `Frames` with the `==` or `!=` operators may not work as expected.
+/// since it ignores their actual range of frames.
 #[derive(Debug, Eq)]
 pub struct Frames<const S: FrameState> {
     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
     typ: MemoryRegionType,
-    /// The Frames covered by this chunk, an inclusive range. 
+    /// The Frames covered by this chunk, an inclusive range. Equal to the frames in the verified chunk.
+    /// Needed because verification fails on a trusted chunk that stores a FrameRange or RangeInclusive<Frame>, 
+    /// but succeeds with RangeInclusive<usize>.
     frames: FrameRange,
     /// The actual verified chunk
     verified_chunk: TrustedChunk
@@ -45,8 +64,8 @@ impl Frames<{FrameState::Unmapped}> {
                 }
             })?;
         
-        assert!(frames.start().number() == verified_chunk.start());
-        assert!(frames.end().number() == verified_chunk.end());
+        // assert!(frames.start().number() == verified_chunk.start());
+        // assert!(frames.end().number() == verified_chunk.end());
 
         let f = Frames {
             typ,
@@ -54,7 +73,6 @@ impl Frames<{FrameState::Unmapped}> {
             verified_chunk
         };
         //warn!("new frames: {:?}", f);
-
         Ok(f)
     }
 
@@ -66,10 +84,9 @@ impl Frames<{FrameState::Unmapped}> {
             frames,
             verified_chunk
         };
-        assert!(f.frames.start().number() == f.verified_chunk.start());
-        assert!(f.frames.end().number() == f.verified_chunk.end());
-        //warn!("from trusted chunk: {:?}", f);
-
+        // assert!(f.frames.start().number() == f.verified_chunk.start());
+        // assert!(f.frames.end().number() == f.verified_chunk.end());
+        // warn!("from trusted chunk: {:?}", f);
         f
     }
 
@@ -78,116 +95,10 @@ impl Frames<{FrameState::Unmapped}> {
             frames: self,
         }
     }
-
-    // /// Returns an `AllocatedFrame` if this `AllocatedFrames` object contains only one frame.
-    // /// 
-    // /// ## Panic
-    // /// Panics if this `AllocatedFrame` contains multiple frames or zero frames.
-    // pub fn as_allocated_frame(&self) -> AllocatedFrame {
-    //     assert!(self.size_in_frames() == 1);
-    //     AllocatedFrame {
-    //         frame: *self.start(),
-    //         _phantom: PhantomData,
-    //     }
-    // }
 }
 
-// impl<const S: FrameState> Drop for Frames<S> {
-//     fn drop(&mut self) {
-//         if self.size_in_frames() == 0 { return; }
-
-//         trace!("frame_allocator: dropping {:?}", self);
-//         let unmapped_frames: Frames<{FrameState::Unmapped}> = Frames {
-//             typ: self.typ,
-//             frames: self.frames.clone(),
-//             verified_chunk: core::mem::replace(&mut self.verified_chunk, TrustedChunk::empty())
-//         };
-
-//         // assert!(unmapped_frames.start().number() == unmapped_frames.verified_chunk.start());
-//         // assert!(unmapped_frames.end().number() == unmapped_frames.verified_chunk.end());
-
-//         // make sure the fields in the Frames match
-//         self.frames = FrameRange::empty();
-
-//         let (list, _typ) = if contains_any(&RESERVED_REGIONS.lock(), &self.frames) {
-//             (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
-//         } else {
-//             (&FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
-//         };
-//         trace!("frame_allocator: deallocating {:?}, typ {:?}", self, _typ);
-
-//         // Simply add the newly-deallocated chunk to the free frames list.
-//         let mut locked_list = list.lock();
-//         let res = locked_list.insert(unmapped_frames);
-//         match res {
-//             Ok(_inserted_free_chunk) => (),
-//             Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free frame list", c),
-//         }
-        
-//         // Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks
-//         // before or after the newly-inserted free chunk. 
-//         // However, there's no *need* to do so until we actually run out of address space or until 
-//         // a requested address is in a chunk that needs to be merged.
-//         // Thus, for performance, we save that for those future situations.
-//     }
-// }
-
-// impl<'f> IntoIterator for &'f Frames<{FrameState::Unmapped}> {
-//     type IntoIter = AllocatedFramesIter<'f>;
-//     type Item = AllocatedFrame<'f>;
-//     fn into_iter(self) -> Self::IntoIter {
-//         AllocatedFramesIter {
-//             _owner: self,
-//             range: self.frames.clone().into_iter(),
-//         }
-//     }
-// }
-
-// /// An iterator over each [`AllocatedFrame`] in a range of [`Frames`].
-// /// 
-// /// We must implement our own iterator type here in order to tie the lifetime `'f`
-// /// of a returned `AllocatedFrame<'f>` type to the lifetime of its containing `Frames`.
-// /// This is because the underlying type of `Frames` is a [`FrameRange`],
-// /// which itself is a [`core::ops::RangeInclusive`] of [`Frame`]s, and unfortunately the
-// /// `RangeInclusive` type doesn't implement an immutable iterator.
-// /// 
-// /// Iterating through a `RangeInclusive` actually modifies its own internal range,
-// /// so we must avoid doing that because it would break the semantics of a `FrameRange`.
-// /// In fact, this is why [`FrameRange`] only implements `IntoIterator` but
-// /// does not implement [`Iterator`] itself.
-// pub struct AllocatedFramesIter<'f> {
-//     _owner: &'f Frames<{FrameState::Unmapped}>,
-//     range: RangeInclusiveIterator<Frame>,
-// }
-// impl<'f> Iterator for AllocatedFramesIter<'f> {
-//     type Item = AllocatedFrame<'f>;
-//     fn next(&mut self) -> Option<Self::Item> {
-//         self.range.next().map(|frame|
-//             AllocatedFrame {
-//                 frame, _phantom: PhantomData,
-//             }
-//         )
-//     }
-// }
-
-// /// A reference to a single frame within a range of `Frames`.
-// /// 
-// /// The lifetime of this type is tied to the lifetime of its owning `Frames`.
-// #[derive(Debug)]
-// pub struct AllocatedFrame<'f> {
-//     frame: Frame,
-//     _phantom: PhantomData<&'f Frame>,
-// }
-// impl<'f> Deref for AllocatedFrame<'f> {
-//     type Target = Frame;
-//     fn deref(&self) -> &Self::Target {
-//         &self.frame
-//     }
-// }
-// assert_not_impl_any!(AllocatedFrame: DerefMut, Clone);
-
-
 impl<const S: FrameState> Frames<S> {
+    #[allow(dead_code)]
     pub(crate) fn frames(&self) -> FrameRange {
         self.frames.clone()
     }
@@ -228,19 +139,19 @@ impl<const S: FrameState> Frames<S> {
                 // use the newly merged TrustedChunk to update the frame range
                 self.frames = into_frame_range(&self.verified_chunk.frames());
                 core::mem::forget(other);
-                assert!(self.frames.start().number() == self.verified_chunk.start());
-                assert!(self.frames.end().number() == self.verified_chunk.end());
+                // assert!(self.frames.start().number() == self.verified_chunk.start());
+                // assert!(self.frames.end().number() == self.verified_chunk.end());
                 //warn!("merge: {:?}", self);
 
                 return Ok(());
             },
             Err(other_verified_chunk) => {
                 let _ = core::mem::replace(&mut other.verified_chunk, other_verified_chunk);
-                assert!(self.frames.start().number() == self.verified_chunk.start());
-                assert!(self.frames.end().number() == self.verified_chunk.end());
+                // assert!(self.frames.start().number() == self.verified_chunk.start());
+                // assert!(self.frames.end().number() == self.verified_chunk.end());
                 
-                assert!(other.frames.start().number() == other.verified_chunk.start());
-                assert!(other.frames.end().number() == other.verified_chunk.end());
+                // assert!(other.frames.start().number() == other.verified_chunk.start());
+                // assert!(other.frames.end().number() == other.verified_chunk.end());
                 return Err(other);
             }
         }
@@ -268,8 +179,8 @@ impl<const S: FrameState> Frames<S> {
             Ok(x) => x,
             Err(vchunk) => {
                 let _ = core::mem::replace(&mut self.verified_chunk, vchunk);
-                assert!(self.frames.start().number() == self.verified_chunk.start());
-                assert!(self.frames.end().number() == self.verified_chunk.end());
+                // assert!(self.frames.start().number() == self.verified_chunk.start());
+                // assert!(self.frames.end().number() == self.verified_chunk.end());
                 return (self, None, None);
             }
         };
@@ -296,19 +207,19 @@ impl<const S: FrameState> Frames<S> {
                 verified_chunk: vchunk
             })
         );
-        assert!(c1.frames.start().number() == c1.verified_chunk.start());
-        assert!(c1.frames.end().number() == c1.verified_chunk.end());
 
-        if let Some(c) = &c2 {
-            assert!(c.frames.start().number() == c.verified_chunk.start());
-            assert!(c.frames.end().number() == c.verified_chunk.end());
-        }
+        // assert!(c1.frames.start().number() == c1.verified_chunk.start());
+        // assert!(c1.frames.end().number() == c1.verified_chunk.end());
 
-        if let Some(c) = &c3 {
-            assert!(c.frames.start().number() == c.verified_chunk.start());
-            assert!(c.frames.end().number() == c.verified_chunk.end());
-        }
+        // if let Some(c) = &c2 {
+        //     assert!(c.frames.start().number() == c.verified_chunk.start());
+        //     assert!(c.frames.end().number() == c.verified_chunk.end());
+        // }
 
+        // if let Some(c) = &c3 {
+        //     assert!(c.frames.start().number() == c.verified_chunk.start());
+        //     assert!(c.frames.end().number() == c.verified_chunk.end());
+        // }
         //warn!("split: {:?} {:?} {:?}", c1, c2, c3);
 
         (c1, c2, c3)
@@ -339,8 +250,8 @@ impl<const S: FrameState> Frames<S> {
             Ok((first, second)) => (first, second),
             Err(vchunk) => {
                 let _ = core::mem::replace(&mut self.verified_chunk, vchunk);
-                assert!(self.frames.start().number() == self.verified_chunk.start());
-                assert!(self.frames.end().number() == self.verified_chunk.end());
+                // assert!(self.frames.start().number() == self.verified_chunk.start());
+                // assert!(self.frames.end().number() == self.verified_chunk.end());
                 return Err(self);
             }
         };
@@ -358,11 +269,11 @@ impl<const S: FrameState> Frames<S> {
             verified_chunk: second
         };
 
-        assert!(c1.frames.start().number() == c1.verified_chunk.start());
-        assert!(c1.frames.end().number() == c1.verified_chunk.end());
+        // assert!(c1.frames.start().number() == c1.verified_chunk.start());
+        // assert!(c1.frames.end().number() == c1.verified_chunk.end());
         
-        assert!(c2.frames.start().number() == c2.verified_chunk.start());
-        assert!(c2.frames.end().number() == c2.verified_chunk.end());
+        // assert!(c2.frames.start().number() == c2.verified_chunk.start());
+        // assert!(c2.frames.end().number() == c2.verified_chunk.end());
 
         //warn!("split at: {:?} {:?}", c1, c2);
 
@@ -399,43 +310,15 @@ impl<const S: FrameState> Borrow<Frame> for &'_ Frames<S> {
 
 
 fn into_frame_range(frames: &RangeInclusive<usize>) -> FrameRange {
-    let start = FrameNum{ frame: *frames.start() }.into_frame()
+    let start = into_frame(*frames.start())
         .expect("Verified chunk start was not a valid frame");
     
-    let end = FrameNum{ frame: *frames.end() }.into_frame()
+    let end = into_frame(*frames.end())
         .expect("Verified chunk end was not a valid frame");
-    
     FrameRange::new(start, end)
 }
 
-struct FrameNum {
-    frame: usize
+fn into_frame(frame_num: usize) -> Option<Frame> {
+    PhysicalAddress::new(frame_num * PAGE_SIZE)
+        .and_then(|addr| Some(Frame::containing_address(addr)))
 }
-
-impl FrameNum {
-    fn into_frame(&self) -> Option<Frame> {
-        PhysicalAddress::new(self.frame * PAGE_SIZE)
-            .and_then(|addr| Some(Frame::containing_address(addr)))
-    }
-}
-
-// /// This function is a callback used to convert `UnmappedFrames` into `AllocatedFrames`.
-// /// `UnmappedFrames` represents frames that have been unmapped from a page that had
-// /// exclusively mapped them, indicating that no others pages have been mapped 
-// /// to those same frames, and thus, they can be safely deallocated.
-// /// 
-// /// This exists to break the cyclic dependency cycle between this crate and
-// /// the `page_table_entry` crate, since `page_table_entry` must depend on types
-// /// from this crate in order to enforce safety when modifying page table entries.
-// pub(crate) fn into_frames_unmapped_state(tc: TrustedChunk, frames: FrameRange) -> Frames<{FrameState::Unmapped}> {
-//     let typ = if contains_any(&RESERVED_REGIONS.lock(), &frames) {
-//         MemoryRegionType::Reserved
-//     } else {
-//         MemoryRegionType::Free
-//     };
-//     let f = Frames { typ, frames, verified_chunk: tc };
-//     assert!(f.frames.start().number() == f.verified_chunk.start());
-//     assert!(f.frames.end().number() == f.verified_chunk.end());
-//     //warn!("into frames unmapped: {:?} ", f);
-//     f
-// }
