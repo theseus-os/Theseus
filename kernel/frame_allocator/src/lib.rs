@@ -33,8 +33,8 @@ extern crate intrusive_collections;
 extern crate range_inclusive;
 extern crate trusted_chunk;
 
-// #[cfg(test)]
-// mod test;
+#[cfg(test)]
+mod test;
 
 mod static_array_rb_tree;
 // mod static_array_linked_list;
