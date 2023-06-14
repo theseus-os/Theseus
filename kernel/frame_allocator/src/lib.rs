@@ -21,6 +21,7 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(box_into_inner)]
+#![allow(incomplete_features)]
 #![feature(adt_const_params)]
 
 extern crate alloc;
