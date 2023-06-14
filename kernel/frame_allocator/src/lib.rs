@@ -56,6 +56,9 @@ use region::*;
 use range_inclusive::RangeInclusive;
 pub use allocated_frames::*;
 
+// pub type AllocatedFrames = Frames<{FrameState::Unmapped}>;
+// pub use frames::AllocatedFrame;
+
 const FRAME_SIZE: usize = PAGE_SIZE;
 #[allow(dead_code)]
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
