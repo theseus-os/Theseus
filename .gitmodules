@@ -22,3 +22,6 @@
 	path = libs/core2
 	url = https://github.com/theseus-os/core2.git
 	shallow = true
+[submodule "libs/trusted_chunk"]
+	path = libs/trusted_chunk
+	url = https://github.com/Ramla-I/trusted_chunk

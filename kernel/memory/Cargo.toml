@@ -24,6 +24,7 @@ page_allocator = { path = "../page_allocator" }
 frame_allocator = { path = "../frame_allocator" }
 no_drop = { path = "../no_drop" }
 owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
+frame_range_callbacks = { path = "../frame_range_callbacks" }
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 

@@ -8,6 +8,7 @@ version = "0.1.0"
 spin = "0.9.4"
 intrusive-collections = "0.9.0"
 static_assertions = "1.1.0"
+range_inclusive = {git = "https://github.com/Ramla-I/range_inclusive"}
 
 [dependencies.log]
 version = "0.4.8"
@@ -17,6 +18,9 @@ path = "../kernel_config"
 
 [dependencies.memory_structs]
 path = "../memory_structs"
+
+[dependencies.trusted_chunk]
+path = "../../libs/trusted_chunk"
 
 [lib]
 crate-type = ["rlib"]

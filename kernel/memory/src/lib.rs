@@ -14,6 +14,7 @@
 #![feature(ptr_internals)]
 
 extern crate alloc;
+extern crate frame_range_callbacks;
 
 mod paging;
 pub use self::paging::{
@@ -244,7 +245,7 @@ pub fn init(
         reserved_index += 1;
     }
 
-    let into_alloc_frames_fn = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
+    let (into_trusted_chunk_fn, into_alloc_frames_fn) = frame_allocator::init(free_regions.iter().flatten(), reserved_regions.iter().flatten())?;
     debug!("Initialized new frame allocator!");
     frame_allocator::dump_frame_allocator_state();
 
@@ -263,8 +264,10 @@ pub fn init(
     debug!("Initialized new page allocator!");
     page_allocator::dump_page_allocator_state();
 
+    frame_range_callbacks::init(into_trusted_chunk_fn, into_alloc_frames_fn);
+
     // Initialize paging, which creates a new page table and maps all of the current code/data sections into it.
-    paging::init(boot_info, kernel_stack_start, into_alloc_frames_fn)
+    paging::init(boot_info, kernel_stack_start)
 }
 
 /// Finishes initializing the memory management system after the heap is ready.
