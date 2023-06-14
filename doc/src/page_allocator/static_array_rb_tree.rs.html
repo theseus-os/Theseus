@@ -308,7 +308,7 @@
     /// If the inner collection is an array, it is pushed onto the back of the array.
 	/// If there is no space left in the array, an `Err` containing the given `value` is returned.
 	///
-	/// If success
+	/// Upon success, a reference to the newly-inserted value is returned.
 	</span><span class="kw">pub fn </span>insert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: T) -&gt; <span class="prelude-ty">Result</span>&lt;ValueRefMut&lt;T&gt;, T&gt; {
 		<span class="kw">match </span><span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0 </span>{
 			Inner::Array(arr) =&gt; {
@@ -354,7 +354,7 @@
 		<span class="kw">let </span><span class="kw-2">mut </span>iter_a = <span class="prelude-val">None</span>;
 		<span class="kw">let </span><span class="kw-2">mut </span>iter_b = <span class="prelude-val">None</span>;
 		<span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0 </span>{
-			Inner::Array(arr)     =&gt; iter_a = <span class="prelude-val">Some</span>(arr.iter().flatten()),
+			Inner::Array(arr)   =&gt; iter_a = <span class="prelude-val">Some</span>(arr.iter().flatten()),
 			Inner::RBTree(tree) =&gt; iter_b = <span class="prelude-val">Some</span>(tree.iter()),
 		}
         iter_a.into_iter()

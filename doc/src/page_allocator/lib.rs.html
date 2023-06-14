@@ -810,6 +810,37 @@
 <a href="#810" id="810">810</a>
 <a href="#811" id="811">811</a>
 <a href="#812" id="812">812</a>
+<a href="#813" id="813">813</a>
+<a href="#814" id="814">814</a>
+<a href="#815" id="815">815</a>
+<a href="#816" id="816">816</a>
+<a href="#817" id="817">817</a>
+<a href="#818" id="818">818</a>
+<a href="#819" id="819">819</a>
+<a href="#820" id="820">820</a>
+<a href="#821" id="821">821</a>
+<a href="#822" id="822">822</a>
+<a href="#823" id="823">823</a>
+<a href="#824" id="824">824</a>
+<a href="#825" id="825">825</a>
+<a href="#826" id="826">826</a>
+<a href="#827" id="827">827</a>
+<a href="#828" id="828">828</a>
+<a href="#829" id="829">829</a>
+<a href="#830" id="830">830</a>
+<a href="#831" id="831">831</a>
+<a href="#832" id="832">832</a>
+<a href="#833" id="833">833</a>
+<a href="#834" id="834">834</a>
+<a href="#835" id="835">835</a>
+<a href="#836" id="836">836</a>
+<a href="#837" id="837">837</a>
+<a href="#838" id="838">838</a>
+<a href="#839" id="839">839</a>
+<a href="#840" id="840">840</a>
+<a href="#841" id="841">841</a>
+<a href="#842" id="842">842</a>
+<a href="#843" id="843">843</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
@@ -821,10 +852,12 @@
 //! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), 
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
 //!
-//! # Notes and Missing Features
-//! This allocator currently does **not** merge freed chunks (de-fragmentation) upon deallocation. 
-//! It only merges free chunks lazily upon request, i.e., when we run out of address space
-//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
+//! # Notes
+//! This allocator only makes one attempt to merge deallocated pages into existing
+//! free chunks for de-fragmentation. It does not iteratively merge adjacent chunks in order to
+//! maximally combine separate chunks into the biggest single chunk.
+//! Instead, free chunks are lazily merged only when running out of address space
+//! or when needed to fulfill a specific request.
 
 </span><span class="attr">#![no_std]
 
@@ -837,10 +870,8 @@
 <span class="kw">extern crate </span>intrusive_collections;
 <span class="kw">use </span>intrusive_collections::Bound;
 
-
 <span class="kw">mod </span>static_array_rb_tree;
 <span class="comment">// mod static_array_linked_list;
-
 
 </span><span class="kw">use </span>core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 <span class="kw">use </span>kernel_config::memory::<span class="kw-2">*</span>;
@@ -1111,22 +1142,53 @@
 		<span class="kw">if </span><span class="self">self</span>.size_in_pages() == <span class="number">0 </span>{ <span class="kw">return</span>; }
 		<span class="comment">// trace!(&quot;page_allocator: deallocating {:?}&quot;, self);
 
-		// Simply add the newly-deallocated chunk to the free pages list.
-		</span><span class="kw">let </span><span class="kw-2">mut </span>locked_list = FREE_PAGE_LIST.lock();
-		<span class="kw">let </span>res = locked_list.insert(Chunk {
+		</span><span class="kw">let </span>chunk = Chunk {
 			pages: <span class="self">self</span>.pages.clone(),
-		});
-		<span class="kw">match </span>res {
-			<span class="prelude-val">Ok</span>(_inserted_free_chunk) =&gt; (),
-			<span class="prelude-val">Err</span>(c) =&gt; <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated chunk {:?} into free page list&quot;</span>, c),
+		};
+		<span class="kw">let </span><span class="kw-2">mut </span>list = FREE_PAGE_LIST.lock();
+		<span class="kw">match </span><span class="kw-2">&amp;mut </span>list.<span class="number">0 </span>{
+			<span class="comment">// For early allocations, just add the deallocated chunk to the free pages list.
+			</span>Inner::Array(<span class="kw">_</span>) =&gt; {
+				<span class="kw">if </span>list.insert(chunk).is_ok() {
+					<span class="kw">return</span>;
+				}
+			}
+
+			<span class="comment">// For full-fledged deallocations, use the entry API to efficiently determine if
+			// we can merge the deallocated pages with an existing contiguously-adjactent chunk
+			// or if we need to insert a new chunk.
+			</span>Inner::RBTree(<span class="kw-2">ref mut </span>tree) =&gt; {
+				<span class="kw">let </span><span class="kw-2">mut </span>cursor_mut = tree.lower_bound_mut(Bound::Included(chunk.start()));
+				<span class="kw">if let </span><span class="prelude-val">Some</span>(next_chunk) = cursor_mut.get() {
+					<span class="kw">if </span><span class="kw-2">*</span>chunk.end() + <span class="number">1 </span>== <span class="kw-2">*</span>next_chunk.start() {
+						<span class="comment">// trace!(&quot;Prepending {:?} onto beg of next {:?}&quot;, chunk, next_chunk.deref());
+						</span><span class="kw">if </span>cursor_mut.replace_with(Wrapper::new_link(Chunk {
+							pages: PageRange::new(<span class="kw-2">*</span>chunk.start(), <span class="kw-2">*</span>next_chunk.end()),
+						})).is_ok() {
+							<span class="kw">return</span>;
+						}
+					}
+				}
+				<span class="kw">if let </span><span class="prelude-val">Some</span>(prev_chunk) = cursor_mut.peek_prev().get() {
+					<span class="kw">if </span><span class="kw-2">*</span>prev_chunk.end() + <span class="number">1 </span>== <span class="kw-2">*</span>chunk.start() {
+						<span class="comment">// trace!(&quot;Appending {:?} onto end of prev {:?}&quot;, chunk, prev_chunk.deref());
+						</span><span class="kw">let </span>new_page_range = PageRange::new(<span class="kw-2">*</span>prev_chunk.start(), <span class="kw-2">*</span>chunk.end());
+						cursor_mut.move_prev();
+						<span class="kw">if </span>cursor_mut.replace_with(Wrapper::new_link(Chunk {
+							pages: new_page_range,
+						})).is_ok() {
+							<span class="kw">return</span>;
+						}
+					}
+				}
+
+				<span class="comment">// trace!(&quot;Inserting new chunk for deallocated {:?} &quot;, chunk.pages);
+				</span>cursor_mut.insert(Wrapper::new_link(chunk));
+				<span class="kw">return</span>;
+			}
 		}
-		
-		<span class="comment">// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks
-		// before or after the newly-inserted free chunk. 
-		// However, there&#39;s no *need* to do so until we actually run out of address space or until 
-		// a requested address is in a chunk that needs to be merged.
-		// Thus, for performance, we save that for those future situations.
-    </span>}
+		<span class="macro">log::error!</span>(<span class="string">&quot;BUG: couldn&#39;t insert deallocated {:?} into free page list&quot;</span>, <span class="self">self</span>.pages);
+    }
 }
 
 
