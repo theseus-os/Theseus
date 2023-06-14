@@ -3,25 +3,21 @@
 //! but succeeds with RangeInclusive<usize>.
 //! 
 //! We should be able to remove this module and work directly with the verified crate in the foreseeable future.
-//! All this model should do is amke sure that the start and end of the stored `frames` is equal to the start and end of the `verified_chunk`
+//! All this model should do is make sure that the start and end of the stored `frames` is equal to the start and end of the `verified_chunk`
 
-use alloc::collections::btree_map::Range;
 use kernel_config::memory::PAGE_SIZE;
 use memory_structs::{FrameRange, Frame, PhysicalAddress};
 use range_inclusive::RangeInclusive;
-use crate::{MemoryRegionType, AllocatedFrames, MIN_FRAME, MAX_FRAME};
-use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}};
-use spin::{Once, Mutex};
-use trusted_chunk::{
-    trusted_chunk::*,
-    linked_list::List,
-    static_array::StaticArray,
-};
+use crate::{MemoryRegionType, AllocatedFrames};
+use core::{borrow::Borrow, cmp::Ordering, ops::{Deref, DerefMut}};
+use spin::Mutex;
+use trusted_chunk::trusted_chunk::*;
 
 static CHUNK_ALLOCATOR: Mutex<TrustedChunkAllocator> = Mutex::new(TrustedChunkAllocator::new());
 
 pub(crate) fn switch_chunk_allocator_to_heap_structure() {
-    let _ = CHUNK_ALLOCATOR.lock().switch_to_heap_allocated();
+    CHUNK_ALLOCATOR.lock().switch_to_heap_allocated()
+        .expect("BUG: Failed to switch the chunk allocator to heap allocated. May have been called twice.");
 }
 
 #[derive(Debug, Eq)]
@@ -42,7 +38,7 @@ impl Chunk {
             .map(|(chunk, _)| chunk)
             .map_err(|chunk_error|{
                 match chunk_error {
-                    ChunkCreationError::Overlap(idx) => "Failed to create a verified chunk due to an overlap",
+                    ChunkCreationError::Overlap(_idx) => "Failed to create a verified chunk due to an overlap",
                     ChunkCreationError::NoSpace => "Before the heap is initialized, requested more chunks than there is space for (64)",
                     ChunkCreationError::InvalidRange => "Could not create a chunk for an empty range, use the empty() function"
                 }
@@ -55,6 +51,8 @@ impl Chunk {
         })
     }
 
+    /// Creates a new Chunk from a TrustedChunk and a FrameRange.
+    /// Only used within the allocated frames callback function.
     pub(crate) fn from_trusted_chunk(verified_chunk: TrustedChunk, frames: FrameRange, typ: MemoryRegionType) -> Chunk {
         Chunk {
             typ,
@@ -63,9 +61,9 @@ impl Chunk {
         }
     }
 
-    pub(crate) fn frames(&self) -> FrameRange {
-        self.frames.clone()
-    }
+    // pub(crate) fn frames(&self) -> FrameRange {
+    //     self.frames.clone()
+    // }
 
     pub(crate) fn typ(&self) -> MemoryRegionType {
         self.typ

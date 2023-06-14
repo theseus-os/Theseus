@@ -18,14 +18,13 @@ use core::{
     slice,
 };
 use log::{error, warn, debug, trace};
-use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
+use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, AllocatedPages, AllocatedFrames}; 
 use crate::paging::{
     get_current_p4,
     PageRange,
     table::{P4, UPCOMING_P4, Table, Level4},
 };
 use pte_flags::PteFlagsArch;
-use spin::Once;
 use kernel_config::memory::PAGE_SIZE;
 use super::tlb_flush_virt_addr;
 use zerocopy::FromBytes;

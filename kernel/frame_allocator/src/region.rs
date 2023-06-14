@@ -1,6 +1,6 @@
 use memory_structs::{FrameRange, Frame};
 use crate::MemoryRegionType;
-use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}};
+use core::{borrow::Borrow, cmp::Ordering, ops::Deref};
 
 /// A region of contiguous frames.
 /// Only used for bookkeeping, not for allocation.
@@ -15,6 +15,7 @@ use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut
 /// Thus, comparing two `Region`s with the `==` or `!=` operators may not work as expected.
 /// since it ignores their actual range of frames.
 #[derive(Debug, Clone, Eq)]
+#[allow(dead_code)]
 pub struct Region {
     /// The type of this memory region, e.g., whether it's in a free or reserved region.
     pub(crate) typ: MemoryRegionType,

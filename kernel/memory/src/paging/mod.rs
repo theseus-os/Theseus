@@ -29,7 +29,7 @@ use core::{
 };
 use log::debug;
 use super::{
-    Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+    Frame, PageRange, VirtualAddress, PhysicalAddress,
     AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
     InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
     get_p4, find_section_memory_bounds,

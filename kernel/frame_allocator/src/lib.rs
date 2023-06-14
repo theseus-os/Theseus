@@ -41,7 +41,7 @@ mod region;
 mod trusted_chunk_shim;
 mod allocated_frames;
 
-use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
+use core::{borrow::Borrow, cmp::{min, max}, ops::Deref};
 use kernel_config::memory::*;
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
 use spin::Mutex;
@@ -50,12 +50,14 @@ use static_array_rb_tree::*;
 use trusted_chunk::trusted_chunk::TrustedChunk;
 use trusted_chunk_shim::*;
 use region::*;
-use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
+use range_inclusive::RangeInclusive;
 pub use allocated_frames::*;
 
 const FRAME_SIZE: usize = PAGE_SIZE;
-pub(crate) const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
-pub(crate) const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
+#[allow(dead_code)]
+const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
+#[allow(dead_code)]
+const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
 
 // Note: we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster. 
 
@@ -410,7 +412,7 @@ fn find_specific_chunk(
             }
         }
         Inner::RBTree(ref mut tree) => {
-            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_frame));
+            let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_frame));
             if let Some(chunk) = cursor_mut.get().map(|w| w.deref().clone()) {
                 if chunk.contains(&requested_frame) {
                     if requested_end_frame <= *chunk.end() {
@@ -460,7 +462,7 @@ fn find_specific_chunk(
                             
                             // now search for the next contiguous chunk, that we already know exists
                             let requested_contiguous_frame = *initial_chunk.end() + 1;
-                            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_contiguous_frame));
+                            let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_contiguous_frame));
                             if let Some(next_chunk) = cursor_mut.get().map(|w| w.deref()) {
                                 if next_chunk.contains(&requested_contiguous_frame) {
                                     // merge the next chunk into the initial chunk
@@ -554,7 +556,7 @@ fn retrieve_chunk_from_ref(mut chosen_chunk_ref: ValueRefMut<Chunk>) -> Option<C
 fn allocate_from_chosen_chunk(
     start_frame: Frame,
     num_frames: usize,
-    mut chosen_chunk_ref: ValueRefMut<Chunk>,
+    chosen_chunk_ref: ValueRefMut<Chunk>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // Remove the chosen chunk from the free frame list.
     let chosen_chunk = retrieve_chunk_from_ref(chosen_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
@@ -579,7 +581,7 @@ fn adjust_chosen_chunk_contiguous(
     mut initial_chunk: Chunk,
     contiguous_chunk_ref: ValueRefMut<Chunk>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
-    let mut contiguous_chunk = retrieve_chunk_from_ref(contiguous_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
+    let contiguous_chunk = retrieve_chunk_from_ref(contiguous_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
 
     initial_chunk.merge(contiguous_chunk).map_err(|_| {
         trace!("contiguous chunks couldn't be merged, despite previous checks");

@@ -50,7 +50,7 @@ impl AllocatedFrames {
     /// If either of those conditions are met, `self` is modified and `Ok(())` is returned,
     /// otherwise `Err(other)` is returned.
     pub fn merge(&mut self, mut other: AllocatedFrames) -> Result<(), AllocatedFrames> {
-        let mut chunk = core::mem::replace(&mut other.frames, Chunk::empty());
+        let chunk = core::mem::replace(&mut other.frames, Chunk::empty());
         match self.frames.merge(chunk) {
             Ok(_) => {
                 // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
@@ -77,7 +77,7 @@ impl AllocatedFrames {
     /// 
     /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
     pub fn split(mut self, at_frame: Frame) -> Result<(AllocatedFrames, AllocatedFrames), AllocatedFrames> {
-         let mut chunk = core::mem::replace(&mut self.frames, Chunk::empty());
+         let chunk = core::mem::replace(&mut self.frames, Chunk::empty());
         match chunk.split_at(at_frame) {
             Ok((chunk1, chunk2)) => {
                 // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
@@ -127,7 +127,7 @@ impl Drop for AllocatedFrames {
     fn drop(&mut self) {
         if self.size_in_frames() == 0 { return; }
 
-        let (list, typ) = if contains_any(&RESERVED_REGIONS.lock(), &self.frames) {
+        let (list, _typ) = if contains_any(&RESERVED_REGIONS.lock(), &self.frames) {
             (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
         } else {
             (&FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
