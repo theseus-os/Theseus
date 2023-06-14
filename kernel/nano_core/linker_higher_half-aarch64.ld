@@ -27,18 +27,6 @@ SECTIONS {
         *(.text .text.*)
     }
 
-    /*
-     * Currently, we are unable to force aarch64 to emit branch (call/jump) instructions
-     * that are capable of addressing a destination instruction pointer more than 128MiB away,
-     * even when specifying the "large" code model with `-C code-model=large`.
-     *
-     * Thus, as a workaround, we reserve the 128MiB chunk of virtual address space that
-     * directly follows the initial base kernel image's executable .text section,
-     * ensuring it can only be used by the page allocator when allocating pages for
-     * newly-loaded .text sections.
-     */
-    . = ALIGN(128M);
-
     .rodata ALIGN(4K) : AT(ADDR(.rodata) - KERNEL_OFFSET)
     {
         *(.rodata .rodata.*)

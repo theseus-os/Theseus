@@ -30,7 +30,7 @@ mod static_array_rb_tree;
 // mod static_array_linked_list;
 
 
-use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
+use core::{borrow::Borrow, cmp::Ordering, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
 use memory_structs::{VirtualAddress, Page, PageRange};
 use spin::{Mutex, Once};
@@ -53,9 +53,7 @@ static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 ///
 /// TODO: once the heap is fully dynamic and not dependent on static addresses,
 /// we can exclude the heap from the designated region.
-static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(
-	VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_P4_START)
-);
+static DESIGNATED_PAGES_HIGH_START: Page = Page::containing_address(VirtualAddress::new_canonical(UPCOMING_PAGE_TABLE_RECURSIVE_MEMORY_START));
 
 const MIN_PAGE: Page = Page::containing_address(VirtualAddress::zero());
 const MAX_PAGE: Page = Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS));
@@ -71,62 +69,45 @@ static FREE_PAGE_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayR
 ///   lower designated region, which should be the ending address of the initial kernel image
 ///   (a lower-half identity address).
 /// 
-/// The page allocator considers two regions as "designated" regions. It will only allocate pages
-/// within these designated regions if the specifically-requested address falls within them.
-/// 1. The lower designated region is for identity-mapped bootloader content
-///    and base kernel image sections, which is used during OS initialization.
-/// 2. The higher designated region is for the same content, mapped to the higher half
-///    of the address space. It also excludes the address ranges for the P4 entries that
-///    Theseus uses for recursive page table mapping.
-///    * See [`RECURSIVE_P4_INDEX`] and [`UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX`].
+/// The page allocator will only allocate addresses lower than `end_vaddr_of_low_designated_region`
+/// if specifically requested.
+/// General allocation requests for any virtual address will not use any address lower than that,
+/// unless the rest of the entire virtual address space is already in use.
 ///
-/// General allocation requests for pages at any virtual address will not use
-/// addresses within designated regions unless the entire address space is already in use,
-/// which is an extraordinarily unlikely (i.e., basically impossible) situation.
 pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'static str> {
 	assert!(end_vaddr_of_low_designated_region < DESIGNATED_PAGES_HIGH_START.start_address());
-	let designated_low_end_page = DESIGNATED_PAGES_LOW_END.call_once(
-		|| Page::containing_address(end_vaddr_of_low_designated_region)
-	);
-	let designated_low_end = *designated_low_end_page;
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.call_once(|| Page::containing_address(end_vaddr_of_low_designated_region));
+	let designated_low_end = *designated_low_end;
 
 	let initial_free_chunks = [
-		// The first region contains all pages from address zero to the end of the low designated region,
-		// which is generally reserved for identity-mapped bootloader stuff and base kernel image sections.
-		Some(Chunk {
+		// The first region contains all pages *below* the beginning of the 510th entry of P4. 
+		// We split it up into three chunks just for ease, since it overlaps the designated regions.
+		Some(Chunk { 
 			pages: PageRange::new(
 				Page::containing_address(VirtualAddress::zero()),
 				designated_low_end,
 			)
 		}),
-		// The second region contains the massive range from the end of the low designated region
-		// to the beginning of the high designated region, which comprises the majority of the address space.
-		// The beginning of the high designated region starts at the reserved P4 entry used to
-		// recursively map the "upcoming" page table (i.e., UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX).
-		Some(Chunk {
+		Some(Chunk { 
 			pages: PageRange::new(
 				designated_low_end + 1,
 				DESIGNATED_PAGES_HIGH_START - 1,
 			)
 		}),
-		// Here, we skip the addresses covered by the `UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX`.
-
-		// The third region contains the range of addresses reserved for the heap,
-		// which ends at the beginning of the addresses covered by the `RECURSIVE_P4_INDEX`,
-		Some(Chunk {
+		Some(Chunk { 
 			pages: PageRange::new(
-				Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START)),
+				DESIGNATED_PAGES_HIGH_START,
 				// This is the page right below the beginning of the 510th entry of the top-level P4 page table.
-				Page::containing_address(VirtualAddress::new_canonical(RECURSIVE_P4_START - 1)),
+				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START - ADDRESSABILITY_PER_P4_ENTRY - 1)),
 			)
 		}),
-		// Here, we skip the addresses covered by the `RECURSIVE_P4_INDEX`.
 
-		// The fourth region contains all pages in the 511th (last) entry of P4.
-		Some(Chunk {
+		// The second region contains all pages *above* the end of the 510th entry of P4, i.e., starting at the 511th (last) entry of P4.
+		// This is fully covered by the second (higher) designated region.
+		Some(Chunk { 
 			pages: PageRange::new(
 				Page::containing_address(VirtualAddress::new_canonical(KERNEL_TEXT_START)),
-				MAX_PAGE,
+				Page::containing_address(VirtualAddress::new_canonical(MAX_VIRTUAL_ADDRESS)),
 			)
 		}),
 		None, None, None, None,
@@ -328,7 +309,7 @@ impl Drop for AllocatedPages {
 /// that may result in heap allocation should occur. 
 /// Such actions include adding chunks to lists of free pages or pages in use. 
 /// 
-/// The vast majority of use cases don't care about such precise control, 
+/// The vast majority of use cases don't  care about such precise control, 
 /// so you can simply drop this struct at any time or ignore it
 /// with a `let _ = ...` binding to instantly drop it. 
 pub struct DeferredAllocAction<'list> {
@@ -363,15 +344,14 @@ impl<'list> Drop for DeferredAllocAction<'list> {
 }
 
 
-/// Possible errors returned by the page allocator.
+/// Possible allocation errors.
 #[derive(Debug)]
-pub enum AllocationError {
+enum AllocationError {
 	/// The requested address was not free: it was already allocated, or is outside the range of this allocator.
 	AddressNotFree(Page, usize),
 	/// The address space was full, or there was not a large-enough chunk 
-	/// or enough remaining chunks (within the given `PageRange`, if any)
-	/// that could satisfy the requested allocation size.
-	OutOfAddressSpace(usize, Option<PageRange>),
+	/// or enough remaining chunks that could satisfy the requested allocation size.
+	OutOfAddressSpace(usize),
 	/// The allocator has not yet been initialized.
 	NotInitialized,
 }
@@ -379,8 +359,7 @@ impl From<AllocationError> for &'static str {
 	fn from(alloc_err: AllocationError) -> &'static str {
 		match alloc_err {
 			AllocationError::AddressNotFree(..) => "address was in use or outside of this page allocator's range",
-			AllocationError::OutOfAddressSpace(_, Some(_range)) => "out of virtual address space in specified range",
-			AllocationError::OutOfAddressSpace(_, None) => "out of virtual address space",
+			AllocationError::OutOfAddressSpace(..) => "out of virtual address space",
 			AllocationError::NotInitialized => "the page allocator has not yet been initialized",
 		}
 	}
@@ -450,52 +429,38 @@ fn find_specific_chunk(
 
 /// Searches the given `list` for any chunk large enough to hold at least `num_pages`.
 ///
-/// If a given range is specified, the returned `AllocatedPages` *must* exist
-/// fully within that inclusive range of pages.
-///
-/// If no range is specified, this function first attempts to find a suitable chunk
-/// that is **not** within the designated regions,
+/// It first attempts to find a suitable chunk **not** in the designated regions,
 /// and only allocates from the designated regions as a backup option.
 fn find_any_chunk(
 	list: &mut StaticArrayRBTree<Chunk>,
-	num_pages: usize,
-	within_range: Option<&PageRange>,
+	num_pages: usize
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
-	let designated_low_end = DESIGNATED_PAGES_LOW_END.get()
-		.ok_or(AllocationError::NotInitialized)?;
-	let full_range = PageRange::new(*designated_low_end + 1, DESIGNATED_PAGES_HIGH_START - 1);
-	let range = within_range.unwrap_or(&full_range);
+	let designated_low_end = DESIGNATED_PAGES_LOW_END.get().ok_or(AllocationError::NotInitialized)?;
 
-	// During the first pass, we only search within the given range.
-	// If no range was given, we search from the end of the low designated region
-	// to the start of the high designated region.
+	// During the first pass, we ignore designated regions.
 	match list.0 {
 		Inner::Array(ref mut arr) => {
 			for elem in arr.iter_mut() {
 				if let Some(chunk) = elem {
-					// Use max and min below to ensure that the range of pages we allocate from
-					// is within *both* the current chunk's bounds and the range's bounds.
-					let lowest_possible_start_page = *max(chunk.start(), range.start());
-					let highest_possible_end_page  = *min(chunk.end(), range.end());
-					if lowest_possible_start_page + num_pages <= highest_possible_end_page {
-						return adjust_chosen_chunk(
-							lowest_possible_start_page,
-							num_pages,
-							&chunk.clone(),
-							ValueRefMut::Array(elem),
-						);
+					// Skip chunks that are too-small or in the designated regions.
+					if  chunk.size_in_pages() < num_pages || 
+						chunk.start() <= designated_low_end || 
+						chunk.end() >= &DESIGNATED_PAGES_HIGH_START
+					{
+						continue;
+					} 
+					else {
+						return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::Array(elem));
 					}
-
-					// The early static array is not sorted, so we must iterate over all elements.
 				}
 			}
 		}
 		Inner::RBTree(ref mut tree) => {
 			// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
 			// ```
-			// let eligible_chunks = tree.range_mut(
-			//     Bound::Included(range.start()),
-			//     Bound::Included(range.end())
+			// let eligible_chunks = tree.range(
+			// 	Bound::Excluded(&DESIGNATED_PAGES_LOW_END),
+			// 	Bound::Excluded(&DESIGNATED_PAGES_HIGH_START)
 			// );
 			// for c in eligible_chunks { ... }
 			// ```
@@ -505,33 +470,18 @@ fn find_any_chunk(
 			// Because we allocate new pages by peeling them off from the beginning part of a chunk, 
 			// it's MUCH faster to start the search for free pages from higher addresses moving down. 
 			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
-			let mut cursor = tree.upper_bound_mut(Bound::Included(range.end()));
+			let mut cursor = tree.upper_bound_mut(Bound::Excluded(&DESIGNATED_PAGES_HIGH_START));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				// Use max and min below to ensure that the range of pages we allocate from
-				// is within *both* the current chunk's bounds and the range's bounds.
-				let lowest_possible_start_page = *max(chunk.start(), range.start());
-				let highest_possible_end_page  = *min(chunk.end(), range.end());
-				if lowest_possible_start_page + num_pages <= highest_possible_end_page {
-					return adjust_chosen_chunk(
-						lowest_possible_start_page,
-						num_pages,
-						&chunk.clone(),
-						ValueRefMut::RBTree(cursor)
-					);
-				}
-
-				if chunk.start() <= range.start() {
+				if chunk.start() <= designated_low_end {
 					break; // move on to searching through the designated regions
 				}
-				warn!("page_allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages in {:?}.", num_pages, range);
+				if num_pages < chunk.size_in_pages() {
+					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
+				}
+				warn!("Page allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages at any address.", num_pages);
 				cursor.move_prev();
 			}
 		}
-	}
-
-	// If we failed to find suitable pages within the given range, return an error.
-	if let Some(range) = within_range {
-		return Err(AllocationError::OutOfAddressSpace(num_pages, Some(range.clone())));
 	}
 
 	// If we can't find any suitable chunks in the non-designated regions, then look in both designated regions.
@@ -560,8 +510,8 @@ fn find_any_chunk(
 			// for c in eligible_chunks { ... }
 			// ```
 			//
-			// RBTree doesn't have a `range_mut()` method, so we use cursors for two rounds of iteration.
-			// The first iterates over the lower designated region, from higher addresses to lower, down to zero.
+			// However, RBTree doesn't have a `range_mut()` method, so we use two sets of cursors for manual iteration.
+			// The first cursor iterates over the lower designated region, from higher addresses to lower, down to zero.
 			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
 				if num_pages < chunk.size_in_pages() {
@@ -570,7 +520,7 @@ fn find_any_chunk(
 				cursor.move_prev();
 			}
 
-			// The second iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
+			// The second cursor iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
 			let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
 				if chunk.start() < &DESIGNATED_PAGES_HIGH_START {
@@ -585,7 +535,7 @@ fn find_any_chunk(
 		}
 	}
 
-	Err(AllocationError::OutOfAddressSpace(num_pages, None))
+	Err(AllocationError::OutOfAddressSpace(num_pages))
 }
 
 
@@ -674,7 +624,6 @@ fn adjust_chosen_chunk(
 pub fn allocate_pages_deferred(
 	requested_vaddr: Option<VirtualAddress>,
 	num_pages: usize,
-	within_range: Option<&PageRange>,
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), &'static str> {
 	if num_pages == 0 {
 		warn!("PageAllocator: requested an allocation of 0 pages... stupid!");
@@ -691,9 +640,8 @@ pub fn allocate_pages_deferred(
 	if let Some(vaddr) = requested_vaddr {
 		find_specific_chunk(&mut locked_list, Page::containing_address(vaddr), num_pages)
 	} else {
-		find_any_chunk(&mut locked_list, num_pages, within_range)
-	}
-	.map_err(From::from) // convert from AllocationError to &str
+		find_any_chunk(&mut locked_list, num_pages)
+	}.map_err(From::from) // convert from AllocationError to &str
 }
 
 
@@ -711,7 +659,7 @@ pub fn allocate_pages_by_bytes_deferred(
 		num_bytes
 	};
 	let num_pages = (actual_num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages_deferred(requested_vaddr, num_pages, None)
+	allocate_pages_deferred(requested_vaddr, num_pages)
 }
 
 
@@ -719,7 +667,7 @@ pub fn allocate_pages_by_bytes_deferred(
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
-	allocate_pages_deferred(None, num_pages, None)
+	allocate_pages_deferred(None, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok()
 }
@@ -751,30 +699,7 @@ pub fn allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -> Re
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<AllocatedPages, &'static str> {
-	allocate_pages_deferred(Some(vaddr), num_pages, None)
-		.map(|(ap, _action)| ap)
-}
-
-
-/// Allocates the given number of pages with the constraint that
-/// they must be within the given inclusive `range` of pages.
-pub fn allocate_pages_in_range(
-	num_pages: usize,
-	range: &PageRange,
-) -> Result<AllocatedPages, &'static str> {
-	allocate_pages_deferred(None, num_pages, Some(range))
-		.map(|(ap, _action)| ap)
-}
-
-
-/// Allocates pages with a size given in number of bytes with the constraint that
-/// they must be within the given inclusive `range` of pages.
-pub fn allocate_pages_by_bytes_in_range(
-	num_bytes: usize,
-	range: &PageRange,
-) -> Result<AllocatedPages, &'static str> {
-	let num_pages = (num_bytes + PAGE_SIZE - 1) / PAGE_SIZE; // round up
-	allocate_pages_deferred(None, num_pages, Some(range))
+	allocate_pages_deferred(Some(vaddr), num_pages)
 		.map(|(ap, _action)| ap)
 }
 

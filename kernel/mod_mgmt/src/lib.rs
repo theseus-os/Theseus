@@ -14,7 +14,7 @@ use alloc::{
 };
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -32,7 +32,6 @@ pub use crate_metadata::*;
 pub mod parse_nano_core;
 pub mod replace_nano_core_crates;
 mod serde;
-
 
 /// The name of the directory that contains all of the CrateNamespace files.
 pub const NAMESPACES_DIRECTORY_NAME: &str = "namespaces";
@@ -2883,35 +2882,6 @@ struct SectionPages {
 }
 
 
-/// The range of virtual addresses from which we allocate pages for executable .text sections.
-///
-/// This is mostly an architecture-specific design choice (hopefully a temporary one):
-/// * On aarch64, even with the large code model, we are not (yet) able to generate
-///   code with branch instructions (call/jump) that can address instructions more than
-///   128 MiB away from the current instruction.
-///   Thus, we restrict the range of .text section locations to ensure they are within 128 MiB.
-///   At some point in the future, this will be a limitation, but not for a long, long time.
-/// * On x86_64, this is not necessary, so the range is `None`.
-pub const KERNEL_TEXT_ADDR_RANGE: Option<PageRange> = {
-    #[cfg(target_arch = "x86_64")] {
-        None
-    }
-    #[cfg(target_arch = "aarch64")] {
-        use {memory::Page, kernel_config::memory::KERNEL_OFFSET};
-
-        const ONE_MIB: usize = 0x10_0000;
-        let start_vaddr = VirtualAddress::new_canonical(KERNEL_OFFSET + ONE_MIB);
-        let end_vaddr = VirtualAddress::new_canonical(start_vaddr.value() + (128 * ONE_MIB) - 1);
-        Some(PageRange::new(
-            // the start of the base kernel image's .text section.
-            Page::containing_address(start_vaddr),
-            // the start of the base kernel image's .text section, plus 128 MiB.
-            Page::containing_address(end_vaddr),
-        ))
-    }
-};
-
-
 /// Allocates and maps memory sufficient to hold the sections that are found in the given `ElfFile`.
 /// Only sections that are marked "allocated" (`ALLOC`) in the ELF object file will contribute to the mappings' sizes.
 fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result<SectionPages, &'static str> {
@@ -2983,37 +2953,10 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
     // trace!("\n\texec_bytes: {exec_bytes} {exec_bytes:#X}\n\tro_bytes:   {ro_bytes} {ro_bytes:#X}\n\trw_bytes:   {rw_bytes} {rw_bytes:#X}");
 
     // Allocate contiguous virtual memory pages for each section and map them to random frames as writable.
-    // We must allocate these pages separately because they use different flags.
-    let alloc_sec = |size_in_bytes: usize, within_range: Option<&PageRange>, flags: PteFlags| {
-        let allocated_pages = if let Some(range) = within_range {
-            allocate_pages_by_bytes_in_range(size_in_bytes, range)
-                .map_err(|_| "Couldn't allocate pages in text section address range")?
-        } else {
-            allocate_pages_by_bytes(size_in_bytes)
-                .ok_or("Couldn't allocate pages for new section")?
-        };
-    
-        kernel_mmi_ref.lock().page_table.map_allocated_pages(
-            allocated_pages,
-            flags.valid(true).writable(true)
-        )
-    };
-
-    let executable_pages = if exec_bytes > 0 {
-        Some(alloc_sec(exec_bytes, KERNEL_TEXT_ADDR_RANGE.as_ref(), TEXT_SECTION_FLAGS)?)
-    } else {
-        None
-    };
-    let read_only_pages  = if ro_bytes > 0 {
-        Some(alloc_sec(ro_bytes, None, RODATA_SECTION_FLAGS)?)
-    } else {
-        None
-    };
-    let read_write_pages = if rw_bytes > 0 {
-        Some(alloc_sec(rw_bytes, None, DATA_BSS_SECTION_FLAGS)?)
-    } else {
-        None
-    };
+    // We must allocate these pages separately because they will have different flags later.
+    let executable_pages = if exec_bytes > 0 { Some(allocate_and_map_as_writable(exec_bytes, TEXT_SECTION_FLAGS,     kernel_mmi_ref)?) } else { None };
+    let read_only_pages  = if ro_bytes   > 0 { Some(allocate_and_map_as_writable(ro_bytes,   RODATA_SECTION_FLAGS,   kernel_mmi_ref)?) } else { None };
+    let read_write_pages = if rw_bytes   > 0 { Some(allocate_and_map_as_writable(rw_bytes,   DATA_BSS_SECTION_FLAGS, kernel_mmi_ref)?) } else { None };
 
     let range_tuple = |mp: MappedPages, size_in_bytes: usize| {
         let start = mp.start_address();
@@ -3025,6 +2968,26 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
         read_only_pages:  read_only_pages .map(|mp| range_tuple(mp, ro_bytes)),
         read_write_pages: read_write_pages.map(|mp| range_tuple(mp, rw_bytes)),
     })
+}
+
+
+/// A convenience function for allocating virtual pages and mapping them to random physical frames. 
+/// 
+/// The returned `MappedPages` will be at least as large as `size_in_bytes`,
+/// rounded up to the nearest `Page` size, 
+/// and is mapped as writable along with the other specified `flags`
+/// to ensure we can copy content into it.
+fn allocate_and_map_as_writable(
+    size_in_bytes: usize,
+    flags: PteFlags,
+    kernel_mmi_ref: &MmiRef,
+) -> Result<MappedPages, &'static str> {
+    let allocated_pages = allocate_pages_by_bytes(size_in_bytes)
+        .ok_or("Couldn't allocate_pages_by_bytes, out of virtual address space")?;
+    kernel_mmi_ref.lock().page_table.map_allocated_pages(
+        allocated_pages,
+        flags.valid(true).writable(true)
+    )
 }
 
 
