@@ -1,8 +1,9 @@
-use crate::{Chunk, MemoryRegionType, contains_any, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST, RESERVED_REGIONS};
+use crate::{MemoryRegionType, contains_any, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST, RESERVED_REGIONS};
 use memory_structs::{FrameRange, Frame};
 use core::{fmt, ops::{Deref, DerefMut}, marker::PhantomData};
 use trusted_chunk::trusted_chunk::TrustedChunk;
 use range_inclusive::RangeInclusiveIterator;
+use crate::frames::*;
 
 /// Represents a range of allocated physical memory [`Frame`]s; derefs to [`FrameRange`].
 /// 
@@ -14,7 +15,7 @@ use range_inclusive::RangeInclusiveIterator;
 /// This object represents ownership of the range of allocated physical frames;
 /// if this object falls out of scope, its allocated frames will be auto-deallocated upon drop. 
 pub struct AllocatedFrames {
-    pub(crate) frames: Chunk,
+    pub(crate) frames: Frames<{FrameState::Unmapped}>,
 }
 
 // AllocatedFrames must not be Cloneable, and it must not expose its inner frames as mutable.
@@ -37,7 +38,7 @@ impl AllocatedFrames {
     /// Can be used as a placeholder, but will not permit any real usage. 
     pub const fn empty() -> AllocatedFrames {
         AllocatedFrames {
-            frames: Chunk::empty()
+            frames: Frames::empty()
         }
     }
 
@@ -50,7 +51,7 @@ impl AllocatedFrames {
     /// If either of those conditions are met, `self` is modified and `Ok(())` is returned,
     /// otherwise `Err(other)` is returned.
     pub fn merge(&mut self, mut other: AllocatedFrames) -> Result<(), AllocatedFrames> {
-        let chunk = core::mem::replace(&mut other.frames, Chunk::empty());
+        let chunk = core::mem::replace(&mut other.frames, Frames::empty());
         match self.frames.merge(chunk) {
             Ok(_) => {
                 // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
@@ -76,8 +77,8 @@ impl AllocatedFrames {
     /// Returns an `Err` containing this `AllocatedFrames` if `at_frame` is otherwise out of bounds.
     /// 
     /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
-    pub fn split(mut self, at_frame: Frame) -> Result<(AllocatedFrames, AllocatedFrames), AllocatedFrames> {
-         let chunk = core::mem::replace(&mut self.frames, Chunk::empty());
+    pub fn split_at(mut self, at_frame: Frame) -> Result<(AllocatedFrames, AllocatedFrames), AllocatedFrames> {
+         let chunk = core::mem::replace(&mut self.frames, Frames::empty());
         match chunk.split_at(at_frame) {
             Ok((chunk1, chunk2)) => {
                 // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
@@ -120,7 +121,7 @@ pub(crate) fn into_allocated_frames(tc: TrustedChunk, frames: FrameRange) -> All
     } else {
         MemoryRegionType::Free
     };
-    AllocatedFrames { frames: Chunk::from_trusted_chunk(tc, frames, typ) }
+    AllocatedFrames { frames: Frames::from_trusted_chunk(tc, frames, typ) }
 }
 
 impl Drop for AllocatedFrames {
@@ -136,7 +137,7 @@ impl Drop for AllocatedFrames {
 
         // Simply add the newly-deallocated chunk to the free frames list.
         let mut locked_list = list.lock();
-        let res = locked_list.insert(core::mem::replace(&mut self.frames, Chunk::empty()));
+        let res = locked_list.insert(core::mem::replace(&mut self.frames, Frames::empty()));
         match res {
             Ok(_inserted_free_chunk) => (),
             Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free frame list", c),

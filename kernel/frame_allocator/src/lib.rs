@@ -21,6 +21,7 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(box_into_inner)]
+#![feature(adt_const_params)]
 
 extern crate alloc;
 #[macro_use] extern crate log;
@@ -38,17 +39,19 @@ extern crate trusted_chunk;
 mod static_array_rb_tree;
 // mod static_array_linked_list;
 mod region;
-mod trusted_chunk_shim;
+// mod trusted_chunk_shim;
 mod allocated_frames;
+mod frames;
 
 use core::{borrow::Borrow, cmp::{min, max}, ops::Deref};
+use frames::*;
 use kernel_config::memory::*;
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
 use spin::Mutex;
 use intrusive_collections::Bound;
 use static_array_rb_tree::*;
 use trusted_chunk::trusted_chunk::TrustedChunk;
-use trusted_chunk_shim::*;
+// use trusted_chunk_shim::*;
 use region::*;
 use range_inclusive::RangeInclusive;
 pub use allocated_frames::*;
@@ -62,9 +65,9 @@ const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonica
 // Note: we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster. 
 
 /// The single, system-wide list of free physical memory frames available for general usage. 
-static FREE_GENERAL_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
+static FREE_GENERAL_FRAMES_LIST: Mutex<StaticArrayRBTree<Frames<{FrameState::Unmapped}>>> = Mutex::new(StaticArrayRBTree::empty()); 
 /// The single, system-wide list of free physical memory frames reserved for specific usage. 
-static FREE_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayRBTree::empty()); 
+static FREE_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<Frames<{FrameState::Unmapped}>>> = Mutex::new(StaticArrayRBTree::empty()); 
 
 /// The fixed list of all known regions that are available for general use.
 /// This does not indicate whether these regions are currently allocated, 
@@ -175,17 +178,17 @@ pub fn init<F, R, P>(
     // }
 
     // Here, since we're sure we now have a list of regions that don't overlap, we can create lists of formally verified Chunks
-    let mut free_list_w_chunks: [Option<Chunk>; 32] = Default::default();
-    let mut reserved_list_w_chunks: [Option<Chunk>; 32] = Default::default();
+    let mut free_list_w_chunks: [Option<Frames<{FrameState::Unmapped}>>; 32] = Default::default();
+    let mut reserved_list_w_chunks: [Option<Frames<{FrameState::Unmapped}>>; 32] = Default::default();
     for (i, elem) in reserved_list.iter().flatten().enumerate() {
-        reserved_list_w_chunks[i] = Some(Chunk::new(
+        reserved_list_w_chunks[i] = Some(Frames::new(
             MemoryRegionType::Reserved,
             elem.frames.clone()
         )?);
     }
 
     for (i, elem) in free_list.iter().flatten().enumerate() {
-        free_list_w_chunks[i] = Some(Chunk::new(
+        free_list_w_chunks[i] = Some(Frames::new(
             MemoryRegionType::Free,
             elem.frames.clone()
         )?);
@@ -312,21 +315,21 @@ pub enum MemoryRegionType {
 /// with a `let _ = ...` binding to instantly drop it. 
 pub struct DeferredAllocAction<'list> {
     /// A reference to the list into which we will insert the free general-purpose `Chunk`s.
-    free_list: &'list Mutex<StaticArrayRBTree<Chunk>>,
+    free_list: &'list Mutex<StaticArrayRBTree<Frames<{FrameState::Unmapped}>>>,
     /// A reference to the list into which we will insert the free "reserved" `Chunk`s.
-    reserved_list: &'list Mutex<StaticArrayRBTree<Chunk>>,
+    reserved_list: &'list Mutex<StaticArrayRBTree<Frames<{FrameState::Unmapped}>>>,
     /// A free chunk that needs to be added back to the free list.
-    free1: Chunk,
+    free1: Frames<{FrameState::Unmapped}>,
     /// Another free chunk that needs to be added back to the free list.
-    free2: Chunk,
+    free2: Frames<{FrameState::Unmapped}>,
 }
 impl<'list> DeferredAllocAction<'list> {
     fn new<F1, F2>(free1: F1, free2: F2) -> DeferredAllocAction<'list> 
-        where F1: Into<Option<Chunk>>,
-              F2: Into<Option<Chunk>>,
+        where F1: Into<Option<Frames<{FrameState::Unmapped}>>>,
+              F2: Into<Option<Frames<{FrameState::Unmapped}>>>,
     {
-        let free1 = free1.into().unwrap_or_else(Chunk::empty);
-        let free2 = free2.into().unwrap_or_else(Chunk::empty);
+        let free1 = free1.into().unwrap_or_else(Frames::empty);
+        let free2 = free2.into().unwrap_or_else(Frames::empty);
         DeferredAllocAction {
             free_list: &FREE_GENERAL_FRAMES_LIST,
             reserved_list: &FREE_RESERVED_FRAMES_LIST,
@@ -337,8 +340,8 @@ impl<'list> DeferredAllocAction<'list> {
 }
 impl<'list> Drop for DeferredAllocAction<'list> {
     fn drop(&mut self) {
-        let chunk1 = core::mem::replace(&mut self.free1, Chunk::empty());
-        let chunk2 = core::mem::replace(&mut self.free2, Chunk::empty());
+        let chunk1 = core::mem::replace(&mut self.free1, Frames::empty());
+        let chunk2 = core::mem::replace(&mut self.free2, Frames::empty());
 
         // Insert all of the chunks, both allocated and free ones, into the list. 
         if chunk1.size_in_frames() > 0 {
@@ -392,7 +395,7 @@ impl From<AllocationError> for &'static str {
 /// Searches the given `list` for the chunk that contains the range of frames from
 /// `requested_frame` to `requested_frame + num_frames`.
 fn find_specific_chunk(
-    list: &mut StaticArrayRBTree<Chunk>,
+    list: &mut StaticArrayRBTree<Frames<{FrameState::Unmapped}>>,
     requested_frame: Frame,
     num_frames: usize
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
@@ -427,7 +430,7 @@ fn find_specific_chunk(
                         //     Requested address: {:?}, num_frames: {}, chunk: {:?}",
                         //     requested_frame, num_frames, chunk,
                         // );
-                        let initial_chunk_ref: Option<ValueRefMut<Chunk>> = {
+                        let initial_chunk_ref: Option<ValueRefMut<Frames<{FrameState::Unmapped}>>> = {
                             let next_cursor = cursor_mut.peek_next();
                             if let Some(next_chunk) = next_cursor.get().map(|w| w.deref()) {
                                 if *chunk.end() + 1 == *next_chunk.start() {
@@ -484,7 +487,7 @@ fn find_specific_chunk(
 
 /// Searches the given `list` for any chunk large enough to hold at least `num_frames`.
 fn find_any_chunk(
-    list: &mut StaticArrayRBTree<Chunk>,
+    list: &mut StaticArrayRBTree<Frames<{FrameState::Unmapped}>>,
     num_frames: usize
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // During the first pass, we ignore designated regions.
@@ -506,7 +509,7 @@ fn find_any_chunk(
             // Because we allocate new frames by peeling them off from the beginning part of a chunk, 
             // it's MUCH faster to start the search for free frames from higher addresses moving down. 
             // This results in an O(1) allocation time in the general case, until all address ranges are already in use.
-            let mut cursor = tree.upper_bound_mut(Bound::<&Chunk>::Unbounded);
+            let mut cursor = tree.upper_bound_mut(Bound::<&Frames<{FrameState::Unmapped}>>::Unbounded);
             while let Some(chunk) = cursor.get().map(|w| w.deref()) {
                 if num_frames <= chunk.size_in_frames() && chunk.typ() == MemoryRegionType::Free {
                     return allocate_from_chosen_chunk(*chunk.start(), num_frames, ValueRefMut::RBTree(cursor));
@@ -530,7 +533,7 @@ fn find_any_chunk(
 
 /// Removes a chunk from the RBTree. 
 /// `chosen_chunk_ref` is basically a wrapper over the cursor which stores the position of the chosen_chunk.
-fn retrieve_chunk_from_ref(mut chosen_chunk_ref: ValueRefMut<Chunk>) -> Option<Chunk> {
+fn retrieve_chunk_from_ref(mut chosen_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>) -> Option<Frames<{FrameState::Unmapped}>> {
     // Remove the chosen chunk from the free frame list.
     let removed_val = chosen_chunk_ref.remove();
     
@@ -556,7 +559,7 @@ fn retrieve_chunk_from_ref(mut chosen_chunk_ref: ValueRefMut<Chunk>) -> Option<C
 fn allocate_from_chosen_chunk(
     start_frame: Frame,
     num_frames: usize,
-    chosen_chunk_ref: ValueRefMut<Chunk>,
+    chosen_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // Remove the chosen chunk from the free frame list.
     let chosen_chunk = retrieve_chunk_from_ref(chosen_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
@@ -578,8 +581,8 @@ fn allocate_from_chosen_chunk(
 fn adjust_chosen_chunk_contiguous(
     start_frame: Frame,
     num_frames: usize,
-    mut initial_chunk: Chunk,
-    contiguous_chunk_ref: ValueRefMut<Chunk>,
+    mut initial_chunk: Frames<{FrameState::Unmapped}>,
+    contiguous_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     let contiguous_chunk = retrieve_chunk_from_ref(contiguous_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
 
@@ -640,7 +643,7 @@ fn contains_any(
 /// overlap any existing regions at all. 
 /// TODO: handle partially-overlapping regions by extending existing regions on either end.
 fn add_reserved_region_to_chunk_list(
-    list: &mut StaticArrayRBTree<Chunk>,
+    list: &mut StaticArrayRBTree<Frames<{FrameState::Unmapped}>>,
     frames: FrameRange,
 ) -> Result<FrameRange, &'static str> {
     // We can remove this check because creating a Chunk will check for overlaps
@@ -676,7 +679,7 @@ fn add_reserved_region_to_chunk_list(
     //     }
     // }
 
-    list.insert(Chunk::new(
+    list.insert(Frames::new(
         MemoryRegionType::Reserved,
         frames.clone(),
     )?).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
@@ -881,7 +884,7 @@ pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<A
 /// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
 #[doc(hidden)] 
 pub fn convert_to_heap_allocated() {
-    trusted_chunk_shim::switch_chunk_allocator_to_heap_structure();
+    switch_chunk_allocator_to_heap_structure();
     FREE_GENERAL_FRAMES_LIST.lock().convert_to_heap_allocated();
     FREE_RESERVED_FRAMES_LIST.lock().convert_to_heap_allocated();
     GENERAL_REGIONS.lock().convert_to_heap_allocated();
