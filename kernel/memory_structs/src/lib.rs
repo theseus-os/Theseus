@@ -432,12 +432,13 @@ macro_rules! implement_page_frame_range {
                 }
 
                 #[doc = "Returns the [`" $address "`] at the given `offset` into this `" $TypeName "`within this `" $TypeName "`, \
-                    i.e., `addr - self.start_address()`.\n\n \
+                    i.e., `self.start_address() + offset`.\n\n \
                     If the given `offset` is not within this range of [`" $chunk "`]s, this returns `None`.\n\n \
                     # Examples\n \
-                    If the range covers addresses `0x2000` to `0x4000`, then `address_at_offset(0x1500)` would return `Some(0x3500)`."]
+                    If the range covers addresses `0x2000` through `0x3FFF`, then `address_at_offset(0x1500)` would return `Some(0x3500)`, \
+                    and `address_at_offset(0x2000)` would return `None`."]
                 pub const fn address_at_offset(&self, offset: usize) -> Option<$address> {
-                    if offset <= self.size_in_bytes() {
+                    if offset < self.size_in_bytes() {
                         Some($address::new_canonical(self.start_address().value() + offset))
                     }
                     else {
