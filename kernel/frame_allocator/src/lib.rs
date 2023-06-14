@@ -875,12 +875,12 @@ fn contains_any(
 ///
 /// Currently, this function adds no new frames at all if any frames within the given `frames` list
 /// overlap any existing regions at all. 
-/// TODO: handle partially-overlapping regions by extending existing regions on either end.
 fn add_reserved_region(
     list: &mut StaticArrayRBTree<Chunk>,
     frames: FrameRange,
 ) -> Result<FrameRange, &'static str> {
-
+    let mut overlapped = false;
+    let mut frames = frames;
     // Check whether the reserved region overlaps any existing regions.
     match &mut list.0 {
         Inner::Array(ref mut arr) => {
@@ -902,20 +902,30 @@ fn add_reserved_region(
                     break;
                 }
                 if let Some(_overlap) = chunk.overlap(&frames) {
-                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                    //     frames, _overlap, chunk
-                    // );
-                    return Err("Failed to add reserved region that overlapped with existing reserved regions (RBTree).");
+                    trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                        frames, _overlap, chunk
+                    );
+                    frames = FrameRange::new(
+                        min(*chunk.start(), *frames.start()),
+                        max(*chunk.end(), *frames.end()),
+                    );
+                    let _removed_chunk = cursor_mut.replace_with(Wrapper::new_link(
+                        Chunk { typ: MemoryRegionType::Reserved, frames: frames.clone() }
+                    )).expect("BUG: frame_allocator failed to replace the current chunk while merging contiguous chunks.");
+                    // we can't remove chunk here and insert below because in this loop we might replace/merge multiple times
+                    overlapped = true;
                 }
                 cursor_mut.move_next();
             }
         }
     }
 
-    list.insert(Chunk {
-        typ: MemoryRegionType::Reserved,
-        frames: frames.clone(),
-    }).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+    if !overlapped {
+        list.insert(Chunk {
+            typ: MemoryRegionType::Reserved,
+            frames: frames.clone(),
+        }).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+    }
 
     Ok(frames)
 }
