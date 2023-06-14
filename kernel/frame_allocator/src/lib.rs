@@ -40,7 +40,7 @@ mod static_array_rb_tree;
 // mod static_array_linked_list;
 mod frames;
 
-use core::{borrow::Borrow, cmp::{min, max, Ordering}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
+use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
 use frames::*;
 use kernel_config::memory::*;
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
@@ -311,9 +311,9 @@ pub enum MemoryRegionType {
 #[allow(dead_code)]
 pub struct Region {
     /// The type of this memory region, e.g., whether it's in a free or reserved region.
-    pub(crate) typ: MemoryRegionType,
+    typ: MemoryRegionType,
     /// The Frames covered by this region, an inclusive range. 
-    pub(crate) frames: FrameRange,
+    frames: FrameRange,
 }
 impl Region {
     /// Returns a new `Region` with an empty range of frames. 
@@ -352,6 +352,7 @@ impl Borrow<Frame> for &'_ Region {
     }
 }
 
+
 /// Represents a range of allocated physical memory [`Frame`]s; derefs to [`FrameRange`].
 /// 
 /// These frames are not immediately accessible because they're not yet mapped
@@ -362,7 +363,7 @@ impl Borrow<Frame> for &'_ Region {
 /// This object represents ownership of the range of allocated physical frames;
 /// if this object falls out of scope, its allocated frames will be auto-deallocated upon drop. 
 pub struct AllocatedFrames {
-    pub(crate) frames: Frames<{FrameState::Unmapped}>,
+    frames: Frames<{FrameState::Unmapped}>,
 }
 
 // AllocatedFrames must not be Cloneable, and it must not expose its inner frames as mutable.
@@ -402,7 +403,6 @@ impl AllocatedFrames {
         match self.frames.merge(chunk) {
             Ok(_) => {
                 // ensure the now-merged AllocatedFrames doesn't run its drop handler and free its frames.
-                // This is not really necessary because it only contains an empty chunk.
                 core::mem::forget(other); 
                 Ok(())
             },
@@ -462,7 +462,7 @@ impl AllocatedFrames {
 /// This exists to break the cyclic dependency cycle between this crate and
 /// the `page_table_entry` crate, since `page_table_entry` must depend on types
 /// from this crate in order to enforce safety when modifying page table entries.
-pub(crate) fn into_allocated_frames(tc: TrustedChunk, frames: FrameRange) -> AllocatedFrames {
+fn into_allocated_frames(tc: TrustedChunk, frames: FrameRange) -> AllocatedFrames {
     let typ = if contains_any(&RESERVED_REGIONS.lock(), &frames) {
         MemoryRegionType::Reserved
     } else {
@@ -475,6 +475,7 @@ impl Drop for AllocatedFrames {
     fn drop(&mut self) {
         if self.size_in_frames() == 0 { return; }
 
+        // Should we remove these lines since we store the typ in Frames?
         let (list, _typ) = if contains_any(&RESERVED_REGIONS.lock(), &self.frames) {
             (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
         } else {
@@ -552,6 +553,7 @@ impl<'f> Deref for AllocatedFrame<'f> {
 }
 assert_not_impl_any!(AllocatedFrame: DerefMut, Clone);
 
+
 /// A series of pending actions related to frame allocator bookkeeping,
 /// which may result in heap allocation. 
 /// 
@@ -611,6 +613,7 @@ impl<'list> Drop for DeferredAllocAction<'list> {
         }
     }
 }
+
 
 /// Possible allocation errors.
 #[derive(Debug)]
