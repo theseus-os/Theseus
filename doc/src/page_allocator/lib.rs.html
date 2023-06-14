@@ -797,6 +797,19 @@
 <a href="#797" id="797">797</a>
 <a href="#798" id="798">798</a>
 <a href="#799" id="799">799</a>
+<a href="#800" id="800">800</a>
+<a href="#801" id="801">801</a>
+<a href="#802" id="802">802</a>
+<a href="#803" id="803">803</a>
+<a href="#804" id="804">804</a>
+<a href="#805" id="805">805</a>
+<a href="#806" id="806">806</a>
+<a href="#807" id="807">807</a>
+<a href="#808" id="808">808</a>
+<a href="#809" id="809">809</a>
+<a href="#810" id="810">810</a>
+<a href="#811" id="811">811</a>
+<a href="#812" id="812">812</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
@@ -1448,6 +1461,16 @@
 }
 
 
+<span class="doccomment">/// Possible options when requested pages from the page allocator.
+</span><span class="kw">pub enum </span>AllocationRequest&lt;<span class="lifetime">&#39;r</span>&gt; {
+	<span class="doccomment">/// The allocated pages can be located at any virtual address.
+	</span>Any,
+	<span class="doccomment">/// The allocated pages must start exactly at the given `VirtualAddress`.
+	</span>AtVirtualAddress(VirtualAddress),
+	<span class="doccomment">/// The allocated pages can be located anywhere within the given range.
+	</span>WithinRange(<span class="kw-2">&amp;</span><span class="lifetime">&#39;r </span>PageRange),
+}
+
 <span class="doccomment">/// The core page allocation routine that allocates the given number of virtual pages,
 /// optionally at the requested starting `VirtualAddress`.
 /// 
@@ -1459,9 +1482,8 @@
 /// Fragmentation isn&#39;t cleaned up until we&#39;re out of address space, but that&#39;s not really a big deal.
 /// 
 /// # Arguments
-/// * `requested_vaddr`: if `Some`, the returned `AllocatedPages` will start at the `Page`
-///   containing this `VirtualAddress`. 
-///   If `None`, the first available `Page` range will be used, starting at any random virtual address.
+/// * `request`: whether to allocate `num_pages` pages at any address,
+///    at a specific virtual address, or withing a specified range.
 /// * `num_pages`: the number of `Page`s to be allocated. 
 /// 
 /// # Return
@@ -1471,9 +1493,8 @@
 ///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
 ///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
 </span><span class="kw">pub fn </span>allocate_pages_deferred(
-	requested_vaddr: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,
+	request: AllocationRequest,
 	num_pages: usize,
-	within_range: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>PageRange&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 	<span class="kw">if </span>num_pages == <span class="number">0 </span>{
 		<span class="macro">warn!</span>(<span class="string">&quot;PageAllocator: requested an allocation of 0 pages... stupid!&quot;</span>);
@@ -1487,12 +1508,18 @@
 	// - Can fit the requested size (starting at the requested address) within the chunk.
 	// - The chunk can only be within in a designated region if a specific address was requested, 
 	//   or all other non-designated chunks are already in use.
-	</span><span class="kw">if let </span><span class="prelude-val">Some</span>(vaddr) = requested_vaddr {
-		find_specific_chunk(<span class="kw-2">&amp;mut </span>locked_list, Page::containing_address(vaddr), num_pages)
-	} <span class="kw">else </span>{
-		find_any_chunk(<span class="kw-2">&amp;mut </span>locked_list, num_pages, within_range)
-	}
-	.map_err(From::from) <span class="comment">// convert from AllocationError to &amp;str
+	</span><span class="kw">let </span>res = <span class="kw">match </span>request {
+		AllocationRequest::AtVirtualAddress(vaddr) =&gt; {
+			find_specific_chunk(<span class="kw-2">&amp;mut </span>locked_list, Page::containing_address(vaddr), num_pages)
+		}
+		AllocationRequest::Any =&gt; {
+			find_any_chunk(<span class="kw-2">&amp;mut </span>locked_list, num_pages, <span class="prelude-val">None</span>)
+		}
+		AllocationRequest::WithinRange(range) =&gt; {
+			find_any_chunk(<span class="kw-2">&amp;mut </span>locked_list, num_pages, <span class="prelude-val">Some</span>(range))
+		}
+	};
+	res.map_err(From::from) <span class="comment">// convert from AllocationError to &amp;str
 </span>}
 
 
@@ -1501,16 +1528,16 @@
 /// 
 /// This function still allocates whole pages by rounding up the number of bytes. 
 </span><span class="kw">pub fn </span>allocate_pages_by_bytes_deferred(
-	requested_vaddr: <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt;,
+	request: AllocationRequest,
 	num_bytes: usize,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(AllocatedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-	<span class="kw">let </span>actual_num_bytes = <span class="kw">if let </span><span class="prelude-val">Some</span>(vaddr) = requested_vaddr {
+	<span class="kw">let </span>actual_num_bytes = <span class="kw">if let </span>AllocationRequest::AtVirtualAddress(vaddr) = request {
 		num_bytes + (vaddr.value() % PAGE_SIZE)
 	} <span class="kw">else </span>{
 		num_bytes
 	};
 	<span class="kw">let </span>num_pages = (actual_num_bytes + PAGE_SIZE - <span class="number">1</span>) / PAGE_SIZE; <span class="comment">// round up
-	</span>allocate_pages_deferred(requested_vaddr, num_pages, <span class="prelude-val">None</span>)
+	</span>allocate_pages_deferred(request, num_pages)
 }
 
 
@@ -1518,7 +1545,7 @@
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 </span><span class="kw">pub fn </span>allocate_pages(num_pages: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt; {
-	allocate_pages_deferred(<span class="prelude-val">None</span>, num_pages, <span class="prelude-val">None</span>)
+	allocate_pages_deferred(AllocationRequest::Any, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok()
 }
@@ -1530,7 +1557,7 @@
 /// This function still allocates whole pages by rounding up the number of bytes. 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 </span><span class="kw">pub fn </span>allocate_pages_by_bytes(num_bytes: usize) -&gt; <span class="prelude-ty">Option</span>&lt;AllocatedPages&gt; {
-	allocate_pages_by_bytes_deferred(<span class="prelude-val">None</span>, num_bytes)
+	allocate_pages_by_bytes_deferred(AllocationRequest::Any, num_bytes)
 		.map(|(ap, _action)| ap)
 		.ok()
 }
@@ -1541,7 +1568,7 @@
 /// This function still allocates whole pages by rounding up the number of bytes. 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 </span><span class="kw">pub fn </span>allocate_pages_by_bytes_at(vaddr: VirtualAddress, num_bytes: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-	allocate_pages_by_bytes_deferred(<span class="prelude-val">Some</span>(vaddr), num_bytes)
+	allocate_pages_by_bytes_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_bytes)
 		.map(|(ap, _action)| ap)
 }
 
@@ -1550,7 +1577,7 @@
 /// 
 /// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
 </span><span class="kw">pub fn </span>allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-	allocate_pages_deferred(<span class="prelude-val">Some</span>(vaddr), num_pages, <span class="prelude-val">None</span>)
+	allocate_pages_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_pages)
 		.map(|(ap, _action)| ap)
 }
 
@@ -1561,7 +1588,7 @@
 	num_pages: usize,
 	range: <span class="kw-2">&amp;</span>PageRange,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-	allocate_pages_deferred(<span class="prelude-val">None</span>, num_pages, <span class="prelude-val">Some</span>(range))
+	allocate_pages_deferred(AllocationRequest::WithinRange(range), num_pages)
 		.map(|(ap, _action)| ap)
 }
 
@@ -1572,8 +1599,7 @@
 	num_bytes: usize,
 	range: <span class="kw-2">&amp;</span>PageRange,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;AllocatedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-	<span class="kw">let </span>num_pages = (num_bytes + PAGE_SIZE - <span class="number">1</span>) / PAGE_SIZE; <span class="comment">// round up
-	</span>allocate_pages_deferred(<span class="prelude-val">None</span>, num_pages, <span class="prelude-val">Some</span>(range))
+	allocate_pages_by_bytes_deferred(AllocationRequest::WithinRange(range), num_bytes)
 		.map(|(ap, _action)| ap)
 }
 

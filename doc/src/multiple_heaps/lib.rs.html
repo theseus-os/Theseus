@@ -642,6 +642,8 @@
 <a href="#642" id="642">642</a>
 <a href="#643" id="643">643</a>
 <a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
 </pre><pre class="rust"><code><span class="doccomment">//! An implementation of an allocator that uses multiple heaps. The heap that will be used on each allocation is determined by a key.
 //! Right now we use the apic id as the key, so that we have per-core heaps.
 //! 
@@ -770,8 +772,10 @@
     size_in_bytes: usize
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(MappedPages, DeferredAllocAction&lt;<span class="lifetime">&#39;static</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;create_heap_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
-    <span class="kw">let </span>(pages, action) = allocate_pages_by_bytes_deferred(<span class="prelude-val">Some</span>(starting_address), size_in_bytes)
-        .map_err(|_e| <span class="string">&quot;create_heap_mapping(): failed to allocate pages at the starting address&quot;</span>)<span class="question-mark">?</span>;
+    <span class="kw">let </span>(pages, action) = allocate_pages_by_bytes_deferred(
+        page_allocator::AllocationRequest::AtVirtualAddress(starting_address),
+        size_in_bytes,
+    ).map_err(|_e| <span class="string">&quot;create_heap_mapping(): failed to allocate pages at the starting address&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">if </span>pages.start_address().value() % HEAP_MAPPED_PAGES_SIZE_IN_BYTES != <span class="number">0 </span>{
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;multiple_heaps: the allocated pages for the heap wasn&#39;t properly aligned&quot;</span>);
     }
