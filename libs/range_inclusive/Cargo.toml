@@ -1,0 +1,5 @@
+[package]
+authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+name = "range_inclusive"
+description = "An implementation of RangeInclusive with an iterator that doesn't mutate the range."
+version = "0.1.0"
