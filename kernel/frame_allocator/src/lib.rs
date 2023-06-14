@@ -74,6 +74,8 @@ static GENERAL_REGIONS: Mutex<StaticArrayRBTree<Region>> = Mutex::new(StaticArra
 /// rather just where they exist and which regions are known to this allocator.
 static RESERVED_REGIONS: Mutex<StaticArrayRBTree<Region>> = Mutex::new(StaticArrayRBTree::empty());
 
+type IntoTrustedChunkFn = fn(RangeInclusive<usize>) -> TrustedChunk;
+type IntoAllocatedFramesFn = fn(TrustedChunk, FrameRange) -> AllocatedFrames;
 
 /// Initialize the frame allocator with the given list of available and reserved physical memory regions.
 ///
@@ -91,7 +93,7 @@ static RESERVED_REGIONS: Mutex<StaticArrayRBTree<Region>> = Mutex::new(StaticArr
 pub fn init<F, R, P>(
     free_physical_memory_areas: F,
     reserved_physical_memory_areas: R,
-) -> Result<(fn(RangeInclusive<usize>) -> TrustedChunk, fn(TrustedChunk, FrameRange) -> AllocatedFrames), &'static str> 
+) -> Result<(IntoTrustedChunkFn, IntoAllocatedFramesFn), &'static str> 
     where P: Borrow<PhysicalMemoryRegion>,
           F: IntoIterator<Item = P>,
           R: IntoIterator<Item = P> + Clone,
@@ -675,7 +677,7 @@ fn find_specific_chunk(
         }
         Inner::RBTree(ref mut tree) => {
             let cursor_mut = tree.upper_bound_mut(Bound::Included(&requested_frame));
-            if let Some(chunk) = cursor_mut.get().map(|w| w.deref().clone()) {
+            if let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
                 if chunk.contains(&requested_frame) {
                     if requested_end_frame <= *chunk.end() {
                         return allocate_from_chosen_chunk(requested_frame, num_frames, ValueRefMut::RBTree(cursor_mut));
@@ -823,7 +825,7 @@ fn allocate_from_chosen_chunk(
     // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
 
     Ok((
-        new_allocation.as_allocated_frames(),
+        new_allocation.into_allocated_frames(),
         DeferredAllocAction::new(before, after),
     ))
 
@@ -849,7 +851,7 @@ fn adjust_chosen_chunk_contiguous(
 
 
     Ok((
-        new_allocation.as_allocated_frames(),
+        new_allocation.into_allocated_frames(),
         DeferredAllocAction::new(before, after),
     ))
 }

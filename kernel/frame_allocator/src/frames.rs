@@ -89,7 +89,7 @@ impl Frames<{FrameState::Unmapped}> {
         // warn!("from trusted chunk: {:?}", f);
     }
 
-    pub(crate) fn as_allocated_frames(self) -> AllocatedFrames {
+    pub(crate) fn into_allocated_frames(self) -> AllocatedFrames {
         AllocatedFrames {
             frames: self,
         }
@@ -318,5 +318,5 @@ fn into_frame_range(frames: &RangeInclusive<usize>) -> FrameRange {
 
 fn into_frame(frame_num: usize) -> Option<Frame> {
     PhysicalAddress::new(frame_num * PAGE_SIZE)
-        .map(|addr| Frame::containing_address(addr))
+        .map(Frame::containing_address)
 }
