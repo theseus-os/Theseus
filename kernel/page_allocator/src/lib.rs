@@ -9,10 +9,12 @@
 //! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), 
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
 //!
-//! # Notes and Missing Features
-//! This allocator currently does **not** merge freed chunks (de-fragmentation) upon deallocation. 
-//! It only merges free chunks lazily upon request, i.e., when we run out of address space
-//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
+//! # Notes
+//! This allocator only makes one attempt to merge deallocated pages into existing
+//! free chunks for de-fragmentation. It does not iteratively merge adjacent chunks in order to
+//! maximally combine separate chunks into the biggest single chunk.
+//! Instead, free chunks are lazily merged only when running out of address space
+//! or when needed to fulfill a specific request.
 
 #![no_std]
 
@@ -25,10 +27,8 @@ extern crate spin;
 extern crate intrusive_collections;
 use intrusive_collections::Bound;
 
-
 mod static_array_rb_tree;
 // mod static_array_linked_list;
-
 
 use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
@@ -299,21 +299,52 @@ impl Drop for AllocatedPages {
 		if self.size_in_pages() == 0 { return; }
 		// trace!("page_allocator: deallocating {:?}", self);
 
-		// Simply add the newly-deallocated chunk to the free pages list.
-		let mut locked_list = FREE_PAGE_LIST.lock();
-		let res = locked_list.insert(Chunk {
+		let chunk = Chunk {
 			pages: self.pages.clone(),
-		});
-		match res {
-			Ok(_inserted_free_chunk) => (),
-			Err(c) => error!("BUG: couldn't insert deallocated chunk {:?} into free page list", c),
+		};
+		let mut list = FREE_PAGE_LIST.lock();
+		match &mut list.0 {
+			// For early allocations, just add the deallocated chunk to the free pages list.
+			Inner::Array(_) => {
+				if list.insert(chunk).is_ok() {
+					return;
+				}
+			}
+
+			// For full-fledged deallocations, use the entry API to efficiently determine if
+			// we can merge the deallocated pages with an existing contiguously-adjactent chunk
+			// or if we need to insert a new chunk.
+			Inner::RBTree(ref mut tree) => {
+				let mut cursor_mut = tree.lower_bound_mut(Bound::Included(chunk.start()));
+				if let Some(next_chunk) = cursor_mut.get() {
+					if *chunk.end() + 1 == *next_chunk.start() {
+						// trace!("Prepending {:?} onto beg of next {:?}", chunk, next_chunk.deref());
+						if cursor_mut.replace_with(Wrapper::new_link(Chunk {
+							pages: PageRange::new(*chunk.start(), *next_chunk.end()),
+						})).is_ok() {
+							return;
+						}
+					}
+				}
+				if let Some(prev_chunk) = cursor_mut.peek_prev().get() {
+					if *prev_chunk.end() + 1 == *chunk.start() {
+						// trace!("Appending {:?} onto end of prev {:?}", chunk, prev_chunk.deref());
+						let new_page_range = PageRange::new(*prev_chunk.start(), *chunk.end());
+						cursor_mut.move_prev();
+						if cursor_mut.replace_with(Wrapper::new_link(Chunk {
+							pages: new_page_range,
+						})).is_ok() {
+							return;
+						}
+					}
+				}
+
+				// trace!("Inserting new chunk for deallocated {:?} ", chunk.pages);
+				cursor_mut.insert(Wrapper::new_link(chunk));
+				return;
+			}
 		}
-		
-		// Here, we could optionally use above `_inserted_free_chunk` to merge the adjacent (contiguous) chunks
-		// before or after the newly-inserted free chunk. 
-		// However, there's no *need* to do so until we actually run out of address space or until 
-		// a requested address is in a chunk that needs to be merged.
-		// Thus, for performance, we save that for those future situations.
+		log::error!("BUG: couldn't insert deallocated {:?} into free page list", self.pages);
     }
 }
 
