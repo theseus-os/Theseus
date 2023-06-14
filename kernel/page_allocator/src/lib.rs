@@ -10,12 +10,11 @@
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
 //!
 //! # Notes
-//! This allocator only makes one attempt to merge freed chunks (for de-fragmentation)
-//! upon deallocation. It does not iteratively merge adjacent chunks in order to
-//! Free chunks are lazily merged more aggressively upon running out of address space
+//! This allocator only makes one attempt to merge deallocated pages into existing
+//! free chunks for de-fragmentation. It does not iteratively merge adjacent chunks in order to
+//! maximally combine separate chunks into the biggest single chunk.
+//! Instead, free chunks are lazily merged only when running out of address space
 //! or when needed to fulfill a specific request.
-//! It only merges free chunks lazily upon request, i.e., when we run out of address space
-//! or when a requested address is in a chunk that needs to be merged with a nearby chunk.
 
 #![no_std]
 
@@ -28,10 +27,8 @@ extern crate spin;
 extern crate intrusive_collections;
 use intrusive_collections::Bound;
 
-
 mod static_array_rb_tree;
 // mod static_array_linked_list;
-
 
 use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
@@ -333,7 +330,6 @@ impl Drop for AllocatedPages {
 					if *prev_chunk.end() + 1 == *chunk.start() {
 						// trace!("Appending {:?} onto end of prev {:?}", chunk, prev_chunk.deref());
 						let new_page_range = PageRange::new(*prev_chunk.start(), *chunk.end());
-						drop(prev_chunk);
 						cursor_mut.move_prev();
 						if cursor_mut.replace_with(Wrapper::new_link(Chunk {
 							pages: new_page_range,
