@@ -12,6 +12,12 @@ impl From<ApicId> for CpuId {
     }
 }
 
+impl From<CpuId> for ApicId {
+    fn from(cpu_id: CpuId) -> Self {
+        ApicId::try_from(cpu_id.value()).expect("An invalid CpuId was encountered")
+    }
+}
+
 impl TryFrom<u32> for CpuId {
     type Error = u32;
     fn try_from(raw_cpu_id: u32) -> Result<Self, Self::Error> {
