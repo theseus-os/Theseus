@@ -79,15 +79,14 @@ impl Frames<{FrameState::Unmapped}> {
     /// Creates a new Chunk from a TrustedChunk and a FrameRange.
     /// Only used within the allocated frames callback function.
     pub(crate) fn from_trusted_chunk(verified_chunk: TrustedChunk, frames: FrameRange, typ: MemoryRegionType) -> Self {
-        let f = Frames {
+        Frames {
             typ,
             frames,
             verified_chunk
-        };
+        }
         // assert!(f.frames.start().number() == f.verified_chunk.start());
         // assert!(f.frames.end().number() == f.verified_chunk.end());
         // warn!("from trusted chunk: {:?}", f);
-        f
     }
 
     pub(crate) fn as_allocated_frames(self) -> AllocatedFrames {
@@ -138,12 +137,11 @@ impl<const S: FrameState> Frames<S> {
             Ok(_) => {
                 // use the newly merged TrustedChunk to update the frame range
                 self.frames = into_frame_range(&self.verified_chunk.frames());
-                core::mem::forget(other);
+                // core::mem::forget(other);
                 // assert!(self.frames.start().number() == self.verified_chunk.start());
                 // assert!(self.frames.end().number() == self.verified_chunk.end());
                 //warn!("merge: {:?}", self);
-
-                return Ok(());
+                Ok(())
             },
             Err(other_verified_chunk) => {
                 let _ = core::mem::replace(&mut other.verified_chunk, other_verified_chunk);
@@ -152,7 +150,7 @@ impl<const S: FrameState> Frames<S> {
                 
                 // assert!(other.frames.start().number() == other.verified_chunk.start());
                 // assert!(other.frames.end().number() == other.verified_chunk.end());
-                return Err(other);
+                Err(other)
             }
         }
     }
@@ -186,26 +184,26 @@ impl<const S: FrameState> Frames<S> {
         };
         
         let typ = self.typ;
-        core::mem::forget(self);
+        // core::mem::forget(self);
 
         let c1 = Self {
             typ,
             frames: into_frame_range(&new_allocation.frames()),
             verified_chunk: new_allocation
         };
-        let c2 = before.and_then(|vchunk| 
-            Some(Self{
+        let c2 = before.map(|vchunk| 
+            Self{
                 typ,
                 frames: into_frame_range(&vchunk.frames()),
                 verified_chunk: vchunk
-            })
+            }
         );
-        let c3 = after.and_then(|vchunk| 
-            Some(Self{
+        let c3 = after.map(|vchunk| 
+            Self{
                 typ,
                 frames: into_frame_range(&vchunk.frames()),
                 verified_chunk: vchunk
-            })
+            }
         );
 
         // assert!(c1.frames.start().number() == c1.verified_chunk.start());
@@ -256,7 +254,7 @@ impl<const S: FrameState> Frames<S> {
             }
         };
         
-        core::mem::forget(self);
+        // core::mem::forget(self);
 
         let c1 = Self {
             typ,
@@ -320,5 +318,5 @@ fn into_frame_range(frames: &RangeInclusive<usize>) -> FrameRange {
 
 fn into_frame(frame_num: usize) -> Option<Frame> {
     PhysicalAddress::new(frame_num * PAGE_SIZE)
-        .and_then(|addr| Some(Frame::containing_address(addr)))
+        .map(|addr| Frame::containing_address(addr))
 }

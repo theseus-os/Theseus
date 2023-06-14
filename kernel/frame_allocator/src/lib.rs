@@ -796,18 +796,12 @@ fn retrieve_chunk_from_ref(mut chosen_chunk_ref: ValueRefMut<Frames<{FrameState:
     // Remove the chosen chunk from the free frame list.
     let removed_val = chosen_chunk_ref.remove();
     
-    let chosen_chunk = match removed_val {
+    match removed_val {
         RemovedValue::Array(c) => c,
         RemovedValue::RBTree(option_chunk) => {
             option_chunk.map(|c| c.into_inner())
-            // if let Some(boxed_chunk) = option_chunk {  
-            //     Some(boxed_chunk.into_inner())
-            // } else {
-            //     None
-            // }
         }
-    };
-    chosen_chunk
+    }
 }
 
 /// The final part of the main allocation routine that splits the given chosen chunk
