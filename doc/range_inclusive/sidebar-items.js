@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["RangeInclusive","A range bounded inclusively below and above (`start..=end`)."],["RangeInclusiveIterator","An iterator for the `RangeInclusive` type."]]};

@@ -517,6 +517,7 @@
 <a href="#517" id="517">517</a>
 <a href="#518" id="518">518</a>
 <a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -531,12 +532,13 @@
     cmp::{min, max},
     fmt,
     iter::Step,
-    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign}
+    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign}
 };
 <span class="kw">use </span>kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>paste::paste;
 <span class="kw">use </span>derive_more::<span class="kw-2">*</span>;
+<span class="kw">use </span>range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 
 <span class="doccomment">/// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
@@ -1007,10 +1009,10 @@
             }
             <span class="kw">impl </span>IntoIterator <span class="kw">for </span><span class="macro-nonterminal">$TypeName </span>{
                 <span class="kw">type </span>Item = <span class="macro-nonterminal">$chunk</span>;
-                <span class="kw">type </span>IntoIter = RangeInclusive&lt;<span class="macro-nonterminal">$chunk</span>&gt;;
+                <span class="kw">type </span>IntoIter = RangeInclusiveIterator&lt;<span class="macro-nonterminal">$chunk</span>&gt;;
                 <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
-                    <span class="self">self</span>.<span class="number">0
-                </span>}
+                    <span class="self">self</span>.<span class="number">0</span>.iter()
+                }
             }
 
             

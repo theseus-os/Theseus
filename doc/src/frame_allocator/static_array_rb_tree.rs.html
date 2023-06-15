@@ -332,7 +332,7 @@
 						<span class="kw">return </span><span class="prelude-val">Ok</span>(ValueRefMut::Array(elem));
 					}
 				}
-				<span class="macro">error!</span>(<span class="string">&quot;Out of space in StaticArrayRBTree&#39;s inner array, failed to insert value.&quot;</span>);
+				<span class="macro">log::error!</span>(<span class="string">&quot;Out of space in StaticArrayRBTree&#39;s inner array, failed to insert value.&quot;</span>);
 				<span class="prelude-val">Err</span>(value)
 			}
 			Inner::RBTree(tree) =&gt; {

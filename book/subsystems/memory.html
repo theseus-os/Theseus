@@ -177,8 +177,8 @@ A <code>Page</code> can be said to contain a <code>VirtualAddress</code> within 
 Although <code>Page</code>s and <code>Frame</code>s have internal numbers, we typically identify them by their starting address, e.g., &quot;the page starting at <code>v0x9000</code>&quot; instead of &quot;page 9&quot;.
 Intrinsically, <code>Page</code>s have no relation to <code>PhysicalAddress</code>es, and similarly, <code>Frame</code>s have no relation to <code>VirtualAddress</code>es.</p>
 <p>For convenience, Theseus provides dedicated &quot;range&quot; types to represent a contiguous range of virtual <code>Page</code>s or physical <code>Frame</code>s. 
-They are inclusive ranges on both sides; see Rust's built-in <a href="https://doc.rust-lang.org/std/ops/struct.RangeInclusive.html"><code>RangeInclusive</code></a> type for more information.
-These types implement the standard Rust <a href="https://doc.rust-lang.org/std/iter/trait.Iterator.html"><code>Iterator</code></a> trait, allowing for easy iteration over all pages or frames in a range.</p>
+They are inclusive ranges on both sides; see our custom <a href="https://theseus-os.github.io/Theseus/doc/range_inclusive/index.html"><code>RangeInclusive</code></a> type that replaces Rust's built-in <code>core::ops::RangeInclusive</code> type for more information.
+These types implement the standard Rust [<code>IntoIterator</code>] trait, allowing for easy iteration over all pages or frames in a range.</p>
 <p>Theseus employs macros to generate the implementation of the above basic types,
 as they are symmetric across the virtual memory and physical memory categories.
 This ensures that the <code>VirtualAddress</code> and <code>PhysicalAddress</code> have the same interface (public methods); the same is true for <code>Page</code> and<code>Frame</code>, and so on.</p>

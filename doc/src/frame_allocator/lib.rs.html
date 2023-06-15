@@ -1081,12 +1081,6 @@
 <a href="#1081" id="1081">1081</a>
 <a href="#1082" id="1082">1082</a>
 <a href="#1083" id="1083">1083</a>
-<a href="#1084" id="1084">1084</a>
-<a href="#1085" id="1085">1085</a>
-<a href="#1086" id="1086">1086</a>
-<a href="#1087" id="1087">1087</a>
-<a href="#1088" id="1088">1088</a>
-<a href="#1089" id="1089">1089</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides an allocator for physical memory frames.
 //! The minimum unit of allocation is a single frame. 
 //!
@@ -1107,17 +1101,10 @@
 //! We don&#39;t need to do so until we actually run out of address space or until 
 //! a requested address is in a chunk that needs to be merged.
 
-</span><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
-#![no_std]
+</span><span class="attr">#![no_std]
+#![allow(clippy::blocks_in_if_conditions)]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>kernel_config;
-<span class="kw">extern crate </span>memory_structs;
-<span class="kw">extern crate </span>spin;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>static_assertions;
-<span class="kw">extern crate </span>intrusive_collections;
-
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>test;
 
@@ -1126,11 +1113,14 @@
 
 
 </span><span class="kw">use </span>core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
-<span class="kw">use </span>kernel_config::memory::<span class="kw-2">*</span>;
-<span class="kw">use </span>memory_structs::{PhysicalAddress, Frame, FrameRange};
-<span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>intrusive_collections::Bound;
+<span class="kw">use </span>kernel_config::memory::<span class="kw-2">*</span>;
+<span class="kw">use </span>log::{error, warn, debug, trace};
+<span class="kw">use </span>memory_structs::{PhysicalAddress, Frame, FrameRange};
+<span class="kw">use </span>range_inclusive::RangeInclusiveIterator;
+<span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>static_array_rb_tree::<span class="kw-2">*</span>;
+<span class="kw">use </span>static_assertions::assert_not_impl_any;
 
 <span class="kw">const </span>FRAME_SIZE: usize = PAGE_SIZE;
 <span class="kw">const </span>MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
@@ -1583,31 +1573,29 @@
     <span class="kw">fn </span>into_iter(<span class="self">self</span>) -&gt; <span class="self">Self</span>::IntoIter {
         AllocatedFramesIter {
             _owner: <span class="self">self</span>,
-            range: <span class="self">self</span>.frames.clone(),
+            range_iter: <span class="self">self</span>.frames.iter(),
         }
     }
 }
 
 <span class="doccomment">/// An iterator over each [`AllocatedFrame`] in a range of [`AllocatedFrames`].
-/// 
+///
 /// We must implement our own iterator type here in order to tie the lifetime `&#39;f`
 /// of a returned `AllocatedFrame&lt;&#39;f&gt;` type to the lifetime of its containing `AllocatedFrames`.
 /// This is because the underlying type of `AllocatedFrames` is a [`FrameRange`],
-/// which itself is a [`core::ops::RangeInclusive`] of [`Frame`]s, and unfortunately the
-/// `RangeInclusive` type doesn&#39;t implement an immutable iterator.
-/// 
-/// Iterating through a `RangeInclusive` actually modifies its own internal range,
-/// so we must avoid doing that because it would break the semantics of a `FrameRange`.
-/// In fact, this is why [`FrameRange`] only implements `IntoIterator` but
-/// does not implement [`Iterator`] itself.
+/// which itself is a [`RangeInclusive`] of [`Frame`]s.
+/// Currently, the [`RangeInclusiveIterator`] type creates a clone of the original
+/// [`RangeInclusive`] instances rather than borrowing a reference to it.
+///
+/// [`RangeInclusive`]: range_inclusive::RangeInclusive
 </span><span class="kw">pub struct </span>AllocatedFramesIter&lt;<span class="lifetime">&#39;f</span>&gt; {
     _owner: <span class="kw-2">&amp;</span><span class="lifetime">&#39;f </span>AllocatedFrames,
-    range: FrameRange,
+    range_iter: RangeInclusiveIterator&lt;Frame&gt;,
 }
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;f</span>&gt; Iterator <span class="kw">for </span>AllocatedFramesIter&lt;<span class="lifetime">&#39;f</span>&gt; {
     <span class="kw">type </span>Item = AllocatedFrame&lt;<span class="lifetime">&#39;f</span>&gt;;
     <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
-        <span class="self">self</span>.range.next().map(|frame|
+        <span class="self">self</span>.range_iter.next().map(|frame|
             AllocatedFrame {
                 frame, _phantom: PhantomData,
             }
