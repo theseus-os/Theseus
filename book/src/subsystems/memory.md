@@ -45,8 +45,8 @@ Intrinsically, `Page`s have no relation to `PhysicalAddress`es, and similarly, `
 
 
 For convenience, Theseus provides dedicated "range" types to represent a contiguous range of virtual `Page`s or physical `Frame`s. 
-They are inclusive ranges on both sides; see Rust's built-in [`RangeInclusive`] type for more information.
-These types implement the standard Rust [`Iterator`] trait, allowing for easy iteration over all pages or frames in a range.
+They are inclusive ranges on both sides; see our custom [`RangeInclusive`] type that replaces Rust's built-in `core::ops::RangeInclusive` type for more information.
+These types implement the standard Rust [`IntoIterator`] trait, allowing for easy iteration over all pages or frames in a range.
 
 Theseus employs macros to generate the implementation of the above basic types,
 as they are symmetric across the virtual memory and physical memory categories.
@@ -103,7 +103,7 @@ That is a powerful guarantee that allows us to build stronger isolation and safe
 [`page_allocator`]:  https://theseus-os.github.io/Theseus/doc/page_allocator/index.html
 [`frame_allocator`]: https://theseus-os.github.io/Theseus/doc/frame_allocator/index.html
 [`Iterator`]: https://doc.rust-lang.org/std/iter/trait.Iterator.html
-[`RangeInclusive`]: https://doc.rust-lang.org/std/ops/struct.RangeInclusive.html
+[`RangeInclusive`]: https://theseus-os.github.io/Theseus/doc/range_inclusive/index.html
 
 [page allocator]:  https://theseus-os.github.io/Theseus/doc/page_allocator/index.html
 [frame allocator]: https://theseus-os.github.io/Theseus/doc/frame_allocator/index.html

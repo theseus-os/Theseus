@@ -634,6 +634,7 @@ doc:
 		--package owned_borrowed_trait \
 		--package percent-encoding \
 		--package port_io \
+		--package range_inclusive \
 		--package stdio \
 		--package str_ref
 ## Now, build the docs for all of Theseus's main kernel crates.
