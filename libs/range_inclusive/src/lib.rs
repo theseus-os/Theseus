@@ -12,6 +12,10 @@ mod test;
 use core::iter::Step;
 use core::ops::{RangeBounds, Bound, Bound::Included};
 
+/// A range bounded inclusively below and above (`start..=end`).
+///
+/// The `RangeInclusive` `start..=end` contains all values with `x >= start`
+/// and `x <= end`. It is empty unless `start <= end`.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct RangeInclusive<Idx: Clone + PartialOrd> {
     pub(crate) start: Idx,
@@ -50,7 +54,7 @@ impl<Idx: Clone + PartialOrd> RangeInclusive<Idx> {
 
     /// Returns an iterator with the same `start` and `end` values as the range.
     pub fn iter(&self) -> RangeInclusiveIterator<Idx> {
-        RangeInclusiveIterator { offset: self.start.clone(), end: self.end.clone() }
+        RangeInclusiveIterator { current: self.start.clone(), end: self.end.clone() }
     }
 
     /// Returns `true` if `item` is contained in the range.
@@ -102,3 +106,21 @@ impl<A: Step> Iterator for RangeInclusiveIterator<A> {
         }
     }
 }
+
+impl<A: Step> ExactSizeIterator for RangeInclusiveIterator<A> {
+    fn len(&self) -> usize {
+        Step::steps_between(&self.current, &self.end).map(|x| x+1).unwrap_or(0)
+    }
+}
+
+impl<A: Step> DoubleEndedIterator for RangeInclusiveIterator<A>  {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.current > self.end {
+            None
+        } else {
+            let n = Step::backward_checked(self.end.clone(), 1).expect("`Step` invariants not upheld");
+            Some(core::mem::replace(&mut self.end, n))
+        }
+    }
+}
+   

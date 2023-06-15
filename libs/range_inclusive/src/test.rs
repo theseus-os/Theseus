@@ -84,3 +84,34 @@ fn greater_start() {
     }
     assert!(range_elements.is_empty());
 }
+
+#[test]
+fn other_iterators() {
+    let range = RangeInclusive::new(1 , 6);
+    let mut iter = range.iter();
+    assert_eq!(iter.len(), 6);
+    assert_eq!(Some(1), iter.next());
+    
+    assert_eq!(iter.len(), 5);
+    assert_eq!(Some(6), iter.next_back());
+    
+    assert_eq!(iter.len(), 4);
+    assert_eq!(Some(5), iter.next_back());
+    
+    assert_eq!(iter.len(), 3);
+    assert_eq!(Some(2), iter.next());
+    
+    assert_eq!(iter.len(), 2);
+    assert_eq!(Some(3), iter.next());
+    
+    assert_eq!(iter.len(), 1);
+    assert_eq!(Some(4), iter.next());
+    
+    assert_eq!(iter.len(), 0);
+    assert_eq!(None, iter.next());
+    
+    assert_eq!(iter.len(), 0);
+    assert_eq!(None, iter.next_back());
+    
+    assert_eq!(iter.len(), 0);
+}
