@@ -1186,6 +1186,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
+ "range_inclusive",
  "spin 0.9.4",
  "static_assertions",
 ]
@@ -2041,6 +2042,7 @@ dependencies = [
  "derive_more",
  "kernel_config",
  "paste",
+ "range_inclusive",
  "zerocopy",
 ]
 
@@ -2931,6 +2933,10 @@ dependencies = [
  "spin 0.9.4",
  "tsc",
 ]
+
+[[package]]
+name = "range_inclusive"
+version = "0.1.0"
 
 [[package]]
 name = "rangemap"

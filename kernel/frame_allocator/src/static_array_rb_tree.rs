@@ -100,7 +100,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 						return Ok(ValueRefMut::Array(elem));
 					}
 				}
-				error!("Out of space in StaticArrayRBTree's inner array, failed to insert value.");
+				log::error!("Out of space in StaticArrayRBTree's inner array, failed to insert value.");
 				Err(value)
 			}
 			Inner::RBTree(tree) => {
