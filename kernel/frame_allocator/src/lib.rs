@@ -18,17 +18,10 @@
 //! We don't need to do so until we actually run out of address space or until 
 //! a requested address is in a chunk that needs to be merged.
 
-#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
+#![allow(clippy::blocks_in_if_conditions)]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate kernel_config;
-extern crate memory_structs;
-extern crate spin;
-#[macro_use] extern crate static_assertions;
-extern crate intrusive_collections;
-
 #[cfg(test)]
 mod test;
 
@@ -37,11 +30,14 @@ mod static_array_rb_tree;
 
 
 use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
-use kernel_config::memory::*;
-use memory_structs::{PhysicalAddress, Frame, FrameRange};
-use spin::Mutex;
 use intrusive_collections::Bound;
+use kernel_config::memory::*;
+use log::{error, warn, debug, trace};
+use memory_structs::{PhysicalAddress, Frame, FrameRange};
+use range_inclusive::RangeInclusiveIterator;
+use spin::Mutex;
 use static_array_rb_tree::*;
+use static_assertions::assert_not_impl_any;
 
 const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
@@ -494,31 +490,29 @@ impl<'f> IntoIterator for &'f AllocatedFrames {
     fn into_iter(self) -> Self::IntoIter {
         AllocatedFramesIter {
             _owner: self,
-            range: self.frames.clone(),
+            range_iter: self.frames.iter(),
         }
     }
 }
 
 /// An iterator over each [`AllocatedFrame`] in a range of [`AllocatedFrames`].
-/// 
+///
 /// We must implement our own iterator type here in order to tie the lifetime `'f`
 /// of a returned `AllocatedFrame<'f>` type to the lifetime of its containing `AllocatedFrames`.
 /// This is because the underlying type of `AllocatedFrames` is a [`FrameRange`],
-/// which itself is a [`core::ops::RangeInclusive`] of [`Frame`]s, and unfortunately the
-/// `RangeInclusive` type doesn't implement an immutable iterator.
-/// 
-/// Iterating through a `RangeInclusive` actually modifies its own internal range,
-/// so we must avoid doing that because it would break the semantics of a `FrameRange`.
-/// In fact, this is why [`FrameRange`] only implements `IntoIterator` but
-/// does not implement [`Iterator`] itself.
+/// which itself is a [`RangeInclusive`] of [`Frame`]s.
+/// Currently, the [`RangeInclusiveIterator`] type creates a clone of the original
+/// [`RangeInclusive`] instances rather than borrowing a reference to it.
+///
+/// [`RangeInclusive`]: range_inclusive::RangeInclusive
 pub struct AllocatedFramesIter<'f> {
     _owner: &'f AllocatedFrames,
-    range: FrameRange,
+    range_iter: RangeInclusiveIterator<Frame>,
 }
 impl<'f> Iterator for AllocatedFramesIter<'f> {
     type Item = AllocatedFrame<'f>;
     fn next(&mut self) -> Option<Self::Item> {
-        self.range.next().map(|frame|
+        self.range_iter.next().map(|frame|
             AllocatedFrame {
                 frame, _phantom: PhantomData,
             }
