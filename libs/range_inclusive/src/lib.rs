@@ -1,7 +1,15 @@
-//! A `RangeInclusive` implementation which creates an iterator that doesn't mutate the original range.
-//! This is accomplished by requiring that the generic type `Idx` implements the `Clone` trait.
-//! 
-//! All functions except for the iterators conform to the specification given for std::ops::RangeInclusive.
+//! A `RangeInclusive` implementation that offers a separate iterator type.
+//!
+//! This `RangeInclusive` does not directly implement the `Iterator` trait,
+//! allowing one to iterate over a copy of the range without mutating the original range.
+//! This is accomplished by requiring that the generic type `Idx` implements `Clone`;
+//! in the future we can remove this trait bound by using references, though most users
+//! of a range type typically do so with numeric types that are cheap to copy/clone.
+//!
+//! All behavior except iteration matches that of `std::ops::RangeInclusive`.
+//! Due to the iterator behavior, there is no need to waste space tracking
+//! whether the range has been `exhausted`, meaning that this `RangeInclusive`
+//! is exactly the size of its two bounds.
 
 #![no_std]
 #![feature(step_trait)]
@@ -16,6 +24,8 @@ use core::ops::{RangeBounds, Bound, Bound::Included};
 ///
 /// The `RangeInclusive` `start..=end` contains all values with `x >= start`
 /// and `x <= end`. It is empty unless `start <= end`.
+///
+/// See the crate-level docs for more information.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct RangeInclusive<Idx: Clone + PartialOrd> {
     pub(crate) start: Idx,
@@ -86,7 +96,8 @@ impl<'a, Idx: Clone + PartialOrd + Step> IntoIterator for &'a RangeInclusive<Idx
 }
 
 /// An iterator for the `RangeInclusive` type.
-/// By creating a separate iterator, we don't need to mutate the original range.
+///
+/// By creating a separate iterator, the original range is not mutated.
 pub struct RangeInclusiveIterator<Idx> {
     /// The current value of the iterator which is returned by `next()`.
     current: Idx,
