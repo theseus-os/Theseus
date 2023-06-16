@@ -50,7 +50,7 @@ pub fn start() -> Result<(), &'static str> {
     info!("Starting first application: crate at {:?}", path);
     // Spawn the default shell
     spawn::new_application_task_builder(path, Some(new_app_ns))?
-        .name("default_shell".to_string())
+        .name("hello_test".to_string())
         .spawn()?;
 
     Ok(())

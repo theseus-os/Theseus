@@ -1197,6 +1197,8 @@ pub fn write_relocation(
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
+
+        // These relocation types are for branch instructions, i.e., call and jump.
         R_AARCH64_CALL26 
         | R_AARCH64_JUMP26 => {
             // The immediate field occupies 26 bits [25:0] in call/jump instructions. 
@@ -1220,6 +1222,7 @@ pub fn write_relocation(
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
+
         // These relocation types all use the same logic, but have different bit masks
         // for the range of the immediate value (`source_val`) that gets used.
         R_AARCH64_ADD_ABS_LO12_NC
@@ -1261,6 +1264,53 @@ pub fn write_relocation(
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
+
+        // These relocation types are for data move instructions that access data
+        // using 64-bit offsets, which exist when using the "large" code-model.
+        R_AARCH64_MOVW_UABS_G0
+        | R_AARCH64_MOVW_UABS_G0_NC
+        | R_AARCH64_MOVW_UABS_G1
+        | R_AARCH64_MOVW_UABS_G1_NC
+        | R_AARCH64_MOVW_UABS_G2
+        | R_AARCH64_MOVW_UABS_G2_NC
+        | R_AARCH64_MOVW_UABS_G3 => {
+            // The immediate field occupies 16 bits [20:5] in the MOV* series of instructions
+            // that these relocation types apply to.
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOVK--Move-wide-with-keep->
+            const IMMEDIATE_FIELD_SHIFT: u8 = 5;
+            const IMMEDIATE_FIELD_MASK: u32 = 0xFFFF;
+            let source_value_shift: usize = match relocation_entry.typ {
+                // Set immediate value to bits [15:0]  of the source_val --> 0-bit right shift.
+                R_AARCH64_MOVW_UABS_G0
+                | R_AARCH64_MOVW_UABS_G0_NC => 0,
+                // Set immediate value to bits [31:16] of the source_val --> 16-bit right shift.
+                R_AARCH64_MOVW_UABS_G1
+                | R_AARCH64_MOVW_UABS_G1_NC => 16,
+                // Set immediate value to bits [47:32] of the source_val --> 32-bit right shift.
+                R_AARCH64_MOVW_UABS_G2
+                | R_AARCH64_MOVW_UABS_G2_NC => 32,
+                // Set immediate value to bits [63:48] of the source_val --> 48-bit right shift.
+                _g3 => 48,
+            };
+    
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
+            let shifted_source_val = source_val >> source_value_shift;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
+            let existing_target_val = u32::from_ne_bytes(
+                target_ref.try_into()
+                    .map_err(|_| "BUG: R_AARCH64_MOVW_UABS_G* relocation target val was not a u32")?
+            );
+            // Set the instruction's immediate value to the shifted source value.
+            let immediate_field_value = shifted_source_val & (IMMEDIATE_FIELD_MASK as usize);
+            let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
+                | ((immediate_field_value << IMMEDIATE_FIELD_SHIFT) as u32);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}, imm val: {:#X}", existing_target_val, new_source_val, immediate_field_value); }
+            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+        }
+
+        // These relocation types are for thread-local storage.
         R_AARCH64_TLSLE_ADD_TPREL_HI12
         | R_AARCH64_TLSLE_ADD_TPREL_LO12
         | R_AARCH64_TLSLE_ADD_TPREL_LO12_NC => {
