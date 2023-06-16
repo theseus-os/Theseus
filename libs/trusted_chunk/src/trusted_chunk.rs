@@ -257,8 +257,8 @@ impl TrustedChunk {
         }
 
         let overlap_idx = chunk_list.elem_overlaps_in_list(chunk_range, 0);
-        if overlap_idx.is_some(){
-            Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
+        if let Some(idx) = overlap_idx {
+            Err(ChunkCreationError::Overlap(idx))
         } else {
             chunk_list.push(chunk_range);
             Ok(TrustedChunk { frames: chunk_range })
@@ -320,8 +320,8 @@ impl TrustedChunk {
         }
 
         let overlap_idx = chunk_list.elem_overlaps_in_array(chunk_range, 0);
-        if overlap_idx.is_some(){
-            Err(ChunkCreationError::Overlap(overlap_idx.unwrap()))
+        if let Some(idx) = overlap_idx {
+            Err(ChunkCreationError::Overlap(idx))
         } else {
             match chunk_list.push(chunk_range){
                 Ok(idx) => Ok((TrustedChunk { frames: chunk_range }, idx)),
