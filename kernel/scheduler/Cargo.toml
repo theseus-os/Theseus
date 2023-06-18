@@ -16,7 +16,7 @@ sleep = { path = "../sleep" }
 task = { path = "../task" }
 
 scheduler_round_robin = { path = "../scheduler_round_robin" }
-scheduler_priority = { path = "../scheduler_priority" }
+scheduler_epoch = { path = "../scheduler_epoch" }
 scheduler_realtime = { path = "../scheduler_realtime" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

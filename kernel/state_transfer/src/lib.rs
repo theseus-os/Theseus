@@ -11,7 +11,7 @@ extern crate task;
 extern crate hpet;
 
 extern crate runqueue_round_robin;
-extern crate runqueue_priority;
+extern crate runqueue_epoch;
 
 use core::ops::Deref;
 use alloc::sync::Arc;
@@ -61,9 +61,9 @@ pub fn prio_sched(_old_namespace: &Arc<CrateNamespace>, _new_namespace: &CrateNa
     for (core, rq) in once_rq.iter() {
         #[cfg(not(loscd_eval))]
         warn!("\tRunqueue on core {:?}: {:?}", core, rq);
-        runqueue_priority::RunQueue::init(*core)?;
+        runqueue_epoch::RunQueue::init(*core)?;
         for t in rq.read().iter() {
-            runqueue_priority::RunQueue::add_task_to_specific_runqueue(*core, t.deref().clone())?;
+            runqueue_epoch::RunQueue::add_task_to_specific_runqueue(*core, t.deref().clone())?;
         }
     }
 

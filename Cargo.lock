@@ -3136,7 +3136,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "lazy_static",
  "log",
- "runqueue_priority",
+ "runqueue_epoch",
  "runqueue_realtime",
  "runqueue_round_robin",
  "single_simd_task_optimization",
@@ -3145,7 +3145,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "runqueue_priority"
+name = "runqueue_epoch"
 version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
@@ -3215,12 +3215,23 @@ dependencies = [
  "cpu_local_preemption",
  "interrupts",
  "log",
- "scheduler_priority",
+ "scheduler_epoch",
  "scheduler_realtime",
  "scheduler_round_robin",
  "sleep",
  "task",
  "x86_64",
+]
+
+[[package]]
+name = "scheduler_epoch"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue",
+ "runqueue_epoch",
+ "spin 0.9.4",
+ "task",
 ]
 
 [[package]]
@@ -3233,17 +3244,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "time",
-]
-
-[[package]]
-name = "scheduler_priority"
-version = "0.1.0"
-dependencies = [
- "log",
- "runqueue",
- "runqueue_priority",
- "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -3636,7 +3636,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "runqueue_priority",
+ "runqueue_epoch",
  "runqueue_round_robin",
  "spin 0.9.4",
  "task",

@@ -15,8 +15,8 @@
 #![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
 cfg_if::cfg_if! {
-    if #[cfg(priority_scheduler)] {
-        extern crate scheduler_priority as scheduler;
+    if #[cfg(epoch_scheduler)] {
+        extern crate scheduler_epoch as scheduler;
     } else if #[cfg(realtime_scheduler)] {
         extern crate scheduler_realtime as scheduler;
     } else {
@@ -37,7 +37,7 @@ pub use task::schedule;
 ///
 /// Currently, there is a single scheduler policy for the whole system.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
-/// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
+/// * `make THESEUS_CONFIG=epoch_scheduler` --> epoch scheduler.
 /// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
 /// * `make` --> basic round-robin scheduler, the default.
 pub fn init() -> Result<(), &'static str> {
@@ -96,10 +96,11 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 /// This function returns an error when a scheduler without priority is loaded. 
 pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::set_priority(_task, _priority)
+    #[cfg(epoch_scheduler)] {
+        scheduler_epoch::set_priority(_task, _priority);
+        Ok(())
     }
-    #[cfg(not(priority_scheduler))] {
+    #[cfg(not(epoch_scheduler))] {
         Err("no scheduler that uses task priority is currently loaded")
     }
 }
@@ -107,10 +108,10 @@ pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> 
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
 pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::get_priority(_task)
+    #[cfg(epoch_scheduler)] {
+        scheduler_epoch::get_priority(_task)
     }
-    #[cfg(not(priority_scheduler))] {
+    #[cfg(not(epoch_scheduler))] {
         None
     }
 }

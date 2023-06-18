@@ -28,8 +28,8 @@ path = "../task"
 [dependencies.runqueue_round_robin]
 path = "../runqueue_round_robin"
 
-[dependencies.runqueue_priority]
-path = "../runqueue_priority"
+[dependencies.runqueue_epoch]
+path = "../runqueue_epoch"
 
 [dependencies.runqueue_realtime]
 path = "../runqueue_realtime"
