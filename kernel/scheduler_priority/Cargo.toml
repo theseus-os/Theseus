@@ -3,6 +3,7 @@ authors = ["Jacob Earle <earlejacobt@gmail.com>"]
 name = "scheduler_priority"
 description = "Provides a priority scheduler"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies.log]
 version = "0.4.8"

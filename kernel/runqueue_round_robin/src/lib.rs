@@ -49,6 +49,7 @@ pub struct RoundRobinTaskRef{
 
 impl Deref for RoundRobinTaskRef {
     type Target = TaskRef;
+
     fn deref(&self) -> &TaskRef {
         &self.taskref
     }
@@ -87,6 +88,7 @@ pub static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap:
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
+    idle_task: TaskRef,
     queue: VecDeque<RoundRobinTaskRef>,
 }
 // impl Drop for RunQueue {
@@ -97,6 +99,7 @@ pub struct RunQueue {
 
 impl Deref for RunQueue {
     type Target = VecDeque<RoundRobinTaskRef>;
+
     fn deref(&self) -> &VecDeque<RoundRobinTaskRef> {
         &self.queue
     }
@@ -121,10 +124,11 @@ impl RunQueue {
     }
 
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-    pub fn init(which_core: u8) -> Result<(), &'static str> {
+    pub fn init(which_core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
         trace!("Created runqueue (round robin) for core {}", which_core);
         let new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
+            idle_task,
             queue: VecDeque::new(),
         });
 
@@ -136,6 +140,10 @@ impl RunQueue {
             // there shouldn't already be a RunQueue for this core
             Ok(())
         }
+    }
+
+    pub fn idle_task(&self) -> &TaskRef {
+        &self.idle_task
     }
 
     /// Returns the `RunQueue` for the given core, which is an `apic_id`.
