@@ -1,4 +1,4 @@
-//! Demo of scheduling a periodic task using the realtime scheduler.
+//! Demo of scheduling a periodic task using the priority scheduler.
 //! 
 //! One potential direction for future testing could be the following:
 //! Let the program take in arguments `n` and `p1` ... `pm`. 
@@ -27,12 +27,12 @@ use alloc::{
 };
 
 pub fn main(_args: Vec<String>) -> isize {
-    #[cfg(not(realtime_scheduler))] {
-        println!("Error: `realtime_scheduler` cfg was not enabled!");
+    #[cfg(not(priority_scheduler))] {
+        println!("Error: `priority_scheduler` cfg was not enabled!");
         -1
     }
-    #[cfg(realtime_scheduler)] {
-        println!("Testing periodic task(s) with the realtime scheduler!");
+    #[cfg(priority_scheduler)] {
+        println!("Testing periodic task(s) with the priority scheduler!");
         // Build and spawn two real time periodic task(s).
         // Start them as blocked in order to set the periods before they run
         let periodic_tb1 = spawn::new_task_builder(_task_delay_tester, 1).block();
