@@ -115,6 +115,6 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     }
     #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
     {
-        Err("called set priority on scheduler that doesn't support set priority")
+        None
     }
 }
