@@ -1,21 +1,20 @@
 //! This scheduler implements a priority algorithm.
 //!
-//! Because the [`runqueue_priority::RunQueue`] internally sorts the tasks 
-//! in increasing order of periodicity, it's trivially easy to choose the next task.
+//! Because the [`runqueue_priority::RunQueue`] internally sorts the tasks
+//! in increasing order of periodicity, it's trivially easy to choose the next
+//! task.
 
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate task;
-extern crate runqueue_priority;
 
-use task::TaskRef;
+use log::error;
 use runqueue_priority::RunQueue;
+use task::TaskRef;
 
 /// Set the periodicity of a given `Task` in all `RunQueue` structures.
 /// A reexport of the set_periodicity function from runqueue_priority
-pub use runqueue_priority::set_periodicity;
+pub use runqueue_priority::{get_priority, set_priority};
 
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task
@@ -23,25 +22,22 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
-            error!("BUG: select_next_task_round_robin(): couldn't get runqueue for core {}", apic_id);
+            error!("BUG: select_next_task_round_robin(): couldn't get runqueue for core {apic_id}");
             return None;
         }
     };
 
     let mut idle_task_index: Option<usize> = None;
     let mut chosen_task_index: Option<usize> = None;
-    
-    for (i, taskref) in runqueue_locked.iter().enumerate() {
-        let t = taskref;
 
+    for (i, task) in runqueue_locked
+        .iter()
+        .filter(|task| task.is_runnable())
+        .enumerate()
+    {
         // we skip the idle task, and only choose it if no other tasks are runnable
-        if t.is_an_idle_task {
+        if task.is_an_idle_task {
             idle_task_index = Some(i);
-            continue;
-        }
-
-        // must be runnable
-        if !t.is_runnable() {
             continue;
         }
 
