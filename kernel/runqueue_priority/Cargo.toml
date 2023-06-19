@@ -5,17 +5,12 @@ description = "Functions and types for handling runqueues in a priority scheduli
 version = "0.1.0"
 edition = "2021"
 
-[dependencies.task]
-path = "../task"
-
-[dependencies.sync_preemption]
-path = "../sync_preemption"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.atomic_linked_list]
-path = "../../libs/atomic_linked_list"
+[dependencies]
+atomic_linked_list = { path = "../../libs/atomic_linked_list" }
+log = "0.4.8"
+sync_preemption = { path = "../sync_preemption" }
+task = { path = "../task" }
+time = { path = "../time" }
 
 [lib]
 crate-type = ["rlib"]

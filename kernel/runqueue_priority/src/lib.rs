@@ -12,10 +12,14 @@ extern crate alloc;
 
 use alloc::collections::BinaryHeap;
 use atomic_linked_list::atomic_map::AtomicMap;
-use core::ops::{Deref, DerefMut};
+use core::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut},
+};
 use log::{error, trace};
 use sync_preemption::PreemptionSafeRwLock;
 use task::TaskRef;
+use time::Instant;
 
 const DEFAULT_PRIORITY: u8 = 0;
 
@@ -25,13 +29,14 @@ const DEFAULT_PRIORITY: u8 = 0;
 /// dereferences to `TaskRef`.
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef {
-    task: TaskRef,
+    pub task: TaskRef,
+    pub last_ran: Instant,
     priority: u8,
 }
 
 impl PartialEq for PriorityTaskRef {
     fn eq(&self, other: &Self) -> bool {
-        self.priority.eq(&other.priority)
+        self.priority.eq(&other.priority) && self.last_ran.eq(&other.last_ran)
     }
 }
 
@@ -39,8 +44,12 @@ impl PartialEq for PriorityTaskRef {
 impl Eq for PriorityTaskRef {}
 
 impl PartialOrd for PriorityTaskRef {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.priority.cmp(&other.priority) {
+            // Tasks that were ran longer ago should be prioritised.
+            Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
+            ordering @ _ => Some(ordering),
+        }
     }
 }
 
@@ -171,9 +180,13 @@ impl RunQueue {
             .add_task(task, DEFAULT_PRIORITY)
     }
 
-    /// Adds a `TaskRef` to this runqueue with the given periodicity value
+    /// Adds a `TaskRef` to this runqueue with the given priority value.
     fn add_task(&mut self, task: TaskRef, priority: u8) -> Result<(), &'static str> {
-        let priority_task = PriorityTaskRef { task, priority };
+        let priority_task = PriorityTaskRef {
+            task,
+            priority,
+            last_ran: Instant::ZERO,
+        };
         self.queue.push(priority_task);
         Ok(())
     }
@@ -223,6 +236,8 @@ impl RunQueue {
                 // TODO: Don't take reference?
                 task: task.clone(),
                 priority,
+                // Not technically correct, but this will be reset next time it is run.
+                last_ran: Instant::ZERO,
             });
             true
         } else {
