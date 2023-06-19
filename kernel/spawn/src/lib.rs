@@ -49,16 +49,22 @@ pub fn init(
     cpu_id: CpuId,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    let cpu_id_as_u8: u8 = cpu_id.into_u8();
-    runqueue::init(cpu_id_as_u8)?;
-    
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
         task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
+
+    let idle_task = new_task_builder(idle_task_entry, cpu_id)
+        .name(format!("idle_task_cpu_{cpu_id}"))
+        .idle(cpu_id)
+        .spawn_restartable(None)?
+        .clone();
+
+    runqueue::init(cpu_id.into_u8(), idle_task)?;
     runqueue::add_task_to_specific_runqueue(
-        cpu_id_as_u8,
+        cpu_id.into_u8(),
         exitable_bootstrap_task.clone(),
     )?;
+
     Ok(BootstrapTaskRef {
         cpu_id,
         exitable_taskref: exitable_bootstrap_task,
@@ -425,10 +431,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        if let Some(cpu) = self.pin_on_cpu {
-            runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
-        } else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+        if !self.idle {
+            if let Some(cpu) = self.pin_on_cpu {
+                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+            } else {
+                runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            }
         }
 
         Ok(task_ref)
@@ -999,16 +1007,16 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
     }
 }
 
-/// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let cpu_id = cpu::current_cpu();
-    debug!("Spawning a new idle task on CPU {}", cpu_id);
+// /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
+// pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
+//     let cpu_id = cpu::current_cpu();
+//     debug!("Spawning a new idle task on CPU {}", cpu_id);
 
-    new_task_builder(idle_task_entry, cpu_id)
-        .name(format!("idle_task_cpu_{cpu_id}"))
-        .idle(cpu_id)
-        .spawn_restartable(None)
-}
+//     new_task_builder(idle_task_entry, cpu_id)
+//         .name(format!("idle_task_cpu_{cpu_id}"))
+//         .idle(cpu_id)
+//         .spawn_restartable(None)
+// }
 
 /// A basic idle task that does nothing but loop endlessly.
 ///

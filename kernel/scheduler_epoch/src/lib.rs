@@ -39,31 +39,18 @@ pub fn get_priority(task: &TaskRef) -> Option<u8> {
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
-    let priority_taskref_with_result = select_next_task_priority(apic_id);
-    match priority_taskref_with_result {
-        // A task has been selected
-        Some(task) => {
-            // If the selected task is idle task we begin a new scheduling epoch
-            if task.idle_task {
-                assign_tokens(apic_id);
-                select_next_task_priority(apic_id).and_then(|m| m.taskref)
-            }
-            // If the selected task is not idle we return the taskref
-            else {
-                task.taskref
-            }
-        }
-
-        // If no task is picked we pick a new scheduling epoch
-        None => {
-            assign_tokens(apic_id);
-            select_next_task_priority(apic_id).and_then(|m| m.taskref)
-        }
+    let next_task = select_next_task_priority(apic_id)?;
+    // If the selected task is idle task we begin a new scheduling epoch
+    if next_task.idle_task {
+        assign_tokens(apic_id);
+        select_next_task_priority(apic_id)?.taskref
+    } else {
+        next_task.taskref
     }
 }
 
 /// this defines the priority scheduler policy.
-/// Returns None if there is no schedule-able task.
+/// Returns None if there is no runqueue
 /// Otherwise returns a task with a flag indicating whether its an idle task.
 fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult> {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
@@ -76,62 +63,31 @@ fn select_next_task_priority(apic_id: u8) -> Option<NextTaskResult> {
         }
     };
 
-    let mut idle_task_index: Option<usize> = None;
-    let mut chosen_task_index: Option<usize> = None;
-    let mut idle_task = true;
-
-    for (i, t) in runqueue_locked.iter().enumerate() {
-        // we skip the idle task, and only choose it if no other tasks are runnable
-        if t.is_an_idle_task {
-            idle_task_index = Some(i);
-            continue;
-        }
-
-        // must be runnable
-        if !t.is_runnable() {
-            continue;
-        }
-
-        // if this task is pinned, it must not be pinned to a different core
-        if let Some(pinned) = t.pinned_cpu() {
-            if pinned.into_u8() != apic_id {
-                // with per-core runqueues, this should never happen!
-                error!(
-                    "select_next_task() (AP {}) found a task pinned to a different core: {:?}",
-                    apic_id, t
-                );
-                return None;
+    if let Some((task_index, _)) = runqueue_locked
+        .iter()
+        .enumerate()
+        .find(|(_, task)| task.is_runnable())
+    {
+        let modified_tokens = {
+            let chosen_task = runqueue_locked.get(task_index);
+            match chosen_task.map(|m| m.tokens_remaining) {
+                Some(x) => x.saturating_sub(1),
+                None => 0,
             }
-        }
+        };
 
-        // if the task has no remaining tokens we ignore the task
-        if t.tokens_remaining == 0 {
-            continue;
-        }
+        let task = runqueue_locked.update_and_move_to_end(task_index, modified_tokens);
 
-        // found a runnable task!
-        chosen_task_index = Some(i);
-        idle_task = false;
-        // debug!("select_next_task(): AP {} chose Task {:?}", apic_id, &*t);
-        break;
-    }
-
-    // We then reduce the number of tokens of the task by one
-    let modified_tokens = {
-        let chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get(index));
-        match chosen_task.map(|m| m.tokens_remaining) {
-            Some(x) => x.saturating_sub(1),
-            None => 0,
-        }
-    };
-
-    chosen_task_index
-        .or(idle_task_index)
-        .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
-        .map(|taskref| NextTaskResult {
-            taskref: Some(taskref),
-            idle_task,
+        Some(NextTaskResult {
+            taskref: task,
+            idle_task: false,
         })
+    } else {
+        Some(NextTaskResult {
+            taskref: Some(runqueue_locked.idle_task().clone()),
+            idle_task: true,
+        })
+    }
 }
 
 /// This assigns tokens between tasks.

@@ -79,6 +79,7 @@ static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap::new
 pub struct RunQueue {
     core: u8,
     queue: BinaryHeap<PriorityTaskRef>,
+    idle_task: TaskRef,
 }
 
 impl Deref for RunQueue {
@@ -96,13 +97,15 @@ impl DerefMut for RunQueue {
 }
 
 impl RunQueue {
-    pub fn init(which_core: u8) -> Result<(), &'static str> {
+    /// Creates a new `RunQueue` for the given core, which is an `apic_id`
+    pub fn init(which_core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
         trace!("Created runqueue (priority) for core {}", which_core);
 
         let new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: BinaryHeap::new(),
+            idle_task,
         });
 
         if RUNQUEUES.insert(which_core, new_rq).is_some() {
@@ -204,6 +207,10 @@ impl RunQueue {
             }
         }
         None
+    }
+
+    pub fn idle_task(&self) -> &TaskRef {
+        &self.idle_task
     }
 
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {

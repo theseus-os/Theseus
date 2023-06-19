@@ -22,32 +22,15 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
-            error!("BUG: select_next_task_round_robin(): couldn't get runqueue for core {apic_id}");
+            error!("BUG: select_next_task_priority(): couldn't get runqueue for core {apic_id}",);
             return None;
         }
     };
 
-    let mut idle_task_index: Option<usize> = None;
-    let mut chosen_task_index: Option<usize> = None;
-
-    for (i, task) in runqueue_locked
-        .iter()
-        .filter(|task| task.is_runnable())
-        .enumerate()
-    {
-        // we skip the idle task, and only choose it if no other tasks are runnable
-        if task.is_an_idle_task {
-            idle_task_index = Some(i);
-            continue;
-        }
-
-        // found a runnable task
-        chosen_task_index = Some(i);
-        break;
+    if let Some(task) = runqueue_locked.iter().find(|task| task.is_runnable()) {
+        // Not complete (first need to remove unrunabble tasks from run queue)
+        runqueue_locked.push(task.clone())
+    } else {
+        Some(runqueue_locked.idle_task().clone())
     }
-
-    // idle task is backup iff no other task has been chosen
-    chosen_task_index
-        .or(idle_task_index)
-        .and_then(|index| runqueue_locked.update_and_reinsert(index))
 }
