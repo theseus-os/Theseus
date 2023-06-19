@@ -48,7 +48,7 @@ impl PartialOrd for PriorityTaskRef {
         match self.priority.cmp(&other.priority) {
             // Tasks that were ran longer ago should be prioritised.
             Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
-            ordering @ _ => Some(ordering),
+            ordering => Some(ordering),
         }
     }
 }
