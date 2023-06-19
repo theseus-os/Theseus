@@ -3,39 +3,23 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "panic_wrapper"
 description = "Wrapper functions for handling and propagating panics"
 version = "0.1.0"
+edition = "2021"
 ## Currently, this crate only needs the build script for frame_pointers.
 build = "../stack_trace_frame_pointers/build.rs"
 
 [dependencies]
+log = "0.4.8"
 
+fault_log = { path = "../fault_log" }
+memory = { path = "../memory" }
+mod_mgmt = { path = "../mod_mgmt" }
+runqueue = { path = "../runqueue" }
+task = { path = "../task" }
 
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.runqueue]
-path = "../runqueue"
-
-[dependencies.unwind]
-path = "../unwind"
-
-[dependencies.fault_log]
-path = "../fault_log"
-
-[dependencies.stack_trace]
-path = "../stack_trace"
-
-[dependencies.stack_trace_frame_pointers]
-path = "../stack_trace_frame_pointers"
-
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+stack_trace = { path = "../stack_trace" }
+stack_trace_frame_pointers =  { path = "../stack_trace_frame_pointers" }
+unwind = { path = "../unwind" }
 
 [lib]
 crate-type = ["rlib"]

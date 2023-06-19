@@ -2083,6 +2083,7 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
+        let verbose_log = true;
         let mut new_crate = new_crate_ref.lock_as_mut()
             .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }

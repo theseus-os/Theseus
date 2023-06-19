@@ -10,20 +10,15 @@ log = "0.4.8"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 
-async_channel = { path = "../async_channel" }
-serial_port = { path = "../serial_port" }
 app_io = { path = "../app_io" }
+async_channel = { path = "../async_channel" }
+io = { path = "../io" }
+mod_mgmt = { path = "../mod_mgmt" }
+path = { path = "../path" }
+serial_port = { path = "../serial_port" }
 spawn = { path = "../spawn" }
 task = { path = "../task" }
 tty = { path = "../tty" }
-io = { path = "../io" }
-
-[target.'cfg(target_arch = "x86_64")'.dependencies]
-path = { path = "../path" }
-mod_mgmt = { path = "../mod_mgmt" }
-
-[target.'cfg(target_arch = "aarch64")'.dependencies]
-hull = { path = "../../applications/hull" }
 
 [lib]
 crate-type = ["rlib"]

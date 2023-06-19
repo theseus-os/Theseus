@@ -3,18 +3,14 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "first_application"
 description = "Starts the first application in Theseus after kernel initialization is complete"
 version = "0.1.0"
+edition = "2021"
 
-[dependencies.log]
-version = "0.4.8"
+[dependencies]
+log = "0.4.8"
 
-[dependencies.spawn]
-path = "../spawn"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.path]
-path = "../path"
+mod_mgmt = { path = "../mod_mgmt" }
+path = { path = "../path" }
+spawn = { path = "../spawn" }
 
 ## In general, Theseus kernel crates *cannot* depend on application crates.
 ## However, this crate is a special exception in that it directly loads and runs
@@ -28,11 +24,13 @@ path = "../path"
 ##
 ## Note: if another application crate is used, make sure to change
 ##       both this dependency and the invocation string in `lib.rs`.
-# [dependencies.shell]
-# path = "../../applications/shell"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+shell = { path = "../../applications/shell" }
 
-[dependencies.hello]
-path = "../../applications/hello"
+## Note: aarch64 doesn't yet support the full graphical `shell` application,
+##       so we currently just run a simple `hello` application as a test.
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+hello = { path = "../../applications/hello" }
 
 [lib]
 crate-type = ["rlib"]
