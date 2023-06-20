@@ -3082,8 +3082,6 @@
 <a href="#3082" id="3082">3082</a>
 <a href="#3083" id="3083">3083</a>
 <a href="#3084" id="3084">3084</a>
-<a href="#3085" id="3085">3085</a>
-<a href="#3086" id="3086">3086</a>
 </pre><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(int_roundings)]
@@ -5983,16 +5981,14 @@
         <span class="prelude-val">None
     </span>}
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-        <span class="kw">use </span>{memory::Page, kernel_config::memory::KERNEL_OFFSET};
-
         <span class="kw">const </span>ONE_MIB: usize = <span class="number">0x10_0000</span>;
-        <span class="kw">let </span>start_vaddr = VirtualAddress::new_canonical(KERNEL_OFFSET + ONE_MIB);
+        <span class="kw">let </span>start_vaddr = VirtualAddress::new_canonical(kernel_config::memory::KERNEL_OFFSET);
         <span class="kw">let </span>end_vaddr = VirtualAddress::new_canonical(start_vaddr.value() + (<span class="number">128 </span>* ONE_MIB) - <span class="number">1</span>);
         <span class="prelude-val">Some</span>(PageRange::new(
             <span class="comment">// the start of the base kernel image&#39;s .text section.
-            </span>Page::containing_address(start_vaddr),
+            </span>memory::Page::containing_address(start_vaddr),
             <span class="comment">// the start of the base kernel image&#39;s .text section, plus 128 MiB.
-            </span>Page::containing_address(end_vaddr),
+            </span>memory::Page::containing_address(end_vaddr),
         ))
     }
 };
