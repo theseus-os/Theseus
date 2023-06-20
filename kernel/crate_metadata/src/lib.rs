@@ -1199,6 +1199,7 @@ pub fn write_relocation(
         }
 
         // These relocation types are for branch instructions, i.e., call and jump.
+        // The immediate field is a signed offset value.
         R_AARCH64_CALL26 
         | R_AARCH64_JUMP26 => {
             // The immediate field occupies 26 bits [25:0] in call/jump instructions. 
@@ -1209,7 +1210,7 @@ pub fn write_relocation(
 
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
+            let source_val = (source_sec_vaddr.value() as isize).wrapping_add(relocation_entry.addend as isize).wrapping_sub(target_ref.as_ptr() as isize);
             let shifted_source_val = source_val >> SOURCE_VALUE_SHIFT;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
             let existing_target_val = u32::from_ne_bytes(
@@ -1217,9 +1218,10 @@ pub fn write_relocation(
                     .map_err(|_| "BUG: R_AARCH64_CALL26/JUMP26 relocation target val was not a u32")?
             );
             // Set the instruction's immediate value to the shifted source value.
+            let immediate_field_value = shifted_source_val as u32 & IMMEDIATE_FIELD_MASK;
             let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
-                | ((shifted_source_val & IMMEDIATE_FIELD_MASK) << IMMEDIATE_FIELD_SHIFT);
-            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
+                | (immediate_field_value << IMMEDIATE_FIELD_SHIFT);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}, imm val: {:#X}", existing_target_val, new_source_val, immediate_field_value); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
         }
 
@@ -1266,7 +1268,7 @@ pub fn write_relocation(
         }
 
         // These relocation types are for data move instructions that access data
-        // using 64-bit offsets, which exist when using the "large" code-model.
+        // using 64-bit unsigned offset values, which exist when using the "large" code-model.
         R_AARCH64_MOVW_UABS_G0
         | R_AARCH64_MOVW_UABS_G0_NC
         | R_AARCH64_MOVW_UABS_G1
