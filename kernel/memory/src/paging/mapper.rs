@@ -240,7 +240,8 @@ impl Mapper {
         // there is no easy/efficient way to store a dynamic list of non-contiguous frames (would require Vec).
         // This is okay because we will deallocate each of these frames when this MappedPages object is dropped
         // and each of the page table entries for its pages are cleared.
-        core::mem::forget(frames);
+        let mapped_frames = frames.into_mapped_frames(); // mark the frames as mapped
+        core::mem::forget(mapped_frames);
 
         Ok(mapped_pages)
     }
@@ -277,8 +278,9 @@ impl Mapper {
                 return Err("map_allocated_pages(): page was already in use");
             } 
 
-            p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags);
-            core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
+            p1[page.p1_index()].set_entry(af.as_unmapped_frame(), actual_flags);
+            let mapped_frames = af.into_mapped_frames(); // mark the frame as mapped
+            core::mem::forget(mapped_frames); // we currently forget frames allocated here since we don't yet have a way to track them.
         }
 
         Ok(MappedPages {

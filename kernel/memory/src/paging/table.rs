@@ -140,7 +140,7 @@ impl<L: HierarchicalLevel> Table<L> {
             assert!(!is_huge(&self[index].flags()), "mapping code does not support huge pages");
             let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
             self[index].set_entry(
-                af.as_allocated_frame(),
+                af.as_unmapped_frame(),
                 flags.valid(true).writable(true), // must be valid and writable on x86_64
             );
             self.next_table_mut(index).unwrap().zero();

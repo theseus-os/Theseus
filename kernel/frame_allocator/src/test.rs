@@ -1,4 +1,6 @@
 //! Tests for the AllocatedFrames type, mainly the `split` method.
+//! These tests have to be run individually because running them all at once leads to overlaps between `TrustedChunk`s
+//! which will return an error.
 
 extern crate std;
 
@@ -6,19 +8,11 @@ use self::std::dbg;
 
 use super::*;
 
-impl PartialEq for AllocatedFrames {
-    fn eq(&self, other: &Self) -> bool {
-        self.frames == other.frames
-    }
-}
-
 fn from_addr(start_addr: usize, end_addr: usize) -> AllocatedFrames {
-    AllocatedFrames {
-        frames: Frames::new(MemoryRegionType::Free, FrameRange::new(
+    AllocatedFrames::new(MemoryRegionType::Free, FrameRange::new(
             Frame::containing_address(PhysicalAddress::new_canonical(start_addr)),
             Frame::containing_address(PhysicalAddress::new_canonical(end_addr)),
         )).unwrap()
-    }
 }
 
 fn frame_addr(addr: usize) -> Frame {

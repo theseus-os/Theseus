@@ -15,7 +15,7 @@
 use core::ops::Deref;
 use memory_structs::{Frame, FrameRange, PhysicalAddress};
 use zerocopy::FromBytes;
-use frame_allocator::AllocatedFrame;
+use frame_allocator::UnmappedFrame;
 use pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
 
 /// A page table entry, which is a `u64` value under the hood.
@@ -90,7 +90,7 @@ impl PageTableEntry {
     /// This is the actual mapping action that informs the MMU of a new mapping.
     ///
     /// Note: this performs no checks about the current value of this page table entry.
-    pub fn set_entry(&mut self, frame: AllocatedFrame, flags: PteFlagsArch) {
+    pub fn set_entry(&mut self, frame: UnmappedFrame, flags: PteFlagsArch) {
         self.0 = (frame.start_address().value() as u64) | flags.bits();
     }
 

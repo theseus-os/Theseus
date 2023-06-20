@@ -110,7 +110,7 @@ impl PageTable {
         temporary_page.with_table_and_frame(|new_table, frame| {
             new_table.zero();
             new_table[RECURSIVE_P4_INDEX].set_entry(
-                frame.as_allocated_frame(),
+                frame.as_unmapped_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
         })?;
@@ -153,11 +153,11 @@ impl PageTable {
         // Overwrite upcoming page table recursive mapping.
         temporary_page.with_table_and_frame(|table, frame| {
             self.p4_mut()[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
-                frame.as_allocated_frame(),
+                frame.as_unmapped_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
             table[UPCOMING_PAGE_TABLE_RECURSIVE_P4_INDEX].set_entry(
-                frame.as_allocated_frame(),
+                frame.as_unmapped_frame(),
                 PteFlagsArch::new().valid(true).writable(true),
             );
         })?;
