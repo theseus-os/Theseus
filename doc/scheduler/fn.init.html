@@ -3,7 +3,7 @@
 <p>Currently, there is a single scheduler policy for the whole system.
 The policy is selected by specifying a Rust <code>cfg</code> value at build time, like so:</p>
 <ul>
-<li><code>make THESEUS_CONFIG=priority_scheduler</code> –&gt; priority scheduler.</li>
+<li><code>make THESEUS_CONFIG=epoch_scheduler</code> –&gt; epoch scheduler.</li>
 <li><code>make THESEUS_CONFIG=realtime_scheduler</code> –&gt; “realtime” (rate monotonic) scheduler.</li>
 <li><code>make</code> –&gt; basic round-robin scheduler, the default.</li>
 </ul>

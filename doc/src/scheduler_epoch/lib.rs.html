@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/scheduler_priority/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../scheduler_priority/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/scheduler_epoch/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../scheduler_epoch/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -221,51 +221,48 @@
 <a href="#221" id="221">221</a>
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
-<a href="#224" id="224">224</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed among tasks
-//! depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all tasks) * length of epoch].
-//! Each time a task is picked, the token count of the task is decremented by 1.
-//! A task is executed only if it has tokens remaining.
-//! When all tokens of all runnable task are exhausted a new scheduling epoch is initiated.
-//! In addition this crate offers the interfaces to set and get priorities  of each task.
-
+//! At the begining of each scheduling epoch a set of tokens is distributed
+//! among tasks depending on their priority.
+//! [tokens assigned to each task = (prioirty of each task / prioirty of all
+//! tasks) * length of epoch]. Each time a task is picked, the token count of
+//! the task is decremented by 1. A task is executed only if it has tokens
+//! remaining. When all tokens of all runnable task are exhausted a new
+//! scheduling epoch is initiated. In addition this crate offers the interfaces
+//! to set and get priorities  of each task.
 
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>runqueue_priority;
 
+<span class="kw">use </span>log::error;
+<span class="kw">use </span>runqueue_epoch::{RunQueue, MAX_PRIORITY};
 <span class="kw">use </span>task::TaskRef;
-<span class="kw">use </span>runqueue_priority::{RunQueue, MAX_PRIORITY};
-
 
 <span class="doccomment">/// A data structure to transfer data from select_next_task_priority
 /// to select_next_task
-</span><span class="kw">struct </span>NextTaskResult{
-    taskref : <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
-    idle_task : bool,
+</span><span class="kw">struct </span>NextTaskResult {
+    taskref: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
+    idle_task: bool,
 }
 
 <span class="doccomment">/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
-</span><span class="kw">pub fn </span>set_priority(task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+/// Priority values must be between 40 (maximum priority) and 0 (minimum
+/// prriority).
+</span><span class="kw">pub fn </span>set_priority(task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) {
     <span class="kw">let </span>priority = core::cmp::min(priority, MAX_PRIORITY);
-    RunQueue::set_priority(task, priority)
+    runqueue_epoch::set_priority(task, priority);
 }
 
 <span class="doccomment">/// Returns the priority of the given task.
 </span><span class="kw">pub fn </span>get_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-    RunQueue::get_priority(task)
+    runqueue_epoch::get_priority(task)
 }
 
 <span class="doccomment">/// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
-</span><span class="kw">pub fn </span>select_next_task(apic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt;  {
-    <span class="kw">let </span>priority_taskref_with_result = select_next_task_priority(apic_id); 
+</span><span class="kw">pub fn </span>select_next_task(apic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
+    <span class="kw">let </span>priority_taskref_with_result = select_next_task_priority(apic_id);
     <span class="kw">match </span>priority_taskref_with_result {
         <span class="comment">// A task has been selected
         </span><span class="prelude-val">Some</span>(task) =&gt; {
@@ -281,7 +278,7 @@
         }
 
         <span class="comment">// If no task is picked we pick a new scheduling epoch
-        </span><span class="prelude-val">None    </span>=&gt; {
+        </span><span class="prelude-val">None </span>=&gt; {
             assign_tokens(apic_id);
             select_next_task_priority(apic_id).and_then(|m| m.taskref)
         }
@@ -291,17 +288,17 @@
 <span class="doccomment">/// this defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
 /// Otherwise returns a task with a flag indicating whether its an idle task.
-</span><span class="kw">fn </span>select_next_task_priority(apic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;NextTaskResult&gt;  {
-
+</span><span class="kw">fn </span>select_next_task_priority(apic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;NextTaskResult&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>runqueue_locked = <span class="kw">match </span>RunQueue::get_runqueue(apic_id) {
         <span class="prelude-val">Some</span>(rq) =&gt; rq.write(),
         <span class="kw">_ </span>=&gt; {
             <span class="comment">// #[cfg(not(loscd_eval))]
-            // error!(&quot;BUG: select_next_task_priority(): couldn&#39;t get runqueue for core {}&quot;, apic_id); 
+            // error!(&quot;BUG: select_next_task_priority(): couldn&#39;t get runqueue for core {}&quot;,
+            // apic_id);
             </span><span class="kw">return </span><span class="prelude-val">None</span>;
         }
     };
-    
+
     <span class="kw">let </span><span class="kw-2">mut </span>idle_task_index: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>chosen_task_index: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>idle_task = <span class="bool-val">true</span>;
@@ -322,7 +319,10 @@
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
             <span class="kw">if </span>pinned.into_u8() != apic_id {
                 <span class="comment">// with per-core runqueues, this should never happen!
-                </span><span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, apic_id, t);
+                </span><span class="macro">error!</span>(
+                    <span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>,
+                    apic_id, t
+                );
                 <span class="kw">return </span><span class="prelude-val">None</span>;
             }
         }
@@ -331,18 +331,18 @@
         </span><span class="kw">if </span>t.tokens_remaining == <span class="number">0 </span>{
             <span class="kw">continue</span>;
         }
-            
+
         <span class="comment">// found a runnable task!
         </span>chosen_task_index = <span class="prelude-val">Some</span>(i);
         idle_task = <span class="bool-val">false</span>;
         <span class="comment">// debug!(&quot;select_next_task(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);
-        </span><span class="kw">break</span>; 
+        </span><span class="kw">break</span>;
     }
 
     <span class="comment">// We then reduce the number of tokens of the task by one
     </span><span class="kw">let </span>modified_tokens = {
         <span class="kw">let </span>chosen_task = chosen_task_index.and_then(|index| runqueue_locked.get(index));
-        <span class="kw">match </span>chosen_task.map(|m| m.tokens_remaining){
+        <span class="kw">match </span>chosen_task.map(|m| m.tokens_remaining) {
             <span class="prelude-val">Some</span>(x) =&gt; x.saturating_sub(<span class="number">1</span>),
             <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
         }
@@ -352,29 +352,27 @@
         .or(idle_task_index)
         .and_then(|index| runqueue_locked.update_and_move_to_end(index, modified_tokens))
         .map(|taskref| NextTaskResult {
-            taskref : <span class="prelude-val">Some</span>(taskref),
-            idle_task, 
+            taskref: <span class="prelude-val">Some</span>(taskref),
+            idle_task,
         })
 }
 
-
 <span class="doccomment">/// This assigns tokens between tasks.
 /// Returns true if successful.
-/// Tokens are assigned based on  (prioirty of each task / prioirty of all tasks).
-</span><span class="kw">fn </span>assign_tokens(apic_id: u8) -&gt; bool  {
-
+/// Tokens are assigned based on  (prioirty of each task / prioirty of all
+/// tasks).
+</span><span class="kw">fn </span>assign_tokens(apic_id: u8) -&gt; bool {
     <span class="kw">let </span><span class="kw-2">mut </span>runqueue_locked = <span class="kw">match </span>RunQueue::get_runqueue(apic_id) {
         <span class="prelude-val">Some</span>(rq) =&gt; rq.write(),
         <span class="kw">_ </span>=&gt; {
             <span class="comment">// #[cfg(not(loscd_eval))]
-            // error!(&quot;BUG: assign_tokens(): couldn&#39;t get runqueue for core {}&quot;, apic_id); 
+            // error!(&quot;BUG: assign_tokens(): couldn&#39;t get runqueue for core {}&quot;, apic_id);
             </span><span class="kw">return </span><span class="bool-val">false</span>;
         }
     };
-    
 
-    <span class="comment">// We begin with total priorities = 1 to avoid division by zero 
-    </span><span class="kw">let </span><span class="kw-2">mut </span>total_priorities :usize = <span class="number">1</span>;
+    <span class="comment">// We begin with total priorities = 1 to avoid division by zero
+    </span><span class="kw">let </span><span class="kw-2">mut </span>total_priorities: usize = <span class="number">1</span>;
 
     <span class="comment">// This loop calculates the total priorities of the runqueue
     </span><span class="kw">for </span>(_i, t) <span class="kw">in </span>runqueue_locked.iter().enumerate() {
@@ -392,32 +390,27 @@
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
             <span class="kw">if </span>pinned.into_u8() != apic_id {
                 <span class="comment">// with per-core runqueues, this should never happen!
-                </span><span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, apic_id, t);
+                </span><span class="macro">error!</span>(
+                    <span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>,
+                    apic_id, t
+                );
                 <span class="kw">return </span><span class="bool-val">false</span>;
             }
         }
-            
-        <span class="comment">// found a runnable task!
-        // We add its priority
-        // debug!(&quot;assign_tokens(): AP {} Task {:?} priority {}&quot;, apic_id, &amp;*t, t.priority);
-        </span>total_priorities = total_priorities.saturating_add(<span class="number">1</span>).saturating_add(t.priority <span class="kw">as </span>usize);
-        
-        
-        
-        <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);
-        // break; 
-    </span>}
+
+        total_priorities = total_priorities
+            .saturating_add(<span class="number">1</span>)
+            .saturating_add(t.priority <span class="kw">as </span>usize);
+    }
 
     <span class="comment">// We keep each epoch for 100 tokens by default
-    // However since this granularity could miss low priority tasks when 
+    // However since this granularity could miss low priority tasks when
     // many concurrent tasks are running, we increase the epoch in such cases
-    </span><span class="kw">let </span>epoch :usize = core::cmp::max(total_priorities, <span class="number">100</span>);
-
+    </span><span class="kw">let </span>epoch: usize = core::cmp::max(total_priorities, <span class="number">100</span>);
 
     <span class="comment">// We iterate through each task in runqueue
     // We dont use iterator as items are modified in the process
-    </span><span class="kw">for </span>(_i, t) <span class="kw">in </span>runqueue_locked.iter_mut().enumerate() { 
-
+    </span><span class="kw">for </span>(_i, t) <span class="kw">in </span>runqueue_locked.iter_mut().enumerate() {
         <span class="comment">// we give zero tokens to the idle tasks
         </span><span class="kw">if </span>t.is_an_idle_task {
             <span class="kw">continue</span>;
@@ -432,18 +425,24 @@
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
             <span class="kw">if </span>pinned.into_u8() != apic_id {
                 <span class="comment">// with per-core runqueues, this should never happen!
-                </span><span class="macro">error!</span>(<span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>, apic_id, <span class="kw-2">&amp;*</span>t);
+                </span><span class="macro">error!</span>(
+                    <span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>,
+                    apic_id, <span class="kw-2">&amp;*</span>t
+                );
                 <span class="kw">return </span><span class="bool-val">false</span>;
             }
         }
         <span class="comment">// task_tokens = epoch * (taskref + 1) / total_priorities;
-        </span><span class="kw">let </span>task_tokens = epoch.saturating_mul((t.priority <span class="kw">as </span>usize).saturating_add(<span class="number">1</span>)).wrapping_div(total_priorities);
+        </span><span class="kw">let </span>task_tokens = epoch
+            .saturating_mul((t.priority <span class="kw">as </span>usize).saturating_add(<span class="number">1</span>))
+            .wrapping_div(total_priorities);
 
         t.tokens_remaining = task_tokens;
         <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);
-        // break; 
+        // break;
     </span>}
 
     <span class="bool-val">true
-</span>}</code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="scheduler_priority" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
+</span>}
+</code></pre></div>
+</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="scheduler_epoch" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

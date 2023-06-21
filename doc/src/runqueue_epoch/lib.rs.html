@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue_priority/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../runqueue_priority/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue_epoch/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../runqueue_epoch/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -267,154 +267,106 @@
 <a href="#267" id="267">267</a>
 <a href="#268" id="268">268</a>
 <a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a>
-<a href="#282" id="282">282</a>
-<a href="#283" id="283">283</a>
-<a href="#284" id="284">284</a>
-<a href="#285" id="285">285</a>
-<a href="#286" id="286">286</a>
-<a href="#287" id="287">287</a>
-<a href="#288" id="288">288</a>
-<a href="#289" id="289">289</a>
-<a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-</pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `RunQueue` structure, for priority scheduler. 
+</pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `RunQueue` structure, for the epoch scheduler.
 //! `RunQueue` structure is essentially a list of Tasks
 //! that it used for scheduling purposes.
-//! 
 
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>sync_preemption;
-<span class="kw">extern crate </span>atomic_linked_list;
-<span class="kw">extern crate </span>task;
-
-<span class="attr">#[cfg(single_simd_task_optimization)]
-</span><span class="kw">extern crate </span>single_simd_task_optimization;
 
 <span class="kw">use </span>alloc::collections::VecDeque;
-<span class="kw">use </span>sync_preemption::PreemptionSafeRwLock;
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
-<span class="kw">use </span>task::TaskRef;
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>log::{debug, error, trace};
+<span class="kw">use </span>sync_preemption::PreemptionSafeRwLock;
+<span class="kw">use </span>task::TaskRef;
 
 <span class="kw">pub const </span>MAX_PRIORITY: u8 = <span class="number">40</span>;
 <span class="kw">pub const </span>DEFAULT_PRIORITY: u8 = <span class="number">20</span>;
 <span class="kw">pub const </span>INITIAL_TOKENS: usize = <span class="number">10</span>;
 
-<span class="doccomment">/// A cloneable reference to a `Taskref` that exposes more methods
-/// related to task scheduling.
-/// 
-/// The `PriorityTaskRef` type is necessary since differnt scheduling algorithms 
-/// require different data associated with the task to be stored alongside.
-/// This makes storing them alongside the task prohibitive.
-/// context_switches is not used in scheduling algorithm
-/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`. 
-</span><span class="attr">#[derive(Debug, Clone)]
-</span><span class="kw">pub struct </span>PriorityTaskRef{
-    <span class="doccomment">/// `TaskRef` wrapped by `PriorityTaskRef`
-    </span>taskref: TaskRef,
-
-    <span class="doccomment">/// Priority assigned for the task. Max priority = 40, Min priority = 0.
-    </span><span class="kw">pub </span>priority: u8,
-
-    <span class="doccomment">/// Remaining tokens in this epoch. A task will be scheduled in an epoch until tokens run out
+<span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">pub struct </span>EpochTaskRef {
+    task: TaskRef,
+    <span class="kw">pub </span>priority: u8,
+    <span class="doccomment">/// Remaining tokens in this epoch. A task will be scheduled in an epoch
+    /// until tokens run out
     </span><span class="kw">pub </span>tokens_remaining: usize,
-
-    <span class="doccomment">/// Number of context switches the task has undergone. Not used in scheduling algorithm
-    </span>context_switches: usize,
 }
 
-<span class="kw">impl </span>Deref <span class="kw">for </span>PriorityTaskRef {
+<span class="kw">impl </span>Deref <span class="kw">for </span>EpochTaskRef {
     <span class="kw">type </span>Target = TaskRef;
+
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.taskref
+        <span class="kw-2">&amp;</span><span class="self">self</span>.task
     }
 }
 
-<span class="kw">impl </span>DerefMut <span class="kw">for </span>PriorityTaskRef {
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>EpochTaskRef {
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>TaskRef {
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>.taskref
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.task
     }
 }
 
-<span class="kw">impl </span>PriorityTaskRef {
-    <span class="doccomment">/// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`.
-    /// We just give an initial number of tokens to run the task till 
+<span class="kw">impl </span>EpochTaskRef {
+    <span class="doccomment">/// Creates a new `EpochTaskRef` that wraps the given `TaskRef`.
+    /// We just give an initial number of tokens to run the task till
     /// next scheduling epoch
-    </span><span class="kw">pub fn </span>new(taskref: TaskRef) -&gt; PriorityTaskRef {
-        PriorityTaskRef {
-            taskref,
+    </span><span class="kw">pub fn </span>new(task: TaskRef) -&gt; EpochTaskRef {
+        EpochTaskRef {
+            task,
             priority: DEFAULT_PRIORITY,
             tokens_remaining: INITIAL_TOKENS,
-            context_switches: <span class="number">0</span>,
         }
-    }
-
-    <span class="doccomment">/// Increment the number of times the task is picked
-    </span><span class="kw">pub fn </span>increment_context_switches(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.context_switches = <span class="self">self</span>.context_switches.saturating_add(<span class="number">1</span>);
     }
 }
 
-
-<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue
-/// and allows the scheduler to select a task from that runqueue to schedule in.
+<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private
+/// runqueue and allows the scheduler to select a task from that runqueue to
+/// schedule in.
 </span><span class="kw">static </span>RUNQUEUES: AtomicMap&lt;u8, PreemptionSafeRwLock&lt;RunQueue&gt;&gt; = AtomicMap::new();
 
-<span class="doccomment">/// A list of references to `Task`s (`PriorityTaskRef`s) 
-/// that is used to store the `Task`s (and associated scheduler related data) 
+<span class="doccomment">/// A list of references to `Task`s (`EpochTaskRef`s)
+/// that is used to store the `Task`s (and associated scheduler related data)
 /// that are runnable on a given core.
-/// A queue is used for the token based prioirty scheduler.
-/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to `VecDeque`.
+/// A queue is used for the token based epoch scheduler.
+/// `Runqueue` implements `Deref` and `DerefMut` traits, which dereferences to
+/// `VecDeque`.
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>RunQueue {
     core: u8,
-    queue: VecDeque&lt;PriorityTaskRef&gt;,
+    queue: VecDeque&lt;EpochTaskRef&gt;,
 }
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>RunQueue {
-    <span class="kw">type </span>Target = VecDeque&lt;PriorityTaskRef&gt;;
-    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>VecDeque&lt;PriorityTaskRef&gt; {
+    <span class="kw">type </span>Target = VecDeque&lt;EpochTaskRef&gt;;
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;</span><span class="self">self</span>.queue
     }
 }
 
 <span class="kw">impl </span>DerefMut <span class="kw">for </span>RunQueue {
-    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>VecDeque&lt;PriorityTaskRef&gt; {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span><span class="self">Self</span>::Target {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.queue
     }
 }
 
 <span class="kw">impl </span>RunQueue {
-
-    <span class="doccomment">/// Moves the `TaskRef` at the given index in this `RunQueue` to the end (back) of this `RunQueue`,
-    /// and returns a cloned reference to that `TaskRef`. The number of tokens is reduced by one and number of context
-    /// switches is increased by one. This function is used when the task is selected by the scheduler
-    </span><span class="kw">pub fn </span>update_and_move_to_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize, tokens : usize) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
+    <span class="doccomment">/// Moves the `TaskRef` at the given index in this `RunQueue` to the end
+    /// (back) of this `RunQueue`, and returns a cloned reference to that
+    /// `TaskRef`. The number of tokens is reduced by one and number of context
+    /// switches is increased by one. This function is used when the task is
+    /// selected by the scheduler
+    </span><span class="kw">pub fn </span>update_and_move_to_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize, tokens: usize) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>priority_task_ref) = <span class="self">self</span>.remove(index) {
             priority_task_ref.tokens_remaining = tokens;
-            priority_task_ref.increment_context_switches();
-            <span class="kw">let </span>taskref = priority_task_ref.taskref.clone();
+            <span class="kw">let </span>task_ref = priority_task_ref.task.clone();
             <span class="self">self</span>.push_back(priority_task_ref);
-            <span class="prelude-val">Some</span>(taskref)
-        } 
-        <span class="kw">else </span>{
-            <span class="prelude-val">None 
+            <span class="prelude-val">Some</span>(task_ref)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
         </span>}
     }
 
@@ -428,10 +380,12 @@
         });
 
         <span class="kw">if </span>RUNQUEUES.insert(which_core, new_rq).is_some() {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {}!&quot;</span>, which_core);
+            <span class="macro">error!</span>(
+                <span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {}!&quot;</span>,
+                which_core
+            );
             <span class="prelude-val">Err</span>(<span class="string">&quot;runqueue already exists for this core&quot;</span>)
-        }
-        <span class="kw">else </span>{
+        } <span class="kw">else </span>{
             <span class="comment">// there shouldn&#39;t already be a RunQueue for this core
             </span><span class="prelude-val">Ok</span>(())
         }
@@ -442,12 +396,11 @@
         RUNQUEUES.get(<span class="kw-2">&amp;</span>which_core)
     }
 
-
-    <span class="doccomment">/// Returns the &quot;least busy&quot; core, which is currently very simple, based on runqueue size.
+    <span class="doccomment">/// Returns the &quot;least busy&quot; core, which is currently very simple, based on
+    /// runqueue size.
     </span><span class="kw">pub fn </span>get_least_busy_core() -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
         <span class="self">Self</span>::get_least_busy_runqueue().map(|rq| rq.read().core)
     }
-
 
     <span class="doccomment">/// Returns the `RunQueue` for the &quot;least busy&quot; core.
     /// See [`get_least_busy_core()`](#method.get_least_busy_core)
@@ -461,8 +414,7 @@
                 <span class="kw">if </span>rq_size &lt; min.<span class="number">1 </span>{
                     min_rq = <span class="prelude-val">Some</span>((rq, rq_size));
                 }
-            }
-            <span class="kw">else </span>{
+            } <span class="kw">else </span>{
                 min_rq = <span class="prelude-val">Some</span>((rq, rq_size));
             }
         }
@@ -470,8 +422,9 @@
         min_rq.map(|m| m.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue (based on simple runqueue-size-based load balancing)
-    /// and adds the given `Task` reference to that core&#39;s runqueue.
+    <span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue (based on simple
+    /// runqueue-size-based load balancing) and adds the given `Task`
+    /// reference to that core&#39;s runqueue.
     </span><span class="kw">pub fn </span>add_task_to_any_runqueue(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.<span class="number">1</span>))
@@ -480,8 +433,12 @@
         rq.write().add_task(task)
     }
 
-    <span class="doccomment">/// Convenience method that adds the given `Task` reference to given core&#39;s runqueue.
-    </span><span class="kw">pub fn </span>add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="doccomment">/// Convenience method that adds the given `Task` reference to given core&#39;s
+    /// runqueue.
+    </span><span class="kw">pub fn </span>add_task_to_specific_runqueue(
+        which_core: u8,
+        task: TaskRef,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         RunQueue::get_runqueue(which_core)
             .ok_or(<span class="string">&quot;Couldn&#39;t get RunQueue for the given core&quot;</span>)<span class="question-mark">?
             </span>.write()
@@ -489,14 +446,14 @@
     }
 
     <span class="doccomment">/// Adds a `TaskRef` to this RunQueue.
-    </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {        
+    </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
-        <span class="kw">let </span>priority_task_ref = PriorityTaskRef::new(task);
+        <span class="kw">let </span>priority_task_ref = EpochTaskRef::new(task);
         <span class="self">self</span>.push_back(priority_task_ref);
-        
+
         <span class="attr">#[cfg(single_simd_task_optimization)]
-        </span>{   
+        </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::ADD_TASK&quot;</span>);
             <span class="comment">// notify simd_personality crate about runqueue change, but only for SIMD tasks
             </span><span class="kw">if </span>task.simd {
@@ -509,10 +466,14 @@
 
     <span class="doccomment">/// Removes a `TaskRef` from this RunQueue.
     </span><span class="kw">pub fn </span>remove_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
-        <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.taskref != task);
+        <span class="macro">debug!</span>(
+            <span class="string">&quot;Removing task from runqueue_priority {}, {:?}&quot;</span>,
+            <span class="self">self</span>.core, task
+        );
+        <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.task != task);
 
-        <span class="attr">#[cfg(single_simd_task_optimization)] </span>{   
+        <span class="attr">#[cfg(single_simd_task_optimization)]
+        </span>{
             <span class="macro">warn!</span>(<span class="string">&quot;USING SINGLE_SIMD_TASK_OPTIMIZATION VERSION OF RUNQUEUE::REMOVE_TASK&quot;</span>);
             <span class="comment">// notify simd_personality crate about runqueue change, but only for SIMD tasks
             </span><span class="kw">if </span>task.simd {
@@ -523,9 +484,10 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-    /// 
-    /// This is a brute force approach that iterates over all runqueues. 
+    <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire
+    /// system.
+    ///
+    /// This is a brute force approach that iterates over all runqueues.
     </span><span class="kw">pub fn </span>remove_task_from_all(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
             rq.write().remove_task(task)<span class="question-mark">?</span>;
@@ -533,54 +495,46 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    <span class="doccomment">/// The internal function that sets the priority of a given `Task` in a single `RunQueue`
-    </span><span class="kw">fn </span>set_priority_internal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// debug!(&quot;called_assign_priority_internal called per core&quot;);
-        </span><span class="kw">for </span>x <span class="kw">in </span><span class="self">self</span>.iter_mut() {
-            <span class="kw">if </span><span class="kw-2">&amp;</span>x.taskref == task{
-                <span class="macro">debug!</span>(<span class="string">&quot;changed priority from {}  to {} &quot;</span>, x.priority, priority);
-                x.priority = priority;
+    <span class="kw">fn </span>get_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+        <span class="kw">for </span>epoch_task <span class="kw">in </span><span class="self">self</span>.iter() {
+            <span class="kw">if </span><span class="kw-2">&amp;</span>epoch_task.task == task {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(epoch_task.priority);
             }
         }
-        <span class="prelude-val">Ok</span>(())
-    } 
+        <span class="prelude-val">None
+    </span>}
 
-    <span class="doccomment">/// Sets the priority of the given `Task` in all the `RunQueue` structures 
-    </span><span class="kw">pub fn </span>set_priority(task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="comment">// debug!(&quot;assign priority wrapper. called once per call&quot;);
-        </span><span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
-            rq.write().set_priority_internal(task, priority)<span class="question-mark">?</span>;
+    <span class="doccomment">/// Sets the priority of the given task.
+    ///
+    /// Returns whether the task was found in the run queue.
+    </span><span class="kw">fn </span>set_priority(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) -&gt; bool {
+        <span class="kw">for </span>epoch_task <span class="kw">in </span><span class="self">self</span>.iter_mut() {
+            <span class="kw">if </span><span class="kw-2">&amp;</span>epoch_task.task == task {
+                epoch_task.priority = priority;
+                <span class="kw">return </span><span class="bool-val">true</span>;
+            }
         }
-        <span class="prelude-val">Ok</span>(())
+        <span class="bool-val">false
+    </span>}
+}
+
+<span class="doccomment">/// Returns the priority of the given task if it exists, otherwise none.
+</span><span class="kw">pub fn </span>get_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+    <span class="kw">for </span>(<span class="kw">_</span>, run_queue) <span class="kw">in </span>RUNQUEUES.iter() {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(priority) = run_queue.read().get_priority(task) {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(priority);
+        }
     }
 
-    <span class="doccomment">/// The internal function that outputs the priority of a given task.
-    /// The priority of the first task that matches is shown.
-    </span><span class="kw">fn </span>get_priority_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-        <span class="comment">// debug!(&quot;called_assign_priority_internal called per core&quot;);
-        </span><span class="kw">for </span>x <span class="kw">in </span><span class="self">self</span>.iter() {
-            <span class="kw">if </span><span class="kw-2">&amp;</span>x.taskref == task {
-                <span class="kw">return </span><span class="prelude-val">Some</span>(x.priority);
-            }
-        }
-        <span class="prelude-val">None
-    </span>}
+    <span class="prelude-val">None
+</span>}
 
-    <span class="doccomment">/// Output the priority of the given task.
-    /// Outputs None if the task is not found in any of the runqueues.
-    </span><span class="kw">pub fn </span>get_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-        <span class="comment">// debug!(&quot;assign priority wrapper. called once per call&quot;);
-        </span><span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
-            <span class="kw">let </span>return_priority = rq.read().get_priority_internal(task);
-            <span class="kw">match </span>return_priority {
-                <span class="comment">//If a matching task is found the iteration terminates
-                </span><span class="prelude-val">Some</span>(x) =&gt; <span class="kw">return </span><span class="prelude-val">Some</span>(x),
-                <span class="prelude-val">None </span>=&gt; <span class="kw">continue</span>,
-            }
+<span class="kw">pub fn </span>set_priority(task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) {
+    <span class="kw">for </span>(<span class="kw">_</span>, run_queue) <span class="kw">in </span>RUNQUEUES.iter() {
+        <span class="kw">if </span>run_queue.write().set_priority(task, priority) {
+            <span class="kw">break</span>;
         }
-        <span class="prelude-val">None
-    </span>}
-
+    }
 }
 </code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="runqueue_priority" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
+</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="runqueue_epoch" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

@@ -71,8 +71,8 @@
 <span class="kw">extern crate </span>task;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>cfg_if;
 <span class="macro">cfg_if! </span>{
-    <span class="kw">if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
-        <span class="kw">extern crate </span>runqueue_priority <span class="kw">as </span>runqueue;
+    <span class="kw">if </span><span class="attr">#[cfg(epoch_scheduler)] </span>{
+        <span class="kw">extern crate </span>runqueue_epoch <span class="kw">as </span>runqueue;
     } <span class="kw">else if </span><span class="attr">#[cfg(realtime_scheduler)] </span>{
         <span class="kw">extern crate </span>runqueue_realtime <span class="kw">as </span>runqueue;
     } <span class="kw">else </span>{

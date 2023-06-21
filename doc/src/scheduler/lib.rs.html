@@ -123,6 +123,7 @@
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
 <a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Offers the ability to control or configure the active task scheduling policy.
 //!
 //! ## What is and isn&#39;t in this crate?
@@ -140,8 +141,8 @@
 #![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(abi_x86_interrupt))]
 
 </span><span class="macro">cfg_if::cfg_if! </span>{
-    <span class="kw">if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
-        <span class="kw">extern crate </span>scheduler_priority <span class="kw">as </span>scheduler;
+    <span class="kw">if </span><span class="attr">#[cfg(epoch_scheduler)] </span>{
+        <span class="kw">extern crate </span>scheduler_epoch <span class="kw">as </span>scheduler;
     } <span class="kw">else if </span><span class="attr">#[cfg(realtime_scheduler)] </span>{
         <span class="kw">extern crate </span>scheduler_realtime <span class="kw">as </span>scheduler;
     } <span class="kw">else </span>{
@@ -162,7 +163,7 @@
 ///
 /// Currently, there is a single scheduler policy for the whole system.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
-/// * `make THESEUS_CONFIG=priority_scheduler` --&gt; priority scheduler.
+/// * `make THESEUS_CONFIG=epoch_scheduler` --&gt; epoch scheduler.
 /// * `make THESEUS_CONFIG=realtime_scheduler` --&gt; &quot;realtime&quot; (rate monotonic) scheduler.
 /// * `make` --&gt; basic round-robin scheduler, the default.
 </span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -221,10 +222,11 @@
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 /// This function returns an error when a scheduler without priority is loaded. 
 </span><span class="kw">pub fn </span>set_priority(_task: <span class="kw-2">&amp;</span>TaskRef, _priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="attr">#[cfg(priority_scheduler)] </span>{
-        scheduler_priority::set_priority(_task, _priority)
+    <span class="attr">#[cfg(epoch_scheduler)] </span>{
+        scheduler_epoch::set_priority(_task, _priority);
+        <span class="prelude-val">Ok</span>(())
     }
-    <span class="attr">#[cfg(not(priority_scheduler))] </span>{
+    <span class="attr">#[cfg(not(epoch_scheduler))] </span>{
         <span class="prelude-val">Err</span>(<span class="string">&quot;no scheduler that uses task priority is currently loaded&quot;</span>)
     }
 }
@@ -232,10 +234,10 @@
 <span class="doccomment">/// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
 </span><span class="kw">pub fn </span>get_priority(_task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-    <span class="attr">#[cfg(priority_scheduler)] </span>{
-        scheduler_priority::get_priority(_task)
+    <span class="attr">#[cfg(epoch_scheduler)] </span>{
+        scheduler_epoch::get_priority(_task)
     }
-    <span class="attr">#[cfg(not(priority_scheduler))] </span>{
+    <span class="attr">#[cfg(not(epoch_scheduler))] </span>{
         <span class="prelude-val">None
     </span>}
 }
