@@ -1,8 +1,9 @@
 [package]
 authors = ["Namitha Liyanage <Namithaliyanage@gmail.com>"]
-name = "runqueue_priority"
-description = "Functions and types for handling runqueues when priority scheduler is in use, i.e., lists of tasks for scheduling purposes"
+name = "runqueue_epoch"
+description = "Run queue for the epoch scheduler"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"

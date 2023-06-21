@@ -33,10 +33,10 @@ pub fn main(args: Vec<String>) -> isize {
         println!("{0:<5}  {1}", "ID", "NAME");
     }
     else {
-        #[cfg(priority_scheduler)] {
+        #[cfg(epoch_scheduler)] {
             println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "PRIORITY", "NAME");
         }
-        #[cfg(not(priority_scheduler))] {
+        #[cfg(not(epoch_scheduler))] {
             println!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}", "ID", "RUNSTATE", "CPU", "PIN", "TYPE", "NAME");
         }
     }
@@ -59,14 +59,14 @@ pub fn main(args: Vec<String>) -> isize {
                 else if task.is_application() {"A"}
                 else {" "} ;
 
-            #[cfg(priority_scheduler)] {
+            #[cfg(epoch_scheduler)] {
                 let priority = scheduler::get_priority(&task).map(|priority| format!("{}", priority)).unwrap_or_else(|| String::from("-"));
                 task_string.push_str(
                     &format!("{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5:<10}  {6}\n", 
                     id, runstate, cpu, pinned, task_type, priority, task.name)
                 );
             }
-            #[cfg(not(priority_scheduler))] {
+            #[cfg(not(epoch_scheduler))] {
                 writeln!(task_string, "{0:<5}  {1:<10}  {2:<4}  {3:<4}  {4:<5}  {5}", 
                     id, runstate, cpu, pinned, task_type, task.name).expect("Failed to write to task_string.");
             }

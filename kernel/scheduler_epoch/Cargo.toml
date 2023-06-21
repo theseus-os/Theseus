@@ -1,8 +1,9 @@
 [package]
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
-name = "scheduler_priority"
-description = "Provides priority scheduling functionality and picks the next task"
+name = "scheduler_epoch"
+description = "Provides epoch scheduling functionality and picks the next task"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
@@ -16,8 +17,8 @@ path = "../task"
 [dependencies.runqueue]
 path = "../runqueue"
 
-[dependencies.runqueue_priority]
-path = "../runqueue_priority"
+[dependencies.runqueue_epoch]
+path = "../runqueue_epoch"
 
 [lib]
 crate-type = ["rlib"]

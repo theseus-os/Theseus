@@ -11,8 +11,8 @@ extern crate atomic_linked_list;
 extern crate task;
 #[macro_use] extern crate cfg_if;
 cfg_if! {
-    if #[cfg(priority_scheduler)] {
-        extern crate runqueue_priority as runqueue;
+    if #[cfg(epoch_scheduler)] {
+        extern crate runqueue_epoch as runqueue;
     } else if #[cfg(realtime_scheduler)] {
         extern crate runqueue_realtime as runqueue;
     } else {
