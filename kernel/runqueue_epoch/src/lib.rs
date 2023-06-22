@@ -3,6 +3,7 @@
 //! that it used for scheduling purposes.
 
 #![no_std]
+#![feature(let_chains)]
 
 extern crate alloc;
 
@@ -270,6 +271,46 @@ pub fn set_priority(task: &TaskRef, priority: u8) {
     for (_, run_queue) in RUNQUEUES.iter() {
         if run_queue.write().set_priority(task, priority) {
             break;
+        }
+    }
+}
+
+/// Modifies the given task's priority to be the maximum of its priority and the
+/// current task's priority.
+pub fn inherit_priority(task: &TaskRef) -> impl FnOnce() + '_ {
+    let current_task = task::get_my_current_task().unwrap();
+
+    let mut current_priority = None;
+    let mut other_priority = None;
+
+    'outer: for (core, run_queue) in RUNQUEUES.iter() {
+        for epoch_task in run_queue.read().iter() {
+            if epoch_task.task == current_task {
+                current_priority = Some(epoch_task.priority);
+                if other_priority.is_some() {
+                    break 'outer;
+                }
+            } else if &epoch_task.task == task {
+                other_priority = Some((core, epoch_task.priority));
+                if current_priority.is_some() {
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    if let (Some(current_priority), Some((core, other_priority))) =
+        (current_priority, other_priority) && current_priority > other_priority
+    {
+        // NOTE: This assumes no task migration.
+        debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task, current_priority));
+    }
+
+    move || {
+        if let (Some(current_priority), Some((_, other_priority))) =
+            (current_priority, other_priority) && current_priority > other_priority
+        {
+            set_priority(task, other_priority);
         }
     }
 }

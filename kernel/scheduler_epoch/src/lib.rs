@@ -16,12 +16,7 @@ use log::error;
 use runqueue_epoch::{RunQueue, MAX_PRIORITY};
 use task::TaskRef;
 
-/// A data structure to transfer data from select_next_task_priority
-/// to select_next_task
-struct NextTaskResult {
-    taskref: Option<TaskRef>,
-    idle_task: bool,
-}
+pub use runqueue_epoch::inherit_priority;
 
 /// Changes the priority of the given task with the given priority level.
 /// Priority values must be between 40 (maximum priority) and 0 (minimum
@@ -34,6 +29,13 @@ pub fn set_priority(task: &TaskRef, priority: u8) {
 /// Returns the priority of the given task.
 pub fn get_priority(task: &TaskRef) -> Option<u8> {
     runqueue_epoch::get_priority(task)
+}
+
+/// A data structure to transfer data from select_next_task_priority
+/// to select_next_task
+struct NextTaskResult {
+    taskref: Option<TaskRef>,
+    idle_task: bool,
 }
 
 /// This defines the priority scheduler policy.

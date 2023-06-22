@@ -89,18 +89,35 @@ impl MutexFlavor for Block {
             // Holder is either no longer running, or has released the lock.
             // Either way we will try the fast path one more time before moving
             // onto the slow path.
+
+            if let Some(guards) = Self::try_lock(mutex, data) {
+                return guards;
+            }
+
+            // Slow path
+            #[cfg(priority_inheritance)]
+            let deinherit_priority = scheduler::inherit_priority(&holder_task);
+
+            // This lint triggers when disabling priority inheritance.
+            #[allow(clippy::let_and_return)]
+            let guards = data.queue.wait_until(|| Self::try_lock(mutex, data));
+
+            #[cfg(priority_inheritance)]
+            deinherit_priority();
+
+            guards
         } else {
             // Unlikely case that another thread just acquired the lock, but hasn't yet set
             // data.holder.
             log::warn!("could not get holder task for mutex middle path");
-        }
 
-        if let Some(guards) = Self::try_lock(mutex, data) {
-            return guards;
-        }
+            if let Some(guards) = Self::try_lock(mutex, data) {
+                return guards;
+            }
 
-        // Slow path
-        data.queue.wait_until(|| Self::try_lock(mutex, data))
+            // Slow path
+            data.queue.wait_until(|| Self::try_lock(mutex, data))
+        }
     }
 
     #[inline]

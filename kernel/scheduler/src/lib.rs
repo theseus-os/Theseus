@@ -118,3 +118,12 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
         None
     }
 }
+
+pub fn inherit_priority(_task: &TaskRef) -> impl FnOnce() + '_ {
+    #[cfg(any(epoch_scheduler, priority_scheduler))]
+    {
+        scheduler::inherit_priority(_task)
+    }
+    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
+    || {}
+}
