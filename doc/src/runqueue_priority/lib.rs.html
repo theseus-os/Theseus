@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue_realtime/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../runqueue_realtime/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/runqueue_priority/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../runqueue_priority/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -286,35 +286,11 @@
 <a href="#286" id="286">286</a>
 <a href="#287" id="287">287</a>
 <a href="#288" id="288">288</a>
-<a href="#289" id="289">289</a>
-<a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
-<a href="#300" id="300">300</a>
-</pre><pre class="rust"><code><span class="doccomment">//! Runqueue structures for a realtime scheduler using rate monotonic scheduling.
+</pre><pre class="rust"><code><span class="doccomment">//! Runqueue structures for a priority scheduler.
 //!
 //! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
-//! Each `RealtimeTaskRef` element in the runqueue contains a `TaskRef` 
+//! Each `PriorityTaskRef` element in the runqueue contains a `TaskRef` 
 //! representing an underlying task and as well as a `period` value.
-//! 
-//! In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
-//! Thus, the `period` value of a `RealtimeTaskRef` acts as a form of priority.
-//! Each `RunQueue` consists of a `VecDeque` of `RealtimeTaskRef`s 
-//! sorted in increasing order of their `period` values.
-//! The sorting is maintained by inserting each `RealtimeTaskRef` at the proper index
-//! according to its `period` value.
-//!
-//! Aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.
-//! Since the scheduler iterates through the runqueue to select the first `Runnable` task,
-//! lower-period tasks are &quot;higher priority&quot; and will be selected first, 
-//! with aperiodic tasks being selected only when no periodic tasks are runnable.
 
 </span><span class="attr">#![no_std]
 
@@ -330,12 +306,12 @@
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
 
-<span class="doccomment">/// A reference to a task with its period for realtime scheduling.
+<span class="doccomment">/// A reference to a task with its period for priority scheduling.
 ///
-/// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
+/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
 </span><span class="attr">#[derive(Debug, Clone)]
-</span><span class="kw">pub struct </span>RealtimeTaskRef {
-    <span class="doccomment">/// `TaskRef` wrapped by `RealtimeTaskRef`
+</span><span class="kw">pub struct </span>PriorityTaskRef {
+    <span class="doccomment">/// `TaskRef` wrapped by `PriorityTaskRef`
     </span>taskref: TaskRef,
     <span class="doccomment">/// `Some` if the task is periodic, `None` if it is aperiodic.
     </span>period: <span class="prelude-ty">Option</span>&lt;usize&gt;,
@@ -343,23 +319,23 @@
     </span>context_switches: usize,
 }
 
-<span class="kw">impl </span>Deref <span class="kw">for </span>RealtimeTaskRef {
+<span class="kw">impl </span>Deref <span class="kw">for </span>PriorityTaskRef {
     <span class="kw">type </span>Target = TaskRef;
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
         <span class="kw-2">&amp;</span><span class="self">self</span>.taskref
     }
 }
 
-<span class="kw">impl </span>DerefMut <span class="kw">for </span>RealtimeTaskRef {
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>PriorityTaskRef {
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>TaskRef {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.taskref
     }
 }
 
-<span class="kw">impl </span>RealtimeTaskRef {
-    <span class="doccomment">/// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
-    </span><span class="kw">pub fn </span>new(taskref: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; RealtimeTaskRef {
-        RealtimeTaskRef {
+<span class="kw">impl </span>PriorityTaskRef {
+    <span class="doccomment">/// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`
+    </span><span class="kw">pub fn </span>new(taskref: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; PriorityTaskRef {
+        PriorityTaskRef {
             taskref,
             period,
             context_switches: <span class="number">0</span>,
@@ -371,17 +347,17 @@
         <span class="self">self</span>.context_switches = <span class="self">self</span>.context_switches.saturating_add(<span class="number">1</span>);
     }
 
-    <span class="doccomment">/// Checks whether the `RealtimeTaskRef` refers to a task that is periodic
+    <span class="doccomment">/// Checks whether the `PriorityTaskRef` refers to a task that is periodic
     </span><span class="kw">pub fn </span>is_periodic(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="self">self</span>.period.is_some()
     }
 
-    <span class="doccomment">/// Returns `true` if the period of this `RealtimeTaskRef` is shorter (less) than
-    /// the period of the other `RealtimeTaskRef`.
+    <span class="doccomment">/// Returns `true` if the period of this `PriorityTaskRef` is shorter (less) than
+    /// the period of the other `PriorityTaskRef`.
     ///
-    /// Returns `false` if this `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`.
+    /// Returns `false` if this `PriorityTaskRef` is aperiodic, i.e. if `period` is `None`.
     /// Returns `true` if this task is periodic and `other` is aperiodic.
-    </span><span class="kw">pub fn </span>has_smaller_period(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>RealtimeTaskRef) -&gt; bool {
+    </span><span class="kw">pub fn </span>has_smaller_period(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>PriorityTaskRef) -&gt; bool {
         <span class="kw">match </span><span class="self">self</span>.period {
             <span class="prelude-val">Some</span>(period_val) =&gt; <span class="kw">if let </span><span class="prelude-val">Some</span>(other_period_val) = other.period {
                 period_val &lt; other_period_val
@@ -397,7 +373,7 @@
 /// and allows the scheduler to select a task from that runqueue to schedule in
 </span><span class="kw">static </span>RUNQUEUES: AtomicMap&lt;u8, PreemptionSafeRwLock&lt;RunQueue&gt;&gt; = AtomicMap::new();
 
-<span class="doccomment">/// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
+<span class="doccomment">/// A list of `Task`s and their associated priority scheduler data that may be run on a given CPU core.
 ///
 /// In rate monotonic scheduling, tasks are sorted in order of increasing periods.
 /// Thus, the `period` value acts as a form of task &quot;priority&quot;,
@@ -405,39 +381,39 @@
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>RunQueue {
     core: u8,
-    queue: VecDeque&lt;RealtimeTaskRef&gt;,
+    queue: VecDeque&lt;PriorityTaskRef&gt;,
 }
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>RunQueue {
-    <span class="kw">type </span>Target = VecDeque&lt;RealtimeTaskRef&gt;;
-    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>VecDeque&lt;RealtimeTaskRef&gt; {
+    <span class="kw">type </span>Target = VecDeque&lt;PriorityTaskRef&gt;;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>VecDeque&lt;PriorityTaskRef&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.queue
     }
 }
 
 <span class="kw">impl </span>DerefMut <span class="kw">for </span>RunQueue {
-    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>VecDeque&lt;RealtimeTaskRef&gt; {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>VecDeque&lt;PriorityTaskRef&gt; {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.queue
     }
 }
 
 
 <span class="kw">impl </span>RunQueue {
-    <span class="doccomment">/// Moves the `RealtimeTaskRef` at the given `index` in this `RunQueue`
+    <span class="doccomment">/// Moves the `PriorityTaskRef` at the given `index` in this `RunQueue`
     /// to the appropriate location in this `RunQueue` based on its period.
     ///
     /// Returns a reference to the underlying `Task`.
     ///
-    /// Thus, the `RealtimeTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
-    /// `RealtimeTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
+    /// Thus, the `PriorityTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
+    /// `PriorityTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
     /// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
     /// Afterwards, the number of context switches is incremented by one.
     /// This function is used when the task is selected by the scheduler.
     </span><span class="kw">pub fn </span>update_and_reinsert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>realtime_taskref) = <span class="self">self</span>.remove(index) {
-            realtime_taskref.increment_context_switches();
-            <span class="kw">let </span>taskref = realtime_taskref.taskref.clone();
-            <span class="self">self</span>.insert_realtime_taskref_at_proper_location(realtime_taskref);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>priority_taskref) = <span class="self">self</span>.remove(index) {
+            priority_taskref.increment_context_switches();
+            <span class="kw">let </span>taskref = priority_taskref.taskref.clone();
+            <span class="self">self</span>.insert_priority_taskref_at_proper_location(priority_taskref);
             <span class="prelude-val">Some</span>(taskref)
         }
         <span class="kw">else </span>{
@@ -448,7 +424,7 @@
     <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`
     </span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="attr">#[cfg(not(loscd_eval))]
-        </span><span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (realtime) for core {}&quot;</span>, which_core);
+        </span><span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (priority) for core {}&quot;</span>, which_core);
         <span class="kw">let </span>new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
@@ -513,11 +489,11 @@
             .add_task(task, <span class="prelude-val">None</span>)
     }
 
-    <span class="doccomment">/// Inserts a `RealtimeTaskRef` at its proper position in the queue.
+    <span class="doccomment">/// Inserts a `PriorityTaskRef` at its proper position in the queue.
     ///
     /// Under the RMS scheduling algorithm, tasks should be sorted in increasing value 
     /// of their periods, with aperiodic tasks being placed at the end.
-    </span><span class="kw">fn </span>insert_realtime_taskref_at_proper_location(<span class="kw-2">&amp;mut </span><span class="self">self</span>, taskref: RealtimeTaskRef) {
+    </span><span class="kw">fn </span>insert_priority_taskref_at_proper_location(<span class="kw-2">&amp;mut </span><span class="self">self</span>, taskref: PriorityTaskRef) {
         <span class="kw">match </span>taskref.period {
             <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.push_back(taskref),
             <span class="prelude-val">Some</span>(<span class="kw">_</span>) =&gt; {
@@ -544,16 +520,16 @@
 
     <span class="doccomment">/// Adds a `TaskRef` to this runqueue with the given periodicity value
     </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_realtime {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
-        <span class="kw">let </span>realtime_taskref = RealtimeTaskRef::new(task, period);
-        <span class="self">self</span>.insert_realtime_taskref_at_proper_location(realtime_taskref);
+        <span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
+        <span class="kw">let </span>priority_taskref = PriorityTaskRef::new(task, period);
+        <span class="self">self</span>.insert_priority_taskref_at_proper_location(priority_taskref);
 
         <span class="prelude-val">Ok</span>(())
     }
     
     <span class="doccomment">/// The internal function that actually removes the task from the runqueue.
     </span><span class="kw">fn </span>remove_internal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_realtime {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
+        <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
         <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.taskref != task);
 
         <span class="prelude-val">Ok</span>(())
@@ -575,16 +551,16 @@
     }
 
     <span class="doccomment">/// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
-    /// then reinserts the `RealtimeTaskRef` at the proper location
+    /// then reinserts the `PriorityTaskRef` at the proper location
     </span><span class="kw">fn </span>set_periodicity_internal(
         <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
         task: <span class="kw-2">&amp;</span>TaskRef, 
         period: usize
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">if let </span><span class="prelude-val">Some</span>(i) = <span class="self">self</span>.iter().position(|rt| <span class="kw-2">&amp;</span>rt.taskref == task) {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>realtime_taskref) = <span class="self">self</span>.remove(i) {
-                realtime_taskref.period = <span class="prelude-val">Some</span>(period);
-                <span class="self">self</span>.insert_realtime_taskref_at_proper_location(realtime_taskref);
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>priority_taskref) = <span class="self">self</span>.remove(i) {
+                priority_taskref.period = <span class="prelude-val">Some</span>(period);
+                <span class="self">self</span>.insert_priority_taskref_at_proper_location(priority_taskref);
             }
         };
         <span class="prelude-val">Ok</span>(())
@@ -599,4 +575,4 @@
     <span class="prelude-val">Ok</span>(())
 }
 </code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="runqueue_realtime" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
+</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="runqueue_priority" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>

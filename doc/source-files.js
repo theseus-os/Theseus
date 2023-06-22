@@ -132,11 +132,11 @@ var sourcesIndex = JSON.parse('{\
 "rtc":["",[],["lib.rs"]],\
 "runqueue":["",[],["lib.rs"]],\
 "runqueue_epoch":["",[],["lib.rs"]],\
-"runqueue_realtime":["",[],["lib.rs"]],\
+"runqueue_priority":["",[],["lib.rs"]],\
 "runqueue_round_robin":["",[],["lib.rs"]],\
 "scheduler":["",[],["lib.rs"]],\
 "scheduler_epoch":["",[],["lib.rs"]],\
-"scheduler_realtime":["",[],["lib.rs"]],\
+"scheduler_priority":["",[],["lib.rs"]],\
 "scheduler_round_robin":["",[],["lib.rs"]],\
 "sdt":["",[],["lib.rs"]],\
 "serial_port":["",[],["lib.rs"]],\

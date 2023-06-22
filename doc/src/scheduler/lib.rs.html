@@ -143,8 +143,8 @@
 </span><span class="macro">cfg_if::cfg_if! </span>{
     <span class="kw">if </span><span class="attr">#[cfg(epoch_scheduler)] </span>{
         <span class="kw">extern crate </span>scheduler_epoch <span class="kw">as </span>scheduler;
-    } <span class="kw">else if </span><span class="attr">#[cfg(realtime_scheduler)] </span>{
-        <span class="kw">extern crate </span>scheduler_realtime <span class="kw">as </span>scheduler;
+    } <span class="kw">else if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
+        <span class="kw">extern crate </span>scheduler_priority <span class="kw">as </span>scheduler;
     } <span class="kw">else </span>{
         <span class="kw">extern crate </span>scheduler_round_robin <span class="kw">as </span>scheduler;
     }
@@ -163,9 +163,9 @@
 ///
 /// Currently, there is a single scheduler policy for the whole system.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
-/// * `make THESEUS_CONFIG=epoch_scheduler` --&gt; epoch scheduler.
-/// * `make THESEUS_CONFIG=realtime_scheduler` --&gt; &quot;realtime&quot; (rate monotonic) scheduler.
-/// * `make` --&gt; basic round-robin scheduler, the default.
+/// - `make`: round-robin scheduler
+/// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
+/// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
 </span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     task::set_scheduler_policy(scheduler::select_next_task);
 
@@ -243,10 +243,10 @@
 }
 
 <span class="kw">pub fn </span>set_periodicity(_task: <span class="kw-2">&amp;</span>TaskRef, _period: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="attr">#[cfg(realtime_scheduler)] </span>{
-        scheduler_realtime::set_periodicity(_task, _period)
+    <span class="attr">#[cfg(priority_scheduler)] </span>{
+        scheduler_priority::set_periodicity(_task, _period)
     }
-    <span class="attr">#[cfg(not(realtime_scheduler))] </span>{
+    <span class="attr">#[cfg(not(priority_scheduler))] </span>{
         <span class="prelude-val">Err</span>(<span class="string">&quot;no scheduler that supports periodic tasks is currently loaded&quot;</span>)
     }
 }

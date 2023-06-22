@@ -57,11 +57,9 @@
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
-<a href="#60" id="60">60</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the API of the `RunQueue` structure, Runqueue Structure should contain
 //! list of tasks with additional scheduling information depending on the scheduler.
 //! All crates except the scheduler should refer to this crate to access functions on `RunQueue`.
-//! 
 
 </span><span class="attr">#![no_std]
 
@@ -73,8 +71,8 @@
 <span class="macro">cfg_if! </span>{
     <span class="kw">if </span><span class="attr">#[cfg(epoch_scheduler)] </span>{
         <span class="kw">extern crate </span>runqueue_epoch <span class="kw">as </span>runqueue;
-    } <span class="kw">else if </span><span class="attr">#[cfg(realtime_scheduler)] </span>{
-        <span class="kw">extern crate </span>runqueue_realtime <span class="kw">as </span>runqueue;
+    } <span class="kw">else if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
+        <span class="kw">extern crate </span>runqueue_priority <span class="kw">as </span>runqueue;
     } <span class="kw">else </span>{
         <span class="kw">extern crate </span>runqueue_round_robin <span class="kw">as </span>runqueue;
     }
