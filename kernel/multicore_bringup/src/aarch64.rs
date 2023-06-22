@@ -117,6 +117,9 @@ pub fn handle_ap_cores(
         // Make the stack available for use by the target CPU.
         ap_start::insert_ap_stack(cpu_id.value(), stack);
 
+        log::trace!("Calling cpu_on(MPIDR: {:#X}, entry: {:#X}, context: {:#X}",
+            mpidr, entry_point_phys_addr, ap_data_phys_addr,
+        );
         match cpu_on(
             mpidr.value(),
             entry_point_phys_addr.value() as u64,
@@ -124,7 +127,10 @@ pub fn handle_ap_cores(
         {
             Ok(()) => {
                 // Wait for the CPU to boot and enter Rust code.
-                while ap_data.ap_ready.read() != 1 {}
+                while ap_data.ap_ready.read() != 1 {
+                    log::trace!("waiting for AP {} to boot...", mpidr);
+                    core::hint::spin_loop();
+                }
 
                 // Here, `ap_stack` is None, indicating the `stack` is being used by
                 // the CPU being booted. A new stack will be allocated for the next CPU.

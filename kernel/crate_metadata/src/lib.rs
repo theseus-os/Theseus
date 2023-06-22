@@ -1027,6 +1027,12 @@ impl InternalDependency {
 /// * `source_sec_vaddr`: the `VirtualAddress` of the source section of the relocation, i.e.,
 ///    the section that the `target_sec` depends on and "points" to.
 /// * `verbose_log`: whether to output verbose logging information about this relocation action.
+///
+/// # Notes
+/// * There is a great, succint table of relocation types here:
+///   <https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html>.
+/// * aarch64-specific relocation docs here:
+///   <https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types>.
 pub fn write_relocation(
     relocation_entry: RelocationEntry,
     target_sec_slice: &mut [u8],
@@ -1034,25 +1040,40 @@ pub fn write_relocation(
     source_sec_vaddr: VirtualAddress,
     verbose_log: bool
 ) -> Result<(), &'static str> {
-    /// An internal function for handling unsupported relocation types.
-    fn unsupported(relocation_type: u32) -> Result<(), &'static str> {
-        error!("found unsupported relocation type {}\n    \
-            --> Compile with 'relocation-model=static', 'code-model=large', and 'tls-model=local-exec'",
-            relocation_type
-        );
-        Err("found unsupported relocation type. \
-            --> Compile with 'relocation-model=static', 'code-model=large', and 'tls-model=local-exec'",
-        )
-    }
-
     // Calculate exactly where we should write the relocation data to.
     let target_sec_offset = target_sec_offset + relocation_entry.offset;
+    write_relocation_arch(
+        relocation_entry,
+        target_sec_slice,
+        target_sec_offset,
+        source_sec_vaddr,
+        verbose_log,
+    )
+}
 
-    // There is a great, succint table of relocation types here:
-    // <https://docs.rs/goblin/0.6.0/goblin/elf/reloc/index.html>
+/// An internal function for handling unsupported relocation types.
+#[inline(always)]
+fn unsupported(relocation_type: u32) -> Result<(), &'static str> {
+    error!("found unsupported relocation type {}\n    \
+        --> Compile with 'relocation-model=static', 'code-model=large', and 'tls-model=local-exec'",
+        relocation_type
+    );
+    Err("found unsupported relocation type. \
+        --> Compile with 'relocation-model=static', 'code-model=large', and 'tls-model=local-exec'",
+    )
+}
 
-    // Handle x86_64 relocation types.
-    #[cfg(target_arch = "x86_64")]
+/// Implement x86_64-specific relocation calculations.
+#[cfg(target_arch = "x86_64")]
+#[inline(always)]
+fn write_relocation_arch(
+    relocation_entry: RelocationEntry,
+    target_sec_slice: &mut [u8],
+    target_sec_offset: usize,
+    source_sec_vaddr: VirtualAddress,
+    verbose_log: bool
+) -> Result<(), &'static str> {
+
     match relocation_entry.typ {
         R_X86_64_32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
@@ -1108,61 +1129,139 @@ pub fn write_relocation(
         other => return unsupported(other),
     }
 
-    // Handle aarch64 relocation types.
-    // Details here: <https://github.com/ARM-software/abi-aa/blob/main/aaelf64/aaelf64.rst#relocation-types>
-    //
-    // TODO: insert overflow checks for all relocation types that don't end in `_NC`.
-    #[cfg(target_arch = "aarch64")]
+    Ok(())
+}
+
+
+/// Implement aarch64-specific relocation calculations.
+#[cfg(target_arch = "aarch64")]
+#[inline(always)]
+fn write_relocation_arch(
+    relocation_entry: RelocationEntry,
+    target_sec_slice: &mut [u8],
+    target_sec_offset: usize,
+    source_sec_vaddr: VirtualAddress,
+    verbose_log: bool
+) -> Result<(), &'static str> {
     use core::convert::TryInto;
-    #[cfg(target_arch = "aarch64")]
+
+    const TWO: isize = 2;
+    const RANGE_16_BIT_SIGNED: Range<isize> = -TWO.pow(15) .. TWO.pow(16);
+    const RANGE_32_BIT_SIGNED: Range<isize> = -TWO.pow(31) .. TWO.pow(32);
+    const RANGE_12_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(12);
+    const RANGE_16_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(16);
+    const RANGE_24_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(24);
+    const RANGE_32_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(32);
+    const RANGE_48_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(48);
+
+    let overflow_check: Option<(usize, Range<isize>)>;
     match relocation_entry.typ {
         R_AARCH64_ABS64 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
+            let source_val = source_val_usize as u64;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            overflow_check = None;
         }
         R_AARCH64_ABS32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
+            let source_val = source_val_usize as u32;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            overflow_check = Some((source_val_usize, RANGE_32_BIT_SIGNED));
         }
         R_AARCH64_ABS16 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u16>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u16;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
+            let source_val = source_val_usize as u16;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            overflow_check = Some((source_val_usize, RANGE_16_BIT_SIGNED));
         }
         R_AARCH64_PREL64 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u64>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u64;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize);
+            let source_val = source_val_usize as u64;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            overflow_check = None;
         }
         R_AARCH64_PREL32 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u32;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize);
+            let source_val = source_val_usize as u32;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            overflow_check = Some((source_val_usize, RANGE_32_BIT_SIGNED));
         }
         R_AARCH64_PREL16 => {
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u16>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize) as u16;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize);
+            let source_val = source_val_usize as u16;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, source_sec_vaddr); }
             target_ref.copy_from_slice(&source_val.to_ne_bytes());
+            overflow_check = Some((source_val_usize, RANGE_16_BIT_SIGNED));
         }
+
+        // These relocation types are for data move instructions that access data
+        // using 64-bit unsigned offset values, which exist when using the "large" code-model.
+        R_AARCH64_MOVW_UABS_G0
+        | R_AARCH64_MOVW_UABS_G0_NC
+        | R_AARCH64_MOVW_UABS_G1
+        | R_AARCH64_MOVW_UABS_G1_NC
+        | R_AARCH64_MOVW_UABS_G2
+        | R_AARCH64_MOVW_UABS_G2_NC
+        | R_AARCH64_MOVW_UABS_G3 => {
+            // The immediate field occupies 16 bits [20:5] in the MOV* series of instructions
+            // that these relocation types apply to.
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOVK--Move-wide-with-keep->
+            const IMMEDIATE_FIELD_SHIFT: u8 = 5;
+            const IMMEDIATE_FIELD_MASK: u32 = 0xFFFF;
+            let (source_value_shift, overflow_range): (usize, _) = match relocation_entry.typ {
+                // Set immediate value to bits [15:0]  of the source_val --> 0-bit right shift.
+                R_AARCH64_MOVW_UABS_G0    => (0, Some(RANGE_16_BIT_UNSIGNED)),
+                R_AARCH64_MOVW_UABS_G0_NC => (0, None),
+                // Set immediate value to bits [31:16] of the source_val --> 16-bit right shift.
+                R_AARCH64_MOVW_UABS_G1    => (16, Some(RANGE_32_BIT_UNSIGNED)),
+                R_AARCH64_MOVW_UABS_G1_NC => (16, None),
+                // Set immediate value to bits [47:32] of the source_val --> 32-bit right shift.
+                R_AARCH64_MOVW_UABS_G2    => (32, Some(RANGE_48_BIT_UNSIGNED)),
+                R_AARCH64_MOVW_UABS_G2_NC => (32, None),
+                // Set immediate value to bits [63:48] of the source_val --> 48-bit right shift.
+                _g3                       => (48, None),
+            };
+    
+            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
+            let target_ref = &mut target_sec_slice[target_range];
+            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
+            let shifted_source_val = source_val >> source_value_shift;
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
+            let existing_target_val = u32::from_ne_bytes(
+                target_ref.try_into()
+                    .map_err(|_| "BUG: R_AARCH64_MOVW_UABS_G* relocation target val was not a u32")?
+            );
+            // Set the instruction's immediate value to the shifted source value.
+            let immediate_field_value = shifted_source_val & (IMMEDIATE_FIELD_MASK as usize);
+            let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
+                | ((immediate_field_value << IMMEDIATE_FIELD_SHIFT) as u32);
+            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}, imm val: {:#X}", existing_target_val, new_source_val, immediate_field_value); }
+            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+            overflow_check = overflow_range.map(|range| (source_val, range));
+        }
+
         R_AARCH64_ADR_PREL_PG_HI21 => {
             // This is a "page" relocation, in which values used for relocation calculations
             // are "page-aligned", i.e., the least-significant 12 bits are cleared.
-            // It is always 12 bits, regardless of the hardware's actual page size.R
-            fn page_mask(val: u64) -> u64 {
+            // It is always 12 bits, regardless of the hardware's actual page size.
+            fn page_mask(val: usize) -> usize {
                 val & !0xFFF
             }
 
@@ -1178,12 +1277,12 @@ pub fn write_relocation(
 
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = page_mask(source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u64)
-                .wrapping_sub(page_mask(target_ref.as_ptr() as u64));
-            let shifted_source_val = source_val >> SOURCE_VALUE_SHIFT;
+            let source_val_usize = page_mask(source_sec_vaddr.value().wrapping_add(relocation_entry.addend))
+                .wrapping_sub(page_mask(target_ref.as_ptr() as usize));
+            let shifted_source_val = source_val_usize >> SOURCE_VALUE_SHIFT;
             // now that we've shifted the source value, it's okay to truncate it into a `u32`.
             let shifted_source_val = shifted_source_val as u32;
-            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
+            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val_usize, shifted_source_val, source_sec_vaddr); }
             let existing_target_val = u32::from_ne_bytes(
                 target_ref.try_into()
                     .map_err(|_| "BUG: R_AARCH64_ADR_PREL_PG_HI21 relocation target val was not a u32")?
@@ -1196,33 +1295,9 @@ pub fn write_relocation(
                 | ((shifted_source_val & IMMEDIATE_FIELD_MASK_HI) << IMMEDIATE_FIELD_SHIFT_HI);
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
-        }
 
-        // These relocation types are for branch instructions, i.e., call and jump.
-        // The immediate field is a signed offset value.
-        R_AARCH64_CALL26 
-        | R_AARCH64_JUMP26 => {
-            // The immediate field occupies 26 bits [25:0] in call/jump instructions. 
-            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch->
-            const IMMEDIATE_FIELD_SHIFT: u8 = 0;
-            const IMMEDIATE_FIELD_MASK: u32 = 0x03FF_FFFF;
-            const SOURCE_VALUE_SHIFT: u8    = 2;
-
-            let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
-            let target_ref = &mut target_sec_slice[target_range];
-            let source_val = (source_sec_vaddr.value() as isize).wrapping_add(relocation_entry.addend as isize).wrapping_sub(target_ref.as_ptr() as isize);
-            let shifted_source_val = source_val >> SOURCE_VALUE_SHIFT;
-            if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
-            let existing_target_val = u32::from_ne_bytes(
-                target_ref.try_into()
-                    .map_err(|_| "BUG: R_AARCH64_CALL26/JUMP26 relocation target val was not a u32")?
-            );
-            // Set the instruction's immediate value to the shifted source value.
-            let immediate_field_value = shifted_source_val as u32 & IMMEDIATE_FIELD_MASK;
-            let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
-                | (immediate_field_value << IMMEDIATE_FIELD_SHIFT);
-            if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}, imm val: {:#X}", existing_target_val, new_source_val, immediate_field_value); }
-            target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+            const RANGE_32_BIT_ADR_SIGNED: Range<isize> = -TWO.pow(32) .. TWO.pow(32);
+            overflow_check = Some((source_val_usize, RANGE_32_BIT_ADR_SIGNED));
         }
 
         // These relocation types all use the same logic, but have different bit masks
@@ -1265,54 +1340,40 @@ pub fn write_relocation(
                 | ((shifted_source_val & IMMEDIATE_FIELD_MASK) << IMMEDIATE_FIELD_SHIFT);
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+            overflow_check = None;
         }
 
-        // These relocation types are for data move instructions that access data
-        // using 64-bit unsigned offset values, which exist when using the "large" code-model.
-        R_AARCH64_MOVW_UABS_G0
-        | R_AARCH64_MOVW_UABS_G0_NC
-        | R_AARCH64_MOVW_UABS_G1
-        | R_AARCH64_MOVW_UABS_G1_NC
-        | R_AARCH64_MOVW_UABS_G2
-        | R_AARCH64_MOVW_UABS_G2_NC
-        | R_AARCH64_MOVW_UABS_G3 => {
-            // The immediate field occupies 16 bits [20:5] in the MOV* series of instructions
-            // that these relocation types apply to.
-            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/MOVK--Move-wide-with-keep->
-            const IMMEDIATE_FIELD_SHIFT: u8 = 5;
-            const IMMEDIATE_FIELD_MASK: u32 = 0xFFFF;
-            let source_value_shift: usize = match relocation_entry.typ {
-                // Set immediate value to bits [15:0]  of the source_val --> 0-bit right shift.
-                R_AARCH64_MOVW_UABS_G0
-                | R_AARCH64_MOVW_UABS_G0_NC => 0,
-                // Set immediate value to bits [31:16] of the source_val --> 16-bit right shift.
-                R_AARCH64_MOVW_UABS_G1
-                | R_AARCH64_MOVW_UABS_G1_NC => 16,
-                // Set immediate value to bits [47:32] of the source_val --> 32-bit right shift.
-                R_AARCH64_MOVW_UABS_G2
-                | R_AARCH64_MOVW_UABS_G2_NC => 32,
-                // Set immediate value to bits [63:48] of the source_val --> 48-bit right shift.
-                _g3 => 48,
-            };
-    
+        // These relocation types are for branch instructions, i.e., call and jump.
+        // The immediate field is a signed offset value.
+        R_AARCH64_CALL26 
+        | R_AARCH64_JUMP26 => {
+            // The immediate field occupies 26 bits [25:0] in call/jump instructions. 
+            // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/B--Branch->
+            const IMMEDIATE_FIELD_SHIFT: u8 = 0;
+            const IMMEDIATE_FIELD_MASK: u32 = 0x03FF_FFFF;
+            const SOURCE_VALUE_SHIFT: u8    = 2;
+
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
-            let shifted_source_val = source_val >> source_value_shift;
+            let source_val = (source_sec_vaddr.value()).wrapping_add(relocation_entry.addend).wrapping_sub(target_ref.as_ptr() as usize);
+            let shifted_source_val = source_val >> SOURCE_VALUE_SHIFT;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
             let existing_target_val = u32::from_ne_bytes(
                 target_ref.try_into()
-                    .map_err(|_| "BUG: R_AARCH64_MOVW_UABS_G* relocation target val was not a u32")?
+                    .map_err(|_| "BUG: R_AARCH64_CALL26/JUMP26 relocation target val was not a u32")?
             );
             // Set the instruction's immediate value to the shifted source value.
-            let immediate_field_value = shifted_source_val & (IMMEDIATE_FIELD_MASK as usize);
+            let immediate_field_value = shifted_source_val as u32 & IMMEDIATE_FIELD_MASK;
             let new_source_val = (existing_target_val & !(IMMEDIATE_FIELD_MASK << IMMEDIATE_FIELD_SHIFT))
-                | ((immediate_field_value << IMMEDIATE_FIELD_SHIFT) as u32);
+                | (immediate_field_value << IMMEDIATE_FIELD_SHIFT);
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}, imm val: {:#X}", existing_target_val, new_source_val, immediate_field_value); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+
+            const RANGE_27_BIT_SIGNED: Range<isize> = -TWO.pow(27) .. TWO.pow(27);
+            overflow_check = Some((source_val, RANGE_27_BIT_SIGNED));
         }
 
-        // These relocation types are for thread-local storage.
+        // These relocation types are for thread-local storage, only the "local-exec" tls model.
         R_AARCH64_TLSLE_ADD_TPREL_HI12
         | R_AARCH64_TLSLE_ADD_TPREL_LO12
         | R_AARCH64_TLSLE_ADD_TPREL_LO12_NC => {
@@ -1321,14 +1382,16 @@ pub fn write_relocation(
             // See: <https://developer.arm.com/documentation/ddi0596/2021-12/Base-Instructions/ADD--immediate---Add--immediate-->
             const IMMEDIATE_FIELD_SHIFT: u8 = 10;
             const IMMEDIATE_FIELD_MASK: u32 = 0xFFF;
-            let source_value_shift = match relocation_entry.typ {
-                R_AARCH64_TLSLE_ADD_TPREL_HI12 => 12,
-                _lo_12                         => 0,
+            let (source_value_shift, overflow_range): (usize, _) = match relocation_entry.typ {
+                R_AARCH64_TLSLE_ADD_TPREL_HI12 => (12, Some(RANGE_24_BIT_UNSIGNED)),
+                R_AARCH64_TLSLE_ADD_TPREL_LO12 => (0, Some(RANGE_12_BIT_UNSIGNED)),
+                _lo_12_nc                      => (0, None),
             };
             
             let target_range = target_sec_offset .. (target_sec_offset + size_of::<u32>());
             let target_ref = &mut target_sec_slice[target_range];
-            let source_val = source_sec_vaddr.value().wrapping_add(relocation_entry.addend) as u32;
+            let source_val_usize = source_sec_vaddr.value().wrapping_add(relocation_entry.addend);
+            let source_val = source_val_usize as u32;
             let shifted_source_val = source_val >> source_value_shift;
             if verbose_log { trace!("                    target_ptr: {:p}, source_val: {:#X}, shifted_source_val: {:#X} (from source_sec_vaddr {:#X})", target_ref.as_ptr(), source_val, shifted_source_val, source_sec_vaddr); }
             let existing_target_val = u32::from_ne_bytes(
@@ -1340,8 +1403,21 @@ pub fn write_relocation(
                 | ((shifted_source_val & IMMEDIATE_FIELD_MASK) << IMMEDIATE_FIELD_SHIFT);
             if verbose_log { trace!("                    existing_instr: {:#X}, new_instr: {:#X}", existing_target_val, new_source_val); }
             target_ref.copy_from_slice(&new_source_val.to_ne_bytes());
+            overflow_check = overflow_range.map(|range| (source_val_usize, range));
         }
         other => return unsupported(other),
+    }
+
+    // Perform the overflow check, if the relocation type requires it.
+    if let Some((source_val_usize, overflow_range)) = overflow_check {
+        let source_val_isize = source_val_usize as isize;
+        if overflow_range.contains(&source_val_isize) {
+            if verbose_log { trace!("                    overflow check: {} <= {} < {}, {:#X} <= {:#X} < {:#X} --> PASS", overflow_range.start, source_val_isize, overflow_range.end, overflow_range.start, source_val_isize, overflow_range.end); }
+        } else {
+            error!("Overflow check: {:#X} <= {:#X} < {:#X} --> FAIL", overflow_range.start, source_val_isize, overflow_range.end);
+            return Err("Relocation failed overflow check");
+        }
+        // TODO: implement overflow check
     }
 
     Ok(())
