@@ -131,16 +131,6 @@
 <a href="#131" id="131">131</a>
 <a href="#132" id="132">132</a>
 <a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a>
-<a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
-<a href="#139" id="139">139</a>
-<a href="#140" id="140">140</a>
-<a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
-<a href="#143" id="143">143</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Provides the default entry points and lang items for panics and unwinding. 
 //! 
 //! These lang items are required by the Rust compiler. 
@@ -153,42 +143,31 @@
 #![feature(panic_info_message)]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>mod_mgmt;
-
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[cfg(not(loadable))] </span><span class="kw">extern crate </span>unwind;
-
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[macro_use] </span><span class="kw">extern crate </span>early_printer;
-
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[cfg(not(loadable))] </span><span class="kw">extern crate </span>panic_wrapper;
 
 <span class="kw">use </span>core::panic::PanicInfo;
+<span class="kw">use </span>log::error;
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>early_printer::println;
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">use </span>log::info <span class="kw">as </span>println;
 
 <span class="doccomment">/// The singular entry point for a language-level panic.
 /// 
 /// The Rust compiler will rename this to &quot;rust_begin_unwind&quot;.
 </span><span class="attr">#[cfg(not(test))]
 #[panic_handler] </span><span class="comment">// same as:  #[lang = &quot;panic_impl&quot;]
-</span><span class="attr">#[doc(hidden)]
 </span><span class="kw">fn </span>panic_entry_point(info: <span class="kw-2">&amp;</span>PanicInfo) -&gt; ! {
     <span class="comment">// Since a panic could occur before the memory subsystem is initialized,
     // we must check before using alloc types or other functions that depend on the memory system (the heap).
     // We can check that by seeing if the kernel mmi has been initialized.
     </span><span class="kw">let </span>kernel_mmi_ref = memory::get_kernel_mmi_ref();  
     <span class="kw">let </span>res = <span class="kw">if </span>kernel_mmi_ref.is_some() {
-        <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
-            <span class="prelude-val">Err</span>(<span class="string">&quot;panic_wrapper unimplemented for aarch64&quot;</span>) <span class="kw">as </span><span class="prelude-ty">Result</span>&lt;(), <span class="kw">_</span>&gt;
-        }
-
         <span class="comment">// proceed with calling the panic_wrapper, but don&#39;t shutdown with try_exit() if errors occur here
-        </span><span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, not(loadable)))] </span>{
+        </span><span class="attr">#[cfg(not(loadable))] </span>{
             panic_wrapper::panic_wrapper(info)
         }
-        <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, loadable))] </span>{
+        <span class="attr">#[cfg(loadable)] </span>{
             <span class="comment">// An internal function for calling the panic_wrapper, but returning errors along the way.
             // We must make sure to not hold any locks when invoking the panic_wrapper function.
             </span><span class="kw">fn </span>invoke_panic_wrapper(info: <span class="kw-2">&amp;</span>PanicInfo) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -214,7 +193,6 @@
     <span class="kw">if let </span><span class="prelude-val">Err</span>(_e) = res {
         <span class="macro">error!</span>(<span class="string">&quot;Halting due to early panic: {}&quot;</span>, info);
         <span class="comment">// basic early panic printing with no dependencies
-        </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
         </span><span class="macro">println!</span>(<span class="string">&quot;\nHalting due to early panic: {}&quot;</span>, info);
     }
 
@@ -236,8 +214,7 @@
 #[no_mangle]
 #[doc(hidden)]
 </span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>rust_eh_personality() -&gt; ! {
-    <span class="macro">error!</span>(<span class="string">&quot;BUG: Theseus does not use rust_eh_personality. Why has it been invoked?&quot;</span>);
-    <span class="kw">loop </span>{ core::hint::spin_loop() }
+    <span class="macro">panic!</span>(<span class="string">&quot;BUG: Theseus does not use rust_eh_personality. Why has it been invoked?&quot;</span>)
 }
 
 <span class="doccomment">/// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
@@ -247,15 +224,12 @@
 /// that invokes the real `unwind_resume()` function in the `unwind` crate, 
 /// but does so dynamically in loadable mode.
 </span><span class="attr">#[no_mangle]
-#[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, allow(unused_variables))]
+#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>_Unwind_Resume(arg: usize) -&gt; ! {
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span><span class="kw">loop </span>{ core::hint::spin_loop() }
-
-    <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, not(loadable)))] </span>{
+    <span class="attr">#[cfg(not(loadable))] </span>{
         unwind::unwind_resume(arg)
     }
-    <span class="attr">#[cfg(all(target_arch = <span class="string">&quot;x86_64&quot;</span>, loadable))] </span>{
+    <span class="attr">#[cfg(loadable)] </span>{
         <span class="comment">// An internal function for calling the real unwind_resume function, but returning errors along the way.
         // We must make sure to not hold any locks when invoking the function.
         </span><span class="kw">fn </span>invoke_unwind_resume(arg: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -275,6 +249,12 @@
         }
         <span class="kw">loop </span>{ core::hint::spin_loop() }
     }
+}
+
+<span class="attr">#[no_mangle]
+#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">extern </span><span class="string">&quot;C&quot; </span><span class="kw">fn </span>_Unwind_Resume(_arg: usize) -&gt; ! {
+    <span class="macro">todo!</span>(<span class="string">&quot;_Unwind_Resume is not yet implemented on aarch64&quot;</span>)
 }
 
 <span class="doccomment">/// This is the callback entry point that gets invoked when the heap allocator runs out of memory.

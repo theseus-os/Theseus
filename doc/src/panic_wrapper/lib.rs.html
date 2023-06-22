@@ -123,20 +123,14 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>mod_mgmt;
-<span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>unwind;
-<span class="kw">extern crate </span>stack_trace;
-<span class="kw">extern crate </span>stack_trace_frame_pointers;
-<span class="kw">extern crate </span>fault_log;
 
 <span class="kw">use </span>core::panic::PanicInfo;
-<span class="comment">// use alloc::string::String;
-</span><span class="kw">use </span>memory::VirtualAddress;
-<span class="kw">use </span>task::{KillReason, PanicInfoOwned};
+<span class="kw">use </span>log::{debug, trace};
 <span class="kw">use </span>fault_log::log_panic_entry;
+<span class="kw">use </span>task::{KillReason, PanicInfoOwned};
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+</span><span class="kw">use </span>log::{error, warn};
 
 <span class="doccomment">/// Performs the standard panic handling routine, which involves the following:
 /// 
@@ -150,15 +144,16 @@
     log_panic_entry (panic_info);
     <span class="comment">// fault_log::print_fault_log();
 
-    // print a stack trace
-    </span><span class="kw">let </span>stack_trace_result = {
+    // Print a stack trace. Not yet supported on aarch64
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
+    <span class="kw">let </span>stack_trace_result = {
         <span class="comment">// By default, we use DWARF-based debugging stack traces
         </span><span class="attr">#[cfg(not(frame_pointers))] </span>{
             <span class="macro">error!</span>(<span class="string">&quot;------------------ Stack Trace (DWARF) ---------------------------&quot;</span>);
             stack_trace::stack_trace(
                 <span class="kw-2">&amp;mut </span>|stack_frame, stack_frame_iter| {
                     <span class="kw">let </span>symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                        VirtualAddress::new_canonical(stack_frame.call_site_address() <span class="kw">as </span>usize),
+                        memory::VirtualAddress::new_canonical(stack_frame.call_site_address() <span class="kw">as </span>usize),
                         <span class="bool-val">false
                     </span>).map(|(sec, offset)| (sec.name.clone(), offset));
                     <span class="kw">if let </span><span class="prelude-val">Some</span>((symbol_name, offset)) = symbol_offset {
@@ -189,7 +184,7 @@
             <span class="kw">let </span>mmi = mmi_ref.lock();
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
                 <span class="kw-2">&amp;</span>mmi.page_table,
-                <span class="kw-2">&amp;mut </span>|_frame_pointer, instruction_pointer: VirtualAddress| {
+                <span class="kw-2">&amp;mut </span>|_frame_pointer, instruction_pointer: memory::VirtualAddress| {
                     <span class="kw">let </span>symbol_offset = namespace.get_section_containing_address(instruction_pointer, <span class="bool-val">false</span>)
                         .map(|(sec, offset)| (sec.name.clone(), offset));
                     <span class="kw">if let </span><span class="prelude-val">Some</span>((symbol_name, offset)) = symbol_offset {
@@ -208,6 +203,7 @@
         <span class="prelude-val">Err</span>(e) =&gt; <span class="macro">error!</span>(<span class="string">&quot;  {}&quot;</span>, e),
     }
     <span class="macro">error!</span>(<span class="string">&quot;------------------------------------------------------------------&quot;</span>);
+    }
 
     <span class="comment">// Call this task&#39;s kill handler, if it has one.
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>kh_func) = task::take_kill_handler() {
@@ -217,7 +213,11 @@
         <span class="macro">debug!</span>(<span class="string">&quot;No kill handler callback in Task {:?}&quot;</span>, task::get_my_current_task());
     }
 
-    <span class="comment">// Start the unwinding process
+    <span class="comment">// Start the unwinding process. Not yet supported on aarch64
+    </span><span class="attr">#[cfg(not(target_arch = <span class="string">&quot;x86_64&quot;</span>))] </span>{
+        <span class="prelude-val">Err</span>(<span class="string">&quot;Unwinding is currently only supported on x86_64&quot;</span>)
+    }
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>{
         <span class="kw">let </span>cause = KillReason::Panic(PanicInfoOwned::from(panic_info));
         <span class="kw">match </span>unwind::start_unwinding(cause, <span class="number">5</span>) {

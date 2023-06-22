@@ -55,6 +55,8 @@
 <a href="#55" id="55">55</a>
 <a href="#56" id="56">56</a>
 <a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains a simple routine to start the first application (or set of applications). 
 //! 
 //! This should be invoked at or towards the end of the kernel initialization procedure. 
@@ -79,12 +81,15 @@
 <span class="kw">extern crate </span>mod_mgmt;
 <span class="kw">extern crate </span>path;
 
-<span class="kw">use </span>alloc::string::ToString;
+<span class="kw">use </span>alloc::format;
 <span class="kw">use </span>mod_mgmt::CrateNamespace;
 <span class="kw">use </span>path::Path;
 
 <span class="doccomment">/// See the crate-level docs and this crate&#39;s `Cargo.toml` for more.
-</span><span class="kw">const </span>FIRST_APPLICATION_CRATE_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;shell-&quot;</span>;
+</span><span class="kw">const </span>FIRST_APPLICATION_CRATE_NAME: <span class="kw-2">&amp;</span>str = {
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{ <span class="string">&quot;shell-&quot; </span>}
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{ <span class="string">&quot;hello-&quot; </span>}
+};
 
 <span class="doccomment">/// Starts the first applications that run in Theseus 
 /// by creating a new &quot;default&quot; application namespace
@@ -105,9 +110,8 @@
 
     <span class="kw">let </span>path = Path::new(app_file.lock().get_absolute_path());
     <span class="macro">info!</span>(<span class="string">&quot;Starting first application: crate at {:?}&quot;</span>, path);
-    <span class="comment">// Spawn the default shell
-    </span>spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_ns))<span class="question-mark">?
-        </span>.name(<span class="string">&quot;default_shell&quot;</span>.to_string())
+    spawn::new_application_task_builder(path, <span class="prelude-val">Some</span>(new_app_ns))<span class="question-mark">?
+        </span>.name(<span class="macro">format!</span>(<span class="string">&quot;first_{}&quot;</span>, <span class="kw-2">&amp;</span>FIRST_APPLICATION_CRATE_NAME[.. FIRST_APPLICATION_CRATE_NAME.len() - <span class="number">1</span>]))
         .spawn()<span class="question-mark">?</span>;
 
     <span class="prelude-val">Ok</span>(())

@@ -229,10 +229,6 @@
 <a href="#229" id="229">229</a>
 <a href="#230" id="230">230</a>
 <a href="#231" id="231">231</a>
-<a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
-<a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -441,10 +437,6 @@
     </span>console::start_connection_detection()<span class="question-mark">?</span>;
 
     <span class="comment">// 3. Start the first application(s).
-    // arch-gate: many subsystems required by applications are missing
-    // on aarch64: windowing, user input, app loading (relocation code
-    // is x86_64-specific at the moment)
-    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
     </span>first_application::start()<span class="question-mark">?</span>;
 
     <span class="macro">info!</span>(<span class="string">&quot;captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...&quot;</span>, bsp_id);
