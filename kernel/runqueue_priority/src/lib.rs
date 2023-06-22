@@ -1,20 +1,8 @@
-//! Runqueue structures for a realtime scheduler using rate monotonic scheduling.
+//! Runqueue structures for a priority scheduler.
 //!
 //! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
-//! Each `RealtimeTaskRef` element in the runqueue contains a `TaskRef` 
+//! Each `PriorityTaskRef` element in the runqueue contains a `TaskRef` 
 //! representing an underlying task and as well as a `period` value.
-//! 
-//! In rate monotonic scheduling, tasks are assigned fixed priorities in order of increasing periods.
-//! Thus, the `period` value of a `RealtimeTaskRef` acts as a form of priority.
-//! Each `RunQueue` consists of a `VecDeque` of `RealtimeTaskRef`s 
-//! sorted in increasing order of their `period` values.
-//! The sorting is maintained by inserting each `RealtimeTaskRef` at the proper index
-//! according to its `period` value.
-//!
-//! Aperiodic tasks are assigned a `period` value of `None` and are placed at the back of the queue.
-//! Since the scheduler iterates through the runqueue to select the first `Runnable` task,
-//! lower-period tasks are "higher priority" and will be selected first, 
-//! with aperiodic tasks being selected only when no periodic tasks are runnable.
 
 #![no_std]
 
@@ -30,12 +18,12 @@ use alloc::collections::VecDeque;
 use core::ops::{Deref, DerefMut};
 use atomic_linked_list::atomic_map::AtomicMap;
 
-/// A reference to a task with its period for realtime scheduling.
+/// A reference to a task with its period for priority scheduling.
 ///
-/// `RealtimeTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
+/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
 #[derive(Debug, Clone)]
-pub struct RealtimeTaskRef {
-    /// `TaskRef` wrapped by `RealtimeTaskRef`
+pub struct PriorityTaskRef {
+    /// `TaskRef` wrapped by `PriorityTaskRef`
     taskref: TaskRef,
     /// `Some` if the task is periodic, `None` if it is aperiodic.
     period: Option<usize>,
@@ -43,23 +31,23 @@ pub struct RealtimeTaskRef {
     context_switches: usize,
 }
 
-impl Deref for RealtimeTaskRef {
+impl Deref for PriorityTaskRef {
     type Target = TaskRef;
     fn deref(&self) -> &TaskRef {
         &self.taskref
     }
 }
 
-impl DerefMut for RealtimeTaskRef {
+impl DerefMut for PriorityTaskRef {
     fn deref_mut(&mut self) -> &mut TaskRef {
         &mut self.taskref
     }
 }
 
-impl RealtimeTaskRef {
-    /// Creates a new `RealtimeTaskRef` that wraps the given `TaskRef`
-    pub fn new(taskref: TaskRef, period: Option<usize>) -> RealtimeTaskRef {
-        RealtimeTaskRef {
+impl PriorityTaskRef {
+    /// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`
+    pub fn new(taskref: TaskRef, period: Option<usize>) -> PriorityTaskRef {
+        PriorityTaskRef {
             taskref,
             period,
             context_switches: 0,
@@ -71,17 +59,17 @@ impl RealtimeTaskRef {
         self.context_switches = self.context_switches.saturating_add(1);
     }
 
-    /// Checks whether the `RealtimeTaskRef` refers to a task that is periodic
+    /// Checks whether the `PriorityTaskRef` refers to a task that is periodic
     pub fn is_periodic(&self) -> bool {
         self.period.is_some()
     }
 
-    /// Returns `true` if the period of this `RealtimeTaskRef` is shorter (less) than
-    /// the period of the other `RealtimeTaskRef`.
+    /// Returns `true` if the period of this `PriorityTaskRef` is shorter (less) than
+    /// the period of the other `PriorityTaskRef`.
     ///
-    /// Returns `false` if this `RealtimeTaskRef` is aperiodic, i.e. if `period` is `None`.
+    /// Returns `false` if this `PriorityTaskRef` is aperiodic, i.e. if `period` is `None`.
     /// Returns `true` if this task is periodic and `other` is aperiodic.
-    pub fn has_smaller_period(&self, other: &RealtimeTaskRef) -> bool {
+    pub fn has_smaller_period(&self, other: &PriorityTaskRef) -> bool {
         match self.period {
             Some(period_val) => if let Some(other_period_val) = other.period {
                 period_val < other_period_val
@@ -97,7 +85,7 @@ impl RealtimeTaskRef {
 /// and allows the scheduler to select a task from that runqueue to schedule in
 static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap::new();
 
-/// A list of `Task`s and their associated realtime scheduler data that may be run on a given CPU core.
+/// A list of `Task`s and their associated priority scheduler data that may be run on a given CPU core.
 ///
 /// In rate monotonic scheduling, tasks are sorted in order of increasing periods.
 /// Thus, the `period` value acts as a form of task "priority",
@@ -105,39 +93,39 @@ static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap::new
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
-    queue: VecDeque<RealtimeTaskRef>,
+    queue: VecDeque<PriorityTaskRef>,
 }
 
 impl Deref for RunQueue {
-    type Target = VecDeque<RealtimeTaskRef>;
-    fn deref(&self) -> &VecDeque<RealtimeTaskRef> {
+    type Target = VecDeque<PriorityTaskRef>;
+    fn deref(&self) -> &VecDeque<PriorityTaskRef> {
         &self.queue
     }
 }
 
 impl DerefMut for RunQueue {
-    fn deref_mut(&mut self) -> &mut VecDeque<RealtimeTaskRef> {
+    fn deref_mut(&mut self) -> &mut VecDeque<PriorityTaskRef> {
         &mut self.queue
     }
 }
 
 
 impl RunQueue {
-    /// Moves the `RealtimeTaskRef` at the given `index` in this `RunQueue`
+    /// Moves the `PriorityTaskRef` at the given `index` in this `RunQueue`
     /// to the appropriate location in this `RunQueue` based on its period.
     ///
     /// Returns a reference to the underlying `Task`.
     ///
-    /// Thus, the `RealtimeTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
-    /// `RealtimeTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
+    /// Thus, the `PriorityTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
+    /// `PriorityTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
     /// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
     /// Afterwards, the number of context switches is incremented by one.
     /// This function is used when the task is selected by the scheduler.
     pub fn update_and_reinsert(&mut self, index: usize) -> Option<TaskRef> {
-        if let Some(mut realtime_taskref) = self.remove(index) {
-            realtime_taskref.increment_context_switches();
-            let taskref = realtime_taskref.taskref.clone();
-            self.insert_realtime_taskref_at_proper_location(realtime_taskref);
+        if let Some(mut priority_taskref) = self.remove(index) {
+            priority_taskref.increment_context_switches();
+            let taskref = priority_taskref.taskref.clone();
+            self.insert_priority_taskref_at_proper_location(priority_taskref);
             Some(taskref)
         }
         else {
@@ -148,7 +136,7 @@ impl RunQueue {
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     pub fn init(which_core: u8) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
-        trace!("Created runqueue (realtime) for core {}", which_core);
+        trace!("Created runqueue (priority) for core {}", which_core);
         let new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
@@ -213,11 +201,11 @@ impl RunQueue {
             .add_task(task, None)
     }
 
-    /// Inserts a `RealtimeTaskRef` at its proper position in the queue.
+    /// Inserts a `PriorityTaskRef` at its proper position in the queue.
     ///
     /// Under the RMS scheduling algorithm, tasks should be sorted in increasing value 
     /// of their periods, with aperiodic tasks being placed at the end.
-    fn insert_realtime_taskref_at_proper_location(&mut self, taskref: RealtimeTaskRef) {
+    fn insert_priority_taskref_at_proper_location(&mut self, taskref: PriorityTaskRef) {
         match taskref.period {
             None => self.push_back(taskref),
             Some(_) => {
@@ -244,16 +232,16 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this runqueue with the given periodicity value
     fn add_task(&mut self, task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
-        debug!("Adding task to runqueue_realtime {}, {:?}", self.core, task);
-        let realtime_taskref = RealtimeTaskRef::new(task, period);
-        self.insert_realtime_taskref_at_proper_location(realtime_taskref);
+        debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
+        let priority_taskref = PriorityTaskRef::new(task, period);
+        self.insert_priority_taskref_at_proper_location(priority_taskref);
 
         Ok(())
     }
     
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        debug!("Removing task from runqueue_realtime {}, {:?}", self.core, task);
+        debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
         self.retain(|x| &x.taskref != task);
 
         Ok(())
@@ -275,16 +263,16 @@ impl RunQueue {
     }
 
     /// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
-    /// then reinserts the `RealtimeTaskRef` at the proper location
+    /// then reinserts the `PriorityTaskRef` at the proper location
     fn set_periodicity_internal(
         &mut self, 
         task: &TaskRef, 
         period: usize
     ) -> Result<(), &'static str> {
         if let Some(i) = self.iter().position(|rt| &rt.taskref == task) {
-            if let Some(mut realtime_taskref) = self.remove(i) {
-                realtime_taskref.period = Some(period);
-                self.insert_realtime_taskref_at_proper_location(realtime_taskref);
+            if let Some(mut priority_taskref) = self.remove(i) {
+                priority_taskref.period = Some(period);
+                self.insert_priority_taskref_at_proper_location(priority_taskref);
             }
         };
         Ok(())

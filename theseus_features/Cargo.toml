@@ -58,7 +58,7 @@ test_libc = { path = "../applications/test_libc", optional = true }
 test_mlx5 = { path = "../applications/test_mlx5", optional = true }
 test_mutex_sleep = { path = "../applications/test_mutex_sleep", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
-test_realtime = { path = "../applications/test_realtime", optional = true }
+test_priority_scheduler = { path = "../applications/test_priority_scheduler", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_scheduler = { path = "../applications/test_scheduler", optional = true }
 test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
@@ -156,7 +156,7 @@ theseus_tests = [
     "test_mlx5",
     "test_mutex_sleep",
     "test_panic",
-    "test_realtime",
+    "test_priority_scheduler",
     "test_restartable",
     "test_scheduler",
     "test_serial_echo",

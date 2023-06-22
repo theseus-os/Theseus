@@ -31,8 +31,8 @@ path = "../runqueue_round_robin"
 [dependencies.runqueue_epoch]
 path = "../runqueue_epoch"
 
-[dependencies.runqueue_realtime]
-path = "../runqueue_realtime"
+[dependencies.runqueue_priority]
+path = "../runqueue_priority"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.
