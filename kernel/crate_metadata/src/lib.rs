@@ -1154,6 +1154,7 @@ fn write_relocation_arch(
     const RANGE_32_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(32);
     const RANGE_48_BIT_UNSIGNED: Range<isize> = 0 .. TWO.pow(48);
 
+    #[allow(clippy::needless_late_init)]
     let overflow_check: Option<(usize, Range<isize>)>;
     match relocation_entry.typ {
         R_AARCH64_ABS64 => {
@@ -1417,7 +1418,6 @@ fn write_relocation_arch(
             error!("Overflow check: {:#X} <= {:#X} < {:#X} --> FAIL", overflow_range.start, source_val_isize, overflow_range.end);
             return Err("Relocation failed overflow check");
         }
-        // TODO: implement overflow check
     }
 
     Ok(())
