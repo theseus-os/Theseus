@@ -1,9 +1,12 @@
 {
   "abi": "softfloat",
   "arch": "aarch64",
+  "code-model": "large",
   "data-layout": "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
   "disable-redzone": true,
+  "executables": true,
   "features": "+strict-align,-neon,-fp-armv8",
+  "has-thread-local": true,
   "linker": "rust-lld",
   "linker-flavor": "ld.lld",
   "llvm-target": "aarch64-unknown-none-elf",

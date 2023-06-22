@@ -110,26 +110,17 @@ fn shell_loop(
         .spawn()?;
 
 
-    let task;
-    #[cfg(target_arch = "x86_64")] {
-        let new_app_ns = mod_mgmt::create_application_namespace(None)?;
+    let new_app_ns = mod_mgmt::create_application_namespace(None)?;
 
-        let (app_file, _ns) =
-            mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
-                .expect("Couldn't find shell in default app namespace");
+    let (app_file, _ns) =
+        mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
+            .expect("Couldn't find hull in default app namespace");
 
-        let path = path::Path::new(app_file.lock().get_absolute_path());
-        task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-            .name(format!("{address:?}_shell"))
-            .block()
-            .spawn()?;
-    }
-    #[cfg(target_arch = "aarch64")] {
-        task = spawn::new_task_builder(hull::main, alloc::vec::Vec::new())
-            .name(alloc::format!("{address:?}_shell"))
-            .block()
-            .spawn()?;
-    }
+    let path = path::Path::new(app_file.lock().get_absolute_path());
+    let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
+        .name(format!("{address:?}_hull"))
+        .block()
+        .spawn()?;
 
     let id = task.id;
     let stream = Arc::new(tty.slave());
@@ -143,7 +134,7 @@ fn shell_loop(
         },
     );
 
-    task.unblock().map_err(|_| "couldn't unblock shell task")?;
+    task.unblock().map_err(|_| "couldn't unblock hull task")?;
     task.join()?;
 
     reader_task.kill(KillReason::Requested).unwrap();

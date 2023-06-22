@@ -249,7 +249,7 @@ where
             .get_symbol_starting_with("captain::init::")
             .upgrade()
             .ok_or("no single symbol matching \"captain::init\"")?;
-        log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section.name);
+        log::info!("The nano_core (in loadable mode) is invoking the captain init function: {:?}", section);
 
         type CaptainInitFunc = fn(MmiRef, NoDrop<Stack>, DropAfterInit, MulticoreBringupInfo, Option<PhysicalAddress>) -> Result<(), &'static str>;
         let func: &CaptainInitFunc = unsafe { section.as_func() }?;
