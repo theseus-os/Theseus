@@ -2897,16 +2897,14 @@ pub const KERNEL_TEXT_ADDR_RANGE: Option<PageRange> = {
         None
     }
     #[cfg(target_arch = "aarch64")] {
-        use {memory::Page, kernel_config::memory::KERNEL_OFFSET};
-
         const ONE_MIB: usize = 0x10_0000;
-        let start_vaddr = VirtualAddress::new_canonical(KERNEL_OFFSET + ONE_MIB);
+        let start_vaddr = VirtualAddress::new_canonical(kernel_config::memory::KERNEL_OFFSET);
         let end_vaddr = VirtualAddress::new_canonical(start_vaddr.value() + (128 * ONE_MIB) - 1);
         Some(PageRange::new(
             // the start of the base kernel image's .text section.
-            Page::containing_address(start_vaddr),
+            memory::Page::containing_address(start_vaddr),
             // the start of the base kernel image's .text section, plus 128 MiB.
-            Page::containing_address(end_vaddr),
+            memory::Page::containing_address(end_vaddr),
         ))
     }
 };
