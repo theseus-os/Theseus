@@ -486,6 +486,7 @@ dependencies = [
  "app_io",
  "async_channel",
  "core2",
+ "hull",
  "io",
  "irq_safety",
  "log",

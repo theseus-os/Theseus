@@ -20,5 +20,11 @@ spawn = { path = "../spawn" }
 task = { path = "../task" }
 tty = { path = "../tty" }
 
-[lib]
-crate-type = ["rlib"]
+## In general, Theseus kernel crates *cannot* depend on application crates.
+## However, this crate loads and runs the `hull` shell application,
+## so it's best to ensure that the `hull` crate is always included in the build
+## by specifying it as a direct dependency here.
+##
+## Note that this does NOT result in a direct runtime dependency
+## from this crate to the `hull` crate; it merely guarantees it gets built.
+hull = { path = "../../applications/hull" }
