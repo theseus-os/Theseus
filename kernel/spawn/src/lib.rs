@@ -431,6 +431,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
+        // Idle tasks are not stored on the run queue.
         if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
                 runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
@@ -1006,17 +1007,6 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
         }
     }
 }
-
-// /// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-// pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-//     let cpu_id = cpu::current_cpu();
-//     debug!("Spawning a new idle task on CPU {}", cpu_id);
-
-//     new_task_builder(idle_task_entry, cpu_id)
-//         .name(format!("idle_task_cpu_{cpu_id}"))
-//         .idle(cpu_id)
-//         .spawn_restartable(None)
-// }
 
 /// A basic idle task that does nothing but loop endlessly.
 ///
