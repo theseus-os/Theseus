@@ -1,0 +1,8 @@
+[package]
+name = "free_tty"
+description = "Returns the next free TTY"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+pty = "0.2.2"

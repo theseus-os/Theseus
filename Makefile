@@ -19,6 +19,7 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
+display ?= yes
 
 ## aarch64 only supports booting via UEFI
 ifeq ($(ARCH),aarch64)
@@ -114,6 +115,7 @@ nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
 efi_firmware := $(BUILD_DIR)/$(OVMF_FILE)
+free_tty_binary := $(ROOT_DIR)/tools/free_tty/target/release/free_tty
 
 ifeq ($(ARCH),x86_64)
 ## The assembly files compiled by the nano_core build script.
@@ -150,7 +152,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb gdb_aarch64 \
-		clippy doc docs view-doc view-docs book view-book
+		clippy doc docs view-doc view-docs book view-book $(free_tty_binary)
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -851,7 +853,10 @@ QEMU_FLAGS += -serial mon:$(SERIAL2)
 ## `-vga none`:      removes the VGA card
 ## `-display none`:  disables QEMU's graphical display
 ## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
-# QEMU_FLAGS += -display none -vga none
+
+ifeq ($(graphic), no)
+	QEMU_FLAGS += -nographic
+endif
 
 ## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
@@ -948,15 +953,37 @@ loadable: run
 wasmtime : export override FEATURES += --features wasmtime
 wasmtime: run
 
+$(free_tty_binary):
+	cargo build --release --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml
 
 ### builds and runs Theseus in QEMU
-run: $(iso)
+run: $(iso) $(free_tty_binary)
+ifdef terminal
+# Check which TTY the OS would give a process requesting a TTY
+	$(eval temp_tty += $(shell $(free_tty_binary)))
+# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
+# there's not much we can do about it.
+#
+# The slee is to give QEMU time to create the TTY.
+	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
+else
 	$(QEMU_BIN) $(QEMU_FLAGS)
+endif
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-run_pause: $(iso)
+run_pause: $(iso) $(free_tty_bin)
+ifdef terminal
+# Check which TTY the OS would give a process requesting a TTY
+	$(eval temp_tty += $(shell $(free_tty_binary)))
+# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
+# there's not much we can do about it.
+#
+# The slee is to give QEMU time to create the TTY.
+	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
+else
 	$(QEMU_BIN) $(QEMU_FLAGS) -S
+endif
 
 
 ### Runs a gdb instance on the host machine. 

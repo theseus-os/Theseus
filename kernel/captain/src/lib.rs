@@ -175,14 +175,15 @@ pub fn init(
 
     // arch-gate: no windowing/input support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
-    let (key_producer, mouse_producer) = window_manager::init()?;
+    match window_manager::init() {
+        Ok((key_producer, mouse_producer)) => {
+            device_manager::init(key_producer, mouse_producer)?;
+        },
+        Err(error) => info!("Window manager initialisation failure: {error}"),
+    }
 
-    device_manager::init(
-        #[cfg(target_arch = "x86_64")]
-        key_producer,
-        #[cfg(target_arch = "x86_64")]
-        mouse_producer,
-    )?;
+    #[cfg(not(target_arch = "x86_64"))]
+    device_manager::init()?;
 
     task_fs::init()?;
 
