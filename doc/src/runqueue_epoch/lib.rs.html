@@ -267,6 +267,12 @@
 <a href="#267" id="267">267</a>
 <a href="#268" id="268">268</a>
 <a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
 </pre><pre class="rust"><code><span class="doccomment">//! This crate contains the `RunQueue` structure, for the epoch scheduler.
 //! `RunQueue` structure is essentially a list of Tasks
 //! that it used for scheduling purposes.
@@ -337,6 +343,7 @@
 </span><span class="kw">pub struct </span>RunQueue {
     core: u8,
     queue: VecDeque&lt;EpochTaskRef&gt;,
+    idle_task: TaskRef,
 }
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>RunQueue {
@@ -371,12 +378,13 @@
     }
 
     <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`
-    </span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>init(which_core: u8, idle_task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (priority) for core {}&quot;</span>, which_core);
         <span class="kw">let </span>new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
+            idle_task,
         });
 
         <span class="kw">if </span>RUNQUEUES.insert(which_core, new_rq).is_some() {
@@ -493,6 +501,10 @@
             rq.write().remove_task(task)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>idle_task(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.idle_task
     }
 
     <span class="kw">fn </span>get_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {

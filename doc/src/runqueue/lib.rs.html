@@ -87,8 +87,8 @@
 
 
 <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-</span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    RunQueue::init(which_core)
+</span><span class="kw">pub fn </span>init(which_core: u8, idle_task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    RunQueue::init(which_core, idle_task)
 }
 
 <span class="doccomment">/// Returns the `RunQueue` of the given core, which is an `apic_id`.

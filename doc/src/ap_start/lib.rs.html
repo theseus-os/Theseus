@@ -134,7 +134,6 @@
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
-<a href="#137" id="137">137</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -246,7 +245,6 @@
     // per-CPU storage, tasking, and create the idle task for this CPU.
     </span>per_cpu::init(cpu_id).unwrap();
     <span class="kw">let </span>bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
-    spawn::create_idle_task().unwrap();
 
     <span class="comment">// The PAT must be initialized explicitly on every CPU,
     // but it is not a fatal error if it doesn&#39;t exist.

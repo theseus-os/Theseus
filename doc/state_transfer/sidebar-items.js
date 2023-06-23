@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":[["prio_sched","This function is used for live evolution from a round robin scheduler to a priority scheduler.  It first extracts the taskrefs from the round robin Runqueue, then converts them into priority taskrefs and places them on the priority Runqueue."]]};

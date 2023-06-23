@@ -227,8 +227,6 @@
 <a href="#227" id="227">227</a>
 <a href="#228" id="228">228</a>
 <a href="#229" id="229">229</a>
-<a href="#230" id="230">230</a>
-<a href="#231" id="231">231</a>
 </pre><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -443,13 +441,11 @@
     <span class="comment">// The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     </span>drop(kernel_mmi_ref);
-    <span class="comment">// 2. Create the idle task for this CPU.
-    </span>spawn::create_idle_task()<span class="question-mark">?</span>;
-    <span class="comment">// 3. Cleanup bootstrap tasks, which handles this one and all other APs&#39; bootstrap tasks.
+    <span class="comment">// 2. Cleanup bootstrap tasks, which handles this one and all other APs&#39; bootstrap tasks.
     </span>spawn::cleanup_bootstrap_tasks(cpu_count)<span class="question-mark">?</span>;
-    <span class="comment">// 4. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.
+    <span class="comment">// 3. &quot;Finish&quot; this bootstrap task, indicating it has exited and no longer needs to run.
     </span>bootstrap_task.finish();
-    <span class="comment">// 5. Enable interrupts such that other tasks can be scheduled in.
+    <span class="comment">// 4. Enable interrupts such that other tasks can be scheduled in.
     </span>enable_interrupts();
     <span class="comment">// ****************************************************
     // NOTE: nothing below here is guaranteed to run again!

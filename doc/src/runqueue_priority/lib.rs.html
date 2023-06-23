@@ -286,6 +286,12 @@
 <a href="#286" id="286">286</a>
 <a href="#287" id="287">287</a>
 <a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Runqueue structures for a priority scheduler.
 //!
 //! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
@@ -382,6 +388,7 @@
 </span><span class="kw">pub struct </span>RunQueue {
     core: u8,
     queue: VecDeque&lt;PriorityTaskRef&gt;,
+    idle_task: TaskRef,
 }
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>RunQueue {
@@ -422,12 +429,13 @@
     }
 
     <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`
-    </span><span class="kw">pub fn </span>init(which_core: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>init(which_core: u8, idle_task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (priority) for core {}&quot;</span>, which_core);
         <span class="kw">let </span>new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
             queue: VecDeque::new(),
+            idle_task,
         });
 
         <span class="kw">if </span>RUNQUEUES.insert(which_core, new_rq).is_some() {
@@ -548,6 +556,10 @@
             rq.write().remove_task(task)<span class="question-mark">?</span>;
         }
         <span class="prelude-val">Ok</span>(())
+    }
+
+    <span class="kw">pub fn </span>idle_task(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.idle_task
     }
 
     <span class="doccomment">/// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`

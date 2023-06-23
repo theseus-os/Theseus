@@ -157,7 +157,6 @@ var sourcesIndex = JSON.parse('{\
 "stack_trace":["",[],["lib.rs"]],\
 "stack_trace_frame_pointers":["",[],["lib.rs"]],\
 "state_store":["",[],["lib.rs"]],\
-"state_transfer":["",[],["lib.rs"]],\
 "stdio":["",[],["lib.rs"]],\
 "storage_device":["",[],["lib.rs"]],\
 "storage_manager":["",[],["lib.rs"]],\
