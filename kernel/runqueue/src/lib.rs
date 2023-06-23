@@ -28,8 +28,8 @@ use runqueue::RunQueue;
 
 
 /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-pub fn init(which_core: u8) -> Result<(), &'static str> {
-    RunQueue::init(which_core)
+pub fn init(which_core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
+    RunQueue::init(which_core, idle_task)
 }
 
 /// Returns the `RunQueue` of the given core, which is an `apic_id`.

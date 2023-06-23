@@ -109,7 +109,6 @@ pub fn kstart_ap(
     // per-CPU storage, tasking, and create the idle task for this CPU.
     per_cpu::init(cpu_id).unwrap();
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
-    spawn::create_idle_task().unwrap();
 
     // The PAT must be initialized explicitly on every CPU,
     // but it is not a fatal error if it doesn't exist.
