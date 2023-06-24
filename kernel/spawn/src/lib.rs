@@ -404,6 +404,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // The new task is marked as idle
         if self.idle {
             new_task.is_an_idle_task = true;
+            log::trace!("New idle task {}({}) had {:X?}", new_task.name, new_task.id, new_task.tls_area());
         }
 
         // If there is a post-build function, invoke it now

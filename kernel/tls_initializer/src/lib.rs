@@ -279,7 +279,7 @@ impl TlsInitializer {
         }
 
         if self.cache_status == CacheStatus::Invalidated {
-            // log::debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+            log::debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
             // On some architectures, such as x86_64, the ABI convention REQUIRES that
             // the TLS area data starts with a pointer to itself (the TLS self pointer).
@@ -331,6 +331,7 @@ impl TlsInitializer {
             };
             let tls_self_ptr_value = dest_slice.as_ptr() as usize;
             dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
+            log::debug!("TLS data at {:#X}: {:X?}", tls_self_ptr_value, data_copy);
             TlsDataImage {
                 _data: Some(data_copy),
                 ptr:   tls_self_ptr_value,

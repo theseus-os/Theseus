@@ -14,7 +14,7 @@ pub(crate) struct Job {
 
 impl Job {
     pub(crate) fn kill(&mut self) -> Result<()> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task
                 .kill(KillReason::Requested)
                 .map_err(|_| Error::KillFailed)?;
@@ -23,14 +23,14 @@ impl Job {
         Ok(())
     }
     pub(crate) fn suspend(&mut self) {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.suspend();
             part.state = State::Suspended;
         }
     }
 
     pub(crate) fn unsuspend(&mut self) {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.unsuspend();
             part.state = State::Running;
         }
@@ -45,7 +45,7 @@ impl Job {
     }
 
     pub(crate) fn update(&mut self) -> Option<isize> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             if part.state == State::Running && part.task.runstate() == RunState::Exited {
                 let exit_value = match part.task.join().unwrap() {
                     ExitValue::Completed(status) => {

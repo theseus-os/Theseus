@@ -24,7 +24,7 @@
 
 #![allow(clippy::range_plus_one)]
 #![no_std]
-#![feature(drain_filter)]
+#![feature(extract_if)]
 
 // TODO: FIXME: remove this once the implementation is complete.
 #![allow(dead_code, unused_variables, unused_imports)]
@@ -336,7 +336,7 @@ impl Line {
         //       merge the next line into the current line.
 
         let _removed_unit = self.units.remove(index.0);
-        let _removed_continuance_units = self.units.drain_filter(|unit| unit.wide.is_continuance());
+        let _removed_continuance_units = self.units.extract_if(|unit| unit.wide.is_continuance());
 
         let num_removed_continuance_units = if false {
             _removed_continuance_units.count()
