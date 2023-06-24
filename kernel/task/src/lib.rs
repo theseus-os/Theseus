@@ -37,6 +37,7 @@ use alloc::{
 };
 use core::{
     any::Any,
+    cell::RefMut,
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
@@ -810,12 +811,12 @@ type TaskSwitchInnerRet = (*mut usize, usize, SimdExt, SimdExt);
 /// Hence, the the main [`task_switch()`] routine proceeds with the context switch
 /// after we return to it from this function.
 fn task_switch_inner(
-    curr_task_tls_slot: &mut Option<TaskRef>,
+    mut curr_task_tls_slot: RefMut<'_, Option<TaskRef>>,
     next: TaskRef,
     cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> Result<TaskSwitchInnerRet, (bool, PreemptionGuard)> {
-    let Some(ref curr) = curr_task_tls_slot else {
+    let Some(ref curr) = curr_task_tls_slot.as_ref() else {
         error!("BUG: task_switch_inner(): couldn't get current task");
         return Err((false, preemption_guard));
     };
@@ -825,7 +826,7 @@ fn task_switch_inner(
         return Err((false, preemption_guard));
     }
 
-    // trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", cpu_id, curr, next, irq_safety::interrupts_enabled());
+    // log::trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", cpu_id, curr, next, irq_safety::interrupts_enabled());
 
     // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
     // if !next.is_runnable() {
@@ -908,10 +909,14 @@ fn task_switch_inner(
     // We store the removed `TaskRef` in CPU-local storage so that it remains accessible
     // until *after* the context switch.
     if curr_task_has_exited {
-        // trace!("task_switch(): deiniting current task TLS for: {:?}, next: {}", curr_task_tls_slot.as_deref(), next.deref());
+        // log::trace!("[CPU {}] task_switch(): deiniting current task TLS for: {:?}, next: {}", cpu_id, curr_task_tls_slot.as_deref(), next.deref());
         let prev_taskref = curr_task_tls_slot.take();
         DROP_AFTER_TASK_SWITCH.with_mut(|d| d.0 = prev_taskref);
     }
+
+    // Now we are done touching the current task's TLS slot, so proactively drop it now
+    // to ensure that it isn't accidentally dropped later after we've switched the active TLS area.
+    drop(curr_task_tls_slot);
 
     // Now, set the next task as the current task running on this CPU.
     //
@@ -1129,7 +1134,9 @@ mod tls_current_task {
                 Ok(ExitableTaskRef { task: taskref })
             }
             Err(_e) => {
-                log::error!("BUG: init_current_task() failed to mutably borrow CURRENT_TASK");
+                log::error!("[CPU {}] BUG: init_current_task(): failed to mutably borrow CURRENT_TASK. \
+                    Task ID: {}, {:?}", cpu::current_cpu(), current_task_id, taskref,
+                );
                 Err(InitCurrentTaskError::AlreadyBorrowed(current_task_id))
             }
         }
@@ -1145,9 +1152,9 @@ mod tls_current_task {
     /// Returns an `Err` containing the `value` if the current task cannot be obtained.
     pub(crate) fn with_current_task_tls_slot_mut<F, R, T>(function: F, value: T) -> Result<R, T>
     where
-        F: FnOnce(&mut Option<TaskRef>, T) -> R
+        F: FnOnce(core::cell::RefMut<'_, Option<TaskRef>>, T) -> R
     {
-        if let Ok(tls_slot) = CURRENT_TASK.try_borrow_mut().as_deref_mut() {
+        if let Ok(tls_slot) = CURRENT_TASK.try_borrow_mut() {
             Ok(function(tls_slot, value))
         } else {
             Err(value)
