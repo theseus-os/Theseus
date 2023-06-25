@@ -816,7 +816,7 @@ fn task_switch_inner(
     cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> Result<TaskSwitchInnerRet, (bool, PreemptionGuard)> {
-    let Some(ref curr) = curr_task_tls_slot.as_ref() else {
+    let Some(curr) = curr_task_tls_slot.as_ref() else {
         error!("BUG: task_switch_inner(): couldn't get current task");
         return Err((false, preemption_guard));
     };
