@@ -1250,6 +1250,13 @@
 <a href="#1250" id="1250">1250</a>
 <a href="#1251" id="1251">1251</a>
 <a href="#1252" id="1252">1252</a>
+<a href="#1253" id="1253">1253</a>
+<a href="#1254" id="1254">1254</a>
+<a href="#1255" id="1255">1255</a>
+<a href="#1256" id="1256">1256</a>
+<a href="#1257" id="1257">1257</a>
+<a href="#1258" id="1258">1258</a>
+<a href="#1259" id="1259">1259</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1289,6 +1296,7 @@
 };
 <span class="kw">use </span>core::{
     any::Any,
+    cell::RefMut,
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
@@ -2062,12 +2070,12 @@
 /// Hence, the the main [`task_switch()`] routine proceeds with the context switch
 /// after we return to it from this function.
 </span><span class="kw">fn </span>task_switch_inner(
-    curr_task_tls_slot: <span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
+    <span class="kw-2">mut </span>curr_task_tls_slot: RefMut&lt;<span class="lifetime">&#39;_</span>, <span class="prelude-ty">Option</span>&lt;TaskRef&gt;&gt;,
     next: TaskRef,
     cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskSwitchInnerRet, (bool, PreemptionGuard)&gt; {
-    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>curr) = curr_task_tls_slot <span class="kw">else </span>{
+    <span class="kw">let </span><span class="prelude-val">Some</span>(curr) = curr_task_tls_slot.as_ref() <span class="kw">else </span>{
         <span class="macro">error!</span>(<span class="string">&quot;BUG: task_switch_inner(): couldn&#39;t get current task&quot;</span>);
         <span class="kw">return </span><span class="prelude-val">Err</span>((<span class="bool-val">false</span>, preemption_guard));
     };
@@ -2077,7 +2085,7 @@
         <span class="kw">return </span><span class="prelude-val">Err</span>((<span class="bool-val">false</span>, preemption_guard));
     }
 
-    <span class="comment">// trace!(&quot;task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}&quot;, cpu_id, curr, next, irq_safety::interrupts_enabled());
+    <span class="comment">// log::trace!(&quot;task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}&quot;, cpu_id, curr, next, irq_safety::interrupts_enabled());
 
     // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
     // if !next.is_runnable() {
@@ -2160,10 +2168,14 @@
     // We store the removed `TaskRef` in CPU-local storage so that it remains accessible
     // until *after* the context switch.
     </span><span class="kw">if </span>curr_task_has_exited {
-        <span class="comment">// trace!(&quot;task_switch(): deiniting current task TLS for: {:?}, next: {}&quot;, curr_task_tls_slot.as_deref(), next.deref());
+        <span class="comment">// log::trace!(&quot;[CPU {}] task_switch(): deiniting current task TLS for: {:?}, next: {}&quot;, cpu_id, curr_task_tls_slot.as_deref(), next.deref());
         </span><span class="kw">let </span>prev_taskref = curr_task_tls_slot.take();
         DROP_AFTER_TASK_SWITCH.with_mut(|d| d.<span class="number">0 </span>= prev_taskref);
     }
+
+    <span class="comment">// Now we are done touching the current task&#39;s TLS slot, so proactively drop it now
+    // to ensure that it isn&#39;t accidentally dropped later after we&#39;ve switched the active TLS area.
+    </span>drop(curr_task_tls_slot);
 
     <span class="comment">// Now, set the next task as the current task running on this CPU.
     //
@@ -2381,7 +2393,9 @@
                 <span class="prelude-val">Ok</span>(ExitableTaskRef { task: taskref })
             }
             <span class="prelude-val">Err</span>(_e) =&gt; {
-                <span class="macro">log::error!</span>(<span class="string">&quot;BUG: init_current_task() failed to mutably borrow CURRENT_TASK&quot;</span>);
+                <span class="macro">log::error!</span>(<span class="string">&quot;[CPU {}] BUG: init_current_task(): failed to mutably borrow CURRENT_TASK. \
+                    Task ID: {}, {:?}&quot;</span>, cpu::current_cpu(), current_task_id, taskref,
+                );
                 <span class="prelude-val">Err</span>(InitCurrentTaskError::AlreadyBorrowed(current_task_id))
             }
         }
@@ -2397,9 +2411,9 @@
     /// Returns an `Err` containing the `value` if the current task cannot be obtained.
     </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>with_current_task_tls_slot_mut&lt;F, R, T&gt;(function: F, value: T) -&gt; <span class="prelude-ty">Result</span>&lt;R, T&gt;
     <span class="kw">where
-        </span>F: FnOnce(<span class="kw-2">&amp;mut </span><span class="prelude-ty">Option</span>&lt;TaskRef&gt;, T) -&gt; R
+        </span>F: FnOnce(core::cell::RefMut&lt;<span class="lifetime">&#39;_</span>, <span class="prelude-ty">Option</span>&lt;TaskRef&gt;&gt;, T) -&gt; R
     {
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(tls_slot) = CURRENT_TASK.try_borrow_mut().as_deref_mut() {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(tls_slot) = CURRENT_TASK.try_borrow_mut() {
             <span class="prelude-val">Ok</span>(function(tls_slot, value))
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(value)
