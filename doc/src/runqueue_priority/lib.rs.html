@@ -262,187 +262,129 @@
 <a href="#262" id="262">262</a>
 <a href="#263" id="263">263</a>
 <a href="#264" id="264">264</a>
-<a href="#265" id="265">265</a>
-<a href="#266" id="266">266</a>
-<a href="#267" id="267">267</a>
-<a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
-<a href="#275" id="275">275</a>
-<a href="#276" id="276">276</a>
-<a href="#277" id="277">277</a>
-<a href="#278" id="278">278</a>
-<a href="#279" id="279">279</a>
-<a href="#280" id="280">280</a>
-<a href="#281" id="281">281</a>
-<a href="#282" id="282">282</a>
-<a href="#283" id="283">283</a>
-<a href="#284" id="284">284</a>
-<a href="#285" id="285">285</a>
-<a href="#286" id="286">286</a>
-<a href="#287" id="287">287</a>
-<a href="#288" id="288">288</a>
-<a href="#289" id="289">289</a>
-<a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Runqueue structures for a priority scheduler.
 //!
-//! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
-//! Each `PriorityTaskRef` element in the runqueue contains a `TaskRef` 
-//! representing an underlying task and as well as a `period` value.
+//! The `RunQueue` structure is essentially a list of `Task`s used for
+//! scheduling purposes. Each `PriorityTaskRef` element in the runqueue contains
+//! a `TaskRef` representing an underlying task and as well as a `period` value.
 
 </span><span class="attr">#![no_std]
+</span><span class="comment">// TODO: Update Rust version to stabilise.
+</span><span class="attr">#![feature(binary_heap_retain)]
 
-</span><span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>sync_preemption;
-<span class="kw">extern crate </span>alloc;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>atomic_linked_list;
+</span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>task::TaskRef;
-<span class="kw">use </span>sync_preemption::PreemptionSafeRwLock;
-<span class="kw">use </span>alloc::collections::VecDeque;
-<span class="kw">use </span>core::ops::{Deref, DerefMut};
+<span class="kw">use </span>alloc::collections::BinaryHeap;
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
+<span class="kw">use </span>core::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut},
+};
+<span class="kw">use </span>log::{error, trace};
+<span class="kw">use </span>sync_preemption::PreemptionSafeRwLock;
+<span class="kw">use </span>task::TaskRef;
+<span class="kw">use </span>time::Instant;
+
+<span class="kw">const </span>DEFAULT_PRIORITY: u8 = <span class="number">0</span>;
 
 <span class="doccomment">/// A reference to a task with its period for priority scheduling.
 ///
-/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
+/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which
+/// dereferences to `TaskRef`.
 </span><span class="attr">#[derive(Debug, Clone)]
 </span><span class="kw">pub struct </span>PriorityTaskRef {
-    <span class="doccomment">/// `TaskRef` wrapped by `PriorityTaskRef`
-    </span>taskref: TaskRef,
-    <span class="doccomment">/// `Some` if the task is periodic, `None` if it is aperiodic.
-    </span>period: <span class="prelude-ty">Option</span>&lt;usize&gt;,
-    <span class="doccomment">/// Number of context switches the task has undergone. Not used in scheduling algorithm
-    </span>context_switches: usize,
+    <span class="kw">pub </span>task: TaskRef,
+    <span class="kw">pub </span>last_ran: Instant,
+    priority: u8,
+}
+
+<span class="kw">impl </span>PartialEq <span class="kw">for </span>PriorityTaskRef {
+    <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
+        <span class="self">self</span>.priority.eq(<span class="kw-2">&amp;</span>other.priority) &amp;&amp; <span class="self">self</span>.last_ran.eq(<span class="kw-2">&amp;</span>other.last_ran)
+    }
+}
+
+<span class="comment">// The equivalence relation is reflexive.
+</span><span class="kw">impl </span>Eq <span class="kw">for </span>PriorityTaskRef {}
+
+<span class="kw">impl </span>PartialOrd <span class="kw">for </span>PriorityTaskRef {
+    <span class="kw">fn </span>partial_cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Ordering&gt; {
+        <span class="kw">match </span><span class="self">self</span>.priority.cmp(<span class="kw-2">&amp;</span>other.priority) {
+            <span class="comment">// Tasks that were ran longer ago should be prioritised.
+            </span>Ordering::Equal =&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.last_ran.cmp(<span class="kw-2">&amp;</span>other.last_ran).reverse()),
+            ordering =&gt; <span class="prelude-val">Some</span>(ordering),
+        }
+    }
+}
+
+<span class="kw">impl </span>Ord <span class="kw">for </span>PriorityTaskRef {
+    <span class="kw">fn </span>cmp(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; core::cmp::Ordering {
+        <span class="self">self</span>.priority.cmp(<span class="kw-2">&amp;</span>other.priority)
+    }
 }
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>PriorityTaskRef {
     <span class="kw">type </span>Target = TaskRef;
+
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.taskref
+        <span class="kw-2">&amp;</span><span class="self">self</span>.task
     }
 }
 
 <span class="kw">impl </span>DerefMut <span class="kw">for </span>PriorityTaskRef {
     <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>TaskRef {
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>.taskref
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.task
     }
 }
 
-<span class="kw">impl </span>PriorityTaskRef {
-    <span class="doccomment">/// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`
-    </span><span class="kw">pub fn </span>new(taskref: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; PriorityTaskRef {
-        PriorityTaskRef {
-            taskref,
-            period,
-            context_switches: <span class="number">0</span>,
-        }
-    }
-
-    <span class="doccomment">/// Increment the number of times the task is picked
-    </span><span class="kw">pub fn </span>increment_context_switches(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
-        <span class="self">self</span>.context_switches = <span class="self">self</span>.context_switches.saturating_add(<span class="number">1</span>);
-    }
-
-    <span class="doccomment">/// Checks whether the `PriorityTaskRef` refers to a task that is periodic
-    </span><span class="kw">pub fn </span>is_periodic(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.period.is_some()
-    }
-
-    <span class="doccomment">/// Returns `true` if the period of this `PriorityTaskRef` is shorter (less) than
-    /// the period of the other `PriorityTaskRef`.
-    ///
-    /// Returns `false` if this `PriorityTaskRef` is aperiodic, i.e. if `period` is `None`.
-    /// Returns `true` if this task is periodic and `other` is aperiodic.
-    </span><span class="kw">pub fn </span>has_smaller_period(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>PriorityTaskRef) -&gt; bool {
-        <span class="kw">match </span><span class="self">self</span>.period {
-            <span class="prelude-val">Some</span>(period_val) =&gt; <span class="kw">if let </span><span class="prelude-val">Some</span>(other_period_val) = other.period {
-                period_val &lt; other_period_val
-            } <span class="kw">else </span>{
-                <span class="bool-val">true
-            </span>},
-            <span class="prelude-val">None </span>=&gt; <span class="bool-val">false</span>,
-        }
-    }
-}
-
-<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private runqueue
-/// and allows the scheduler to select a task from that runqueue to schedule in
+<span class="doccomment">/// There is one runqueue per core, each core only accesses its own private
+/// runqueue and allows the scheduler to select a task from that runqueue to
+/// schedule in
 </span><span class="kw">static </span>RUNQUEUES: AtomicMap&lt;u8, PreemptionSafeRwLock&lt;RunQueue&gt;&gt; = AtomicMap::new();
 
-<span class="doccomment">/// A list of `Task`s and their associated priority scheduler data that may be run on a given CPU core.
+<span class="doccomment">/// A list of `Task`s and their associated priority scheduler data that may be
+/// run on a given CPU core.
 ///
-/// In rate monotonic scheduling, tasks are sorted in order of increasing periods.
-/// Thus, the `period` value acts as a form of task &quot;priority&quot;,
+/// In rate monotonic scheduling, tasks are sorted in order of increasing
+/// periods. Thus, the `period` value acts as a form of task &quot;priority&quot;,
 /// with higher priority (shorter period) tasks coming first.
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>RunQueue {
     core: u8,
-    queue: VecDeque&lt;PriorityTaskRef&gt;,
+    queue: BinaryHeap&lt;PriorityTaskRef&gt;,
     idle_task: TaskRef,
 }
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>RunQueue {
-    <span class="kw">type </span>Target = VecDeque&lt;PriorityTaskRef&gt;;
-    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>VecDeque&lt;PriorityTaskRef&gt; {
+    <span class="kw">type </span>Target = BinaryHeap&lt;PriorityTaskRef&gt;;
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>BinaryHeap&lt;PriorityTaskRef&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.queue
     }
 }
 
 <span class="kw">impl </span>DerefMut <span class="kw">for </span>RunQueue {
-    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>VecDeque&lt;PriorityTaskRef&gt; {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>BinaryHeap&lt;PriorityTaskRef&gt; {
         <span class="kw-2">&amp;mut </span><span class="self">self</span>.queue
     }
 }
 
-
 <span class="kw">impl </span>RunQueue {
-    <span class="doccomment">/// Moves the `PriorityTaskRef` at the given `index` in this `RunQueue`
-    /// to the appropriate location in this `RunQueue` based on its period.
-    ///
-    /// Returns a reference to the underlying `Task`.
-    ///
-    /// Thus, the `PriorityTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
-    /// `PriorityTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
-    /// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
-    /// Afterwards, the number of context switches is incremented by one.
-    /// This function is used when the task is selected by the scheduler.
-    </span><span class="kw">pub fn </span>update_and_reinsert(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>priority_taskref) = <span class="self">self</span>.remove(index) {
-            priority_taskref.increment_context_switches();
-            <span class="kw">let </span>taskref = priority_taskref.taskref.clone();
-            <span class="self">self</span>.insert_priority_taskref_at_proper_location(priority_taskref);
-            <span class="prelude-val">Some</span>(taskref)
-        }
-        <span class="kw">else </span>{
-            <span class="prelude-val">None
-        </span>}
-    }
-
     <span class="doccomment">/// Creates a new `RunQueue` for the given core, which is an `apic_id`
     </span><span class="kw">pub fn </span>init(which_core: u8, idle_task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">trace!</span>(<span class="string">&quot;Created runqueue (priority) for core {}&quot;</span>, which_core);
+
         <span class="kw">let </span>new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
-            queue: VecDeque::new(),
+            queue: BinaryHeap::new(),
             idle_task,
         });
 
         <span class="kw">if </span>RUNQUEUES.insert(which_core, new_rq).is_some() {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {}!&quot;</span>, which_core);
+            <span class="macro">error!</span>(<span class="string">&quot;BUG: RunQueue::init(): runqueue already exists for core {which_core}!&quot;</span>);
             <span class="prelude-val">Err</span>(<span class="string">&quot;runqueue already exists for this core&quot;</span>)
-        }
-        <span class="kw">else </span>{
+        } <span class="kw">else </span>{
             <span class="comment">// there shouldn&#39;t already be a RunQueue for this core
             </span><span class="prelude-val">Ok</span>(())
         }
@@ -451,9 +393,10 @@
     <span class="doccomment">/// Returns `RunQueue` for the given core, which is an `apic_id`.
     </span><span class="kw">pub fn </span>get_runqueue(which_core: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>PreemptionSafeRwLock&lt;RunQueue&gt;&gt; {
         RUNQUEUES.get(<span class="kw-2">&amp;</span>which_core)
-    } 
+    }
 
-    <span class="doccomment">/// Returns the &quot;least busy&quot; core, which is currently very simple, based on runqueue size.
+    <span class="doccomment">/// Returns the &quot;least busy&quot; core, which is currently very simple, based on
+    /// runqueue size.
     </span><span class="kw">pub fn </span>get_least_busy_core() -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
         <span class="self">Self</span>::get_least_busy_runqueue().map(|rq| rq.read().core)
     }
@@ -470,8 +413,7 @@
                 <span class="kw">if </span>rq_size &lt; min.<span class="number">1 </span>{
                     min_rq = <span class="prelude-val">Some</span>((rq, rq_size));
                 }
-            }
-            <span class="kw">else </span>{
+            } <span class="kw">else </span>{
                 min_rq = <span class="prelude-val">Some</span>((rq, rq_size));
             }
         }
@@ -479,67 +421,43 @@
         min_rq.map(|m| m.<span class="number">0</span>)
     }
 
-    <span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue (based on simple runqueue-size-based load balancing)
-    /// and adds the given `Task` reference to that core&#39;s runqueue.
+    <span class="doccomment">/// Chooses the &quot;least busy&quot; core&#39;s runqueue (based on simple
+    /// runqueue-size-based load balancing) and adds the given `Task`
+    /// reference to that core&#39;s runqueue.
     </span><span class="kw">pub fn </span>add_task_to_any_runqueue(task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.<span class="number">1</span>))
             .ok_or(<span class="string">&quot;couldn&#39;t find any runqueues to add the task to!&quot;</span>)<span class="question-mark">?</span>;
 
-        rq.write().add_task(task, <span class="prelude-val">None</span>)
+        rq.write().add_task(task, DEFAULT_PRIORITY)
     }
 
-    <span class="doccomment">/// Convenience method that adds the given `Task` reference to given core&#39;s runqueue.
-    </span><span class="kw">pub fn </span>add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="doccomment">/// Convenience method that adds the given `Task` reference to given core&#39;s
+    /// runqueue.
+    </span><span class="kw">pub fn </span>add_task_to_specific_runqueue(
+        which_core: u8,
+        task: TaskRef,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         RunQueue::get_runqueue(which_core)
             .ok_or(<span class="string">&quot;Couldn&#39;t get RunQueue for the given core&quot;</span>)<span class="question-mark">?
             </span>.write()
-            .add_task(task, <span class="prelude-val">None</span>)
+            .add_task(task, DEFAULT_PRIORITY)
     }
 
-    <span class="doccomment">/// Inserts a `PriorityTaskRef` at its proper position in the queue.
-    ///
-    /// Under the RMS scheduling algorithm, tasks should be sorted in increasing value 
-    /// of their periods, with aperiodic tasks being placed at the end.
-    </span><span class="kw">fn </span>insert_priority_taskref_at_proper_location(<span class="kw-2">&amp;mut </span><span class="self">self</span>, taskref: PriorityTaskRef) {
-        <span class="kw">match </span>taskref.period {
-            <span class="prelude-val">None </span>=&gt; <span class="self">self</span>.push_back(taskref),
-            <span class="prelude-val">Some</span>(<span class="kw">_</span>) =&gt; {
-                <span class="kw">if </span><span class="self">self</span>.is_empty() {
-                    <span class="self">self</span>.push_back(taskref);
-                } <span class="kw">else </span>{
-                    <span class="kw">let </span><span class="kw-2">mut </span>index_to_insert: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
-                    <span class="kw">for </span>(index, inserted_taskref) <span class="kw">in </span><span class="self">self</span>.iter().enumerate() {
-                        <span class="kw">if </span>taskref.has_smaller_period(inserted_taskref) {
-                            index_to_insert = <span class="prelude-val">Some</span>(index);
-                            <span class="kw">break</span>;
-                        }
-                    }
-
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(index) = index_to_insert {
-                        <span class="self">self</span>.insert(index, taskref);
-                    } <span class="kw">else </span>{
-                        <span class="self">self</span>.push_back(taskref);
-                    }
-                }
-            }
-        }
-    }
-
-    <span class="doccomment">/// Adds a `TaskRef` to this runqueue with the given periodicity value
-    </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef, period: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="macro">debug!</span>(<span class="string">&quot;Adding task to runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
-        <span class="kw">let </span>priority_taskref = PriorityTaskRef::new(task, period);
-        <span class="self">self</span>.insert_priority_taskref_at_proper_location(priority_taskref);
-
+    <span class="doccomment">/// Adds a `TaskRef` to this runqueue with the given priority value.
+    </span><span class="kw">fn </span>add_task(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef, priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+        <span class="kw">let </span>priority_task = PriorityTaskRef {
+            task,
+            priority,
+            last_ran: Instant::ZERO,
+        };
+        <span class="self">self</span>.queue.push(priority_task);
         <span class="prelude-val">Ok</span>(())
     }
-    
+
     <span class="doccomment">/// The internal function that actually removes the task from the runqueue.
     </span><span class="kw">fn </span>remove_internal(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="macro">debug!</span>(<span class="string">&quot;Removing task from runqueue_priority {}, {:?}&quot;</span>, <span class="self">self</span>.core, task);
-        <span class="self">self</span>.retain(|x| <span class="kw-2">&amp;</span>x.taskref != task);
-
+        <span class="self">self</span>.queue.retain(|x| <span class="kw-2">&amp;</span>x.task != task);
         <span class="prelude-val">Ok</span>(())
     }
 
@@ -548,9 +466,10 @@
         <span class="self">self</span>.remove_internal(task)
     }
 
-    <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-    /// 
-    /// This is a brute force approach that iterates over all runqueues. 
+    <span class="doccomment">/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire
+    /// system.
+    ///
+    /// This is a brute force approach that iterates over all runqueues.
     </span><span class="kw">pub fn </span>remove_task_from_all(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
             rq.write().remove_task(task)<span class="question-mark">?</span>;
@@ -558,33 +477,54 @@
         <span class="prelude-val">Ok</span>(())
     }
 
+    <span class="kw">fn </span>get_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+        <span class="kw">for </span>t <span class="kw">in </span><span class="self">self</span>.queue.iter() {
+            <span class="kw">if </span>t.task == <span class="kw-2">*</span>task {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(t.priority);
+            }
+        }
+        <span class="prelude-val">None
+    </span>}
+
     <span class="kw">pub fn </span>idle_task(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
         <span class="kw-2">&amp;</span><span class="self">self</span>.idle_task
     }
 
-    <span class="doccomment">/// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
-    /// then reinserts the `PriorityTaskRef` at the proper location
-    </span><span class="kw">fn </span>set_periodicity_internal(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>, 
-        task: <span class="kw-2">&amp;</span>TaskRef, 
-        period: usize
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(i) = <span class="self">self</span>.iter().position(|rt| <span class="kw-2">&amp;</span>rt.taskref == task) {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>priority_taskref) = <span class="self">self</span>.remove(i) {
-                priority_taskref.period = <span class="prelude-val">Some</span>(period);
-                <span class="self">self</span>.insert_priority_taskref_at_proper_location(priority_taskref);
-            }
-        };
-        <span class="prelude-val">Ok</span>(())
+    <span class="kw">fn </span>set_priority(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) -&gt; bool {
+        <span class="kw">let </span>previous_len = <span class="self">self</span>.queue.len();
+        <span class="self">self</span>.queue.retain(|t| t.task != <span class="kw-2">*</span>task);
+
+        <span class="kw">if </span>previous_len != <span class="self">self</span>.queue.len() {
+            <span class="macro">debug_assert_eq!</span>(<span class="self">self</span>.queue.len() + <span class="number">1</span>, previous_len);
+            <span class="self">self</span>.queue.push(PriorityTaskRef {
+                <span class="comment">// TODO: Don&#39;t take reference?
+                </span>task: task.clone(),
+                priority,
+                <span class="comment">// Not technically correct, but this will be reset next time it is run.
+                </span>last_ran: Instant::ZERO,
+            });
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            <span class="bool-val">false
+        </span>}
     }
 }
 
-<span class="doccomment">/// Set the periodicity of a given `Task` in all the `RunQueue` structures
-</span><span class="kw">pub fn </span>set_periodicity(task: <span class="kw-2">&amp;</span>TaskRef, period: usize) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="kw">for </span>(_core, rq) <span class="kw">in </span>RUNQUEUES.iter() {
-        rq.write().set_periodicity_internal(task, period)<span class="question-mark">?</span>;
+<span class="kw">pub fn </span>get_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+    <span class="kw">for </span>(<span class="kw">_</span>, run_queue) <span class="kw">in </span>RUNQUEUES.iter() {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(priority) = run_queue.read().get_priority(task) {
+            <span class="kw">return </span><span class="prelude-val">Some</span>(priority);
+        }
     }
-    <span class="prelude-val">Ok</span>(())
+    <span class="prelude-val">None
+</span>}
+
+<span class="kw">pub fn </span>set_priority(task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) {
+    <span class="kw">for </span>(<span class="kw">_</span>, run_queue) <span class="kw">in </span>RUNQUEUES.iter() {
+        <span class="kw">if </span>run_queue.write().set_priority(task, priority) {
+            <span class="kw">break</span>;
+        }
+    }
 }
 </code></pre></div>
 </section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="runqueue_priority" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
