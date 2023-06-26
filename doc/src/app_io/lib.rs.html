@@ -221,6 +221,8 @@
 <a href="#221" id="221">221</a>
 <a href="#222" id="222">222</a>
 <a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
 </pre><pre class="rust"><code><span class="doccomment">//! A simple library that handles stdio queues for applications invoked by a
 //! shell.
 //!
@@ -411,8 +413,10 @@
 <span class="doccomment">/// Calls `print!()` with an extra newline (&#39;\n&#39;) appended to the end.
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>println {
-    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
-    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+    () =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="string">&quot;\n&quot;</span>));
+    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
+        <span class="macro-nonterminal">$crate::print_to_stdout_args</span>(<span class="macro">::core::format_args!</span>(<span class="string">&quot;{}\n&quot;</span>, <span class="macro">::core::format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>)));
+    });
 
 }
 
@@ -421,7 +425,7 @@
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>print {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
-        <span class="macro-nonterminal">$crate::print_to_stdout_args</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+        <span class="macro-nonterminal">$crate::print_to_stdout_args</span>(<span class="macro">::core::format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
