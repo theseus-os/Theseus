@@ -3163,6 +3163,7 @@ dependencies = [
  "log",
  "sync_preemption",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -3253,6 +3254,7 @@ dependencies = [
  "log",
  "runqueue_priority",
  "task",
+ "time",
 ]
 
 [[package]]

@@ -1,20 +1,15 @@
 //! This scheduler implements a priority algorithm.
-//!
-//! Because the [`runqueue_priority::RunQueue`] internally sorts the tasks
-//! in increasing order of periodicity, it's trivially easy to choose the next
-//! task.
 
 #![no_std]
 
 extern crate alloc;
 
+use alloc::vec::Vec;
 use log::error;
 use runqueue_priority::RunQueue;
 use task::TaskRef;
 
-/// Set the periodicity of a given `Task` in all `RunQueue` structures.
-/// A reexport of the set_periodicity function from runqueue_priority
-pub use runqueue_priority::set_periodicity;
+pub use runqueue_priority::{get_priority, set_priority};
 
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task
@@ -27,13 +22,23 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
         }
     };
 
-    if let Some((task_index, _)) = runqueue_locked
-        .iter()
-        .enumerate()
-        .find(|(_, task)| task.is_runnable())
-    {
-        runqueue_locked.update_and_reinsert(task_index)
-    } else {
-        Some(runqueue_locked.idle_task().clone())
+    // This is a temporary solution before the PR to only store runnable tasks in
+    // the run queue is merged.
+    let mut blocked_tasks = Vec::with_capacity(2);
+    while let Some(mut task) = runqueue_locked.pop() {
+        if task.is_runnable() {
+            for t in blocked_tasks {
+                runqueue_locked.push(t)
+            }
+            task.last_ran = time::now::<time::Monotonic>();
+            runqueue_locked.push(task.clone());
+            return Some(task.task);
+        } else {
+            blocked_tasks.push(task);
+        }
     }
+    for task in blocked_tasks {
+        runqueue_locked.push(task);
+    }
+    Some(runqueue_locked.idle_task().clone())
 }

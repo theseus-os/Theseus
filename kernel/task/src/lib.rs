@@ -37,6 +37,7 @@ use alloc::{
 };
 use core::{
     any::Any,
+    cell::RefMut,
     fmt,
     hash::{Hash, Hasher},
     ops::Deref,
@@ -815,7 +816,7 @@ fn task_switch_inner(
     cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> Result<TaskSwitchInnerRet, (bool, PreemptionGuard)> {
-    let Some(ref curr) = curr_task_tls_slot.as_ref() else {
+    let Some(curr) = curr_task_tls_slot.as_ref() else {
         error!("BUG: task_switch_inner(): couldn't get current task");
         return Err((false, preemption_guard));
     };
@@ -825,7 +826,7 @@ fn task_switch_inner(
         return Err((false, preemption_guard));
     }
 
-    log::trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", cpu_id, curr, next, irq_safety::interrupts_enabled());
+    // log::trace!("task_switch [0]: (CPU {}) prev {:?}, next {:?}, interrupts?: {}", cpu_id, curr, next, irq_safety::interrupts_enabled());
 
     // These conditions are checked elsewhere, but can be re-enabled if we want to be extra strict.
     // if !next.is_runnable() {
@@ -908,7 +909,7 @@ fn task_switch_inner(
     // We store the removed `TaskRef` in CPU-local storage so that it remains accessible
     // until *after* the context switch.
     if curr_task_has_exited {
-        log::trace!("[CPU {}] task_switch(): deiniting current task TLS for: {:?}, next: {}", cpu_id, curr_task_tls_slot.as_deref(), next.deref());
+        // log::trace!("[CPU {}] task_switch(): deiniting current task TLS for: {:?}, next: {}", cpu_id, curr_task_tls_slot.as_deref(), next.deref());
         let prev_taskref = curr_task_tls_slot.take();
         DROP_AFTER_TASK_SWITCH.with_mut(|d| d.0 = prev_taskref);
     }
@@ -1136,7 +1137,9 @@ mod tls_current_task {
                 Ok(ExitableTaskRef { task: taskref })
             }
             Err(_e) => {
-                log::error!("[CPU {}] BUG: init_current_task(): failed to mutably borrow CURRENT_TASK. ID: {}, {:?}", cpu::current_cpu(), current_task_id, taskref);
+                log::error!("[CPU {}] BUG: init_current_task(): failed to mutably borrow CURRENT_TASK. \
+                    Task ID: {}, {:?}", cpu::current_cpu(), current_task_id, taskref,
+                );
                 Err(InitCurrentTaskError::AlreadyBorrowed(current_task_id))
             }
         }

@@ -1,154 +1,126 @@
 //! Runqueue structures for a priority scheduler.
 //!
-//! The `RunQueue` structure is essentially a list of `Task`s used for scheduling purposes.
-//! Each `PriorityTaskRef` element in the runqueue contains a `TaskRef` 
-//! representing an underlying task and as well as a `period` value.
+//! The `RunQueue` structure is essentially a list of `Task`s used for
+//! scheduling purposes. Each `PriorityTaskRef` element in the runqueue contains
+//! a `TaskRef` representing an underlying task and as well as a `period` value.
 
 #![no_std]
+// TODO: Update Rust version to stabilise.
+#![feature(binary_heap_retain)]
 
-extern crate task;
-extern crate sync_preemption;
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate atomic_linked_list;
 
-use task::TaskRef;
-use sync_preemption::PreemptionSafeRwLock;
-use alloc::collections::VecDeque;
-use core::ops::{Deref, DerefMut};
+use alloc::collections::BinaryHeap;
 use atomic_linked_list::atomic_map::AtomicMap;
+use core::{
+    cmp::Ordering,
+    ops::{Deref, DerefMut},
+};
+use log::{error, trace};
+use sync_preemption::PreemptionSafeRwLock;
+use task::TaskRef;
+use time::Instant;
+
+const DEFAULT_PRIORITY: u8 = 0;
 
 /// A reference to a task with its period for priority scheduling.
 ///
-/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which dereferences to `TaskRef`.
+/// `PriorityTaskRef` implements `Deref` and `DerefMut` traits, which
+/// dereferences to `TaskRef`.
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef {
-    /// `TaskRef` wrapped by `PriorityTaskRef`
-    taskref: TaskRef,
-    /// `Some` if the task is periodic, `None` if it is aperiodic.
-    period: Option<usize>,
-    /// Number of context switches the task has undergone. Not used in scheduling algorithm
-    context_switches: usize,
+    pub task: TaskRef,
+    pub last_ran: Instant,
+    priority: u8,
+}
+
+impl PartialEq for PriorityTaskRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority.eq(&other.priority) && self.last_ran.eq(&other.last_ran)
+    }
+}
+
+// The equivalence relation is reflexive.
+impl Eq for PriorityTaskRef {}
+
+impl PartialOrd for PriorityTaskRef {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.priority.cmp(&other.priority) {
+            // Tasks that were ran longer ago should be prioritised.
+            Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
+            ordering => Some(ordering),
+        }
+    }
+}
+
+impl Ord for PriorityTaskRef {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
 }
 
 impl Deref for PriorityTaskRef {
     type Target = TaskRef;
+
     fn deref(&self) -> &TaskRef {
-        &self.taskref
+        &self.task
     }
 }
 
 impl DerefMut for PriorityTaskRef {
     fn deref_mut(&mut self) -> &mut TaskRef {
-        &mut self.taskref
+        &mut self.task
     }
 }
 
-impl PriorityTaskRef {
-    /// Creates a new `PriorityTaskRef` that wraps the given `TaskRef`
-    pub fn new(taskref: TaskRef, period: Option<usize>) -> PriorityTaskRef {
-        PriorityTaskRef {
-            taskref,
-            period,
-            context_switches: 0,
-        }
-    }
-
-    /// Increment the number of times the task is picked
-    pub fn increment_context_switches(&mut self) {
-        self.context_switches = self.context_switches.saturating_add(1);
-    }
-
-    /// Checks whether the `PriorityTaskRef` refers to a task that is periodic
-    pub fn is_periodic(&self) -> bool {
-        self.period.is_some()
-    }
-
-    /// Returns `true` if the period of this `PriorityTaskRef` is shorter (less) than
-    /// the period of the other `PriorityTaskRef`.
-    ///
-    /// Returns `false` if this `PriorityTaskRef` is aperiodic, i.e. if `period` is `None`.
-    /// Returns `true` if this task is periodic and `other` is aperiodic.
-    pub fn has_smaller_period(&self, other: &PriorityTaskRef) -> bool {
-        match self.period {
-            Some(period_val) => if let Some(other_period_val) = other.period {
-                period_val < other_period_val
-            } else {
-                true
-            },
-            None => false,
-        }
-    }
-}
-
-/// There is one runqueue per core, each core only accesses its own private runqueue
-/// and allows the scheduler to select a task from that runqueue to schedule in
+/// There is one runqueue per core, each core only accesses its own private
+/// runqueue and allows the scheduler to select a task from that runqueue to
+/// schedule in
 static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap::new();
 
-/// A list of `Task`s and their associated priority scheduler data that may be run on a given CPU core.
+/// A list of `Task`s and their associated priority scheduler data that may be
+/// run on a given CPU core.
 ///
-/// In rate monotonic scheduling, tasks are sorted in order of increasing periods.
-/// Thus, the `period` value acts as a form of task "priority",
+/// In rate monotonic scheduling, tasks are sorted in order of increasing
+/// periods. Thus, the `period` value acts as a form of task "priority",
 /// with higher priority (shorter period) tasks coming first.
 #[derive(Debug)]
 pub struct RunQueue {
     core: u8,
-    queue: VecDeque<PriorityTaskRef>,
+    queue: BinaryHeap<PriorityTaskRef>,
     idle_task: TaskRef,
 }
 
 impl Deref for RunQueue {
-    type Target = VecDeque<PriorityTaskRef>;
-    fn deref(&self) -> &VecDeque<PriorityTaskRef> {
+    type Target = BinaryHeap<PriorityTaskRef>;
+
+    fn deref(&self) -> &BinaryHeap<PriorityTaskRef> {
         &self.queue
     }
 }
 
 impl DerefMut for RunQueue {
-    fn deref_mut(&mut self) -> &mut VecDeque<PriorityTaskRef> {
+    fn deref_mut(&mut self) -> &mut BinaryHeap<PriorityTaskRef> {
         &mut self.queue
     }
 }
 
-
 impl RunQueue {
-    /// Moves the `PriorityTaskRef` at the given `index` in this `RunQueue`
-    /// to the appropriate location in this `RunQueue` based on its period.
-    ///
-    /// Returns a reference to the underlying `Task`.
-    ///
-    /// Thus, the `PriorityTaskRef will be reinserted into the `RunQueue` so the `RunQueue` contains the
-    /// `PriorityTaskRef`s in order of increasing period. All aperiodic tasks will simply be reinserted at the end of the `RunQueue`
-    /// in order to ensure no aperiodic tasks are selected until there are no periodic tasks ready for execution.
-    /// Afterwards, the number of context switches is incremented by one.
-    /// This function is used when the task is selected by the scheduler.
-    pub fn update_and_reinsert(&mut self, index: usize) -> Option<TaskRef> {
-        if let Some(mut priority_taskref) = self.remove(index) {
-            priority_taskref.increment_context_switches();
-            let taskref = priority_taskref.taskref.clone();
-            self.insert_priority_taskref_at_proper_location(priority_taskref);
-            Some(taskref)
-        }
-        else {
-            None
-        }
-    }
-
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
     pub fn init(which_core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
         trace!("Created runqueue (priority) for core {}", which_core);
+
         let new_rq = PreemptionSafeRwLock::new(RunQueue {
             core: which_core,
-            queue: VecDeque::new(),
+            queue: BinaryHeap::new(),
             idle_task,
         });
 
         if RUNQUEUES.insert(which_core, new_rq).is_some() {
-            error!("BUG: RunQueue::init(): runqueue already exists for core {}!", which_core);
+            error!("BUG: RunQueue::init(): runqueue already exists for core {which_core}!");
             Err("runqueue already exists for this core")
-        }
-        else {
+        } else {
             // there shouldn't already be a RunQueue for this core
             Ok(())
         }
@@ -157,9 +129,10 @@ impl RunQueue {
     /// Returns `RunQueue` for the given core, which is an `apic_id`.
     pub fn get_runqueue(which_core: u8) -> Option<&'static PreemptionSafeRwLock<RunQueue>> {
         RUNQUEUES.get(&which_core)
-    } 
+    }
 
-    /// Returns the "least busy" core, which is currently very simple, based on runqueue size.
+    /// Returns the "least busy" core, which is currently very simple, based on
+    /// runqueue size.
     pub fn get_least_busy_core() -> Option<u8> {
         Self::get_least_busy_runqueue().map(|rq| rq.read().core)
     }
@@ -176,8 +149,7 @@ impl RunQueue {
                 if rq_size < min.1 {
                     min_rq = Some((rq, rq_size));
                 }
-            }
-            else {
+            } else {
                 min_rq = Some((rq, rq_size));
             }
         }
@@ -185,67 +157,43 @@ impl RunQueue {
         min_rq.map(|m| m.0)
     }
 
-    /// Chooses the "least busy" core's runqueue (based on simple runqueue-size-based load balancing)
-    /// and adds the given `Task` reference to that core's runqueue.
+    /// Chooses the "least busy" core's runqueue (based on simple
+    /// runqueue-size-based load balancing) and adds the given `Task`
+    /// reference to that core's runqueue.
     pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
             .ok_or("couldn't find any runqueues to add the task to!")?;
 
-        rq.write().add_task(task, None)
+        rq.write().add_task(task, DEFAULT_PRIORITY)
     }
 
-    /// Convenience method that adds the given `Task` reference to given core's runqueue.
-    pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
+    /// Convenience method that adds the given `Task` reference to given core's
+    /// runqueue.
+    pub fn add_task_to_specific_runqueue(
+        which_core: u8,
+        task: TaskRef,
+    ) -> Result<(), &'static str> {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
             .write()
-            .add_task(task, None)
+            .add_task(task, DEFAULT_PRIORITY)
     }
 
-    /// Inserts a `PriorityTaskRef` at its proper position in the queue.
-    ///
-    /// Under the RMS scheduling algorithm, tasks should be sorted in increasing value 
-    /// of their periods, with aperiodic tasks being placed at the end.
-    fn insert_priority_taskref_at_proper_location(&mut self, taskref: PriorityTaskRef) {
-        match taskref.period {
-            None => self.push_back(taskref),
-            Some(_) => {
-                if self.is_empty() {
-                    self.push_back(taskref);
-                } else {
-                    let mut index_to_insert: Option<usize> = None;
-                    for (index, inserted_taskref) in self.iter().enumerate() {
-                        if taskref.has_smaller_period(inserted_taskref) {
-                            index_to_insert = Some(index);
-                            break;
-                        }
-                    }
-
-                    if let Some(index) = index_to_insert {
-                        self.insert(index, taskref);
-                    } else {
-                        self.push_back(taskref);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Adds a `TaskRef` to this runqueue with the given periodicity value
-    fn add_task(&mut self, task: TaskRef, period: Option<usize>) -> Result<(), &'static str> {
-        debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
-        let priority_taskref = PriorityTaskRef::new(task, period);
-        self.insert_priority_taskref_at_proper_location(priority_taskref);
-
+    /// Adds a `TaskRef` to this runqueue with the given priority value.
+    fn add_task(&mut self, task: TaskRef, priority: u8) -> Result<(), &'static str> {
+        let priority_task = PriorityTaskRef {
+            task,
+            priority,
+            last_ran: Instant::ZERO,
+        };
+        self.queue.push(priority_task);
         Ok(())
     }
-    
+
     /// The internal function that actually removes the task from the runqueue.
     fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
-        debug!("Removing task from runqueue_priority {}, {:?}", self.core, task);
-        self.retain(|x| &x.taskref != task);
-
+        self.queue.retain(|x| &x.task != task);
         Ok(())
     }
 
@@ -254,9 +202,10 @@ impl RunQueue {
         self.remove_internal(task)
     }
 
-    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-    /// 
-    /// This is a brute force approach that iterates over all runqueues. 
+    /// Removes a `TaskRef` from all `RunQueue`s that exist on the entire
+    /// system.
+    ///
+    /// This is a brute force approach that iterates over all runqueues.
     pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
@@ -264,31 +213,52 @@ impl RunQueue {
         Ok(())
     }
 
+    fn get_priority(&self, task: &TaskRef) -> Option<u8> {
+        for t in self.queue.iter() {
+            if t.task == *task {
+                return Some(t.priority);
+            }
+        }
+        None
+    }
+
     pub fn idle_task(&self) -> &TaskRef {
         &self.idle_task
     }
 
-    /// The internal function that sets the periodicity of a given `Task` in a single `RunQueue`
-    /// then reinserts the `PriorityTaskRef` at the proper location
-    fn set_periodicity_internal(
-        &mut self, 
-        task: &TaskRef, 
-        period: usize
-    ) -> Result<(), &'static str> {
-        if let Some(i) = self.iter().position(|rt| &rt.taskref == task) {
-            if let Some(mut priority_taskref) = self.remove(i) {
-                priority_taskref.period = Some(period);
-                self.insert_priority_taskref_at_proper_location(priority_taskref);
-            }
-        };
-        Ok(())
+    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+        let previous_len = self.queue.len();
+        self.queue.retain(|t| t.task != *task);
+
+        if previous_len != self.queue.len() {
+            debug_assert_eq!(self.queue.len() + 1, previous_len);
+            self.queue.push(PriorityTaskRef {
+                // TODO: Don't take reference?
+                task: task.clone(),
+                priority,
+                // Not technically correct, but this will be reset next time it is run.
+                last_ran: Instant::ZERO,
+            });
+            true
+        } else {
+            false
+        }
     }
 }
 
-/// Set the periodicity of a given `Task` in all the `RunQueue` structures
-pub fn set_periodicity(task: &TaskRef, period: usize) -> Result<(), &'static str> {
-    for (_core, rq) in RUNQUEUES.iter() {
-        rq.write().set_periodicity_internal(task, period)?;
+pub fn get_priority(task: &TaskRef) -> Option<u8> {
+    for (_, run_queue) in RUNQUEUES.iter() {
+        if let Some(priority) = run_queue.read().get_priority(task) {
+            return Some(priority);
+        }
     }
-    Ok(())
+    None
+}
+
+pub fn set_priority(task: &TaskRef, priority: u8) {
+    for (_, run_queue) in RUNQUEUES.iter() {
+        if run_queue.write().set_priority(task, priority) {
+            break;
+        }
+    }
 }

@@ -5,14 +5,11 @@ description = "Provides a priority scheduler"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.runqueue_priority]
-path = "../runqueue_priority"
+[dependencies]
+log = "0.4.8"
+runqueue_priority = { path = "../runqueue_priority" }
+task = { path = "../task" }
+time = { path = "../time" }
 
 [lib]
 crate-type = ["rlib"]
