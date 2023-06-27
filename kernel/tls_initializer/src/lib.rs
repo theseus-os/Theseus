@@ -331,7 +331,6 @@ impl TlsInitializer {
             };
             let tls_self_ptr_value = dest_slice.as_ptr() as usize;
             dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
-            log::debug!("TLS data at {:#X}: {:X?}", tls_self_ptr_value, data_copy);
             TlsDataImage {
                 _data: Some(data_copy),
                 ptr:   tls_self_ptr_value,
