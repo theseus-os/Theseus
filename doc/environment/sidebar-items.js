@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["Error","The error type for environment operations."]],"struct":[["Environment","A structure that contains environment state for a given `Task` or group of `Task`s."]],"type":[["Result","A specialized `Result` type for environment operations."]]};
+window.SIDEBAR_ITEMS = {"enum":["Error"],"struct":["Environment"],"type":["Result"]};

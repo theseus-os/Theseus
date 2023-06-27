@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["BindError","Error returned by [`Socket::bind`]"],["RecvError","Error returned by [`Socket::recv`]"],["SendError","Error returned by [`Socket::send`]"]],"struct":[["Socket","A User Datagram Protocol socket."]],"type":[["PacketBuffer","A UDP packet ring buffer."],["PacketMetadata","A UDP packet metadata."]]};
+window.SIDEBAR_ITEMS = {"enum":["BindError","RecvError","SendError"],"struct":["Socket"],"type":["PacketBuffer","PacketMetadata"]};

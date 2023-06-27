@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["FixedSizeBlockAllocator",""]]};
+window.SIDEBAR_ITEMS = {"struct":["FixedSizeBlockAllocator"]};

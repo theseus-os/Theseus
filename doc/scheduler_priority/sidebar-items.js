@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["get_priority",""],["select_next_task","This defines the priority scheduler policy. Returns None if there is no schedule-able task"],["set_priority",""]]};
+window.SIDEBAR_ITEMS = {"fn":["get_priority","select_next_task","set_priority"]};

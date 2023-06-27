@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["PMUResults",""],["PerformanceCounters",""]]};
+window.SIDEBAR_ITEMS = {"struct":["PMUResults","PerformanceCounters"]};

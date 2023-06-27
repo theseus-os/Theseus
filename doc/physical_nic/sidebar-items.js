@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":[["PhysicalNic","This trait must be implemented by any NIC driver that wants to support language-level virtualization. It provides functions that are used to return Rx/Tx queues back to the physical NIC."]]};
+window.SIDEBAR_ITEMS = {"trait":["PhysicalNic"]};

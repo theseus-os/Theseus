@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["TlsInitializerError","Errors that may occur when adding TLS sections to a `TlsInitializer`."]],"struct":[["TlsDataImage","An initialized TLS area data image ready to be used by a new task."],["TlsInitializer","A “factory” that creates Thread-Local Storage (TLS) data images, which are used to initialize a new `Task`’s TLS area."]]};
+window.SIDEBAR_ITEMS = {"enum":["TlsInitializerError"],"struct":["TlsDataImage","TlsInitializer"]};

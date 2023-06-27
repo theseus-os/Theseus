@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["LockedIdt","A thread-safe and interrupt-safe wrapper around [`InterruptDescriptorTable`]. "]]};
+window.SIDEBAR_ITEMS = {"struct":["LockedIdt"]};

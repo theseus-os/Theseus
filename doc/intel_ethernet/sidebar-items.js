@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["descriptors","The different descriptor types used by Intel NICs. Usually the newer NICs use more advanced descriptor types but retain support for older ones. The difference in the types is the amount of packet information that is included in the descriptor, and the format."]]};
+window.SIDEBAR_ITEMS = {"mod":["descriptors"]};

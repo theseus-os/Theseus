@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"ethernet_smoltcp_device":[["impl&lt;N:&nbsp;NetworkInterfaceCard + 'static&gt; NetworkInterface for <a class=\"struct\" href=\"ethernet_smoltcp_device/struct.EthernetNetworkInterface.html\" title=\"struct ethernet_smoltcp_device::EthernetNetworkInterface\">EthernetNetworkInterface</a>&lt;N&gt;"]]
+"ethernet_smoltcp_device":[["impl&lt;N: NetworkInterfaceCard + 'static&gt; NetworkInterface for <a class=\"struct\" href=\"ethernet_smoltcp_device/struct.EthernetNetworkInterface.html\" title=\"struct ethernet_smoltcp_device::EthernetNetworkInterface\">EthernetNetworkInterface</a>&lt;N&gt;"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

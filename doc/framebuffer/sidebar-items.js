@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initializes the final framebuffer based on graphics mode info obtained during boot."]],"mod":[["pixel","Defines the `Pixel` trait as well as basic pixel formats, like RBG/RBGA. "]],"struct":[["Framebuffer","A framebuffer is a region of memory interpreted as a 2-D array of pixels. The memory buffer is a rectangular region with a width and height."]]};
+window.SIDEBAR_ITEMS = {"fn":["init"],"mod":["pixel"],"struct":["Framebuffer"]};

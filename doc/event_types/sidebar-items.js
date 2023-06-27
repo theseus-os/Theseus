@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["Event",""]],"struct":[["KeyboardInputEvent","A keyboard event, indicating that one or more keys were pressed or released."],["MousePositionEvent","An event describing mouse position rather than movement differential from last event. It contains two position, `coodinate` for the relative position in each window, and `gcoordinate` for global absolute position of the screen."]]};
+window.SIDEBAR_ITEMS = {"enum":["Event"],"struct":["KeyboardInputEvent","MousePositionEvent"]};

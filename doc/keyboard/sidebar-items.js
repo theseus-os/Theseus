@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the PS/2 keyboard driver and register its interrupt handler."]]};
+window.SIDEBAR_ITEMS = {"fn":["init"]};

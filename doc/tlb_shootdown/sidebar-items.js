@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["handle_tlb_shootdown_ipi","Handles a TLB shootdown IPI requested by another CPU."],["init","Initializes data, functions, and structures for the TLB shootdown. "]]};
+window.SIDEBAR_ITEMS = {"fn":["handle_tlb_shootdown_ipi","init"]};

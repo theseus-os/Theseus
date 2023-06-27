@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"macro":[["debugit","Formats the given argument using its `Debug` trait definition and returns the `core::fmt::Arguments` containing its Debug output, iff the argument’s type implements the Debug trait. "]],"struct":[["DebugIt","A helper type for using with the `debugit!()` macro."]]};
+window.SIDEBAR_ITEMS = {"macro":["debugit"],"struct":["DebugIt"]};

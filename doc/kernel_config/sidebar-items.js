@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":[["display",""],["memory","The basic virtual address ranges (virtual memory map) defined by Theseus."],["time",""]]};
+window.SIDEBAR_ITEMS = {"mod":["display","memory","time"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init_rx_buf_pool","Initialize the receive buffer pool from where receive buffers are taken and returned"],["init_rx_queue","Steps to create and initialize a receive descriptor queue"],["init_tx_queue","Steps to create and initialize a transmit descriptor queue"]]};
+window.SIDEBAR_ITEMS = {"fn":["init_rx_buf_pool","init_rx_queue","init_tx_queue"]};

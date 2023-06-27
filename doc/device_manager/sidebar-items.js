@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["early_init","Performs early-stage initialization for simple devices needed during early boot."],["init","Initializes all other devices not initialized during [`early_init()`]. "]]};
+window.SIDEBAR_ITEMS = {"fn":["early_init","init"]};

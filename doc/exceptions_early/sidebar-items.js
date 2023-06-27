@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["double_fault_handler","exception 0x08"],["init","Initializes an early IDT with a basic set of early exception handlers that print out basic information when an exception occurs, mostly for debugging."]],"static":[["EARLY_IDT","An initial Interrupt Descriptor Table (IDT) with only very simple CPU exceptions handlers. This is no longer used after interrupts are set up properly, it’s just a failsafe."]]};
+window.SIDEBAR_ITEMS = {"fn":["double_fault_handler","init"],"static":["EARLY_IDT"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["get_first_ioapic","Returns the first `IoApic` that was created, if any, after locking it. This is not necessarily the default one."],["get_ioapic","If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex) and return the locked `IoApic`."],["get_ioapics","Returns a reference to the list of IoApics."]],"struct":[["IoApic","A representation of an IoApic (x86-specific interrupt chip for I/O devices)."]]};
+window.SIDEBAR_ITEMS = {"fn":["get_first_ioapic","get_ioapic","get_ioapics"],"struct":["IoApic"]};

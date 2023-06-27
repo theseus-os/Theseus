@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["CONNECTX5_DEV","Device ID for the ConnectX-5 NIC"],["CONNECTX5_EX_DEV","Device ID for the ConnectX-5-EX NIC"],["MLX_VEND","Vendor ID for Mellanox"]],"fn":[["get_mlx5_nic","Returns a reference to the NIC wrapped in a MutexIrqSafe, if it exists and has been initialized."]],"struct":[["ConnectX5Nic","Struct representing a ConnectX-5 network interface card."]]};
+window.SIDEBAR_ITEMS = {"constant":["CONNECTX5_DEV","CONNECTX5_EX_DEV","MLX_VEND"],"fn":["get_mlx5_nic"],"struct":["ConnectX5Nic"]};

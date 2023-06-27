@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["MouseButtons",""],["MouseEvent",""],["MouseMovementRelative",""]]};
+window.SIDEBAR_ITEMS = {"struct":["MouseButtons","MouseEvent","MouseMovementRelative"]};

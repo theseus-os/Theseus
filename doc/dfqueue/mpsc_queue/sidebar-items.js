@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":[["PopResult","A result of the `pop` function."]],"struct":[["MpscQueue","The multi-producer single-consumer structure. This is not cloneable, but it may be safely shared so long as it is guaranteed that there is only one popper at a time (many pushers are allowed)."]]};
+window.SIDEBAR_ITEMS = {"enum":["PopResult"],"struct":["MpscQueue"]};

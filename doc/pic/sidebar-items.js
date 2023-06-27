@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["IRQ_BASE_OFFSET","The offset added to the first IRQ: `0x20`."],["PIC_SPURIOUS_INTERRUPT_IRQ","The IRQ number reserved for spurious PIC interrupts (as recommended by OS dev wiki)."]],"struct":[["ChainedPics","A pair of chained PIC chips, which represents the standard x86 configuration."],["IrqStatusRegisters","The set of status registers for both PIC chips."]]};
+window.SIDEBAR_ITEMS = {"constant":["IRQ_BASE_OFFSET","PIC_SPURIOUS_INTERRUPT_IRQ"],"struct":["ChainedPics","IrqStatusRegisters"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["drop","Clears the early TLS image"],["insert","Insert the current early TLS image with the given `new_tls_image`, and loads the new image on this CPU."],["reload","Loads the existing (previously-initialized) early TLS image on this CPU."]]};
+window.SIDEBAR_ITEMS = {"fn":["drop","insert","reload"]};

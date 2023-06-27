@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["WaitGuard","An object that holds a blocked `Task` that will be automatically unblocked upon drop."]]};
+window.SIDEBAR_ITEMS = {"struct":["WaitGuard"]};

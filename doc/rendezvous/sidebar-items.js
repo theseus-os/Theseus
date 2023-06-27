@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["new_channel","Creates a new rendezvous channel with the default deadlock prevention method."],["new_channel_with","Creates a new rendezvous channel with the specified deadlock prevention method."]],"struct":[["Receiver","The receiver side of a channel."],["Sender","The sender (transmit) side of a channel."]]};
+window.SIDEBAR_ITEMS = {"fn":["new_channel","new_channel_with"],"struct":["Receiver","Sender"]};

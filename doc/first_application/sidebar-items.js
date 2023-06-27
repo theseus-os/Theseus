@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["start","Starts the first applications that run in Theseus  by creating a new “default” application namespace and spawning the first application `Task`(s). "]]};
+window.SIDEBAR_ITEMS = {"fn":["start"]};

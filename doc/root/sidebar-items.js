@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["ROOT_DIRECTORY_NAME",""]],"fn":[["get_root","Returns a reference to the root directory."]],"struct":[["ROOT","The root directory Returns a tuple for easy access to the name of the root so we don’t have to lock it"],["RootDirectory","A struct that represents a node in the VFS "]]};
+window.SIDEBAR_ITEMS = {"constant":["ROOT_DIRECTORY_NAME"],"fn":["get_root"],"struct":["ROOT","RootDirectory"]};

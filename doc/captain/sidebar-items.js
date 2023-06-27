@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the Captain, which is the main crate that “steers the ship” of Theseus. "]],"struct":[["DropAfterInit","Items that must be held until the end of [`init()`] and should be dropped after."],["MulticoreBringupInfo","Information needed to bring up APs (secondary CPUs) on x86_64."]]};
+window.SIDEBAR_ITEMS = {"fn":["init"],"struct":["DropAfterInit","MulticoreBringupInfo"]};

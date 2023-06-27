@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init_memory_management","Initializes the virtual memory management system and returns a MemoryManagementInfo instance, which represents the initial (kernel) address space. "]]};
+window.SIDEBAR_ITEMS = {"fn":["init_memory_management"]};

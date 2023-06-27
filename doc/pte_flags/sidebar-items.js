@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["PTE_FRAME_MASK","A mask for the bits of a page table entry that contain the physical frame address."]],"struct":[["PteFlags","Common, architecture-independent flags for a page table entry (PTE) that define how a page is mapped."],["PteFlagsAarch64","Page table entry (PTE) flags on aarch64."],["PteFlagsArch","Page table entry (PTE) flags on x86_64."],["PteFlagsX86_64","Page table entry (PTE) flags on x86_64."]]};
+window.SIDEBAR_ITEMS = {"constant":["PTE_FRAME_MASK"],"struct":["PteFlags","PteFlagsAarch64","PteFlagsArch","PteFlagsX86_64"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["Window","This struct is the application-facing representation of a window."]],"type":[["FramebufferRef","A wrapper around a locked inner window that immutably derefs to a `Framebuffer`."],["FramebufferRefMut","A wrapper around a locked inner window that mutably derefs to a `Framebuffer`."]]};
+window.SIDEBAR_ITEMS = {"struct":["Window"],"type":["FramebufferRef","FramebufferRefMut"]};

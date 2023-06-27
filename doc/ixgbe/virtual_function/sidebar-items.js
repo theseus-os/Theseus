@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["create_virtual_nic","Create a virtual NIC from the ixgbe device."]]};
+window.SIDEBAR_ITEMS = {"fn":["create_virtual_nic"]};

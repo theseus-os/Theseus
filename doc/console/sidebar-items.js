@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["ignore_serial_port_input","Configures the console connection listener to ignore inputs from the given serial port."],["start_connection_detection","Starts a new task that detects new console connections by waiting for new data to be received on serial ports."]]};
+window.SIDEBAR_ITEMS = {"fn":["ignore_serial_port_input","start_connection_detection"]};

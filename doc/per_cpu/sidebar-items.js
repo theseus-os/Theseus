@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initializes the current CPU’s `PerCpuData`."]],"struct":[["CpuLocalCpuId","An immutable type wrapper for this CPU’s unique ID, kept in CPU-local storage."],["PerCpuData","The data stored on a per-CPU basis in Theseus."]]};
+window.SIDEBAR_ITEMS = {"fn":["init"],"struct":["CpuLocalCpuId","PerCpuData"]};

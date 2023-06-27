@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["new_waker","Creates a new waker and blocker pair that are associated with each other."]],"struct":[["Blocker","A blocker that blocks until the associated waker is woken."]]};
+window.SIDEBAR_ITEMS = {"fn":["new_waker"],"struct":["Blocker"]};

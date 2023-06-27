@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["WaitQueue","A queue of tasks waiting for an event to occur."]]};
+window.SIDEBAR_ITEMS = {"struct":["WaitQueue"]};

@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"macro":[["thread_local","Declare a new thread local storage key of type [`LocalKey`]."]],"struct":[["AccessError","An error returned by `LocalKey::try_with`."],["LocalKey","A thread-local storage key which owns its contents."]]};
+window.SIDEBAR_ITEMS = {"macro":["thread_local"],"struct":["AccessError","LocalKey"]};

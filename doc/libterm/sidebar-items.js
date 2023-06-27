@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["FONT_BACKGROUND_COLOR",""],["FONT_FOREGROUND_COLOR",""]],"enum":[["ScrollError","Error type for tracking different scroll errors that a terminal application could encounter."]],"mod":[["cursor",""]],"struct":[["Terminal","An instance of a graphical terminal emulator."]]};
+window.SIDEBAR_ITEMS = {"constant":["FONT_BACKGROUND_COLOR","FONT_FOREGROUND_COLOR"],"enum":["ScrollError"],"mod":["cursor"],"struct":["Terminal"]};

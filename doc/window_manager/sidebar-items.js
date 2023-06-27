@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["init","Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices."]],"static":[["WINDOW_MANAGER","The instance of the default window manager"]],"struct":[["WindowManager","Window manager structure which maintains a list of windows and a mouse."]]};
+window.SIDEBAR_ITEMS = {"fn":["init"],"static":["WINDOW_MANAGER"],"struct":["WindowManager"]};

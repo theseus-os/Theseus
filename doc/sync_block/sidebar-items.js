@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["Block","A synchronisation flavour that blocks the current thread while waiting for the lock to become available."],["Condvar","A condition variable."]],"type":[["Mutex",""],["MutexGuard",""],["RwLock",""],["RwLockReadGuard",""],["RwLockWriteGuard",""]]};
+window.SIDEBAR_ITEMS = {"struct":["Block","Condvar"],"type":["Mutex","MutexGuard","RwLock","RwLockReadGuard","RwLockWriteGuard"]};

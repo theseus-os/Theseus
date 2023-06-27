@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["FRAMEBUFFER_MAX_RESOLUTION","The maximum resolution `(width, height)` of the graphical framebuffer, in pixels. This is a requested limit and does not control what the actual resolution of the graphical framebuffer will be."]]};
+window.SIDEBAR_ITEMS = {"constant":["FRAMEBUFFER_MAX_RESOLUTION"]};

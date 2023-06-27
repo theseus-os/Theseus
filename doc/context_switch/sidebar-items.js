@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["context_switch","Switches context from an SSE Task to another SSE Task."],["read_first_register","Reads the value of the first register from the actual CPU register hardware."]],"struct":[["Context","The registers saved before a context switch and restored after a context switch for SSE-enabled Tasks."]]};
+window.SIDEBAR_ITEMS = {"fn":["context_switch","read_first_register"],"struct":["Context"]};

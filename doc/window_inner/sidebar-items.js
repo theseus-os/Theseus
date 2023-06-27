@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"constant":[["DEFAULT_BORDER_SIZE",""],["DEFAULT_TITLE_BAR_HEIGHT",""]],"enum":[["WindowMovingStatus","Whether a window is moving (being dragged by the mouse)."]],"struct":[["WindowInner","The `WindowInner` struct is the internal system-facing representation of a window.  Its members and functions describe the size, state, and events related to window handling, including elements like:"]]};
+window.SIDEBAR_ITEMS = {"constant":["DEFAULT_BORDER_SIZE","DEFAULT_TITLE_BAR_HEIGHT"],"enum":["WindowMovingStatus"],"struct":["WindowInner"]};

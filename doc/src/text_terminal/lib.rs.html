@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-1f7d512b176f0f72.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-124a1ca42af929b6.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-fbcde169c4acde5f.css" id="mainThemeStyle"><link rel="stylesheet" id="themeStyle" href="../../static.files/light-4743e13df3dfe8c4.css"><link rel="stylesheet" disabled href="../../static.files/dark-0e1b889528bd466b.css"><link rel="stylesheet" disabled href="../../static.files/ayu-65289d5d067c7c66.css"><script id="default-settings" ></script><script src="../../static.files/storage-d43fa987303ecbbb.js"></script><script defer src="../../static.files/source-script-ea63cb6500f71309.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-bc1b32400f872ddb.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-5ec35bf9ca753509.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/text_terminal/src/lib.rs`."><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-f40c346f39d9abc1.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="text_terminal" data-themes="" data-resource-suffix="" data-rustdoc-version="1.72.0-nightly (065a1f5df 2023-06-21)" data-search-js="search-95c92dd01058facf.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-190c35055d2a8300.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../text_terminal/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2329,16 +2329,7 @@
 <a href="#2329" id="2329">2329</a>
 <a href="#2330" id="2330">2330</a>
 <a href="#2331" id="2331">2331</a>
-<a href="#2332" id="2332">2332</a>
-<a href="#2333" id="2333">2333</a>
-<a href="#2334" id="2334">2334</a>
-<a href="#2335" id="2335">2335</a>
-<a href="#2336" id="2336">2336</a>
-<a href="#2337" id="2337">2337</a>
-<a href="#2338" id="2338">2338</a>
-<a href="#2339" id="2339">2339</a>
-<a href="#2340" id="2340">2340</a>
-</pre><pre class="rust"><code><span class="doccomment">//! A text-mode terminal emulator. 
+</pre></div><pre class="rust"><code><span class="doccomment">//! A text-mode terminal emulator. 
 //!
 //! This provides basic support for various standards of control codes and escape sequences:
 //! * ANSI
@@ -2364,7 +2355,7 @@
 
 </span><span class="attr">#![allow(clippy::range_plus_one)]
 #![no_std]
-#![feature(drain_filter)]
+#![feature(extract_if)]
 
 </span><span class="comment">// TODO: FIXME: remove this once the implementation is complete.
 </span><span class="attr">#![allow(dead_code, unused_variables, unused_imports)]
@@ -2676,7 +2667,7 @@
         //       merge the next line into the current line.
 
         </span><span class="kw">let </span>_removed_unit = <span class="self">self</span>.units.remove(index.<span class="number">0</span>);
-        <span class="kw">let </span>_removed_continuance_units = <span class="self">self</span>.units.drain_filter(|unit| unit.wide.is_continuance());
+        <span class="kw">let </span>_removed_continuance_units = <span class="self">self</span>.units.extract_if(|unit| unit.wide.is_continuance());
 
         <span class="kw">let </span>num_removed_continuance_units = <span class="kw">if </span><span class="bool-val">false </span>{
             _removed_continuance_units.count()
@@ -3875,9 +3866,10 @@
     </span>style: CursorStyle,
 }
 
-<span class="attr">#[derive(Debug)]
+<span class="attr">#[derive(Debug, Default)]
 </span><span class="kw">pub enum </span>CursorStyle {
     <span class="doccomment">/// A rectangle that covers the entire character box. This is the default.
+    </span><span class="attr">#[default]
     </span>FilledBox,
     <span class="doccomment">/// A line beneath the character box.
     </span>Underscore,
@@ -3886,12 +3878,6 @@
     <span class="doccomment">/// An empty box that surrounds the character but does not occlude it.
     </span>EmptyBox,
 }
-<span class="kw">impl </span>Default <span class="kw">for </span>CursorStyle {
-    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-        CursorStyle::FilledBox
-    }
-}
-
 
 
 <span class="doccomment">/// Advances the cursor&#39;s screen coordinate forward by the given number of columns,
@@ -4640,11 +4626,12 @@ is actually handled and processed.&quot;</span>]
 }
 
 <span class="doccomment">/// The kinds of Units and how they correspond to previous Units in the same Line.
-</span><span class="attr">#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+</span><span class="attr">#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 </span><span class="kw">enum </span>WideDisplayedUnit {
     <span class="doccomment">/// (Default) This Unit is not part of any wide-displayed character sequence,
     /// and is completely standlone with no relationship to other adjacent Units.
     /// Thus, the character sequence in this `Unit` is guaranteed to display within one Column.
+    </span><span class="attr">#[default]
     </span><span class="prelude-val">None</span>,
     <span class="doccomment">/// This Unit is the beginning of a tab character.
     /// As such, this unit contains a [`Character::Single`]`(&#39;\t&#39;)`.
@@ -4658,11 +4645,6 @@ is actually handled and processed.&quot;</span>]
     <span class="doccomment">/// This Unit is a continuance for a previously-existing wide non-tab character
     ///, e.g., emoji, Chinese character, etc.
     </span>MultiFill,
-}
-<span class="kw">impl </span>Default <span class="kw">for </span>WideDisplayedUnit {
-    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
-        WideDisplayedUnit::None
-    }
 }
 <span class="kw">impl </span>WideDisplayedUnit {
     <span class="doccomment">/// A continuance Unit is one that occupies space as a continuance
@@ -4678,5 +4660,4 @@ is actually handled and processed.&quot;</span>]
 </span><span class="kw">const fn </span>round_down(value: usize, multiple: usize) -&gt; usize {
     (value / multiple) * multiple
 }
-</code></pre></div>
-</section></main><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="text_terminal" data-themes="" data-resource-suffix="" data-rustdoc-version="1.68.0-nightly (0442fbabe 2023-01-10)" data-search-js="search-181581080540673f.js" data-settings-js="settings-bebeae96e00e4617.js" data-settings-css="settings-58836c674e2f7bd2.css" ></div></body></html>
+</code></pre></div></section></main></body></html>

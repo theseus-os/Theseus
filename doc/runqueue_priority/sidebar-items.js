@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":[["get_priority",""],["set_priority",""]],"struct":[["PriorityTaskRef","A reference to a task with its period for priority scheduling."],["RunQueue","A list of `Task`s and their associated priority scheduler data that may be run on a given CPU core."]]};
+window.SIDEBAR_ITEMS = {"fn":["get_priority","set_priority"],"struct":["PriorityTaskRef","RunQueue"]};

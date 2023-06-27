@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"trait":[["Displayable","The `Displayable` trait is an abstraction for any object that can display itself onto a framebuffer.  Examples include a text box, button, window border, etc."]]};
+window.SIDEBAR_ITEMS = {"trait":["Displayable"]};

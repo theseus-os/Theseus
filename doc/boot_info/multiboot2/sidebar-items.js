@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["MemoryRegions",""]]};
+window.SIDEBAR_ITEMS = {"struct":["MemoryRegions"]};

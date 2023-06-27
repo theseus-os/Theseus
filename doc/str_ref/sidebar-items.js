@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":[["StrRef","A wrapper around an `Arc<str>`: an immutable shared reference to a string slice."]]};
+window.SIDEBAR_ITEMS = {"struct":["StrRef"]};
