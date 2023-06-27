@@ -6,20 +6,14 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate mod_mgmt;
-extern crate task;
-extern crate unwind;
-extern crate stack_trace;
-extern crate stack_trace_frame_pointers;
-extern crate fault_log;
 
 use core::panic::PanicInfo;
-// use alloc::string::String;
-use memory::VirtualAddress;
-use task::{KillReason, PanicInfoOwned};
+use log::{debug, trace};
 use fault_log::log_panic_entry;
+use task::{KillReason, PanicInfoOwned};
+
+#[cfg(target_arch = "x86_64")]
+use log::{error, warn};
 
 /// Performs the standard panic handling routine, which involves the following:
 /// 
@@ -33,7 +27,8 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
     log_panic_entry (panic_info);
     // fault_log::print_fault_log();
 
-    // print a stack trace
+    // Print a stack trace. Not yet supported on aarch64
+    #[cfg(target_arch = "x86_64")] {
     let stack_trace_result = {
         // By default, we use DWARF-based debugging stack traces
         #[cfg(not(frame_pointers))] {
@@ -41,7 +36,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
             stack_trace::stack_trace(
                 &mut |stack_frame, stack_frame_iter| {
                     let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                        VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                        memory::VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
                         false
                     ).map(|(sec, offset)| (sec.name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
@@ -72,7 +67,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
             let mmi = mmi_ref.lock();
             stack_trace_frame_pointers::stack_trace_using_frame_pointers(
                 &mmi.page_table,
-                &mut |_frame_pointer, instruction_pointer: VirtualAddress| {
+                &mut |_frame_pointer, instruction_pointer: memory::VirtualAddress| {
                     let symbol_offset = namespace.get_section_containing_address(instruction_pointer, false)
                         .map(|(sec, offset)| (sec.name.clone(), offset));
                     if let Some((symbol_name, offset)) = symbol_offset {
@@ -91,6 +86,7 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         Err(e) => error!("  {}", e),
     }
     error!("------------------------------------------------------------------");
+    }
 
     // Call this task's kill handler, if it has one.
     if let Some(ref kh_func) = task::take_kill_handler() {
@@ -100,7 +96,11 @@ pub fn panic_wrapper(panic_info: &PanicInfo) -> Result<(), &'static str> {
         debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
     }
 
-    // Start the unwinding process
+    // Start the unwinding process. Not yet supported on aarch64
+    #[cfg(not(target_arch = "x86_64"))] {
+        Err("Unwinding is currently only supported on x86_64")
+    }
+    #[cfg(target_arch = "x86_64")]
     {
         let cause = KillReason::Panic(PanicInfoOwned::from(panic_info));
         match unwind::start_unwinding(cause, 5) {

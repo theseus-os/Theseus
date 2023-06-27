@@ -1164,6 +1164,7 @@ dependencies = [
 name = "first_application"
 version = "0.1.0"
 dependencies = [
+ "hello",
  "log",
  "mod_mgmt",
  "path",
@@ -1467,7 +1468,6 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
- "app_io",
  "log",
 ]
 
