@@ -415,6 +415,8 @@
 <a href="#415" id="415">415</a>
 <a href="#416" id="416">416</a>
 <a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A basic ASCII text printer for early text output to a graphical framebuffer
 //! or text-mode VGA display.
 //!
@@ -812,7 +814,7 @@
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>print {
     ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
-        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">::core::format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
     });
 }
 
@@ -820,8 +822,10 @@
 /// to the early framebuffer writer, if it has been initialized.
 </span><span class="attr">#[macro_export]
 </span><span class="macro">macro_rules! </span>println {
-    (<span class="macro-nonterminal">$fmt</span>:expr) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>)));
-    (<span class="macro-nonterminal">$fmt</span>:expr, $(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="macro">concat!</span>(<span class="macro-nonterminal">$fmt</span>, <span class="string">&quot;\n&quot;</span>), $(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>));
+    () =&gt; (<span class="macro-nonterminal">$</span><span class="macro">crate::print!</span>(<span class="string">&quot;\n&quot;</span>));
+    ($(<span class="macro-nonterminal">$arg</span>:tt)<span class="kw-2">*</span>) =&gt; ({
+        <span class="kw">let _ </span>= <span class="macro-nonterminal">$crate::print_args_raw</span>(<span class="macro">::core::format_args!</span>(<span class="string">&quot;{}\n&quot;</span>, <span class="macro">::core::format_args!</span>($(<span class="macro-nonterminal">$arg</span>)<span class="kw-2">*</span>)));
+    });
 }
 
 <span class="attr">#[doc(hidden)]
