@@ -40,13 +40,9 @@ use crate_name_utils::get_containing_crate_name;
 
 /// calls println!() and then log!()
 macro_rules! println_log {
-    ($fmt:expr) => {
-        debug!($fmt);
-        print!(concat!($fmt, "\n"));
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        debug!($fmt, $($arg)*);
-        print!(concat!($fmt, "\n"), $($arg)*);
+    ($($arg:tt)*) => {
+        debug!($($arg)*);
+        println!($($arg)*);
     };
 }
 
