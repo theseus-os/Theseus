@@ -896,6 +896,7 @@ fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
+#[allow(clippy::extra_unused_type_parameters)]
 fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: ExitableTaskRef) -> ! 
     where A: Send + 'static, 
           R: Send + 'static,

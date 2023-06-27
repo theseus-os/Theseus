@@ -47,7 +47,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("r", "receive", "Test receive functionality. 
     If this flag is enabled then the program will never terminate since the queues are endlessly polled for incoming packets.");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

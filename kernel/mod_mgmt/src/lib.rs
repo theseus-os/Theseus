@@ -1015,7 +1015,7 @@ impl CrateNamespace {
             // Tell the existing target_sec that it no longer depends on the old source section (old_sec),
             // and that it now depends on the new source_sec.
             let mut found_strong_dependency = false;
-            for mut strong_dep in target_sec.inner.write().sections_i_depend_on.iter_mut() {
+            for strong_dep in target_sec.inner.write().sections_i_depend_on.iter_mut() {
                 if Arc::ptr_eq(&strong_dep.section, old_section) && strong_dep.relocation == relocation_entry {
                     strong_dep.section = Arc::clone(new_section);
                     found_strong_dependency = true;

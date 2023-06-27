@@ -43,7 +43,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optopt("d", "directory-crates", "the absolute path of the base directory where new crates will be loaded from", "PATH");
     opts.optmulti("t", "state-transfer", "the fully-qualified symbol names of state transfer functions, to be run in the order given", "SYMBOL");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

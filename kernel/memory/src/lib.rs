@@ -23,14 +23,31 @@ pub use self::paging::{
 };
 
 pub use memory_structs::*;
-pub use page_allocator::*;
-pub use frame_allocator::*;
+pub use page_allocator::{
+    AllocatedPages,
+    AllocationRequest,
+    allocate_pages,
+    allocate_pages_at,
+    allocate_pages_by_bytes,
+    allocate_pages_by_bytes_at,
+    allocate_pages_in_range,
+    allocate_pages_by_bytes_in_range,
+    dump_page_allocator_state,
+};
+pub use frame_allocator::{
+    AllocatedFrames,
+    allocate_frames,
+    allocate_frames_at,
+    allocate_frames_by_bytes,
+    allocate_frames_by_bytes_at,
+    dump_frame_allocator_state,
+};
 
 #[cfg(target_arch = "x86_64")]
-use memory_x86_64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr };
+use memory_x86_64::{tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds, get_vga_mem_addr};
 
 #[cfg(target_arch = "aarch64")]
-use memory_aarch64::{ tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds };
+use memory_aarch64::{tlb_flush_virt_addr, tlb_flush_all, get_p4, find_section_memory_bounds};
 
 pub use pte_flags::*;
 
@@ -38,8 +55,8 @@ use boot_info::{BootInformation, MemoryRegion};
 use log::debug;
 use spin::Once;
 use irq_safety::MutexIrqSafe;
-use alloc::vec::Vec;
-use alloc::sync::Arc;
+use alloc::{sync::Arc, vec::Vec};
+use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
 use no_drop::NoDrop;
 pub use kernel_config::memory::PAGE_SIZE;
 
@@ -281,8 +298,8 @@ pub fn init_post_heap(
 ) -> MmiRef {
     // HERE: heap is initialized! We can now use `alloc` types.
 
-    page_allocator::convert_to_heap_allocated();
-    frame_allocator::convert_to_heap_allocated();
+    page_allocator::convert_page_allocator_to_heap_based();
+    frame_allocator::convert_frame_allocator_to_heap_based();
 
     let extra_mapped_pages = alloc::vec![additional_mapped_pages, heap_mapped_pages];
    
