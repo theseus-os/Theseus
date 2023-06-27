@@ -1510,6 +1510,7 @@ name = "hull"
 version = "0.1.0"
 dependencies = [
  "app_io",
+ "atomic_linked_list",
  "core2",
  "embedded-hal",
  "hashbrown",

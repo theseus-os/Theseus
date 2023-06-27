@@ -22,7 +22,7 @@ pub enum Error {
     /// Failed to kill a task.
     KillFailed,
     /// Failed to spawn a task.
-    SpawnFailed,
+    SpawnFailed(&'static str),
     /// Failed to unblock a task.
     ///
     /// The current runstate is stored in the field.

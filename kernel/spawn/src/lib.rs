@@ -206,10 +206,17 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 ///    meaning that the new application crate will be linked against the crates within that new namespace. 
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
 /// 
-pub fn new_application_task_builder(
+pub fn new_application_task_builder<F>(
     crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
-) -> Result<TaskBuilder<MainFunc, MainFuncArg, MainFuncRet>, &'static str> {
+    cleanup_function: F,
+) -> Result<
+    TaskBuilder<impl FnOnce(MainFuncArg) -> MainFuncRet, MainFuncArg, MainFuncRet>,
+    &'static str,
+>
+where
+    F: FnOnce(),
+{
     
     let namespace = new_namespace
         .or_else(|| task::with_current_task(|t| t.get_namespace().clone()).ok())
@@ -239,12 +246,19 @@ pub fn new_application_task_builder(
     let main_func_sec = main_func_sec_opt.ok_or("spawn::new_application_task_builder(): couldn't find \"main\" function, expected function name like \"<crate_name>::main::<hash>\"\
         --> Is this an app-level library or kernel crate? (Note: you cannot spawn a library crate with no main function)")?;
     // SAFETY: None. There is a lint in compiler_plugins/application_main_fn.rs, but it's currently disabled.
-    let main_func = unsafe { main_func_sec.as_func::<MainFunc>() }?;
+    let main_func = *unsafe { main_func_sec.as_func::<MainFunc>() }?;
 
     // Create the underlying task builder. 
     // Give it a default name based on the app crate's name, but that can be changed later. 
-    let mut tb = TaskBuilder::new(*main_func, MainFuncArg::default())
-        .name(app_crate_ref.lock_as_ref().crate_name.to_string()); 
+    let mut tb = TaskBuilder::new(
+        move |args| {
+            let result = main_func(args);
+            cleanup_function();
+            result
+        },
+        MainFuncArg::default(),
+    )
+    .name(app_crate_ref.lock_as_ref().crate_name.to_string());
 
     // Once the new application task is created (but before its scheduled in),
     // ensure it has the relevant app-specific fields set properly.
@@ -295,7 +309,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
 {
     /// Creates a new `Task` from the given function `func`
     /// that will be passed the argument `arg` when spawned. 
-    fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
+    pub fn new(func: F, argument: A) -> TaskBuilder<F, A, R> {
         TaskBuilder {
             argument,
             func,

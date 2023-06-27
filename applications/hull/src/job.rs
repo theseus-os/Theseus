@@ -1,14 +1,20 @@
 //! Shell job control.
 
+use core::fmt;
+
 use crate::{Error, Result};
-use alloc::vec::Vec;
+use alloc::{string::String, vec::Vec};
 use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
 
 /// A shell job consisting of multiple parts.
 ///
 /// E.g. `sleep 5 | sleep 10` is one job consisting of two job parts.
-#[derive(Debug)]
+///
+/// Backgrounded tasks (e.g. `sleep 1` in `sleep 1 & sleep 2`) are a separate
+/// job.
+#[derive(Debug, Default)]
 pub(crate) struct Job {
+    pub(crate) line: String,
     pub(crate) parts: Vec<JobPart>,
 }
 
@@ -18,7 +24,7 @@ impl Job {
             part.task
                 .kill(KillReason::Requested)
                 .map_err(|_| Error::KillFailed)?;
-            part.state = State::Complete(130);
+            part.state = State::Done(130);
         }
         Ok(())
     }
@@ -63,14 +69,14 @@ impl Job {
                         KillReason::Exception(num) => num.into(),
                     },
                 };
-                part.state = State::Complete(exit_value);
+                part.state = State::Done(exit_value);
             }
         }
         self.exit_value()
     }
 
     pub(crate) fn exit_value(&mut self) -> Option<isize> {
-        if let State::Complete(value) = self.parts.last()?.state {
+        if let State::Done(value) = self.parts.last()?.state {
             Some(value)
         } else {
             None
@@ -86,16 +92,26 @@ pub(crate) struct JobPart {
 
 #[derive(Debug)]
 pub(crate) enum State {
-    Complete(isize),
+    Done(isize),
     Suspended,
     Running,
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Done(_) => write!(f, "done"),
+            Self::Suspended => write!(f, "suspended"),
+            Self::Running => write!(f, "running"),
+        }
+    }
 }
 
 impl core::cmp::PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
         matches!(
             (self, other),
-            (State::Complete(_), State::Complete(_))
+            (State::Done(_), State::Done(_))
                 | (State::Suspended, State::Suspended)
                 | (State::Running, State::Running)
         )

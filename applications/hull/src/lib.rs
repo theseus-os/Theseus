@@ -20,18 +20,30 @@ mod wrapper;
 pub use error::{Error, Result};
 
 use crate::job::{JobPart, State};
-use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec, vec::Vec};
+use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
 use app_io::println;
-use core::fmt::Write;
-use hashbrown::HashMap;
+use atomic_linked_list::atomic_map::AtomicMap;
+use core::{fmt::Write, mem};
 use job::Job;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
 use tty::{Event, LineDiscipline};
 
 pub fn main(_: Vec<String>) -> isize {
-    Shell::run().expect("shell failed");
-    0
+    let mut shell = Shell {
+        discipline: app_io::line_discipline().expect("no line discipline"),
+        jobs: Arc::new(AtomicMap::new()),
+        stop_order: Vec::new(),
+        history: Vec::new(),
+    };
+    let result = shell.run();
+    shell.set_app_discipline();
+    if let Err(e) = result {
+        println!("{e:?}");
+        -1
+    } else {
+        0
+    }
 }
 
 pub struct Shell {
@@ -39,22 +51,9 @@ pub struct Shell {
     // TODO: Could use a vec-based data structure like Vec<Option<JoinableTaskRef>
     // Adding a job would iterate over the vec trying to find a None and if it can't, push to the
     // end. Removing a job would replace the job with None.
-    jobs: HashMap<usize, Job>,
+    jobs: Arc<AtomicMap<usize, Job>>,
     stop_order: Vec<usize>,
-}
-
-impl Shell {
-    /// Creates a new shell and runs it.
-    pub fn run() -> Result<()> {
-        let mut shell = Self {
-            discipline: app_io::line_discipline().expect("no line discipline"),
-            jobs: HashMap::new(),
-            stop_order: Vec::new(),
-        };
-        let result = shell.run_inner();
-        shell.set_app_discipline();
-        result
-    }
+    history: Vec<String>,
 }
 
 impl Shell {
@@ -68,7 +67,7 @@ impl Shell {
         self.discipline.set_sane();
     }
 
-    fn run_inner(&mut self) -> Result<()> {
+    fn run(&mut self) -> Result<()> {
         self.set_shell_discipline();
 
         let wrapper = wrapper::Wrapper {
@@ -84,7 +83,7 @@ impl Shell {
         loop {
             editor.dedup_history();
             if let Ok(line) = editor.readline("> ", &mut io) {
-                match self.execute(line) {
+                match self.execute_line(line) {
                     Ok(()) => {}
                     Err(Error::ExitRequested) => return Ok(()),
                     Err(e) => return Err(e),
@@ -95,17 +94,113 @@ impl Shell {
         }
     }
 
-    fn execute(&mut self, line: &str) -> Result<()> {
+    fn execute_line(&mut self, line: &str) -> Result<()> {
         // TODO: | and &
 
-        let (cmd, args) = if let Some((cmd, args_str)) = line.split_once(' ') {
-            let args = args_str.split(' ').collect::<Vec<_>>();
-            (cmd, args)
-        } else {
-            (line, Vec::new())
+        self.history.push(line.to_owned());
+
+        let mut temp_job = Job {
+            line: line.to_owned(),
+            parts: Vec::new(),
+        };
+        for cmd in parse_line(line) {
+            match self.execute_cmd(cmd, &mut temp_job) {
+                Ok(()) => continue,
+                Err(Error::ExitRequested) => return Err(Error::ExitRequested),
+                Err(Error::CurrentTaskUnavailable) => return Err(Error::CurrentTaskUnavailable),
+                Err(Error::Command(exit_code)) => println!("exit {}", exit_code),
+                Err(Error::CommandNotFound(command)) => println!("{}: command not found", command),
+                Err(Error::SpawnFailed(s)) => println!("failed to spawn task: {s}"),
+                Err(Error::KillFailed) => println!("failed to kill task"),
+                Err(Error::UnblockFailed(state)) => {
+                    println!("failed to unblock task with state {:?}", state)
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn execute_cmd(&mut self, cmd: Command, temp_job: &mut Job) -> Result<()> {
+        match cmd {
+            // TODO: Handle internal backgrounded commands.
+            Command::Backgrounded(cmd, args) => {
+                let job_part = self.resolve_external(cmd, args)?;
+                temp_job.parts.push(job_part);
+                let mut job = mem::take(temp_job);
+                job.unblock()?;
+                self.insert_job(job);
+                Ok(())
+            }
+            // TODO: Handle internal piped commands.
+            Command::Piped(cmd, args) => {
+                let job_part = self.resolve_external(cmd, args)?;
+                todo!("handle io");
+                temp_job.parts.push(job_part);
+            }
+            Command::None(cmd, args) => {
+                if let Some(result) = self.execute_builtin(cmd, &args) {
+                    result
+                } else {
+                    let job_part = self.resolve_external(cmd, args)?;
+                    temp_job.parts.push(job_part);
+                    let mut job = mem::take(temp_job);
+                    job.unblock()?;
+                    let num = self.insert_job(job);
+                    self.wait_on_job(num)?;
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    // We can't do anything use
+    fn insert_job(&mut self, mut job: Job) -> usize {
+        let mut num = 1;
+        loop {
+            match self.jobs.try_insert(num, job) {
+                Ok(_) => return num,
+                Err(e) => {
+                    job = e.value;
+                }
+            }
+            num += 1;
+        }
+    }
+
+    fn wait_on_job(&mut self, num: usize) -> Result<()> {
+        let Some(job) = self.jobs.get_mut(num) else {
+            return Ok(())
         };
 
-        let result = match cmd {
+        self.discipline.clear_events();
+        loop {
+            // TODO: Use async futures::select! loop?
+            if let Ok(event) = self.discipline.event_receiver().try_receive() {
+                return match event {
+                    Event::CtrlC => {
+                        job.kill()?;
+                        // self.jobs.remove(&num);
+                        Err(Error::Command(130))
+                    }
+                    Event::CtrlD => todo!(),
+                    Event::CtrlZ => {
+                        job.suspend();
+                        todo!();
+                    }
+                };
+            } else if let Some(exit_value) = job.update() {
+                // self.jobs.remove(&num);
+                return match exit_value {
+                    0 => Ok(()),
+                    _ => Err(Error::Command(exit_value)),
+                };
+            }
+        }
+    }
+
+    fn execute_builtin(&mut self, cmd: &str, args: &Vec<&str>) -> Option<Result<()>> {
+        Some(match cmd {
             "" => Ok(()),
             "alias" => self.alias(args),
             "bg" => self.bg(args),
@@ -117,87 +212,20 @@ impl Shell {
             "fg" => self.fg(args),
             "getopts" => self.getopts(args),
             "hash" => self.hash(args),
-            "history" => self.history(args),
+            "history" => {
+                self.history(args);
+                Ok(())
+            }
             "jobs" => self.jobs(args),
             "set" => self.set(args),
             "unalias" => self.unalias(args),
             "unset" => self.unset(args),
             "wait" => self.wait(args),
-            _ => self.execute_external(cmd, args),
-        };
-
-        match result {
-            Ok(()) => Ok(()),
-            Err(Error::ExitRequested) | Err(Error::CurrentTaskUnavailable) => result,
-            Err(Error::Command(exit_code)) => {
-                println!("exit {}", exit_code);
-                Ok(())
-            }
-            Err(Error::CommandNotFound(command)) => {
-                println!("{}: command not found", command);
-                Ok(())
-            }
-            Err(Error::SpawnFailed) => {
-                println!("failed to spawn task");
-                Ok(())
-            }
-            Err(Error::KillFailed) => {
-                println!("failed to kill task");
-                Ok(())
-            }
-            Err(Error::UnblockFailed(state)) => {
-                println!("failed to unblock task with state {:?}", state);
-                Ok(())
-            }
-        }
+            _ => return None,
+        })
     }
 
-    // TODO: Use guards to reset line disciplines rather than an extra function.
-    fn execute_external(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
-        self.set_app_discipline();
-        let result = self.execute_external_inner(cmd, args);
-        self.set_shell_discipline();
-        result
-    }
-
-    fn execute_external_inner(&mut self, cmd: &str, args: Vec<&str>) -> Result<()> {
-        let mut job = self.resolve_external(cmd, args)?;
-
-        let mut num = 1;
-        while self.jobs.contains_key(&num) {
-            num += 1;
-        }
-
-        job.unblock()?;
-        // We just checked that num isn't in self.jobs.
-        let job = self.jobs.try_insert(num, job).unwrap();
-        self.discipline.clear_events();
-
-        loop {
-            if let Ok(event) = self.discipline.event_receiver().try_receive() {
-                return match event {
-                    Event::CtrlC => {
-                        job.kill()?;
-                        self.jobs.remove(&num);
-                        Err(Error::Command(130))
-                    }
-                    Event::CtrlD => todo!(),
-                    Event::CtrlZ => {
-                        job.suspend();
-                        todo!();
-                    }
-                };
-            } else if let Some(exit_value) = job.update() {
-                self.jobs.remove(&num);
-                return match exit_value {
-                    0 => Ok(()),
-                    _ => Err(Error::Command(exit_value)),
-                };
-            }
-        }
-    }
-
-    fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<Job> {
+    fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<JobPart> {
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .expect("couldn't get namespace dir");
@@ -213,29 +241,95 @@ impl Shell {
         };
 
         if matching_files.next().is_some() {
-            panic!("multiple matching files found");
+            println!("multiple matching files found, running: {app_path}");
         }
 
-        let task = spawn::new_application_task_builder(app_path, None)
-            .map_err(|_| Error::SpawnFailed)?
-            .argument(
-                args.into_iter()
-                    .map(|arg| arg.to_owned())
-                    .collect::<Vec<_>>(),
-            )
-            .block()
-            .spawn()
-            .unwrap();
+        let task = spawn::new_application_task_builder(app_path, None, || {
+            if self.jobs.remove(todo!()).is_err() {
+                error!("job {id} not present in jobs list");
+            }
+        })
+        .map_err(Error::SpawnFailed)?
+        .argument(args.into_iter().map(ToOwned::to_owned).collect::<Vec<_>>())
+        .block()
+        .spawn()
+        .unwrap();
 
         let id = task.id;
         // TODO: Double arc :(
         app_io::insert_child_streams(id, app_io::streams().unwrap());
 
-        Ok(Job {
-            parts: vec![JobPart {
-                state: State::Running,
-                task,
-            }],
+        // task.unblock().map_err(Error::UnblockFailed)?;
+
+        Ok(JobPart {
+            state: State::Running,
+            task,
         })
+    }
+}
+
+enum Command<'a> {
+    Backgrounded(&'a str, Vec<&'a str>),
+    Piped(&'a str, Vec<&'a str>),
+    None(&'a str, Vec<&'a str>),
+}
+
+fn parse_line(mut line: &str) -> Vec<Command<'_>> {
+    let mut result = Vec::new();
+
+    // TODO: Error when last command is piped
+    loop {
+        match (line.split_once('|'), line.split_once('&')) {
+            (Some((a, rem_1)), Some((b, rem_2))) => {
+                if a.len() < b.len() {
+                    let (cmd, args) = split_args(a.trim());
+                    result.push(Command::Piped(cmd, args));
+                    line = rem_1.trim();
+                } else {
+                    let (cmd, args) = split_args(b.trim());
+                    result.push(Command::Backgrounded(cmd, args));
+                    line = rem_2.trim();
+                }
+            }
+            (Some((a, rem)), None) => {
+                let (cmd, args) = split_args(a.trim());
+                result.push(Command::Piped(cmd, args));
+                line = rem.trim();
+            }
+            (None, Some((b, rem))) => {
+                let (cmd, args) = split_args(b.trim());
+                result.push(Command::Backgrounded(cmd, args));
+                line = rem.trim();
+            }
+            (None, None) => break,
+        }
+    }
+
+    let trimmed = line.trim();
+    if !trimmed.is_empty() {
+        let (cmd, args) = split_args(trimmed);
+        result.push(Command::None(cmd, args));
+    }
+
+    result
+}
+
+fn split_args(line: &str) -> (&str, Vec<&str>) {
+    // TODO: Handle backslashes and quotes.
+    if let Some((cmd, args_str)) = line.split_once(' ') {
+        let args = args_str.split(' ').collect::<Vec<_>>();
+        (cmd, args)
+    } else {
+        (line, Vec::new())
+    }
+}
+
+struct AppDisciplineGuard<'a> {
+    discipline: &'a LineDiscipline,
+}
+
+impl<'a> Drop for AppDisciplineGuard<'a> {
+    fn drop(&mut self) {
+        self.discipline.set_raw();
     }
 }
