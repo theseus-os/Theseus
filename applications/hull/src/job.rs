@@ -37,7 +37,7 @@ impl Job {
     }
 
     pub(crate) fn unblock(&mut self) -> Result<()> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.unblock().map_err(Error::UnblockFailed)?;
             part.state = State::Running;
         }

@@ -42,7 +42,7 @@ use core::{
     hash::{Hash, Hasher},
     ops::Deref,
     sync::atomic::{AtomicBool, fence, Ordering},
-    task::Waker, cell::RefMut,
+    task::Waker,
 };
 use cpu::CpuId;
 use crossbeam_utils::atomic::AtomicCell;
@@ -1105,8 +1105,6 @@ mod tls_current_task {
         current_task_id: usize,
         current_task: Option<TaskRef>,
     ) -> Result<ExitableTaskRef, InitCurrentTaskError> {
-        log::warn!("here");
-        let ct_clone = current_task.clone();
         let taskref = if let Some(t) = current_task {
             if t.id != current_task_id {
                 log::error!("BUG: `current_task` {:?} did not match `current_task_id` {}",
