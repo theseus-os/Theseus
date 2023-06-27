@@ -1535,9 +1535,10 @@ struct ScreenCursor {
     style: CursorStyle,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum CursorStyle {
     /// A rectangle that covers the entire character box. This is the default.
+    #[default]
     FilledBox,
     /// A line beneath the character box.
     Underscore,
@@ -1546,12 +1547,6 @@ pub enum CursorStyle {
     /// An empty box that surrounds the character but does not occlude it.
     EmptyBox,
 }
-impl Default for CursorStyle {
-    fn default() -> Self {
-        CursorStyle::FilledBox
-    }
-}
-
 
 
 /// Advances the cursor's screen coordinate forward by the given number of columns,
@@ -2300,11 +2295,12 @@ impl Default for TerminalMode {
 }
 
 /// The kinds of Units and how they correspond to previous Units in the same Line.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 enum WideDisplayedUnit {
     /// (Default) This Unit is not part of any wide-displayed character sequence,
     /// and is completely standlone with no relationship to other adjacent Units.
     /// Thus, the character sequence in this `Unit` is guaranteed to display within one Column.
+    #[default]
     None,
     /// This Unit is the beginning of a tab character.
     /// As such, this unit contains a [`Character::Single`]`('\t')`.
@@ -2318,11 +2314,6 @@ enum WideDisplayedUnit {
     /// This Unit is a continuance for a previously-existing wide non-tab character
     ///, e.g., emoji, Chinese character, etc.
     MultiFill,
-}
-impl Default for WideDisplayedUnit {
-    fn default() -> Self {
-        WideDisplayedUnit::None
-    }
 }
 impl WideDisplayedUnit {
     /// A continuance Unit is one that occupies space as a continuance

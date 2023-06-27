@@ -53,7 +53,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optopt("w", "whole", "spawn N whole empty tasks and run them each to completion", "N");
     opts.optopt("s", "single", "spawn a single task and add/remove it from various runqueues N times", "N");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

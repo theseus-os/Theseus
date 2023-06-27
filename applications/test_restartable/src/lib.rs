@@ -147,7 +147,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("m", "modified", "same as failed but with a simple modification to unlock properly");
     opts.optflag("r", "recursive", "runs a recursive function");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
