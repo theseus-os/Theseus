@@ -32,7 +32,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
     opts.optflag("h", "help", "print this help menu");
     opts.optflag("r", "recursive", "recursively remove directories and their contents");
     
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(e) => {
             print_usage(opts);

@@ -1058,7 +1058,7 @@ pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<A
 /// Call this function once heap allocation is available. 
 /// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
 #[doc(hidden)] 
-pub fn convert_to_heap_allocated() {
+pub fn convert_frame_allocator_to_heap_based() {
     FREE_GENERAL_FRAMES_LIST.lock().convert_to_heap_allocated();
     FREE_RESERVED_FRAMES_LIST.lock().convert_to_heap_allocated();
     GENERAL_REGIONS.lock().convert_to_heap_allocated();

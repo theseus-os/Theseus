@@ -15,7 +15,9 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
 
-    let matches = match opts.parse(&args) {
+    println!("This is an example application.\nArguments: {:?}", args);
+
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
@@ -28,8 +30,6 @@ pub fn main(args: Vec<String>) -> isize {
         print_usage(opts);
         return 0;
     }
-
-    println!("This is an example application.\nArguments: {:?}", args);
 
     0
 }

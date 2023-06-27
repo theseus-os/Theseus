@@ -16,7 +16,6 @@ use alloc::{
 };
 use spin::Mutex;
 use pci::PciDevice;
-use storage_device::StorageControllerRef;
 
 pub use storage_device::*;
 

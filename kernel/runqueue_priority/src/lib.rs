@@ -5,8 +5,6 @@
 //! a `TaskRef` representing an underlying task and as well as a `period` value.
 
 #![no_std]
-// TODO: Update Rust version to stabilise.
-#![feature(binary_heap_retain)]
 
 extern crate alloc;
 

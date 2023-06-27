@@ -35,7 +35,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("f", "files", "lists crate object files available in this namespace rather than currently-loaded crates");
     opts.optopt("", "load", "load a crate into the current namespace. Ignores all other arguments.", "CRATE_OBJ_FILE_PATH");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
