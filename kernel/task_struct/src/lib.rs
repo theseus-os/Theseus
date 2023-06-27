@@ -256,12 +256,6 @@ pub struct Task {
     pub simd: SimdExt,
 }
 
-impl Task {
-    pub fn tls_area(&self) -> &TlsDataImage {
-        &self.tls_area
-    }
-}
-
 // Ensure that atomic fields in the `Tast` struct are actually lock-free atomics.
 const _: () = assert!(AtomicCell::<OptionalCpuId>::is_lock_free());
 const _: () = assert!(AtomicCell::<RunState>::is_lock_free());
