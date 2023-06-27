@@ -1131,7 +1131,6 @@ mod tls_current_task {
             } else {
                 *t_opt = Some(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
-                log::warn!("[CPU {}] Successfully set {:?} as current task!", cpu::current_cpu(), taskref);
                 Ok(ExitableTaskRef { task: taskref })
             }
             Err(_e) => {

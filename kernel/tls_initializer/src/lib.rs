@@ -279,7 +279,7 @@ impl TlsInitializer {
         }
 
         if self.cache_status == CacheStatus::Invalidated {
-            log::debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+            // log::debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
             // On some architectures, such as x86_64, the ABI convention REQUIRES that
             // the TLS area data starts with a pointer to itself (the TLS self pointer).
