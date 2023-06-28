@@ -227,6 +227,9 @@
 <a href="#227" id="227">227</a>
 <a href="#228" id="228">228</a>
 <a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -404,14 +407,17 @@
 
     <span class="comment">// arch-gate: no windowing/input support on aarch64 at the moment
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-    </span><span class="kw">let </span>(key_producer, mouse_producer) = window_manager::init()<span class="question-mark">?</span>;
+    </span><span class="kw">match </span>window_manager::init() {
+        <span class="prelude-val">Ok</span>((key_producer, mouse_producer)) =&gt; {
+            device_manager::init(key_producer, mouse_producer)<span class="question-mark">?</span>;
+        },
+        <span class="prelude-val">Err</span>(error) =&gt; {
+            <span class="macro">error!</span>(<span class="string">&quot;Failed to init window manager (expected if using nographic): {error}&quot;</span>);
+        }
+    }
 
-    device_manager::init(
-        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-        </span>key_producer,
-        <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-        </span>mouse_producer,
-    )<span class="question-mark">?</span>;
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span>device_manager::init()<span class="question-mark">?</span>;
 
     task_fs::init()<span class="question-mark">?</span>;
 
