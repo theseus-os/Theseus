@@ -179,7 +179,9 @@ pub fn init(
         Ok((key_producer, mouse_producer)) => {
             device_manager::init(key_producer, mouse_producer)?;
         },
-        Err(error) => info!("Window manager initialisation failure: {error}"),
+        Err(error) => {
+            info!("Window manager initialisation failure (expected if using nographic): {error}")
+        }
     }
 
     #[cfg(target_arch = "aarch64")]
