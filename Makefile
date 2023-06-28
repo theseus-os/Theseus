@@ -770,22 +770,37 @@ help:
 	@echo -e "\t    'none':  Disable all networking in the QEMU guest. This is the default behavior if no other 'net' option is provided."
 # @echo -e "   kvm=yes:"
 # @echo -e "\t Enable KVM acceleration (the host computer must support it)."
-	@echo -e "   host=yes:"
+	@echo -e "   host=yes"
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
-	@echo -e "   int=yes:"
+	@echo -e "   int=yes"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
-	@echo -e "   vfio=<pci_device_slot>:"
+	@echo -e "   vfio=<PCI_DEVICE_SLOT>"
 	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
-	@echo -e "   SERIAL<N>=<backend>":
+	@echo -e "   SERIAL<N>=<BACKEND>"
 	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
 	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
 	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
 	@echo -e "\t For the 'pty' option, QEMU will print a statement like so:"
 	@echo -e "\t     char device redirected to /dev/pts/6 (label serial1)"
 	@echo -e "\t Note that QEMU uses 0-based indexing for serial ports, so its 'serial1' label refers to the second serial port, our 'SERIAL2'."
-	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6'."
+	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6',"
+	@echo -e "\t or use the below 'terminal=' option to auto-launch a new terminal."
 	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
 	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
+	@echo -e "   terminal=\"TERMINAL_COMMAND\""
+	@echo -e "\t Auto-launch a new terminal window connected to the specified SERIAL<N> TTY/PTY backend"
+	@echo -e "\t that QEMU created for us, as described above."
+	@echo -e "\t The TERMINAL_COMMAND is specific to your system's terminal emulator and available binaries,"
+	@echo -e "\t and will be invoked by our makefile with one argument: the PTY device file created by QEMU."
+	@echo -e "\t For example, on a default GNOME-based Linux distro with 'screen' installed, you can run:"
+	@echo -e "\t     make run terminal=\"gnome-terminal -- screen\""
+	@echo -e "\t On a system with 'alacritty' installed, you can just run:"
+	@echo -e "\t     make run terminal=alacritty"
+	@echo -e "\t The specific syntax of TERMINAL_COMMAND depends on your host system and chosen terminal emulator."
+	@echo -e "   graphic=no"
+	@echo -e "\t Disable the graphical QEMU window, which reroutes the VGA text mode output to stdio."
+	@echo -e "\t -- Note: the VGA device will still exist and be used by Theseus, it just will not be displayed."
+
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
@@ -851,7 +866,10 @@ QEMU_FLAGS += -serial mon:$(SERIAL2)
 ## `-vga none`:      removes the VGA card
 ## `-display none`:  disables QEMU's graphical display
 ## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
-# QEMU_FLAGS += -display none -vga none
+
+ifeq ($(graphic), no)
+	QEMU_FLAGS += -nographic
+endif
 
 ## Set the amount of system memory (RAM) provided to the QEMU guest OS
 QEMU_MEMORY ?= 512M
@@ -948,15 +966,34 @@ loadable: run
 wasmtime : export override FEATURES += --features wasmtime
 wasmtime: run
 
-
 ### builds and runs Theseus in QEMU
 run: $(iso)
+ifdef terminal
+# Check which TTY the OS would give a process requesting a TTY
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
+# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
+# there's not much we can do about it.
+#
+# The sleep is to give QEMU time to create the TTY.
+	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
+else
 	$(QEMU_BIN) $(QEMU_FLAGS)
+endif
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
 run_pause: $(iso)
+ifdef terminal
+# Check which TTY the OS would give a process requesting a TTY
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
+# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
+# there's not much we can do about it.
+#
+# The sleep is to give QEMU time to create the TTY.
+	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
+else
 	$(QEMU_BIN) $(QEMU_FLAGS) -S
+endif
 
 
 ### Runs a gdb instance on the host machine. 
