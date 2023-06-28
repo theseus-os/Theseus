@@ -775,9 +775,9 @@ help:
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
 	@echo -e "   int=yes"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
-	@echo -e "   vfio=<PCI_DEVICE_SLOT>:"
+	@echo -e "   vfio=<PCI_DEVICE_SLOT>"
 	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
-	@echo -e "   SERIAL<N>=<BACKEND>":
+	@echo -e "   SERIAL<N>=<BACKEND>"
 	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
 	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
 	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
@@ -788,7 +788,7 @@ help:
 	@echo -e "\t or use the below 'terminal=' option to auto-launch a new terminal."
 	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
 	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
-	@echo -e "   terminal=\"TERMINAL_COMMAND\":"
+	@echo -e "   terminal=\"TERMINAL_COMMAND\""
 	@echo -e "\t Auto-launch a new terminal window connected to the specified SERIAL<N> TTY/PTY backend"
 	@echo -e "\t that QEMU created for us, as described above."
 	@echo -e "\t The TERMINAL_COMMAND is specific to your system's terminal emulator and available binaries,"
@@ -796,10 +796,11 @@ help:
 	@echo -e "\t For example, on a default GNOME-based Linux distro with 'screen' installed, you can run:"
 	@echo -e "\t     make run terminal=\"gnome-terminal -- screen\""
 	@echo -e "\t On a system with 'alacritty' installed, you can just run:"
-	@echo -e "\t     make run terminal=\"alacritty\""
+	@echo -e "\t     make run terminal=alacritty"
 	@echo -e "\t The specific syntax of TERMINAL_COMMAND depends on your host system and chosen terminal emulator."
 	@echo -e "   graphic=no:"
 	@echo -e "\t Disable the graphical QEMU window, which reroutes the VGA text mode output to stdio."
+	@echo -e "\t -- Note: the VGA device will still exist and be used by Theseus, it just will not be displayed."
 
 
 	@echo -e "\nThe following make targets exist for building documentation:"
