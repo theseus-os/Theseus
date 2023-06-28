@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "free_tty"
+name = "get_tty"
 version = "0.1.0"
 dependencies = [
  "pty",

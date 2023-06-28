@@ -956,7 +956,7 @@ wasmtime: run
 run: $(iso)
 ifdef terminal
 # Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml))
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
 # If another process snags a new TTY here, the command below will connect to the wrong TTY, but
 # there's not much we can do about it.
 #
@@ -971,7 +971,7 @@ endif
 run_pause: $(iso)
 ifdef terminal
 # Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml))
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
 # If another process snags a new TTY here, the command below will connect to the wrong TTY, but
 # there's not much we can do about it.
 #
