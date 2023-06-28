@@ -14,6 +14,7 @@ impl Shell {
     }
 
     pub(crate) fn bg(&mut self, args: &Vec<&str>) -> Result<()> {
+        let mut jobs = self.jobs.lock();
         if args.is_empty() {
             loop {
                 let num = match self.stop_order.pop() {
@@ -23,7 +24,7 @@ impl Shell {
                         return Err(Error::Command(1));
                     }
                 };
-                if let Some(task) = self.jobs.get_mut(&num) {
+                if let Some(task) = jobs.get_mut(&num) {
                     task.unsuspend();
                     // TODO: Print
                     return Ok(());
@@ -42,7 +43,7 @@ impl Shell {
                             return Err(Error::Command(1));
                         }
                     };
-                    let task = match self.jobs.get_mut(&num) {
+                    let task = match jobs.get_mut(&num) {
                         Some(t) => t,
                         None => {
                             println!("{}: no such job", arg);
@@ -132,7 +133,7 @@ impl Shell {
 
     pub(crate) fn jobs(&self, _: &Vec<&str>) -> Result<()> {
         // TODO: Sort IDs.
-        for (id, job) in self.jobs.iter() {
+        for (id, job) in self.jobs.lock().iter() {
             // TODO: Separate job parts if they are in different states.
             let state = &job.parts[0].state;
             let line = &job.line;

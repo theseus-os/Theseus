@@ -8,7 +8,8 @@
 //! This shell will eventually supercede the shell located at
 //! `applications/shell`.
 
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+#![feature(extend_one, let_chains)]
 
 extern crate alloc;
 
@@ -17,22 +18,24 @@ mod error;
 mod job;
 mod wrapper;
 
-pub use error::{Error, Result};
-
 use crate::job::{JobPart, State};
 use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
-use app_io::println;
-use atomic_linked_list::atomic_map::AtomicMap;
-use core::{fmt::Write, mem};
+use app_io::{println, IoStreams};
+use core::fmt::Write;
+pub use error::{Error, Result};
+use hashbrown::HashMap;
 use job::Job;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
+use stdio::Stdio;
+use sync_block::Mutex;
+use task::{ExitValue, KillReason};
 use tty::{Event, LineDiscipline};
 
 pub fn main(_: Vec<String>) -> isize {
     let mut shell = Shell {
         discipline: app_io::line_discipline().expect("no line discipline"),
-        jobs: Arc::new(AtomicMap::new()),
+        jobs: Arc::new(Mutex::new(HashMap::new())),
         stop_order: Vec::new(),
         history: Vec::new(),
     };
@@ -51,7 +54,7 @@ pub struct Shell {
     // TODO: Could use a vec-based data structure like Vec<Option<JoinableTaskRef>
     // Adding a job would iterate over the vec trying to find a None and if it can't, push to the
     // end. Removing a job would replace the job with None.
-    jobs: Arc<AtomicMap<usize, Job>>,
+    jobs: Arc<Mutex<HashMap<usize, Job>>>,
     stop_order: Vec<usize>,
     history: Vec<String>,
 }
@@ -95,17 +98,31 @@ impl Shell {
     }
 
     fn execute_line(&mut self, line: &str) -> Result<()> {
-        // TODO: | and &
+        // TODO: Use line editor history.
+        let parsed_line = parse_line(line);
+
+        if parsed_line.is_empty() {
+            return Ok(());
+        }
 
         self.history.push(line.to_owned());
 
-        let mut temp_job = Job {
-            line: line.to_owned(),
-            parts: Vec::new(),
-        };
-        for cmd in parse_line(line) {
-            match self.execute_cmd(cmd, &mut temp_job) {
-                Ok(()) => continue,
+        let mut iter = parsed_line.background;
+        // TODO: Unnecessary clone.
+        if let Some(foreground) = parsed_line.foreground.clone() {
+            iter.extend_one(foreground);
+        }
+
+        let mut last_id = None;
+        for (cmd, cmd_str) in iter {
+            let current = if let Some((foreground, _)) = &parsed_line.foreground {
+                *foreground == cmd
+            } else {
+                false
+            };
+
+            match self.execute_cmd(cmd, cmd_str, current) {
+                Ok(id) => last_id = id,
                 Err(Error::ExitRequested) => return Err(Error::ExitRequested),
                 Err(Error::CurrentTaskUnavailable) => return Err(Error::CurrentTaskUnavailable),
                 Err(Error::Command(exit_code)) => println!("exit {}", exit_code),
@@ -118,60 +135,89 @@ impl Shell {
             }
         }
 
+        if let Some(last_id) = last_id && parsed_line.foreground.is_some() {
+            self.wait_on_job(last_id)?;
+        }
+
         Ok(())
     }
 
-    fn execute_cmd(&mut self, cmd: Command, temp_job: &mut Job) -> Result<()> {
-        match cmd {
-            // TODO: Handle internal backgrounded commands.
-            Command::Backgrounded(cmd, args) => {
-                let job_part = self.resolve_external(cmd, args)?;
-                temp_job.parts.push(job_part);
-                let mut job = mem::take(temp_job);
-                job.unblock()?;
-                self.insert_job(job);
-                Ok(())
-            }
-            // TODO: Handle internal piped commands.
-            Command::Piped(cmd, args) => {
-                let job_part = self.resolve_external(cmd, args)?;
-                todo!("handle io");
-                temp_job.parts.push(job_part);
-            }
-            Command::None(cmd, args) => {
-                if let Some(result) = self.execute_builtin(cmd, &args) {
-                    result
-                } else {
-                    let job_part = self.resolve_external(cmd, args)?;
-                    temp_job.parts.push(job_part);
-                    let mut job = mem::take(temp_job);
-                    job.unblock()?;
-                    let num = self.insert_job(job);
-                    self.wait_on_job(num)?;
-                    Ok(())
-                }
-            }
-        }
-    }
+    /// Executes a command.
+    fn execute_cmd(&mut self, cmd: Command, line: &str, current: bool) -> Result<Option<usize>> {
+        let shell_streams = app_io::streams().unwrap();
 
-    // We can't do anything use
-    fn insert_job(&mut self, mut job: Job) -> usize {
-        let mut num = 1;
+        let stderr = shell_streams.stderr;
+        let mut previous_output = shell_streams.stdin;
+
+        let mut iter = cmd.into_iter().peekable();
+        let mut cmd_part = iter.next();
+
+        let mut jobs = self.jobs.lock();
+        let mut job_id = 1;
+        let mut temp_job = Job {
+            line: line.to_owned(),
+            parts: Vec::new(),
+            current,
+        };
         loop {
-            match self.jobs.try_insert(num, job) {
-                Ok(_) => return num,
+            match jobs.try_insert(job_id, temp_job) {
+                Ok(_) => break,
                 Err(e) => {
-                    job = e.value;
+                    temp_job = e.value;
                 }
             }
-            num += 1;
+            job_id += 1;
         }
+        drop(jobs);
+
+        while let Some((cmd, args)) = cmd_part {
+            if iter.peek().is_none() {
+                if let Some(result) = self.execute_builtin(cmd, &args) {
+                    return result.map(|_| None);
+                } else {
+                    let streams = IoStreams {
+                        // TODO: Technically clone not needed.
+                        stdin: previous_output.clone(),
+                        stdout: shell_streams.stdout.clone(),
+                        stderr: stderr.clone(),
+                        discipline: shell_streams.discipline,
+                    };
+                    let part = self.resolve_external(cmd, args, streams, job_id)?;
+                    self.jobs.lock().get_mut(&job_id).unwrap().parts.push(part);
+                    return Ok(Some(job_id));
+                }
+            }
+
+            // TODO: Piped builtin commands.
+
+            let pipe = Stdio::new();
+            let streams = IoStreams {
+                stdin: previous_output.clone(),
+                stdout: Arc::new(pipe.get_writer()),
+                stderr: stderr.clone(),
+                // TODO: Is this right?
+                discipline: None,
+            };
+            let part = self.resolve_external(cmd, args, streams, job_id)?;
+            self.jobs.lock().get_mut(&job_id).unwrap().parts.push(part);
+
+            previous_output = Arc::new(pipe.get_reader());
+            cmd_part = iter.next();
+        }
+
+        unreachable!("called execute_cmd with empty command");
     }
 
     fn wait_on_job(&mut self, num: usize) -> Result<()> {
-        let Some(job) = self.jobs.get_mut(num) else {
+        let jobs = self.jobs.lock();
+        let Some(job) = jobs.get(&num) else {
             return Ok(())
         };
+        if !job.current {
+            todo!("warn");
+            return Ok(());
+        }
+        drop(jobs);
 
         self.discipline.clear_events();
         loop {
@@ -179,23 +225,32 @@ impl Shell {
             if let Ok(event) = self.discipline.event_receiver().try_receive() {
                 return match event {
                     Event::CtrlC => {
-                        job.kill()?;
-                        // self.jobs.remove(&num);
+                        if let Some(mut job) = self.jobs.lock().remove(&num) {
+                            job.kill()?;
+                        } else {
+                            todo!("log error");
+                        }
                         Err(Error::Command(130))
                     }
                     Event::CtrlD => todo!(),
                     Event::CtrlZ => {
-                        job.suspend();
+                        self.jobs.lock().get_mut(&num).unwrap().suspend();
                         todo!();
                     }
                 };
-            } else if let Some(exit_value) = job.update() {
-                // self.jobs.remove(&num);
-                return match exit_value {
-                    0 => Ok(()),
-                    _ => Err(Error::Command(exit_value)),
-                };
+            } else {
+                let mut jobs = self.jobs.lock();
+                if let Some(job) = jobs.get_mut(&num)
+                    && let Some(exit_value) = job.exit_value()
+                {
+                        jobs.remove(&num);
+                        return match exit_value {
+                            0 => Ok(()),
+                            _ => Err(Error::Command(exit_value)),
+                        };
+                }
             }
+            // scheduler::schedule();
         }
     }
 
@@ -225,7 +280,13 @@ impl Shell {
         })
     }
 
-    fn resolve_external(&self, cmd: &str, args: Vec<&str>) -> Result<JobPart> {
+    fn resolve_external(
+        &self,
+        cmd: &str,
+        args: Vec<&str>,
+        streams: IoStreams,
+        job_id: usize,
+    ) -> Result<JobPart> {
         let namespace_dir = task::get_my_current_task()
             .map(|t| t.get_namespace().dir().clone())
             .expect("couldn't get namespace dir");
@@ -244,74 +305,114 @@ impl Shell {
             println!("multiple matching files found, running: {app_path}");
         }
 
-        let task = spawn::new_application_task_builder(app_path, None, || {
-            if self.jobs.remove(todo!()).is_err() {
-                error!("job {id} not present in jobs list");
-            }
-        })
-        .map_err(Error::SpawnFailed)?
-        .argument(args.into_iter().map(ToOwned::to_owned).collect::<Vec<_>>())
-        .block()
-        .spawn()
-        .unwrap();
+        let task = spawn::new_application_task_builder(app_path, None)
+            .map_err(Error::SpawnFailed)?
+            .argument(args.into_iter().map(ToOwned::to_owned).collect::<Vec<_>>())
+            .block()
+            .spawn()
+            .unwrap();
+        let task_ref = task.clone();
 
         let id = task.id;
         // TODO: Double arc :(
-        app_io::insert_child_streams(id, app_io::streams().unwrap());
+        app_io::insert_child_streams(id, streams);
+        task.unblock().map_err(Error::UnblockFailed)?;
 
-        // task.unblock().map_err(Error::UnblockFailed)?;
+        // Spawn watchdog task.
+        spawn::new_task_builder(
+            move |_| {
+                let task_ref = task.clone();
+
+                println!("watchdog starting");
+                let exit_value = match task.join().unwrap() {
+                    ExitValue::Completed(status) => {
+                        match status.downcast_ref::<isize>() {
+                            Some(num) => *num,
+                            // FIXME: Document/decide on a number for when app doesn't
+                            // return isize.
+                            None => 210,
+                        }
+                    }
+                    ExitValue::Killed(reason) => match reason {
+                        // FIXME: Document/decide on a number. This is used by bash.
+                        KillReason::Requested => 130,
+                        KillReason::Panic(_) => 1,
+                        KillReason::Exception(num) => num.into(),
+                    },
+                };
+
+                let mut jobs = self.jobs.lock();
+                match jobs.remove(&job_id) {
+                    Some(mut job) => {
+                        for mut part in job.parts.iter_mut() {
+                            if part.task == task_ref {
+                                // TODO
+                                part.state = State::Done(exit_value);
+                                break;
+                            }
+                        }
+
+                        if job.current {
+                            jobs.insert(job_id, job);
+                        }
+                    }
+                    None => todo!("here?"),
+                }
+            },
+            (),
+        )
+        .spawn()
+        .map_err(Error::SpawnFailed)?;
 
         Ok(JobPart {
             state: State::Running,
-            task,
+            task: task_ref,
         })
     }
 }
 
-enum Command<'a> {
-    Backgrounded(&'a str, Vec<&'a str>),
-    Piped(&'a str, Vec<&'a str>),
-    None(&'a str, Vec<&'a str>),
+#[derive(Debug, Eq, PartialEq)]
+struct ParsedCommandLine<'a> {
+    background: Vec<(Command<'a>, &'a str)>,
+    foreground: Option<(Command<'a>, &'a str)>,
 }
 
-fn parse_line(mut line: &str) -> Vec<Command<'_>> {
-    let mut result = Vec::new();
-
-    // TODO: Error when last command is piped
-    loop {
-        match (line.split_once('|'), line.split_once('&')) {
-            (Some((a, rem_1)), Some((b, rem_2))) => {
-                if a.len() < b.len() {
-                    let (cmd, args) = split_args(a.trim());
-                    result.push(Command::Piped(cmd, args));
-                    line = rem_1.trim();
-                } else {
-                    let (cmd, args) = split_args(b.trim());
-                    result.push(Command::Backgrounded(cmd, args));
-                    line = rem_2.trim();
-                }
-            }
-            (Some((a, rem)), None) => {
-                let (cmd, args) = split_args(a.trim());
-                result.push(Command::Piped(cmd, args));
-                line = rem.trim();
-            }
-            (None, Some((b, rem))) => {
-                let (cmd, args) = split_args(b.trim());
-                result.push(Command::Backgrounded(cmd, args));
-                line = rem.trim();
-            }
-            (None, None) => break,
-        }
+impl<'a> ParsedCommandLine<'a> {
+    fn is_empty(&self) -> bool {
+        self.background.is_empty() && self.foreground.is_none()
     }
+}
 
-    let trimmed = line.trim();
-    if !trimmed.is_empty() {
-        let (cmd, args) = split_args(trimmed);
-        result.push(Command::None(cmd, args));
+/// A list of piped commands.
+type Command<'a> = Vec<(&'a str, Vec<&'a str>)>;
+
+fn parse_line(line: &str) -> ParsedCommandLine<'_> {
+    let mut iter = line.split('&');
+
+    // Iterator contains at least one element.
+    let last = iter.next_back().unwrap();
+    let trimmed = last.trim();
+    let foreground = if trimmed == "" {
+        None
+    } else {
+        Some((split_pipes(trimmed), last))
+    };
+
+    ParsedCommandLine {
+        background: iter
+            .clone()
+            .map(|s| split_pipes(s.trim()))
+            .zip(iter)
+            .collect(),
+        foreground,
     }
+}
 
-    result
+fn split_pipes(line: &str) -> Command<'_> {
+    line.split('|')
+        .map(|s| s.trim())
+        .map(|s| split_args(s))
+        .collect()
 }
 
 fn split_args(line: &str) -> (&str, Vec<&str>) {
@@ -331,5 +432,50 @@ struct AppDisciplineGuard<'a> {
 impl<'a> Drop for AppDisciplineGuard<'a> {
     fn drop(&mut self) {
         self.discipline.set_raw();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use alloc::vec;
+
+    #[test]
+    fn test_split_pipes() {
+        assert_eq!(
+            split_pipes("a b c |d e f|g | h | i j"),
+            vec![
+                ("a", vec!["b", "c"]),
+                ("d", vec!["e", "f"]),
+                ("g", vec![]),
+                ("h", vec![]),
+                ("i", vec!["j"])
+            ]
+        );
+    }
+
+    #[test]
+    fn test_parse_line() {
+        assert_eq!(
+            parse_line("a b|c  &d e f|g | h & i j | k"),
+            ParsedCommandLine {
+                background: vec![
+                    vec![("a", vec!["b"]), ("c", vec![])],
+                    vec![("d", vec!["e", "f"]), ("g", vec![]), ("h", vec![])],
+                ],
+                foreground: Some(vec![("i", vec!["j"]), ("k", vec![])]),
+            }
+        );
+        assert_eq!(
+            parse_line("a b|c  &d e f|g | h & i j | k&  "),
+            ParsedCommandLine {
+                background: vec![
+                    vec![("a", vec!["b"]), ("c", vec![])],
+                    vec![("d", vec!["e", "f"]), ("g", vec![]), ("h", vec![])],
+                    vec![("i", vec!["j"]), ("k", vec![])]
+                ],
+                foreground: None,
+            }
+        );
     }
 }

@@ -4,7 +4,7 @@ use core::fmt;
 
 use crate::{Error, Result};
 use alloc::{string::String, vec::Vec};
-use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
+use task::{ExitValue, JoinableTaskRef, KillReason, RunState, TaskRef};
 
 /// A shell job consisting of multiple parts.
 ///
@@ -16,6 +16,7 @@ use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
 pub(crate) struct Job {
     pub(crate) line: String,
     pub(crate) parts: Vec<JobPart>,
+    pub(crate) current: bool,
 }
 
 impl Job {
@@ -50,34 +51,17 @@ impl Job {
         Ok(())
     }
 
-    pub(crate) fn update(&mut self) -> Option<isize> {
-        for mut part in self.parts.iter_mut() {
-            if part.state == State::Running && part.task.runstate() == RunState::Exited {
-                let exit_value = match part.task.join().unwrap() {
-                    ExitValue::Completed(status) => {
-                        match status.downcast_ref::<isize>() {
-                            Some(num) => *num,
-                            // FIXME: Document/decide on a number for when app doesn't
-                            // return isize.
-                            None => 210,
-                        }
-                    }
-                    ExitValue::Killed(reason) => match reason {
-                        // FIXME: Document/decide on a number. This is used by bash.
-                        KillReason::Requested => 130,
-                        KillReason::Panic(_) => 1,
-                        KillReason::Exception(num) => num.into(),
-                    },
-                };
-                part.state = State::Done(exit_value);
-            }
-        }
-        self.exit_value()
-    }
-
     pub(crate) fn exit_value(&mut self) -> Option<isize> {
-        if let State::Done(value) = self.parts.last()?.state {
-            Some(value)
+        if self
+            .parts
+            .iter()
+            .all(|part| matches!(part.state, State::Done(_)))
+        {
+            if let State::Done(value) = self.parts.last()?.state {
+                Some(value)
+            } else {
+                unreachable!();
+            }
         } else {
             None
         }
@@ -87,7 +71,7 @@ impl Job {
 #[derive(Debug)]
 pub(crate) struct JobPart {
     pub(crate) state: State,
-    pub(crate) task: JoinableTaskRef,
+    pub(crate) task: TaskRef,
 }
 
 #[derive(Debug)]
@@ -99,11 +83,11 @@ pub(crate) enum State {
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Done(_) => write!(f, "done"),
-            Self::Suspended => write!(f, "suspended"),
-            Self::Running => write!(f, "running"),
-        }
+        f.write_str(match self {
+            Self::Done(_) => "done",
+            Self::Suspended => "suspended",
+            Self::Running => "running",
+        })
     }
 }
 
