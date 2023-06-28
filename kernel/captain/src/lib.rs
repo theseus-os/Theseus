@@ -180,7 +180,7 @@ pub fn init(
             device_manager::init(key_producer, mouse_producer)?;
         },
         Err(error) => {
-            info!("Window manager initialisation failure (expected if using nographic): {error}")
+            error!("Failed to init window manager (expected if using nographic): {error}");
         }
     }
 
