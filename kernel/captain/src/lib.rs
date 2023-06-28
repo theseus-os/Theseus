@@ -182,7 +182,7 @@ pub fn init(
         Err(error) => info!("Window manager initialisation failure: {error}"),
     }
 
-    #[cfg(not(target_arch = "x86_64"))]
+    #[cfg(target_arch = "aarch64")]
     device_manager::init()?;
 
     task_fs::init()?;
