@@ -19,7 +19,6 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
-display ?= yes
 
 ## aarch64 only supports booting via UEFI
 ifeq ($(ARCH),aarch64)
@@ -798,7 +797,7 @@ help:
 	@echo -e "\t On a system with 'alacritty' installed, you can just run:"
 	@echo -e "\t     make run terminal=alacritty"
 	@echo -e "\t The specific syntax of TERMINAL_COMMAND depends on your host system and chosen terminal emulator."
-	@echo -e "   graphic=no:"
+	@echo -e "   graphic=no"
 	@echo -e "\t Disable the graphical QEMU window, which reroutes the VGA text mode output to stdio."
 	@echo -e "\t -- Note: the VGA device will still exist and be used by Theseus, it just will not be displayed."
 
