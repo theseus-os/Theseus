@@ -964,7 +964,7 @@ ifdef terminal
 # If another process snags a new TTY here, the command below will connect to the wrong TTY, but
 # there's not much we can do about it.
 #
-# The slee is to give QEMU time to create the TTY.
+# The sleep is to give QEMU time to create the TTY.
 	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
 else
 	$(QEMU_BIN) $(QEMU_FLAGS)
@@ -979,7 +979,7 @@ ifdef terminal
 # If another process snags a new TTY here, the command below will connect to the wrong TTY, but
 # there's not much we can do about it.
 #
-# The slee is to give QEMU time to create the TTY.
+# The sleep is to give QEMU time to create the TTY.
 	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
 else
 	$(QEMU_BIN) $(QEMU_FLAGS) -S
