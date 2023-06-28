@@ -146,7 +146,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all full \
 		check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
+		orun orun_pause run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb gdb_aarch64 \
@@ -614,7 +614,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
-doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
+doc : export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
 doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
 doc:
@@ -701,19 +701,30 @@ help:
 	@echo -e "   run:"
 	@echo -e "\t Builds Theseus (via the 'iso' target) and runs it using QEMU."
 
+	@echo -e "   run_pause:"
+	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
+	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+
+	@echo -e "   orun:"
+	@echo -e "\t Runs the existing build of Theseus using QEMU, without building Theseus first."
+
+	@echo -e "   orun_pause:"
+	@echo -e "\t Same as 'orun', but pauses QEMU at its GDB stub entry point,"
+	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
 
 	@echo -e "   wasmtime:"
 	@echo -e "\t Same as 'run', but includes the 'wasmtime' crates in the build."
 
-	@echo -e "   run_pause:"
-	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
-	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
-
 	@echo -e "   gdb:"
-	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
-	@echo -e "\t You must run an instance of Theseus in QEMU beforehand in a separate terminal."
+	@echo -e "\t Runs a new instance of GDB that connects to an already-running x86_64 QEMU instance."
+	@echo -e "\t You must run an instance of Theseus on x86_64 in QEMU beforehand in a separate terminal."
+
+	@echo -e "   gdb_aarch64:"
+	@echo -e "\t Runs a new instance of GDB multiarch that connects to an already-running aarch64 QEMU instance."
+	@echo -e "\t You must run an instance of Theseus on aarch64 in QEMU beforehand in a separate terminal."
 
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
@@ -862,11 +873,10 @@ QEMU_FLAGS += -serial mon:$(SERIAL1)
 ## -- `picocom /dev/pts/6`
 QEMU_FLAGS += -serial mon:$(SERIAL2)
 
-## Disable the graphical display (for testing headless server functionality)
+## Disable the graphical display (for running in "headless" mode)
 ## `-vga none`:      removes the VGA card
 ## `-display none`:  disables QEMU's graphical display
 ## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
-
 ifeq ($(graphic), no)
 	QEMU_FLAGS += -nographic
 endif
@@ -947,14 +957,28 @@ QEMU_FLAGS += $(QEMU_EXTRA)
 ########################## Targets for running and debugging Theseus ##############################
 ###################################################################################################
 
-### Old Run: runs the most recent build without rebuilding
+### `qemu`/`orun` (old run): runs the most recent build without rebuilding.
+### This is the base-level target responsible for actually invoking QEMU;
+### all other targets that want to invoke QEMU should depend on this target to do so.
+qemu: orun
 orun:
+ifdef terminal
+## Check which PTY/TTY the OS would give to the next process that requests one,
+## which is the best way to guess which PTY QEMU will use for redirected serial I/O.
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
+## If another process obtains that TTY here before we can run QEMU,
+## the 'terminal' command below will connect to the wrong TTY, but there's nothing we can do.
+##
+## Sleep for 2 seconds to allow QEMU enough time to start and request the TTY.
+	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
+else
 	$(QEMU_BIN) $(QEMU_FLAGS)
+endif
 
 
-### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
-orun_pause:
-	$(QEMU_BIN) $(QEMU_FLAGS) -S
+### Old Run Pause: runs the most recent build without rebuilding, but pauses QEMU until GDB is connected.
+orun_pause : export override QEMU_FLAGS += -S
+orun_pause: orun
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -966,34 +990,13 @@ loadable: run
 wasmtime : export override FEATURES += --features wasmtime
 wasmtime: run
 
+
 ### builds and runs Theseus in QEMU
-run: $(iso)
-ifdef terminal
-# Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
-# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
-# there's not much we can do about it.
-#
-# The sleep is to give QEMU time to create the TTY.
-	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
-else
-	$(QEMU_BIN) $(QEMU_FLAGS)
-endif
+run: $(iso) orun
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-run_pause: $(iso)
-ifdef terminal
-# Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
-# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
-# there's not much we can do about it.
-#
-# The sleep is to give QEMU time to create the TTY.
-	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
-else
-	$(QEMU_BIN) $(QEMU_FLAGS) -S
-endif
+run_pause: $(iso) orun_pause
 
 
 ### Runs a gdb instance on the host machine. 
