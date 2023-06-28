@@ -115,7 +115,6 @@ nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
 efi_firmware := $(BUILD_DIR)/$(OVMF_FILE)
-free_tty_binary := $(ROOT_DIR)/tools/free_tty/target/release/free_tty
 
 ifeq ($(ARCH),x86_64)
 ## The assembly files compiled by the nano_core build script.
@@ -152,7 +151,7 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb gdb_aarch64 \
-		clippy doc docs view-doc view-docs book view-book $(free_tty_binary)
+		clippy doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -953,14 +952,11 @@ loadable: run
 wasmtime : export override FEATURES += --features wasmtime
 wasmtime: run
 
-$(free_tty_binary):
-	cargo build --release --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml
-
 ### builds and runs Theseus in QEMU
-run: $(iso) $(free_tty_binary)
+run: $(iso)
 ifdef terminal
 # Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell $(free_tty_binary)))
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml))
 # If another process snags a new TTY here, the command below will connect to the wrong TTY, but
 # there's not much we can do about it.
 #
@@ -972,10 +968,10 @@ endif
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-run_pause: $(iso) $(free_tty_bin)
+run_pause: $(iso)
 ifdef terminal
 # Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell $(free_tty_binary)))
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml))
 # If another process snags a new TTY here, the command below will connect to the wrong TTY, but
 # there's not much we can do about it.
 #
