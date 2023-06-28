@@ -118,6 +118,10 @@
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
 <a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Offers the ability to control or configure the active task scheduling policy.
 //!
 //! ## What is and isn&#39;t in this crate?
@@ -237,5 +241,9 @@
     </span>{
         <span class="prelude-val">None
     </span>}
+}
+
+<span class="kw">pub fn </span>inherit_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; scheduler::PriorityInheritanceGuard&lt;<span class="lifetime">&#39;_</span>&gt; {
+    scheduler::inherit_priority(task)
 }
 </code></pre></div></section></main></body></html>

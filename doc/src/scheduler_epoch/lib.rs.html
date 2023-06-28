@@ -177,6 +177,8 @@
 <a href="#177" id="177">177</a>
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
+<a href="#180" id="180">180</a>
+<a href="#181" id="181">181</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate picks the next task on token based scheduling policy.
 //! At the begining of each scheduling epoch a set of tokens is distributed
 //! among tasks depending on their priority.
@@ -194,6 +196,8 @@
 <span class="kw">use </span>log::error;
 <span class="kw">use </span>runqueue_epoch::{RunQueue, MAX_PRIORITY};
 <span class="kw">use </span>task::TaskRef;
+
+<span class="kw">pub use </span>runqueue_epoch::{inherit_priority, PriorityInheritanceGuard};
 
 <span class="doccomment">/// A data structure to transfer data from select_next_task_priority
 /// to select_next_task

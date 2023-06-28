@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["select_next_task"]};
+window.SIDEBAR_ITEMS = {"fn":["inherit_priority","select_next_task"],"struct":["PriorityInheritanceGuard"]};

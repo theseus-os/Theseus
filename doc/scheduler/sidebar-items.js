@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["get_priority","init","schedule","set_priority"]};
+window.SIDEBAR_ITEMS = {"fn":["get_priority","inherit_priority","init","schedule","set_priority"]};

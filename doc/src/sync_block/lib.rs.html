@@ -195,6 +195,16 @@
 <a href="#195" id="195">195</a>
 <a href="#196" id="196">196</a>
 <a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
 </pre></div><pre class="rust"><code><span class="attr">#![feature(negative_impls, let_chains)]
 #![no_std]
 
@@ -286,18 +296,28 @@
             <span class="comment">// Holder is either no longer running, or has released the lock.
             // Either way we will try the fast path one more time before moving
             // onto the slow path.
-        </span>} <span class="kw">else </span>{
+
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock(mutex, data) {
+                <span class="kw">return </span>guards;
+            }
+
+            <span class="comment">// Slow path
+            </span><span class="attr">#[cfg(priority_inheritance)]
+            </span><span class="kw">let </span>_priority_guard = scheduler::inherit_priority(<span class="kw-2">&amp;</span>holder_task);
+
+            data.queue.wait_until(|| <span class="self">Self</span>::try_lock(mutex, data))
+        } <span class="kw">else </span>{
             <span class="comment">// Unlikely case that another thread just acquired the lock, but hasn&#39;t yet set
             // data.holder.
             </span><span class="macro">log::warn!</span>(<span class="string">&quot;could not get holder task for mutex middle path&quot;</span>);
-        }
 
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock(mutex, data) {
-            <span class="kw">return </span>guards;
-        }
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(guards) = <span class="self">Self</span>::try_lock(mutex, data) {
+                <span class="kw">return </span>guards;
+            }
 
-        <span class="comment">// Slow path
-        </span>data.queue.wait_until(|| <span class="self">Self</span>::try_lock(mutex, data))
+            <span class="comment">// Slow path
+            </span>data.queue.wait_until(|| <span class="self">Self</span>::try_lock(mutex, data))
+        }
     }
 
     <span class="attr">#[inline]
