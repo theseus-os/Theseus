@@ -262,9 +262,24 @@ pub fn set_priority(task: &TaskRef, priority: u8) {
     }
 }
 
+/// Lowers the task's priority to its previous value when dropped.
+pub struct PriorityInheritanceGuard<'a> {
+    inner: Option<(&'a TaskRef, u8)>,
+}
+
+impl<'a> Drop for PriorityInheritanceGuard<'a> {
+    fn drop(&mut self) {
+        if let Some((task, priority)) = self.inner {
+            set_priority(task, priority)
+        }
+    }
+}
+
 /// Modifies the given task's priority to be the maximum of its priority and the
 /// current task's priority.
-pub fn inherit_priority(task: &TaskRef) -> impl FnOnce() + '_ {
+///
+/// Returns a guard which reverts the change when dropped.
+pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
     let current_task = task::get_my_current_task().unwrap();
 
     let mut current_priority = None;
@@ -293,11 +308,14 @@ pub fn inherit_priority(task: &TaskRef) -> impl FnOnce() + '_ {
         debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task, current_priority));
     }
 
-    move || {
-        if let (Some(current_priority), Some((_, other_priority))) =
-            (current_priority, other_priority) && current_priority > other_priority
+    PriorityInheritanceGuard {
+        inner: if let (Some(current_priority), Some((_, other_priority))) =
+            (current_priority, other_priority)
+            && current_priority > other_priority
         {
-            set_priority(task, other_priority);
-        }
+            Some((task, other_priority))
+        } else {
+            None
+        },
     }
 }

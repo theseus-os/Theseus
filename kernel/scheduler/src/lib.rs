@@ -119,11 +119,6 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     }
 }
 
-pub fn inherit_priority(_task: &TaskRef) -> impl FnOnce() + '_ {
-    #[cfg(any(epoch_scheduler, priority_scheduler))]
-    {
-        scheduler::inherit_priority(_task)
-    }
-    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    || {}
+pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
+    scheduler::inherit_priority(task)
 }

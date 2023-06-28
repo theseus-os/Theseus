@@ -6,6 +6,8 @@
 
 extern crate alloc;
 
+use core::marker::PhantomData;
+
 use log::error;
 use runqueue_round_robin::RunQueue;
 use task::TaskRef;
@@ -31,5 +33,15 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
         runqueue_locked.move_to_end(task_index)
     } else {
         Some(runqueue_locked.idle_task().clone())
+    }
+}
+
+pub struct PriorityInheritanceGuard<'a> {
+    phantom: PhantomData<&'a ()>,
+}
+
+pub fn inherit_priority(_: &TaskRef) -> PriorityInheritanceGuard<'_> {
+    PriorityInheritanceGuard {
+        phantom: PhantomData,
     }
 }

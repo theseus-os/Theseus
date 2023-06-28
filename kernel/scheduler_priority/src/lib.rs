@@ -9,7 +9,9 @@ use log::error;
 use runqueue_priority::RunQueue;
 use task::TaskRef;
 
-pub use runqueue_priority::{get_priority, inherit_priority, set_priority};
+pub use runqueue_priority::{
+    get_priority, inherit_priority, set_priority, PriorityInheritanceGuard,
+};
 
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task

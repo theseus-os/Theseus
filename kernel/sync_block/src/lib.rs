@@ -96,16 +96,9 @@ impl MutexFlavor for Block {
 
             // Slow path
             #[cfg(priority_inheritance)]
-            let deinherit_priority = scheduler::inherit_priority(&holder_task);
+            let _priority_guard = scheduler::inherit_priority(&holder_task);
 
-            // This lint triggers when disabling priority inheritance.
-            #[allow(clippy::let_and_return)]
-            let guards = data.queue.wait_until(|| Self::try_lock(mutex, data));
-
-            #[cfg(priority_inheritance)]
-            deinherit_priority();
-
-            guards
+            data.queue.wait_until(|| Self::try_lock(mutex, data))
         } else {
             // Unlikely case that another thread just acquired the lock, but hasn't yet set
             // data.holder.
