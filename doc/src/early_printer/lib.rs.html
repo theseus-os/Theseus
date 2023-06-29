@@ -562,7 +562,7 @@
                 .ok()
             )
             .and_then(|mp| {
-                staging_fb_range = <span class="prelude-val">Some</span>(mp.deref().clone());
+                staging_fb_range = <span class="prelude-val">Some</span>(mp.range().clone());
                 mp.into_borrowed_slice_mut(<span class="number">0</span>, fb_pixel_count).ok()
             });
             

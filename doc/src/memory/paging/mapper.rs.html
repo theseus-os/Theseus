@@ -1251,7 +1251,6 @@
 <a href="#1251" id="1251">1251</a>
 <a href="#1252" id="1252">1252</a>
 <a href="#1253" id="1253">1253</a>
-<a href="#1254" id="1254">1254</a>
 </pre></div><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -1275,7 +1274,6 @@
 <span class="kw">use crate</span>::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
 <span class="kw">use </span><span class="kw">crate</span>::paging::{
     get_current_p4,
-    PageRange,
     table::{P4, UPCOMING_P4, Table, Level4},
 };
 <span class="kw">use </span>pte_flags::PteFlagsArch;
@@ -1474,7 +1472,7 @@
         }
 
         <span class="comment">// iterate over pages and frames in lockstep
-        </span><span class="kw">for </span>(page, frame) <span class="kw">in </span>pages.deref().clone().into_iter().zip(frames.borrow().into_iter()) {
+        </span><span class="kw">for </span>(page, frame) <span class="kw">in </span>pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
             <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
             <span class="kw">let </span>p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
             <span class="kw">let </span>p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
@@ -1536,7 +1534,7 @@
             .valid(<span class="bool-val">true</span>)
             .exclusive(<span class="bool-val">true</span>);
 
-        <span class="kw">for </span>page <span class="kw">in </span>pages.deref().clone() {
+        <span class="kw">for </span>page <span class="kw">in </span>pages.range().clone() {
             <span class="kw">let </span>af = frame_allocator::allocate_frames(<span class="number">1</span>).ok_or(<span class="string">&quot;map_allocated_pages(): couldn&#39;t allocate new frame, out of memory&quot;</span>)<span class="question-mark">?</span>;
 
             <span class="kw">let </span>p3 = <span class="self">self</span>.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
@@ -1612,9 +1610,9 @@
     </span>flags: PteFlagsArch,
 }
 <span class="kw">impl </span>Deref <span class="kw">for </span>MappedPages {
-    <span class="kw">type </span>Target = PageRange;
-    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
-        <span class="self">self</span>.pages.deref()
+    <span class="kw">type </span>Target = AllocatedPages;
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>AllocatedPages {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.pages
     }
 }
 
@@ -1791,7 +1789,7 @@
             <span class="kw">return </span><span class="prelude-val">Ok</span>(());
         }
 
-        <span class="kw">for </span>page <span class="kw">in </span><span class="self">self</span>.pages.clone() {
+        <span class="kw">for </span>page <span class="kw">in </span><span class="self">self</span>.pages.range().clone() {
             <span class="kw">let </span>p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -1804,7 +1802,7 @@
         }
         
         <span class="kw">if let </span><span class="prelude-val">Some</span>(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-            func(<span class="self">self</span>.pages.deref().clone());
+            func(<span class="self">self</span>.pages.range().clone());
         }
 
         <span class="self">self</span>.flags = new_flags;
@@ -1867,7 +1865,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>first_frame_range: <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt; = <span class="prelude-val">None</span>; <span class="comment">// this is what we&#39;ll return
         </span><span class="kw">let </span><span class="kw-2">mut </span>current_frame_range: <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt; = <span class="prelude-val">None</span>;
 
-        <span class="kw">for </span>page <span class="kw">in </span><span class="self">self</span>.pages.clone() {            
+        <span class="kw">for </span>page <span class="kw">in </span><span class="self">self</span>.pages.range().clone() {            
             <span class="kw">let </span>p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -1930,7 +1928,7 @@
         <span class="attr">#[cfg(not(bm_map))]
         </span>{
             <span class="kw">if let </span><span class="prelude-val">Some</span>(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-                func(<span class="self">self</span>.pages.deref().clone());
+                func(<span class="self">self</span>.pages.range().clone());
             }
         }
 

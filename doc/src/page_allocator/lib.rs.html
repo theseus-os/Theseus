@@ -841,6 +841,55 @@
 <a href="#841" id="841">841</a>
 <a href="#842" id="842">842</a>
 <a href="#843" id="843">843</a>
+<a href="#844" id="844">844</a>
+<a href="#845" id="845">845</a>
+<a href="#846" id="846">846</a>
+<a href="#847" id="847">847</a>
+<a href="#848" id="848">848</a>
+<a href="#849" id="849">849</a>
+<a href="#850" id="850">850</a>
+<a href="#851" id="851">851</a>
+<a href="#852" id="852">852</a>
+<a href="#853" id="853">853</a>
+<a href="#854" id="854">854</a>
+<a href="#855" id="855">855</a>
+<a href="#856" id="856">856</a>
+<a href="#857" id="857">857</a>
+<a href="#858" id="858">858</a>
+<a href="#859" id="859">859</a>
+<a href="#860" id="860">860</a>
+<a href="#861" id="861">861</a>
+<a href="#862" id="862">862</a>
+<a href="#863" id="863">863</a>
+<a href="#864" id="864">864</a>
+<a href="#865" id="865">865</a>
+<a href="#866" id="866">866</a>
+<a href="#867" id="867">867</a>
+<a href="#868" id="868">868</a>
+<a href="#869" id="869">869</a>
+<a href="#870" id="870">870</a>
+<a href="#871" id="871">871</a>
+<a href="#872" id="872">872</a>
+<a href="#873" id="873">873</a>
+<a href="#874" id="874">874</a>
+<a href="#875" id="875">875</a>
+<a href="#876" id="876">876</a>
+<a href="#877" id="877">877</a>
+<a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
@@ -1055,12 +1104,6 @@
 <span class="comment">// AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.
 </span><span class="macro">assert_not_impl_any!</span>(AllocatedPages: DerefMut, Clone);
 
-<span class="kw">impl </span>Deref <span class="kw">for </span>AllocatedPages {
-    <span class="kw">type </span>Target = PageRange;
-    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.pages
-    }
-}
 <span class="kw">impl </span>fmt::Debug <span class="kw">for </span>AllocatedPages {
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter) -&gt; fmt::Result {
 		<span class="macro">write!</span>(f, <span class="string">&quot;AllocatedPages({:?})&quot;</span>, <span class="self">self</span>.pages)
@@ -1074,6 +1117,61 @@
         AllocatedPages {
 			pages: PageRange::empty()
 		}
+	}
+
+	<span class="doccomment">/// Returns the starting `VirtualAddress` in this range of pages.
+    </span><span class="kw">pub fn </span>start_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VirtualAddress {
+        <span class="self">self</span>.pages.start_address()
+    }
+
+	<span class="doccomment">/// Returns the size in bytes of this range of pages.
+    </span><span class="kw">pub fn </span>size_in_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.pages.size_in_bytes()
+    }
+
+	<span class="doccomment">/// Returns the size in number of pages of this range of pages.
+    </span><span class="kw">pub fn </span>size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.pages.size_in_pages()
+    }
+
+	<span class="doccomment">/// Returns the starting `Page` in this range of pages.
+	</span><span class="kw">pub fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+		<span class="self">self</span>.pages.start()
+	}
+
+	<span class="doccomment">/// Returns the ending `Page` (inclusive) in this range of pages.
+	</span><span class="kw">pub fn </span>end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+		<span class="self">self</span>.pages.end()
+	}
+
+	<span class="doccomment">/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
+	</span><span class="kw">pub fn </span>range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
+		<span class="kw-2">&amp;</span><span class="self">self</span>.pages
+	}
+
+	<span class="doccomment">/// Returns the offset of the given `VirtualAddress` within this range of pages,
+	/// i.e., `addr - self.start_address()`.
+	///
+	/// If the given `addr` is not covered by this range of pages, this returns `None`.
+	///
+	/// ## Examples
+	/// If the range covers addresses `0x2000` to `0x4000`,
+	/// then `offset_of_address(0x3500)` would return `Some(0x1500)`.
+	</span><span class="kw">pub const fn </span>offset_of_address(<span class="kw-2">&amp;</span><span class="self">self</span>, addr: VirtualAddress) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+		<span class="self">self</span>.pages.offset_of_address(addr)
+	}
+
+	<span class="doccomment">/// Returns the `VirtualAddress` at the given offset into this range of pages,
+	/// i.e., `self.start_address() + offset`.
+	///
+	/// If the given `offset` is not within this range of pages, this returns `None`.
+	///
+	/// ## Examples
+	/// If the range covers addresses `0x2000` through `0x3FFF`,
+	/// then `address_at_offset(0x1500)` would return `Some(0x3500)`,
+	/// and `address_at_offset(0x2000)` would return `None`.
+	</span><span class="kw">pub const fn </span>address_at_offset(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: usize) -&gt; <span class="prelude-ty">Option</span>&lt;VirtualAddress&gt; {
+		<span class="self">self</span>.pages.address_at_offset(offset)
 	}
 
 	<span class="doccomment">/// Merges the given `AllocatedPages` object `ap` into this `AllocatedPages` object (`self`).
