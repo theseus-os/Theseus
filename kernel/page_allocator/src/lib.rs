@@ -227,32 +227,32 @@ impl AllocatedPages {
 		}
 	}
 
-	///	Returns the starting `VirtualAddress` in this range of pages.
+	/// Returns the starting `VirtualAddress` in this range of pages.
     pub fn start_address(&self) -> VirtualAddress {
         self.pages.start_address()
     }
 
-	///	Returns the size in bytes of this range of pages.
+	/// Returns the size in bytes of this range of pages.
     pub fn size_in_bytes(&self) -> usize {
         self.pages.size_in_bytes()
     }
 
-	///	Returns the size in number of pages of this range of pages.
+	/// Returns the size in number of pages of this range of pages.
     pub fn size_in_pages(&self) -> usize {
         self.pages.size_in_pages()
     }
 
-	///	Returns the starting `Page` in this range of pages.
+	/// Returns the starting `Page` in this range of pages.
 	pub fn start(&self) -> &Page {
 		self.pages.start()
 	}
 
-	///	Returns the ending `Page` (inclusive) in this range of pages.
+	/// Returns the ending `Page` (inclusive) in this range of pages.
 	pub fn end(&self) -> &Page {
 		self.pages.end()
 	}
 
-	///	Returns a reference to the inner `PageRange`, which is cloneable/iterable.
+	/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
 	pub fn range(&self) -> &PageRange {
 		&self.pages
 	}
