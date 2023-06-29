@@ -54,7 +54,9 @@ where
                     // Ensure that we don't get preempted after blocking ourselves
                     // before we get a chance to release the internal lock of the queue.
                     let preemption_guard = hold_preemption();
+                    log::error!("blocking");
                     task.block().unwrap();
+                    log::error!("blocked");
                     Err(preemption_guard)
                 }
             };
@@ -62,8 +64,12 @@ where
             match self.inner.push_if_fail(task.clone(), wrapped_condition) {
                 Ok(value) => return value,
                 Err(preemption_guard) => {
+                    log::error!("preemption counter before guard: {}", preemption_guard.prev_val);
+                    log::error!("preemption was disabled by guard: {}", preemption_guard.preemption_was_enabled());
                     drop(preemption_guard);
+                    log::error!("scheduling");
                     scheduler::schedule();
+                    log::error!("scheduled");
                 }
             }
         }

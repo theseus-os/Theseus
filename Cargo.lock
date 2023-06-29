@@ -1513,11 +1513,14 @@ dependencies = [
  "core2",
  "embedded-hal",
  "hashbrown",
+ "log",
  "mod_mgmt",
  "nb 1.0.0",
  "noline",
  "path",
  "root",
+ "runqueue",
+ "scheduler",
  "spawn",
  "stdio",
  "sync_block",
@@ -3068,6 +3071,7 @@ dependencies = [
  "apic",
  "app_io",
  "getopts",
+ "log",
  "runqueue",
  "task",
 ]
@@ -4433,6 +4437,7 @@ name = "wait_queue"
 version = "0.1.0"
 dependencies = [
  "cpu_local_preemption",
+ "log",
  "mpmc_queue",
  "scheduler",
  "sync",

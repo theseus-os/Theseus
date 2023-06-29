@@ -18,6 +18,10 @@ stdio = { path = "../../libs/stdio" }
 sync_block = { path = "../../kernel/sync_block" }
 task = { path = "../../kernel/task" }
 tty = { path = "../../kernel/tty" }
+log = "0.4.8"
+
+scheduler = { path = "../../kernel/scheduler" }
+runqueue = { path = "../../kernel/runqueue" }
 
 [dependencies.core2]
 version = "0.4.0"

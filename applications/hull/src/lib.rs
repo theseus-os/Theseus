@@ -33,6 +33,23 @@ use task::{ExitValue, KillReason};
 use tty::{Event, LineDiscipline};
 
 pub fn main(_: Vec<String>) -> isize {
+    // spawn::new_task_builder(
+    //     |_| loop {
+    //         for i in 0..4 {
+    //             let rq = runqueue::get_runqueue(i).unwrap().read();
+    //             log::error!("{i}");
+    //             for thingy in rq.iter() {
+    //                 log::warn!("{thingy:?}");
+    //             }
+    //         }
+    //         for i in 0..200 {
+    //             scheduler::schedule();
+    //         }
+    //     },
+    //     (),
+    // )
+    // .spawn()
+    // .unwrap();
     let mut shell = Shell {
         discipline: app_io::line_discipline().expect("no line discipline"),
         jobs: Arc::new(Mutex::new(HashMap::new())),
@@ -136,7 +153,18 @@ impl Shell {
         }
 
         if let Some(last_id) = last_id && parsed_line.foreground.is_some() {
-            self.wait_on_job(last_id)?;
+            match self.wait_on_job(last_id) {
+                Ok(()) => {},
+                Err(Error::ExitRequested) => return Err(Error::ExitRequested),
+                Err(Error::CurrentTaskUnavailable) => return Err(Error::CurrentTaskUnavailable),
+                Err(Error::Command(exit_code)) => println!("exit {}", exit_code),
+                Err(Error::CommandNotFound(command)) => println!("{}: command not found", command),
+                Err(Error::SpawnFailed(s)) => println!("failed to spawn task: {s}"),
+                Err(Error::KillFailed) => println!("failed to kill task"),
+                Err(Error::UnblockFailed(state)) => {
+                    println!("failed to unblock task with state {:?}", state)
+                }
+            };
         }
 
         Ok(())
@@ -318,12 +346,14 @@ impl Shell {
         app_io::insert_child_streams(id, streams);
         task.unblock().map_err(Error::UnblockFailed)?;
 
+        println!("spawning watchdog");
+
         // Spawn watchdog task.
         spawn::new_task_builder(
             move |_| {
                 let task_ref = task.clone();
 
-                println!("watchdog starting");
+                log::info!("watchdog starting");
                 let exit_value = match task.join().unwrap() {
                     ExitValue::Completed(status) => {
                         match status.downcast_ref::<isize>() {
@@ -340,6 +370,7 @@ impl Shell {
                         KillReason::Exception(num) => num.into(),
                     },
                 };
+                log::info!("watchdog joined on application");
 
                 let mut jobs = self.jobs.lock();
                 match jobs.remove(&job_id) {
@@ -363,6 +394,7 @@ impl Shell {
         )
         .spawn()
         .map_err(Error::SpawnFailed)?;
+        log::info!("spawned watchdog");
 
         Ok(JobPart {
             state: State::Running,

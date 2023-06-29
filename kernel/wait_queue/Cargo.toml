@@ -12,3 +12,4 @@ scheduler = { path = "../scheduler" }
 sync = { path = "../../libs/sync" }
 sync_spin = { path = "../../libs/sync_spin" }
 task = { path = "../task" }
+log = "0.4.8"

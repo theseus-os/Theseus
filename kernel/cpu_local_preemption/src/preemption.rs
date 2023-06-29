@@ -9,7 +9,7 @@ use crate::cpu_local::{CpuLocal, CpuLocalField, PerCpuField};
 use no_drop::NoDrop;
 
 /// The preemption count for the current CPU.
-static PREEMPTION_COUNT: CpuLocal<PreemptionCount> = CpuLocal::new(PerCpuField::PreemptionCount);
+pub static PREEMPTION_COUNT: CpuLocal<PreemptionCount> = CpuLocal::new(PerCpuField::PreemptionCount);
 
 /// A type wrapper around [`AtomicU8`] that represents a CPU-local preemption count.
 ///
@@ -63,6 +63,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     let mut guard_placeholder = NoDrop::new(PreemptionGuard {
         cpu_id,
         preemption_was_enabled: false, // updated below
+        prev_val: 42,
     });
     let prev_val = PREEMPTION_COUNT.with_preempt(
         &guard_placeholder,
@@ -74,6 +75,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     // Create a real guard here immediately after incrementing the counter,
     // in order to guarantee that a failure below will drop it and decrement the counter.
     guard_placeholder.preemption_was_enabled = preemption_was_enabled;
+    guard_placeholder.prev_val = prev_val;
     let guard = guard_placeholder.into_inner();
 
     if DISABLE_TIMER && preemption_was_enabled {
@@ -114,6 +116,7 @@ pub struct PreemptionGuard {
     cpu_id: CpuId,
     /// Whether preemption was enabled when this guard was created.
     preemption_was_enabled: bool,
+    pub prev_val: u8,
 }
 impl !Send for PreemptionGuard { }
 
