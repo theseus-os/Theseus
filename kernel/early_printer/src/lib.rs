@@ -143,7 +143,7 @@ pub fn init(
                 .ok()
             )
             .and_then(|mp| {
-                staging_fb_range = Some(mp.deref().clone());
+                staging_fb_range = Some(mp.range().clone());
                 mp.into_borrowed_slice_mut(0, fb_pixel_count).ok()
             });
             
