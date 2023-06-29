@@ -17,6 +17,7 @@
 #[cfg(test)]
 mod test;
 
+use core::fmt;
 use core::iter::Step;
 use core::ops::{RangeBounds, Bound, Bound::Included};
 
@@ -26,10 +27,16 @@ use core::ops::{RangeBounds, Bound, Bound::Included};
 /// and `x <= end`. It is empty unless `start <= end`.
 ///
 /// See the crate-level docs for more information.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct RangeInclusive<Idx: Clone + PartialOrd> {
     pub(crate) start: Idx,
     pub(crate) end: Idx
+}
+
+impl<Idx: Clone + PartialOrd + fmt::Debug> fmt::Debug for RangeInclusive<Idx> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:X?}..={:X?}", self.start, self.end)
+    }
 }
 
 impl<Idx: Clone + PartialOrd> RangeInclusive<Idx> {
