@@ -134,6 +134,13 @@
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A `RangeInclusive` implementation that offers a separate iterator type.
 //!
 //! This `RangeInclusive` does not directly implement the `Iterator` trait,
@@ -153,6 +160,7 @@
 #[cfg(test)]
 </span><span class="kw">mod </span>test;
 
+<span class="kw">use </span>core::fmt;
 <span class="kw">use </span>core::iter::Step;
 <span class="kw">use </span>core::ops::{RangeBounds, Bound, Bound::Included};
 
@@ -162,10 +170,16 @@
 /// and `x &lt;= end`. It is empty unless `start &lt;= end`.
 ///
 /// See the crate-level docs for more information.
-</span><span class="attr">#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+</span><span class="attr">#[derive(Copy, Clone, PartialEq, Eq, Hash)]
 </span><span class="kw">pub struct </span>RangeInclusive&lt;Idx: Clone + PartialOrd&gt; {
     <span class="kw">pub</span>(<span class="kw">crate</span>) start: Idx,
     <span class="kw">pub</span>(<span class="kw">crate</span>) end: Idx
+}
+
+<span class="kw">impl</span>&lt;Idx: Clone + PartialOrd + fmt::Debug&gt; fmt::Debug <span class="kw">for </span>RangeInclusive&lt;Idx&gt; {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{:?}..={:?}&quot;</span>, <span class="self">self</span>.start, <span class="self">self</span>.end)
+    }
 }
 
 <span class="kw">impl</span>&lt;Idx: Clone + PartialOrd&gt; RangeInclusive&lt;Idx&gt; {
