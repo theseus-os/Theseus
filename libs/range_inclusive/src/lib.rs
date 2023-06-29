@@ -35,7 +35,7 @@ pub struct RangeInclusive<Idx: Clone + PartialOrd> {
 
 impl<Idx: Clone + PartialOrd + fmt::Debug> fmt::Debug for RangeInclusive<Idx> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:X?}..={:X?}", self.start, self.end)
+        write!(f, "{:?}..={:?}", self.start, self.end)
     }
 }
 
