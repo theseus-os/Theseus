@@ -133,6 +133,6 @@ impl Stack {
     /// Guard pages are virtual pages that are reserved/owned by this stack
     /// but are not mapped, causing any access to them to result in a page fault. 
     pub fn guard_page(&self) -> &memory_structs::PageRange {
-        &self.guard_page
+        self.guard_page.range()
     }
 }

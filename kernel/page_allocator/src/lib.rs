@@ -212,12 +212,6 @@ pub struct AllocatedPages {
 // AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.
 assert_not_impl_any!(AllocatedPages: DerefMut, Clone);
 
-impl Deref for AllocatedPages {
-    type Target = PageRange;
-    fn deref(&self) -> &PageRange {
-        &self.pages
-    }
-}
 impl fmt::Debug for AllocatedPages {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		write!(f, "AllocatedPages({:?})", self.pages)
@@ -231,6 +225,61 @@ impl AllocatedPages {
         AllocatedPages {
 			pages: PageRange::empty()
 		}
+	}
+
+	/// Returns the starting `VirtualAddress` in this range of pages.
+    pub fn start_address(&self) -> VirtualAddress {
+        self.pages.start_address()
+    }
+
+	/// Returns the size in bytes of this range of pages.
+    pub fn size_in_bytes(&self) -> usize {
+        self.pages.size_in_bytes()
+    }
+
+	/// Returns the size in number of pages of this range of pages.
+    pub fn size_in_pages(&self) -> usize {
+        self.pages.size_in_pages()
+    }
+
+	/// Returns the starting `Page` in this range of pages.
+	pub fn start(&self) -> &Page {
+		self.pages.start()
+	}
+
+	/// Returns the ending `Page` (inclusive) in this range of pages.
+	pub fn end(&self) -> &Page {
+		self.pages.end()
+	}
+
+	/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
+	pub fn range(&self) -> &PageRange {
+		&self.pages
+	}
+
+	/// Returns the offset of the given `VirtualAddress` within this range of pages,
+	/// i.e., `addr - self.start_address()`.
+	///
+	/// If the given `addr` is not covered by this range of pages, this returns `None`.
+	///
+	/// ## Examples
+	/// If the range covers addresses `0x2000` to `0x4000`,
+	/// then `offset_of_address(0x3500)` would return `Some(0x1500)`.
+	pub const fn offset_of_address(&self, addr: VirtualAddress) -> Option<usize> {
+		self.pages.offset_of_address(addr)
+	}
+
+	/// Returns the `VirtualAddress` at the given offset into this range of pages,
+	/// i.e., `self.start_address() + offset`.
+	///
+	/// If the given `offset` is not within this range of pages, this returns `None`.
+	///
+	/// ## Examples
+	/// If the range covers addresses `0x2000` through `0x3FFF`,
+	/// then `address_at_offset(0x1500)` would return `Some(0x3500)`,
+	/// and `address_at_offset(0x2000)` would return `None`.
+	pub const fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
+		self.pages.address_at_offset(offset)
 	}
 
 	/// Merges the given `AllocatedPages` object `ap` into this `AllocatedPages` object (`self`).
