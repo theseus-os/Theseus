@@ -4,7 +4,7 @@
 //! 
 
 #![no_std]
-#![feature(drain_filter)]
+#![feature(extract_if)]
 
 extern crate alloc;
 
@@ -209,7 +209,7 @@ pub fn log_panic_entry(panic_info: &PanicInfo) {
 /// Removes the unhandled faults from the fault log and returns. 
 /// Is useful when we update the recovery detail about unhandled exceptions. 
 pub fn remove_unhandled_exceptions() -> Vec<FaultEntry> {
-    FAULT_LIST.lock().drain_filter(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
+    FAULT_LIST.lock().extract_if(|fe| fe.action_taken == RecoveryAction::None).collect::<Vec<_>>()
 }
 
 /// Prints to both the `early_printer` and the current terminal via `app_io`.

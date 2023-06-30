@@ -21,7 +21,7 @@ pub(crate) struct Job {
 
 impl Job {
     pub(crate) fn kill(&mut self) -> Result<()> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task
                 .kill(KillReason::Requested)
                 .map_err(|_| Error::KillFailed)?;
@@ -30,21 +30,21 @@ impl Job {
         Ok(())
     }
     pub(crate) fn suspend(&mut self) {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.suspend();
             part.state = State::Suspended;
         }
     }
 
     pub(crate) fn unsuspend(&mut self) {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.unsuspend();
             part.state = State::Running;
         }
     }
 
     pub(crate) fn unblock(&mut self) -> Result<()> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.unblock().map_err(Error::UnblockFailed)?;
             part.state = State::Running;
         }

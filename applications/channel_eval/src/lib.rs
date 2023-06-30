@@ -29,7 +29,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     opts.optopt("n", "iterations", "number of test iterations (default 100)", "ITER");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

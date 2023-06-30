@@ -96,31 +96,29 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 /// This function returns an error when a scheduler without priority is loaded. 
 pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(epoch_scheduler)] {
-        scheduler_epoch::set_priority(_task, _priority);
-        Ok(())
+    #[cfg(any(epoch_scheduler, priority_scheduler))]
+    {
+        Ok(scheduler::set_priority(_task, _priority))
     }
-    #[cfg(not(epoch_scheduler))] {
-        Err("no scheduler that uses task priority is currently loaded")
+    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
+    {
+        Err("called set priority on scheduler that doesn't support set priority")
     }
 }
 
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
 pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(epoch_scheduler)] {
-        scheduler_epoch::get_priority(_task)
+    #[cfg(any(epoch_scheduler, priority_scheduler))]
+    {
+        scheduler::get_priority(_task)
     }
-    #[cfg(not(epoch_scheduler))] {
+    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
+    {
         None
     }
 }
 
-pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::set_periodicity(_task, _period)
-    }
-    #[cfg(not(priority_scheduler))] {
-        Err("no scheduler that supports periodic tasks is currently loaded")
-    }
+pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
+    scheduler::inherit_priority(task)
 }

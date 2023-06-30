@@ -179,10 +179,12 @@ pub fn init(
         Ok((key_producer, mouse_producer)) => {
             device_manager::init(key_producer, mouse_producer)?;
         },
-        Err(error) => info!("Window manager initialisation failure: {error}"),
+        Err(error) => {
+            error!("Failed to init window manager (expected if using nographic): {error}");
+        }
     }
 
-    #[cfg(not(target_arch = "x86_64"))]
+    #[cfg(target_arch = "aarch64")]
     device_manager::init()?;
 
     task_fs::init()?;

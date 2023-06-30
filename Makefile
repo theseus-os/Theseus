@@ -19,7 +19,6 @@ debug ?= none
 net ?= none
 merge_sections ?= yes
 bootloader ?= grub
-display ?= yes
 
 ## aarch64 only supports booting via UEFI
 ifeq ($(ARCH),aarch64)
@@ -115,7 +114,6 @@ nano_core_binary := $(NANO_CORE_BUILD_DIR)/nano_core-$(ARCH).bin
 ## The linker script for linking the `nano_core_binary` with the compiled assembly files.
 linker_script := $(ROOT_DIR)/kernel/nano_core/linker_higher_half-$(ARCH).ld
 efi_firmware := $(BUILD_DIR)/$(OVMF_FILE)
-free_tty_binary := $(ROOT_DIR)/tools/free_tty/target/release/free_tty
 
 ifeq ($(ARCH),x86_64)
 ## The assembly files compiled by the nano_core build script.
@@ -148,11 +146,11 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 .PHONY: all full \
 		check-usb \
 		clean clean-doc clean-old-build \
-		run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
+		orun orun_pause run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
 		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb gdb_aarch64 \
-		clippy doc docs view-doc view-docs book view-book $(free_tty_binary)
+		clippy doc docs view-doc view-docs book view-book
 
 
 ### If we compile for SIMD targets newer than SSE (e.g., AVX or newer),
@@ -616,7 +614,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
 docs: doc
-doc: export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
+doc : export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
 doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
 doc:
@@ -703,19 +701,30 @@ help:
 	@echo -e "   run:"
 	@echo -e "\t Builds Theseus (via the 'iso' target) and runs it using QEMU."
 
+	@echo -e "   run_pause:"
+	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
+	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+
+	@echo -e "   orun:"
+	@echo -e "\t Runs the existing build of Theseus using QEMU, without building Theseus first."
+
+	@echo -e "   orun_pause:"
+	@echo -e "\t Same as 'orun', but pauses QEMU at its GDB stub entry point,"
+	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
+
 	@echo -e "   loadable:"
 	@echo -e "\t Same as 'run', but enables the 'loadable' configuration so that all crates are dynamically loaded."
 
 	@echo -e "   wasmtime:"
 	@echo -e "\t Same as 'run', but includes the 'wasmtime' crates in the build."
 
-	@echo -e "   run_pause:"
-	@echo -e "\t Same as 'run', but pauses QEMU at its GDB stub entry point,"
-	@echo -e "\t which waits for you to connect a GDB debugger using 'make gdb'."
-
 	@echo -e "   gdb:"
-	@echo -e "\t Runs a new instance of GDB that connects to an already-running QEMU instance."
-	@echo -e "\t You must run an instance of Theseus in QEMU beforehand in a separate terminal."
+	@echo -e "\t Runs a new instance of GDB that connects to an already-running x86_64 QEMU instance."
+	@echo -e "\t You must run an instance of Theseus on x86_64 in QEMU beforehand in a separate terminal."
+
+	@echo -e "   gdb_aarch64:"
+	@echo -e "\t Runs a new instance of GDB multiarch that connects to an already-running aarch64 QEMU instance."
+	@echo -e "\t You must run an instance of Theseus on aarch64 in QEMU beforehand in a separate terminal."
 
 	@echo -e "   bochs:"
 	@echo -e "\t Same as 'make run', but runs Theseus in the Bochs emulator instead of QEMU."
@@ -772,22 +781,37 @@ help:
 	@echo -e "\t    'none':  Disable all networking in the QEMU guest. This is the default behavior if no other 'net' option is provided."
 # @echo -e "   kvm=yes:"
 # @echo -e "\t Enable KVM acceleration (the host computer must support it)."
-	@echo -e "   host=yes:"
+	@echo -e "   host=yes"
 	@echo -e "\t Enable KVM and use the host CPU model. This is required for using certain x86 hardware not supported by QEMU, e.g., PMU, AVX."
-	@echo -e "   int=yes:"
+	@echo -e "   int=yes"
 	@echo -e "\t Enable interrupt logging in QEMU console (-d int). This is VERY verbose and slow."
-	@echo -e "   vfio=<pci_device_slot>:"
+	@echo -e "   vfio=<PCI_DEVICE_SLOT>"
 	@echo -e "\t Use VFIO-based PCI device assignment (passthrough) in QEMU for the given device slot, e.g 'vfio=59:00.0'"
-	@echo -e "   SERIAL<N>=<backend>":
+	@echo -e "   SERIAL<N>=<BACKEND>"
 	@echo -e "\t Connect a guest OS serial port (e.g., 'SERIAL1' or 'SERIAL2') to a QEMU-supported backend."
 	@echo -e "\t For example, 'SERIAL2=pty' will connect the second serial port for the given architecture"
 	@echo -e "\t ('COM2 on x86) to a newly-allocated pseudo-terminal on Linux, e.g., '/dev/pts/6'."
 	@echo -e "\t For the 'pty' option, QEMU will print a statement like so:"
 	@echo -e "\t     char device redirected to /dev/pts/6 (label serial1)"
 	@echo -e "\t Note that QEMU uses 0-based indexing for serial ports, so its 'serial1' label refers to the second serial port, our 'SERIAL2'."
-	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6'."
+	@echo -e "\t You can then connect to this using something like 'screen /dev/pts/6' or 'picocom /dev/pts/6',"
+	@echo -e "\t or use the below 'terminal=' option to auto-launch a new terminal."
 	@echo -e "\t Other options include 'stdio' (the default for 'SERIAL1'), 'file', 'pipe', etc."
 	@echo -e "\t For more details, search the QEMU manual for '-serial dev'."
+	@echo -e "   terminal=\"TERMINAL_COMMAND\""
+	@echo -e "\t Auto-launch a new terminal window connected to the specified SERIAL<N> TTY/PTY backend"
+	@echo -e "\t that QEMU created for us, as described above."
+	@echo -e "\t The TERMINAL_COMMAND is specific to your system's terminal emulator and available binaries,"
+	@echo -e "\t and will be invoked by our makefile with one argument: the PTY device file created by QEMU."
+	@echo -e "\t For example, on a default GNOME-based Linux distro with 'screen' installed, you can run:"
+	@echo -e "\t     make run terminal=\"gnome-terminal -- screen\""
+	@echo -e "\t On a system with 'alacritty' installed, you can just run:"
+	@echo -e "\t     make run terminal=alacritty"
+	@echo -e "\t The specific syntax of TERMINAL_COMMAND depends on your host system and chosen terminal emulator."
+	@echo -e "   graphic=no"
+	@echo -e "\t Disable the graphical QEMU window, which reroutes the VGA text mode output to stdio."
+	@echo -e "\t -- Note: the VGA device will still exist and be used by Theseus, it just will not be displayed."
+
 
 	@echo -e "\nThe following make targets exist for building documentation:"
 	@echo -e "   doc:"
@@ -849,11 +873,10 @@ QEMU_FLAGS += -serial mon:$(SERIAL1)
 ## -- `picocom /dev/pts/6`
 QEMU_FLAGS += -serial mon:$(SERIAL2)
 
-## Disable the graphical display (for testing headless server functionality)
+## Disable the graphical display (for running in "headless" mode)
 ## `-vga none`:      removes the VGA card
 ## `-display none`:  disables QEMU's graphical display
 ## `-nographic`:     disables QEMU's graphical display and redirects VGA text mode output to serial.
-
 ifeq ($(graphic), no)
 	QEMU_FLAGS += -nographic
 endif
@@ -934,14 +957,28 @@ QEMU_FLAGS += $(QEMU_EXTRA)
 ########################## Targets for running and debugging Theseus ##############################
 ###################################################################################################
 
-### Old Run: runs the most recent build without rebuilding
+### `qemu`/`orun` (old run): runs the most recent build without rebuilding.
+### This is the base-level target responsible for actually invoking QEMU;
+### all other targets that want to invoke QEMU should depend on this target to do so.
+qemu: orun
 orun:
+ifdef terminal
+## Check which PTY/TTY the OS would give to the next process that requests one,
+## which is the best way to guess which PTY QEMU will use for redirected serial I/O.
+	$(eval temp_tty += $(shell cargo run --release --quiet --manifest-path $(ROOT_DIR)/tools/get_tty/Cargo.toml))
+## If another process obtains that TTY here before we can run QEMU,
+## the 'terminal' command below will connect to the wrong TTY, but there's nothing we can do.
+##
+## Sleep for 2 seconds to allow QEMU enough time to start and request the TTY.
+	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
+else
 	$(QEMU_BIN) $(QEMU_FLAGS)
+endif
 
 
-### Old Run Pause: runs the most recent build without rebuilding but waits for a GDB connection.
-orun_pause:
-	$(QEMU_BIN) $(QEMU_FLAGS) -S
+### Old Run Pause: runs the most recent build without rebuilding, but pauses QEMU until GDB is connected.
+orun_pause : export override QEMU_FLAGS += -S
+orun_pause: orun
 
 
 ### builds and runs Theseus in loadable mode, where all crates are dynamically loaded.
@@ -953,37 +990,13 @@ loadable: run
 wasmtime : export override FEATURES += --features wasmtime
 wasmtime: run
 
-$(free_tty_binary):
-	cargo build --release --manifest-path $(ROOT_DIR)/tools/free_tty/Cargo.toml
 
 ### builds and runs Theseus in QEMU
-run: $(iso) $(free_tty_binary)
-ifdef terminal
-# Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell $(free_tty_binary)))
-# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
-# there's not much we can do about it.
-#
-# The slee is to give QEMU time to create the TTY.
-	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
-else
-	$(QEMU_BIN) $(QEMU_FLAGS)
-endif
+run: $(iso) orun
 
 
 ### builds and runs Theseus in QEMU, but pauses execution until a GDB instance is connected.
-run_pause: $(iso) $(free_tty_bin)
-ifdef terminal
-# Check which TTY the OS would give a process requesting a TTY
-	$(eval temp_tty += $(shell $(free_tty_binary)))
-# If another process snags a new TTY here, the command below will connect to the wrong TTY, but
-# there's not much we can do about it.
-#
-# The slee is to give QEMU time to create the TTY.
-	(sleep 2 && $(terminal) $(temp_tty)) & $(QEMU_BIN) $(QEMU_FLAGS)
-else
-	$(QEMU_BIN) $(QEMU_FLAGS) -S
-endif
+run_pause: $(iso) orun_pause
 
 
 ### Runs a gdb instance on the host machine. 

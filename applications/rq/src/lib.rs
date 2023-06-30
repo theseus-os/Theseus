@@ -24,7 +24,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     log::error!("a");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => { m }
         Err(_f) => { println!("{} \n", _f);
                     return -1; }

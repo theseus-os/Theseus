@@ -828,7 +828,7 @@ pub fn allocate_pages_by_bytes_in_range(
 /// Call this function once heap allocation is available. 
 /// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
 #[doc(hidden)] 
-pub fn convert_to_heap_allocated() {
+pub fn convert_page_allocator_to_heap_based() {
 	FREE_PAGE_LIST.lock().convert_to_heap_allocated();
 }
 

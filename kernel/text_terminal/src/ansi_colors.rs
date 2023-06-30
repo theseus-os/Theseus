@@ -21,7 +21,7 @@ use alloc::borrow::Cow;
 /// * Finally, the 24-bit color variant accepts standard RGB values. 
 ///
 /// See here for the set of colors: <https://en.wikipedia.org/wiki/ANSI_escape_code#Colors>
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Color {
     /////////////////////// 2-bit Colors //////////////////////
     Black,
@@ -63,6 +63,7 @@ pub enum Color {
 
     /// The default color, which is generally unspecified
     /// and depends on the context in which it is used.
+    #[default]
     Default,
 }
 impl From<u8> for Color {
@@ -86,11 +87,6 @@ impl From<u8> for Color {
             15 => Self::BrightWhite,
             x  => Self::Color8Bit(x),
         }
-    }
-}
-impl Default for Color {
-    fn default() -> Self {
-        Color::Default
     }
 }
 

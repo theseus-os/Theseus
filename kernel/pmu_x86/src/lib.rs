@@ -857,7 +857,7 @@ pub fn handle_sample(stack_frame: &InterruptStackFrame) -> Result<bool, &'static
     let my_core_id = cpu::current_cpu().into_u8();
 
     let mut sampling_info = SAMPLING_INFO.lock();
-    let mut samples = sampling_info.get_mut(&my_core_id)
+    let samples = sampling_info.get_mut(&my_core_id)
         .ok_or("pmu_x86::handle_sample: Could not retrieve sampling information for this core")?;
 
     let current_count = samples.sample_count;

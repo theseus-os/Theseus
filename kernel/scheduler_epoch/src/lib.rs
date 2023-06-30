@@ -16,6 +16,8 @@ use log::error;
 use runqueue_epoch::{RunQueue, MAX_PRIORITY};
 use task::TaskRef;
 
+pub use runqueue_epoch::{inherit_priority, PriorityInheritanceGuard};
+
 /// A data structure to transfer data from select_next_task_priority
 /// to select_next_task
 struct NextTaskResult {
