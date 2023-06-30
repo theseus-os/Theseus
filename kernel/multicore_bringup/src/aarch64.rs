@@ -57,10 +57,6 @@ pub fn handle_ap_cores(
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let page_table = &mut kernel_mmi.page_table;
 
-        // get the physical address of ap_entry_point
-        let entry_point_virt_addr = VirtualAddress::new_canonical(ap_entry_point as usize);
-        entry_point_phys_addr = page_table.translate(entry_point_virt_addr).unwrap();
-
         // get the physical address of the MmuConfig
         let mmu_config_virt_addr = VirtualAddress::new_canonical(&mmu_config as *const _ as usize);
         ap_data.ap_mmu_config.write(page_table.translate(mmu_config_virt_addr).unwrap());
@@ -88,19 +84,19 @@ pub fn handle_ap_cores(
         // It would still be preferable to use the first solution, as it doesn't
         // rely on a cache trick.
         if false {
-            // Note: this could be variable on aarch64
-            // we'd need a way to find any identity mappable page+frame range
-            const AP_STARTUP: usize = 0x10000;
+            const ID_MAPPED_ENTRY_POINT: usize = 0x5001_0000;
+
+            entry_point_phys_addr = PhysicalAddress::new_canonical(ID_MAPPED_ENTRY_POINT);
 
             // When the AArch64 core will enter startup code, it will do so with MMU disabled,
             // which means these frames MUST be identity mapped.
-            let ap_startup_frames = memory::allocate_frames_by_bytes_at(PhysicalAddress::new_canonical(AP_STARTUP), PAGE_SIZE)
+            let ap_startup_frames = memory::allocate_frames_by_bytes_at(entry_point_phys_addr, PAGE_SIZE)
                 .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup frames")?;
-            let ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(AP_STARTUP), ap_startup_frames.size_in_frames())
+            let ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(ID_MAPPED_ENTRY_POINT), ap_startup_frames.size_in_frames())
                 .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup pages")?;
 
             // map this RWX
-            let flags = PteFlags::new().valid(true).writable(true);
+            let flags = PteFlags::new().valid(true).writable(true).executable(true);
             ap_startup_mapped_pages = page_table.map_allocated_pages_to(
                 ap_startup_pages,
                 ap_startup_frames,
@@ -108,9 +104,15 @@ pub fn handle_ap_cores(
             )?;
 
             // copy the entry point code
+            // instructions must have an alignment of four bytes; a page's alignment will always be larger.
             let dst = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
             let src = unsafe { (ap_entry_point as *const [u8; PAGE_SIZE]).as_ref() }.unwrap();
             dst.copy_from_slice(src);
+
+        } else {
+            // get the physical address of ap_entry_point
+            let entry_point_virt_addr = VirtualAddress::new_canonical(ap_entry_point as usize);
+            entry_point_phys_addr = page_table.translate(entry_point_virt_addr).unwrap();
         }
     }
 
