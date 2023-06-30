@@ -21,7 +21,6 @@ use log::{error, warn, debug, trace};
 use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
 use crate::paging::{
     get_current_p4,
-    PageRange,
     table::{P4, UPCOMING_P4, Table, Level4},
 };
 use pte_flags::PteFlagsArch;
@@ -220,7 +219,7 @@ impl Mapper {
         }
 
         // iterate over pages and frames in lockstep
-        for (page, frame) in pages.deref().clone().into_iter().zip(frames.borrow().into_iter()) {
+        for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
             let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
             let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
@@ -282,7 +281,7 @@ impl Mapper {
             .valid(true)
             .exclusive(true);
 
-        for page in pages.deref().clone() {
+        for page in pages.range().clone() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
             let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
@@ -358,9 +357,9 @@ pub struct MappedPages {
     flags: PteFlagsArch,
 }
 impl Deref for MappedPages {
-    type Target = PageRange;
-    fn deref(&self) -> &PageRange {
-        self.pages.deref()
+    type Target = AllocatedPages;
+    fn deref(&self) -> &AllocatedPages {
+        &self.pages
     }
 }
 
@@ -537,7 +536,7 @@ impl MappedPages {
             return Ok(());
         }
 
-        for page in self.pages.clone() {
+        for page in self.pages.range().clone() {
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -550,7 +549,7 @@ impl MappedPages {
         }
         
         if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-            func(self.pages.deref().clone());
+            func(self.pages.range().clone());
         }
 
         self.flags = new_flags;
@@ -613,7 +612,7 @@ impl MappedPages {
         let mut first_frame_range: Option<AllocatedFrames> = None; // this is what we'll return
         let mut current_frame_range: Option<AllocatedFrames> = None;
 
-        for page in self.pages.clone() {            
+        for page in self.pages.range().clone() {            
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -676,7 +675,7 @@ impl MappedPages {
         #[cfg(not(bm_map))]
         {
             if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-                func(self.pages.deref().clone());
+                func(self.pages.range().clone());
             }
         }
 
