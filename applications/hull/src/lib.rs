@@ -33,23 +33,6 @@ use task::{ExitValue, KillReason};
 use tty::{Event, LineDiscipline};
 
 pub fn main(_: Vec<String>) -> isize {
-    // spawn::new_task_builder(
-    //     |_| loop {
-    //         for i in 0..4 {
-    //             let rq = runqueue::get_runqueue(i).unwrap().read();
-    //             log::error!("{i}");
-    //             for thingy in rq.iter() {
-    //                 log::warn!("{thingy:?}");
-    //             }
-    //         }
-    //         for i in 0..200 {
-    //             scheduler::schedule();
-    //         }
-    //     },
-    //     (),
-    // )
-    // .spawn()
-    // .unwrap();
     let mut shell = Shell {
         discipline: app_io::line_discipline().expect("no line discipline"),
         jobs: Arc::new(Mutex::new(HashMap::new())),
@@ -83,8 +66,11 @@ impl Shell {
     }
 
     /// Configures the line discipline for use by applications.
-    fn set_app_discipline(&self) {
+    fn set_app_discipline(&self) -> AppDisciplineGuard<'_> {
         self.discipline.set_sane();
+        AppDisciplineGuard {
+            discipline: &self.discipline,
+        }
     }
 
     fn run(&mut self) -> Result<()> {
@@ -115,13 +101,13 @@ impl Shell {
     }
 
     fn execute_line(&mut self, line: &str) -> Result<()> {
-        // TODO: Use line editor history.
         let parsed_line = parse_line(line);
 
         if parsed_line.is_empty() {
             return Ok(());
         }
 
+        // TODO: Use line editor history.
         self.history.push(line.to_owned());
 
         let mut iter = parsed_line.background;
@@ -131,14 +117,18 @@ impl Shell {
         }
 
         let mut last_id = None;
+        let mut app_discipline_guard = None;
+
         for (cmd, cmd_str) in iter {
-            let current = if let Some((foreground, _)) = &parsed_line.foreground {
-                *foreground == cmd
+            app_discipline_guard = if let Some((foreground, _)) = &parsed_line.foreground
+                && *foreground == cmd
+            {
+                Some(self.set_app_discipline())
             } else {
-                false
+                None
             };
 
-            match self.execute_cmd(cmd, cmd_str, current) {
+            match self.execute_cmd(cmd, cmd_str, app_discipline_guard) {
                 Ok(id) => last_id = id,
                 Err(Error::ExitRequested) => return Err(Error::ExitRequested),
                 Err(Error::CurrentTaskUnavailable) => return Err(Error::CurrentTaskUnavailable),
@@ -166,12 +156,18 @@ impl Shell {
                 }
             };
         }
+        drop(app_discipline_guard);
 
         Ok(())
     }
 
     /// Executes a command.
-    fn execute_cmd(&mut self, cmd: Command, line: &str, current: bool) -> Result<Option<usize>> {
+    fn execute_cmd(
+        &mut self,
+        cmd: Command,
+        line: &str,
+        app_guard: Option<AppDisciplineGuard<'_>>,
+    ) -> Result<Option<usize>> {
         let shell_streams = app_io::streams().unwrap();
 
         let stderr = shell_streams.stderr;
@@ -185,7 +181,7 @@ impl Shell {
         let mut temp_job = Job {
             line: line.to_owned(),
             parts: Vec::new(),
-            current,
+            current: app_guard.is_some(),
         };
         loop {
             match jobs.try_insert(job_id, temp_job) {
@@ -201,6 +197,7 @@ impl Shell {
         while let Some((cmd, args)) = cmd_part {
             if iter.peek().is_none() {
                 if let Some(result) = self.execute_builtin(cmd, &args) {
+                    self.jobs.lock().remove(&job_id);
                     return result.map(|_| None);
                 } else {
                     let streams = IoStreams {
@@ -272,6 +269,7 @@ impl Shell {
                     && let Some(exit_value) = job.exit_value()
                 {
                         jobs.remove(&num);
+                        self.set_shell_discipline();
                         return match exit_value {
                             0 => Ok(()),
                             _ => Err(Error::Command(exit_value)),
@@ -336,7 +334,6 @@ impl Shell {
         let task = spawn::new_application_task_builder(app_path, None)
             .map_err(Error::SpawnFailed)?
             .argument(args.into_iter().map(ToOwned::to_owned).collect::<Vec<_>>())
-            .pin_on_cpu(3.try_into().unwrap())
             .block()
             .spawn()
             .unwrap();
@@ -347,14 +344,11 @@ impl Shell {
         app_io::insert_child_streams(id, streams);
         task.unblock().map_err(Error::UnblockFailed)?;
 
-        println!("spawning watchdog");
-
         // Spawn watchdog task.
         spawn::new_task_builder(
             move |_| {
                 let task_ref = task.clone();
 
-                log::info!("watchdog starting");
                 let exit_value = match task.join().unwrap() {
                     ExitValue::Completed(status) => {
                         match status.downcast_ref::<isize>() {
@@ -371,7 +365,6 @@ impl Shell {
                         KillReason::Exception(num) => num.into(),
                     },
                 };
-                log::info!("watchdog joined on application");
 
                 let mut jobs = self.jobs.lock();
                 match jobs.remove(&job_id) {
@@ -395,7 +388,6 @@ impl Shell {
         )
         .spawn()
         .map_err(Error::SpawnFailed)?;
-        log::info!("spawned watchdog");
 
         Ok(JobPart {
             state: State::Running,

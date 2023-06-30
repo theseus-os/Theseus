@@ -624,7 +624,6 @@ mod scheduler {
         // If preemption was not previously enabled (before we disabled it above),
         // then we shouldn't perform a task switch here.
         if !preemption_guard.preemption_was_enabled() {
-            log::trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
             return false;
         }
 
@@ -634,9 +633,9 @@ mod scheduler {
             return false; // keep running the same current task
         };
 
-        // if let Some(current_task) = crate::get_my_current_task() && current_task == next_task {
-        //     return false;
-        // }
+        if let Some(current_task) = crate::get_my_current_task() && current_task == next_task {
+            return false;
+        }
 
         let (did_switch, recovered_preemption_guard) = task_switch(
             next_task,
