@@ -58,6 +58,7 @@ pub fn hold_preemption_no_timer_disable() -> PreemptionGuard {
 /// will be disabled upon a transition from preemption being enabled to being disabled.
 fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     let cpu_id = cpu::current_cpu();
+    // log::error!("diabling cpu id: {cpu_id}");
     // Create an initial preemption guard such that we can call `CpuLocal::with_preempt()`,
     // but don't allow it to be dropped until we actually disable preemption below.
     let mut guard_placeholder = NoDrop::new(PreemptionGuard {
@@ -67,7 +68,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     });
     let prev_val = PREEMPTION_COUNT.with_preempt(
         &guard_placeholder,
-        |count| count.0.fetch_add(1, Ordering::Relaxed)
+        |count| count.0.fetch_add(1, Ordering::SeqCst)
     );
     // If the previous counter value was 0, that indicates we are transitioning
     // from preemption being enabled to disabled on this CPU.
@@ -80,7 +81,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
 
     if DISABLE_TIMER && preemption_was_enabled {
         // log::trace!(" CPU {}:   disabling local timer interrupt", cpu_id);
-        
+
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
         #[cfg(target_arch = "x86_64")]
@@ -151,8 +152,9 @@ impl Drop for PreemptionGuard {
 
         let prev_val = PREEMPTION_COUNT.with_preempt(
             self,
-            |count| count.0.fetch_sub(1, Ordering::Relaxed)
+            |count| count.0.fetch_sub(1, Ordering::SeqCst)
         );
+        // assert_eq!(prev_val == 1, self.preemption_was_enabled);
         if prev_val == 1 {
             // log::trace!("CPU {}: re-enabling local timer interrupt", cpu_id);
 

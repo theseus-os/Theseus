@@ -112,15 +112,11 @@ impl DerefMut for RunQueue {
 }
 
 impl RunQueue {
-    
     /// Moves the `TaskRef` at the given index into this `RunQueue` to the end (back) of this `RunQueue`,
     /// and returns a cloned reference to that `TaskRef`.
     pub fn move_to_end(&mut self, index: usize) -> Option<TaskRef> {
         self.remove(index).map(|rr_taskref| {
             let taskref = rr_taskref.taskref.clone();
-            if taskref.name.starts_with("rq") {
-                log::info!("scheduling: {rr_taskref:?}");
-            }
             self.push_back(rr_taskref);
             taskref
         })

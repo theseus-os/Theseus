@@ -201,7 +201,6 @@ impl TaskRef {
             Ok(Runnable)
         } else if self.0.task.runstate().compare_exchange(Blocked, Blocked).is_ok() {
             log::warn!("Blocked an already blocked task: {:?}", self);
-            log::warn!("currnt: {:?}", get_my_current_task());
             Ok(Blocked)
         } else {
             Err(self.0.task.runstate().load())
@@ -625,7 +624,6 @@ mod scheduler {
         // If preemption was not previously enabled (before we disabled it above),
         // then we shouldn't perform a task switch here.
         if !preemption_guard.preemption_was_enabled() {
-            log::trace!("thingy {}", preemption_guard.prev_val);
             log::trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
             return false;
         }
@@ -633,12 +631,8 @@ mod scheduler {
         let cpu_id = preemption_guard.cpu_id();
 
         let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
-            log::info!("same task");
             return false; // keep running the same current task
         };
-        if !(next_task.name == "window_manager_loop" || next_task.name == "shell_loop") {
-            log::trace!("switching to: {next_task:?}");
-        }
 
         // if let Some(current_task) = crate::get_my_current_task() && current_task == next_task {
         //     return false;
@@ -649,9 +643,6 @@ mod scheduler {
             cpu_id,
             preemption_guard,
         ); 
-
-        // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
-        // log::trace!("after task switch current: {:?}", crate::get_my_current_task());
 
         drop(recovered_preemption_guard);
         did_switch

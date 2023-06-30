@@ -120,6 +120,7 @@ impl<T: CpuLocalField> CpuLocal<T> {
         F: FnOnce(&T) -> R,
     {
         let ptr_to_cpu_local = self_ptr() + T::FIELD.offset();
+        // log::error!("{ptr_to_cpu_local:0x?}");
         let local_ref = unsafe { &*(ptr_to_cpu_local as *const T) };
         func(local_ref)
     }

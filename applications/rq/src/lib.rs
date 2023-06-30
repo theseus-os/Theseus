@@ -22,19 +22,16 @@ use apic::get_lapics;
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    log::error!("a");
 
     let matches = match opts.parse(args) {
         Ok(m) => { m }
         Err(_f) => { println!("{} \n", _f);
                     return -1; }
     };
-    log::error!("b");
 
     if matches.opt_present("h") {
         return print_usage(opts)
     }
-    log::error!("c");
 
     let all_lapics = get_lapics();
     for lapic in all_lapics.iter() {
@@ -45,13 +42,10 @@ pub fn main(args: Vec<String>) -> isize {
         let core_type = if is_bootstrap_cpu { "Boot CPU" } else { "Secondary CPU" };
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
-        log::error!("l");
         
-        if let Some(runqueue) = runqueue::get_runqueue(apic_id.value() as u8).map(|rq| rq.read()) {
+        if let Some(runqueue) = runqueue::get_runqueue(apic_id.value() as u8).map(|rq| rq.read().clone()) {
             let mut runqueue_contents = String::new();
-            log::error!("m");
             for task in runqueue.iter() {
-                log::error!("n");
                 writeln!(runqueue_contents, "    {} ({}) {}", 
                     task.name, 
                     task.id,
@@ -59,20 +53,15 @@ pub fn main(args: Vec<String>) -> isize {
                 )
                 .expect("Failed to write to runqueue_contents");
             }
-            log::error!("o");
             println!("{}", runqueue_contents);
-            log::error!("maybe?");
         }
         
         else {
-            log::error!("p");
             println!("Can't retrieve runqueue for core {}", apic_id);
             return -1;
         }
-        log::error!("temp");
     }
     
-    log::error!("d");
     println!("");
     0
 }

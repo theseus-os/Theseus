@@ -177,6 +177,7 @@ pub fn init(
     #[cfg(target_arch = "x86_64")]
     match window_manager::init() {
         Ok((key_producer, mouse_producer)) => {
+            log::info!("succesfully inited window manager?");
             device_manager::init(key_producer, mouse_producer)?;
         },
         Err(error) => {

@@ -59,6 +59,12 @@ impl<P: Pixel> Hash for Framebuffer<P> {
     }
 }
 
+impl<P: Pixel> core::fmt::Debug for Framebuffer<P> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Framebuffer").field("width", &self.width).field("height", &self.height).finish()
+    }
+}
+
 impl<P: Pixel> Framebuffer<P> {
     /// Creates a new framebuffer with rectangular dimensions of `width * height`, 
     /// specified in number of pixels.

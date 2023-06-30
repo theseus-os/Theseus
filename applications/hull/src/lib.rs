@@ -278,7 +278,7 @@ impl Shell {
                         };
                 }
             }
-            // scheduler::schedule();
+            scheduler::schedule();
         }
     }
 
@@ -336,6 +336,7 @@ impl Shell {
         let task = spawn::new_application_task_builder(app_path, None)
             .map_err(Error::SpawnFailed)?
             .argument(args.into_iter().map(ToOwned::to_owned).collect::<Vec<_>>())
+            .pin_on_cpu(3.try_into().unwrap())
             .block()
             .spawn()
             .unwrap();

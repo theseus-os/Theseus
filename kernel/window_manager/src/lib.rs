@@ -603,6 +603,7 @@ impl WindowManager {
 /// Initialize the window manager. It returns (keyboard_producer, mouse_producer) for the I/O devices.
 pub fn init() -> Result<(Queue<Event>, Queue<Event>), &'static str> {
     let final_fb: Framebuffer<AlphaPixel> = framebuffer::init()?;
+    log::info!("{final_fb:?}");
     let (width, height) = final_fb.get_size();
 
     let mut bottom_fb = Framebuffer::new(width, height, None)?;
