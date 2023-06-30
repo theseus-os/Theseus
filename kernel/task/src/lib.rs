@@ -26,7 +26,6 @@
 #![no_std]
 #![feature(negative_impls)]
 #![feature(thread_local)]
-#![feature(let_chains)]
 
 extern crate alloc;
 
@@ -188,23 +187,6 @@ impl TaskRef {
     #[doc(alias("orphan", "zombie"))]
     pub fn is_joinable(&self) -> bool {
         self.0.joinable.load(Ordering::Relaxed)
-    }
-
-    /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on error.
-    /// This will only succeed if the task is runnable or already blocked.
-    pub fn block(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable};
-
-        if self.0.task.runstate().compare_exchange(Runnable, Blocked).is_ok() {
-            Ok(Runnable)
-        } else if self.0.task.runstate().compare_exchange(Blocked, Blocked).is_ok() {
-            log::warn!("Blocked an already blocked task: {:?}", self);
-            Ok(Blocked)
-        } else {
-            Err(self.0.task.runstate().load())
-        }
     }
 
     /// Kills this `Task` (not a clean exit) without allowing it to run to completion.
@@ -632,10 +614,6 @@ mod scheduler {
         let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
             return false; // keep running the same current task
         };
-
-        if let Some(current_task) = crate::get_my_current_task() && current_task == next_task {
-            return false;
-        }
 
         let (did_switch, recovered_preemption_guard) = task_switch(
             next_task,

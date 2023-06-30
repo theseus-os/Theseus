@@ -17,7 +17,6 @@ use task::TaskRef;
 // TODO: Remove option?
 // TODO: Return &'static TaskRef?
 pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
-    // log::info!("called schedule");
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
@@ -33,7 +32,6 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
     {
         runqueue_locked.move_to_end(task_index)
     } else {
-        // log::info!("spawning idle task");
         Some(runqueue_locked.idle_task().clone())
     }
 }

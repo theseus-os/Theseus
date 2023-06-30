@@ -510,7 +510,7 @@ impl Task {
         if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
             Ok(Blocked)
         } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
-            // warn!("Unblocked an already runnable task: {:?}", self);
+            warn!("Unblocked an already runnable task: {:?}", self);
             Ok(Runnable)
         } else {
             Err(self.runstate.load())
