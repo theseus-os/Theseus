@@ -4223,6 +4223,7 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "core2",
+ "log",
  "mutex_sleep",
 ]
 

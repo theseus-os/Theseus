@@ -66,10 +66,10 @@ impl Shell {
     }
 
     /// Configures the line discipline for use by applications.
-    fn set_app_discipline(&self) -> AppDisciplineGuard<'_> {
+    fn set_app_discipline(&self) -> AppDisciplineGuard {
         self.discipline.set_sane();
         AppDisciplineGuard {
-            discipline: &self.discipline,
+            discipline: self.discipline.clone(),
         }
     }
 
@@ -110,64 +110,31 @@ impl Shell {
         // TODO: Use line editor history.
         self.history.push(line.to_owned());
 
-        let mut iter = parsed_line.background;
-        // TODO: Unnecessary clone.
-        if let Some(foreground) = parsed_line.foreground.clone() {
-            iter.extend_one(foreground);
-        }
-
-        let mut last_id = None;
-        let mut app_discipline_guard = None;
-
-        for (cmd, cmd_str) in iter {
-            app_discipline_guard = if let Some((foreground, _)) = &parsed_line.foreground
-                && *foreground == cmd
-            {
-                Some(self.set_app_discipline())
-            } else {
-                None
-            };
-
-            match self.execute_cmd(cmd, cmd_str, app_discipline_guard) {
-                Ok(id) => last_id = id,
-                Err(Error::ExitRequested) => return Err(Error::ExitRequested),
-                Err(Error::CurrentTaskUnavailable) => return Err(Error::CurrentTaskUnavailable),
-                Err(Error::Command(exit_code)) => println!("exit {}", exit_code),
-                Err(Error::CommandNotFound(command)) => println!("{}: command not found", command),
-                Err(Error::SpawnFailed(s)) => println!("failed to spawn task: {s}"),
-                Err(Error::KillFailed) => println!("failed to kill task"),
-                Err(Error::UnblockFailed(state)) => {
-                    println!("failed to unblock task with state {:?}", state)
-                }
+        for (cmd, cmd_str) in parsed_line.background {
+            if let Err(error) = self.execute_cmd(cmd, cmd_str, false) {
+                error.print()?;
             }
         }
 
-        if let Some(last_id) = last_id && parsed_line.foreground.is_some() {
-            match self.wait_on_job(last_id) {
-                Ok(()) => {},
-                Err(Error::ExitRequested) => return Err(Error::ExitRequested),
-                Err(Error::CurrentTaskUnavailable) => return Err(Error::CurrentTaskUnavailable),
-                Err(Error::Command(exit_code)) => println!("exit {}", exit_code),
-                Err(Error::CommandNotFound(command)) => println!("{}: command not found", command),
-                Err(Error::SpawnFailed(s)) => println!("failed to spawn task: {s}"),
-                Err(Error::KillFailed) => println!("failed to kill task"),
-                Err(Error::UnblockFailed(state)) => {
-                    println!("failed to unblock task with state {:?}", state)
+        if let Some((cmd, cmd_str)) = parsed_line.foreground {
+            let app_discipline_guard = self.set_app_discipline();
+            match self.execute_cmd(cmd, cmd_str, true) {
+                Ok(Some(foreground_id)) => {
+                    if let Err(error) = self.wait_on_job(foreground_id) {
+                        error.print()?;
+                    }
                 }
-            };
+                Ok(None) => {}
+                Err(error) => error.print()?,
+            }
+            drop(app_discipline_guard);
         }
-        drop(app_discipline_guard);
 
         Ok(())
     }
 
     /// Executes a command.
-    fn execute_cmd(
-        &mut self,
-        cmd: Command,
-        line: &str,
-        app_guard: Option<AppDisciplineGuard<'_>>,
-    ) -> Result<Option<usize>> {
+    fn execute_cmd(&mut self, cmd: Command, line: &str, current: bool) -> Result<Option<usize>> {
         let shell_streams = app_io::streams().unwrap();
 
         let stderr = shell_streams.stderr;
@@ -181,7 +148,7 @@ impl Shell {
         let mut temp_job = Job {
             line: line.to_owned(),
             parts: Vec::new(),
-            current: app_guard.is_some(),
+            current,
         };
         loop {
             match jobs.try_insert(job_id, temp_job) {
@@ -244,10 +211,14 @@ impl Shell {
         }
         drop(jobs);
 
+        log::info!("clearing events");
         self.discipline.clear_events();
+        log::info!("cleared events");
         loop {
             // TODO: Use async futures::select! loop?
+            // log::info!("checking event");
             if let Ok(event) = self.discipline.event_receiver().try_receive() {
+                log::info!("EVENT!!: {event:?}");
                 return match event {
                     Event::CtrlC => {
                         if let Some(mut job) = self.jobs.lock().remove(&num) {
@@ -269,7 +240,6 @@ impl Shell {
                     && let Some(exit_value) = job.exit_value()
                 {
                         jobs.remove(&num);
-                        self.set_shell_discipline();
                         return match exit_value {
                             0 => Ok(()),
                             _ => Err(Error::Command(exit_value)),
@@ -367,6 +337,8 @@ impl Shell {
                 };
 
                 let mut jobs = self.jobs.lock();
+                log::info!("{jobs:#?}");
+                log::info!("{job_id}");
                 match jobs.remove(&job_id) {
                     Some(mut job) => {
                         for mut part in job.parts.iter_mut() {
@@ -450,11 +422,11 @@ fn split_args(line: &str) -> (&str, Vec<&str>) {
     }
 }
 
-struct AppDisciplineGuard<'a> {
-    discipline: &'a LineDiscipline,
+struct AppDisciplineGuard {
+    discipline: Arc<LineDiscipline>,
 }
 
-impl<'a> Drop for AppDisciplineGuard<'a> {
+impl Drop for AppDisciplineGuard {
     fn drop(&mut self) {
         self.discipline.set_raw();
     }
