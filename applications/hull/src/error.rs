@@ -31,6 +31,7 @@ pub enum Error {
 }
 
 impl Error {
+    /// Prints this error if it is recoverable, otherwise returning the error.
     pub(crate) fn print(self) -> Result<()> {
         match self {
             Error::ExitRequested => return Err(Error::ExitRequested),

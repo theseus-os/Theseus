@@ -7,6 +7,15 @@
 //!
 //! This shell will eventually supercede the shell located at
 //! `applications/shell`.
+//!
+//! Terminology used in this file using `sleep 1 | sleep 2 & sleep 3` as an
+//! example:
+//! - A line is an entire line of user input i.e. `sleep 1 | sleep 2 & sleep 3`.
+//! - A task is a subset of a line used to spawn an individual task i.e. `sleep
+//!   1`, `sleep 2`, and `sleep 3`.
+//! - A job is a list of piped tasks i.e. `sleep 1 | sleep 2`, and `sleep 3`.
+//! - A command is the first word in a task i.e. `sleep`.
+//! - The arguments are any subsequent words in a task i.e. `1`, `2`, and `3`.
 
 #![cfg_attr(not(test), no_std)]
 #![feature(extend_one, let_chains)]
@@ -16,13 +25,16 @@ extern crate alloc;
 mod builtin;
 mod error;
 mod job;
+mod parse;
 mod wrapper;
 
-use crate::job::{JobPart, State};
+use crate::{
+    job::{JobPart, State},
+    parse::{ParsedJob, ParsedLine, ParsedTask},
+};
 use alloc::{borrow::ToOwned, format, string::String, sync::Arc, vec::Vec};
 use app_io::{println, IoStreams};
 use core::fmt::Write;
-pub use error::{Error, Result};
 use hashbrown::HashMap;
 use job::Job;
 use log::warn;
@@ -32,6 +44,8 @@ use stdio::Stdio;
 use sync_block::Mutex;
 use task::{ExitValue, KillReason};
 use tty::{Event, LineDiscipline};
+
+pub use crate::error::{Error, Result};
 
 pub fn main(_: Vec<String>) -> isize {
     let mut shell = Shell {
@@ -102,7 +116,7 @@ impl Shell {
     }
 
     fn execute_line(&mut self, line: &str) -> Result<()> {
-        let parsed_line = parse_line(line);
+        let parsed_line = ParsedLine::from(line);
 
         if parsed_line.is_empty() {
             return Ok(());
@@ -111,15 +125,15 @@ impl Shell {
         // TODO: Use line editor history.
         self.history.push(line.to_owned());
 
-        for (cmd, cmd_str) in parsed_line.background {
-            if let Err(error) = self.execute_cmd(cmd, cmd_str, false) {
+        for (job_str, job) in parsed_line.background {
+            if let Err(error) = self.execute_cmd(job, job_str, false) {
                 error.print()?;
             }
         }
 
-        if let Some((cmd, cmd_str)) = parsed_line.foreground {
+        if let Some((job_str, job)) = parsed_line.foreground {
             let app_discipline_guard = self.set_app_discipline();
-            match self.execute_cmd(cmd, cmd_str, true) {
+            match self.execute_cmd(job, job_str, true) {
                 Ok(Some(foreground_id)) => {
                     if let Err(error) = self.wait_on_job(foreground_id) {
                         error.print()?;
@@ -135,19 +149,24 @@ impl Shell {
     }
 
     /// Executes a command.
-    fn execute_cmd(&mut self, cmd: Command, line: &str, current: bool) -> Result<Option<usize>> {
+    fn execute_cmd(
+        &mut self,
+        parsed_job: ParsedJob,
+        job_str: &str,
+        current: bool,
+    ) -> Result<Option<usize>> {
         let shell_streams = app_io::streams().unwrap();
 
         let stderr = shell_streams.stderr;
         let mut previous_output = shell_streams.stdin;
 
-        let mut iter = cmd.into_iter().peekable();
-        let mut cmd_part = iter.next();
+        let mut iter = parsed_job.into_iter().peekable();
+        let mut task = iter.next();
 
         let mut jobs = self.jobs.lock();
         let mut job_id = 1;
         let mut temp_job = Job {
-            line: line.to_owned(),
+            string: job_str.to_owned(),
             parts: Vec::new(),
             current,
         };
@@ -162,9 +181,9 @@ impl Shell {
         }
         drop(jobs);
 
-        while let Some((cmd, args)) = cmd_part {
+        while let Some(ParsedTask { command, args }) = task {
             if iter.peek().is_none() {
-                if let Some(result) = self.execute_builtin(cmd, &args) {
+                if let Some(result) = self.execute_builtin(command, &args) {
                     self.jobs.lock().remove(&job_id);
                     return result.map(|_| None);
                 } else {
@@ -175,7 +194,7 @@ impl Shell {
                         stderr: stderr.clone(),
                         discipline: shell_streams.discipline,
                     };
-                    let part = self.resolve_external(cmd, args, streams, job_id)?;
+                    let part = self.resolve_external(command, args, streams, job_id)?;
                     self.jobs.lock().get_mut(&job_id).unwrap().parts.push(part);
                     return Ok(Some(job_id));
                 }
@@ -188,14 +207,13 @@ impl Shell {
                 stdin: previous_output.clone(),
                 stdout: Arc::new(pipe.get_writer()),
                 stderr: stderr.clone(),
-                // TODO: Is this right?
                 discipline: None,
             };
-            let part = self.resolve_external(cmd, args, streams, job_id)?;
+            let part = self.resolve_external(command, args, streams, job_id)?;
             self.jobs.lock().get_mut(&job_id).unwrap().parts.push(part);
 
             previous_output = Arc::new(pipe.get_reader());
-            cmd_part = iter.next();
+            task = iter.next();
         }
 
         unreachable!("called execute_cmd with empty command");
@@ -363,57 +381,6 @@ impl Shell {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-struct ParsedCommandLine<'a> {
-    background: Vec<(Command<'a>, &'a str)>,
-    foreground: Option<(Command<'a>, &'a str)>,
-}
-
-impl<'a> ParsedCommandLine<'a> {
-    fn is_empty(&self) -> bool {
-        self.background.is_empty() && self.foreground.is_none()
-    }
-}
-
-/// A list of piped commands.
-type Command<'a> = Vec<(&'a str, Vec<&'a str>)>;
-
-fn parse_line(line: &str) -> ParsedCommandLine<'_> {
-    let mut iter = line.split('&');
-
-    // Iterator contains at least one element.
-    let last = iter.next_back().unwrap();
-    let trimmed = last.trim();
-    let foreground = if trimmed.is_empty() {
-        None
-    } else {
-        Some((split_pipes(trimmed), last))
-    };
-
-    ParsedCommandLine {
-        background: iter
-            .clone()
-            .map(|s| split_pipes(s.trim()))
-            .zip(iter)
-            .collect(),
-        foreground,
-    }
-}
-
-fn split_pipes(line: &str) -> Command<'_> {
-    line.split('|').map(str::trim).map(split_args).collect()
-}
-
-fn split_args(line: &str) -> (&str, Vec<&str>) {
-    // TODO: Handle backslashes and quotes.
-    if let Some((cmd, args_str)) = line.split_once(' ') {
-        let args = args_str.split(' ').collect::<Vec<_>>();
-        (cmd, args)
-    } else {
-        (line, Vec::new())
-    }
-}
-
 struct AppDisciplineGuard {
     discipline: Arc<LineDiscipline>,
 }
@@ -447,7 +414,7 @@ mod tests {
     fn test_parse_line() {
         assert_eq!(
             parse_line("a b|c  &d e f|g | h & i j | k"),
-            ParsedCommandLine {
+            ParsedLine {
                 background: vec![
                     vec![("a", vec!["b"]), ("c", vec![])],
                     vec![("d", vec!["e", "f"]), ("g", vec![]), ("h", vec![])],
@@ -457,7 +424,7 @@ mod tests {
         );
         assert_eq!(
             parse_line("a b|c  &d e f|g | h & i j | k&  "),
-            ParsedCommandLine {
+            ParsedLine {
                 background: vec![
                     vec![("a", vec!["b"]), ("c", vec![])],
                     vec![("d", vec!["e", "f"]), ("g", vec![]), ("h", vec![])],

@@ -14,7 +14,7 @@ use task::{KillReason, TaskRef};
 /// job.
 #[derive(Debug, Default)]
 pub(crate) struct Job {
-    pub(crate) line: String,
+    pub(crate) string: String,
     pub(crate) parts: Vec<JobPart>,
     pub(crate) current: bool,
 }

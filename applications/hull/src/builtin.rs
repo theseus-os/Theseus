@@ -138,7 +138,7 @@ impl Shell {
             let Some(state) = &job.parts.get(0).map(|part| &part.state) else {
                 continue;
             };
-            let line = &job.line;
+            let line = &job.string;
 
             println!("[{id}]    {state}    {line}");
         }
