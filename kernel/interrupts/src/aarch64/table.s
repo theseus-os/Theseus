@@ -48,7 +48,7 @@ __vector_\handler:
     b   1b
 .endm
 
-.text
+.section .text
 
 // Align by 2^11 bytes, as demanded by ARMv8-A. Same as ALIGN(2048) in an ld script.
 //

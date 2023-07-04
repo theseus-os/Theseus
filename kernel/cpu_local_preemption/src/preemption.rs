@@ -78,7 +78,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
 
     if DISABLE_TIMER && preemption_was_enabled {
         // log::trace!(" CPU {}:   disabling local timer interrupt", cpu_id);
-
+        
         // When transitioning from preemption being enabled to disabled,
         // we must disable the local APIC timer used for preemptive task switching.
         #[cfg(target_arch = "x86_64")]
