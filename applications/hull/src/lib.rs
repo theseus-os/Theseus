@@ -213,12 +213,11 @@ impl Shell {
 
         log::info!("clearing events");
         self.discipline.clear_events();
+        let event_receiver = self.discipline.event_receiver();
         log::info!("cleared events");
         loop {
             // TODO: Use async futures::select! loop?
-            // log::info!("checking event");
-            if let Ok(event) = self.discipline.event_receiver().try_receive() {
-                log::info!("EVENT!!: {event:?}");
+            if let Ok(event) = event_receiver.try_receive() {
                 return match event {
                     Event::CtrlC => {
                         if let Some(mut job) = self.jobs.lock().remove(&num) {
@@ -337,23 +336,18 @@ impl Shell {
                 };
 
                 let mut jobs = self.jobs.lock();
-                log::info!("{jobs:#?}");
-                log::info!("{job_id}");
-                match jobs.remove(&job_id) {
-                    Some(mut job) => {
-                        for mut part in job.parts.iter_mut() {
-                            if part.task == task_ref {
-                                // TODO
-                                part.state = State::Done(exit_value);
-                                break;
-                            }
-                        }
-
-                        if job.current {
-                            jobs.insert(job_id, job);
+                if let Some(mut job) = jobs.remove(&job_id) {
+                    for part in job.parts.iter_mut() {
+                        if part.task == task_ref {
+                            // TODO
+                            part.state = State::Done(exit_value);
+                            break;
                         }
                     }
-                    None => todo!("here?"),
+
+                    if job.current {
+                        jobs.insert(job_id, job);
+                    }
                 }
             },
             (),
