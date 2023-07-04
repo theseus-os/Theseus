@@ -235,21 +235,18 @@ impl Shell {
         loop {
             // TODO: Use async futures::select! loop?
             if let Ok(event) = event_receiver.try_receive() {
-                return match event {
+                match event {
                     Event::CtrlC => {
                         if let Some(mut job) = self.jobs.lock().remove(&num) {
                             job.kill()?;
                         } else {
-                            error!("tried to kill job that doesn't exist");
+                            error!("tried to kill a job that doesn't exist");
                         }
-                        Err(Error::Command(130))
+                        return Err(Error::Command(130));
                     }
-                    Event::CtrlD => todo!(),
-                    Event::CtrlZ => {
-                        self.jobs.lock().get_mut(&num).unwrap().suspend();
-                        todo!();
-                    }
-                };
+                    Event::CtrlD => error!("received ctrl+d event"),
+                    Event::CtrlZ => error!("received ctrl+z event"),
+                }
             } else {
                 let mut jobs = self.jobs.lock();
                 if let Some(job) = jobs.get_mut(&num)
@@ -356,7 +353,6 @@ impl Shell {
                 if let Some(mut job) = jobs.remove(&job_id) {
                     for part in job.parts.iter_mut() {
                         if part.task == task_ref {
-                            // TODO
                             part.state = State::Done(exit_value);
                             break;
                         }
