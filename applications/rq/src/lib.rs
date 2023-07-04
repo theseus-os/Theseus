@@ -52,7 +52,7 @@ pub fn main(args: Vec<String>) -> isize {
                 )
                 .expect("Failed to write to runqueue_contents");
             }
-            println!("{}", runqueue_contents);
+            print!("{}", runqueue_contents);
         }
         
         else {
