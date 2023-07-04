@@ -37,7 +37,7 @@ use app_io::{println, IoStreams};
 use core::fmt::Write;
 use hashbrown::HashMap;
 use job::Job;
-use log::warn;
+use log::{error, warn};
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
 use stdio::Stdio;
@@ -230,10 +230,8 @@ impl Shell {
         }
         drop(jobs);
 
-        log::info!("clearing events");
         self.discipline.clear_events();
         let event_receiver = self.discipline.event_receiver();
-        log::info!("cleared events");
         loop {
             // TODO: Use async futures::select! loop?
             if let Ok(event) = event_receiver.try_receive() {
@@ -242,7 +240,7 @@ impl Shell {
                         if let Some(mut job) = self.jobs.lock().remove(&num) {
                             job.kill()?;
                         } else {
-                            todo!("log error");
+                            error!("tried to kill job that doesn't exist");
                         }
                         Err(Error::Command(130))
                     }

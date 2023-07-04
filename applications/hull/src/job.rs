@@ -52,7 +52,7 @@ impl Job {
             if let State::Done(value) = self.parts.last()?.state {
                 Some(value)
             } else {
-                unreachable!();
+                unreachable!("tried to get exit value of empty job: {self:?}");
             }
         } else {
             None
