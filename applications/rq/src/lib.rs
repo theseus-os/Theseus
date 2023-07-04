@@ -1,7 +1,6 @@
 #![no_std]
 extern crate alloc;
 #[macro_use] extern crate app_io;
-#[macro_use] extern crate log;
 
 extern crate apic;
 extern crate getopts;

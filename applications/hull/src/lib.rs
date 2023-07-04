@@ -25,6 +25,7 @@ use core::fmt::Write;
 pub use error::{Error, Result};
 use hashbrown::HashMap;
 use job::Job;
+use log::warn;
 use noline::{builder::EditorBuilder, sync::embedded::IO as Io};
 use path::Path;
 use stdio::Stdio;
@@ -206,7 +207,7 @@ impl Shell {
             return Ok(())
         };
         if !job.current {
-            todo!("warn");
+            warn!("asked to wait on non-current job");
             return Ok(());
         }
         drop(jobs);
@@ -249,7 +250,7 @@ impl Shell {
         }
     }
 
-    fn execute_builtin(&mut self, cmd: &str, args: &Vec<&str>) -> Option<Result<()>> {
+    fn execute_builtin(&mut self, cmd: &str, args: &[&str]) -> Option<Result<()>> {
         Some(match cmd {
             "" => Ok(()),
             "alias" => self.alias(args),
@@ -383,7 +384,7 @@ fn parse_line(line: &str) -> ParsedCommandLine<'_> {
     // Iterator contains at least one element.
     let last = iter.next_back().unwrap();
     let trimmed = last.trim();
-    let foreground = if trimmed == "" {
+    let foreground = if trimmed.is_empty() {
         None
     } else {
         Some((split_pipes(trimmed), last))
@@ -400,10 +401,7 @@ fn parse_line(line: &str) -> ParsedCommandLine<'_> {
 }
 
 fn split_pipes(line: &str) -> Command<'_> {
-    line.split('|')
-        .map(|s| s.trim())
-        .map(|s| split_args(s))
-        .collect()
+    line.split('|').map(str::trim).map(split_args).collect()
 }
 
 fn split_args(line: &str) -> (&str, Vec<&str>) {

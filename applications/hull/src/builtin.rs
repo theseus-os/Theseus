@@ -1,19 +1,19 @@
 //! Builtin shell commands.
 
 use crate::{Error, Result, Shell};
-use alloc::{borrow::ToOwned, string::ToString, vec::Vec};
+use alloc::{borrow::ToOwned, string::ToString};
 use app_io::println;
 use path::Path;
 
 // TODO: Decide which builtins we don't need.
 
 impl Shell {
-    pub(crate) fn alias(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn alias(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn bg(&mut self, args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn bg(&mut self, args: &[&str]) -> Result<()> {
         let mut jobs = self.jobs.lock();
         if args.is_empty() {
             loop {
@@ -59,7 +59,7 @@ impl Shell {
         }
     }
 
-    pub(crate) fn cd(&self, args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn cd(&self, args: &[&str]) -> Result<()> {
         if args.len() > 1 {
             return Err(Error::Command(1));
         }
@@ -81,42 +81,42 @@ impl Shell {
         }
     }
 
-    pub(crate) fn exec(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn exec(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn exit(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn exit(&self, _args: &[&str]) -> Result<()> {
         // TODO: Clean up background tasks?
         Err(Error::ExitRequested)
     }
 
-    pub(crate) fn export(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn export(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn fc(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn fc(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn fg(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn fg(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn getopts(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn getopts(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn hash(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn hash(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn history(&self, _args: &Vec<&str>) {
+    pub(crate) fn history(&self, _args: &[&str]) {
         let num_column_max_length = self.history.len().to_string().len() + 1;
 
         for (i, line) in self
@@ -131,7 +131,7 @@ impl Shell {
         }
     }
 
-    pub(crate) fn jobs(&self, _: &Vec<&str>) -> Result<()> {
+    pub(crate) fn jobs(&self, _: &[&str]) -> Result<()> {
         // TODO: Sort IDs.
         for (id, job) in self.jobs.lock().iter() {
             // TODO: Separate job parts if they are in different states.
@@ -145,22 +145,22 @@ impl Shell {
         Ok(())
     }
 
-    pub(crate) fn set(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn set(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn unalias(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn unalias(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn unset(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn unset(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }
 
-    pub(crate) fn wait(&self, _args: &Vec<&str>) -> Result<()> {
+    pub(crate) fn wait(&self, _args: &[&str]) -> Result<()> {
         println!("not yet implemented");
         Err(Error::Command(1))
     }

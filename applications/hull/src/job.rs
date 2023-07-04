@@ -4,7 +4,7 @@ use core::fmt;
 
 use crate::{Error, Result};
 use alloc::{string::String, vec::Vec};
-use task::{ExitValue, JoinableTaskRef, KillReason, RunState, TaskRef};
+use task::{KillReason, TaskRef};
 
 /// A shell job consisting of multiple parts.
 ///
@@ -41,14 +41,6 @@ impl Job {
             part.task.unsuspend();
             part.state = State::Running;
         }
-    }
-
-    pub(crate) fn unblock(&mut self) -> Result<()> {
-        for part in self.parts.iter_mut() {
-            part.task.unblock().map_err(Error::UnblockFailed)?;
-            part.state = State::Running;
-        }
-        Ok(())
     }
 
     pub(crate) fn exit_value(&mut self) -> Option<isize> {

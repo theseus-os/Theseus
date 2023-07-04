@@ -168,7 +168,6 @@ impl Drop for BootstrapTaskRef {
 /// The new task will not be spawned until [`TaskBuilder::spawn()`](struct.TaskBuilder.html#method.spawn) is invoked. 
 /// See the `TaskBuilder` documentation for more details. 
 /// 
-#[must_use]
 pub fn new_task_builder<F, A, R>(
     func: F,
     argument: A
@@ -207,7 +206,6 @@ type MainFunc = fn(MainFuncArg) -> MainFuncRet;
 ///    meaning that the new application crate will be linked against the crates within that new namespace. 
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
 /// 
-#[must_use]
 pub fn new_application_task_builder(
     crate_object_file: Path, // TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     new_namespace: Option<Arc<CrateNamespace>>,
