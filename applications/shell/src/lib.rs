@@ -1328,12 +1328,9 @@ impl Shell {
             }
             if need_refresh {
                 // update if there are inputs
-                // log::info!("needs refresh");
                 self.terminal.lock().refresh_display()?;
             } else {
-                // log::info!("nothing to do scheduling");
                 scheduler::schedule(); // yield the CPU if nothing to do
-                // log::info!("scheduled");
             }
         }
     }
