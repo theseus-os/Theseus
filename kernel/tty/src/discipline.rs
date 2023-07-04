@@ -108,9 +108,7 @@ impl LineDiscipline {
 
     pub fn clear_events(&self) {
         let receiver = self.manager.receiver();
-        while receiver.try_receive().is_ok() {
-            log::info!("event cleared");
-        }
+        while receiver.try_receive().is_ok() {}
     }
 
     /// Sets the canonical flag.
@@ -156,13 +154,11 @@ impl LineDiscipline {
 
         match byte {
             INTERRUPT => {
-                log::info!("sending ctrl + C");
                 let _ = self.manager.send(Event::CtrlC);
                 self.clear_input_buf(canonical);
                 return Ok(());
             }
             SUSPEND => {
-                log::info!("sending ctrl + Z");
                 let _ = self.manager.send(Event::CtrlZ);
                 self.clear_input_buf(canonical);
                 return Ok(());
