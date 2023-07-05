@@ -1014,7 +1014,7 @@ impl<T: FromBytes, B: Borrow<MappedPages>> BorrowedMappedPages<T, Immutable, B> 
     ///    * This can be any "owned" type that wraps `MappedPages` without requiring a lifetime
     ///      and implements the `Borrow` trait, e.g., `MappedPages` itself,
     ///      `Arc<MappedPages>`, `Rc<MappedPages>`, `&'static MappedPages`.
-    ///    * You cannot use a wrapper type that requires a lifetime, e.g.,
+    ///    * You cannot use a wrapper type that requires a non-`static` lifetime, e.g.,
     ///      `&'a MappedPages`, `&'a mut MappedPages`, `Cow<'a, MappedPages>`, etc.
     /// * `byte_offset`: the offset (in number of bytes) from the beginning of the `MappedPages`
     ///    memory region at which the struct `T` is located (where it should start).
@@ -1170,7 +1170,7 @@ impl<T: FromBytes, B: Borrow<MappedPages>> BorrowedSliceMappedPages<T, Immutable
     ///    * This can be any "owned" type that wraps `MappedPages` without requiring a lifetime
     ///      and implements the `Borrow` trait, e.g., `MappedPages` itself,
     ///      `Arc<MappedPages>`, `Rc<MappedPages>`, `&'static MappedPages`.
-    ///    * You cannot use a wrapper type that requires a lifetime, e.g.,
+    ///    * You cannot use a wrapper type that requires a non-`static` lifetime, e.g.,
     ///      `&'a MappedPages`, `&'a mut MappedPages`, `Cow<'a, MappedPages>`, etc.
     /// * `byte_offset`: the offset (in number of bytes) from the beginning of the `MappedPages`
     ///    memory region at which the struct `T` is located (where it should start).
