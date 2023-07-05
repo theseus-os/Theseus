@@ -2001,6 +2001,7 @@ dependencies = [
  "page_table_entry",
  "pte_flags",
  "spin 0.9.4",
+ "static_assertions",
  "x86_64",
  "xmas-elf",
  "zerocopy",
