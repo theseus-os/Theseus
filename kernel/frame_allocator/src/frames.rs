@@ -1,4 +1,4 @@
-//! A range of unmapped frames that stores a verified `TrustedChunk`.
+//! A range of frames that are either mapped or unmapped.
 //! A `Frames` object is uncloneable and is the only way to access the range of frames it references.
 
 use memory_structs::{FrameRange, Frame};
@@ -19,9 +19,6 @@ pub enum FrameState {
 
 /// A range of contiguous frames.
 /// Owning a `Frames` object gives ownership of the range of frames it references.
-/// The `verified_chunk` field is a verified `TrustedChunk` that stores the actual frames,
-/// and has the invariant that it does not overlap with any other `TrustedChunk` created by the
-/// `CHUNK_ALLOCATOR`.
 /// 
 /// The frames can be in an unmapped or mapped state. In the unmapped state, the frames are not
 /// immediately accessible because they're not yet mapped by any virtual memory pages.
@@ -43,9 +40,7 @@ pub enum FrameState {
 pub struct Frames<const S: FrameState> {
     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
     typ: MemoryRegionType,
-    /// The Frames covered by this chunk, an inclusive range. Equal to the frames in the verified chunk.
-    /// Needed because verification fails on a trusted chunk that stores a FrameRange or RangeInclusive<Frame>, 
-    /// but succeeds with RangeInclusive<usize>.
+    /// The Frames covered by this chunk, an inclusive range.
     frames: FrameRange
 }
 
@@ -56,32 +51,29 @@ assert_not_impl_any!(Frames<{FrameState::Mapped}>: DerefMut, Clone);
 
 impl Frames<{FrameState::Unmapped}> {
     /// Creates a new `Frames` object in an unmapped state.
-    /// If `frames` is empty, there is no space to store the new `Frames` information pre-heap intialization,
-    /// or a `TrustedChunk` already exists which overlaps with the given `frames`, then an error is returned.
+    /// The frame allocator is reponsible for making sure no two `Frames` objects overlap.
     pub(crate) fn new(typ: MemoryRegionType, frames: FrameRange) -> Self {
-        // assert!(frames.start().number() == verified_chunk.start());
-        // assert!(frames.end().number() == verified_chunk.end());
-
         Frames {
             typ,
             frames,
         }
-        // warn!("NEW FRAMES: {:?}", f);
-        // Ok(f)
     }
 
 
     /// Consumes the `Frames` in an unmapped state and converts them to `Frames` in a mapped state.
     /// This should only be called once a `MappedPages` has been created from the `Frames`.
     pub fn into_mapped_frames(self) -> Frames<{FrameState::Mapped}> {    
-        Frames {
+        let f = Frames {
             typ: self.typ,
             frames: self.frames.clone(),
-        }
+        };
+        core::mem::forget(self);
+        f
     }
 
     /// Returns an `UnmappedFrame` if this `Frames<{FrameState::Unmapped}>` object contains only one frame.
     /// I've kept the terminology of allocated frame here to avoid changing code outside of this crate.
+    /// 
     /// ## Panic
     /// Panics if this `UnmappedFrame` contains multiple frames or zero frames.
     pub fn as_allocated_frame(&self) -> UnmappedFrame {
@@ -116,7 +108,6 @@ impl<const S: FrameState> Drop for Frames<S> {
         match S {
             FrameState::Unmapped => {
                 if self.size_in_frames() == 0 { return; }
-                // trace!("FRAMES DROP {:?}", self);
         
                 let unmapped_frames: Frames<{FrameState::Unmapped}> = Frames {
                     typ: self.typ,
@@ -161,7 +152,7 @@ impl<'f> IntoIterator for &'f Frames<{FrameState::Unmapped}> {
 
 /// An iterator over each [`UnmappedFrame`] in a range of [`Frames<{FrameState::Unmapped}>`].
 /// 
-/// To Do: Description is no longer valid, since we have an iterator for RangeInclusive now.
+/// To Do (get Kevin's input): Description is no longer valid, since we have an iterator for RangeInclusive now.
 /// but I still think it's useful to have a `Frames<{FrameState::Unmapped}>` iterator that ties the lifetime
 /// of the `UnmappedFrame` to the original object.
 /// 
