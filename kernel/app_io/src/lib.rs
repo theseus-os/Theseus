@@ -188,8 +188,10 @@ pub fn line_discipline() -> Result<Arc<LineDiscipline>, &'static str> {
 /// Calls `print!()` with an extra newline ('\n') appended to the end.
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ({
+        $crate::print_to_stdout_args(::core::format_args!("{}\n", ::core::format_args!($($arg)*)));
+    });
 
 }
 
@@ -198,7 +200,7 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        $crate::print_to_stdout_args(format_args!($($arg)*));
+        $crate::print_to_stdout_args(::core::format_args!($($arg)*));
     });
 }
 

@@ -161,7 +161,7 @@ impl AcpiTables {
         if new_frames.start() < self.frames.start() {
             let diff = self.frames.start_address().value() - new_frames.start_address().value();
             trace!("ACPI table: adjusting mapping offsets +{}", diff);
-            for mut loc in self.tables.values_mut() {
+            for loc in self.tables.values_mut() {
                 loc.offset += diff; 
                 if let Some((ref mut slice_offset, _)) = loc.slice_offset_and_length {
                     *slice_offset += diff;

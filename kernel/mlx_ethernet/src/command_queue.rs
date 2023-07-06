@@ -12,7 +12,7 @@ use byteorder::BigEndian;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 use num_enum::TryFromPrimitive;
-use core::convert::TryFrom;
+use core::{convert::TryFrom, marker::ConstParamTy};
 use crate::{
     Rqn, Sqn, Cqn, Pd, Td, Lkey, Eqn, Tirn, Tisn, FtId, FgId,
     initialization_segment::InitializationSegment,
@@ -483,6 +483,7 @@ enum NetworkPortRegisters {
 
 /// The possible states a command can be in as it is updated by the driver and then posted to the HCA
 #[derive(PartialEq, Eq)]
+#[derive(ConstParamTy)]
 pub enum CmdState {
     /// Command entries have been filled, but it is still owned by SW
     Initialized,

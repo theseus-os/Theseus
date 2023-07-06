@@ -10,42 +10,31 @@
 #![feature(panic_info_message)]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate mod_mgmt;
-
-#[cfg(target_arch = "x86_64")]
-#[cfg(not(loadable))] extern crate unwind;
-
-#[cfg(target_arch = "x86_64")]
-#[macro_use] extern crate early_printer;
-
-#[cfg(target_arch = "x86_64")]
-#[cfg(not(loadable))] extern crate panic_wrapper;
 
 use core::panic::PanicInfo;
+use log::error;
+
+#[cfg(target_arch = "x86_64")]
+use early_printer::println;
+#[cfg(target_arch = "aarch64")]
+use log::info as println;
 
 /// The singular entry point for a language-level panic.
 /// 
 /// The Rust compiler will rename this to "rust_begin_unwind".
 #[cfg(not(test))]
 #[panic_handler] // same as:  #[lang = "panic_impl"]
-#[doc(hidden)]
 fn panic_entry_point(info: &PanicInfo) -> ! {
     // Since a panic could occur before the memory subsystem is initialized,
     // we must check before using alloc types or other functions that depend on the memory system (the heap).
     // We can check that by seeing if the kernel mmi has been initialized.
     let kernel_mmi_ref = memory::get_kernel_mmi_ref();  
     let res = if kernel_mmi_ref.is_some() {
-        #[cfg(target_arch = "aarch64")] {
-            Err("panic_wrapper unimplemented for aarch64") as Result<(), _>
-        }
-
         // proceed with calling the panic_wrapper, but don't shutdown with try_exit() if errors occur here
-        #[cfg(all(target_arch = "x86_64", not(loadable)))] {
+        #[cfg(not(loadable))] {
             panic_wrapper::panic_wrapper(info)
         }
-        #[cfg(all(target_arch = "x86_64", loadable))] {
+        #[cfg(loadable)] {
             // An internal function for calling the panic_wrapper, but returning errors along the way.
             // We must make sure to not hold any locks when invoking the panic_wrapper function.
             fn invoke_panic_wrapper(info: &PanicInfo) -> Result<(), &'static str> {
@@ -71,7 +60,6 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
     if let Err(_e) = res {
         error!("Halting due to early panic: {}", info);
         // basic early panic printing with no dependencies
-        #[cfg(target_arch = "x86_64")]
         println!("\nHalting due to early panic: {}", info);
     }
 
@@ -93,8 +81,7 @@ fn panic_entry_point(info: &PanicInfo) -> ! {
 #[no_mangle]
 #[doc(hidden)]
 extern "C" fn rust_eh_personality() -> ! {
-    error!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?");
-    loop { core::hint::spin_loop() }
+    panic!("BUG: Theseus does not use rust_eh_personality. Why has it been invoked?")
 }
 
 /// This function is automatically jumped to after each unwinding cleanup routine finishes executing,
@@ -104,15 +91,12 @@ extern "C" fn rust_eh_personality() -> ! {
 /// that invokes the real `unwind_resume()` function in the `unwind` crate, 
 /// but does so dynamically in loadable mode.
 #[no_mangle]
-#[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
+#[cfg(target_arch = "x86_64")]
 extern "C" fn _Unwind_Resume(arg: usize) -> ! {
-    #[cfg(target_arch = "aarch64")]
-    loop { core::hint::spin_loop() }
-
-    #[cfg(all(target_arch = "x86_64", not(loadable)))] {
+    #[cfg(not(loadable))] {
         unwind::unwind_resume(arg)
     }
-    #[cfg(all(target_arch = "x86_64", loadable))] {
+    #[cfg(loadable)] {
         // An internal function for calling the real unwind_resume function, but returning errors along the way.
         // We must make sure to not hold any locks when invoking the function.
         fn invoke_unwind_resume(arg: usize) -> Result<(), &'static str> {
@@ -132,6 +116,12 @@ extern "C" fn _Unwind_Resume(arg: usize) -> ! {
         }
         loop { core::hint::spin_loop() }
     }
+}
+
+#[no_mangle]
+#[cfg(target_arch = "aarch64")]
+extern "C" fn _Unwind_Resume(_arg: usize) -> ! {
+    todo!("_Unwind_Resume is not yet implemented on aarch64")
 }
 
 /// This is the callback entry point that gets invoked when the heap allocator runs out of memory.

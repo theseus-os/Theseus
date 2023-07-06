@@ -49,16 +49,22 @@ pub fn init(
     cpu_id: CpuId,
     stack: NoDrop<Stack>,
 ) -> Result<BootstrapTaskRef, &'static str> {
-    let cpu_id_as_u8: u8 = cpu_id.into_u8();
-    runqueue::init(cpu_id_as_u8)?;
-    
     let (joinable_bootstrap_task, exitable_bootstrap_task) =
         task::bootstrap_task(cpu_id, stack, kernel_mmi_ref)?;
     BOOTSTRAP_TASKS.lock().push(joinable_bootstrap_task);
+
+    let idle_task = new_task_builder(idle_task_entry, cpu_id)
+        .name(format!("idle_task_cpu_{cpu_id}"))
+        .idle(cpu_id)
+        .spawn_restartable(None)?
+        .clone();
+
+    runqueue::init(cpu_id.into_u8(), idle_task)?;
     runqueue::add_task_to_specific_runqueue(
-        cpu_id_as_u8,
+        cpu_id.into_u8(),
         exitable_bootstrap_task.clone(),
     )?;
+
     Ok(BootstrapTaskRef {
         cpu_id,
         exitable_taskref: exitable_bootstrap_task,
@@ -264,6 +270,7 @@ pub fn new_application_task_builder(
 /// 
 /// [tb]:  fn.new_task_builder.html
 /// [atb]: fn.new_application_task_builder.html
+#[must_use = "a `TaskBuilder` does nothing until `spawn()` is invoked on it"]
 pub struct TaskBuilder<F, A, R> {
     func: F,
     argument: A,
@@ -425,10 +432,13 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        if let Some(cpu) = self.pin_on_cpu {
-            runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
-        } else {
-            runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+        // Idle tasks are not stored on the run queue.
+        if !self.idle {
+            if let Some(cpu) = self.pin_on_cpu {
+                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+            } else {
+                runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+            }
         }
 
         Ok(task_ref)
@@ -887,6 +897,7 @@ fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
 
 /// The final piece of the task cleanup logic,
 /// which removes the task from its runqueue and permanently deschedules it. 
+#[allow(clippy::extra_unused_type_parameters)]
 fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: ExitableTaskRef) -> ! 
     where A: Send + 'static, 
           R: Send + 'static,
@@ -997,17 +1008,6 @@ fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
             error!("BUG: couldn't remove exited task from runqueue: {}", e);
         }
     }
-}
-
-/// Spawns an idle task on the current CPU and adds it to this CPU's runqueue.
-pub fn create_idle_task() -> Result<JoinableTaskRef, &'static str> {
-    let cpu_id = cpu::current_cpu();
-    debug!("Spawning a new idle task on CPU {}", cpu_id);
-
-    new_task_builder(idle_task_entry, cpu_id)
-        .name(format!("idle_task_cpu_{cpu_id}"))
-        .idle(cpu_id)
-        .spawn_restartable(None)
 }
 
 /// A basic idle task that does nothing but loop endlessly.

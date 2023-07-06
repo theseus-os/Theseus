@@ -1,23 +1,15 @@
 [package]
-authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+authors = ["Jacob Earle <earlejacobt@gmail.com>"]
 name = "scheduler_priority"
-description = "Provides priority scheduling functionality and picks the next task"
+description = "Provides a priority scheduler"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-spin = "0.9.4"
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.task]
-path = "../task"
-
-[dependencies.runqueue]
-path = "../runqueue"
-
-[dependencies.runqueue_priority]
-path = "../runqueue_priority"
+log = "0.4.8"
+runqueue_priority = { path = "../runqueue_priority" }
+task = { path = "../task" }
+time = { path = "../time" }
 
 [lib]
 crate-type = ["rlib"]

@@ -126,8 +126,10 @@ fn create_heap_mapping(
     size_in_bytes: usize
 ) -> Result<(MappedPages, DeferredAllocAction<'static>), &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_heap_mapping(): KERNEL_MMI was not yet initialized!")?;
-    let (pages, action) = allocate_pages_by_bytes_deferred(Some(starting_address), size_in_bytes)
-        .map_err(|_e| "create_heap_mapping(): failed to allocate pages at the starting address")?;
+    let (pages, action) = allocate_pages_by_bytes_deferred(
+        page_allocator::AllocationRequest::AtVirtualAddress(starting_address),
+        size_in_bytes,
+    ).map_err(|_e| "create_heap_mapping(): failed to allocate pages at the starting address")?;
     if pages.start_address().value() % HEAP_MAPPED_PAGES_SIZE_IN_BYTES != 0 {
         return Err("multiple_heaps: the allocated pages for the heap wasn't properly aligned");
     }

@@ -57,7 +57,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optopt("s", "buffer size", "size of packet to send to target address, (min: 8, max: 120, default: 40)", "N");
     
   
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

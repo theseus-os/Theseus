@@ -181,14 +181,17 @@ pub fn init(
 
     // arch-gate: no windowing/input support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
-    let (key_producer, mouse_producer) = window_manager::init()?;
+    match window_manager::init() {
+        Ok((key_producer, mouse_producer)) => {
+            device_manager::init(key_producer, mouse_producer)?;
+        },
+        Err(error) => {
+            error!("Failed to init window manager (expected if using nographic): {error}");
+        }
+    }
 
-    device_manager::init(
-        #[cfg(target_arch = "x86_64")]
-        key_producer,
-        #[cfg(target_arch = "x86_64")]
-        mouse_producer,
-    )?;
+    #[cfg(target_arch = "aarch64")]
+    device_manager::init()?;
 
     task_fs::init()?;
 
@@ -212,23 +215,17 @@ pub fn init(
     console::start_connection_detection()?;
 
     // 3. Start the first application(s).
-    // arch-gate: many subsystems required by applications are missing
-    // on aarch64: windowing, user input, app loading (relocation code
-    // is x86_64-specific at the moment)
-    #[cfg(target_arch = "x86_64")]
     first_application::start()?;
 
     info!("captain::init(): initialization done! Spawning an idle task on BSP core {} and enabling interrupts...", bsp_id);
     // The following final initialization steps are important, and order matters:
     // 1. Drop any other local stack variables that still exist.
     drop(kernel_mmi_ref);
-    // 2. Create the idle task for this CPU.
-    spawn::create_idle_task()?;
-    // 3. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
+    // 2. Cleanup bootstrap tasks, which handles this one and all other APs' bootstrap tasks.
     spawn::cleanup_bootstrap_tasks(cpu_count)?;
-    // 4. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
+    // 3. "Finish" this bootstrap task, indicating it has exited and no longer needs to run.
     bootstrap_task.finish();
-    // 5. Enable interrupts such that other tasks can be scheduled in.
+    // 4. Enable interrupts such that other tasks can be scheduled in.
     enable_interrupts();
     // ****************************************************
     // NOTE: nothing below here is guaranteed to run again!

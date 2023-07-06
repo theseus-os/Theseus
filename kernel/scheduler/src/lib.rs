@@ -15,10 +15,10 @@
 #![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
 cfg_if::cfg_if! {
-    if #[cfg(priority_scheduler)] {
+    if #[cfg(epoch_scheduler)] {
+        extern crate scheduler_epoch as scheduler;
+    } else if #[cfg(priority_scheduler)] {
         extern crate scheduler_priority as scheduler;
-    } else if #[cfg(realtime_scheduler)] {
-        extern crate scheduler_realtime as scheduler;
     } else {
         extern crate scheduler_round_robin as scheduler;
     }
@@ -37,9 +37,9 @@ pub use task::schedule;
 ///
 /// Currently, there is a single scheduler policy for the whole system.
 /// The policy is selected by specifying a Rust `cfg` value at build time, like so:
-/// * `make THESEUS_CONFIG=priority_scheduler` --> priority scheduler.
-/// * `make THESEUS_CONFIG=realtime_scheduler` --> "realtime" (rate monotonic) scheduler.
-/// * `make` --> basic round-robin scheduler, the default.
+/// - `make`: round-robin scheduler
+/// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
+/// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
 pub fn init() -> Result<(), &'static str> {
     task::set_scheduler_policy(scheduler::select_next_task);
 
@@ -96,30 +96,29 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 /// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
 /// This function returns an error when a scheduler without priority is loaded. 
 pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::set_priority(_task, _priority)
+    #[cfg(any(epoch_scheduler, priority_scheduler))]
+    {
+        Ok(scheduler::set_priority(_task, _priority))
     }
-    #[cfg(not(priority_scheduler))] {
-        Err("no scheduler that uses task priority is currently loaded")
+    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
+    {
+        Err("called set priority on scheduler that doesn't support set priority")
     }
 }
 
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
 pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(priority_scheduler)] {
-        scheduler_priority::get_priority(_task)
+    #[cfg(any(epoch_scheduler, priority_scheduler))]
+    {
+        scheduler::get_priority(_task)
     }
-    #[cfg(not(priority_scheduler))] {
+    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
+    {
         None
     }
 }
 
-pub fn set_periodicity(_task: &TaskRef, _period: usize) -> Result<(), &'static str> {
-    #[cfg(realtime_scheduler)] {
-        scheduler_realtime::set_periodicity(_task, _period)
-    }
-    #[cfg(not(realtime_scheduler))] {
-        Err("no scheduler that supports periodic tasks is currently loaded")
-    }
+pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
+    scheduler::inherit_priority(task)
 }

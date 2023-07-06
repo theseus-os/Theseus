@@ -143,7 +143,7 @@ pub fn init(
                 .ok()
             )
             .and_then(|mp| {
-                staging_fb_range = Some(mp.deref().clone());
+                staging_fb_range = Some(mp.range().clone());
                 mp.into_borrowed_slice_mut(0, fb_pixel_count).ok()
             });
             
@@ -395,7 +395,7 @@ impl Write for EarlyFramebufferPrinter {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        let _ = $crate::print_args_raw(format_args!($($arg)*));
+        let _ = $crate::print_args_raw(::core::format_args!($($arg)*));
     });
 }
 
@@ -403,8 +403,10 @@ macro_rules! print {
 /// to the early framebuffer writer, if it has been initialized.
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ({
+        let _ = $crate::print_args_raw(::core::format_args!("{}\n", ::core::format_args!($($arg)*)));
+    });
 }
 
 #[doc(hidden)]

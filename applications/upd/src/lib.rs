@@ -65,7 +65,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("v", "verbose", "enable verbose logging");
     opts.optopt ("d", "destination", "specify the IP address (and optionally, the port) of the update server", "IP_ADDR[:PORT]");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

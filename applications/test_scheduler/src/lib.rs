@@ -56,7 +56,7 @@ pub fn main(_args: Vec<String>) -> isize {
     let _priority2 = scheduler::get_priority(&taskref2);
     let _priority3 = scheduler::get_priority(&taskref3);
 
-    #[cfg(priority_scheduler)]
+    #[cfg(epoch_scheduler)]
     {
         assert_eq!(_priority1,Some(30));
         assert_eq!(_priority2,Some(20));

@@ -1,7 +1,7 @@
 [package]
-name = "test_realtime"
+name = "test_priority_scheduler"
 version = "0.1.0"
-description = "Application to test scheduling of periodic tasks."
+description = "Application to test the priority scheduler"
 authors = ["Jacob Earle <earlejacobt@gmail.com>"]
 
 [dependencies]

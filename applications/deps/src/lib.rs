@@ -40,13 +40,9 @@ use crate_name_utils::get_containing_crate_name;
 
 /// calls println!() and then log!()
 macro_rules! println_log {
-    ($fmt:expr) => {
-        debug!($fmt);
-        print!(concat!($fmt, "\n"));
-    };
-    ($fmt:expr, $($arg:tt)*) => {
-        debug!($fmt, $($arg)*);
-        print!(concat!($fmt, "\n"), $($arg)*);
+    ($($arg:tt)*) => {
+        debug!($($arg)*);
+        println!($($arg)*);
     };
 }
 
@@ -74,7 +70,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("",  "num-rodata",       "count the private .rodata sections for all crates");
     
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

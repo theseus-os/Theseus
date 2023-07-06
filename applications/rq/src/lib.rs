@@ -22,7 +22,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => { m }
         Err(_f) => { println!("{} \n", _f);
                     return -1; }
@@ -42,7 +42,7 @@ pub fn main(args: Vec<String>) -> isize {
 
         println!("\n{} (apic: {}, proc: {})", core_type, apic_id, processor); 
         
-        if let Some(runqueue) = runqueue::get_runqueue(apic_id.value() as u8).map(|rq| rq.read()) {
+        if let Some(runqueue) = runqueue::get_runqueue(apic_id.value() as u8).map(|rq| rq.read().clone()) {
             let mut runqueue_contents = String::new();
             for task in runqueue.iter() {
                 writeln!(runqueue_contents, "    {} ({}) {}", 

@@ -29,10 +29,10 @@ stack = { path = "../stack" }
 task = { path = "../task" }
 cpu = { path = "../cpu" }
 per_cpu = { path = "../per_cpu" }
+first_application = { path = "../first_application" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 window_manager = { path = "../window_manager" }
-first_application = { path = "../first_application" }
 exceptions_full = { path = "../exceptions_full" }
 multiple_heaps = { path = "../multiple_heaps" }
 tsc = { path = "../tsc" }
