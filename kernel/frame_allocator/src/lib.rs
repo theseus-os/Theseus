@@ -31,17 +31,15 @@ mod static_array_rb_tree;
 // mod static_array_linked_list;
 mod frames;
 
-use core::{borrow::Borrow, cmp::{Ordering, min, max}, fmt, ops::{Deref, DerefMut}, marker::PhantomData};
+use core::{borrow::Borrow, cmp::{Ordering, min, max}, ops::Deref};
 use intrusive_collections::Bound;
 use kernel_config::memory::*;
 use log::{error, warn, debug, trace};
 use memory_structs::{PhysicalAddress, Frame, FrameRange};
-use range_inclusive::RangeInclusiveIterator;
 use spin::Mutex;
 use static_array_rb_tree::*;
-use static_assertions::assert_not_impl_any;
 use frames::{Frames, FrameState};
-pub use frames::{AllocatedFrames, UnmappedFrame};
+pub use frames::{AllocatedFrames, AllocatedFrame};
 
 const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
@@ -296,12 +294,14 @@ pub enum MemoryRegionType {
 #[derive(Debug, Clone, Eq)]
 struct Region {
     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
+    #[allow(unused)]
     typ: MemoryRegionType,
     /// The Frames covered by this chunk, an inclusive range. 
     frames: FrameRange,
 }
 impl Region {
     /// Returns a new `Chunk` with an empty range of frames. 
+    #[allow(unused)]
     const fn empty() -> Region {
         Region {
             typ: MemoryRegionType::Unknown,
@@ -626,6 +626,8 @@ enum AllocationError {
     ContiguousChunkNotFound(Frame, usize),
     /// Failed to remove a chunk from the free list given a reference to it.
     ChunkRemovalFailed,
+    /// Failed to merge or split a Chunk.
+    ChunkOperationFailed,
 }
 impl From<AllocationError> for &'static str {
     fn from(alloc_err: AllocationError) -> &'static str {
@@ -635,6 +637,7 @@ impl From<AllocationError> for &'static str {
             AllocationError::OutOfAddressSpace(..) => "out of physical address space",
             AllocationError::ContiguousChunkNotFound(..) => "only some of the requested frames were available",
             AllocationError::ChunkRemovalFailed => "Failed to remove a Chunk from the free list, this is most likely due to some logical error",
+            AllocationError::ChunkOperationFailed => "Could not merge or split a Chunk",
         }
     }
 }
@@ -709,11 +712,9 @@ fn find_specific_chunk(
                         };
                         if let Some(next_chunk) = next_contiguous_chunk {
                             // We found a suitable chunk that came contiguously after the initial too-small chunk. 
-                            // Now merge it into the initial chunk (since we have a cursor pointing to it already) 
-                            let initial_chunk = cursor_mut.get().map(|w| w.deref_mut()).unwrap();
-                            // We're using the merge function with all the chunks, but we could just set the frame range since we've already conducted all the checks
-                            let _ = initial_chunk.merge(next_chunk); // this shoiuld always succeed
-                            return allocate_from_chosen_chunk(requested_frame, num_frames, ValueRefMut::RBTree(cursor_mut));
+                            // We would like to merge it into the initial chunk (since we have a cursor pointing to it already),
+                            // but we can't get a mutable reference to the element the cursor is pointing to. 
+                            return merge_contiguous_chunks_and_allocate(requested_frame, num_frames, ValueRefMut::RBTree(cursor_mut), next_chunk);
                         }
                     }
                 }
@@ -785,6 +786,33 @@ fn retrieve_frames_from_ref(mut frames_ref: ValueRefMut<Frames<{FrameState::Unma
     }
 }
 
+/// The final part of the main allocation routine that splits the given chosen chunk
+/// into multiple smaller chunks, thereby "allocating" frames from it.
+///
+/// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
+/// from (part of) that chunk, ranging from `start_frame` to `start_frame + num_frames`.
+fn merge_contiguous_chunks_and_allocate(
+    start_frame: Frame,
+    num_frames: usize,
+    initial_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
+    next_chunk: Frames<{FrameState::Unmapped}>,
+) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
+    // Remove the chosen chunk from the free frame list.
+    let mut chosen_chunk = retrieve_frames_from_ref(initial_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
+    // This should always succeed, since we've already checked the conditions for a merge
+    // We should return the next_chunk back to the list, but a failure at this point implies a bug in the frame allocator.
+    chosen_chunk.merge(next_chunk).map_err(|_| AllocationError::ChunkOperationFailed)?; 
+    let (new_allocation, before, after) = chosen_chunk.split(start_frame, num_frames);
+
+    // TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
+    // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
+
+    Ok((
+        new_allocation,
+        DeferredAllocAction::new(before, after),
+    ))
+
+}
 
 /// The final part of the main allocation routine that splits the given chosen chunk
 /// into multiple smaller chunks, thereby "allocating" frames from it.
@@ -794,7 +822,7 @@ fn retrieve_frames_from_ref(mut frames_ref: ValueRefMut<Frames<{FrameState::Unma
 fn allocate_from_chosen_chunk(
     start_frame: Frame,
     num_frames: usize,
-    mut chosen_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
+    chosen_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // Remove the chosen chunk from the free frame list.
     let chosen_chunk = retrieve_frames_from_ref(chosen_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
@@ -809,57 +837,6 @@ fn allocate_from_chosen_chunk(
     ))
 
 }
-
-// /// An inner function that breaks up the given chunk into multiple smaller chunks.
-// /// 
-// /// Returns a tuple of three chunks:
-// /// 1. The `Chunk` containing the requested range of frames starting at `start_frame`.
-// /// 2. The range of frames in the `chosen_chunk` that came before the beginning of the requested frame range.
-// /// 3. The range of frames in the `chosen_chunk` that came after the end of the requested frame range.
-// fn split_chosen_chunk(
-//     start_frame: Frame,
-//     num_frames: usize,
-//     chosen_chunk: &Chunk,
-// ) -> (Chunk, Option<Chunk>, Option<Chunk>) {
-//     // The new allocated chunk might start in the middle of an existing chunk,
-//     // so we need to break up that existing chunk into 3 possible chunks: before, newly-allocated, and after.
-//     //
-//     // Because Frames and PhysicalAddresses use saturating add/subtract, we need to double-check that 
-//     // we don't create overlapping duplicate Chunks at either the very minimum or the very maximum of the address space.
-//     let new_allocation = Chunk {
-//         typ: chosen_chunk.typ,
-//         // The end frame is an inclusive bound, hence the -1. Parentheses are needed to avoid overflow.
-//         frames: FrameRange::new(start_frame, start_frame + (num_frames - 1)),
-//     };
-//     let before = if start_frame == MIN_FRAME {
-//         None
-//     } else {
-//         Some(Chunk {
-//             typ: chosen_chunk.typ,
-//             frames: FrameRange::new(*chosen_chunk.start(), *new_allocation.start() - 1),
-//         })
-//     };
-//     let after = if new_allocation.end() == &MAX_FRAME { 
-//         None
-//     } else {
-//         Some(Chunk {
-//             typ: chosen_chunk.typ,
-//             frames: FrameRange::new(*new_allocation.end() + 1, *chosen_chunk.end()),
-//         })
-//     };
-
-//     // some sanity checks -- these can be removed or disabled for better performance
-//     if let Some(ref b) = before {
-//         assert!(!new_allocation.contains(b.end()));
-//         assert!(!b.contains(new_allocation.start()));
-//     }
-//     if let Some(ref a) = after {
-//         assert!(!new_allocation.contains(a.start()));
-//         assert!(!a.contains(new_allocation.end()));
-//     }
-
-//     (new_allocation, before, after)
-// }
 
 
 /// Returns `true` if the given list contains *any* of the given `frames`.

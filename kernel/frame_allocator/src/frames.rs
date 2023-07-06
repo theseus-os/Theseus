@@ -1,16 +1,15 @@
 //! A range of unmapped frames that stores a verified `TrustedChunk`.
 //! A `Frames` object is uncloneable and is the only way to access the range of frames it references.
 
-use kernel_config::memory::PAGE_SIZE;
-use memory_structs::{FrameRange, Frame, PhysicalAddress};
-use range_inclusive::RangeInclusive;
+use memory_structs::{FrameRange, Frame};
 use crate::{MemoryRegionType, contains_any, RESERVED_REGIONS, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST};
 use core::{borrow::Borrow, cmp::Ordering, ops::{Deref, DerefMut}, fmt, marker::ConstParamTy};
-use spin::Mutex;
 use static_assertions::assert_not_impl_any;
 use log::error;
 
 pub type AllocatedFrames = Frames<{FrameState::Unmapped}>;
+pub type AllocatedFrame<'f>  = UnmappedFrame<'f>;
+
 
 #[derive(PartialEq, Eq, ConstParamTy)]
 pub enum FrameState {
@@ -74,18 +73,18 @@ impl Frames<{FrameState::Unmapped}> {
 
     /// Consumes the `Frames` in an unmapped state and converts them to `Frames` in a mapped state.
     /// This should only be called once a `MappedPages` has been created from the `Frames`.
-    pub fn into_mapped_frames(mut self) -> Frames<{FrameState::Mapped}> {    
+    pub fn into_mapped_frames(self) -> Frames<{FrameState::Mapped}> {    
         Frames {
             typ: self.typ,
-            frames: self.frames,
+            frames: self.frames.clone(),
         }
     }
 
     /// Returns an `UnmappedFrame` if this `Frames<{FrameState::Unmapped}>` object contains only one frame.
-    /// 
+    /// I've kept the terminology of allocated frame here to avoid changing code outside of this crate.
     /// ## Panic
-    /// Panics if this `AllocatedFrame` contains multiple frames or zero frames.
-    pub fn as_unmapped_frame(&self) -> UnmappedFrame {
+    /// Panics if this `UnmappedFrame` contains multiple frames or zero frames.
+    pub fn as_allocated_frame(&self) -> UnmappedFrame {
         assert!(self.size_in_frames() == 1);
         UnmappedFrame {
             frame: *self.start(),
@@ -121,14 +120,13 @@ impl<const S: FrameState> Drop for Frames<S> {
         
                 let unmapped_frames: Frames<{FrameState::Unmapped}> = Frames {
                     typ: self.typ,
-                    frames: self.frames,
+                    frames: self.frames.clone(),
                 };
         
-                // Should we remove these lines since we store the typ in Frames?
-                let (list, _typ) = if contains_any(&RESERVED_REGIONS.lock(), &unmapped_frames) {
-                    (&FREE_RESERVED_FRAMES_LIST, MemoryRegionType::Reserved)
+                let list = if unmapped_frames.typ == MemoryRegionType::Reserved {
+                    &FREE_RESERVED_FRAMES_LIST
                 } else {
-                    (&FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
+                    &FREE_GENERAL_FRAMES_LIST
                 };
         
                 // Simply add the newly-deallocated chunk to the free frames list.
@@ -156,7 +154,7 @@ impl<'f> IntoIterator for &'f Frames<{FrameState::Unmapped}> {
     fn into_iter(self) -> Self::IntoIter {
         UnmappedFramesIter {
             _owner: self,
-            range: self.frames.clone().into_iter(),
+            range: self.frames.iter(),
         }
     }
 }
@@ -236,7 +234,7 @@ impl<const S: FrameState> Frames<S> {
     ///
     /// If either of those conditions are met, `self` is modified and `Ok(())` is returned,
     /// otherwise `Err(other)` is returned.
-    pub fn merge(&mut self, mut other: Self) -> Result<(), Self> {
+    pub fn merge(&mut self, other: Self) -> Result<(), Self> {
         if self.is_empty() || other.is_empty() {
             return Err(other);
         }
