@@ -2,7 +2,7 @@
 //! A `Frames` object is uncloneable and is the only way to access the range of frames it references.
 
 use memory_structs::{FrameRange, Frame};
-use crate::{MemoryRegionType, contains_any, RESERVED_REGIONS, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST};
+use crate::{MemoryRegionType, contains_any, RESERVED_REGIONS, FREE_GENERAL_FRAMES_LIST, FREE_RESERVED_FRAMES_LIST, MIN_FRAME, MAX_FRAME};
 use core::{borrow::Borrow, cmp::Ordering, ops::{Deref, DerefMut}, fmt, marker::ConstParamTy};
 use static_assertions::assert_not_impl_any;
 use log::error;
@@ -252,7 +252,7 @@ impl<const S: FrameState> Frames<S> {
             return Err(other);
         }
 
-        // ensure the now-merged TrustedChunk doesn't run its drop handler (currently not implemented, but to prevent any future issues.)
+        // ensure the now-merged Frames doesn't run its drop handler
         core::mem::forget(other); 
         Ok(())
     }
@@ -267,29 +267,29 @@ impl<const S: FrameState> Frames<S> {
     /// If `start_frame` is not contained within `self` or `num_frames` results in an end frame greater than the end of `self`,
     /// then `self` is not changed and we return (self, None, None).
     pub fn split(
-        mut self,
+        self,
         start_frame: Frame,
         num_frames: usize,
     ) -> (Self, Option<Self>, Option<Self>) {
-        if (start_frame < *self.start()) || (start_frame + num_frames - 1 > *self.end()) || (num_frames <= 0) {
+        if (start_frame < *self.start()) || (start_frame + (num_frames - 1) > *self.end()) || (num_frames <= 0) {
             return (self, None, None);
         }
 
-        let before = if start_frame == *self.start()  {
+        let new_allocation = Frames{ frames: FrameRange::new(start_frame, start_frame + (num_frames - 1)), ..self };
+        let before = if start_frame == MIN_FRAME || start_frame == *self.start() {
             None
         } else {
-            Some(Frames{ frames: FrameRange::new(*self.start(), start_frame - 1), ..self })
+            Some(Frames{ frames: FrameRange::new(*self.start(), *new_allocation.start() - 1), ..self })
         };
-        let required = Frames{ frames: FrameRange::new(start_frame, start_frame + num_frames - 1), ..self };
 
-        let after = if start_frame + num_frames - 1 == *self.end() {
+        let after = if *new_allocation.end() == MAX_FRAME || *new_allocation.end() == *self.end(){
             None
         } else {
-            Some(Frames{ frames: FrameRange::new(start_frame + num_frames, *self.end()), ..self })
+            Some(Frames{ frames: FrameRange::new(*new_allocation.end() + 1, *self.end()), ..self })
         };
 
         core::mem::forget(self);
-        (required, before, after)
+        (new_allocation, before, after)
     }
 
     /// Splits this `Frames` into two separate `Frames` objects:
@@ -301,10 +301,10 @@ impl<const S: FrameState> Frames<S> {
     /// * If `at_frame == self.start`, the first returned `Frames` object will be empty.
     /// * If `at_frame == self.end + 1`, the second returned `Frames` object will be empty.
     /// 
-    /// Returns an `Err` containing this `Frames` if `at_frame` is otherwise out of bounds.
+    /// Returns an `Err` containing this `Frames` if `at_frame` is otherwise out of bounds, or if `self` was empty.
     /// 
     /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
-    pub fn split_at(mut self, at_frame: Frame) -> Result<(Self, Self), Self> {
+    pub fn split_at(self, at_frame: Frame) -> Result<(Self, Self), Self> {
         if self.is_empty() { return Err(self); }
 
         let end_of_first = at_frame - 1;
@@ -329,7 +329,7 @@ impl<const S: FrameState> Frames<S> {
         };
 
         let typ = self.typ;
-        // ensure the original AllocatedFrames doesn't run its drop handler and free its frames.
+        // ensure the original Frames doesn't run its drop handler and free its frames.
         core::mem::forget(self);   
         Ok((
             Frames { typ, frames: first }, 

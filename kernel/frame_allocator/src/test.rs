@@ -6,20 +6,20 @@ use self::std::dbg;
 
 use super::*;
 
-impl PartialEq for AllocatedFrames {
-    fn eq(&self, other: &Self) -> bool {
-        self.frames() == other.frames()
-    }
-}
+// impl PartialEq for AllocatedFrames {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.frames() == other.frames()
+//     }
+// }
 
 fn from_addr(start_addr: usize, end_addr: usize) -> AllocatedFrames {
-    AllocatedFrames {
-        typ: MemoryRegionType::Free,
-        frames: FrameRange::new(
+    AllocatedFrames::new(
+        MemoryRegionType::Free,
+        FrameRange::new(
             Frame::containing_address(PhysicalAddress::new_canonical(start_addr)),
             Frame::containing_address(PhysicalAddress::new_canonical(end_addr)),
         )
-    }
+    )
 }
 
 fn frame_addr(addr: usize) -> Frame {
