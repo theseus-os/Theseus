@@ -591,7 +591,7 @@ impl<const S: FrameState> Frames<S> {
         start_frame: Frame,
         num_frames: usize,
     ) -> (Self, Option<Self>, Option<Self>) {
-        if (start_frame < *self.start()) || (start_frame + (num_frames - 1) > *self.end()) || (num_frames <= 0) {
+        if (start_frame < *self.start()) || (start_frame + (num_frames - 1) > *self.end()) || (num_frames == 0) {
             return (self, None, None);
         }
 
@@ -1074,7 +1074,6 @@ fn add_reserved_region_to_frames_list(
     Ok(frames)
 }
 
-/// ToDo: combine both functions for adding reserved regions using a trait.
 /// Adds the given `frames` to the given `list` as a Region of reserved frames. 
 /// 
 /// Returns the range of **new** frames that were added to the list, 
@@ -1083,6 +1082,8 @@ fn add_reserved_region_to_frames_list(
 /// Currently, this function adds no new frames at all if any frames within the given `frames` list
 /// overlap any existing regions at all. 
 /// TODO: handle partially-overlapping regions by extending existing regions on either end.
+/// 
+/// TODO: combine both functions for adding reserved regions/ frames using a trait OR make one function which adds to both lists, since they are always called together.
 fn add_reserved_region_to_regions_list(
     list: &mut StaticArrayRBTree<Region>,
     frames: FrameRange,
