@@ -30,26 +30,14 @@ pub struct SystemInterruptController {
 /// On x86_64, this corresponds to a LocalApic.
 pub struct LocalInterruptController;
 
-// 1st variant: get system controller
-// 2nd variant: get local controller
-macro_rules! get_int_ctlr {
-    ($name:ident, $func:ident, $this:expr) => {
-        let mut $name = get_ioapic($this.id).expect(concat!("BUG: ", stringify!($func), "(): get_ioapic() returned None"));
-    };
-    ($name:ident, $func:ident) => {
-        let mut $name = get_my_apic().expect(concat!("BUG: ", stringify!($func), "(): get_my_apic() returned None"));
-        let mut $name = $name.write();
-    };
-}
-
 impl SystemInterruptControllerApi for SystemInterruptController {
     fn id(&self) -> SystemInterruptControllerId {
-        get_int_ctlr!(int_ctlr, id, self);
+        let mut int_ctlr = get_ioapic(self.id).expect("BUG: id(): get_ioapic() returned None");
         SystemInterruptControllerId(int_ctlr.id())
     }
 
     fn version(&self) -> SystemInterruptControllerVersion {
-        get_int_ctlr!(int_ctlr, version, self);
+        let mut int_ctlr = get_ioapic(self.id).expect("BUG: version(): get_ioapic() returned None");
         SystemInterruptControllerVersion(int_ctlr.version())
     }
 
@@ -67,7 +55,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         destination: InterruptDestination,
         priority: Priority,
     ) -> Result<(), &'static str> {
-        get_int_ctlr!(int_ctlr, set_destination, self);
+        let mut int_ctlr = get_ioapic(self.id).expect("BUG: set_destination(): get_ioapic() returned None");
 
         // no support for priority on x86_64
         let _ = priority;
@@ -83,21 +71,17 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 
     fn id(&self) -> LocalInterruptControllerId {
-        get_int_ctlr!(int_ctlr, id);
-
+        let int_ctlr = get_my_apic().expect("BUG: id(): get_my_apic() returned None");
+        let int_ctlr = int_ctlr.read();
         LocalInterruptControllerId(int_ctlr.processor_id())
     }
 
     fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority {
-        get_int_ctlr!(int_ctlr, get_local_interrupt_priority);
-
         // No priority support on x86_64
         Priority
     }
 
     fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority) {
-        get_int_ctlr!(int_ctlr, set_local_interrupt_priority);
-
         // No priority support on x86_64
         let _ = priority;
     }
@@ -111,7 +95,8 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 
     fn send_ipi(&self, num: InterruptNumber, dest: Option<CpuId>) {
-        get_int_ctlr!(int_ctlr, send_ipi);
+        let mut int_ctlr = get_my_apic().expect("BUG: send_ipi(): get_my_apic() returned None");
+        let mut int_ctlr = int_ctlr.write();
         int_ctlr.send_ipi(num, match dest {
             Some(cpu) => LapicIpiDestination::One(cpu.into()),
             None => LapicIpiDestination::AllButMe,
@@ -119,15 +104,11 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 
     fn get_minimum_priority(&self) -> Priority {
-        get_int_ctlr!(int_ctlr, get_minimum_priority);
-
         // No priority support on x86_64
         Priority
     }
 
     fn set_minimum_priority(&self, priority: Priority) {
-        get_int_ctlr!(int_ctlr, set_minimum_priority);
-
         // No priority support on x86_64
         let _ = priority;
     }
@@ -137,7 +118,8 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 
     fn end_of_interrupt(&self, _number: InterruptNumber) {
-        get_int_ctlr!(int_ctlr, end_of_interrupt);
+        let mut int_ctlr = get_my_apic().expect("BUG: end_of_interrupt(): get_my_apic() returned None");
+        let mut int_ctlr = int_ctlr.write();
 
         // On x86, passing the number isn't required.
         int_ctlr.eoi();
