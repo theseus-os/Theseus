@@ -6,12 +6,6 @@ use self::std::dbg;
 
 use super::*;
 
-// impl PartialEq for AllocatedFrames {
-//     fn eq(&self, other: &Self) -> bool {
-//         self.frames() == other.frames()
-//     }
-// }
-
 fn from_addr(start_addr: usize, end_addr: usize) -> AllocatedFrames {
     AllocatedFrames::new(
         MemoryRegionType::Free,
