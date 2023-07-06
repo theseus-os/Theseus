@@ -1065,12 +1065,14 @@ impl<T: FromBytes> BorrowedMappedPages<T, Mutable, MappedPages> {
 }
 
 impl<T: FromBytes, M: Mutability, B: Borrow<MappedPages>> BorrowedMappedPages<T, M, B> {
-    /// Consumes this object and returns the inner `MappedPages`.
+    /// Consumes this object and returns the inner `MappedPages` value
+    /// (more specifically, the `Borrow`-able container holding the `MappedPages`).
     pub fn into_inner(self) -> B {
         self.mp
     }
 
-    /// Returns a reference to the inner borrowed `MappedPages`.
+    /// Returns a reference to the inner `MappedPages` value
+    /// (more specifically, the `Borrow`-able container holding the `MappedPages`).
     pub fn inner_ref(&self) -> &B {
         &self.mp
     }
