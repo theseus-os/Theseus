@@ -786,7 +786,7 @@ impl From<AllocationError> for &'static str {
             AllocationError::OutOfAddressSpace(..) => "out of physical address space",
             AllocationError::ContiguousChunkNotFound(..) => "only some of the requested frames were available",
             AllocationError::ChunkRemovalFailed => "Failed to remove a Chunk from the free list, this is most likely due to some logical error",
-            AllocationError::ChunkOperationFailed => "Could not merge or split a Chunk",
+            AllocationError::ChunkOperationFailed => "Could not merge or split a Chunk. This indicated a bug in the frame allocator.",
         }
     }
 }
@@ -861,8 +861,9 @@ fn find_specific_chunk(
                         };
                         if let Some(next_chunk) = next_contiguous_chunk {
                             // We found a suitable chunk that came contiguously after the initial too-small chunk. 
-                            // We would like to merge it into the initial chunk (since we have a cursor pointing to it already),
-                            // but we can't get a mutable reference to the element the cursor is pointing to. 
+                            // We would like to merge it into the initial chunk with just the reference (since we have a cursor pointing to it already),
+                            // but we can't get a mutable reference to the element the cursor is pointing to.
+                            // So both chunks will be removed and then merged. 
                             return merge_contiguous_chunks_and_allocate(requested_frame, num_frames, ValueRefMut::RBTree(cursor_mut), next_chunk);
                         }
                     }
@@ -935,10 +936,10 @@ fn retrieve_frames_from_ref(mut frames_ref: ValueRefMut<Frames<{FrameState::Unma
     }
 }
 
-/// The final part of the main allocation routine that splits the given chosen chunk
-/// into multiple smaller chunks, thereby "allocating" frames from it.
+/// The final part of the main allocation routine that merges two contiguous chunks and 
+/// then splits the resulting chunk into multiple smaller chunks, thereby "allocating" frames from it.
 ///
-/// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
+/// This function merges two chunks and then breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
 /// from (part of) that chunk, ranging from `start_frame` to `start_frame + num_frames`.
 fn merge_contiguous_chunks_and_allocate(
     start_frame: Frame,
@@ -946,7 +947,7 @@ fn merge_contiguous_chunks_and_allocate(
     initial_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
     next_chunk: Frames<{FrameState::Unmapped}>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
-    // Remove the chosen chunk from the free frame list.
+    // Remove the initial chunk from the free frame list.
     let mut chosen_chunk = retrieve_frames_from_ref(initial_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
     // This should always succeed, since we've already checked the conditions for a merge
     // We should return the next_chunk back to the list, but a failure at this point implies a bug in the frame allocator.
@@ -1073,7 +1074,8 @@ fn add_reserved_region_to_frames_list(
     Ok(frames)
 }
 
-/// Adds the given `frames` to the given `list` as a Chunk of reserved frames. 
+/// ToDo: combine both functions for adding reserved regions using a trait.
+/// Adds the given `frames` to the given `list` as a Region of reserved frames. 
 /// 
 /// Returns the range of **new** frames that were added to the list, 
 /// which will be a subset of the given input `frames`.
