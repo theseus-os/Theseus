@@ -12,10 +12,6 @@ pub struct SystemInterruptControllerId(pub u32);
 #[derive(Debug, Copy, Clone)]
 pub struct LocalInterruptControllerId(pub u32);
 #[derive(Debug, Copy, Clone)]
-pub struct SystemInterruptNumber(pub(crate) u8);
-#[derive(Debug, Copy, Clone)]
-pub struct LocalInterruptNumber(pub(crate) u8);
-#[derive(Debug, Copy, Clone)]
 pub struct Priority;
 
     /// Initializes the interrupt controller, on aarch64
@@ -59,7 +55,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
     fn get_destination(
         &self,
-        interrupt_num: SystemInterruptNumber,
+        interrupt_num: InterruptNumber,
     ) -> Result<(Vec<InterruptDestination>, Priority), &'static str> {
         // no way to read the destination for an IRQ number in IoApic
         unimplemented!()
@@ -67,7 +63,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
     fn set_destination(
         &self,
-        sys_int_num: SystemInterruptNumber,
+        sys_int_num: InterruptNumber,
         destination: InterruptDestination,
         priority: Priority,
     ) -> Result<(), &'static str> {
@@ -76,7 +72,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         // no support for priority on x86_64
         let _ = priority;
 
-        int_ctlr.set_irq(sys_int_num.0, destination.cpu.into(), destination.local_number.0)
+        int_ctlr.set_irq(sys_int_num, destination.cpu.into(), destination.local_number)
     }
 }
 
@@ -92,31 +88,31 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         LocalInterruptControllerId(int_ctlr.processor_id())
     }
 
-    fn get_local_interrupt_priority(&self, num: LocalInterruptNumber) -> Priority {
+    fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority {
         get_int_ctlr!(int_ctlr, get_local_interrupt_priority);
 
         // No priority support on x86_64
         Priority
     }
 
-    fn set_local_interrupt_priority(&self, num: LocalInterruptNumber, priority: Priority) {
+    fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority) {
         get_int_ctlr!(int_ctlr, set_local_interrupt_priority);
 
         // No priority support on x86_64
         let _ = priority;
     }
 
-    fn is_local_interrupt_enabled(&self, num: LocalInterruptNumber) -> bool {
+    fn is_local_interrupt_enabled(&self, num: InterruptNumber) -> bool {
         todo!()
     }
 
-    fn enable_local_interrupt(&self, num: LocalInterruptNumber, enabled: bool) {
+    fn enable_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
         todo!()
     }
 
-    fn send_ipi(&self, num: LocalInterruptNumber, dest: Option<CpuId>) {
+    fn send_ipi(&self, num: InterruptNumber, dest: Option<CpuId>) {
         get_int_ctlr!(int_ctlr, send_ipi);
-        int_ctlr.send_ipi(num.0, match dest {
+        int_ctlr.send_ipi(num, match dest {
             Some(cpu) => LapicIpiDestination::One(cpu.into()),
             None => LapicIpiDestination::AllButMe,
         });

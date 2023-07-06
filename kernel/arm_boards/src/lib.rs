@@ -39,13 +39,13 @@ pub struct BoardConfig {
 
     /// The IRQ number reserved for the PL011 Single-Serial-Port Controller
     /// which Theseus currently uses for logging and UART console.
-    pub pl011_rx_spi: u32,
+    pub pl011_rx_spi: u8,
 
     /// The IRQ number reserved for CPU-local timer interrupts,
     /// which Theseus currently uses for preemptive task switching.
     //
     // aarch64 manuals define the default timer IRQ number to be 30.
-    pub cpu_local_timer_ppi: u32,
+    pub cpu_local_timer_ppi: u8,
 }
 
 // by default & on x86_64, the default.rs file is used

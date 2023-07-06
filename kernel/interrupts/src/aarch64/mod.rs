@@ -10,14 +10,13 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use interrupt_controller::{
-    LocalInterruptController, SystemInterruptController, LocalInterruptNumber,
+    LocalInterruptController, SystemInterruptController,
     InterruptDestination, LocalInterruptControllerApi, SystemInterruptControllerApi,
-    SystemInterruptNumber,
 };
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
 use irq_safety::RwLockIrqSafe;
-use log::{info, error};
+use log::error;
 use cpu::current_cpu;
 use spin::Once;
 
@@ -30,18 +29,18 @@ global_asm!(include_str!("table.s"));
 
 /// The IRQ number reserved for the PL011 Single-Serial-Port Controller
 /// which Theseus currently uses for logging and UART console.
-pub const PL011_RX_SPI: SystemInterruptNumber = SystemInterruptNumber::new(BOARD_CONFIG.pl011_rx_spi);
+pub const PL011_RX_SPI: InterruptNumber = BOARD_CONFIG.pl011_rx_spi;
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
-pub const CPU_LOCAL_TIMER_IRQ: LocalInterruptNumber = LocalInterruptNumber::new(BOARD_CONFIG.cpu_local_timer_ppi);
+pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = BOARD_CONFIG.cpu_local_timer_ppi;
 
 /// The IRQ/IPI number for TLB Shootdowns
 ///
 /// Note: This is arbitrarily defined in the range 0..16,
 /// which is reserved for IPIs (SGIs - for software generated
 /// interrupts - in GIC terminology).
-pub const TLB_SHOOTDOWN_IPI: LocalInterruptNumber = LocalInterruptNumber::new(2);
+pub const TLB_SHOOTDOWN_IPI: InterruptNumber = 2;
 
 const MAX_IRQ_NUM: usize = 256;
 
@@ -190,13 +189,9 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 
 /// This function registers an interrupt handler for an inter-processor interrupt
 /// and handles interrupt controller configuration for that interrupt.
-pub fn setup_ipi_handler(handler: InterruptHandler, local_num: LocalInterruptNumber) -> Result<(), &'static str> {
-    let int_num: InterruptNumber = local_num.into();
-    let int_num_usize: usize = int_num.into();
-    assert!(int_num_usize < 16, "Inter-processor interrupts must have a number in the range 0..16");
-
+pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) -> Result<(), &'static str> {
     // register the handler
-    if let Err(existing_handler) = register_interrupt(int_num, handler) {
+    if let Err(existing_handler) = register_interrupt(local_num, handler) {
         if handler as *const InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for that IPI");
         }
@@ -301,7 +296,7 @@ pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) ->
 
 /// Broadcast an Inter-Processor Interrupt to all other
 /// cores in the system
-pub fn send_ipi_to_all_other_cpus(irq_num: LocalInterruptNumber) {
+pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
     let int_ctrl = LocalInterruptController;
     int_ctrl.send_ipi(irq_num, None);
 }

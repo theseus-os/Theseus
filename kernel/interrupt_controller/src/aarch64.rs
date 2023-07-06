@@ -16,36 +16,6 @@ pub struct SystemInterruptControllerVersion(pub u8);
 pub struct SystemInterruptControllerId(pub u8);
 #[derive(Debug, Copy, Clone)]
 pub struct LocalInterruptControllerId(pub u16);
-#[derive(Debug, Copy, Clone)]
-pub struct SystemInterruptNumber(pub(crate) gic::InterruptNumber);
-#[derive(Debug, Copy, Clone)]
-pub struct LocalInterruptNumber(pub(crate) gic::InterruptNumber);
-
-impl SystemInterruptNumber {
-    /// Constructor
-    ///
-    /// On aarch64, shared-peripheral interrupt numbers must lie
-    /// between 32 & 1019 (inclusive)
-    pub const fn new(raw_num: u32) -> Self {
-        match raw_num {
-            32..=1019 => Self(raw_num),
-            _ => panic!("Invalid SystemInterruptNumber (must lie in 32..1020)"),
-        }
-    }
-}
-
-impl LocalInterruptNumber {
-    /// Constructor
-    ///
-    /// On aarch64, shared-peripheral interrupt numbers must lie
-    /// between 0 & 31 (inclusive)
-    pub const fn new(raw_num: u32) -> Self {
-        match raw_num {
-            0..=31 => Self(raw_num),
-            _ => panic!("Invalid LocalInterruptNumber (must lie in 0..32)"),
-        }
-    }
-}
 
 /// The private global Generic Interrupt Controller singleton
 pub(crate) static INTERRUPT_CONTROLLER: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
@@ -112,12 +82,13 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
     fn get_destination(
         &self,
-        interrupt_num: SystemInterruptNumber,
+        interrupt_num: InterruptNumber,
     ) -> Result<(Vec<InterruptDestination>, Priority), &'static str> {
+        assert!(interrupt_num >= 32, "shared peripheral interrupts have a number >= 32");
         get_int_ctlr!(int_ctlr, get_destination, self);
 
-        let priority = int_ctlr.get_interrupt_priority(interrupt_num.0);
-        let vec = match int_ctlr.get_spi_target(interrupt_num.0)?.canonicalize() {
+        let priority = int_ctlr.get_interrupt_priority(interrupt_num as _);
+        let vec = match int_ctlr.get_spi_target(interrupt_num as _)?.canonicalize() {
             SpiDestination::Specific(cpu) => [InterruptDestination {
                 cpu,
             }].to_vec(),
@@ -140,14 +111,15 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
     fn set_destination(
         &self,
-        sys_int_num: SystemInterruptNumber,
+        sys_int_num: InterruptNumber,
         destination: InterruptDestination,
         priority: Priority,
     ) -> Result<(), &'static str> {
+        assert!(sys_int_num >= 32, "shared peripheral interrupts have a number >= 32");
         get_int_ctlr!(int_ctlr, set_destination, self);
 
-        int_ctlr.set_spi_target(sys_int_num.0, SpiDestination::Specific(destination.cpu));
-        int_ctlr.set_interrupt_priority(sys_int_num.0, priority);
+        int_ctlr.set_spi_target(sys_int_num as _, SpiDestination::Specific(destination.cpu));
+        int_ctlr.set_interrupt_priority(sys_int_num as _, priority);
 
         Ok(())
     }
@@ -164,29 +136,34 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         LocalInterruptControllerId(int_ctlr.get_cpu_interface_id())
     }
 
-    fn get_local_interrupt_priority(&self, num: LocalInterruptNumber) -> Priority {
+    fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority {
+        assert!(num < 32, "local interrupts have a number < 32");
         get_int_ctlr!(int_ctlr, get_local_interrupt_priority);
-        int_ctlr.get_interrupt_priority(num.0)
+        int_ctlr.get_interrupt_priority(num as _)
     }
 
-    fn set_local_interrupt_priority(&self, num: LocalInterruptNumber, priority: Priority) {
+    fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority) {
+        assert!(num < 32, "local interrupts have a number < 32");
         get_int_ctlr!(int_ctlr, set_local_interrupt_priority);
-        int_ctlr.set_interrupt_priority(num.0, priority);
+        int_ctlr.set_interrupt_priority(num as _, priority);
     }
 
-    fn is_local_interrupt_enabled(&self, num: LocalInterruptNumber) -> bool {
+    fn is_local_interrupt_enabled(&self, num: InterruptNumber) -> bool {
+        assert!(num < 32, "local interrupts have a number < 32");
         get_int_ctlr!(int_ctlr, is_local_interrupt_enabled);
-        int_ctlr.get_interrupt_state(num.0)
+        int_ctlr.get_interrupt_state(num as _)
     }
 
-    fn enable_local_interrupt(&self, num: LocalInterruptNumber, enabled: bool) {
+    fn enable_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
+        assert!(num < 32, "local interrupts have a number < 32");
         get_int_ctlr!(int_ctlr, enable_local_interrupt);
-        int_ctlr.set_interrupt_state(num.0, enabled);
+        int_ctlr.set_interrupt_state(num as _, enabled);
     }
 
-    fn send_ipi(&self, num: LocalInterruptNumber, dest: Option<CpuId>) {
+    fn send_ipi(&self, num: InterruptNumber, dest: Option<CpuId>) {
+        assert!(num < 16, "IPIs have a number < 16");
         get_int_ctlr!(int_ctlr, send_ipi);
-        int_ctlr.send_ipi(num.0, match dest {
+        int_ctlr.send_ipi(num as _, match dest {
             Some(cpu) => IpiTargetCpu::Specific(cpu),
             None => IpiTargetCpu::AllOtherCpus,
         });
@@ -204,18 +181,12 @@ impl LocalInterruptControllerApi for LocalInterruptController {
 
     fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
         get_int_ctlr!(int_ctlr, acknowledge_interrupt);
-
         let (num, prio) = int_ctlr.acknowledge_interrupt();
-
-        (match num {
-            0..=31 => LocalInterruptNumber(num).into(),
-            _ => SystemInterruptNumber(num).into(),
-        }, prio)
+        (num as _, prio)
     }
 
     fn end_of_interrupt(&self, number: InterruptNumber) {
         get_int_ctlr!(int_ctlr, end_of_interrupt);
-        let num_usize: usize = number.into();
-        int_ctlr.end_of_interrupt(num_usize as _)
+        int_ctlr.end_of_interrupt(number as _)
     }
 }
