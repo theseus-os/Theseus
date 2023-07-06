@@ -170,7 +170,7 @@ pub fn init() -> Result<(), &'static str> {
 /// timer and handles interrupt controller configuration for the timer interrupt.
 pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
-    if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ.into(), timer_tick_handler) {
+    if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
         if timer_tick_handler as *const InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for the timer IRQ number");
         }
@@ -255,7 +255,7 @@ pub fn enable_timer(enable: bool) {
 /// * `Err(existing_handler_address)` if the given `irq_num` was already in use.
 pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
-    let index: usize = int_num.into();
+    let index = int_num as usize;
 
     let value = handlers[index] as *const InterruptHandler;
     let default = default_irq_handler as *const InterruptHandler;
@@ -280,7 +280,7 @@ pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> R
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
 pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
-    let index: usize = int_num.into();
+    let index = int_num as usize;
 
     let value = handlers[index] as *const InterruptHandler;
     let func = func as *const InterruptHandler;
@@ -423,9 +423,9 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
         int_ctrl.acknowledge_interrupt()
     };
 
-    let irq_num_usize: usize = irq_num.into();
-    let handler = match irq_num_usize < MAX_IRQ_NUM {
-        true => IRQ_HANDLERS.read()[irq_num_usize],
+    let index = irq_num as usize;
+    let handler = match index < MAX_IRQ_NUM {
+        true => IRQ_HANDLERS.read()[index],
         false => default_irq_handler,
     };
 

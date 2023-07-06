@@ -84,7 +84,7 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
         eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
 
         #[cfg(target_arch = "aarch64")]
-        eoi(CPU_LOCAL_TIMER_IRQ.into());
+        eoi(CPU_LOCAL_TIMER_IRQ);
     }
 
     schedule();
