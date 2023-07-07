@@ -1460,7 +1460,7 @@ dependencies = [
  "hash32",
  "rustc_version 0.4.0",
  "spin 0.9.4",
- "stable_deref_trait 1.2.0",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -1512,12 +1512,16 @@ dependencies = [
  "core2",
  "embedded-hal",
  "hashbrown",
+ "log",
  "mod_mgmt",
  "nb 1.0.0",
  "noline",
  "path",
  "root",
+ "scheduler",
  "spawn",
+ "stdio",
+ "sync_block",
  "task",
  "tty",
 ]
@@ -1642,11 +1646,9 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#39ef02580d199b32ac6336fc35ae73682b95bf89"
+source = "git+https://github.com/theseus-os/irq_safety#0e32fe775fdb93be1fc6f85b306d109aea5d920e"
 dependencies = [
- "owning_ref",
  "spin 0.9.4",
- "stable_deref_trait 1.1.1",
 ]
 
 [[package]]
@@ -2516,15 +2518,6 @@ dependencies = [
 [[package]]
 name = "owned_borrowed_trait"
 version = "0.1.0"
-
-[[package]]
-name = "owning_ref"
-version = "0.4.1"
-source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
-dependencies = [
- "spin 0.9.4",
- "stable_deref_trait 1.1.1",
-]
 
 [[package]]
 name = "page_allocator"
@@ -3572,14 +3565,6 @@ dependencies = [
 name = "spin"
 version = "0.9.8"
 source = "git+https://github.com/theseus-os/spin-rs#5c4470db034ad11f6cc7a8a5c400607c024e9392"
-
-[[package]]
-name = "stable_deref_trait"
-version = "1.1.1"
-source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
-dependencies = [
- "spin 0.9.4",
-]
 
 [[package]]
 name = "stable_deref_trait"
