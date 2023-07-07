@@ -29,6 +29,7 @@ impl Job {
         }
         Ok(())
     }
+    #[allow(unused)]
     pub(crate) fn suspend(&mut self) {
         for part in self.parts.iter_mut() {
             part.task.suspend();
@@ -69,6 +70,7 @@ pub(crate) struct JobPart {
 #[derive(Debug)]
 pub(crate) enum State {
     Done(isize),
+    #[allow(unused)]
     Suspended,
     Running,
 }
