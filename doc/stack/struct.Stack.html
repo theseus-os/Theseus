@@ -86,8 +86,11 @@ from “untyped” memory, i.e., an array of bytes.</p>
 <ul>
 <li><code>byte_offset</code>: the offset (in number of bytes) from the beginning of the memory region
 at which the struct is located (where it should start).
-This offset must be properly aligned with respect to the alignment requirements
+<ul>
+<li>This offset must be properly aligned with respect to the alignment requirements
 of type <code>T</code>, otherwise an error will be returned.</li>
+</ul>
+</li>
 </ul>
 <p>Returns a reference to the new struct (<code>&amp;T</code>) that is formed from the underlying memory region,
 with a lifetime dependent upon the lifetime of this <code>MappedPages</code> object.
@@ -110,8 +113,11 @@ cannot be used after this <code>MappedPages</code> object is dropped and unmappe
 <ul>
 <li><code>byte_offset</code>: the offset (in number of bytes) into the memory region
 at which the slice should start.
-This offset must be properly aligned with respect to the alignment requirements
+<ul>
+<li>This offset must be properly aligned with respect to the alignment requirements
 of type <code>T</code>, otherwise an error will be returned.</li>
+</ul>
+</li>
 <li><code>length</code>: the length of the slice, i.e., the number of elements of type <code>T</code> in the slice. 
 Thus, the slice’s address bounds will span the range from
 <code>byte_offset</code> (inclusive) to <code>byte_offset + (size_of::&lt;T&gt;() * length)</code> (exclusive).</li>
