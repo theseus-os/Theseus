@@ -967,6 +967,8 @@
 <a href="#967" id="967">967</a>
 <a href="#968" id="968">968</a>
 <a href="#969" id="969">969</a>
+<a href="#970" id="970">970</a>
+<a href="#971" id="971">971</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Support for DWARF debug information from ELF files.
 //! 
 //! This is a good intro to the DWARF format:
@@ -982,7 +984,6 @@
 <span class="kw">extern crate </span>goblin;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>fs_node;
-<span class="kw">extern crate </span>owning_ref;
 <span class="kw">extern crate </span>crate_metadata;
 <span class="kw">extern crate </span>mod_mgmt;
 <span class="kw">extern crate </span>hashbrown;
@@ -998,8 +999,7 @@
     sync::Arc,
 };
 <span class="kw">use </span>fs_node::WeakFileRef;
-<span class="kw">use </span>owning_ref::ArcRef;
-<span class="kw">use </span>memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags};
+<span class="kw">use </span>memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags, BorrowedSliceMappedPages, Immutable};
 <span class="kw">use </span>xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
@@ -1772,9 +1772,13 @@
         <span class="kw">let </span>debug_sections_mp = Arc::new(debug_sections_mp);
 
         <span class="kw">let </span>create_debug_section_slice = |debug_sec: DebugSection| -&gt; <span class="prelude-ty">Result</span>&lt;DebugSectionSlice, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-            ArcRef::new(Arc::clone(<span class="kw-2">&amp;</span>debug_sections_mp))
-                .try_map(|mp| mp.as_slice::&lt;u8&gt;(debug_sec.mp_offset, debug_sec.size))
-                .map(DebugSectionSlice)
+            BorrowedSliceMappedPages::from(
+                Arc::clone(<span class="kw-2">&amp;</span>debug_sections_mp),
+                debug_sec.mp_offset,
+                debug_sec.size
+            )
+            .map_err(|(_mp, err_str)| err_str)
+            .map(DebugSectionSlice)
         };
 
         <span class="kw">let </span>loaded = DebugSections {
@@ -1880,7 +1884,7 @@
 }
 
 <span class="doccomment">/// A slice that contains the exact byte range of fully-linked debug section.
-</span><span class="kw">struct </span>DebugSectionSlice(ArcRef&lt;MappedPages, [u8]&gt;);
+</span><span class="kw">struct </span>DebugSectionSlice(BorrowedSliceMappedPages&lt;u8, Immutable, Arc&lt;MappedPages&gt;&gt;);
 
 
 
