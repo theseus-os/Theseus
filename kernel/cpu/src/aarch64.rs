@@ -3,7 +3,7 @@
 use cortex_a::registers::MPIDR_EL1;
 use tock_registers::interfaces::Readable;
 use derive_more::{Display, Binary, Octal, LowerHex, UpperHex};
-use irq_safety::RwLockIrqSafe;
+use sync_irq::IrqSafeRwLock;
 use core::fmt;
 use alloc::vec::Vec;
 use arm_boards::{mpidr::DefinedMpidrValue, BOARD_CONFIG};
@@ -11,7 +11,7 @@ use arm_boards::{mpidr::DefinedMpidrValue, BOARD_CONFIG};
 use super::CpuId;
 
 // The vector of CpuIds for known and online CPU cores
-static ONLINE_CPUS: RwLockIrqSafe<Vec<CpuId>> = RwLockIrqSafe::new(Vec::new());
+static ONLINE_CPUS: IrqSafeRwLock<Vec<CpuId>> = IrqSafeRwLock::new(Vec::new());
 
 /// This must be called once for every CPU core in the system.
 ///

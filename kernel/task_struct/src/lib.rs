@@ -28,7 +28,7 @@ use alloc::{
 };
 use cpu::{CpuId, OptionalCpuId};
 use crossbeam_utils::atomic::AtomicCell;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use log::{warn, trace};
 use memory::MmiRef;
 use stack::Stack;
@@ -211,7 +211,7 @@ pub struct Task {
     /// because the other fields aside from this one are primarily read, not written.
     ///
     /// This must not be public because it permits interior mutability of key task states.
-    inner: MutexIrqSafe<TaskInner>,
+    inner: IrqSafeMutex<TaskInner>,
 
     /// The unique identifier of this Task.
     pub id: usize,
@@ -323,7 +323,7 @@ impl Task {
         let tls_area = namespace.get_tls_initializer_data();
 
         Ok(Task {
-            inner: MutexIrqSafe::new(TaskInner {
+            inner: IrqSafeMutex::new(TaskInner {
                 saved_sp: 0,
                 kstack,
                 pinned_cpu: None,
@@ -597,7 +597,7 @@ impl Deref for ExposedTask {
 // Here we simply expose accessors for all private fields of `Task`.
 impl ExposedTask {
     #[inline(always)]
-    pub fn inner(&self) -> &MutexIrqSafe<TaskInner> {
+    pub fn inner(&self) -> &IrqSafeMutex<TaskInner> {
         &self.inner
     }
     #[inline(always)]

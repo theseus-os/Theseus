@@ -14,7 +14,7 @@
 #[macro_use] extern crate lazy_static;
 extern crate alloc;
 extern crate spin;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
@@ -52,7 +52,7 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages, map_frame_range, MMIO_FLAGS};
 use pci::{PciDevice, MsixVectorTable, PciConfigSpaceAccessMechanism, PciLocation};
 use bit_field::BitField;
@@ -109,12 +109,12 @@ pub const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
 
 
 /// All the 82599 NICs found in the PCI space are initialized and then stored here.
-pub static IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
+pub static IXGBE_NICS: Once<Vec<IrqSafeMutex<IxgbeNic>>> = Once::new();
 
 
-/// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
+/// Returns a reference to the IxgbeNic wrapped in a IrqSafeMutex, if it exists and has been initialized.
 /// Currently we use the pci location of the device as identification since it should not change after initialization.
-pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
+pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static IrqSafeMutex<IxgbeNic>, &'static str> {
     let nics = IXGBE_NICS.get().ok_or("Ixgbe NICs weren't initialized")?;
     nics.iter()
         .find( |nic| { nic.lock().dev_id == id } )
@@ -122,7 +122,7 @@ pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>,
 }
 
 /// Returns a reference to the list of all initialized ixgbe NICs
-pub fn get_ixgbe_nics_list() -> Option<&'static Vec<MutexIrqSafe<IxgbeNic>>> {
+pub fn get_ixgbe_nics_list() -> Option<&'static Vec<IrqSafeMutex<IxgbeNic>>> {
     IXGBE_NICS.get()
 }
 
@@ -265,7 +265,7 @@ impl IxgbeNic {
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
         num_tx_descriptors: u16
-    ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
+    ) -> Result<IrqSafeMutex<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
         if enable_virtualization && (interrupts.is_some() || enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
@@ -416,7 +416,7 @@ impl IxgbeNic {
 
         info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed() as u32);
 
-        Ok(MutexIrqSafe::new(ixgbe_nic))
+        Ok(IrqSafeMutex::new(ixgbe_nic))
     }
 
     /// Returns the device id of the PCI device.

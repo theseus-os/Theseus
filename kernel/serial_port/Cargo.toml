@@ -11,7 +11,7 @@ spin = "0.9.4"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 
 serial_port_basic = { path = "../serial_port_basic" }
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync_irq = { path = "../../libs/sync_irq" }
 interrupts = { path = "../interrupts" }
 deferred_interrupt_tasks = { path = "../deferred_interrupt_tasks" }
 

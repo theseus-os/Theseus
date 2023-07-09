@@ -1,9 +1,9 @@
 use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use irq_safety::MutexIrqSafe;
 use mutex_sleep::MutexSleep;
 use smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
+use sync_irq::IrqSafeMutex;
 
 pub use smoltcp::iface::SocketSet;
 pub use wire::{IpAddress, IpCidr};
@@ -14,12 +14,12 @@ pub use wire::{IpAddress, IpCidr};
 /// abstractions such as polling sockets.
 pub struct NetworkInterface {
     inner: MutexSleep<iface::Interface<'static>>,
-    device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
+    device: &'static IrqSafeMutex<dyn crate::NetworkDevice>,
     sockets: MutexSleep<SocketSet<'static>>,
 }
 
 impl NetworkInterface {
-    pub(crate) fn new<T>(device: &'static MutexIrqSafe<T>, ip: IpCidr, gateway: IpAddress) -> Self
+    pub(crate) fn new<T>(device: &'static IrqSafeMutex<T>, ip: IpCidr, gateway: IpAddress) -> Self
     where
         T: NetworkDevice,
     {

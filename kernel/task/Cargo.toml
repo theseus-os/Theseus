@@ -21,5 +21,6 @@ memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
 stack = { path = "../stack" }
+sync_irq = { path = "../../libs/sync_irq" }
 task_struct = { path = "../task_struct" }
 waker_generic = { path = "../waker_generic" }

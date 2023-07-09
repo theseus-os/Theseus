@@ -8,7 +8,7 @@ use alloc::{format, sync::Arc};
 use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
 use core2::io::Write;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use log::{error, info, warn};
 use serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
 use task::{JoinableTaskRef, KillReason};
@@ -93,7 +93,7 @@ fn console_connection_detector(
 
 fn shell_loop(
     (port, address, receiver): (
-        Arc<MutexIrqSafe<SerialPort>>,
+        Arc<IrqSafeMutex<SerialPort>>,
         SerialPortAddress,
         Receiver<DataChunk>,
     ),
@@ -154,7 +154,7 @@ fn shell_loop(
     Ok(())
 }
 
-fn tty_to_port_loop((port, master): (Arc<MutexIrqSafe<SerialPort>>, tty::Master)) {
+fn tty_to_port_loop((port, master): (Arc<IrqSafeMutex<SerialPort>>, tty::Master)) {
     let mut data = [0; 256];
     loop {
         let len = match master.read(&mut data) {
