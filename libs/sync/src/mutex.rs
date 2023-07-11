@@ -132,6 +132,16 @@ where
     }
 }
 
+impl<T, F> Default for Mutex<T, F>
+where
+    T: Default,
+    F: MutexFlavor,
+{
+    fn default() -> Self {
+        Self::new(T::default())
+    }
+}
+
 /// A RAII implementation of a "scoped lock" of a mutex.
 ///
 /// When this structure is dropped, the lock will be unlocked.

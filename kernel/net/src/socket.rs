@@ -2,11 +2,11 @@ use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use mutex_sleep::{MutexSleep, MutexSleepGuard};
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::AnySocket,
 };
+use sync_block::{Mutex, MutexGuard};
 
 /// A network socket.
 ///
@@ -18,7 +18,7 @@ where
     T: AnySocket<'static> + ?Sized,
 {
     pub(crate) handle: SocketHandle,
-    pub(crate) sockets: &'a MutexSleep<SocketSet<'static>>,
+    pub(crate) sockets: &'a Mutex<SocketSet<'static>>,
     pub(crate) phantom_data: PhantomData<T>,
 }
 
@@ -27,7 +27,7 @@ where
     T: AnySocket<'static> + ?Sized,
 {
     handle: SocketHandle,
-    sockets: MutexSleepGuard<'a, SocketSet<'static>>,
+    sockets: MutexGuard<'a, SocketSet<'static>>,
     phantom_data: PhantomData<T>,
 }
 
@@ -58,7 +58,7 @@ where
     pub fn lock(&self) -> impl DerefMut<Target = T> + 'a {
         LockedSocket {
             handle: self.handle,
-            sockets: self.sockets.lock().expect("failed to lock sockets"),
+            sockets: self.sockets.lock(),
             phantom_data: PhantomData,
         }
     }

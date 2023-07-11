@@ -17,8 +17,8 @@ path = "../../kernel/task"
 [dependencies.stdio]
 path = "../../libs/stdio"
 
-[dependencies.mutex_sleep]
-path = "../../kernel/mutex_sleep"
+[dependencies.sync_block]
+path = "../../kernel/sync_block"
 
 [dependencies.tty]
 path = "../../kernel/tty"
