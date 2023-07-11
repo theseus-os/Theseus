@@ -18,6 +18,7 @@ use core::{
 };
 use alloc::{
     string::String,
+    string::ToString,
     sync::Arc,
     vec::Vec,
 };
@@ -34,7 +35,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("f", "files", "lists crate object files available in this namespace rather than currently-loaded crates");
     opts.optopt("", "load", "load a crate into the current namespace. Ignores all other arguments.", "CRATE_OBJ_FILE_PATH");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
@@ -69,7 +70,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
     if let Some(crate_obj_file_path) = matches.opt_str("load") {
         let path = Path::new(crate_obj_file_path);
         let file = path.get_file(&curr_wd).ok_or_else(||
-            format!("Couldn't resolve path to crate object file at {:?}", path)
+            format!("Couldn't resolve path to crate object file at {path:?}")
         )?;
         load_crate(&mut output, file, &namespace)?;
     } else if matches.opt_present("f") {
@@ -86,13 +87,13 @@ fn rmain(matches: Matches) -> Result<(), String> {
 
 
 fn load_crate(output: &mut String, crate_file_ref: FileRef, namespace: &Arc<CrateNamespace>) -> Result<(), String> {
-    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| format!("Cannot get kernel_mmi_ref"))?;
+    let kernel_mmi_ref = memory::get_kernel_mmi_ref().ok_or_else(|| "Cannot get kernel_mmi_ref".to_string())?;
     let (_new_crate_ref, _new_syms) = namespace.load_crate(
         &crate_file_ref,
         None,
         kernel_mmi_ref,
         false
-    ).map_err(|e| String::from(e))?;
+    ).map_err(String::from)?;
     writeln!(output, "Loaded crate with {} new symbols from {}", _new_syms, crate_file_ref.lock().get_absolute_path()).unwrap();
     Ok(())
 }
@@ -126,7 +127,7 @@ fn print_crates(output: &mut String, indent: usize, namespace: &CrateNamespace, 
     });
     crates.sort();
     for c in crates {
-        writeln!(output, "{}", c)?;
+        writeln!(output, "{c}")?;
     }
 
     if recursive {
@@ -144,5 +145,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "\nUsage: ns [OPTION]
+const USAGE: &str = "\nUsage: ns [OPTION]
 Lists the crates that are loaded in the currently-active crate namespace.";

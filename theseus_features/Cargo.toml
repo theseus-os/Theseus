@@ -52,30 +52,33 @@ test_async = { path = "../applications/test_async", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
 test_block_io = { path = "../applications/test_block_io", optional = true }
 test_channel = { path = "../applications/test_channel", optional = true }
-test_downtime = { path = "../applications/test_downtime", optional = true }
 test_filerw = { path = "../applications/test_filerw", optional = true }
 test_ixgbe = { path = "../applications/test_ixgbe", optional = true }
 test_libc = { path = "../applications/test_libc", optional = true }
 test_mlx5 = { path = "../applications/test_mlx5", optional = true }
 test_mutex_sleep = { path = "../applications/test_mutex_sleep", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
-test_realtime = { path = "../applications/test_realtime", optional = true }
+test_priority_scheduler = { path = "../applications/test_priority_scheduler", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
+test_scheduler = { path = "../applications/test_scheduler", optional = true }
 test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
 test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
 test_wait_queue = { path = "../applications/test_wait_queue", optional = true }
 test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
 tls_test = { path = "../applications/tls_test", optional = true }
-unwind_test = { path = "../applications/unwind_test", optional = true }
 
 
 ## Benchmark crates.
 bm = { path = "../applications/bm", optional = true }
 channel_eval = { path = "../applications/channel_eval", optional = true }
 heap_eval = { path = "../applications/heap_eval", optional = true }
+rq_access_eval = { path = "../applications/rq_access_eval",  optional = true }
 rq_eval = { path = "../applications/rq_eval",  optional = true }
 scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+unwind_test = { path = "../applications/unwind_test", optional = true }
 
 
 
@@ -87,6 +90,15 @@ scheduler_eval = { path = "../applications/scheduler_eval",  optional = true }
 [features]
 default = [
     "unwind_test",  ## used for regular testing
+]
+
+## Includes all optional components.
+everything = [
+    "theseus_apps",
+    "theseus_benchmarks",
+    "theseus_std",
+    "theseus_tests",
+    "wasmtime",
 ]
 
 ## Includes `wasmtime`, the WebAssembly (WASM) runtime, in the build.
@@ -123,6 +135,7 @@ theseus_benchmarks = [
     "bm",
     "channel_eval",
     "heap_eval",
+    "rq_access_eval",
     "rq_eval",
     "scheduler_eval",
 ]
@@ -137,15 +150,15 @@ theseus_tests = [
     "test_backtrace",
     "test_block_io",
     "test_channel",
-    "test_downtime",
     "test_filerw",
     "test_ixgbe",
     "test_libc",
     "test_mlx5",
     "test_mutex_sleep",
     "test_panic",
-    "test_realtime",
+    "test_priority_scheduler",
     "test_restartable",
+    "test_scheduler",
     "test_serial_echo",
     "test_std_fs",
     "test_task_cancel",

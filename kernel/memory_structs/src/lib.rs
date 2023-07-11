@@ -8,22 +8,17 @@
 #![no_std]
 #![feature(step_trait)]
 
-extern crate kernel_config;
-#[macro_use] extern crate derive_more;
-extern crate bit_field;
-extern crate zerocopy;
-extern crate paste;
-
 use core::{
     cmp::{min, max},
     fmt,
     iter::Step,
-    ops::{Add, AddAssign, Deref, DerefMut, RangeInclusive, Sub, SubAssign},
+    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign}
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
 use paste::paste;
-
+use derive_more::*;
+use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
@@ -113,6 +108,8 @@ macro_rules! implement_address {
                     *self = $TypeName::new_canonical(self.0.saturating_sub(rhs));
                 }
             }
+
+            #[allow(clippy::from_over_into)]
             impl Into<usize> for $TypeName {
                 #[inline]
                 fn into(self) -> usize {
@@ -125,16 +122,23 @@ macro_rules! implement_address {
 
 #[cfg(target_arch = "x86_64")]
 mod canonical_address {
-    use bit_field::BitField;
+    const CANONICAL_VIRT_ADDR_MASK: usize = 0x0000_7FFF_FFFF_FFFF;
+    const CANONICAL_PHYS_ADDR_MASK: usize = 0x000F_FFFF_FFFF_FFFF;
 
+    /// Returns whether the given virtual address value is canonical.
+    ///
+    /// On x86_64, virtual addresses must have their 16 most-significant bits
+    /// be sign-extended from bit 47.
     #[inline]
-    pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-        match virt_addr.get_bits(47..64) {
-            0 | 0b1_1111_1111_1111_1111 => true,
-            _ => false,
-        }
+    pub const fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+        let upper17 = virt_addr & !CANONICAL_VIRT_ADDR_MASK;
+        upper17 == 0 || upper17 == !CANONICAL_VIRT_ADDR_MASK
     }
 
+    /// Returns a canonicalized instance of the given virtual address value.
+    ///
+    /// On x86_64, virtual addresses must have their 16 most-significant bits
+    /// be sign-extended from bit 47.
     #[inline]
     pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
         // match virt_addr.get_bit(47) {
@@ -146,66 +150,72 @@ mod canonical_address {
         ((virt_addr << 16) as isize >> 16) as usize
     }
 
+    /// Returns whether the given phyiscal address value is canonical.
+    ///
+    /// On x86_64, physical addresses are 52 bits long,
+    /// so their 12 most-significant bits must be cleared.
     #[inline]
-    pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
-        match phys_addr.get_bits(52..64) {
-            0 => true,
-            _ => false,
-        }
+    pub const fn is_canonical_physical_address(phys_addr: usize) -> bool {
+        phys_addr & !CANONICAL_PHYS_ADDR_MASK == 0
     }
 
+    /// Returns a canonicalized instance of the given phyiscal address value.
+    ///
+    /// On x86_64, physical addresses are 52 bits long,
+    /// so their 12 most-significant bits must be cleared.
     #[inline]
     pub const fn canonicalize_physical_address(phys_addr: usize) -> usize {
-        phys_addr & 0x000F_FFFF_FFFF_FFFF
+        phys_addr & CANONICAL_PHYS_ADDR_MASK
     }
 }
 
 #[cfg(target_arch = "aarch64")]
 mod canonical_address {
-    use bit_field::BitField;
+    const CANONICAL_VIRT_ADDR_MASK: usize = 0x0000_FFFF_FFFF_FFFF;
+    const CANONICAL_PHYS_ADDR_MASK: usize = 0x0000_FFFF_FFFF_FFFF;
 
-    /// On aarch64, VAs are composed of an ASID
-    /// which is 8 or 16 bits long depending
-    /// on MMU config. In Theseus, we use 8-bits
-    /// and the next 8 bits are unused.
-    /// Our ASID is zero, so a "canonical" VA has
-    /// the 16 most significant bits cleared.
+    /// Returns whether the given virtual address value is canonical.
+    ///
+    /// On aarch64, virtual addresses contain an address space ID (ASID),
+    /// which is 8 or 16 bits long, depending on MMU config.
+    ///
+    /// In Theseus, we use 8-bit ASIDs, with the next 8 bits are unused.
+    /// Theseus's ASID is zero, so a canonical virtual address has its
+    /// 16 most-significant bits cleared (set to zero).
     #[inline]
-    pub fn is_canonical_virtual_address(virt_addr: usize) -> bool {
-        match virt_addr.get_bits(48..64) {
-            0 => true,
-            _ => false,
-        }
+    pub const fn is_canonical_virtual_address(virt_addr: usize) -> bool {
+        virt_addr & !CANONICAL_VIRT_ADDR_MASK == 0
     }
 
-    /// On aarch64, VAs are composed of an ASID
-    /// which is 8 or 16 bits long depending
-    /// on MMU config. In Theseus, we use 8-bits
-    /// and the next 8 bits are unused.
-    /// Our ASID is zero, so a "canonical" VA has
-    /// the 16 most significant bits cleared.
+    /// Returns a canonicalized instance of the given virtual address value.
+    ///
+    /// On aarch64, virtual addresses contain an address space ID (ASID),
+    /// which is 8 or 16 bits long, depending on MMU config.
+    ///
+    /// In Theseus, we use 8-bit ASIDs, with the next 8 bits are unused.
+    /// Theseus's ASID is zero, so a virtual address is canonicalized
+    /// by clearing (setting to zero) its 16 most-significant bits.
     #[inline]
     pub const fn canonicalize_virtual_address(virt_addr: usize) -> usize {
-        virt_addr & 0x0000_FFFF_FFFF_FFFF
+        virt_addr & CANONICAL_VIRT_ADDR_MASK
     }
 
-    /// On aarch64, we configure the MMU to use 48-bit
-    /// physical addresses; "canonical" physical addresses
-    /// have the 16 most significant bits cleared.
+    /// Returns whether the given physical address value is canonical.
+    ///
+    /// On aarch64, Theseus configures the MMU to use 48-bit physical addresses.
+    /// Thus, a canonical physical address has its 16 most-significant bits cleared.
     #[inline]
-    pub fn is_canonical_physical_address(phys_addr: usize) -> bool {
-        match phys_addr.get_bits(48..64) {
-            0 => true,
-            _ => false,
-        }
+    pub const fn is_canonical_physical_address(phys_addr: usize) -> bool {
+        phys_addr & !CANONICAL_PHYS_ADDR_MASK == 0
     }
 
-    /// On aarch64, we configure the MMU to use 48-bit
-    /// physical addresses; "canonical" physical addresses
-    /// have the 16 most significant bits cleared.
+    /// Returns a canonicalized instance of the given physical address value.
+    ///
+    /// On aarch64, Theseus configures the MMU to use 48-bit physical addresses.
+    /// Thus, a physical address is canonicalized by clearing its 16 most-significant bits.
     #[inline]
     pub const fn canonicalize_physical_address(phys_addr: usize) -> usize {
-        phys_addr & 0x0000_FFFF_FFFF_FFFF
+        phys_addr & CANONICAL_PHYS_ADDR_MASK
     }
 }
 
@@ -342,7 +352,7 @@ impl Page {
     /// Using this returned `usize` value as an index into the P1 entries list will give you the final PTE,
     /// from which you can extract the mapped [`Frame`]  using `PageTableEntry::pointed_frame()`.
     pub const fn p1_index(&self) -> usize {
-        (self.number >> 0) & 0x1FF
+        self.number & 0x1FF
     }
 }
 
@@ -371,12 +381,17 @@ macro_rules! implement_page_frame_range {
 
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
                     all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
-                pub fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
-                    assert!(size_in_bytes > 0);
-                    let start = $chunk::containing_address(starting_addr);
-                    // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
-                    let end = $chunk::containing_address(starting_addr + (size_in_bytes - 1));
-                    $TypeName::new(start, end)
+                pub const fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
+                    if size_in_bytes == 0 {
+                        $TypeName::empty()
+                    } else {
+                        let start = $chunk::containing_address(starting_addr);
+                        // The end bound is inclusive, hence the -1. Parentheses are needed to avoid overflow.
+                        let end = $chunk::containing_address(
+                            $address::new_canonical(starting_addr.value() + (size_in_bytes - 1))
+                        );
+                        $TypeName::new(start, end)
+                    }
                 }
 
                 #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]
@@ -398,8 +413,10 @@ macro_rules! implement_page_frame_range {
                 }
 
                 #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
-                pub fn contains_address(&self, addr: $address) -> bool {
-                    self.0.contains(&$chunk::containing_address(addr))
+                pub const fn contains_address(&self, addr: $address) -> bool {
+                    let c = $chunk::containing_address(addr);
+                    self.0.start().number <= c.number
+                        && c.number <= self.0.end().number
                 }
 
                 #[doc = "Returns the offset of the given [`" $address "`] within this `" $TypeName "`, \
@@ -407,7 +424,7 @@ macro_rules! implement_page_frame_range {
                     If the given `addr` is not covered by this range of [`" $chunk "`]s, this returns `None`.\n\n \
                     # Examples\n \
                     If the range covers addresses `0x2000` to `0x4000`, then `offset_of_address(0x3500)` would return `Some(0x1500)`."]
-                pub fn offset_of_address(&self, addr: $address) -> Option<usize> {
+                pub const fn offset_of_address(&self, addr: $address) -> Option<usize> {
                     if self.contains_address(addr) {
                         Some(addr.value() - self.start_address().value())
                     } else {
@@ -416,13 +433,14 @@ macro_rules! implement_page_frame_range {
                 }
 
                 #[doc = "Returns the [`" $address "`] at the given `offset` into this `" $TypeName "`within this `" $TypeName "`, \
-                    i.e., `addr - self.start_address()`.\n\n \
+                    i.e., `self.start_address() + offset`.\n\n \
                     If the given `offset` is not within this range of [`" $chunk "`]s, this returns `None`.\n\n \
                     # Examples\n \
-                    If the range covers addresses `0x2000` to `0x4000`, then `address_at_offset(0x1500)` would return `Some(0x3500)`."]
-                pub fn address_at_offset(&self, offset: usize) -> Option<$address> {
-                    if offset <= self.size_in_bytes() {
-                        Some(self.start_address() + offset)
+                    If the range covers addresses `0x2000` through `0x3FFF`, then `address_at_offset(0x1500)` would return `Some(0x3500)`, \
+                    and `address_at_offset(0x2000)` would return `None`."]
+                pub const fn address_at_offset(&self, offset: usize) -> Option<$address> {
+                    if offset < self.size_in_bytes() {
+                        Some($address::new_canonical(self.start_address().value() + offset))
                     }
                     else {
                         None
@@ -471,9 +489,27 @@ macro_rules! implement_page_frame_range {
             }
             impl IntoIterator for $TypeName {
                 type Item = $chunk;
-                type IntoIter = RangeInclusive<$chunk>;
+                type IntoIter = RangeInclusiveIterator<$chunk>;
                 fn into_iter(self) -> Self::IntoIter {
-                    self.0
+                    self.0.iter()
+                }
+            }
+
+            
+            #[doc = "A `" $TypeName "` that implements `Copy`"]
+            #[derive(Clone, Copy)]
+            pub struct [<Copyable $TypeName>] {
+                start: $chunk,
+                end: $chunk,
+            }
+            impl From<$TypeName> for [<Copyable $TypeName>] {
+                fn from(r: $TypeName) -> Self {
+                    Self { start: *r.start(), end: *r.end() }
+                }
+            }
+            impl From<[<Copyable $TypeName>]> for $TypeName {
+                fn from(cr: [<Copyable $TypeName>]) -> Self {
+                    Self::new(cr.start, cr.end)
                 }
             }
         }

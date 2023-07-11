@@ -14,7 +14,7 @@ pub(crate) struct Job {
 
 impl Job {
     pub(crate) fn kill(&mut self) -> Result<()> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task
                 .kill(KillReason::Requested)
                 .map_err(|_| Error::KillFailed)?;
@@ -23,21 +23,21 @@ impl Job {
         Ok(())
     }
     pub(crate) fn suspend(&mut self) {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.suspend();
             part.state = State::Suspended;
         }
     }
 
     pub(crate) fn unsuspend(&mut self) {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.unsuspend();
             part.state = State::Running;
         }
     }
 
     pub(crate) fn unblock(&mut self) -> Result<()> {
-        for mut part in self.parts.iter_mut() {
+        for part in self.parts.iter_mut() {
             part.task.unblock().map_err(Error::UnblockFailed)?;
             part.state = State::Running;
         }
@@ -45,30 +45,25 @@ impl Job {
     }
 
     pub(crate) fn update(&mut self) -> Option<isize> {
-        for mut part in self.parts.iter_mut() {
-            if part.state == State::Running {
-                match part.task.runstate() {
-                    RunState::Exited => {
-                        let exit_value = match part.task.retrieve_exit_value().unwrap() {
-                            ExitValue::Completed(status) => {
-                                match status.downcast_ref::<isize>() {
-                                    Some(num) => *num,
-                                    // FIXME: Document/decide on a number for when app doesn't
-                                    // return isize.
-                                    None => 210,
-                                }
-                            }
-                            ExitValue::Killed(reason) => match reason {
-                                // FIXME: Document/decide on a number. This is used by bash.
-                                KillReason::Requested => 130,
-                                KillReason::Panic(_) => 1,
-                                KillReason::Exception(num) => num.into(),
-                            },
-                        };
-                        part.state = State::Complete(exit_value);
+        for part in self.parts.iter_mut() {
+            if part.state == State::Running && part.task.runstate() == RunState::Exited {
+                let exit_value = match part.task.join().unwrap() {
+                    ExitValue::Completed(status) => {
+                        match status.downcast_ref::<isize>() {
+                            Some(num) => *num,
+                            // FIXME: Document/decide on a number for when app doesn't
+                            // return isize.
+                            None => 210,
+                        }
                     }
-                    _ => {}
-                }
+                    ExitValue::Killed(reason) => match reason {
+                        // FIXME: Document/decide on a number. This is used by bash.
+                        KillReason::Requested => 130,
+                        KillReason::Panic(_) => 1,
+                        KillReason::Exception(num) => num.into(),
+                    },
+                };
+                part.state = State::Complete(exit_value);
             }
         }
         self.exit_value()

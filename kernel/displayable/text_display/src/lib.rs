@@ -41,7 +41,7 @@ impl Displayable for TextDisplay {
         coordinate: Coord,
         framebuffer: &mut Framebuffer<P>,
     ) -> Result<Rectangle, &'static str> {
-        let (string, col, line) = if self.cache.len() > 0 && self.text.starts_with(self.cache.as_str()) {
+        let (string, col, line) = if !self.cache.is_empty() && self.text.starts_with(self.cache.as_str()) {
             (
                 &self.text.as_str()[self.cache.len()..self.text.len()],
                 self.next_col,
@@ -71,7 +71,7 @@ impl Displayable for TextDisplay {
         self.next_line = next_line;
         self.cache = self.text.clone();
 
-        return Ok(bounding_box + coordinate);
+        Ok(bounding_box + coordinate)
     }
 
     fn set_size(&mut self, width: usize, height: usize) {
@@ -96,13 +96,13 @@ impl TextDisplay {
         bg_color: Color,
     ) -> Result<TextDisplay, &'static str> {
         Ok(TextDisplay {
-            width: width,
-            height: height,
+            width,
+            height,
             next_col: 0,
             next_line: 0,
             text: String::new(),
-            fg_color: fg_color,
-            bg_color: bg_color,
+            fg_color,
+            bg_color,
             cache: String::new(),
         })
     }

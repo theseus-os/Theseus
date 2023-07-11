@@ -1,17 +1,18 @@
- //! Defines the Command Queue that is used to pass commands from the driver to the NIC.
- //! Also defines multiple enums that specify the valid input and output values for different commands.
+//! Defines the Command Queue that is used to pass commands from the driver to the NIC.
+//! Also defines multiple enums that specify the valid input and output values for different commands.
+
+#![allow(clippy::upper_case_acronyms)]
 
 use alloc::{vec::Vec, boxed::Box};
-use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 use volatile::{ReadOnly,Volatile};
 use bit_field::BitField;
 use zerocopy::{U32, FromBytes};
 use byteorder::BigEndian;
-use nic_initialization::NIC_MAPPING_FLAGS;
 use kernel_config::memory::PAGE_SIZE;
 use core::fmt;
 use num_enum::TryFromPrimitive;
-use core::convert::TryFrom;
+use core::{convert::TryFrom, marker::ConstParamTy};
 use crate::{
     Rqn, Sqn, Cqn, Pd, Td, Lkey, Eqn, Tirn, Tisn, FtId, FgId,
     initialization_segment::InitializationSegment,
@@ -398,8 +399,9 @@ pub enum QueryHcaCapMaxOpMod {
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::QueryHcaCap`] and we want to retrieve current values of capabilities.
 #[derive(Copy, Clone)]
 pub enum QueryHcaCapCurrentOpMod {
+    #[allow(clippy::identity_op)]
     GeneralDeviceCapabilities       = (0x0 << 1) | 0x1,
-    EthernetOffloadCapabilities     = (0x1 << 1) | 0x1
+    EthernetOffloadCapabilities     = (0x1 << 1) | 0x1,
 }
 
 /// Possible values of the opcode modifer when the opcode is [`CommandOpcode::AccessRegister`].
@@ -437,7 +439,7 @@ struct NicVportContext {
     permanent_address_l: Volatile<U32<BigEndian>>,
 }
 
-const_assert_eq!(core::mem::size_of::<NicVportContext>(), 252);
+const _: () = assert!(core::mem::size_of::<NicVportContext>() == 252);
 
 /// A struct storing a 4KiB page that can be used as an input or output mailbox
 struct MailboxBuffer {
@@ -481,6 +483,7 @@ enum NetworkPortRegisters {
 
 /// The possible states a command can be in as it is updated by the driver and then posted to the HCA
 #[derive(PartialEq, Eq)]
+#[derive(ConstParamTy)]
 pub enum CmdState {
     /// Command entries have been filled, but it is still owned by SW
     Initialized,
@@ -577,7 +580,7 @@ pub struct CommandBuilder {
 impl CommandBuilder {
     pub fn new(opcode: CommandOpcode) -> CommandBuilder {
         CommandBuilder { 
-            opcode: opcode, 
+            opcode, 
             opmod: None, 
             allocated_pages: None, 
             user_access_region: None, 
@@ -717,7 +720,7 @@ impl CommandQueue {
         // start off by pre-allocating one page per entry
         let mut mailbox_buffers= Vec::with_capacity(num_cmdq_entries);
         for _ in 0..num_cmdq_entries {
-            let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)?;
+            let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)?;
             mailbox_buffers.push(MailboxBuffer{mp, addr});
         }
 
@@ -736,7 +739,7 @@ impl CommandQueue {
     pub fn create_and_execute_command(&mut self, parameters: CommandBuilder, init_segment: &mut InitializationSegment) -> Result<Command<{CmdState::Completed}>, CommandQueueError> {
         Ok( self.create_command(parameters)?
                 .post(init_segment)
-                .complete(&self) )
+                .complete(self) )
     }
     
     /// Fill in the fields of a command queue entry.
@@ -971,7 +974,7 @@ impl CommandQueue {
             if let Some(mb_buffer) = self.mailbox_buffers.pop() {
                 command_mailbox_buffers.push(mb_buffer);
             } else {
-                let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, NIC_MAPPING_FLAGS)
+                let (mp, addr) = create_contiguous_mapping(PAGE_SIZE, MMIO_FLAGS)
                     .map_err(|_e| CommandQueueError::PageAllocationFailed)?;
                 command_mailbox_buffers.push(MailboxBuffer{mp, addr});
             }
@@ -1078,6 +1081,7 @@ impl CommandQueue {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_send_queue_context_to_mailbox(
         input_mailbox_buffers: &mut [MailboxBuffer],
         pages: Vec<PhysicalAddress>, 
@@ -1195,7 +1199,7 @@ impl CommandQueue {
 
         let dest_list_mb: usize = libm::ceilf((0x30 + 0x300) as f32 / MAILBOX_DATA_SIZE_IN_BYTES as f32) as usize;
         const DEST_LIST_MB_OFFSET: usize = 304; 
-        let dest_list = DestinationEntry::init(DestinationType::TIR, tirn);
+        let dest_list = DestinationEntry::init(DestinationType::Tir, tirn);
         input_mailbox_buffers[dest_list_mb - 1].write_to_mailbox(dest_list, DEST_LIST_MB_OFFSET)?;
 
         Ok(())
@@ -1479,7 +1483,7 @@ pub struct CommandQueueEntry {
     token_signature_status_own:     Volatile<U32<BigEndian>>
 }
 
-const_assert_eq!(core::mem::size_of::<CommandQueueEntry>(), 64);
+const _: () = assert!(core::mem::size_of::<CommandQueueEntry>() == 64);
 
 impl fmt::Debug for CommandQueueEntry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -1667,7 +1671,7 @@ struct CommandInterfaceMailbox {
     /// Should have the same value in the command and the mailbox blocks.
     token_ctrl_signature:   Volatile<U32<BigEndian>>
 }
-const_assert_eq!(core::mem::size_of::<CommandInterfaceMailbox>(), MAILBOX_SIZE_IN_BYTES);
+const _: () = assert!(core::mem::size_of::<CommandInterfaceMailbox>() == MAILBOX_SIZE_IN_BYTES);
 
 impl CommandInterfaceMailbox {
     /// Sets all fields of the mailbox to 0.
@@ -1779,7 +1783,7 @@ struct HCACapabilitiesLayout {
     match_definer:                  ReadOnly<U32<BigEndian>>, 
 }
 
-const_assert_eq!(core::mem::size_of::<HCACapabilitiesLayout>(), 256);
+const _: () = assert!(core::mem::size_of::<HCACapabilitiesLayout>() == 256);
 
 /// The HCA capabilities are stored in this struct after being extracted from [`HCACapabilitiesLayout`]
 #[allow(dead_code)]

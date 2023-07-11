@@ -7,8 +7,8 @@
 //! 
 //! Only `Send` types can be sent or received through the channel.
 //! 
-//! This is not a zero-copy channel; 
-//! To avoid copying large messages, use a reference (layer of indirection) like `Box`.
+//! This is not a zero-copy channel; to avoid copying large messages,
+//! use a reference type like `Box` or another layer of indirection.
 //! 
 //! TODO: add support for a queue of pending senders and receivers 
 //!       so that we can enable MPMC (multi-producer multi-consumer) behavior
@@ -24,17 +24,20 @@ extern crate alloc;
 extern crate spin;
 extern crate irq_safety;
 extern crate wait_queue;
+extern crate wait_guard;
 extern crate task;
 extern crate scheduler;
-
-#[cfg(downtime_eval)]
-extern crate hpet;
+extern crate sync;
+extern crate sync_spin;
 
 use core::fmt;
 use alloc::sync::Arc;
 use irq_safety::MutexIrqSafe;
 use spin::Mutex;
-use wait_queue::{WaitQueue, WaitGuard, WaitError};
+use wait_queue::WaitQueue;
+use wait_guard::WaitGuard;
+use sync::DeadlockPrevention;
+use sync_spin::Spin;
 
 
 /// A wrapper type for an `ExchangeSlot` that is used for sending only.
@@ -129,23 +132,33 @@ impl<T> fmt::Debug for ExchangeState<T> {
 // }
 
 
-/// Create a new channel that requires a sender a receiver to rendezvous
-/// in order to exchange a message. 
-/// 
-/// Returns a tuple of `(Sender, Receiver)`.
+/// Creates a new rendezvous channel with the default deadlock prevention method.
+///
+/// For the vast majority of use cases, this function is recommended way to create
+/// a new channel, because there is no need to specify a deadlock prevention method.
+/// To create a channel with different deadlock prevention, see [`new_channel_with()`].
 pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
-    let channel = Arc::new(Channel::<T> {
+    new_channel_with()
+}
+
+/// Creates a new rendezvous channel with the specified deadlock prevention method.
+///
+/// See [`new_channel()`] for more details.
+///
+/// The rendezvous channel uses a wait queue internally and hence exposes a
+/// deadlock prevention type parameter `P` that is [`Spin`] by default.
+/// See [`WaitQueue`]'s documentation for more info on setting this type parameter.
+pub fn new_channel_with<T: Send, P: DeadlockPrevention>() -> (Sender<T, P>, Receiver<T, P>) {
+    let channel = Arc::new(Channel {
         slot: ExchangeSlot::new(),
         waiting_senders: WaitQueue::new(),
         waiting_receivers: WaitQueue::new(),
     });
     (
         Sender   { channel: channel.clone() },
-        Receiver { channel: channel }
+        Receiver { channel }
     )
 }
-
-
 
 /// The inner channel for synchronous rendezvous-based communication
 /// between `Sender`s and `Receiver`s. 
@@ -156,40 +169,37 @@ pub fn new_channel<T: Send>() -> (Sender<T>, Receiver<T>) {
 /// Sender-side and Receiver-side references to an exchange slot can be obtained in both 
 /// a blocking and non-blocking fashion, 
 /// which supports both synchronous (rendezvous-based) and asynchronous channels.
-struct Channel<T: Send> {
+struct Channel<T: Send, P: DeadlockPrevention = Spin> {
     /// In a zero-capacity synchronous channel, there is only a single slot,
     /// but senders and receivers perform a blocking wait on it until the slot becomes available.
     /// In contrast, a synchronous channel with a capacity of 1 would return a "channel full" error
     /// if the slot was taken, instead of blocking. 
     slot: ExchangeSlot<T>,
-    waiting_senders: WaitQueue,
-    waiting_receivers: WaitQueue,
+    waiting_senders: WaitQueue<P>,
+    waiting_receivers: WaitQueue<P>,
 }
-impl<T: Send> Channel<T> {
+
+impl<T: Send, P: DeadlockPrevention> Channel<T, P> {
     /// Obtain a sender slot, blocking until one is available.
-    fn take_sender_slot(&self) -> Result<SenderSlot<T>, WaitError> {
+    fn take_sender_slot(&self) -> SenderSlot<T> {
         // Fast path: the uncontended case.
         if let Some(s) = self.try_take_sender_slot() {
-            return Ok(s);
+            return s;
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire sender slot...");
-        let res = self.waiting_senders.wait_until(&|| self.try_take_sender_slot());
-        // trace!("... acquired sender slot!");
-        res
+        self.waiting_senders.wait_until(&|| self.try_take_sender_slot())
     }
     
     /// Obtain a receiver slot, blocking until one is available.
-    fn take_receiver_slot(&self) -> Result<ReceiverSlot<T>, WaitError> {
+    fn take_receiver_slot(&self) -> ReceiverSlot<T> {
         // Fast path: the uncontended case.
         if let Some(s) = self.try_take_receiver_slot() {
-            return Ok(s);
+            return s;
         }
         // Slow path: add ourselves to the waitqueue
         // trace!("waiting to acquire receiver slot...");
-        let res = self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot());
-        // trace!("... acquired receiver slot!");
-        res
+        self.waiting_receivers.wait_until(&|| self.try_take_receiver_slot())
     }
 
     /// Try to obtain a sender slot in a non-blocking fashion,
@@ -208,10 +218,10 @@ impl<T: Send> Channel<T> {
 
 /// The sender (transmit) side of a channel.
 #[derive(Clone)]
-pub struct Sender<T: Send> {
-    channel: Arc<Channel<T>>,
+pub struct Sender<T: Send, P: DeadlockPrevention = Spin> {
+    channel: Arc<Channel<T, P>>,
 }
-impl <T: Send> Sender<T> {
+impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
     /// Send a message, blocking until a receiver is ready.
     /// 
     /// Returns `Ok(())` if the message was sent and received successfully,
@@ -220,18 +230,8 @@ impl <T: Send> Sender<T> {
         #[cfg(trace_channel)]
         trace!("rendezvous: sending msg: {:?}", debugit!(msg));
 
-        #[cfg(downtime_eval)] {
-            let value = hpet::get_hpet().as_ref().unwrap().get_counter();
-            // debug!("Value {} {}", value, value % 1024);
-            // Fault mimicing a memory write. Function could panic when getting task
-            if (value % 4096) == 0  && task::with_current_task(|t| t.is_restartable()).unwrap_or(false) {
-                // debug!("Fake error {}", value);
-                unsafe { *(0x5050DEADBEEF as *mut usize) = 0x5555_5555_5555; }
-            }
-        }
-
         // obtain a sender-side exchange slot, blocking if necessary
-        let sender_slot = self.channel.take_sender_slot().map_err(|_| "failed to take_sender_slot")?;
+        let sender_slot = self.channel.take_sender_slot();
 
         // Here, either the sender (this task) arrived first and needs to wait for a receiver,
         // or a receiver has already arrived and is waiting for a sender. 
@@ -372,10 +372,10 @@ impl <T: Send> Sender<T> {
 
 /// The receiver side of a channel.
 #[derive(Clone)]
-pub struct Receiver<T: Send> {
-    channel: Arc<Channel<T>>,
+pub struct Receiver<T: Send, P: DeadlockPrevention = Spin> {
+    channel: Arc<Channel<T, P>>,
 }
-impl <T: Send> Receiver<T> {
+impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
     /// Receive a message, blocking until a sender is ready. 
     /// 
     /// Returns the message if it was received properly,
@@ -385,7 +385,7 @@ impl <T: Send> Receiver<T> {
         let curr_task = task::get_my_current_task().ok_or("couldn't get current task")?;
         
         // obtain a receiver-side exchange slot, blocking if necessary
-        let receiver_slot = self.channel.take_receiver_slot().map_err(|_| "failed to take_receiver_slot")?;
+        let receiver_slot = self.channel.take_receiver_slot();
 
         // Here, either the receiver (this task) arrived first and needs to wait for a sender,
         // or a sender has already arrived and is waiting for a receiver. 

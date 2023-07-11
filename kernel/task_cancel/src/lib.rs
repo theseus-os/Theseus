@@ -8,11 +8,7 @@ use core::sync::atomic::Ordering;
 use task::{KillReason, TaskRef};
 use x86_64::structures::idt::InterruptStackFrame;
 
-pub fn cancel_task(task: TaskRef) {
-    task.cancel_requested.store(true, Ordering::Relaxed);
-}
-
-fn set_trap_flag(stack_frame: &mut InterruptStackFrame) {
+pub fn set_trap_flag(stack_frame: &mut InterruptStackFrame) {
     unsafe { stack_frame.as_mut() }.update(|stack_frame| stack_frame.cpu_flags |= 0x100);
 }
 

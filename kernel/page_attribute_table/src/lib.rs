@@ -60,7 +60,6 @@ pub static FIXED_PAT: PageAttributeTable = PageAttributeTable::from_bytes([
     MemoryCachingType::UncachedMinus  as u8, // 7: 0b111
 ]);
 
-
 /// The Page Attribute Table (PAT) consists of 8 "slots" that can each
 /// be configured with a different [MemoryCachingType].
 #[bitfield(bits = 64)]
@@ -137,6 +136,10 @@ pub fn is_supported() -> bool {
     )
 }
 
+/// An empty error type indicating that the Page Attribute Table
+/// is not supported on this machine.
+#[derive(Debug)]
+pub struct PatNotSupported;
 
 /// Sets up and enables the Page Attribute Table (PAT) for this (the current) CPU.
 ///
@@ -144,10 +147,10 @@ pub fn is_supported() -> bool {
 /// specified by [`FIXED_PAT`];
 /// thus, it must be done separately on each and every CPU.
 ///
-/// Returns `Ok(())` upon success, and `Err(())` if PAT is unsupported.
-pub fn init() -> Result<(), ()> {
+/// Returns `Ok(())` upon success, and `Err(PatNotSupported::Unsupported)` if PAT is unsupported.
+pub fn init() -> Result<(), PatNotSupported> {
     if !is_supported() {
-        return Err(());
+        return Err(PatNotSupported);
     }
 
     // TODO: do we need to disable the cache using CR0 first? or flush it?

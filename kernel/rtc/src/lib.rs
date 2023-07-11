@@ -49,11 +49,11 @@ pub type RtcInterruptFunction = fn(Option<usize>);
 // /// and the given closure that will run on each RTC interrupt.
 // /// The closure is provided with the current number of RTC ticks since boot,
 // /// in the form of an `Option<usize>` because it is not guaranteed that the number of ticks can be retrieved.
-// pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(HandlerFunc), ()> {
+// pub fn init(rtc_freq: usize, interrupt_func: RtcInterruptFunction) -> Result<(InterruptHandler), ()> {
 //     RTC_INTERRUPT_FUNC.call_once(|| interrupt_func);
 //     enable_rtc_interrupt();
 //     let res = set_rtc_frequency(rtc_freq);
-//     res.map( |_| rtc_interrupt_handler as HandlerFunc )
+//     res.map( |_| rtc_interrupt_handler as InterruptHandler )
 // }
 
 
@@ -133,15 +133,10 @@ pub fn read_rtc() -> RtcTime {
     }
 }
 
-pub fn get_rtc_ticks() -> Result<usize, ()> {
-     if let Some(ticks) = RTC_TICKS.get() {
-         Ok(ticks.load(Ordering::Acquire))
-     }
-     else {
-        Err(())
-     }
+/// Returns the current RTC tick count.
+pub fn get_rtc_ticks() -> Option<usize> {
+    RTC_TICKS.get().map(|ticks| ticks.load(Ordering::Acquire))
 }
-
 
 /// turn on IRQ 8 (mapped to 0x28), rtc begins sending interrupts 
 pub fn enable_rtc_interrupt()
@@ -183,12 +178,18 @@ fn log2(value: usize) -> usize {
     result
 }
 
-/// sets the period of the RTC interrupt. 
-/// `rate` must be a power of 2, between 2 and 8192 inclusive.
-pub fn set_rtc_frequency(rate: usize) -> Result<(), ()> {
-    if !(rate.is_power_of_two() && rate >= 2 && rate <= 8192) {
+/// The error returned from [`set_rtc_frequency()`] if an invalid rate is provided.
+#[derive(Debug)]
+pub struct InvalidRtcRate;
+
+/// Sets the period of the RTC interrupt to the given `rate`.
+///
+/// `rate` must be a power of 2, between 2 and 8192 inclusive;
+/// otherwise, an error is returned.
+pub fn set_rtc_frequency(rate: usize) -> Result<(), InvalidRtcRate> {
+    if !(rate.is_power_of_two() && (2..=8192).contains(&rate)) {
         error!("RTC rate was {}, must be a power of two between [2: 8192] inclusive!", rate);
-        return Err(());
+        return Err(InvalidRtcRate);
     }
 
     // formula is "rate = 32768 Hz >> (dividor - 1)"

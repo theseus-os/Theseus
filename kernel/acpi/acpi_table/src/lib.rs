@@ -8,12 +8,9 @@
 #![no_std]
 
 extern crate alloc;
-#[macro_use] extern crate log;
-extern crate memory;
-extern crate sdt;
-extern crate zerocopy;
 
 use alloc::collections::BTreeMap;
+use log::{trace, error};
 use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange};
 use sdt::Sdt;
 use core::ops::Add;
@@ -39,7 +36,8 @@ pub struct TableLocation {
 /// All ACPI tables are covered by a single large MappedPages object, 
 /// which is necessary because they may span multiple pages/frames,
 /// and generally should not be multiply aliased/accessed due to potential race conditions.
-/// As more ACPI tables are discovered, the single MappedPages object is 
+/// As more ACPI tables are discovered, the single MappedPages object is
+/// extended to cover them.
 pub struct AcpiTables {
     /// The range of pages that cover all of the discovered ACPI tables.
     mapped_pages: MappedPages,
@@ -78,7 +76,7 @@ impl AcpiTables {
         if !self.frames.contains(&first_frame) {
             // Drop the current MappedPages and deallocate its frames so we can reallocate over them below. 
             let _orig_mp = core::mem::replace(&mut self.mapped_pages, MappedPages::empty());
-            trace!("[0] Dropping original {:?}", _orig_mp);
+            // trace!("[0] Dropping original {:?}", _orig_mp);
             drop(_orig_mp);
 
             let new_frames = self.frames.to_extended(first_frame);
@@ -163,7 +161,7 @@ impl AcpiTables {
         if new_frames.start() < self.frames.start() {
             let diff = self.frames.start_address().value() - new_frames.start_address().value();
             trace!("ACPI table: adjusting mapping offsets +{}", diff);
-            for mut loc in self.tables.values_mut() {
+            for loc in self.tables.values_mut() {
                 loc.offset += diff; 
                 if let Some((ref mut slice_offset, _)) = loc.slice_offset_and_length {
                     *slice_offset += diff;

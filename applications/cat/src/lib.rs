@@ -23,7 +23,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
     
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
@@ -85,7 +85,7 @@ pub fn main(args: Vec<String>) -> isize {
             return -1;
         }
     };
-    return 0;
+    0
 }
 
 fn print_usage(opts: Options) {
@@ -107,5 +107,5 @@ fn echo_from_stdin() -> Result<(), &'static str> {
     Ok(())
 }
 
-const USAGE: &'static str = "Usage: cat [file ...]
+const USAGE: &str = "Usage: cat [file ...]
 concatenate and print files";

@@ -18,6 +18,7 @@ VBECardInfo:
 
 ABSOLUTE 0x5200
 VBEModeInfo:
+    ; All VBE versions have the following
 	.attributes            resw 1
 	.winAattr              resb 1
 	.winBattr              resb 1
@@ -27,6 +28,7 @@ VBEModeInfo:
 	.winBsegment           resw 1
 	.winfuncptr            resd 1
 	.bytesperscanline      resw 1
+    ; VBE 1.2 and above has the following
 	.width                 resw 1
 	.height                resw 1
 	.xcharsize             resb 1
@@ -47,9 +49,11 @@ VBEModeInfo:
 	.rsvdmasksize          resb 1
 	.rsvdfieldposition     resb 1
 	.directcolormodeinfo   resb 1
+    ; VBE 2.0 and above has the following
 	.physbaseptr           resd 1
 	.reserved1             resd 1
 	.reserved2             resw 1
+    ; VBE 3.0 and above has the following (currently unused)
     .reserved_vbe3         resb 13
 	.reserved3             resb 189
 
@@ -65,6 +69,14 @@ best_mode:
     .physaddr              resd 1
 	.attributes            resw 1
 	.totalmemory64KiB      resw 1
+	.bytesperscanline      resw 1
+	.bitsperpixel          resb 1
+    .redmasksize           resb 1
+	.redfieldposition      resb 1
+	.greenmasksize         resb 1
+	.greenfieldposition    resb 1
+	.bluemasksize          resb 1
+	.bluefieldposition     resb 1
 %endif ; BIOS
 
 section .init.realmodetext16 progbits alloc exec nowrite
@@ -90,64 +102,48 @@ ap_start_realmode:
 
 %ifdef BIOS
     ; need to use BIOS interrupts to write to vga buffer, not mem-mapped 0xb8000
-    mov ah, 0x0E
-    mov al, "A"
-    int 0x10
-    mov al, "P"
-    int 0x10
-    mov al, " "
-    int 0x10
-    mov al, "B"
-    int 0x10
-    mov al, "O"
-    int 0x10
-    mov al, "O"
-    int 0x10
-    mov al, "T"
-    int 0x10
+    ; mov ah, 0x0E
+    ; mov al, "A"
+    ; int 0x10
+    ; mov al, "P"
+    ; int 0x10
+    ; mov al, " "
+    ; int 0x10
+    ; mov al, "B"
+    ; int 0x10
+    ; mov al, "O"
+    ; int 0x10
+    ; mov al, "O"
+    ; int 0x10
+    ; mov al, "T"
+    ; int 0x10
 
-; We only need to execute the graphic mode setting code once, system-wide. 
-; We use the byte at [0000:0900] to indicate if another core has already run this code.
+; We only execute the graphic mode setting code once, when bringing up the last AP.
     mov ax, 0
     mov es, ax
-    mov di, 0x900
-    mov ax, [es:di]
-    cmp ax, 5
-    ; skip graphics mode setting code if it's already been done.
-    je create_gdt
+    mov al, [es:AP_IS_LAST_AP]
+    cmp al, 1
+    ; skip graphics mode setting code 
+    jne after_graphic_mode
 
 
 ; This is the start of the graphics mode code. 
-; First, initialize both our "best" mode info and the Rust-visible GraphicInfo to all zeros.
-    mov word [best_mode.mode],             0
-    mov word [best_mode.width],            0
-    mov word [best_mode.height],           0
-    mov word [best_mode.physaddr],         0
-    mov word [best_mode.physaddr+2],       0
-    mov word [best_mode.attributes],       0
-    mov word [best_mode.totalmemory64KiB], 0
+; First, zero-out the key fields of our "best" mode info and the Rust-visible GraphicInfo.
+    mov word  [best_mode.mode],     0
+    mov word  [best_mode.width],    0
+    mov word  [best_mode.height],   0
+    mov dword [best_mode.physaddr], 0
     
     ; WARNING: the below code must be kept in sync with the `GraphicInfo` struct 
     ;          in the `multicore_bringup` crate. 
     push di
     mov ax, 0
     mov es, ax
-    mov di, 0xF100
-    ; set width to zero
-    mov word [es:di+0],  0
-    mov word [es:di+2],  0
-    mov word [es:di+4],  0
-    mov word [es:di+6],  0
-    ; set height to zero
-    mov word [es:di+8],  0
-    mov word [es:di+10], 0
-    mov word [es:di+12], 0
-    mov word [es:di+14], 0
-    ; set physical address to zero
-    mov word [es:di+16], 0
-    mov word [es:di+18], 0
-    mov word [es:di+20], 0
-    mov word [es:di+22], 0
+    mov di, 0xF100  ; see `GRAPHIC_INFO_OFFSET_FROM_TRAMPOLINE`
+    ; set key fields of `GraphicInfo` to zero
+    mov word  [es:di+0],  0   ; width
+    mov word  [es:di+2],  0   ; height
+    mov dword [es:di+4],  0   ; physical address 
     pop di
 
 ; Next, we get the VBE card info such that we can iterate over the list of available modes. 
@@ -159,7 +155,7 @@ get_vbe_card_info:
     mov di, VBECardInfo    ; Set `di` to the address where the VBE card info will be written
     int 0x10
     cmp al, 0x4F           ; The result is placed into `al`. A result of `0x4f` means the query was successful.
-    jne graphic_mode_done  ; A failure here means we can't set graphic modes, so just skip to the end. 
+    jne after_graphic_mode  ; A failure here means we can't set graphic modes, so just skip to the end. 
     
     ; initialize the mode pointer so we can iterate over the available graphics modes
     mov si, [VBECardInfo.videomodeptr]
@@ -177,16 +173,23 @@ get_vbe_card_info:
     ; Here, we attempt to get the mode info for the mode we just iterated to
     push esi
     mov [current.mode], cx  ; Store the current mode in `current.mode`
-    mov ax, 0x4F01          ; 0x4F01 is the argument fo the BIOS 0x10 interrupt used to get the currrent mode information
+    mov ax, 0x4F01          ; 0x4F01 is the argument for the BIOS 0x10 interrupt used to get the current mode information
     mov di, VBEModeInfo     ; Set `di` to the address where the mode information will be written
     int 0x10
     pop esi
     cmp al, 0x4F            ; The result is placed into `al`. A result of `0x4f` means the query was successful.
     jne .next_mode          ; We failed to get info about this mode. Go back and try the next mode.
 
+    ; Check whether the current mode is supported by the hardware.
+    ; If bit 0 is clear, the mode is unsupported, so continue on to the next mode.
+    mov word ax, [VBEModeInfo.attributes]
+    test word ax, 1
+    jz .next_mode
+
     ; We only support modes with 32-bit pixel sizes
     cmp byte [VBEModeInfo.bitsperpixel], 32
     jne .next_mode
+
     ; Check whether the current mode is higher resolution than our maximum resolution.
     ; If it is, then continue iterating through the modes.
     mov word ax, [VBEModeInfo.width]
@@ -195,6 +198,7 @@ get_vbe_card_info:
     mov word ax, [VBEModeInfo.height]
     cmp word ax, [es:AP_MAX_FB_HEIGHT]
     ja .next_mode
+
     ; Check whether the current mode is higher resolution than the "best" mode thus far.
     ; If not, continue iterating through the modes. 
     mov word ax, [best_mode.width]
@@ -219,6 +223,22 @@ get_vbe_card_info:
     mov word [best_mode.attributes], ax
     mov word ax, [VBECardInfo.totalmemory64KiB]
     mov word [best_mode.totalmemory64KiB], ax
+    mov word ax, [VBEModeInfo.bytesperscanline]
+    mov word [best_mode.bytesperscanline], ax
+    mov byte al, [VBEModeInfo.bitsperpixel]
+    mov byte [best_mode.bitsperpixel], al
+    mov byte al, [VBEModeInfo.redmasksize]
+    mov byte [best_mode.redmasksize], al
+    mov byte al, [VBEModeInfo.redfieldposition]
+    mov byte [best_mode.redfieldposition], al
+    mov byte al, [VBEModeInfo.greenmasksize]
+    mov byte [best_mode.greenmasksize], al
+    mov byte al, [VBEModeInfo.greenfieldposition]
+    mov byte [best_mode.greenfieldposition], al
+    mov byte al, [VBEModeInfo.bluemasksize]
+    mov byte [best_mode.bluemasksize], al
+    mov byte al, [VBEModeInfo.bluefieldposition]
+    mov byte [best_mode.bluefieldposition], al
     jmp .next_mode    ; we may find better modes later, so keep iterating!
 
 ; Once we have iterated over all available graphic modes, we jump here to
@@ -251,6 +271,31 @@ mode_iter_done:
     ; move the best mode's totalmemory64KiB value to [0:F10C]
     mov word ax, [best_mode.totalmemory64KiB]
     mov word [es:di+12], ax
+    ; move the best mode's bytesperscanline value to [0:F10E]
+    mov word ax, [best_mode.bytesperscanline]
+    mov word [es:di+14], ax
+    ; move the best mode's bitsperpixel value to [0:F110]
+    mov byte al, [best_mode.bitsperpixel]
+    mov byte [es:di+16], al
+    ; move the best mode's redmasksize value to [0:F111]
+    mov byte al, [best_mode.redmasksize]
+    mov byte [es:di+17], al
+    ; move the best mode's redfieldposition value to [0:F112]
+    mov byte al, [best_mode.redfieldposition]
+    mov byte [es:di+18], al
+    ; move the best mode's greenmasksize value to [0:F113]
+    mov byte al, [best_mode.greenmasksize]
+    mov byte [es:di+19], al
+    ; move the best mode's greenfieldposition value to [0:F114]
+    mov byte al, [best_mode.greenfieldposition]
+    mov byte [es:di+20], al
+    ; move the best mode's bluemasksize value to [0:F115]
+    mov byte al, [best_mode.bluemasksize]
+    mov byte [es:di+21], al
+    ; move the best mode's bluefieldposition value to [0:F116]
+    mov byte al, [best_mode.bluefieldposition]
+    mov byte [es:di+22], al
+    ; Note: the size of `GraphicInfo` is currently 23 bytes.
     pop di
 
 ; Finally, once we have saved the info of the best graphical mode,
@@ -261,15 +306,10 @@ mode_iter_done:
     mov bx, [best_mode.mode]
     int 0x10
 
-graphic_mode_done:
-    ; Set the byte at [0000:0900] to indicate that we've run the graphic mode setting code.
-    mov ax, 0
-    mov es, ax
-    mov di, 0x900
-    mov byte [es:di], 5
-    ; move on (fall through) to the next step, setting up our GDT
 %endif ; BIOS
 
+after_graphic_mode:
+    ; move on (fall through) to the next step, setting up our GDT
 
 ; Here, we create a GDT manually by writing its contents directly, starting at address 0x800.
 ; Since this code will be forcibly loaded by the GRUB multiboot2 bootloader at an address above 1MB,
@@ -342,7 +382,7 @@ section .init.text32ap progbits alloc exec
 bits 32
 prot_mode:
 
-    ; set up new segment selectors. Code selector is already set correctly)
+    ; set up new segment selectors. Code selector is already set correctly
     ; GDT: kernel code is 0x08, kernel data is 0x10
     mov ax, 0x10   
     mov ds, ax
@@ -354,15 +394,14 @@ prot_mode:
 %ifdef BIOS
     ; each character is reversed in the dword cuz of little endianness
     ; prints "AP_PROTECTED"
-    mov dword [0xb8000], 0x4f504f41 ; "AP"
-    mov dword [0xb8004], 0x4f504f5F ; "_P"
-    mov dword [0xb8008], 0x4f4f4f52 ; "RO"
-    mov dword [0xb800c], 0x4f454f54 ; "TE"
-    mov dword [0xb8010], 0x4f544f43 ; "CT"
-    mov dword [0xb8014], 0x4f444f45 ; "ED"
+    ; mov dword [0xb8000], 0x4f504f41 ; "AP"
+    ; mov dword [0xb8004], 0x4f504f5F ; "_P"
+    ; mov dword [0xb8008], 0x4f4f4f52 ; "RO"
+    ; mov dword [0xb800c], 0x4f454f54 ; "TE"
+    ; mov dword [0xb8010], 0x4f544f43 ; "CT"
+    ; mov dword [0xb8014], 0x4f444f45 ; "ED"
 %endif ; BIOS
-    
- 
+
     jmp 0x08:ap_start_protected_mode
     
 

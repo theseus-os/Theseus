@@ -1,0 +1,11 @@
+[package]
+name = "waker_generic"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A standalone generic Waker + Blocker implementation, with no dependency on tasking"
+edition = "2021"
+
+[dependencies]
+spin = "0.9.4"
+
+cpu_local_preemption = { path = "../cpu_local_preemption" }

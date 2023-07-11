@@ -1,10 +1,7 @@
-use crate::ElfSectionFlags;
-use bootloader_api::info;
-use core::{
-    iter::{Iterator, Peekable},
-    ops::Range,
-};
-use kernel_config::memory::{KERNEL_OFFSET, KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
+use crate::{ElfSectionFlags, FramebufferFormat};
+use uefi_bootloader_api::PixelFormat;
+use core::iter::{Iterator, Peekable};
+use kernel_config::memory::{KERNEL_STACK_SIZE_IN_PAGES, PAGE_SIZE};
 use memory_structs::{PhysicalAddress, VirtualAddress};
 
 // TODO: Ideally this would be defined in nano_core. However, that would
@@ -14,27 +11,12 @@ use memory_structs::{PhysicalAddress, VirtualAddress};
 pub const STACK_SIZE: usize = (KERNEL_STACK_SIZE_IN_PAGES + 2) * PAGE_SIZE;
 
 /// A custom memory region kind used by the bootloader for the modules.
-const MODULES_MEMORY_KIND: info::MemoryRegionKind = info::MemoryRegionKind::UnknownUefi(0x80000000);
+const MODULES_MEMORY_KIND: uefi_bootloader_api::MemoryRegionKind =
+    uefi_bootloader_api::MemoryRegionKind::UnknownUefi(0x80000000);
 
-pub struct MemoryRegion {
-    start: PhysicalAddress,
-    len: usize,
-    is_usable: bool,
-}
-
-impl From<info::MemoryRegion> for MemoryRegion {
-    fn from(info::MemoryRegion { start, end, kind }: info::MemoryRegion) -> Self {
-        Self {
-            start: PhysicalAddress::new_canonical(start as usize),
-            len: (end - start) as usize,
-            is_usable: matches!(kind, info::MemoryRegionKind::Usable),
-        }
-    }
-}
-
-impl crate::MemoryRegion for MemoryRegion {
+impl crate::MemoryRegion for uefi_bootloader_api::MemoryRegion {
     fn start(&self) -> PhysicalAddress {
-        self.start
+        PhysicalAddress::new_canonical(self.start)
     }
 
     fn len(&self) -> usize {
@@ -42,38 +24,37 @@ impl crate::MemoryRegion for MemoryRegion {
     }
 
     fn is_usable(&self) -> bool {
-        self.is_usable
+        matches!(self.kind, uefi_bootloader_api::MemoryRegionKind::Usable)
     }
 }
 
-pub struct MemoryRegions {
-    inner: Peekable<core::slice::Iter<'static, info::MemoryRegion>>,
+pub struct MemoryRegions<'a> {
+    inner: Peekable<core::slice::Iter<'a, uefi_bootloader_api::MemoryRegion>>,
 }
 
-impl Iterator for MemoryRegions {
-    type Item = MemoryRegion;
+impl<'a> Iterator for MemoryRegions<'a> {
+    type Item = uefi_bootloader_api::MemoryRegion;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut area: MemoryRegion = (*self.inner.next()?).into();
+        let mut region = *self.inner.next()?;
 
         // UEFI often separates contiguous memory into separate memory regions. We
         // consolidate them to minimise the number of entries in the frame allocator's
         // reserved and available lists.
-        while let Some(next) = self.inner.next_if(|next| {
-            let next = MemoryRegion::from(**next);
-            area.is_usable == next.is_usable && (area.start + area.len) == next.start
-        }) {
-            let next = MemoryRegion::from(*next);
-            area.len += next.len;
+        while let Some(next) = self
+            .inner
+            .next_if(|next| region.kind == next.kind && (region.start + region.len) == next.start)
+        {
+            region.len += next.len;
         }
 
-        Some(area)
+        Some(region)
     }
 }
 
-impl<'a> crate::ElfSection for &'a info::ElfSection {
+impl<'a> crate::ElfSection for &'a uefi_bootloader_api::ElfSection {
     fn name(&self) -> &str {
-        info::ElfSection::name(self)
+        uefi_bootloader_api::ElfSection::name(self)
     }
 
     fn start(&self) -> VirtualAddress {
@@ -89,14 +70,15 @@ impl<'a> crate::ElfSection for &'a info::ElfSection {
     }
 }
 
+#[derive(Debug)]
 pub struct Module {
-    inner: info::Module,
-    regions: &'static info::MemoryRegions,
+    inner: uefi_bootloader_api::Module,
+    regions: &'static uefi_bootloader_api::MemoryRegions,
 }
 
 impl crate::Module for Module {
     fn name(&self) -> Result<&str, &'static str> {
-        Ok(info::Module::name(&self.inner))
+        Ok(uefi_bootloader_api::Module::name(&self.inner))
     }
 
     fn start(&self) -> PhysicalAddress {
@@ -105,7 +87,7 @@ impl crate::Module for Module {
                 .iter()
                 .find(|region| region.kind == MODULES_MEMORY_KIND)
                 .expect("no modules region")
-                .start as usize
+                .start
                 + self.inner.offset,
         )
     }
@@ -116,8 +98,8 @@ impl crate::Module for Module {
 }
 
 pub struct Modules {
-    inner: &'static info::Modules,
-    regions: &'static info::MemoryRegions,
+    inner: &'static uefi_bootloader_api::Modules,
+    regions: &'static uefi_bootloader_api::MemoryRegions,
     index: usize,
 }
 
@@ -135,15 +117,17 @@ impl Iterator for Modules {
     }
 }
 
-impl crate::BootInformation for &'static bootloader_api::BootInfo {
-    type MemoryRegion<'a> = MemoryRegion;
-    type MemoryRegions<'a> = MemoryRegions;
+impl crate::BootInformation for &'static uefi_bootloader_api::BootInformation {
+    type MemoryRegion<'a> = uefi_bootloader_api::MemoryRegion;
+    type MemoryRegions<'a> = MemoryRegions<'a>;
 
-    type ElfSection<'a> = &'a info::ElfSection;
-    type ElfSections<'a> = core::slice::Iter<'a, info::ElfSection>;
+    type ElfSection<'a> = &'a uefi_bootloader_api::ElfSection;
+    type ElfSections<'a> = core::slice::Iter<'a, uefi_bootloader_api::ElfSection>;
 
     type Module<'a> = Module;
     type Modules<'a> = Modules;
+
+    type AdditionalReservedMemoryRegions = core::iter::Empty<crate::ReservedMemoryRegion>;
 
     fn start(&self) -> Option<VirtualAddress> {
         VirtualAddress::new(*self as *const _ as usize)
@@ -151,68 +135,6 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
 
     fn len(&self) -> usize {
         self.size
-    }
-
-    // The bootloader creates two memory regions with the bootloader type. The first
-    // one always starts at 0x1000 and contains the page table, boot info, etc. The
-    // second one starts at some other address and contains the nano_core elf file.
-    // It is the same size as the nano_core elf file.
-
-    fn kernel_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        use crate::ElfSection;
-
-        let start = PhysicalAddress::new(
-            self.elf_sections()?
-                .into_iter()
-                .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
-                .map(|s| s.start())
-                .min()
-                .ok_or("couldn't find kernel start address")?
-                .value(),
-        )
-        .ok_or("kernel physical start address was invalid")?;
-        let virtual_end = self
-            .elf_sections()?
-            .into_iter()
-            .filter(|s| s.flags().contains(ElfSectionFlags::ALLOCATED))
-            .map(|s| s.start() + s.len())
-            .max()
-            .ok_or("couldn't find kernel end address")?;
-        let physical_end = PhysicalAddress::new(virtual_end.value() - KERNEL_OFFSET)
-            .ok_or("kernel physical end address was invalid")?;
-
-        Ok(start..physical_end)
-    }
-
-    fn bootloader_info_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        let mut iter = self
-            .memory_regions
-            .iter()
-            .filter(|region| region.kind == info::MemoryRegionKind::Bootloader)
-            .filter(|region| region.start == 0x1000);
-
-        let bootloader_info_memory_region =
-            iter.next().ok_or("no bootloader info memory region")?;
-        if iter.next().is_some() {
-            Err("multiple potential bootloader memory info memory regions")
-        } else {
-            let start = PhysicalAddress::new(bootloader_info_memory_region.start as usize)
-                .ok_or("invalid bootloader info start address")?;
-            let end = PhysicalAddress::new(bootloader_info_memory_region.end as usize)
-                .ok_or("invalid bootloader info end address")?;
-            Ok(start..end)
-        }
-    }
-
-    fn modules_memory_range(&self) -> Result<Range<PhysicalAddress>, &'static str> {
-        let area = self
-            .memory_regions
-            .iter()
-            .find(|region| region.kind == MODULES_MEMORY_KIND)
-            .ok_or("no modules memory region")?;
-        let start = PhysicalAddress::new_canonical(area.start as usize);
-        let end = PhysicalAddress::new_canonical(area.end as usize);
-        Ok(start..end)
     }
 
     fn memory_regions(&self) -> Result<Self::MemoryRegions<'_>, &'static str> {
@@ -233,13 +155,69 @@ impl crate::BootInformation for &'static bootloader_api::BootInfo {
         }
     }
 
+    fn additional_reserved_memory_regions(
+        &self,
+    ) -> Result<Self::AdditionalReservedMemoryRegions, &'static str> {
+        Ok(core::iter::empty())
+    }
+
+    fn kernel_end(&self) -> Result<VirtualAddress, &'static str> {
+        use crate::ElfSection;
+
+        VirtualAddress::new(
+            self.elf_sections()?
+                .filter(|section| section.flags().contains(ElfSectionFlags::ALLOCATED))
+                .filter(|section| section.size > 0)
+                .map(|section| section.start + section.size)
+                .max()
+                .ok_or("couldn't find kernel end address")?
+        )
+        .ok_or("kernel virtual end address was invalid")
+    }
+
     fn rsdp(&self) -> Option<PhysicalAddress> {
-        self.rsdp_addr
-            .into_option()
-            .map(|address| PhysicalAddress::new_canonical(address as usize))
+        self.rsdp_address
+            .map(PhysicalAddress::new_canonical)
     }
 
     fn stack_size(&self) -> Result<usize, &'static str> {
         Ok(STACK_SIZE)
+    }
+
+    fn framebuffer_info(&self) -> Option<crate::FramebufferInfo> {
+        let uefi_fb = self.frame_buffer.as_ref()?;
+        let uefi_fb_info = uefi_fb.info;
+        let format = match uefi_fb_info.pixel_format {
+            PixelFormat::Rgb => FramebufferFormat::RgbPixel,
+            PixelFormat::Bgr => FramebufferFormat::BgrPixel,
+            // TODO: handle gop::PixelFormat::Bitmask and BltOnly in `uefi-bootloader` and `uefi-bootloader-api`
+            /*
+            info::PixelFormat::U8  => FramebufferFormat::Grayscale,
+            info::PixelFormat::Unknown {
+                red_position,
+                green_position,
+                blue_position,
+            } => FramebufferFormat::CustomPixel {
+                // each pixel is 8 bits
+                red_bit_position: red_position,
+                red_size_in_bits: 8,
+                green_bit_position: green_position,
+                green_size_in_bits: 8,
+                blue_bit_position: blue_position,
+                blue_size_in_bits: 8,
+            },
+            _ => return None,
+            */
+        };
+        Some(crate::FramebufferInfo {
+            virt_addr: Some(VirtualAddress::new_canonical(uefi_fb.virt)),
+            phys_addr: PhysicalAddress::new_canonical(uefi_fb.physical),
+            total_size_in_bytes: uefi_fb_info.size as u64,
+            width: uefi_fb_info.width as u32,
+            height: uefi_fb_info.height as u32,
+            bits_per_pixel: (uefi_fb_info.bytes_per_pixel * 8) as u8,
+            stride: uefi_fb_info.stride as u32,
+            format,
+        })
     }
 }

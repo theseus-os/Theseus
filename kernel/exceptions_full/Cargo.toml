@@ -10,8 +10,8 @@ x86_64 = "0.14.8"
 log = "0.4.8"
 locked_idt = { path = "../../libs/locked_idt" }
 
-[dependencies.vga_buffer]
-path = "../vga_buffer"
+[dependencies.early_printer]
+path = "../early_printer"
 
 [dependencies.app_io]
 path = "../app_io"

@@ -71,7 +71,7 @@ bits 64
 
 ; We follow the System V calling conventions, which rust uses, in order to
 ; get and return arguments. In general, all calling arguments are passed in
-; rdi, rsi, rdx, rcx( or r10?), r8 and r9 or varients thereof (the first 32
+; rdi, rsi, rdx, rcx( or r10?), r8 and r9 or variants thereof (the first 32
 ; bit argument will be passed in edi, the first 16 in di, and the first 8 in
 ; di as well) and the return value is passed in rax.
 ; All registers except RBP, RBX, and r12-r15 are caller preserved :)

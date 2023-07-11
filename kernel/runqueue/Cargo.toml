@@ -16,8 +16,8 @@ version = "0.4.8"
 features = ["spin_no_std"]
 version = "1.4.0"
 
-[dependencies.mutex_preemption]
-path = "../mutex_preemption"
+[dependencies.sync_preemption]
+path = "../sync_preemption"
 
 [dependencies.atomic_linked_list]
 path = "../../libs/atomic_linked_list"
@@ -28,11 +28,11 @@ path = "../task"
 [dependencies.runqueue_round_robin]
 path = "../runqueue_round_robin"
 
+[dependencies.runqueue_epoch]
+path = "../runqueue_epoch"
+
 [dependencies.runqueue_priority]
 path = "../runqueue_priority"
-
-[dependencies.runqueue_realtime]
-path = "../runqueue_realtime"
 
 ## This should be dependent upon 'cfg(single_simd_task_optimization)',
 ## but it cannot be because of https://github.com/rust-lang/cargo/issues/5499.

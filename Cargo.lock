@@ -91,6 +91,8 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
+ "early_tls",
  "interrupts",
  "irq_safety",
  "kernel_config",
@@ -98,6 +100,7 @@ dependencies = [
  "memory",
  "no_drop",
  "page_attribute_table",
+ "per_cpu",
  "scheduler",
  "spawn",
  "stack",
@@ -110,6 +113,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "crossbeam-utils",
+ "derive_more",
  "irq_safety",
  "kernel_config",
  "log",
@@ -118,7 +122,6 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -139,6 +142,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arm_boards"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "derive_more",
+ "memory_structs",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -151,12 +163,10 @@ dependencies = [
  "core2",
  "crossbeam-utils",
  "debugit",
- "hpet",
  "log",
  "mpmc",
- "spin 0.9.4",
- "static_assertions",
- "task",
+ "sync",
+ "sync_spin",
  "wait_queue",
 ]
 
@@ -190,9 +200,9 @@ version = "0.1.0"
 
 [[package]]
 name = "autocfg"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8aac770f1885fd7e387acedd76065302551364496e46b3dd00860b2f8359b9d"
+checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "backtrace"
@@ -302,6 +312,7 @@ dependencies = [
  "apic",
  "app_io",
  "async_channel",
+ "cpu",
  "fs_node",
  "getopts",
  "heapfile",
@@ -325,16 +336,11 @@ name = "boot_info"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "bootloader_api",
  "kernel_config",
  "memory_structs",
  "multiboot2",
+ "uefi-bootloader-api",
 ]
-
-[[package]]
-name = "bootloader_api"
-version = "0.11.0"
-source = "git+https://github.com/theseus-os/bootloader?branch=theseus#6cc130e2f9dc633445846a1e2c4d961b1daddd78"
 
 [[package]]
 name = "bootloader_modules"
@@ -366,6 +372,7 @@ dependencies = [
  "device_manager",
  "dfqueue",
  "e1000",
+ "early_printer",
  "exceptions_full",
  "first_application",
  "interrupts",
@@ -381,6 +388,7 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
+ "per_cpu",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -478,6 +486,7 @@ dependencies = [
  "app_io",
  "async_channel",
  "core2",
+ "hull",
  "io",
  "irq_safety",
  "log",
@@ -561,6 +570,15 @@ version = "0.1.0"
 source = "git+https://github.com/rust-lang/stdsimd#0711e11593e7d3ce7cffdb7bd966553e4a4f858f"
 
 [[package]]
+name = "cortex-a"
+version = "7.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdecfbb28672ad3664e71ae05a398a52df430d86d660691501b28968cc4467e6"
+dependencies = [
+ "tock-registers",
+]
+
+[[package]]
 name = "cortex-m"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -603,6 +621,27 @@ name = "cpu"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "arm_boards",
+ "cortex-a",
+ "derive_more",
+ "irq_safety",
+ "tock-registers",
+]
+
+[[package]]
+name = "cpu_local_preemption"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "cortex-a",
+ "cpu",
+ "irq_safety",
+ "log",
+ "memory",
+ "no_drop",
+ "spin 0.9.4",
+ "tock-registers",
+ "x86_64",
 ]
 
 [[package]]
@@ -626,7 +665,6 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.4",
- "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -744,7 +782,6 @@ dependencies = [
  "mod_mgmt",
  "owning_ref",
  "rustc-demangle",
- "util",
  "xmas-elf",
 ]
 
@@ -762,7 +799,6 @@ dependencies = [
  "scheduler",
  "spawn",
  "task",
- "x86_64",
 ]
 
 [[package]]
@@ -862,7 +898,7 @@ dependencies = [
  "net",
  "network_manager",
  "pci",
- "ps2_controller",
+ "ps2",
  "serial_port",
  "spin 0.9.4",
  "storage_manager",
@@ -900,7 +936,6 @@ dependencies = [
  "log",
  "memory",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -915,17 +950,18 @@ name = "dreadnought"
 version = "0.1.0"
 dependencies = [
  "futures",
- "mutex_sleep",
- "scheduler",
  "sleep",
  "spawn",
  "task",
+ "time",
+ "waker",
 ]
 
 [[package]]
 name = "e1000"
 version = "0.1.0"
 dependencies = [
+ "deferred_interrupt_tasks",
  "intel_ethernet",
  "interrupts",
  "irq_safety",
@@ -941,10 +977,32 @@ dependencies = [
  "nic_queues",
  "pci",
  "spin 0.9.4",
- "static_assertions",
+ "task",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
+]
+
+[[package]]
+name = "early_printer"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "font",
+ "log",
+ "memory",
+ "page_attribute_table",
+ "spin 0.9.4",
+ "vga_buffer",
+ "volatile 0.2.7",
+]
+
+[[package]]
+name = "early_tls"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+ "tls_initializer",
 ]
 
 [[package]]
@@ -1008,13 +1066,13 @@ dependencies = [
 name = "exceptions_early"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "gdt",
  "locked_idt",
  "memory",
  "mod_mgmt",
  "spin 0.9.4",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1025,6 +1083,7 @@ dependencies = [
  "app_io",
  "cpu",
  "debug_info",
+ "early_printer",
  "fault_log",
  "locked_idt",
  "log",
@@ -1038,7 +1097,6 @@ dependencies = [
  "tlb_shootdown",
  "tss",
  "unwind",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1058,7 +1116,6 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1097,17 +1154,18 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "cpu",
+ "early_printer",
  "irq_safety",
  "log",
  "memory",
  "task",
- "vga_buffer",
 ]
 
 [[package]]
 name = "first_application"
 version = "0.1.0"
 dependencies = [
+ "hello",
  "log",
  "mod_mgmt",
  "path",
@@ -1130,6 +1188,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory_structs",
+ "range_inclusive",
  "spin 0.9.4",
  "static_assertions",
 ]
@@ -1139,6 +1198,7 @@ name = "framebuffer"
 version = "0.1.0"
 dependencies = [
  "color",
+ "early_printer",
  "log",
  "memory",
  "multicore_bringup",
@@ -1266,6 +1326,7 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",
@@ -1300,6 +1361,18 @@ dependencies = [
  "cfg-if 1.0.0",
  "libc",
  "wasi 0.10.2+wasi-snapshot-preview1",
+]
+
+[[package]]
+name = "gic"
+version = "0.1.0"
+dependencies = [
+ "arm_boards",
+ "cpu",
+ "log",
+ "memory",
+ "static_assertions",
+ "zerocopy",
 ]
 
 [[package]]
@@ -1355,6 +1428,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
+ "cpu",
  "getopts",
  "hashbrown",
  "heap",
@@ -1395,7 +1469,6 @@ dependencies = [
 name = "hello"
 version = "0.1.0"
 dependencies = [
- "app_io",
  "log",
 ]
 
@@ -1409,7 +1482,6 @@ dependencies = [
  "memory",
  "sdt",
  "spin 0.9.4",
- "static_assertions",
  "time",
  "volatile 0.2.7",
  "zerocopy",
@@ -1453,6 +1525,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "idle"
+version = "0.1.0"
+dependencies = [
+ "cfg-if 1.0.0",
+ "raw-cpuid",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1475,22 +1555,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "interrupt_controller"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "arm_boards",
+ "cpu",
+ "gic",
+ "ioapic",
+ "irq_safety",
+ "log",
+ "memory",
+]
+
+[[package]]
 name = "interrupts"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "arm_boards",
+ "cortex-a",
+ "cpu",
+ "early_printer",
  "exceptions_early",
  "gdt",
+ "gic",
+ "interrupt_controller",
+ "irq_safety",
+ "kernel_config",
  "locked_idt",
  "log",
  "memory",
  "pic",
- "scheduler",
- "sleep",
  "spin 0.9.4",
- "task",
+ "time",
+ "tock-registers",
  "tss",
- "vga_buffer",
  "x86_64",
 ]
 
@@ -1519,6 +1619,7 @@ dependencies = [
 name = "ioapic"
 version = "0.1.0"
 dependencies = [
+ "apic",
  "atomic_linked_list",
  "log",
  "memory",
@@ -1536,7 +1637,6 @@ dependencies = [
  "log",
  "memory",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1544,7 +1644,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#4908fbb38aca1513572e0b4c7a98884390ef361a"
+source = "git+https://github.com/theseus-os/irq_safety#39ef02580d199b32ac6336fc35ae73682b95bf89"
 dependencies = [
  "owning_ref",
  "spin 0.9.4",
@@ -1564,8 +1664,8 @@ dependencies = [
 name = "ixgbe"
 version = "0.1.0"
 dependencies = [
- "acpi",
  "bit_field 0.7.0",
+ "cpu",
  "hashbrown",
  "hpet",
  "intel_ethernet",
@@ -1588,10 +1688,8 @@ dependencies = [
  "rand",
  "runqueue",
  "spin 0.9.4",
- "static_assertions",
  "virtual_nic",
  "volatile 0.2.7",
- "x86_64",
  "zerocopy",
 ]
 
@@ -1704,6 +1802,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
+ "cpu",
  "hashbrown",
  "hpet",
  "libm",
@@ -1740,10 +1839,11 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.4.2"
+version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd96ffd135b2fd7b973ac026d28085defbe8983df057ced3eb4f2130b0831312"
+checksum = "435011366fe56583b16cf956f9df0095b405b82d76425bc8981c0e22e60ec4df"
 dependencies = [
+ "autocfg",
  "scopeguard",
 ]
 
@@ -1776,10 +1876,10 @@ dependencies = [
 name = "logger"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -1820,7 +1920,6 @@ dependencies = [
  "memory",
  "pic",
  "sdt",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1873,6 +1972,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "memory"
 version = "0.1.0"
 dependencies = [
@@ -1885,6 +1993,7 @@ dependencies = [
  "kernel_config",
  "lazy_static",
  "log",
+ "memory_aarch64",
  "memory_structs",
  "memory_x86_64",
  "no_drop",
@@ -1899,11 +2008,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "memory_aarch64"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "cortex-a",
+ "kernel_config",
+ "log",
+ "memory_structs",
+ "pte_flags",
+ "tock-registers",
+]
+
+[[package]]
 name = "memory_initialization"
 version = "0.1.0"
 dependencies = [
  "boot_info",
  "bootloader_modules",
+ "early_printer",
  "heap",
  "irq_safety",
  "kernel_config",
@@ -1917,10 +2040,10 @@ dependencies = [
 name = "memory_structs"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0",
  "derive_more",
  "kernel_config",
  "paste",
+ "range_inclusive",
  "zerocopy",
 ]
 
@@ -1994,9 +2117,7 @@ dependencies = [
  "memory",
  "mpmc",
  "nic_buffers",
- "nic_initialization",
  "num_enum",
- "static_assertions",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -2014,6 +2135,7 @@ dependencies = [
  "crate_metadata_serde",
  "crate_name_utils",
  "cstr_core",
+ "early_tls",
  "fs_node",
  "hashbrown",
  "kernel_config",
@@ -2021,14 +2143,14 @@ dependencies = [
  "lz4_flex",
  "memfs",
  "memory",
+ "no_drop",
  "path",
  "qp-trie",
- "rangemap",
  "root",
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "util",
+ "tls_initializer",
  "vfs_node",
  "xmas-elf",
 ]
@@ -2088,6 +2210,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf78b1242a953be96e01b5f8ed8ffdfc8055c0a2b779899b3835e5d27a69dced"
 
 [[package]]
+name = "mpmc_queue"
+version = "0.1.0"
+dependencies = [
+ "sync",
+]
+
+[[package]]
 name = "msr"
 version = "0.1.0"
 
@@ -2107,13 +2236,16 @@ dependencies = [
  "acpi",
  "ap_start",
  "apic",
+ "arm_boards",
+ "cpu",
  "kernel_config",
  "log",
  "madt",
  "memory",
+ "memory_aarch64",
  "mod_mgmt",
- "pause",
  "pit_clock_basic",
+ "psci",
  "spin 0.9.4",
  "stack",
  "volatile 0.2.7",
@@ -2138,16 +2270,6 @@ dependencies = [
  "slabmalloc_safe",
  "slabmalloc_unsafe",
  "spin 0.9.4",
- "static_assertions",
-]
-
-[[package]]
-name = "mutex_preemption"
-version = "0.1.0"
-dependencies = [
- "lockable",
- "preemption",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -2167,6 +2289,9 @@ version = "0.1.0"
 dependencies = [
  "boot_info",
  "captain",
+ "cfg-if 1.0.0",
+ "early_printer",
+ "early_tls",
  "exceptions_early",
  "irq_safety",
  "kernel_config",
@@ -2182,7 +2307,7 @@ dependencies = [
  "serial_port_basic",
  "stack",
  "state_store",
- "vga_buffer",
+ "uefi-bootloader-api",
 ]
 
 [[package]]
@@ -2204,12 +2329,13 @@ checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 name = "net"
 version = "0.1.0"
 dependencies = [
+ "heapless",
  "irq_safety",
  "log",
  "mutex_sleep",
  "nic_buffers",
  "random",
- "smoltcp 0.8.0",
+ "smoltcp 0.8.1",
  "spin 0.9.4",
 ]
 
@@ -2258,7 +2384,6 @@ dependencies = [
  "mpmc",
  "nic_buffers",
  "nic_queues",
- "pci",
  "volatile 0.2.7",
 ]
 
@@ -2266,6 +2391,7 @@ dependencies = [
 name = "nic_queues"
 version = "0.1.0"
 dependencies = [
+ "cpu",
  "intel_ethernet",
  "log",
  "memory",
@@ -2364,9 +2490,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.16.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 
 [[package]]
 name = "ota_update_client"
@@ -2418,7 +2544,6 @@ name = "page_attribute_table"
 version = "0.1.0"
 dependencies = [
  "log",
- "memory",
  "modular-bitfield",
  "msr",
  "raw-cpuid",
@@ -2441,12 +2566,12 @@ dependencies = [
 name = "panic_entry"
 version = "0.1.0"
 dependencies = [
+ "early_printer",
  "log",
  "memory",
  "mod_mgmt",
  "panic_wrapper",
  "unwind",
- "vga_buffer",
 ]
 
 [[package]]
@@ -2489,18 +2614,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "pause"
-version = "0.1.0"
-
-[[package]]
 name = "pci"
 version = "0.1.0"
 dependencies = [
  "bit_field 0.7.0",
+ "cpu",
+ "interrupts",
  "log",
  "memory",
  "port_io",
  "spin 0.9.4",
+ "volatile 0.2.7",
+ "zerocopy",
+]
+
+[[package]]
+name = "per_cpu"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "cpu_local_preemption",
+ "log",
+ "memoffset 0.8.0",
+ "no_drop",
+ "task",
 ]
 
 [[package]]
@@ -2583,6 +2720,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pl011"
+version = "1.0.0"
+source = "git+https://github.com/theseus-os/pl011/?rev=464dbf22#464dbf2288a5d9e7445b0b1f404ddd41b1fd1c1e"
+dependencies = [
+ "log",
+ "volatile-register",
+]
+
+[[package]]
 name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2613,6 +2759,7 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "bit_field 0.10.1",
+ "cpu",
  "irq_safety",
  "lazy_static",
  "log",
@@ -2636,14 +2783,6 @@ name = "ppv-lite86"
 version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
-
-[[package]]
-name = "preemption"
-version = "0.1.0"
-dependencies = [
- "apic",
- "log",
-]
 
 [[package]]
 name = "print_fault_log"
@@ -2699,6 +2838,8 @@ dependencies = [
 name = "ps2"
 version = "0.1.0"
 dependencies = [
+ "acpi",
+ "fadt",
  "log",
  "modular-bitfield",
  "num_enum",
@@ -2707,14 +2848,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "ps2_controller"
-version = "0.1.0"
-dependencies = [
- "acpi",
- "fadt",
- "log",
- "ps2",
-]
+name = "psci"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3374e3ae47f134467227a48be93b929e5d304efcd25ce5d176006403ca1d9bab"
 
 [[package]]
 name = "psm"
@@ -2731,7 +2868,6 @@ version = "0.1.0"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
- "static_assertions",
 ]
 
 [[package]]
@@ -2745,9 +2881,9 @@ dependencies = [
 
 [[package]]
 name = "qp-trie"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a075ecba64154fed5429568c9c6a0e0eccc3276209e93e6133206413ea6834b4"
+checksum = "9569328cda9b68120dbbf855bac541eeb40c475d96a9a380cf8b5547bfe0c165"
 dependencies = [
  "new_debug_unreachable",
  "unreachable",
@@ -2800,9 +2936,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "range_inclusive"
+version = "0.1.0"
+
+[[package]]
 name = "rangemap"
-version = "1.0.3"
-source = "git+https://github.com/jeffparsons/rangemap#8b290d474bae680531bfba42e545e4d0121b70fd"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b9283c6b06096b47afc7109834fdedab891175bb5241ee5d4f7d2546549f263"
 
 [[package]]
 name = "raw-cpuid"
@@ -2864,12 +3005,14 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
- "hpet",
  "irq_safety",
  "log",
  "scheduler",
  "spin 0.9.4",
+ "sync",
+ "sync_spin",
  "task",
+ "wait_guard",
  "wait_queue",
 ]
 
@@ -2929,6 +3072,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "rq_access_eval"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "cpu",
+ "getopts",
+ "irq_safety",
+ "runqueue",
+ "time",
+]
+
+[[package]]
 name = "rq_eval"
 version = "0.1.0"
 dependencies = [
@@ -2948,7 +3103,6 @@ name = "rsdp"
 version = "0.1.0"
 dependencies = [
  "memory",
- "static_assertions",
  "zerocopy",
 ]
 
@@ -2983,11 +3137,22 @@ dependencies = [
  "cfg-if 1.0.0",
  "lazy_static",
  "log",
- "mutex_preemption",
+ "runqueue_epoch",
  "runqueue_priority",
- "runqueue_realtime",
  "runqueue_round_robin",
  "single_simd_task_optimization",
+ "sync_preemption",
+ "task",
+]
+
+[[package]]
+name = "runqueue_epoch"
+version = "0.1.0"
+dependencies = [
+ "atomic_linked_list",
+ "log",
+ "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -2997,19 +3162,9 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
- "single_simd_task_optimization",
+ "sync_preemption",
  "task",
-]
-
-[[package]]
-name = "runqueue_realtime"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "mutex_preemption",
- "task",
+ "time",
 ]
 
 [[package]]
@@ -3018,8 +3173,8 @@ version = "0.1.0"
 dependencies = [
  "atomic_linked_list",
  "log",
- "mutex_preemption",
  "single_simd_task_optimization",
+ "sync_preemption",
  "task",
 ]
 
@@ -3057,15 +3212,27 @@ checksum = "f2cc38e8fa666e2de3c4aba7edeb5ffc5246c1c2ed0e3d17e560aeeba736b23f"
 name = "scheduler"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cfg-if 1.0.0",
- "irq_safety",
+ "cpu",
+ "cpu_local_preemption",
+ "interrupts",
  "log",
- "preemption",
- "runqueue",
+ "scheduler_epoch",
  "scheduler_priority",
- "scheduler_realtime",
  "scheduler_round_robin",
+ "sleep",
+ "task",
+ "task_cancel",
+ "x86_64",
+]
+
+[[package]]
+name = "scheduler_epoch"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "runqueue",
+ "runqueue_epoch",
  "spin 0.9.4",
  "task",
 ]
@@ -3074,11 +3241,12 @@ dependencies = [
 name = "scheduler_eval"
 version = "0.1.0"
 dependencies = [
- "log",
- "logger",
+ "app_io",
+ "cpu",
+ "getopts",
  "scheduler",
  "spawn",
- "task",
+ "time",
 ]
 
 [[package]]
@@ -3086,19 +3254,9 @@ name = "scheduler_priority"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue",
  "runqueue_priority",
- "spin 0.9.4",
  "task",
-]
-
-[[package]]
-name = "scheduler_realtime"
-version = "0.1.0"
-dependencies = [
- "log",
- "runqueue_realtime",
- "task",
+ "time",
 ]
 
 [[package]]
@@ -3131,7 +3289,6 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
- "static_assertions",
  "zerocopy",
 ]
 
@@ -3196,15 +3353,16 @@ dependencies = [
  "log",
  "serial_port_basic",
  "spin 0.9.4",
- "static_assertions",
- "x86_64",
 ]
 
 [[package]]
 name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
+ "arm_boards",
  "irq_safety",
+ "memory",
+ "pl011",
  "port_io",
  "spin 0.9.4",
 ]
@@ -3252,7 +3410,6 @@ dependencies = [
 name = "signal_handler"
 version = "0.1.0"
 dependencies = [
- "bitflags",
  "log",
  "memory",
  "spin 0.9.4",
@@ -3329,10 +3486,11 @@ dependencies = [
 name = "sleep"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "lazy_static",
- "scheduler",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -3347,8 +3505,8 @@ dependencies = [
 
 [[package]]
 name = "smoltcp"
-version = "0.8.0"
-source = "git+https://github.com/smoltcp-rs/smoltcp#6b8b667be5878fbf288365df9260996116b81fa6"
+version = "0.8.1"
+source = "git+https://github.com/smoltcp-rs/smoltcp#19c7cba8d39dc0cea0fbd9a7ec7d7cb2ec8301c6"
 dependencies = [
  "bitflags",
  "byteorder",
@@ -3376,7 +3534,9 @@ dependencies = [
  "catch_unwind",
  "context_switch",
  "cpu",
+ "cpu_local_preemption",
  "debugit",
+ "early_tls",
  "fault_crate_swap",
  "fault_log",
  "fs_node",
@@ -3387,8 +3547,6 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
- "pause",
- "preemption",
  "runqueue",
  "scheduler",
  "spin 0.9.4",
@@ -3411,6 +3569,11 @@ checksum = "7f6002a767bff9e83f8eeecf883ecb8011875a21ae8da43bffb817a57e78cc09"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spin"
+version = "0.9.8"
+source = "git+https://github.com/theseus-os/spin-rs#5c4470db034ad11f6cc7a8a5c400607c024e9392"
 
 [[package]]
 name = "stable_deref_trait"
@@ -3464,23 +3627,6 @@ dependencies = [
  "atomic_linked_list",
  "lazy_static",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "state_transfer"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "hpet",
- "irq_safety",
- "lazy_static",
- "log",
- "memory",
- "mod_mgmt",
- "runqueue_priority",
- "runqueue_round_robin",
- "spin 0.9.4",
- "task",
 ]
 
 [[package]]
@@ -3552,6 +3698,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.8",
+]
+
+[[package]]
+name = "sync_block"
+version = "0.1.0"
+dependencies = [
+ "cpu_local_preemption",
+ "log",
+ "mpmc_queue",
+ "scheduler",
+ "sync",
+ "sync_spin",
+ "task",
+ "wait_queue",
+]
+
+[[package]]
+name = "sync_preemption"
+version = "0.1.0"
+dependencies = [
+ "cpu_local_preemption",
+ "sync",
+]
+
+[[package]]
+name = "sync_spin"
+version = "0.1.0"
+dependencies = [
+ "sync",
+]
+
+[[package]]
 name = "synstructure"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3574,21 +3756,19 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
+ "cpu_local_preemption",
  "crossbeam-utils",
  "environment",
  "irq_safety",
- "kernel_config",
  "log",
  "memory",
  "mod_mgmt",
  "no_drop",
- "preemption",
- "root",
  "spin 0.9.4",
  "stack",
  "static_assertions",
- "tss",
- "x86_64",
+ "task_struct",
+ "waker_generic",
 ]
 
 [[package]]
@@ -3613,6 +3793,22 @@ dependencies = [
  "root",
  "spin 0.9.4",
  "task",
+]
+
+[[package]]
+name = "task_struct"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "crossbeam-utils",
+ "environment",
+ "irq_safety",
+ "kernel_config",
+ "log",
+ "memory",
+ "mod_mgmt",
+ "spin 0.9.4",
+ "stack",
 ]
 
 [[package]]
@@ -3660,30 +3856,6 @@ dependencies = [
  "spawn",
  "spin 0.9.4",
  "task",
-]
-
-[[package]]
-name = "test_downtime"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "async_channel",
- "color",
- "cpu",
- "framebuffer",
- "framebuffer_drawer",
- "getopts",
- "hpet",
- "log",
- "rendezvous",
- "runqueue",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "task",
- "unified_channel",
- "window",
 ]
 
 [[package]]
@@ -3749,7 +3921,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_realtime"
+name = "test_priority_scheduler"
 version = "0.1.0"
 dependencies = [
  "app_io",
@@ -3757,6 +3929,7 @@ dependencies = [
  "scheduler",
  "sleep",
  "spawn",
+ "time",
 ]
 
 [[package]]
@@ -3768,6 +3941,17 @@ dependencies = [
  "log",
  "spawn",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "test_scheduler"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "log",
+ "scheduler",
+ "spawn",
+ "task",
 ]
 
 [[package]]
@@ -3862,7 +4046,6 @@ dependencies = [
  "event_types",
  "log",
  "unicode-width",
- "util",
  "vte",
 ]
 
@@ -3896,6 +4079,7 @@ dependencies = [
  "raw_mode",
  "rm",
  "rq",
+ "rq_access_eval",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
@@ -3905,15 +4089,15 @@ dependencies = [
  "test_backtrace",
  "test_block_io",
  "test_channel",
- "test_downtime",
  "test_filerw",
  "test_ixgbe",
  "test_libc",
  "test_mlx5",
  "test_mutex_sleep",
  "test_panic",
- "test_realtime",
+ "test_priority_scheduler",
  "test_restartable",
+ "test_scheduler",
  "test_serial_echo",
  "test_std_fs",
  "test_task_cancel",
@@ -3966,9 +4150,6 @@ dependencies = [
 [[package]]
 name = "thread_local_macro"
 version = "0.1.0"
-dependencies = [
- "static_assertions",
-]
 
 [[package]]
 name = "time"
@@ -3976,7 +4157,6 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
  "log",
- "static_assertions",
 ]
 
 [[package]]
@@ -3984,10 +4164,26 @@ name = "tlb_shootdown"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cpu",
+ "interrupts",
  "irq_safety",
  "log",
  "memory",
- "pause",
+ "memory_aarch64",
+ "memory_x86_64",
+]
+
+[[package]]
+name = "tls_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "log",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.4",
+ "tock-registers",
  "x86_64",
 ]
 
@@ -4000,6 +4196,12 @@ dependencies = [
  "test_thread_local",
  "thread_local_macro",
 ]
+
+[[package]]
+name = "tock-registers"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ee8fba06c1f4d0b396ef61a54530bb6b28f0dc61c38bc8bc5a5a48161e6282e"
 
 [[package]]
 name = "tsc"
@@ -4035,6 +4237,11 @@ name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
+
+[[package]]
+name = "uefi-bootloader-api"
+version = "0.1.0"
+source = "git+https://github.com/theseus-os/uefi-bootloader#661ea6245885307a3988713eeebcb7de723b7583"
 
 [[package]]
 name = "unicode-ident"
@@ -4119,13 +4326,9 @@ dependencies = [
 
 [[package]]
 name = "utf8parse"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "936e4b492acfd135421d8dca4b1aa80a7bfc26e702ef3af710e0752684df5372"
-
-[[package]]
-name = "util"
-version = "0.1.0"
+checksum = "711b9620af191e0cdc7468a8d14e709c3dcdb115b36f838e601583af800a370a"
 
 [[package]]
 name = "vcell"
@@ -4153,9 +4356,6 @@ dependencies = [
 name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
- "kernel_config",
- "logger",
- "spin 0.9.4",
  "volatile 0.2.7",
 ]
 
@@ -4231,18 +4431,43 @@ dependencies = [
 name = "wait_condition"
 version = "0.1.0"
 dependencies = [
- "task",
  "wait_queue",
+]
+
+[[package]]
+name = "wait_guard"
+version = "0.1.0"
+dependencies = [
+ "task",
 ]
 
 [[package]]
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
- "log",
+ "cpu_local_preemption",
+ "mpmc_queue",
  "scheduler",
+ "sync",
+ "sync_spin",
  "task",
+]
+
+[[package]]
+name = "waker"
+version = "0.1.0"
+dependencies = [
+ "spin 0.9.4",
+ "task",
+ "waker_generic",
+]
+
+[[package]]
+name = "waker_generic"
+version = "0.1.0"
+dependencies = [
+ "cpu_local_preemption",
+ "spin 0.9.4",
 ]
 
 [[package]]

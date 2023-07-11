@@ -1,6 +1,6 @@
 #![no_std]
 
-#[macro_use] extern crate alloc;
+extern crate alloc;
 #[macro_use] extern crate log;
 #[macro_use] extern crate app_io;
 extern crate getopts;
@@ -32,7 +32,7 @@ static PINNED: Once<bool> = Once::new();
 macro_rules! pin_task {
     ($tb:ident, $cpu:expr) => (
         if PINNED.get() == Some(&true) {
-            $tb.pin_on_core($cpu)
+            $tb.pin_on_cpu($cpu)
         } else {
             $tb
         });
@@ -70,7 +70,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("o", "oneshot", "run the 'oneshot' test variant, in which {ITER} tasks are spawned to send/receive one message each.");
     opts.optflag("m", "multiple", "run the 'multiple' test, in which one sender and one receiver task are spawned to send/receive {ITER} messages.");
     
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);

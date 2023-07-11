@@ -26,7 +26,7 @@ pub fn main(_: Vec<String>) -> isize {
 
     while !lock.is_locked() {}
 
-    task_cancel::cancel_task(task.clone());
+    task.cancel();
 
     log::debug!("waiting for lock to be unlocked");
 

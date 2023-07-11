@@ -1,45 +1,33 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Nathan Royer <nathan.royer.pro@gmail.com>"]
 name = "interrupts"
 description = "Interrupt configuration and handlers for Theseus"
 version = "0.1.0"
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-spin = "0.9.4"
-x86_64 = "0.14.8"
-locked_idt = { path = "../../libs/locked_idt" }
 log = "0.4.8"
 
-[dependencies.memory]
-path = "../memory"
+interrupt_controller = { path = "../interrupt_controller" }
+memory = { path = "../memory" }
+cpu = { path = "../cpu" }
+spin = "0.9.4"
 
-[dependencies.apic]
-path = "../apic"
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+arm_boards = { path = "../arm_boards" }
+kernel_config = { path = "../kernel_config" }
+gic = { path = "../gic" }
+tock-registers = "0.7.0"
+cortex-a = "7.5.0"
+time = { path = "../time" }
 
-[dependencies.tss]
-path = "../tss"
-
-[dependencies.gdt]
-path = "../gdt"
-
-[dependencies.pic]
-path = "../pic"
-
-[dependencies.exceptions_early]
-path = "../exceptions_early"
-
-[dependencies.scheduler]
-path = "../scheduler"
-
-[dependencies.sleep]
-path = "../sleep"
-
-[dependencies.vga_buffer]
-path = "../vga_buffer"
-
-[dependencies.task]
-path = "../task"
-
-[lib]
-crate-type = ["rlib"]
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+exceptions_early = { path = "../exceptions_early" }
+early_printer = { path = "../early_printer" }
+apic = { path = "../apic" }
+gdt = { path = "../gdt" }
+pic = { path = "../pic" }
+tss = { path = "../tss" }
+x86_64 = "0.14.8"
+locked_idt = { path = "../../libs/locked_idt" }

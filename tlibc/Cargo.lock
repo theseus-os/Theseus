@@ -3,24 +3,6 @@
 version = 3
 
 [[package]]
-name = "acpi"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "acpi_table_handler",
- "dmar",
- "fadt",
- "hpet",
- "iommu",
- "log",
- "madt",
- "memory",
- "rsdp",
- "rsdt",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "acpi_table"
 version = "0.1.0"
 dependencies = [
@@ -28,20 +10,6 @@ dependencies = [
  "memory",
  "sdt",
  "zerocopy",
-]
-
-[[package]]
-name = "acpi_table_handler"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "dmar",
- "fadt",
- "hpet",
- "log",
- "madt",
- "memory",
- "rsdt",
 ]
 
 [[package]]
@@ -53,22 +21,6 @@ dependencies = [
  "getrandom",
  "once_cell",
  "version_check",
-]
-
-[[package]]
-name = "ap_start"
-version = "0.1.0"
-dependencies = [
- "apic",
- "interrupts",
- "irq_safety",
- "kernel_config",
- "log",
- "memory",
- "no_drop",
- "scheduler",
- "spawn",
- "stack",
 ]
 
 [[package]]
@@ -86,7 +38,6 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
- "static_assertions",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -97,16 +48,28 @@ name = "app_io"
 version = "0.1.0"
 dependencies = [
  "core2",
- "event_types",
- "keycodes_ascii",
- "libterm",
- "log",
- "logger",
- "print",
- "spin 0.9.4",
+ "hashbrown",
+ "lazy_static",
+ "logger_x86_64",
+ "mutex_sleep",
  "stdio",
  "task",
- "window_manager",
+ "tty",
+]
+
+[[package]]
+name = "async_channel"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "crossbeam-utils",
+ "debugit",
+ "hpet",
+ "log",
+ "mpmc",
+ "spin 0.9.4",
+ "task",
+ "wait_queue",
 ]
 
 [[package]]
@@ -153,6 +116,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "boot_info"
+version = "0.1.0"
+dependencies = [
+ "bitflags",
+ "kernel_config",
+ "memory_structs",
+]
+
+[[package]]
 name = "bootloader_modules"
 version = "0.1.0"
 dependencies = [
@@ -160,25 +132,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "by_address"
-version = "1.0.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e245704f60eb4eb45810d65cf14eb54d2eb50a6f3715fe2d7cd01ee905c2944f"
-
-[[package]]
 name = "byteorder"
 version = "1.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
-
-[[package]]
-name = "catch_unwind"
-version = "0.1.0"
-dependencies = [
- "log",
- "task",
- "unwind",
-]
 
 [[package]]
 name = "cbitset"
@@ -206,18 +163,6 @@ name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
-
-[[package]]
-name = "color"
-version = "0.1.0"
-
-[[package]]
-name = "compositor"
-version = "0.1.0"
-dependencies = [
- "framebuffer",
- "shapes",
-]
 
 [[package]]
 name = "const_format"
@@ -286,11 +231,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "cortex-a"
+version = "7.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bdecfbb28672ad3664e71ae05a398a52df430d86d660691501b28968cc4467e6"
+dependencies = [
+ "tock-registers",
+]
+
+[[package]]
 name = "cow_arc"
 version = "0.1.0"
 dependencies = [
  "dereffer",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "cpu"
+version = "0.1.0"
+dependencies = [
+ "apic",
 ]
 
 [[package]]
@@ -307,7 +268,6 @@ dependencies = [
  "qp-trie",
  "serde",
  "spin 0.9.4",
- "static_assertions",
  "str_ref",
  "xmas-elf",
 ]
@@ -327,23 +287,6 @@ dependencies = [
  "crate_metadata",
  "itertools",
  "path",
-]
-
-[[package]]
-name = "crate_swap"
-version = "0.1.0"
-dependencies = [
- "by_address",
- "fs_node",
- "hashbrown",
- "hpet",
- "lazy_static",
- "log",
- "memory",
- "mod_mgmt",
- "path",
- "qp-trie",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -403,32 +346,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dfqueue"
-version = "0.1.0"
-
-[[package]]
-name = "displayable"
-version = "0.1.0"
-dependencies = [
- "color",
- "framebuffer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "dmar"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "log",
- "memory",
- "sdt",
- "static_assertions",
- "zerocopy",
-]
-
-[[package]]
 name = "either"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -442,15 +359,6 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
-]
-
-[[package]]
-name = "event_types"
-version = "0.1.0"
-dependencies = [
- "keycodes_ascii",
- "mouse_data",
- "shapes",
 ]
 
 [[package]]
@@ -477,54 +385,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "fadt"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "memory",
- "sdt",
- "static_assertions",
- "zerocopy",
-]
-
-[[package]]
 name = "fallible-iterator"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
-name = "fault_crate_swap"
-version = "0.1.0"
-dependencies = [
- "crate_swap",
- "fault_log",
- "fs_node",
- "log",
- "memory",
- "mod_mgmt",
- "path",
- "task",
-]
-
-[[package]]
 name = "fault_log"
 version = "0.1.0"
 dependencies = [
- "apic",
+ "app_io",
+ "cpu",
  "irq_safety",
  "log",
  "memory",
- "print",
  "task",
  "vga_buffer",
-]
-
-[[package]]
-name = "font"
-version = "0.1.0"
-dependencies = [
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -537,47 +413,6 @@ dependencies = [
  "memory_structs",
  "spin 0.9.4",
  "static_assertions",
-]
-
-[[package]]
-name = "framebuffer"
-version = "0.1.0"
-dependencies = [
- "color",
- "log",
- "memory",
- "multicore_bringup",
- "page_attribute_table",
- "shapes",
- "zerocopy",
-]
-
-[[package]]
-name = "framebuffer_compositor"
-version = "0.1.0"
-dependencies = [
- "compositor",
- "framebuffer",
- "hashbrown",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "framebuffer_drawer"
-version = "0.1.0"
-dependencies = [
- "framebuffer",
- "shapes",
-]
-
-[[package]]
-name = "framebuffer_printer"
-version = "0.1.0"
-dependencies = [
- "font",
- "framebuffer",
- "shapes",
 ]
 
 [[package]]
@@ -664,7 +499,7 @@ dependencies = [
  "memory",
  "sdt",
  "spin 0.9.4",
- "static_assertions",
+ "time",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -707,32 +542,6 @@ dependencies = [
  "lockable",
  "log",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "ioapic"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "memory",
- "spin 0.9.4",
- "volatile 0.2.7",
- "zerocopy",
-]
-
-[[package]]
-name = "iommu"
-version = "0.1.0"
-dependencies = [
- "bitflags",
- "irq_safety",
- "log",
- "memory",
- "spin 0.9.4",
- "static_assertions",
- "volatile 0.2.7",
- "zerocopy",
 ]
 
 [[package]]
@@ -781,29 +590,6 @@ version = "0.2.127"
 source = "git+https://github.com/theseus-os/libc?branch=theseus#5e1da08f39d9b25c649f1152e0084585b0adf725"
 
 [[package]]
-name = "libterm"
-version = "0.1.0"
-dependencies = [
- "color",
- "dfqueue",
- "displayable",
- "environment",
- "event_types",
- "font",
- "framebuffer",
- "framebuffer_drawer",
- "framebuffer_printer",
- "log",
- "print",
- "root",
- "shapes",
- "text_display",
- "tsc",
- "window",
- "window_manager",
-]
-
-[[package]]
 name = "linked_list_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -844,28 +630,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "logger"
+name = "logger_x86_64"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "log",
  "serial_port_basic",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "madt"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "apic",
- "ioapic",
- "log",
- "memory",
- "pic",
- "sdt",
- "static_assertions",
- "zerocopy",
 ]
 
 [[package]]
@@ -902,14 +673,15 @@ dependencies = [
  "atomic_linked_list",
  "bit_field 0.7.0",
  "bitflags",
+ "boot_info",
  "frame_allocator",
  "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
+ "memory_aarch64",
  "memory_structs",
  "memory_x86_64",
- "multiboot2",
  "no_drop",
  "owned_borrowed_trait",
  "page_allocator",
@@ -919,6 +691,19 @@ dependencies = [
  "x86_64",
  "xmas-elf",
  "zerocopy",
+]
+
+[[package]]
+name = "memory_aarch64"
+version = "0.1.0"
+dependencies = [
+ "boot_info",
+ "cortex-a",
+ "kernel_config",
+ "log",
+ "memory_structs",
+ "pte_flags",
+ "tock-registers",
 ]
 
 [[package]]
@@ -936,10 +721,10 @@ dependencies = [
 name = "memory_x86_64"
 version = "0.1.0"
 dependencies = [
+ "boot_info",
  "kernel_config",
  "log",
  "memory_structs",
- "multiboot2",
  "pte_flags",
  "x86_64",
 ]
@@ -962,6 +747,7 @@ dependencies = [
  "log",
  "memfs",
  "memory",
+ "no_drop",
  "path",
  "qp-trie",
  "rangemap",
@@ -969,51 +755,9 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "util",
  "vfs_node",
- "xmas-elf",
-]
-
-[[package]]
-name = "modular-bitfield"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a53d79ba8304ac1c4f9eb3b9d281f21f7be9d4626f72ce7df4ad8fbde4f38a74"
-dependencies = [
- "modular-bitfield-impl",
- "static_assertions",
-]
-
-[[package]]
-name = "modular-bitfield-impl"
-version = "0.11.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "mouse"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "interrupts",
- "log",
- "mouse_data",
- "mpmc",
- "ps2",
- "spin 0.9.4",
  "x86_64",
-]
-
-[[package]]
-name = "mouse_data"
-version = "0.1.0"
-dependencies = [
- "modular-bitfield",
+ "xmas-elf",
 ]
 
 [[package]]
@@ -1027,41 +771,23 @@ name = "msr"
 version = "0.1.0"
 
 [[package]]
-name = "multiboot2"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6170b6f12ea75d8d0f5621e3ed780b041a666c4a5b904c77261fe343d0e798d"
-dependencies = [
- "bitflags",
-]
-
-[[package]]
-name = "multicore_bringup"
-version = "0.1.0"
-dependencies = [
- "acpi",
- "ap_start",
- "apic",
- "kernel_config",
- "log",
- "madt",
- "memory",
- "mod_mgmt",
- "pause",
- "pit_clock_basic",
- "spin 0.9.4",
- "stack",
- "volatile 0.2.7",
- "zerocopy",
-]
-
-[[package]]
 name = "mutex_preemption"
 version = "0.1.0"
 dependencies = [
  "lockable",
  "preemption",
  "spin 0.9.4",
+]
+
+[[package]]
+name = "mutex_sleep"
+version = "0.1.0"
+dependencies = [
+ "lockable",
+ "log",
+ "spin 0.9.4",
+ "task",
+ "wait_queue",
 ]
 
 [[package]]
@@ -1138,22 +864,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "page_attribute_table"
-version = "0.1.0"
-dependencies = [
- "log",
- "memory",
- "modular-bitfield",
- "msr",
- "raw-cpuid",
- "x86_64",
-]
-
-[[package]]
 name = "page_table_entry"
 version = "0.1.0"
 dependencies = [
- "bit_field 0.7.0",
  "frame_allocator",
  "kernel_config",
  "memory_structs",
@@ -1207,10 +920,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pause"
-version = "0.1.0"
-
-[[package]]
 name = "pic"
 version = "0.1.0"
 dependencies = [
@@ -1246,16 +955,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "print"
-version = "0.1.0"
-dependencies = [
- "dfqueue",
- "event_types",
- "log",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.40"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1265,30 +964,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "ps2"
-version = "0.1.0"
-dependencies = [
- "log",
- "modular-bitfield",
- "num_enum",
- "port_io",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "pte_flags"
 version = "0.1.0"
 dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
- "static_assertions",
 ]
 
 [[package]]
 name = "qp-trie"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a075ecba64154fed5429568c9c6a0e0eccc3276209e93e6133206413ea6834b4"
+checksum = "9569328cda9b68120dbbf855bac541eeb40c475d96a9a380cf8b5547bfe0c165"
 dependencies = [
  "new_debug_unreachable",
  "unreachable",
@@ -1305,8 +992,9 @@ dependencies = [
 
 [[package]]
 name = "rangemap"
-version = "1.0.3"
-source = "git+https://github.com/jeffparsons/rangemap#8b290d474bae680531bfba42e545e4d0121b70fd"
+version = "1.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b9283c6b06096b47afc7109834fdedab891175bb5241ee5d4f7d2546549f263"
 
 [[package]]
 name = "raw-cpuid"
@@ -1325,24 +1013,6 @@ dependencies = [
  "lazy_static",
  "log",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "rsdp"
-version = "0.1.0"
-dependencies = [
- "memory",
- "static_assertions",
- "zerocopy",
-]
-
-[[package]]
-name = "rsdt"
-version = "0.1.0"
-dependencies = [
- "acpi_table",
- "memory",
- "sdt",
 ]
 
 [[package]]
@@ -1481,7 +1151,6 @@ dependencies = [
 name = "sdt"
 version = "0.1.0"
 dependencies = [
- "static_assertions",
  "zerocopy",
 ]
 
@@ -1530,10 +1199,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "shapes"
-version = "0.1.0"
-
-[[package]]
 name = "single_simd_task_optimization"
 version = "0.1.0"
 dependencies = [
@@ -1546,38 +1211,12 @@ dependencies = [
 name = "sleep"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-utils",
  "irq_safety",
  "lazy_static",
  "scheduler",
  "task",
-]
-
-[[package]]
-name = "spawn"
-version = "0.1.0"
-dependencies = [
- "apic",
- "catch_unwind",
- "context_switch",
- "debugit",
- "fault_crate_swap",
- "fault_log",
- "fs_node",
- "irq_safety",
- "lazy_static",
- "log",
- "memory",
- "mod_mgmt",
- "no_drop",
- "path",
- "pause",
- "preemption",
- "runqueue",
- "scheduler",
- "spin 0.9.4",
- "stack",
- "task",
- "thread_local_macro",
+ "time",
 ]
 
 [[package]]
@@ -1680,8 +1319,8 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
- "apic",
  "context_switch",
+ "cpu",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -1700,23 +1339,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "text_display"
+name = "time"
 version = "0.1.0"
 dependencies = [
- "color",
- "displayable",
- "font",
- "framebuffer",
- "framebuffer_printer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "thread_local_macro"
-version = "0.1.0"
-dependencies = [
- "static_assertions",
+ "crossbeam-utils",
+ "log",
 ]
 
 [[package]]
@@ -1739,23 +1366,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "tsc"
-version = "0.1.0"
-dependencies = [
- "log",
- "pit_clock_basic",
-]
+name = "tock-registers"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ee8fba06c1f4d0b396ef61a54530bb6b28f0dc61c38bc8bc5a5a48161e6282e"
 
 [[package]]
 name = "tss"
 version = "0.1.0"
 dependencies = [
- "apic",
  "atomic_linked_list",
+ "cpu",
  "log",
  "memory",
  "spin 0.9.4",
  "x86_64",
+]
+
+[[package]]
+name = "tty"
+version = "0.1.0"
+dependencies = [
+ "async_channel",
+ "core2",
+ "mutex_sleep",
 ]
 
 [[package]]
@@ -1794,10 +1428,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "util"
-version = "0.1.0"
-
-[[package]]
 name = "version_check"
 version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1818,7 +1448,7 @@ name = "vga_buffer"
 version = "0.1.0"
 dependencies = [
  "kernel_config",
- "logger",
+ "logger_x86_64",
  "spin 0.9.4",
  "volatile 0.2.7",
 ]
@@ -1844,65 +1474,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e4c2dbd44eb8b53973357e6e207e370f0c1059990df850aca1eca8947cf464f0"
 
 [[package]]
+name = "wait_queue"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "log",
+ "scheduler",
+ "task",
+]
+
+[[package]]
 name = "wasi"
 version = "0.10.2+wasi-snapshot-preview1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd6fbd9a79829dd1ad0cc20627bf1ed606756a7f77edff7b66b7064f9cb327c6"
-
-[[package]]
-name = "window"
-version = "0.1.0"
-dependencies = [
- "color",
- "dereffer",
- "event_types",
- "framebuffer",
- "framebuffer_drawer",
- "log",
- "mouse",
- "mpmc",
- "path",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
- "window_manager",
-]
-
-[[package]]
-name = "window_inner"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "framebuffer",
- "mpmc",
- "shapes",
-]
-
-[[package]]
-name = "window_manager"
-version = "0.1.0"
-dependencies = [
- "color",
- "compositor",
- "event_types",
- "font",
- "framebuffer",
- "framebuffer_compositor",
- "framebuffer_drawer",
- "keycodes_ascii",
- "lazy_static",
- "log",
- "mod_mgmt",
- "mouse_data",
- "mpmc",
- "path",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
-]
 
 [[package]]
 name = "x86_64"

@@ -1,52 +1,25 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "task"
-description = "Task types and structure definitions"
+description = "Shareable Task reference with more robust multithreading functionality"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
-spin = "0.9.4"
-x86_64 = "0.14.8"
-static_assertions = "1.1.0"
-crossbeam-utils = { version = "0.8.12", default-features = false }
 log = "0.4.8"
+spin = "0.9.4"
+static_assertions = "1.1.0"
+crossbeam-utils = { version = "0.8.2", default-features = false }
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
-[dependencies.cpu]
-path = "../cpu"
-
-[dependencies.tss]
-path = "../tss"
-
-[dependencies.kernel_config]
-path = "../kernel_config"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.stack]
-path = "../stack"
-
-[dependencies.mod_mgmt]
-path = "../mod_mgmt"
-
-[dependencies.context_switch]
-path = "../context_switch"
-
-[dependencies.preemption]
-path = "../preemption"
-
-[dependencies.environment]
-path = "../environment"
-
-[dependencies.root]
-path = "../root"
-
-[dependencies.no_drop]
-path = "../no_drop"
-
-
-[lib]
-crate-type = ["rlib"]
+context_switch = { path = "../context_switch" }
+cpu = { path = "../cpu" }
+cpu_local_preemption = { path = "../cpu_local_preemption" }
+environment = { path = "../environment" }
+memory = { path = "../memory" }
+mod_mgmt = { path = "../mod_mgmt" }
+no_drop = { path = "../no_drop" }
+stack = { path = "../stack" }
+task_struct = { path = "../task_struct" }
+waker_generic = { path = "../waker_generic" }

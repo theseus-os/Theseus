@@ -10,34 +10,38 @@ use memory::{PteFlags, PteFlagsArch, PhysicalAddress, Mutable, BorrowedSliceMapp
 use shapes::Coord;
 pub use pixel::*;
 
-/// Initializes the final framebuffer based on VESA graphics mode information obtained during boot.
+/// Initializes the final framebuffer based on graphics mode info obtained during boot.
 /// 
-/// The final framebuffer represents the actual pixel content displayed on screen 
-/// because its memory is directly mapped to the VESA display device's underlying physical memory.
+/// The final framebuffer represents the actual pixel content displayed on screen,
+/// as its memory is directly mapped to the display device's underlying physical memory.
 pub fn init<P: Pixel>() -> Result<Framebuffer<P>, &'static str> {
-    // get the graphic mode information
-    let vesa_display_phys_start: PhysicalAddress;
-    let buffer_width: usize;
-    let buffer_height: usize;
-    {
-        let graphic_info = multicore_bringup::GRAPHIC_INFO.lock();
-        info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
-            graphic_info.width(),
-            graphic_info.height(),
-            graphic_info.physical_address(),
-        );
-        if graphic_info.physical_address() == 0 {
-            return Err("Failed to get graphic mode information!");
-        }
-        vesa_display_phys_start = PhysicalAddress::new(graphic_info.physical_address() as usize)
-            .ok_or("Graphic mode physical address was invalid")?;
-        buffer_width = graphic_info.width() as usize;
-        buffer_height = graphic_info.height() as usize;
-    };
+    // Attempt to get the below 3 items of graphic mode info.
+    let mut width_height_paddr: Option<(usize, usize, PhysicalAddress)> = None;
+    // Take possession of the early framebuffer and obtain graphic info from it.
+    if let Some(early_fb) = early_printer::take() {
+        width_height_paddr = Some((
+            early_fb.width as usize,
+            early_fb.height as usize,
+            early_fb.paddr,
+        ));
+        // Here: the early framebuffer's underlying mapping is dropped.
+    }
 
-    // create and return the final framebuffer
-    let framebuffer = Framebuffer::new(buffer_width, buffer_height, Some(vesa_display_phys_start))?;
-    Ok(framebuffer)
+    // If we booted up other CPUs, we may have switched to a better graphics mode.
+    if let Some(gi) = multicore_bringup::get_graphic_info() {
+        let paddr = PhysicalAddress::new(gi.physical_address() as usize)
+            .ok_or("Graphic mode physical address was invalid")?;
+        let width = gi.width() as usize;
+        let height = gi.height() as usize;
+        width_height_paddr = Some((width, height, paddr));
+    }
+    
+    let (width, height, paddr) = width_height_paddr
+        .ok_or("Failed to get graphic mode information!")?;
+    info!("Graphical framebuffer info: {} x {}, at paddr {:#X}",
+        width, height, paddr,
+    );
+    Framebuffer::new(width, height, Some(paddr))
 }
 
 /// A framebuffer is a region of memory interpreted as a 2-D array of pixels.
@@ -152,7 +156,7 @@ impl<P: Pixel> Framebuffer<P> {
     /// at that `coordinate` in this framebuffer.
     pub fn draw_pixel(&mut self, coordinate: Coord, pixel: P) {
         if let Some(index) = self.index_of(coordinate) {
-            self.buffer[index] = pixel.blend(self.buffer[index]).into();
+            self.buffer[index] = pixel.blend(self.buffer[index]);
         }
     }
 

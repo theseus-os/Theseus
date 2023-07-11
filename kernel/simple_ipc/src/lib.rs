@@ -77,7 +77,7 @@ impl Receiver {
                 }
             }
         )
-        .map(|msg| (msg >> 8) as u8 & 0xFF)
+        .map(|msg| (msg >> 8) as u8)
         .map_err(|_e| "There was no message in the buffer.")
     }
 

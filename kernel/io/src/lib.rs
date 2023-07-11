@@ -37,9 +37,10 @@
 //! in which the next read or write operation will start where the prior one ended.
 //!
 
+#![allow(clippy::range_plus_one)]
 #![no_std]
+#![feature(int_roundings)]
 
-// #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 #[macro_use] extern crate delegate;
 extern crate spin;
@@ -124,6 +125,7 @@ impl<B> BlockIo for &mut B where B: BlockIo + ?Sized {
 /// A trait that represents an I/O stream that has a known length, e.g., a disk drive.
 ///
 /// This trait exists to enable seeking to an offset from the end of the stream.
+#[allow(clippy::len_without_is_empty)]
 pub trait KnownLength {
     /// Returns the length (size in bytes) of this I/O stream or device.
     fn len(&self) -> usize;
@@ -324,7 +326,6 @@ impl<R> From<R> for ByteReaderWrapper<R> where R: BlockReader {
 impl<R> ByteReader for ByteReaderWrapper<R> where R: BlockReader {
     fn read_at(&mut self, buffer: &mut [u8], offset: usize) -> Result<usize, IoError> {
         let mut tmp_block_bytes: Vec<u8> = Vec::new(); // avoid unnecessary allocation
-        let offset = offset as usize;
 
         let transfers = blocks_from_bytes(offset .. offset + buffer.len(), self.block_size());
         for transfer in transfers.iter().flatten() {
@@ -969,7 +970,7 @@ pub fn blocks_from_bytes(
                 };
                 transfers[transfer_idx] = Some(BlockByteTransfer {
                     byte_range_absolute: curr_byte .. end_byte,
-                    block_range: curr_block .. (round_up(end_byte, block_size) / block_size),
+                    block_range: curr_block .. (end_byte.next_multiple_of(block_size) / block_size),
                     bytes_in_block_range: 0 .. (end_byte - curr_byte),
                 });
                 transfer_idx += 1;
@@ -978,7 +979,7 @@ pub fn blocks_from_bytes(
         }
         // Otherwise, if the curr_byte is NOT block-aligned, then we can only do a single-block transfer.
         else {
-            let end_byte = min(byte_range.end, round_up(curr_byte, block_size));
+            let end_byte = min(byte_range.end, curr_byte.next_multiple_of(block_size));
             transfers[transfer_idx] = Some(BlockByteTransfer {
                 byte_range_absolute: curr_byte .. end_byte,
                 block_range: curr_block .. curr_block + 1, // just one block
@@ -1013,15 +1014,8 @@ pub struct BlockByteTransfer {
     pub bytes_in_block_range: Range<usize>,
 }
 
-
-/// Rounds the given `value` up to the nearest `multiple`.
-#[inline]
-pub fn round_up(value: usize, multiple: usize) -> usize {
-    ((value + multiple - 1) / multiple) * multiple
-}
-
 /// Rounds the given `value` down to the nearest `multiple`.
 #[inline]
-pub fn round_down(value: usize, multiple: usize) -> usize {
+fn round_down(value: usize, multiple: usize) -> usize {
     (value / multiple) * multiple
 }

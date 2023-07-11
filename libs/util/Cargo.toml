@@ -1,8 +1,0 @@
-[package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "util"
-description = "Random utility libraries used in Theseus."
-version = "0.1.0"
-
-[lib]
-crate-type = ["rlib"]

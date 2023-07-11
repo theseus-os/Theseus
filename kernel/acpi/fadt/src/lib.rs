@@ -2,19 +2,13 @@
 
 #![no_std]
 
-extern crate memory;
-extern crate sdt;
-extern crate acpi_table;
-extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
-
 use memory::PhysicalAddress;
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiSignature, AcpiTables};
 use zerocopy::FromBytes;
 
 
-pub const FADT_SIGNATURE: &'static [u8; 4] = b"FACP";
+pub const FADT_SIGNATURE: &[u8; 4] = b"FACP";
 
 
 /// The handler for parsing the FADT table and adding it to the ACPI tables list.
@@ -87,11 +81,12 @@ pub struct Fadt {
     pub x_gpe0_block: GenericAddressStructure,
     pub x_gpe1_block: GenericAddressStructure,
 }
-const_assert_eq!(core::mem::size_of::<Fadt>(), 244);
+const _: () = assert!(core::mem::size_of::<Fadt>() == 244);
+const _: () = assert!(core::mem::align_of::<Fadt>() == 1);
 
 impl Fadt {
     /// Finds the FADT in the given `AcpiTables` and returns a reference to it.
-    pub fn get<'t>(acpi_tables: &'t AcpiTables) -> Option<&'t Fadt> {
-        acpi_tables.table(&FADT_SIGNATURE).ok()
+    pub fn get(acpi_tables: &AcpiTables) -> Option<&Fadt> {
+        acpi_tables.table(FADT_SIGNATURE).ok()
     }
 }

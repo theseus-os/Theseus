@@ -9,7 +9,6 @@ spin = "0.9.4"
 volatile = "0.2.7"
 x86_64 = "0.14.8"
 zerocopy = "0.5.0"
-static_assertions = "1.1.0"
 mpmc = "0.1.6"
 
 
@@ -52,6 +51,12 @@ path = "../nic_initialization"
 
 [dependencies.net]
 path = "../net"
+
+[dependencies.deferred_interrupt_tasks]
+path = "../deferred_interrupt_tasks"
+
+[dependencies.task]
+path = "../task"
 
 [lib]
 crate-type = ["rlib"]

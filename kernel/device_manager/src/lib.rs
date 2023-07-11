@@ -1,50 +1,33 @@
 #![no_std]
-#![feature(trait_alias)]
+#![cfg_attr(target_arch = "x86_64", feature(trait_alias))]
 
-#[macro_use] extern crate log;
-extern crate spin;
-extern crate event_types;
-extern crate e1000;
-extern crate memory;
-extern crate apic;
-extern crate acpi;
-extern crate serial_port;
-extern crate console;
-extern crate logger;
-extern crate keyboard;
-extern crate pci;
-extern crate mouse;
-extern crate storage_manager;
-extern crate network_manager;
-extern crate ethernet_smoltcp_device;
-extern crate mpmc;
-extern crate ixgbe;
 extern crate alloc;
-extern crate fatfs;
-extern crate io;
-extern crate core2;
-#[macro_use] extern crate derive_more;
-extern crate mlx5;
-extern crate net;
 
-use core::convert::TryFrom;
-use mpmc::Queue;
-use event_types::Event;
-use memory::MemoryManagementInfo;
-use ethernet_smoltcp_device::EthernetNetworkInterface;
-use network_manager::add_to_network_interfaces;
-use alloc::vec::Vec;
-use io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter};
-use serial_port::{SerialPortAddress, take_serial_port_basic};
-use storage_manager::StorageDevice;
-use memory::PhysicalAddress;
+use log::info;
+
+#[cfg(target_arch = "x86_64")]
+use {
+    log::{error, debug, warn},
+    mpmc::Queue,
+    event_types::Event,
+    memory::MemoryManagementInfo,
+    ethernet_smoltcp_device::EthernetNetworkInterface,
+    network_manager::add_to_network_interfaces,
+    alloc::vec::Vec,
+    io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter},
+    storage_manager::StorageDevice,
+    memory::PhysicalAddress,
+    serial_port::{SerialPortAddress, init_serial_port, take_serial_port_basic},
+};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 /// TODO: use DHCP to acquire an IP address.
-const DEFAULT_LOCAL_IP: &'static str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
+#[cfg(target_arch = "x86_64")]
+const DEFAULT_LOCAL_IP: &str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
 
 /// Standard home router address.
 /// TODO: use DHCP to acquire gateway IP
+#[cfg(target_arch = "x86_64")]
 const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
 
 /// Performs early-stage initialization for simple devices needed during early boot.
@@ -52,6 +35,7 @@ const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slir
 /// This includes:
 /// * local APICs ([`apic`]),
 /// * [`acpi`] tables for system configuration info, including the IOAPIC.
+#[cfg(target_arch = "x86_64")]
 pub fn early_init(
     rsdp_address: Option<PhysicalAddress>,
     kernel_mmi: &mut MemoryManagementInfo
@@ -72,43 +56,54 @@ pub fn early_init(
 /// Devices include:
 /// * At least one [`serial_port`] (e.g., `COM1`) with full interrupt support,
 /// * The fully-featured system [`logger`],
-/// * PS2 [`keyboard`] and [`mouse`],
+/// * The legacy PS2 controller and any connected devices: [`keyboard`] and [`mouse`],
 /// * All other devices discovered on the [`pci`] bus.
-pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<(), &'static str>  {
+pub fn init(
+    #[cfg(target_arch = "x86_64")]
+    key_producer: Queue<Event>,
+    #[cfg(target_arch = "x86_64")]
+    mouse_producer: Queue<Event>,
+) -> Result<(), &'static str>  {
 
     let serial_ports = logger::take_early_log_writers();
     let logger_writers = IntoIterator::into_iter(serial_ports)
         .flatten()
-        .flat_map(|sp| SerialPortAddress::try_from(sp.base_port_address())
-            .ok()
-            .map(|sp_addr| serial_port::init_serial_port(sp_addr, sp))
-        ).map(|arc_ref| arc_ref.clone());
+        .filter_map(|sp| serial_port::init_serial_port(sp.base_port_address(), sp))
+        .cloned();
 
-    logger::init(None, logger_writers).map_err(|_e| "BUG: logger::init() failed")?;
+    logger::init(None, logger_writers);
     info!("Initialized full logger.");
 
-    // Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
-    // If a serial port was used for logging (as configured in [`logger::early_init()`]),
-    // ignore its inputs for purposes of starting new console instances.
-    let init_serial_port = |spa: SerialPortAddress| {
-        if let Some(sp) = take_serial_port_basic(spa) {
-            serial_port::init_serial_port(spa, sp);
-        } else {
-            console::ignore_serial_port_input(spa as u16);
-            info!("Ignoring input on {:?} because it is being used for logging.", spa);
-        }
-    };
-    init_serial_port(SerialPortAddress::COM1);
-    init_serial_port(SerialPortAddress::COM2);
+    // COM1 is the only UART on aarch64; it's used for logging as well as for the console.
+    #[cfg(target_arch = "x86_64")] {
+        // Ensure that both COM1 and COM2 are initialized, for logging and/or headless operation.
+        // If a serial port was used for logging (as configured in [`logger::early_init()`]),
+        // ignore its inputs for purposes of starting new console instances.
+        let init_serial_port = |spa: SerialPortAddress| {
+            if let Some(sp) = take_serial_port_basic(spa) {
+                init_serial_port(spa, sp);
+            } else {
+                console::ignore_serial_port_input(spa as u16);
+                info!("Ignoring input on {:?} because it is being used for logging.", spa);
+            }
+        };
+        init_serial_port(SerialPortAddress::COM1);
+        init_serial_port(SerialPortAddress::COM2);
+    }
 
-    ps2_controller::init()?;
-    keyboard::init(key_producer)?;
-    mouse::init(mouse_producer)?;
+    // PS/2 is x86_64 only
+    #[cfg(target_arch = "x86_64")] {
+        let ps2_controller = ps2::init()?;
+        keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
+        mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
+    }
 
+    // No PCI support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")] {
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter() {
         debug!("Found pci device: {:X?}", dev);
-    } 
+    }
 
     // store all the initialized ixgbe NICs here to be added to the network interface list
     let mut ixgbe_devs = Vec::new();
@@ -142,7 +137,8 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
                 let nic = e1000::E1000Nic::init(dev)?;
-                net::register_device(nic);
+                let interface = net::register_device(nic);
+                nic.lock().init_interrupts(interface)?;
 
                 let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
                 add_to_network_interfaces(e1000_interface);
@@ -210,7 +206,7 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
     // and mount each filesystem to the root directory by default.
     if false {
         for storage_device in storage_manager::storage_devices() {
-            let disk = FatFsAdapter(
+            let disk = fatfs_adapter::FatFsAdapter::new(
                 ReaderWriter::new(
                     ByteReaderWriterWrapper::from(
                         LockableIo::<dyn StorageDevice + Send, spin::Mutex<_>, _>::from(storage_device)
@@ -242,11 +238,16 @@ pub fn init(key_producer: Queue<Event>, mouse_producer: Queue<Event>) -> Result<
             }
         }
     }
+    }
 
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
+mod fatfs_adapter {
 // TODO: move the following `FatFsAdapter` stuff into a separate crate. 
+
+use derive_more::{From, Into};
 
 /// An adapter (wrapper type) that implements traits required by the [`fatfs`] crate
 /// for any I/O device that wants to be usable by [`fatfs`].
@@ -308,4 +309,5 @@ impl fatfs::IoError for FatFsIoErrorAdapter {
     fn new_write_zero_error() -> Self {
         FatFsIoErrorAdapter(core2::io::ErrorKind::WriteZero.into())
     }
+}
 }

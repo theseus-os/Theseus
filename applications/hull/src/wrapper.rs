@@ -17,7 +17,7 @@ impl serial::Read<u8> for Wrapper {
         let mut buf = [0; 1];
         match self.stdin.read(&mut buf)? {
             0 => Err(nb::Error::Other(io::Error::new(
-                io::ErrorKind::Other.into(),
+                io::ErrorKind::Other,
                 "read zero",
             ))),
             _ => Ok(buf[0]),

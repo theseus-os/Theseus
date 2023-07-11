@@ -62,15 +62,15 @@ pub fn init(idt_ref: &'static LockedIdt) {
 }
 
 
-/// calls print!() and then print_raw!()
+/// Prints to both the `early_printer` and the current terminal via `app_io`.
 macro_rules! println_both {
     ($fmt:expr) => {
-        vga_buffer::print_raw!(concat!($fmt, "\n"));
-        app_io::print!(concat!($fmt, "\n"));
+        early_printer::println!($fmt);
+        app_io::println!($fmt);
     };
     ($fmt:expr, $($arg:tt)*) => {
-        vga_buffer::print_raw!(concat!($fmt, "\n"), $($arg)*);
-        app_io::print!(concat!($fmt, "\n"), $($arg)*);
+        early_printer::println!($fmt, $($arg)*);
+        app_io::println!($fmt, $($arg)*);
     };
 }
 
@@ -106,7 +106,7 @@ fn kill_and_halt(
     }
 
 
-    #[cfg(all(unwind_exceptions, not(downtime_eval)))] {
+    #[cfg(unwind_exceptions)] {
         println_both!("Unwinding {:?} due to exception {}.", task::get_my_current_task(), exception_number);
     }
     #[cfg(not(unwind_exceptions))] {
@@ -122,14 +122,14 @@ fn kill_and_halt(
             let krate = app_crate.lock_as_ref();
             trace!("============== Crate {} =================", krate.crate_name);
             for s in krate.sections.values() {
-                trace!("   {:?}", &*s);
+                trace!("   {:?}", s);
             }
             krate.debug_symbols_file.clone()
         };
 
         if false {
             let mut debug = debug_info::DebugSymbols::Unloaded(debug_symbols_file);
-            let debug_sections = debug.load(&app_crate, &curr_task.get_namespace()).unwrap();
+            let debug_sections = debug.load(&app_crate, curr_task.get_namespace()).unwrap();
             let instr_ptr = stack_frame.instruction_pointer.as_u64() as usize - 1; // points to the next instruction (at least for a page fault)
 
             let res = debug_sections.find_subprogram_containing(VirtualAddress::new_canonical(instr_ptr));
@@ -138,41 +138,37 @@ fn kill_and_halt(
     }
 
     // print a stack trace
-    #[cfg(not(downtime_eval))] {
-        if print_stack_trace {
-            println_both!("------------------ Stack Trace (DWARF) ---------------------------");
-            let stack_trace_result = stack_trace::stack_trace(
-                &mut |stack_frame, stack_frame_iter| {
-                    let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
-                        VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
-                        false
-                    ).map(|(sec, offset)| (sec.name.clone(), offset));
-                    if let Some((symbol_name, offset)) = symbol_offset {
-                        println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
-                    } else {
-                        println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
-                    }
-                    true
-                },
-                None,
-            );
-            match stack_trace_result {
-                Ok(()) => { println_both!("  Beginning of stack"); }
-                Err(e) => { println_both!("  {}", e); }
-            }
-            println_both!("---------------------- End of Stack Trace ------------------------");
+    if print_stack_trace {
+        println_both!("------------------ Stack Trace (DWARF) ---------------------------");
+        let stack_trace_result = stack_trace::stack_trace(
+            &mut |stack_frame, stack_frame_iter| {
+                let symbol_offset = stack_frame_iter.namespace().get_section_containing_address(
+                    VirtualAddress::new_canonical(stack_frame.call_site_address() as usize),
+                    false
+                ).map(|(sec, offset)| (sec.name.clone(), offset));
+                if let Some((symbol_name, offset)) = symbol_offset {
+                    println_both!("  {:>#018X} in {} + {:#X}", stack_frame.call_site_address(), symbol_name, offset);
+                } else {
+                    println_both!("  {:>#018X} in ??", stack_frame.call_site_address());
+                }
+                true
+            },
+            None,
+        );
+        match stack_trace_result {
+            Ok(()) => { println_both!("  Beginning of stack"); }
+            Err(e) => { println_both!("  {}", e); }
         }
+        println_both!("---------------------- End of Stack Trace ------------------------");
     }
 
     let cause = task::KillReason::Exception(exception_number);
 
     // Call this task's kill handler, if it has one.
     if let Some(ref kh_func) = task::take_kill_handler() {
-        #[cfg(not(downtime_eval))]
         debug!("Found kill handler callback to invoke in Task {:?}", task::get_my_current_task());
         kh_func(&cause);
     } else {
-        #[cfg(not(downtime_eval))]
         debug!("No kill handler callback in Task {:?}", task::get_my_current_task());
     }
 
@@ -221,7 +217,7 @@ fn kill_and_halt(
             }
             kill_result
         });
-        if let Err(()) = res {
+        if res.is_err() {
             println_both!("BUG: kill_and_halt(): Couldn't get current task in order to kill it.");
         }
     }
@@ -231,7 +227,7 @@ fn kill_and_halt(
     // But in general, this task should have already been marked as killed and thus no longer schedulable,
     // so it should not reach this point. 
     // Only exceptions during the early OS initialization process will get here, meaning that the OS will basically stop.
-    loop { }
+    loop { core::hint::spin_loop() }
 }
 
 
@@ -269,16 +265,11 @@ extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame)
 /// another regular interrupt. 
 /// This includes printing to the log (e.g., `debug!()`) or the screen.
 extern "x86-interrupt" fn nmi_handler(stack_frame: InterruptStackFrame) {
+    // trace!("nmi_handler (CPU {})", cpu::current_cpu());
     let mut expected_nmi = false;
 
-    // currently we're using NMIs to send TLB shootdown IPIs
-    {
-        let pages_to_invalidate = tlb_shootdown::TLB_SHOOTDOWN_IPI_PAGES.read().clone();
-        if let Some(pages) = pages_to_invalidate {
-            // trace!("nmi_handler (AP {})", cpu::current_cpu());
-            tlb_shootdown::handle_tlb_shootdown_ipi(pages);
-            expected_nmi = true;
-        }
+    if tlb_shootdown::handle_tlb_shootdown_ipi() {
+        return;
     }
 
     // Performance monitoring hardware uses NMIs to trigger a sampling interrupt.
@@ -353,7 +344,7 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame,
     }
     
     kill_and_halt(0x8, &stack_frame, Some(error_code.into()), false);
-    loop {}
+    loop { core::hint::spin_loop() }
 }
 
 /// exception 0x0A
@@ -384,16 +375,14 @@ extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: Interrup
 extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {
     let accessed_vaddr = Cr2::read_raw() as usize;
 
-    #[cfg(not(downtime_eval))] {
-        println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
-            error code: {:?}\n{:#X?}",
-            accessed_vaddr,
-            error_code,
-            stack_frame
-        );
-        if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr)) {
-            println_both!("--> Page fault was caused by stack overflow, tried to access {:#X}\n.", accessed_vaddr);
-        }
+    println_both!("\nEXCEPTION: PAGE FAULT while accessing {:#x}\n\
+        error code: {:?}\n{:#X?}",
+        accessed_vaddr,
+        error_code,
+        stack_frame
+    );
+    if is_stack_overflow(VirtualAddress::new_canonical(accessed_vaddr)) {
+        println_both!("--> Page fault was caused by stack overflow, tried to access {:#X}\n.", accessed_vaddr);
     }
     
     kill_and_halt(0xE, &stack_frame, Some(ErrorCode::PageFaultError { accessed_address: accessed_vaddr, pf_error: error_code }), true)
@@ -416,7 +405,7 @@ extern "x86-interrupt" fn alignment_check_handler(stack_frame: InterruptStackFra
 extern "x86-interrupt" fn machine_check_handler(stack_frame: InterruptStackFrame) -> ! {
     println_both!("\nEXCEPTION: MACHINE CHECK\n{:#X?}", stack_frame);
     kill_and_halt(0x12, &stack_frame, None, true);
-    loop {}
+    loop { core::hint::spin_loop() }
 }
 
 /// exception 0x13

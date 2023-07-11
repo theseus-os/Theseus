@@ -3,80 +3,41 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "device_manager"
 description = "Code for handling the sequence required to manage and initialize each driver"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+event_types = { path = "../event_types" }
+serial_port = { path = "../serial_port" }
+console = { path = "../console" }
+logger = { path = "../logger" }
 derive_more = "0.99.0"
 mpmc = "0.1.6"
+log = "0.4.8"
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+memory = { path = "../memory" }
+e1000 = { path = "../e1000" }
+acpi = { path = "../acpi" }
+pci = { path = "../pci" }
+ps2 = { path = "../ps2" }
+keyboard = { path = "../keyboard" }
+mouse = { path = "../mouse" }
+storage_manager = { path = "../storage_manager" }
+network_manager = { path = "../network_manager" }
+ethernet_smoltcp_device = { path = "../ethernet_smoltcp_device" }
+ixgbe = { path = "../ixgbe" }
+io = { path = "../io" }
+mlx5 = { path = "../mlx5" }
+iommu = { path = "../iommu" }
+net = { path = "../net" }
+apic = { path = "../apic" }
 
 [dependencies.fatfs]
 git = "https://github.com/rafalh/rust-fatfs"
 default-features = false
 features = [ "alloc", "lfn", "unicode", "log_level_warn" ]
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.event_types]
-path = "../event_types"
-
-[dependencies.memory]
-path = "../memory"
-
-[dependencies.apic]
-path = "../apic"
-
-[dependencies.serial_port]
-path = "../serial_port"
-
-[dependencies.console]
-path = "../console"
-
-[dependencies.logger]
-path = "../logger"
-
-[dependencies.e1000]
-path = "../e1000"
-
-[dependencies.acpi]
-path = "../acpi"
-
-[dependencies.pci]
-path = "../pci"
-
-[dependencies.ps2_controller]
-path = "../ps2_controller"
-
-[dependencies.keyboard]
-path = "../keyboard"
-
-[dependencies.mouse]
-path = "../mouse"
-
-[dependencies.storage_manager]
-path = "../storage_manager"
-
-[dependencies.network_manager]
-path = "../network_manager"
-
-[dependencies.ethernet_smoltcp_device]
-path = "../ethernet_smoltcp_device"
-
-[dependencies.ixgbe]
-path = "../ixgbe"
-
-[dependencies.io]
-path = "../io"
-
-[dependencies.mlx5]
-path = "../mlx5"
-
-[dependencies.iommu]
-path = "../iommu"
-
-[dependencies.net]
-path = "../net"
 
 [lib]
 crate-type = ["rlib"]

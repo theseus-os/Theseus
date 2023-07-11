@@ -7,13 +7,12 @@
 use zerocopy::{U32, FromBytes};
 use volatile::Volatile;
 use byteorder::BigEndian;
-use memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable};
+use memory::{MappedPages, create_contiguous_mapping, BorrowedSliceMappedPages, Mutable, MMIO_FLAGS};
 use core::fmt;
 use num_enum::TryFromPrimitive;
 use core::convert::TryFrom;
 use alloc::vec::Vec;
 use nic_buffers::ReceiveBuffer;
-use nic_initialization::NIC_MAPPING_FLAGS;
 
 #[allow(unused_imports)]
 use crate::{Rqn, Lkey, CQN_MASK, command_queue::CommandOpcode, work_queue::WorkQueueEntryReceive, completion_queue::CompletionQueue};
@@ -36,7 +35,7 @@ pub(crate) struct TransportInterfaceReceiveContext {
     _padding4:              [u8; 20],
 }
 
-const_assert_eq!(core::mem::size_of::<TransportInterfaceReceiveContext>(), 92);
+const _: () = assert!(core::mem::size_of::<TransportInterfaceReceiveContext>() == 92);
 
 impl TransportInterfaceReceiveContext {
     /// Initialize the TIR object
@@ -93,7 +92,7 @@ pub(crate) struct ReceiveQueueContext {
     _padding1:                          [u8; 20],
 }
 
-const_assert_eq!(core::mem::size_of::<ReceiveQueueContext>(), 48);
+const _: () = assert!(core::mem::size_of::<ReceiveQueueContext>() == 48);
 
 impl fmt::Debug for ReceiveQueueContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -136,7 +135,7 @@ impl ReceiveQueueContext {
     /// Find the state of the RQ from the RQ context 
     pub fn get_state(&self) -> Result<ReceiveQueueState, &'static str> {
         let state = (self.rlky_state.read().get() & STATE_MASK) >> STATE_SHIFT;
-        Ok( ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")? )
+        ReceiveQueueState::try_from(state as u8).map_err(|_e| "Invalid value in the RQ state")
     }
 
     /// Offset that this context is written to in the mailbox buffer
@@ -229,7 +228,7 @@ impl ReceiveQueue {
             let rx_buf = self.pool.pop()
                 .ok_or("Couldn't obtain a ReceiveBuffer from the pool")
                 .or_else(|_e| {
-                    create_contiguous_mapping(buffer_size as usize, NIC_MAPPING_FLAGS)
+                    create_contiguous_mapping(buffer_size as usize, MMIO_FLAGS)
                         .and_then(|(buf_mapped, buf_paddr)|
                             ReceiveBuffer::new(buf_mapped, buf_paddr, buffer_size as u16, mem_pool)
                         )

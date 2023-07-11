@@ -215,7 +215,7 @@ pub fn main(args: Vec<String>) -> isize {
     // Set and parse options.
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(e) => {
             error!("{}", e);

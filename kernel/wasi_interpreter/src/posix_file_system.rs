@@ -134,9 +134,9 @@ impl PosixNode {
     ) -> PosixNode {
         PosixNode {
             theseus_file_or_dir: file_or_dir,
-            fs_rights_base: fs_rights_base,
-            fs_rights_inheriting: fs_rights_inheriting,
-            fs_flags: fs_flags,
+            fs_rights_base,
+            fs_rights_inheriting,
+            fs_flags,
             offset: 0,
         }
     }
@@ -335,7 +335,7 @@ impl FileDescriptorTable {
         fd_table.insert(wasi::FD_STDIN, PosixNodeOrStdio::Stdin);
         fd_table.insert(wasi::FD_STDOUT, PosixNodeOrStdio::Stdout);
         fd_table.insert(wasi::FD_STDERR, PosixNodeOrStdio::Stderr);
-        FileDescriptorTable { fd_table: fd_table }
+        FileDescriptorTable { fd_table }
     }
 
     /// Open file or directory at path in accordance to given open flags and insert in fd table.
@@ -352,6 +352,7 @@ impl FileDescriptorTable {
     /// # Return
     /// If successful, returns resulting file descriptor number.
     /// Otherwise, returns a wasi::Errno.
+    #[allow(clippy::too_many_arguments)]
     pub fn open_path(
         &mut self,
         path: &str,
@@ -411,7 +412,7 @@ impl FileDescriptorTable {
                     } else if truncate_file_to_size_zero {
                         // HACK: Truncate file by overwriting file.
                         let new_file: FileRef =
-                            MemFile::new(String::from(base_name), &parent_dir).unwrap();
+                            MemFile::create(String::from(base_name), &parent_dir).unwrap();
                         FileOrDir::File(new_file)
                     } else {
                         file_or_dir
@@ -422,7 +423,7 @@ impl FileDescriptorTable {
             None => {
                 if create_file_if_no_exist {
                     let new_file: FileRef =
-                        MemFile::new(String::from(base_name), &parent_dir).unwrap();
+                        MemFile::create(String::from(base_name), &parent_dir).unwrap();
                     FileOrDir::File(new_file)
                 } else {
                     return Err(wasi::ERRNO_NOENT);
@@ -485,12 +486,10 @@ impl FileDescriptorTable {
     /// # Return
     /// Returns corresponding file system node if exists.
     pub fn get_posix_node(&mut self, fd: wasi::Fd) -> Option<&mut PosixNode> {
-        match self.get_posix_node_or_stdio(fd) {
-            Some(posix_node_or_stdio) => match posix_node_or_stdio {
-                PosixNodeOrStdio::Inode(posix_node) => Some(posix_node),
-                _ => None,
-            },
-            None => None,
-        }
+        if let Some(PosixNodeOrStdio::Inode(posix_node)) = self.get_posix_node_or_stdio(fd) {
+            Some(posix_node)
+        } else {
+            None
+        }        
     }
 }

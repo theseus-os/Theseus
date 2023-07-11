@@ -1,0 +1,9 @@
+[package]
+name = "sync_irq"
+version = "0.1.0"
+description = "Interrupt-request-disabling synchronisation primitives"
+edition = "2021"
+
+[dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync = { path = "../sync" }

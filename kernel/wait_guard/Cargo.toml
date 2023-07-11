@@ -1,0 +1,7 @@
+[package]
+name = "wait_guard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+task = { path = "../task" }

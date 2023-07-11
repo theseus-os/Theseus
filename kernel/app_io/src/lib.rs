@@ -12,6 +12,7 @@
 #![no_std]
 
 extern crate alloc;
+extern crate logger;
 
 use alloc::{format, sync::Arc};
 use core2::io::{self, Error, ErrorKind, Read, Write};
@@ -187,8 +188,10 @@ pub fn line_discipline() -> Result<Arc<LineDiscipline>, &'static str> {
 /// Calls `print!()` with an extra newline ('\n') appended to the end.
 #[macro_export]
 macro_rules! println {
-    ($fmt:expr) => ($crate::print!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => ($crate::print!(concat!($fmt, "\n"), $($arg)*));
+    () => ($crate::print!("\n"));
+    ($($arg:tt)*) => ({
+        $crate::print_to_stdout_args(::core::format_args!("{}\n", ::core::format_args!($($arg)*)));
+    });
 
 }
 
@@ -197,7 +200,7 @@ macro_rules! println {
 #[macro_export]
 macro_rules! print {
     ($($arg:tt)*) => ({
-        $crate::print_to_stdout_args(format_args!($($arg)*));
+        $crate::print_to_stdout_args(::core::format_args!($($arg)*));
     });
 }
 
@@ -208,18 +211,15 @@ pub fn print_to_stdout_args(fmt_args: core::fmt::Arguments) {
 
     // Obtains the correct stdout stream and push the output bytes.
     let locked_streams = shared_maps::lock_stream_map();
-    match locked_streams.get(&task_id) {
-        Some(queues) => {
-            if queues
+    if let Some(queues) = locked_streams.get(&task_id) {
+        if queues
                 .stdout
-                .write_all(format!("{}", fmt_args).as_bytes())
+                .write_all(format!("{fmt_args}").as_bytes())
                 .is_err()
             {
                 let _ = logger::write_str("\x1b[31m [E] failed to write to stdout \x1b[0m\n");
             }
-        }
-        None => {
-            let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
-        }
+    } else {
+        // let _ = logger::write_str("\x1b[31m [E] error in print!/println! macro: no stdout queue for current task \x1b[0m\n");
     };
 }

@@ -40,14 +40,19 @@ pub(crate) fn into_loaded_crate(
         data_sections:       serialized_crate.data_sections,
         reexported_symbols:  BTreeSet::new(),
     });
+    let parent_crate_weak_ref = CowArc::downgrade(&loaded_crate);
 
     let mut sections = HashMap::with_capacity(serialized_crate.sections.len());
     for (shndx, section) in serialized_crate.sections {
+        // Skip zero-sized TLS sections, which are just markers, not real sections.
+        if section.ty.is_tls() && section.size == 0 {
+            continue;
+        }
         sections.insert(
             shndx,
             into_loaded_section(
                 section,
-                CowArc::downgrade(&loaded_crate),
+                parent_crate_weak_ref.clone(),
                 namespace,
                 text_pages,
                 rodata_pages,
@@ -100,26 +105,25 @@ fn into_loaded_section(
         SectionType::Data
         | SectionType::Bss => Arc::clone(data_pages),
     };
-    let virtual_address = VirtualAddress::new(serialized_section.virtual_address)
+    let virt_addr = VirtualAddress::new(serialized_section.virtual_address)
         .ok_or("SerializedSection::into_loaded_section(): invalid virtual address")?;
 
-    let loaded_section = LoadedSection {
-        name: match serialized_section.ty {
+    let loaded_section = LoadedSection::new(
+        serialized_section.ty,
+        match serialized_section.ty {
             SectionType::EhFrame
             | SectionType::GccExceptTable => crate::section_name_str_ref(&serialized_section.ty),
             _ => serialized_section.name.as_str().into(),
         },
-        typ: serialized_section.ty,
-        global: serialized_section.global,
-        mapped_pages_offset: serialized_section.offset,
         mapped_pages,
-        virt_addr: virtual_address,
-        size: serialized_section.size,
+        serialized_section.offset,
+        virt_addr,
+        serialized_section.size,
+        serialized_section.global,
         parent_crate,
-        inner: Default::default(),
-    };
+    );
 
-    if let SectionType::TlsData | SectionType::TlsBss = serialized_section.ty {
+    if serialized_section.ty.is_tls() {
         namespace.tls_initializer.lock().add_existing_static_tls_section(
             loaded_section,
             // TLS sections encode their TLS offset in the virtual address field,

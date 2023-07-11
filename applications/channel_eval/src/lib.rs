@@ -29,7 +29,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optflag("h", "help", "print this help menu");
     opts.optopt("n", "iterations", "number of test iterations (default 100)", "ITER");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
@@ -65,21 +65,21 @@ fn rmain(_matches: Matches) -> Result<(), &'static str> {
 
 /// A simple test that spawns a sender & receiver task to send `iterations` messages.
 fn test_multiple(iterations: usize) -> Result<(), &'static str> {
-    let my_cpu = cpu::current_cpu();
+    let this_cpu = cpu::current_cpu();
 
     let (sender, receiver) = unified_channel::new_string_channel(2);
 
     let t1 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
         info!("test_multiple(): Entered sender task!");
         for i in 0..iterations {
-            sender.send(format!("Message {:03}", i))?;
+            sender.send(format!("Message {i:03}"))?;
             info!("test_multiple(): Sender sent message {:03}", i);
         }
         Ok(())
     }, ())
         .name(String::from("sender_task"))
         .block()
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(this_cpu)
         .spawn()?;
 
     let t2 = spawn::new_task_builder(|_: ()| -> Result<(), &'static str> {
@@ -92,7 +92,7 @@ fn test_multiple(iterations: usize) -> Result<(), &'static str> {
     }, ())
         .name(String::from("receiver_task"))
         .block()
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(this_cpu)
         .spawn()?;
 
     info!("test_multiple(): Finished spawning the sender and receiver tasks");
@@ -112,5 +112,5 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: channel_eval [ARGS]
+const USAGE: &str = "Usage: channel_eval [ARGS]
 Used for evaluating live evolution between sync/async channels in Theseus.";

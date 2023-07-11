@@ -1,0 +1,12 @@
+[package]
+name = "mpmc_queue"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "A growable FIFO MPMC queue"
+edition = "2021"
+
+[dependencies]
+sync = { path = "../sync" }
+
+[dev-dependencies]
+sync_spin = { path = "../sync_spin"}

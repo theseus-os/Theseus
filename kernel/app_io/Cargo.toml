@@ -9,15 +9,13 @@ edition = "2021"
 [dependencies]
 hashbrown = "0.11"
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+logger = { path = "../logger" }
 
 [dependencies.task]
 path = "../../kernel/task"
 
 [dependencies.stdio]
 path = "../../libs/stdio"
-
-[dependencies.logger]
-path = "../../kernel/logger"
 
 [dependencies.mutex_sleep]
 path = "../../kernel/mutex_sleep"

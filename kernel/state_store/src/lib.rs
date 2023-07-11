@@ -90,7 +90,7 @@ pub fn insert_state<S: Any>(state: S) -> Option<S> {
 	// and then obtain a single-count Arc<S> from that &Arc<S>,
 	// while we achieve by cloning the &Arc<S> and then letting it drop out of scope.
 	let solo_arc = match old_val {
-		Some(g) => g.downcast_ref::<Arc<S>>().map( |a| Arc::clone(a)),
+		Some(g) => g.downcast_ref::<Arc<S>>().map(Arc::clone),
 		_ => None,
 	};
 
@@ -115,7 +115,7 @@ impl<S: Any> SSCached<S> {
 		// this is the VERY common case, simply loading the cached weak pointer and upgrading it
 		// SAFE: because we're the only ones able to access this AtomicPtr
 		let val: &Option<Weak<S>> = unsafe{ &*self.0.load(Ordering::Acquire) };
-		if let &Some(ref v) = val {
+		if let Some(ref v) = val {
 			if let Some(arc) = v.upgrade() {
 				// weird structure, because we only want to return if upgrade works!
 				return Some(arc);

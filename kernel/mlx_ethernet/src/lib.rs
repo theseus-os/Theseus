@@ -15,13 +15,11 @@
 
 #[macro_use]extern crate log;
 #[macro_use] extern crate alloc;
-#[macro_use] extern crate static_assertions;
 extern crate memory;
 extern crate volatile;
 extern crate bit_field;
 extern crate zerocopy;
 extern crate byteorder;
-extern crate nic_initialization;
 extern crate kernel_config;
 extern crate libm;
 extern crate num_enum;

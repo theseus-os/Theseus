@@ -2,9 +2,6 @@
 
 #![no_std]
 
-extern crate memory;
-extern crate zerocopy;
-#[macro_use] extern crate static_assertions;
 
 use core::mem;
 use memory::{
@@ -18,7 +15,7 @@ const RSDP_SEARCH_START: usize = 0xE_0000;
 /// The ending physical address of the region of memory where the RSDP table exists.
 const RSDP_SEARCH_END:   usize = 0xF_FFFF;
 /// The byte-string signature of the RSDP in memory.
-const RSDP_SIGNATURE: &'static [u8; 8] = b"RSD PTR ";
+const RSDP_SIGNATURE: &[u8; 8] = b"RSD PTR ";
 /// The RSDP signature is always aligned on a 16-byte boundary.
 const RSDP_SIGNATURE_ALIGNMENT: usize = 16;
 
@@ -39,8 +36,8 @@ pub struct Rsdp {
     extended_checksum: u8,
     reserved: [u8; 3],
 }
-const_assert_eq!(core::mem::size_of::<Rsdp>(), 36);
-const_assert_eq!(core::mem::align_of::<Rsdp>(), 1);
+const _: () = assert!(core::mem::size_of::<Rsdp>() == 36);
+const _: () = assert!(core::mem::align_of::<Rsdp>() == 1);
 
 impl Rsdp {
     /// Search for the RSDP in the BIOS memory area from 0xE_0000 to 0xF_FFFF.
@@ -63,7 +60,7 @@ impl Rsdp {
         {
             let region_slice: &[u8] = region.as_slice(0, size)?;
             for offset in (0..size).step_by(RSDP_SIGNATURE_ALIGNMENT) {
-                if &region_slice[offset..(offset + signature_length)] == &*RSDP_SIGNATURE {
+                if &region_slice[offset..(offset + signature_length)] == RSDP_SIGNATURE {
                     found_offset = Some(offset);
                 }
             }

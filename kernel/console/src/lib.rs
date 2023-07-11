@@ -15,7 +15,7 @@ use task::{JoinableTaskRef, KillReason};
 
 /// The serial port being used for the default system logger can optionally
 /// ignore inputs.
-static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(0);
+static IGNORED_SERIAL_PORT_INPUT: AtomicU16 = AtomicU16::new(u16::MAX);
 
 /// Configures the console connection listener to ignore inputs from the given
 /// serial port.
@@ -79,7 +79,7 @@ fn console_connection_detector(
         }
 
         if spawn::new_task_builder(shell_loop, (serial_port, serial_port_address, receiver))
-            .name(format!("{:?}_manager", serial_port_address))
+            .name(format!("{serial_port_address:?}_manager"))
             .spawn()
             .is_err()
         {
@@ -103,21 +103,22 @@ fn shell_loop(
     let tty = tty::Tty::new();
 
     let reader_task = spawn::new_task_builder(tty_to_port_loop, (port.clone(), tty.master()))
-        .name(format!("tty_to_{:?}", address))
+        .name(format!("tty_to_{address:?}"))
         .spawn()?;
     let writer_task = spawn::new_task_builder(port_to_tty_loop, (receiver, tty.master()))
-        .name(format!("{:?}_to_tty", address))
+        .name(format!("{address:?}_to_tty"))
         .spawn()?;
+
 
     let new_app_ns = mod_mgmt::create_application_namespace(None)?;
 
     let (app_file, _ns) =
         mod_mgmt::CrateNamespace::get_crate_object_file_starting_with(&new_app_ns, "hull-")
-            .expect("Couldn't find shell in default app namespace");
+            .expect("Couldn't find hull in default app namespace");
 
     let path = path::Path::new(app_file.lock().get_absolute_path());
     let task = spawn::new_application_task_builder(path, Some(new_app_ns))?
-        .name(format!("{:?}_shell", address))
+        .name(format!("{address:?}_hull"))
         .block()
         .spawn()?;
 
@@ -133,7 +134,7 @@ fn shell_loop(
         },
     );
 
-    task.unblock().map_err(|_| "couldn't unblock shell task")?;
+    task.unblock().map_err(|_| "couldn't unblock hull task")?;
     task.join()?;
 
     reader_task.kill(KillReason::Requested).unwrap();

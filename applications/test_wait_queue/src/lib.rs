@@ -43,12 +43,12 @@ fn rmain() -> Result<(), &'static str> {
 
     let t1 = spawn::new_task_builder(wait_task, (wc, ready3))
         .name(String::from("wait_task"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .spawn()?;
 
     let t2 = spawn::new_task_builder(notify_task, (wc2, ready2))
         .name(String::from("notify_task"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
         
@@ -60,7 +60,7 @@ fn rmain() -> Result<(), &'static str> {
         t1.clone(),
         )
         .name(String::from("deeznutz"))
-        .pin_on_core(my_cpu)
+        .pin_on_cpu(my_cpu)
         .block()
         .spawn()?;
 
@@ -83,12 +83,10 @@ fn rmain() -> Result<(), &'static str> {
 }
 
 
-fn wait_task<WF: WaitConditionFn>((wc, ready): (Arc<WaitCondition<WF>>, Arc<Mutex<bool>>)) -> Result<(), &'static str> {
+fn wait_task<WF: WaitConditionFn>((wc, ready): (Arc<WaitCondition<WF>>, Arc<Mutex<bool>>)) {
     warn!("  wait_task:  entered task. Calling wait()...");
-    let retval = wc.wait();
-    warn!("  wait_task:  wait() returned {:?}", retval);
+    wc.wait();
     warn!("  wait_task:  after waiting, ready is {:?}", ready);
-    retval.map_err(|_e| "wc.wait() error")
 }
 
 

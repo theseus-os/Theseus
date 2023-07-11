@@ -162,7 +162,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let func1: &SimdTestFunc = unsafe { section_ref1.as_func() }?;
 	let _task1 = spawn::new_task_builder(*func1, ())
 		.name(format!("simd_test_1-{}", simd_app_namespace.name()))
-		.pin_on_core(this_core)
+		.pin_on_cpu(this_core)
 		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test1 task");
@@ -174,7 +174,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let func2: &SimdTestFunc = unsafe { section_ref2.as_func() }?;
 	let _task2 = spawn::new_task_builder(*func2, ())
 		.name(format!("simd_test_2-{}", simd_app_namespace.name()))
-		.pin_on_core(this_core)
+		.pin_on_cpu(this_core)
 		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test2 task");
@@ -186,7 +186,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	let func3: &SimdTestFunc = unsafe { section_ref3.as_func() }?;
 	let _task3 = spawn::new_task_builder(*func3, ())
 		.name(format!("simd_test_short-{}", simd_app_namespace.name()))
-		.pin_on_core(this_core)
+		.pin_on_cpu(this_core)
 		.simd(simd_ext)
 		.spawn()?;
 	debug!("finished spawning simd_test::test_short task");
@@ -198,7 +198,7 @@ fn internal_setup_simd_personality(simd_ext: SimdExt) -> Result<(), &'static str
 	// TODO FIXME: check for this somehow in the thread spawn code, perhaps by giving the new thread ownership of the MappedPages,
 	//             just like we do for application Tasks
 
-	loop { }
+	loop { core::hint::spin_loop() }
 	
 	// _task1.join()?;
 	// _task2.join()?;

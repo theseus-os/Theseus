@@ -7,15 +7,12 @@ LABEL author=kevinaboos@gmail.com
 
 
 # These build args are required.
-# RUSTC_VERSION is the Rust version and build date, e.g., "nightly-2019-10-17"
 # USER is the current user's name: "kevin"
 # UID is that same user's id: "1000"
 # GID is that same user's group id: "1000"
-ARG RUSTC_VERSION
 ARG USER
 ARG UID
 ARG GID
-RUN test -n "$RUSTC_VERSION" || (echo "\nError: RUSTC_VERSION build arg not set\n" && false)
 RUN test -n "$USER" || (echo "\nError: USER build arg not set\n" && false)
 RUN test -n "$UID" || (echo "\nError: UID build arg not set\n" && false)
 RUN test -n "$GID" || (echo "\nError: GID build arg not set\n" && false)
@@ -33,7 +30,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && apt-get install -y --no-ins
 RUN apt-get install -y build-essential curl git
 
 # Install Theseus's build dependencies
-RUN apt-get install -y make nasm pkg-config grub-pc-bin mtools xorriso
+RUN apt-get install -y make gcc nasm pkg-config grub-pc-bin mtools xorriso wget
 # Install QEMU and KVM, based on <https://help.ubuntu.com/community/KVM/Installation>
 RUN apt-get install -y qemu qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
 
@@ -60,6 +57,3 @@ ENV HOME="/home/${USER}"
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
 # To enable us to use Rust, add its binaries to our path.
 ENV PATH="$HOME/.cargo/bin:${PATH}"
-
-# Install the specific version of the Rust toolchain currently required by Theseus.
-RUN rustup toolchain install ${RUSTC_VERSION} && rustup component add rust-src

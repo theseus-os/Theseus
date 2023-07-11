@@ -46,7 +46,7 @@ pub(crate) struct UserAccessRegion {
     db_blueflame_buffer3_odd_fast_path: Volatile<[U32<BigEndian>; 64]>,
 }
 
-const_assert_eq!(core::mem::size_of::<UserAccessRegion>(), 4096);
+const _: () = assert!(core::mem::size_of::<UserAccessRegion>() == 4096);
 
 impl UserAccessRegion {
     pub(crate) fn write_wqe_to_doorbell(&mut self, current_doorbell: &CurrentUARDoorbell, wqe_value: [U32<BigEndian>; 64]) {

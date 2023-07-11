@@ -2,15 +2,17 @@
 
 extern crate task;
 #[macro_use] extern crate app_io;
-#[macro_use] extern crate alloc;
-// #[macro_use] extern crate log;
+extern crate alloc;
 extern crate fs_node;
 extern crate getopts;
 extern crate path;
 
-use alloc::vec::Vec;
-use alloc::string::String;
-use alloc::string::ToString;
+use alloc::{
+    string::String,
+    string::ToString,
+    vec::Vec,
+};
+use core::fmt::Write;
 use fs_node::{FileOrDir, DirRef};
 use getopts::Options;
 use path::Path;
@@ -19,7 +21,7 @@ pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
     opts.optflag("h", "help", "print this help menu");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
@@ -45,21 +47,21 @@ pub fn main(args: Vec<String>) -> isize {
 
     let path = Path::new(matches.free[0].to_string());
 
-    // navigate to the path specified by first argument
+    // Navigate to the path specified by first argument
     match path.get(&curr_wd) {
         Some(FileOrDir::Dir(dir)) => {
             print_children(&dir);
-            return 0;
+            0
         }
         Some(FileOrDir::File(file)) => {
             println!("'{}' is not a directory; `ls` currently only supports listing directory contents.", file.lock().get_name());
-            return -1;
+            -1
         }
         _ => {
             println!("Couldn't find path: {}", path); 
-            return -1;
+            -1
         }
-    };
+    }
 }
 
 fn print_children(dir: &DirRef) {
@@ -67,7 +69,7 @@ fn print_children(dir: &DirRef) {
     let mut child_list = dir.lock().list(); 
     child_list.reverse();
     for child in child_list.iter() {
-        child_string.push_str(&format!("{}\n", child));
+        writeln!(child_string, "{child}").expect("Failed to write child_string");
     }
     println!("{}", child_string);
 }
@@ -77,6 +79,6 @@ fn print_usage(opts: Options) {
 }
 
 
-const USAGE: &'static str = "Usage: ls [DIR | FILE]
+const USAGE: &str = "Usage: ls [DIR | FILE]
 List the contents of the given directory or info about the given file.
 If no arguments are provided, it lists the contents of the current directory.";

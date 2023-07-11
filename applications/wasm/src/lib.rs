@@ -42,7 +42,7 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optmulti("d", "dir", "directories to grant file system access", "DIR");
     opts.optflag("h", "help", "print this help menu");
 
-    let matches = match opts.parse(&args) {
+    let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
             println!("{}", _f);
@@ -132,7 +132,7 @@ fn print_usage(opts: Options) {
     println!("{}", opts.usage(USAGE));
 }
 
-const USAGE: &'static str = "USAGE:
+const USAGE: &str = "USAGE:
     wasm [option]... WASM_BINARY_PATH [arg]...
 
 EXAMPLES:

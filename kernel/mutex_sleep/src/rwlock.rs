@@ -1,3 +1,6 @@
+// TODO: add documentation to each unsafe block, laying out all the conditions under which it's safe or unsafe to use it.
+#![allow(clippy::missing_safety_doc)]
+
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use spin::{RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -64,8 +67,6 @@ impl<T> RwLockSleep<T> {
 impl<T: ?Sized> RwLockSleep<T> {
     /// Returns `true` if the lock is currently held.
     ///
-    /// # Safety
-    ///
     /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
     #[inline(always)]
@@ -94,15 +95,13 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     // The lock is dropped and interrupts are restored to their prior state
     /// }
     /// ```
-    pub fn read<'a>(&'a self) -> Result<RwLockSleepReadGuard<'a, T>, &'static str> {
+    pub fn read(&self) -> Result<RwLockSleepReadGuard<T>, &'static str> {
         // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_read() {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the lock.
-        self.queue
-            .wait_until(&|| self.try_read())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_read()))
     }
 
     /// Attempt to acquire this lock with shared read (immutable) access.
@@ -134,8 +133,6 @@ impl<T: ?Sized> RwLockSleep<T> {
 
     /// Return the number of readers that currently hold the lock (including upgradable readers).
     ///
-    /// # Safety
-    ///
     /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
     pub fn reader_count(&self) -> usize {
@@ -145,8 +142,6 @@ impl<T: ?Sized> RwLockSleep<T> {
     /// Return the number of writers that currently hold the lock.
     ///
     /// Because [`RwLockSleep`] guarantees exclusive mutable access, this function may only return either `0` or `1`.
-    ///
-    /// # Safety
     ///
     /// This function provides no synchronization guarantees and so its result should be considered 'out of date'
     /// the instant it is called. Do not use it for synchronization purposes. However, it may be useful as a heuristic.
@@ -194,15 +189,13 @@ impl<T: ?Sized> RwLockSleep<T> {
     ///     // The lock is dropped
     /// }
     /// ```
-    pub fn write<'a>(&'a self) -> Result<RwLockSleepWriteGuard<'a, T>, &'static str> {
+    pub fn write(&self) -> Result<RwLockSleepWriteGuard<T>, &'static str> {
         // Fast path: check for the uncontended case.
         if let Some(guard) = self.try_write() {
             return Ok(guard);
         }
         // Slow path if already locked elsewhere: wait until we obtain the write lock.
-        self.queue
-            .wait_until(&|| self.try_write())
-            .map_err(|_| "failed to add current task to waitqueue")
+        Ok(self.queue.wait_until(|| self.try_write()))
     }
 
     /// Attempt to acquire this lock with exclusive write (mutable) access.
@@ -269,7 +262,7 @@ impl<'rwlock, T: ?Sized> Deref for RwLockSleepReadGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-       & *(self.guard) 
+       &self.guard
     }
 }
 
@@ -277,13 +270,13 @@ impl<'rwlock, T: ?Sized> Deref for RwLockSleepWriteGuard<'rwlock, T> {
     type Target = T;
 
     fn deref(&self) -> &T { 
-        & *(self.guard)
+        &self.guard
     }
 }
 
 impl<'rwlock, T: ?Sized> DerefMut for RwLockSleepWriteGuard<'rwlock, T> {
     fn deref_mut(&mut self) -> &mut T { 
-        &mut *(self.guard)
+        &mut self.guard
     }
 }
 

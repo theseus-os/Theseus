@@ -2,16 +2,20 @@
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "serial_port_basic"
 description = "Standalone, basic driver for serial ports (e.g., COM1, COM) with minimal dependencies"
+edition = "2021"
 version = "0.1.0"
 
 [dependencies]
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 spin = "0.9.4"
 
-[dependencies.port_io]
-path = "../../libs/port_io"
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+port_io = { path = "../../libs/port_io" }
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+pl011 = { git = "https://github.com/theseus-os/pl011/", rev = "464dbf22" }
+arm_boards = { path = "../arm_boards" }
+memory = { path = "../memory" }
 
 [lib]
 crate-type = ["rlib"]

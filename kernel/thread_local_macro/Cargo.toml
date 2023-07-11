@@ -5,7 +5,6 @@ description = "Implementation of the thread_local!() macro, similar to Rust libs
 version = "0.1.0"
 
 [dependencies]
-static_assertions = "1.1.0"
 
 [lib]
 crate-type = ["rlib"]
