@@ -1489,13 +1489,11 @@ dependencies = [
 name = "http_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "httparse",
  "log",
- "network_manager",
+ "net",
  "percent-encoding",
- "smoltcp 0.5.0",
- "smoltcp_helper",
+ "time",
 ]
 
 [[package]]

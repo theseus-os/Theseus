@@ -1,5 +1,5 @@
 use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core::marker::PhantomData;
 use irq_safety::MutexIrqSafe;
 use mutex_sleep::MutexSleep;
@@ -13,9 +13,9 @@ pub use wire::{IpAddress, IpCidr};
 /// This is a wrapper around a network device which provides higher level
 /// abstractions such as polling sockets.
 pub struct NetworkInterface {
-    inner: MutexSleep<iface::Interface<'static>>,
+    pub(crate) inner: MutexSleep<iface::Interface<'static>>,
     device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
-    sockets: MutexSleep<SocketSet<'static>>,
+    pub(crate) sockets: MutexSleep<SocketSet<'static>>,
 }
 
 impl NetworkInterface {
@@ -56,7 +56,7 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(&self, socket: T) -> Socket<T>
+    pub fn add_socket<T>(self: &Arc<Self>, socket: T) -> Socket<T>
     where
         T: AnySocket<'static>,
     {
@@ -67,7 +67,7 @@ impl NetworkInterface {
             .add(socket);
         Socket {
             handle,
-            sockets: &self.sockets,
+            interface: self.clone(),
             phantom_data: PhantomData,
         }
     }

@@ -19,7 +19,7 @@ pub use smoltcp::{
     phy,
     socket::{icmp, tcp, udp},
     time::Instant,
-    wire,
+    wire::{self, IpEndpoint},
 };
 pub use socket::Socket;
 
