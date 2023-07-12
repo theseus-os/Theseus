@@ -1,45 +1,10 @@
 [package]
 name = "ping"
 version = "0.1.0"
-description = "pings an IPv4 address and returns ping statistics"
-authors = ["Barry Shiberu <berketshiberu@gmail.com>"]
+edition = "2021"
 
 [dependencies]
-byteorder = { version = "1.0", default-features = false }
+app_io = { path = "../../kernel/app_io" }
 getopts = "0.2.21"
-
-[dependencies.app_io]
-path = "../../kernel/app_io"
-
-
-[dependencies.log]
-version = "0.4.8"
-
-[dependencies.upd]
-path = "../upd"
-
-[dependencies.hpet]
-path = "../../kernel/acpi/hpet"
-
-[dependencies.hashbrown]
-version = "0.11.2"
-features = ["nightly"]
-
-[dependencies.network_manager]
-path = "../../kernel/network_manager"
-
-[dependencies.smoltcp_helper]
-path = "../../kernel/smoltcp_helper"
-
-[dependencies.ota_update_client]
-path = "../../kernel/ota_update_client"
-
-[dependencies.smoltcp]
-version = "0.5.0"
-default-features = false
-features = [
-    "alloc", "ethernet",
-    # "log", "verbose", 
-    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
-    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp"
-]
+net = { path = "../../kernel/net" }
+time = { path = "../../kernel/time" }
