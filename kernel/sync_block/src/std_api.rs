@@ -17,6 +17,7 @@ impl<T> Mutex<T> {
         }
     }
 
+    #[allow(clippy::result_unit_err)]
     pub fn lock(&self) -> Result<MutexGuard<T>, ()> {
         Ok(self.inner.lock())
     }
@@ -34,10 +35,12 @@ impl<T> RwLock<T> {
         }
     }
 
+    #[allow(clippy::result_unit_err)]
     pub fn read(&self) -> Result<RwLockReadGuard<T>, ()> {
         Ok(self.inner.read())
     }
 
+    #[allow(clippy::result_unit_err)]
     pub fn write(&self) -> Result<RwLockWriteGuard<T>, ()> {
         Ok(self.inner.write())
     }
