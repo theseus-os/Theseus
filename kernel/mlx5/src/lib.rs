@@ -14,7 +14,7 @@
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
 extern crate spin;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate memory;
 extern crate pci; 
 extern crate nic_initialization;
@@ -28,7 +28,7 @@ extern crate mpmc;
 
 use spin::Once; 
 use alloc::vec::Vec;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, map_frame_range, BorrowedMappedPages, Mutable, MMIO_FLAGS};
 use pci::PciDevice;
 use nic_initialization::init_rx_buf_pool;
@@ -72,11 +72,11 @@ lazy_static! {
 
 /// The singleton connectx-5 NIC.
 /// TODO: Allow for multiple NICs
-static CONNECTX5_NIC: Once<MutexIrqSafe<ConnectX5Nic>> = Once::new();
+static CONNECTX5_NIC: Once<IrqSafeMutex<ConnectX5Nic>> = Once::new();
 
-/// Returns a reference to the NIC wrapped in a MutexIrqSafe,
+/// Returns a reference to the NIC wrapped in a IrqSafeMutex,
 /// if it exists and has been initialized.
-pub fn get_mlx5_nic() -> Option<&'static MutexIrqSafe<ConnectX5Nic>> {
+pub fn get_mlx5_nic() -> Option<&'static IrqSafeMutex<ConnectX5Nic>> {
     CONNECTX5_NIC.get()
 }
 
@@ -127,7 +127,7 @@ impl ConnectX5Nic {
         num_tx_descs: usize, 
         num_rx_descs: usize, 
         mtu: u16
-    ) -> Result<&'static MutexIrqSafe<ConnectX5Nic> , &'static str> {
+    ) -> Result<&'static IrqSafeMutex<ConnectX5Nic> , &'static str> {
         let sq_size_in_bytes = num_tx_descs * core::mem::size_of::<WorkQueueEntrySend>();
         let rq_size_in_bytes = num_rx_descs * core::mem::size_of::<WorkQueueEntryReceive>();
         
@@ -636,7 +636,7 @@ impl ConnectX5Nic {
             receive_queue
         };
         
-        let nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
+        let nic_ref = CONNECTX5_NIC.call_once(|| IrqSafeMutex::new(mlx5_nic));
         Ok(nic_ref)
     }
     

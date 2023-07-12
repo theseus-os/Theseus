@@ -7,12 +7,12 @@
 extern crate smoltcp;
 extern crate network_interface_card;
 extern crate nic_buffers;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate network_manager;
 
 
 use alloc::collections::BTreeMap;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use smoltcp::{
     socket::SocketSet,
     time::Instant,
@@ -77,7 +77,7 @@ impl<N: NetworkInterfaceCard + 'static > EthernetNetworkInterface<N> {
     /// Currently, `static_ip` and `gateway_ip` are required because we don't yet support DHCP.
     /// 
     pub fn new<G: Into<IpAddress>>(
-        nic: &'static MutexIrqSafe<N>,
+        nic: &'static IrqSafeMutex<N>,
         static_ip: Option<IpCidr>,
         gateway_ip: Option<G>,
     ) -> Result<EthernetNetworkInterface<N>, &'static str> 
@@ -122,7 +122,7 @@ impl<N: NetworkInterfaceCard + 'static > EthernetNetworkInterface<N> {
     /// * `static_ip`: ip address to be assigned to this interface
     /// * `gateway_ip`: ipv4 gateway address for this interface
     pub fn new_ipv4_interface(
-        nic_ref: &'static MutexIrqSafe<N>,
+        nic_ref: &'static IrqSafeMutex<N>,
         static_ip: &str, 
         gateway_ip: &[u8]
     ) -> Result<EthernetNetworkInterface<N>, &'static str> 
@@ -139,11 +139,11 @@ impl<N: NetworkInterfaceCard + 'static > EthernetNetworkInterface<N> {
 /// to use our existing ethernet driver.
 /// An instance of this `EthernetDevice` can be used in smoltcp's `EthernetInterface`.
 pub struct EthernetDevice<N: NetworkInterfaceCard + 'static> { 
-    nic_ref: &'static MutexIrqSafe<N>,
+    nic_ref: &'static IrqSafeMutex<N>,
 }
 impl<N: NetworkInterfaceCard + 'static> EthernetDevice<N> {
     /// Create a new instance of the `EthernetDevice`.
-    pub fn new(nic_ref: &'static MutexIrqSafe<N>) -> EthernetDevice<N> {
+    pub fn new(nic_ref: &'static IrqSafeMutex<N>) -> EthernetDevice<N> {
         EthernetDevice {
             nic_ref,
         }
@@ -212,7 +212,7 @@ impl<'d, N: NetworkInterfaceCard + 'static> smoltcp::phy::Device<'d> for Etherne
 /// The transmit token type used by smoltcp, which contains only a reference to the relevant NIC 
 /// because the actual transmit buffer is allocated lazily only when it needs to be consumed.
 pub struct TxToken<N: NetworkInterfaceCard + 'static> {
-    nic_ref: &'static MutexIrqSafe<N>,
+    nic_ref: &'static IrqSafeMutex<N>,
 }
 impl<N: NetworkInterfaceCard + 'static> smoltcp::phy::TxToken for TxToken<N> {
     fn consume<R, F>(self, _timestamp: Instant, len: usize, f: F) -> smoltcp::Result<R>

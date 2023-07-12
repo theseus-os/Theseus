@@ -25,8 +25,7 @@ page_allocator = { path = "../page_allocator" }
 frame_allocator = { path = "../frame_allocator" }
 no_drop = { path = "../no_drop" }
 owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
-
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync_irq = { path = "../../libs/sync_irq" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"

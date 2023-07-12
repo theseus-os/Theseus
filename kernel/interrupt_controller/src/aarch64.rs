@@ -1,7 +1,7 @@
 use {
     gic::{ArmGic, SpiDestination, IpiTargetCpu, Version as GicVersion},
     arm_boards::{BOARD_CONFIG, InterruptControllerConfig},
-    irq_safety::MutexIrqSafe,
+    sync_irq::IrqSafeMutex,
     memory::get_kernel_mmi_ref,
     core::ops::DerefMut,
 };
@@ -48,7 +48,7 @@ impl LocalInterruptNumber {
 }
 
 /// The private global Generic Interrupt Controller singleton
-pub(crate) static INTERRUPT_CONTROLLER: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
+pub(crate) static INTERRUPT_CONTROLLER: IrqSafeMutex<Option<ArmGic>> = IrqSafeMutex::new(None);
 
 /// Initializes the interrupt controller, on aarch64
 pub fn init() -> Result<(), &'static str> {

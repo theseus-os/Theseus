@@ -8,7 +8,7 @@ use zerocopy::FromBytes;
 use spin::Once;
 use raw_cpuid::CpuId as X86CpuIdInstr;
 use msr::*;
-use irq_safety::RwLockIrqSafe;
+use sync_irq::IrqSafeRwLock;
 use memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use atomic_linked_list::atomic_map::AtomicMap;
@@ -77,7 +77,7 @@ pub enum InterruptChip {
 const _: () = assert!(AtomicCell::<InterruptChip>::is_lock_free());
 
 /// The set of system-wide `LocalApic`s, one per CPU core.
-static LOCAL_APICS: AtomicMap<ApicId, RwLockIrqSafe<LocalApic>> = AtomicMap::new();
+static LOCAL_APICS: AtomicMap<ApicId, IrqSafeRwLock<LocalApic>> = AtomicMap::new();
 
 /// The number of CPUs currently initialized in the system.
 /// This must match the number of Local APICs initialized in the system.
@@ -111,7 +111,7 @@ pub fn has_x2apic() -> bool {
 }
 
 /// Returns a reference to the list of LocalApics, one per CPU core.
-pub fn get_lapics() -> &'static AtomicMap<ApicId, RwLockIrqSafe<LocalApic>> {
+pub fn get_lapics() -> &'static AtomicMap<ApicId, IrqSafeRwLock<LocalApic>> {
 	&LOCAL_APICS
 }
 
@@ -128,7 +128,7 @@ pub fn current_cpu() -> ApicId {
 }
 
 /// Returns a reference to the LocalApic for the currently executing CPU core.
-pub fn get_my_apic() -> Option<&'static RwLockIrqSafe<LocalApic>> {
+pub fn get_my_apic() -> Option<&'static IrqSafeRwLock<LocalApic>> {
     LOCAL_APICS.get(&current_cpu())
 }
 
@@ -544,7 +544,7 @@ impl LocalApic {
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
 
-        let _existing = LOCAL_APICS.insert(actual_apic_id, RwLockIrqSafe::new(lapic));
+        let _existing = LOCAL_APICS.insert(actual_apic_id, IrqSafeRwLock::new(lapic));
         if _existing.is_some() {
             return Err(LapicInitError::AlreadyExisted(actual_apic_id));
         }

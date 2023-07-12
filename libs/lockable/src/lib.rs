@@ -3,7 +3,7 @@
 #![no_std]
 
 extern crate spin;
-extern crate irq_safety;
+extern crate sync_irq;
 
 use core::ops::{Deref, DerefMut};
 
@@ -100,9 +100,9 @@ impl<'t, T> LockableSized<'t, T> for spin::RwLock<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }
 
-/// Implement `Lockable` for [`irq_safety::MutexIrqSafe`].
-impl<'t, T> Lockable<'t, T> for irq_safety::MutexIrqSafe<T> where T: 't {
-    type Guard = irq_safety::MutexIrqSafeGuard<'t, T>;
+/// Implement `Lockable` for [`sync_irq::IrqSafeMutex`].
+impl<'t, T> Lockable<'t, T> for sync_irq::IrqSafeMutex<T> where T: 't {
+    type Guard = sync_irq::IrqSafeMutexGuard<'t, T>;
     type GuardMut = Self::Guard;
 
     fn lock(&'t self) -> Self::Guard { self.lock() }
@@ -112,15 +112,15 @@ impl<'t, T> Lockable<'t, T> for irq_safety::MutexIrqSafe<T> where T: 't {
     fn is_locked(&self) -> bool { self.is_locked() }
     fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
 }
-/// Implement `LockableSized` for [`irq_safety::MutexIrqSafe`].
-impl<'t, T> LockableSized<'t, T> for irq_safety::MutexIrqSafe<T> where T: 't + Sized {
+/// Implement `LockableSized` for [`sync_irq::IrqSafeMutex`].
+impl<'t, T> LockableSized<'t, T> for sync_irq::IrqSafeMutex<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }
 
-/// Implement `Lockable` for [`irq_safety::RwLockIrqSafe`].
-impl<'t, T> Lockable<'t, T> for irq_safety::RwLockIrqSafe<T> where T: 't {
-    type Guard = irq_safety::RwLockIrqSafeReadGuard<'t, T>;
-    type GuardMut = irq_safety::RwLockIrqSafeWriteGuard<'t, T>;
+/// Implement `Lockable` for [`sync_irq::IrqSafeRwLock`].
+impl<'t, T> Lockable<'t, T> for sync_irq::IrqSafeRwLock<T> where T: 't {
+    type Guard = sync_irq::IrqSafeRwLockReadGuard<'t, T>;
+    type GuardMut = sync_irq::IrqSafeRwLockWriteGuard<'t, T>;
 
     fn lock(&'t self) -> Self::Guard { self.read() }
     fn try_lock(&'t self) -> Option<Self::Guard> { self.try_read() }
@@ -129,7 +129,7 @@ impl<'t, T> Lockable<'t, T> for irq_safety::RwLockIrqSafe<T> where T: 't {
     fn is_locked(&self) -> bool { self.writer_count() > 0 }
     fn get_mut(&'t mut self) -> &mut T { self.get_mut() }
 }
-/// Implement `LockableSized` for [`irq_safety::RwLockIrqSafe`].
-impl<'t, T> LockableSized<'t, T> for irq_safety::RwLockIrqSafe<T> where T: 't + Sized {
+/// Implement `LockableSized` for [`sync_irq::IrqSafeRwLock`].
+impl<'t, T> LockableSized<'t, T> for sync_irq::IrqSafeRwLock<T> where T: 't + Sized {
     fn into_inner(self) -> T { self.into_inner() }
 }

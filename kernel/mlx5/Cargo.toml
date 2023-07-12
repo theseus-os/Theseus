@@ -12,8 +12,8 @@ mpmc = "0.1.6"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.memory]
 path = "../memory"

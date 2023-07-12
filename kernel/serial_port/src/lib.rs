@@ -30,7 +30,7 @@ pub use serial_port_basic::{
 
 use alloc::{boxed::Box, sync::Arc};
 use core::{fmt, ops::{Deref, DerefMut}};
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use spin::Once;
 use interrupts::{InterruptHandler, EoiBehaviour, InterruptNumber, interrupt_handler};
 
@@ -57,17 +57,17 @@ static NEW_CONNECTION_NOTIFIER: Once<Sender<SerialPortAddress>> = Once::new();
 
 // Serial ports cannot be reliably probed (discovered dynamically), thus,
 // we ensure they are exposed safely as singletons through the below static instances.
-static COM1_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
-static COM2_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
-static COM3_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
-static COM4_SERIAL_PORT: Once<Arc<MutexIrqSafe<SerialPort>>> = Once::new();
+static COM1_SERIAL_PORT: Once<Arc<IrqSafeMutex<SerialPort>>> = Once::new();
+static COM2_SERIAL_PORT: Once<Arc<IrqSafeMutex<SerialPort>>> = Once::new();
+static COM3_SERIAL_PORT: Once<Arc<IrqSafeMutex<SerialPort>>> = Once::new();
+static COM4_SERIAL_PORT: Once<Arc<IrqSafeMutex<SerialPort>>> = Once::new();
 
 
 /// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`],
 /// if it has been initialized (see [`init_serial_port()`]).
 pub fn get_serial_port(
     serial_port_address: SerialPortAddress
-) -> Option<&'static Arc<MutexIrqSafe<SerialPort>>> {
+) -> Option<&'static Arc<IrqSafeMutex<SerialPort>>> {
     static_port_of(&serial_port_address).get()
 }
 
@@ -81,14 +81,14 @@ pub fn get_serial_port(
 pub fn init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
-) -> Option<&'static Arc<MutexIrqSafe<SerialPort>>> {
+) -> Option<&'static Arc<IrqSafeMutex<SerialPort>>> {
     #[cfg(target_arch = "aarch64")]
     if serial_port_address != SerialPortAddress::COM1 {
         return None;
     }
 
     Some(static_port_of(&serial_port_address).call_once(|| {
-        let sp = Arc::new(MutexIrqSafe::new(SerialPort::new(serial_port)));
+        let sp = Arc::new(IrqSafeMutex::new(SerialPort::new(serial_port)));
 
         #[cfg(target_arch = "x86_64")]
         let (int_num, int_handler) = interrupt_number_handler(&serial_port_address);
@@ -108,7 +108,7 @@ pub fn init_serial_port(
 /// Returns a reference to the static instance of this serial port.
 fn static_port_of(
     serial_port_address: &SerialPortAddress
-) -> &'static Once<Arc<MutexIrqSafe<SerialPort>>> {
+) -> &'static Once<Arc<IrqSafeMutex<SerialPort>>> {
     match serial_port_address {
         SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
         SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
@@ -169,7 +169,7 @@ impl SerialPort {
     /// Register the interrupt handler for this serial port
     /// and spawn a deferrent interrupt task to handle its data receival. 
     pub fn register_interrupt_handler(
-        serial_port: Arc<MutexIrqSafe<SerialPort>>,
+        serial_port: Arc<IrqSafeMutex<SerialPort>>,
         interrupt_number: InterruptNumber,
         interrupt_handler: InterruptHandler,
     ) -> Result<(), &'static str> {
@@ -304,7 +304,7 @@ impl fmt::Write for SerialPort {
 /// On the other hand, the interrupt handler itself merely notifies the system 
 /// that it's time to invoke this function soon.
 fn serial_port_receive_deferred(
-    serial_port: &Arc<MutexIrqSafe<SerialPort>>
+    serial_port: &Arc<IrqSafeMutex<SerialPort>>
 ) -> Result<(), ()> {
     let mut buf = DataChunk::empty();
     let bytes_read;

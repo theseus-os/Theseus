@@ -9,7 +9,7 @@ extern crate alloc;
 extern crate task;
 extern crate core2;
 extern crate io;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate serial_port;
 
 
@@ -20,7 +20,7 @@ use alloc::{
 };
 use core2::io::Read;
 use io::LockableIo;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use serial_port::{SerialPort, SerialPortAddress, get_serial_port};
 
 
@@ -38,7 +38,7 @@ pub fn main(args: Vec<String>) -> isize {
     };
     
     if true {
-        let mut serial_port_io = LockableIo::<SerialPort, MutexIrqSafe<_>, _>::from(serial_port);
+        let mut serial_port_io = LockableIo::<SerialPort, IrqSafeMutex<_>, _>::from(serial_port);
         let mut serial_port_io2 = serial_port_io.clone();
         let mut buf = [0; 100];
         loop {

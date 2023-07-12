@@ -6,7 +6,7 @@ edition = "2021"
 version = "0.1.0"
 
 [dependencies]
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync_irq = { path = "../../libs/sync_irq" }
 spin = "0.9.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 #![no_std]
 
-extern crate irq_safety;
+extern crate sync_irq;
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate spin;
@@ -14,7 +14,7 @@ extern crate zerocopy;
 extern crate bitflags;
 
 use spin::Once;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use memory::{PageTable, PteFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
 
 mod regs;
@@ -33,7 +33,7 @@ pub struct IntelIommu {
 }
 
 /// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)
-static IOMMU: Once<MutexIrqSafe<IntelIommu>> = Once::new();
+static IOMMU: Once<IrqSafeMutex<IntelIommu>> = Once::new();
 
 /// Initialize the IOMMU hardware.
 ///
@@ -97,7 +97,7 @@ pub fn init(host_address_width: u8,
     };
 
     // initialize the iommu singleton with this object
-    IOMMU.call_once(|| {MutexIrqSafe::new(iommu)});
+    IOMMU.call_once(|| {IrqSafeMutex::new(iommu)});
 
     // Ensure translation is disabled.
     //

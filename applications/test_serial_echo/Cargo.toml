@@ -8,8 +8,8 @@ description = "a simple app for testing serial port I/O using higher-level I/O t
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 log = "0.4.8"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.app_io]
 path = "../../kernel/app_io"

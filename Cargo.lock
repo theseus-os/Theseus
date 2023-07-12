@@ -104,6 +104,7 @@ dependencies = [
  "scheduler",
  "spawn",
  "stack",
+ "sync_irq",
 ]
 
 [[package]]
@@ -114,7 +115,6 @@ dependencies = [
  "bit_field 0.7.0",
  "crossbeam-utils",
  "derive_more",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
@@ -122,6 +122,7 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
+ "sync_irq",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -488,12 +489,12 @@ dependencies = [
  "core2",
  "hull",
  "io",
- "irq_safety",
  "log",
  "mod_mgmt",
  "path",
  "serial_port",
  "spawn",
+ "sync_irq",
  "task",
  "tty",
 ]
@@ -624,7 +625,7 @@ dependencies = [
  "arm_boards",
  "cortex-a",
  "derive_more",
- "irq_safety",
+ "sync_irq",
  "tock-registers",
 ]
 
@@ -963,7 +964,6 @@ dependencies = [
  "deferred_interrupt_tasks",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -976,6 +976,7 @@ dependencies = [
  "nic_queues",
  "pci",
  "spin 0.9.4",
+ "sync_irq",
  "task",
  "volatile 0.2.7",
  "x86_64",
@@ -1034,7 +1035,6 @@ dependencies = [
 name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "lazy_static",
  "log",
  "memory",
@@ -1042,6 +1042,7 @@ dependencies = [
  "network_manager",
  "nic_buffers",
  "smoltcp 0.5.0",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1153,9 +1154,9 @@ dependencies = [
  "app_io",
  "cpu",
  "early_printer",
- "irq_safety",
  "log",
  "memory",
+ "sync_irq",
  "task",
 ]
 
@@ -1413,11 +1414,11 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1565,9 +1566,9 @@ dependencies = [
  "cpu",
  "gic",
  "ioapic",
- "irq_safety",
  "log",
  "memory",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1583,13 +1584,13 @@ dependencies = [
  "gdt",
  "gic",
  "interrupt_controller",
- "irq_safety",
  "kernel_config",
  "locked_idt",
  "log",
  "memory",
  "pic",
  "spin 0.9.4",
+ "sync_irq",
  "time",
  "tock-registers",
  "tss",
@@ -1635,10 +1636,10 @@ name = "iommu"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "irq_safety",
  "log",
  "memory",
  "spin 0.9.4",
+ "sync_irq",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1670,7 +1671,6 @@ dependencies = [
  "hpet",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1688,6 +1688,7 @@ dependencies = [
  "rand",
  "runqueue",
  "spin 0.9.4",
+ "sync_irq",
  "virtual_nic",
  "volatile 0.2.7",
  "zerocopy",
@@ -1851,15 +1852,15 @@ dependencies = [
 name = "lockable"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
 name = "locked_idt"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "sync_irq",
  "x86_64",
 ]
 
@@ -1877,9 +1878,9 @@ name = "logger"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
- "irq_safety",
  "log",
  "serial_port_basic",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1989,7 +1990,6 @@ dependencies = [
  "bitflags",
  "boot_info",
  "frame_allocator",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2003,6 +2003,7 @@ dependencies = [
  "pte_flags",
  "spin 0.9.4",
  "static_assertions",
+ "sync_irq",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -2091,7 +2092,6 @@ dependencies = [
 name = "mlx5"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "libm",
@@ -2104,6 +2104,7 @@ dependencies = [
  "nic_initialization",
  "pci",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -2262,7 +2263,6 @@ dependencies = [
  "hashbrown",
  "heap",
  "intrusive-collections",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
@@ -2271,6 +2271,7 @@ dependencies = [
  "slabmalloc_safe",
  "slabmalloc_unsafe",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -2331,13 +2332,13 @@ name = "net"
 version = "0.1.0"
 dependencies = [
  "heapless",
- "irq_safety",
  "log",
  "mutex_sleep",
  "nic_buffers",
  "random",
  "smoltcp 0.8.1",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -2752,7 +2753,6 @@ dependencies = [
  "apic",
  "bit_field 0.10.1",
  "cpu",
- "irq_safety",
  "lazy_static",
  "log",
  "memory",
@@ -2762,6 +2762,7 @@ dependencies = [
  "port_io",
  "raw-cpuid",
  "spin 0.9.4",
+ "sync_irq",
  "task",
  "x86_64",
 ]
@@ -2997,11 +2998,11 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
- "irq_safety",
  "log",
  "scheduler",
  "spin 0.9.4",
  "sync",
+ "sync_irq",
  "sync_spin",
  "task",
  "wait_guard",
@@ -3340,10 +3341,10 @@ dependencies = [
  "core2",
  "deferred_interrupt_tasks",
  "interrupts",
- "irq_safety",
  "log",
  "serial_port_basic",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -3351,11 +3352,11 @@ name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
  "arm_boards",
- "irq_safety",
  "memory",
  "pl011",
  "port_io",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -3478,8 +3479,8 @@ name = "sleep"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
- "irq_safety",
  "lazy_static",
+ "sync_irq",
  "task",
  "time",
 ]
@@ -3702,6 +3703,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync_irq"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "sync",
+]
+
+[[package]]
 name = "sync_preemption"
 version = "0.1.0"
 dependencies = [
@@ -3750,6 +3759,7 @@ dependencies = [
  "spin 0.9.4",
  "stack",
  "static_assertions",
+ "sync_irq",
  "task_struct",
  "waker_generic",
 ]
@@ -3775,13 +3785,13 @@ dependencies = [
  "cpu",
  "crossbeam-utils",
  "environment",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
  "mod_mgmt",
  "spin 0.9.4",
  "stack",
+ "sync_irq",
 ]
 
 [[package]]
@@ -3934,9 +3944,9 @@ dependencies = [
  "app_io",
  "core2",
  "io",
- "irq_safety",
  "log",
  "serial_port",
+ "sync_irq",
  "task",
 ]
 
@@ -4144,6 +4154,7 @@ dependencies = [
  "memory",
  "memory_aarch64",
  "memory_x86_64",
+ "sync_irq",
 ]
 
 [[package]]
@@ -4337,11 +4348,11 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "irq_safety",
  "network_interface_card",
  "nic_buffers",
  "nic_queues",
  "physical_nic",
+ "sync_irq",
 ]
 
 [[package]]
