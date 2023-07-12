@@ -151,15 +151,15 @@
 <span class="kw">extern crate </span>physical_nic;
 <span class="kw">extern crate </span>intel_ethernet;
 <span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 
 <span class="kw">use </span>nic_buffers::{TransmitBuffer, ReceivedFrame};
 <span class="kw">use </span>nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-<span class="kw">use </span>network_interface_card::{NetworkInterfaceCard};
+<span class="kw">use </span>network_interface_card::NetworkInterfaceCard;
 <span class="kw">use </span>intel_ethernet::descriptors::{TxDescriptor, RxDescriptor};
 <span class="kw">use </span>physical_nic::PhysicalNic;
 <span class="kw">use </span>alloc::vec::Vec;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="doccomment">/// A structure that contains a set of `RxQueue`s and `TxQueue`s that can be used to send and receive packets.
 </span><span class="kw">pub struct </span>VirtualNic&lt;S: RxQueueRegisters + <span class="lifetime">&#39;static</span>, T: RxDescriptor + <span class="lifetime">&#39;static</span>, U: TxQueueRegisters + <span class="lifetime">&#39;static</span>, V: TxDescriptor + <span class="lifetime">&#39;static</span>&gt; {
@@ -176,7 +176,7 @@
     <span class="doccomment">/// MAC address of the NIC
     </span>mac_address: [u8; <span class="number">6</span>],
     <span class="doccomment">/// Reference to the physical NIC that Rx/Tx queues will be returned to.
-    </span>physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt;&gt;
+    </span>physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt;&gt;
 }
 
 <span class="kw">impl</span>&lt;S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor&gt; VirtualNic&lt;S,T,U,V&gt; {
@@ -188,7 +188,7 @@
         tx_queues: Vec&lt;TxQueue&lt;U,V&gt;&gt;,
         default_tx_queue: usize, 
         mac_address: [u8; <span class="number">6</span>], 
-        physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt;&gt;
+        physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt;&gt;
     ) -&gt; <span class="prelude-ty">Result</span>&lt;VirtualNic&lt;S,T,U,V&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
         <span class="kw">if </span>rx_queues.is_empty() || tx_queues.is_empty() { 

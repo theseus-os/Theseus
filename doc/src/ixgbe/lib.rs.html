@@ -1322,7 +1322,7 @@
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>lazy_static;
 <span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>kernel_config;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>pci; 
@@ -1360,7 +1360,7 @@
     sync::Arc,
     vec::Vec,
 };
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages, map_frame_range, MMIO_FLAGS};
 <span class="kw">use </span>pci::{PciDevice, MsixVectorTable, PciConfigSpaceAccessMechanism, PciLocation};
 <span class="kw">use </span>bit_field::BitField;
@@ -1417,12 +1417,12 @@
 
 
 <span class="doccomment">/// All the 82599 NICs found in the PCI space are initialized and then stored here.
-</span><span class="kw">pub static </span>IXGBE_NICS: Once&lt;Vec&lt;MutexIrqSafe&lt;IxgbeNic&gt;&gt;&gt; = Once::new();
+</span><span class="kw">pub static </span>IXGBE_NICS: Once&lt;Vec&lt;IrqSafeMutex&lt;IxgbeNic&gt;&gt;&gt; = Once::new();
 
 
-<span class="doccomment">/// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
+<span class="doccomment">/// Returns a reference to the IxgbeNic wrapped in a IrqSafeMutex, if it exists and has been initialized.
 /// Currently we use the pci location of the device as identification since it should not change after initialization.
-</span><span class="kw">pub fn </span>get_ixgbe_nic(id: PciLocation) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;IxgbeNic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+</span><span class="kw">pub fn </span>get_ixgbe_nic(id: PciLocation) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;IxgbeNic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>nics = IXGBE_NICS.get().ok_or(<span class="string">&quot;Ixgbe NICs weren&#39;t initialized&quot;</span>)<span class="question-mark">?</span>;
     nics.iter()
         .find( |nic| { nic.lock().dev_id == id } )
@@ -1430,7 +1430,7 @@
 }
 
 <span class="doccomment">/// Returns a reference to the list of all initialized ixgbe NICs
-</span><span class="kw">pub fn </span>get_ixgbe_nics_list() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Vec&lt;MutexIrqSafe&lt;IxgbeNic&gt;&gt;&gt; {
+</span><span class="kw">pub fn </span>get_ixgbe_nics_list() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Vec&lt;IrqSafeMutex&lt;IxgbeNic&gt;&gt;&gt; {
     IXGBE_NICS.get()
 }
 
@@ -1573,7 +1573,7 @@
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
         num_tx_descriptors: u16
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;MutexIrqSafe&lt;IxgbeNic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;IrqSafeMutex&lt;IxgbeNic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="comment">// Series of checks to determine if starting parameters are acceptable
         </span><span class="kw">if </span>enable_virtualization &amp;&amp; (interrupts.is_some() || enable_rss) {
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Cannot enable virtualization when interrupts or RSS are enabled&quot;</span>);
@@ -1724,7 +1724,7 @@
 
         <span class="macro">info!</span>(<span class="string">&quot;Link is up with speed: {} Mb/s&quot;</span>, ixgbe_nic.link_speed() <span class="kw">as </span>u32);
 
-        <span class="prelude-val">Ok</span>(MutexIrqSafe::new(ixgbe_nic))
+        <span class="prelude-val">Ok</span>(IrqSafeMutex::new(ixgbe_nic))
     }
 
     <span class="doccomment">/// Returns the device id of the PCI device.

@@ -947,7 +947,7 @@
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>raw_cpuid::CpuId <span class="kw">as </span>X86CpuIdInstr;
 <span class="kw">use </span>msr::<span class="kw-2">*</span>;
-<span class="kw">use </span>irq_safety::RwLockIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeRwLock;
 <span class="kw">use </span>memory::{PageTable, PhysicalAddress, PteFlags, MappedPages, allocate_pages, allocate_frames_at, AllocatedFrames, BorrowedMappedPages, Mutable};
 <span class="kw">use </span>kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 <span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
@@ -1016,7 +1016,7 @@
 </span><span class="kw">const _</span>: () = <span class="macro">assert!</span>(AtomicCell::&lt;InterruptChip&gt;::is_lock_free());
 
 <span class="doccomment">/// The set of system-wide `LocalApic`s, one per CPU core.
-</span><span class="kw">static </span>LOCAL_APICS: AtomicMap&lt;ApicId, RwLockIrqSafe&lt;LocalApic&gt;&gt; = AtomicMap::new();
+</span><span class="kw">static </span>LOCAL_APICS: AtomicMap&lt;ApicId, IrqSafeRwLock&lt;LocalApic&gt;&gt; = AtomicMap::new();
 
 <span class="doccomment">/// The number of CPUs currently initialized in the system.
 /// This must match the number of Local APICs initialized in the system.
@@ -1050,7 +1050,7 @@
 </span>}
 
 <span class="doccomment">/// Returns a reference to the list of LocalApics, one per CPU core.
-</span><span class="kw">pub fn </span>get_lapics() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicMap&lt;ApicId, RwLockIrqSafe&lt;LocalApic&gt;&gt; {
+</span><span class="kw">pub fn </span>get_lapics() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicMap&lt;ApicId, IrqSafeRwLock&lt;LocalApic&gt;&gt; {
 	<span class="kw-2">&amp;</span>LOCAL_APICS
 }
 
@@ -1067,7 +1067,7 @@
 }
 
 <span class="doccomment">/// Returns a reference to the LocalApic for the currently executing CPU core.
-</span><span class="kw">pub fn </span>get_my_apic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>RwLockIrqSafe&lt;LocalApic&gt;&gt; {
+</span><span class="kw">pub fn </span>get_my_apic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeRwLock&lt;LocalApic&gt;&gt; {
     LOCAL_APICS.get(<span class="kw-2">&amp;</span>current_cpu())
 }
 
@@ -1483,7 +1483,7 @@
             BSP_PROCESSOR_ID.call_once(|| actual_apic_id); 
         }
 
-        <span class="kw">let </span>_existing = LOCAL_APICS.insert(actual_apic_id, RwLockIrqSafe::new(lapic));
+        <span class="kw">let </span>_existing = LOCAL_APICS.insert(actual_apic_id, IrqSafeRwLock::new(lapic));
         <span class="kw">if </span>_existing.is_some() {
             <span class="kw">return </span><span class="prelude-val">Err</span>(LapicInitError::AlreadyExisted(actual_apic_id));
         }

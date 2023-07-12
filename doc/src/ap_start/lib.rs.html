@@ -134,6 +134,7 @@
 <a href="#134" id="134">134</a>
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
+<a href="#137" id="137">137</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -146,7 +147,8 @@
 <span class="kw">use </span>core::sync::atomic::{AtomicBool, Ordering};
 <span class="kw">use </span>log::{error, info};
 <span class="kw">use </span>cpu::CpuId;
-<span class="kw">use </span>irq_safety::{enable_interrupts, MutexIrqSafe};
+<span class="kw">use </span>irq_safety::enable_interrupts;
+<span class="kw">use </span>sync_irq::IrqSafeMutex; 
 <span class="kw">use </span>memory::{VirtualAddress, get_kernel_mmi_ref};
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>no_drop::NoDrop;
@@ -164,7 +166,7 @@
 
 <span class="doccomment">/// Temporary storage for transferring allocated `Stack`s from 
 /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-</span><span class="kw">static </span>AP_STACKS: MutexIrqSafe&lt;BTreeMap&lt;u32, NoDrop&lt;Stack&gt;&gt;&gt; = MutexIrqSafe::new(BTreeMap::new());
+</span><span class="kw">static </span>AP_STACKS: IrqSafeMutex&lt;BTreeMap&lt;u32, NoDrop&lt;Stack&gt;&gt;&gt; = IrqSafeMutex::new(BTreeMap::new());
 
 <span class="doccomment">/// Insert a new stack that was allocated for the AP with the given `cpu_id`.
 </span><span class="kw">pub fn </span>insert_ap_stack(cpu_id: u32, stack: Stack) {

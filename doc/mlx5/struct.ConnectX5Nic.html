@@ -5,7 +5,7 @@
     num_tx_descs: <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.usize.html">usize</a>,
     num_rx_descs: <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.usize.html">usize</a>,
     mtu: <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.u16.html">u16</a>
-) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;&amp;'static <a class="struct" href="../irq_safety/mutex_irqsafe/struct.MutexIrqSafe.html" title="struct irq_safety::mutex_irqsafe::MutexIrqSafe">MutexIrqSafe</a>&lt;<a class="struct" href="struct.ConnectX5Nic.html" title="struct mlx5::ConnectX5Nic">ConnectX5Nic</a>&gt;, &amp;'static <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;&amp;'static IrqSafeMutex&lt;<a class="struct" href="struct.ConnectX5Nic.html" title="struct mlx5::ConnectX5Nic">ConnectX5Nic</a>&gt;, &amp;'static <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Initializes the new ConnectX-5 network interface card that is connected as the given PciDevice.
 (steps taken from the PRM, Section 7.2: HCA Driver Start-up)</p>
 <h5 id="arguments"><a href="#arguments">Arguments</a></h5>
 <ul>

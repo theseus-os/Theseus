@@ -278,7 +278,7 @@
 <span class="kw">use </span>log::debug;
 <span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>memory::VirtualAddress;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>core::panic::PanicInfo;
 
 <span class="doccomment">/// The possible faults (panics and exceptions) encountered 
@@ -384,7 +384,7 @@
 
 
 <span class="doccomment">/// The structure to hold the list of all faults so far occured in the system
-</span><span class="kw">static </span>FAULT_LIST: MutexIrqSafe&lt;Vec&lt;FaultEntry&gt;&gt; = MutexIrqSafe::new(Vec::new());
+</span><span class="kw">static </span>FAULT_LIST: IrqSafeMutex&lt;Vec&lt;FaultEntry&gt;&gt; = IrqSafeMutex::new(Vec::new());
 
 <span class="doccomment">/// Clears the log of faults so far occured in the system 
 </span><span class="kw">pub fn </span>clear_fault_log() {

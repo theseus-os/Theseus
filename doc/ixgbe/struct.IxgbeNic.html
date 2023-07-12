@@ -8,7 +8,7 @@
     rx_buffer_size_kbytes: <a class="enum" href="enum.RxBufferSizeKiB.html" title="enum ixgbe::RxBufferSizeKiB">RxBufferSizeKiB</a>,
     num_rx_descriptors: <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.u16.html">u16</a>,
     num_tx_descriptors: <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.u16.html">u16</a>
-) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="../irq_safety/mutex_irqsafe/struct.MutexIrqSafe.html" title="struct irq_safety::mutex_irqsafe::MutexIrqSafe">MutexIrqSafe</a>&lt;<a class="struct" href="struct.IxgbeNic.html" title="struct ixgbe::IxgbeNic">IxgbeNic</a>&gt;, &amp;'static <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Store required values from the device’s PCI config space, and initialize different features of the nic.</p>
+) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;IrqSafeMutex&lt;<a class="struct" href="struct.IxgbeNic.html" title="struct ixgbe::IxgbeNic">IxgbeNic</a>&gt;, &amp;'static <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Store required values from the device’s PCI config space, and initialize different features of the nic.</p>
 <h5 id="arguments"><a href="#arguments">Arguments</a></h5>
 <ul>
 <li><code>ixgbe_pci_dev</code>: Contains the pci device information for this NIC.</li>

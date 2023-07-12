@@ -695,7 +695,7 @@
 #[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>pci; 
 <span class="kw">extern crate </span>nic_initialization;
@@ -709,7 +709,7 @@
 
 <span class="kw">use </span>spin::Once; 
 <span class="kw">use </span>alloc::vec::Vec;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>memory::{PhysicalAddress, MappedPages, create_contiguous_mapping, map_frame_range, BorrowedMappedPages, Mutable, MMIO_FLAGS};
 <span class="kw">use </span>pci::PciDevice;
 <span class="kw">use </span>nic_initialization::init_rx_buf_pool;
@@ -753,11 +753,11 @@
 
 <span class="doccomment">/// The singleton connectx-5 NIC.
 /// TODO: Allow for multiple NICs
-</span><span class="kw">static </span>CONNECTX5_NIC: Once&lt;MutexIrqSafe&lt;ConnectX5Nic&gt;&gt; = Once::new();
+</span><span class="kw">static </span>CONNECTX5_NIC: Once&lt;IrqSafeMutex&lt;ConnectX5Nic&gt;&gt; = Once::new();
 
-<span class="doccomment">/// Returns a reference to the NIC wrapped in a MutexIrqSafe,
+<span class="doccomment">/// Returns a reference to the NIC wrapped in a IrqSafeMutex,
 /// if it exists and has been initialized.
-</span><span class="kw">pub fn </span>get_mlx5_nic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;ConnectX5Nic&gt;&gt; {
+</span><span class="kw">pub fn </span>get_mlx5_nic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;ConnectX5Nic&gt;&gt; {
     CONNECTX5_NIC.get()
 }
 
@@ -808,7 +808,7 @@
         num_tx_descs: usize, 
         num_rx_descs: usize, 
         mtu: u16
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;ConnectX5Nic&gt; , <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;ConnectX5Nic&gt; , <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>sq_size_in_bytes = num_tx_descs * core::mem::size_of::&lt;WorkQueueEntrySend&gt;();
         <span class="kw">let </span>rq_size_in_bytes = num_rx_descs * core::mem::size_of::&lt;WorkQueueEntryReceive&gt;();
         
@@ -1317,7 +1317,7 @@
             receive_queue
         };
         
-        <span class="kw">let </span>nic_ref = CONNECTX5_NIC.call_once(|| MutexIrqSafe::new(mlx5_nic));
+        <span class="kw">let </span>nic_ref = CONNECTX5_NIC.call_once(|| IrqSafeMutex::new(mlx5_nic));
         <span class="prelude-val">Ok</span>(nic_ref)
     }
     

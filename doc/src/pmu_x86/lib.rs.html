@@ -983,7 +983,7 @@
 <span class="kw">extern crate </span>raw_cpuid;
 <span class="kw">extern crate </span>task;
 <span class="kw">extern crate </span>memory;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>apic;
 <span class="kw">extern crate </span>cpu;
@@ -995,7 +995,7 @@
 <span class="kw">use </span>x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::InterruptStackFrame};
 <span class="kw">use </span>raw_cpuid::CpuId <span class="kw">as </span>X86CpuIdInstr;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>alloc::{
     collections::{BTreeMap, BTreeSet},
     string::{String, ToString},
@@ -1064,9 +1064,9 @@
 }
 
 <span class="doccomment">/// Set to store the cores that the PMU has already been initialized on
-</span><span class="kw">static </span>CORES_INITIALIZED: MutexIrqSafe&lt;BTreeSet&lt;u8&gt;&gt; = MutexIrqSafe::new(BTreeSet::new());
+</span><span class="kw">static </span>CORES_INITIALIZED: IrqSafeMutex&lt;BTreeSet&lt;u8&gt;&gt; = IrqSafeMutex::new(BTreeSet::new());
 <span class="doccomment">/// The sampling information for each core
-</span><span class="kw">static </span>SAMPLING_INFO: MutexIrqSafe&lt;BTreeMap&lt;u8, SampledEvents&gt;&gt; =  MutexIrqSafe::new(BTreeMap::new());
+</span><span class="kw">static </span>SAMPLING_INFO: IrqSafeMutex&lt;BTreeMap&lt;u8, SampledEvents&gt;&gt; =  IrqSafeMutex::new(BTreeMap::new());
 
 <span class="doccomment">/// Used to select the event type to count. Event types are described in the Intel SDM 18.2.1 for PMU Version 1.
 /// The discriminant value for each event type is the value written to the event select register for a general purpose PMC.

@@ -92,9 +92,9 @@
 </pre></div><pre class="rust"><code><span class="kw">use crate</span>::{device::DeviceWrapper, NetworkDevice, <span class="prelude-ty">Result</span>, Socket};
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::marker::PhantomData;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>mutex_sleep::MutexSleep;
 <span class="kw">use </span>smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="kw">pub use </span>smoltcp::iface::SocketSet;
 <span class="kw">pub use </span>wire::{IpAddress, IpCidr};
@@ -105,12 +105,12 @@
 /// abstractions such as polling sockets.
 </span><span class="kw">pub struct </span>NetworkInterface {
     inner: MutexSleep&lt;iface::Interface&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
-    device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;<span class="kw">dyn </span><span class="kw">crate</span>::NetworkDevice&gt;,
+    device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span><span class="kw">crate</span>::NetworkDevice&gt;,
     sockets: MutexSleep&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
 }
 
 <span class="kw">impl </span>NetworkInterface {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new&lt;T&gt;(device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;T&gt;, ip: IpCidr, gateway: IpAddress) -&gt; <span class="self">Self
+    <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>new&lt;T&gt;(device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;T&gt;, ip: IpCidr, gateway: IpAddress) -&gt; <span class="self">Self
     </span><span class="kw">where
         </span>T: NetworkDevice,
     {

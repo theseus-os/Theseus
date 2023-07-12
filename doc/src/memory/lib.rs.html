@@ -371,7 +371,7 @@
 <span class="kw">use </span>boot_info::{BootInformation, MemoryRegion};
 <span class="kw">use </span>log::debug;
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
 <span class="kw">use </span>frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
 <span class="kw">use </span>no_drop::NoDrop;
@@ -381,7 +381,7 @@
 </span><span class="kw">static </span>KERNEL_MMI: Once&lt;MmiRef&gt; = Once::new();
 
 <span class="doccomment">/// A shareable reference to a `MemoryManagementInfo` struct wrapper in a lock.
-</span><span class="kw">pub type </span>MmiRef = Arc&lt;MutexIrqSafe&lt;MemoryManagementInfo&gt;&gt;;
+</span><span class="kw">pub type </span>MmiRef = Arc&lt;IrqSafeMutex&lt;MemoryManagementInfo&gt;&gt;;
 
 <span class="doccomment">/// Returns a reference to the kernel&#39;s `MemoryManagementInfo`, if initialized.
 /// If not, it returns `None`.
@@ -627,7 +627,7 @@
     };
 
     <span class="kw">let </span>kernel_mmi_ref = KERNEL_MMI.call_once( || {
-        Arc::new(MutexIrqSafe::new(kernel_mmi))
+        Arc::new(IrqSafeMutex::new(kernel_mmi))
     });
 
     kernel_mmi_ref.clone()

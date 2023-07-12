@@ -71,9 +71,9 @@
 </span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
 <span class="kw">use </span>smoltcp::wire::Ipv4Address;
 <span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="kw">mod </span>device;
 <span class="kw">mod </span>error;
@@ -109,7 +109,7 @@
 ///
 /// The function will convert the device to an interface and it will then be
 /// accessible using [`get_interfaces()`].
-</span><span class="kw">pub fn </span>register_device&lt;T&gt;(device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;T&gt;) -&gt; Arc&lt;NetworkInterface&gt;
+</span><span class="kw">pub fn </span>register_device&lt;T&gt;(device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;T&gt;) -&gt; Arc&lt;NetworkInterface&gt;
 <span class="kw">where
     </span>T: <span class="lifetime">&#39;static </span>+ NetworkDevice + Send,
 {

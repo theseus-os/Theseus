@@ -108,7 +108,7 @@
 #![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>irq_safety; 
+<span class="kw">extern crate </span>sync_irq; 
 <span class="kw">extern crate </span>spin;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>kernel_config;
@@ -117,7 +117,7 @@
 <span class="kw">use </span>alloc::alloc::{GlobalAlloc, Layout};
 <span class="kw">use </span>memory::PteFlags;
 <span class="kw">use </span>kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>alloc::boxed::Box;
 <span class="kw">use </span>block_allocator::FixedSizeBlockAllocator;
@@ -164,7 +164,7 @@
 /// It starts off with one basic fixed size allocator, the `initial allocator`. 
 /// When a more complex heap is created and set as the `DEFAULT_ALLOCATOR`, then it is used.
 </span><span class="kw">pub struct </span>Heap {
-    initial_allocator: MutexIrqSafe&lt;block_allocator::FixedSizeBlockAllocator&gt;, 
+    initial_allocator: IrqSafeMutex&lt;block_allocator::FixedSizeBlockAllocator&gt;, 
 }
 
 
@@ -172,7 +172,7 @@
     <span class="doccomment">/// Returns a heap in which only an empty initial allocator has been created.
     </span><span class="kw">pub const fn </span>empty() -&gt; Heap {
         Heap {
-            initial_allocator: MutexIrqSafe::new(FixedSizeBlockAllocator::new()),
+            initial_allocator: IrqSafeMutex::new(FixedSizeBlockAllocator::new()),
         }
     }
 }

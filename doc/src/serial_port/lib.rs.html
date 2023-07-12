@@ -439,7 +439,7 @@
 
 <span class="kw">use </span>alloc::{boxed::Box, sync::Arc};
 <span class="kw">use </span>core::{fmt, ops::{Deref, DerefMut}};
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>interrupts::{InterruptHandler, EoiBehaviour, InterruptNumber, interrupt_handler};
 
@@ -466,17 +466,17 @@
 
 <span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,
 // we ensure they are exposed safely as singletons through the below static instances.
-</span><span class="kw">static </span>COM1_SERIAL_PORT: Once&lt;Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; = Once::new();
-<span class="kw">static </span>COM2_SERIAL_PORT: Once&lt;Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; = Once::new();
-<span class="kw">static </span>COM3_SERIAL_PORT: Once&lt;Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; = Once::new();
-<span class="kw">static </span>COM4_SERIAL_PORT: Once&lt;Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; = Once::new();
+</span><span class="kw">static </span>COM1_SERIAL_PORT: Once&lt;Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; = Once::new();
+<span class="kw">static </span>COM2_SERIAL_PORT: Once&lt;Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; = Once::new();
+<span class="kw">static </span>COM3_SERIAL_PORT: Once&lt;Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; = Once::new();
+<span class="kw">static </span>COM4_SERIAL_PORT: Once&lt;Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; = Once::new();
 
 
 <span class="doccomment">/// Obtains a reference to the [`SerialPort`] specified by the given [`SerialPortAddress`],
 /// if it has been initialized (see [`init_serial_port()`]).
 </span><span class="kw">pub fn </span>get_serial_port(
     serial_port_address: SerialPortAddress
-) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; {
+) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; {
     static_port_of(<span class="kw-2">&amp;</span>serial_port_address).get()
 }
 
@@ -490,14 +490,14 @@
 </span><span class="kw">pub fn </span>init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
-) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; {
+) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; {
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
     </span><span class="kw">if </span>serial_port_address != SerialPortAddress::COM1 {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
 
     <span class="prelude-val">Some</span>(static_port_of(<span class="kw-2">&amp;</span>serial_port_address).call_once(|| {
-        <span class="kw">let </span>sp = Arc::new(MutexIrqSafe::new(SerialPort::new(serial_port)));
+        <span class="kw">let </span>sp = Arc::new(IrqSafeMutex::new(SerialPort::new(serial_port)));
 
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
         </span><span class="kw">let </span>(int_num, int_handler) = interrupt_number_handler(<span class="kw-2">&amp;</span>serial_port_address);
@@ -517,7 +517,7 @@
 <span class="doccomment">/// Returns a reference to the static instance of this serial port.
 </span><span class="kw">fn </span>static_port_of(
     serial_port_address: <span class="kw-2">&amp;</span>SerialPortAddress
-) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Once&lt;Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;&gt; {
+) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Once&lt;Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;&gt; {
     <span class="kw">match </span>serial_port_address {
         SerialPortAddress::COM1 =&gt; <span class="kw-2">&amp;</span>COM1_SERIAL_PORT,
         SerialPortAddress::COM2 =&gt; <span class="kw-2">&amp;</span>COM2_SERIAL_PORT,
@@ -578,7 +578,7 @@
     <span class="doccomment">/// Register the interrupt handler for this serial port
     /// and spawn a deferrent interrupt task to handle its data receival. 
     </span><span class="kw">pub fn </span>register_interrupt_handler(
-        serial_port: Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;,
+        serial_port: Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;,
         interrupt_number: InterruptNumber,
         interrupt_handler: InterruptHandler,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -713,7 +713,7 @@
 /// On the other hand, the interrupt handler itself merely notifies the system 
 /// that it&#39;s time to invoke this function soon.
 </span><span class="kw">fn </span>serial_port_receive_deferred(
-    serial_port: <span class="kw-2">&amp;</span>Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;
+    serial_port: <span class="kw-2">&amp;</span>Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), ()&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>buf = DataChunk::empty();
     <span class="kw">let </span>bytes_read;

@@ -149,7 +149,7 @@
 </span><span class="attr">#![allow(dead_code)]
 #![no_std]
 
-</span><span class="kw">extern crate </span>irq_safety;
+</span><span class="kw">extern crate </span>sync_irq;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>spin;
@@ -158,7 +158,7 @@
 <span class="kw">extern crate </span>bitflags;
 
 <span class="kw">use </span>spin::Once;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>memory::{PageTable, PteFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
 
 <span class="kw">mod </span>regs;
@@ -177,7 +177,7 @@
 }
 
 <span class="doccomment">/// Singleton representing IOMMU (TODO: could there be more than one IOMMU?)
-</span><span class="kw">static </span>IOMMU: Once&lt;MutexIrqSafe&lt;IntelIommu&gt;&gt; = Once::new();
+</span><span class="kw">static </span>IOMMU: Once&lt;IrqSafeMutex&lt;IntelIommu&gt;&gt; = Once::new();
 
 <span class="doccomment">/// Initialize the IOMMU hardware.
 ///
@@ -241,7 +241,7 @@
     };
 
     <span class="comment">// initialize the iommu singleton with this object
-    </span>IOMMU.call_once(|| {MutexIrqSafe::new(iommu)});
+    </span>IOMMU.call_once(|| {IrqSafeMutex::new(iommu)});
 
     <span class="comment">// Ensure translation is disabled.
     //

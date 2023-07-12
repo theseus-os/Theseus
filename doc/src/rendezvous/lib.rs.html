@@ -529,7 +529,7 @@
 <span class="attr">#[cfg(trace_channel)] 
 #[macro_use] </span><span class="kw">extern crate </span>debugit;
 <span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>wait_queue;
 <span class="kw">extern crate </span>wait_guard;
 <span class="kw">extern crate </span>task;
@@ -539,7 +539,7 @@
 
 <span class="kw">use </span>core::fmt;
 <span class="kw">use </span>alloc::sync::Arc;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>wait_queue::WaitQueue;
 <span class="kw">use </span>wait_guard::WaitGuard;
@@ -548,9 +548,9 @@
 
 
 <span class="doccomment">/// A wrapper type for an `ExchangeSlot` that is used for sending only.
-</span><span class="kw">struct </span>SenderSlot&lt;T&gt;(Arc&lt;MutexIrqSafe&lt;ExchangeState&lt;T&gt;&gt;&gt;);
+</span><span class="kw">struct </span>SenderSlot&lt;T&gt;(Arc&lt;IrqSafeMutex&lt;ExchangeState&lt;T&gt;&gt;&gt;);
 <span class="doccomment">/// A wrapper type for an `ExchangeSlot` that is used for receiving only.
-</span><span class="kw">struct </span>ReceiverSlot&lt;T&gt;(Arc&lt;MutexIrqSafe&lt;ExchangeState&lt;T&gt;&gt;&gt;);
+</span><span class="kw">struct </span>ReceiverSlot&lt;T&gt;(Arc&lt;IrqSafeMutex&lt;ExchangeState&lt;T&gt;&gt;&gt;);
 
 
 <span class="doccomment">/// An `ExchangeSlot` consists of two references to a shared state
@@ -564,7 +564,7 @@
 }
 <span class="kw">impl</span>&lt;T&gt; ExchangeSlot&lt;T&gt; {
     <span class="kw">fn </span>new() -&gt; ExchangeSlot&lt;T&gt; {
-        <span class="kw">let </span>inner = Arc::new(MutexIrqSafe::new(ExchangeState::Init));
+        <span class="kw">let </span>inner = Arc::new(IrqSafeMutex::new(ExchangeState::Init));
         ExchangeSlot {
             sender: Mutex::new(<span class="prelude-val">Some</span>(SenderSlot(inner.clone()))),
             receiver: Mutex::new(<span class="prelude-val">Some</span>(ReceiverSlot(inner))),
@@ -750,7 +750,7 @@
             <span class="kw">match </span>current_state {
                 ExchangeState::Init =&gt; {
                     <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,
-                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    // which is currently done automatically because the slot uses a IrqSafeMutex.
                     </span><span class="kw">let </span>curr = task::get_my_current_task().ok_or(<span class="string">&quot;couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
                     <span class="kw-2">*</span>exchange_state = ExchangeState::WaitingForReceiver(
                         WaitGuard::new(curr).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>,
@@ -850,13 +850,13 @@
             let current_state = core::mem::replace(&amp;mut *wait_entry, RendezvousState::Init);
             match current_state {
                 RendezvousState::Init =&gt; {
-                    let _held_interrupts = irq_safety::hold_interrupts();
+                    let _held_interrupts = sync_irq::hold_interrupts();
                     *wait_entry = RendezvousState::Waiting(WaitGuard::new(curr_task.clone()), Some(msg));
                     // interrupts are re-enabled here
                 }
                 RendezvousState::Waiting(task_to_notify, dest) =&gt; {
                     *dest = Some(msg);
-                    let _held_interrupts = irq_safety::hold_interrupts();
+                    let _held_interrupts = sync_irq::hold_interrupts();
                     *task_to_notify = WaitGuard::new(curr_task.clone());
                     drop(task_to_notify); // notifies the receiver
                 }
@@ -904,7 +904,7 @@
             <span class="kw">match </span>current_state {
                 ExchangeState::Init =&gt; {
                     <span class="comment">// Hold interrupts to avoid blocking &amp; descheduling this task until we release the slot lock,
-                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    // which is currently done automatically because the slot uses a IrqSafeMutex.
                     </span><span class="kw-2">*</span>exchange_state = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create wait guard&quot;</span>)<span class="question-mark">?</span>);
                     <span class="prelude-val">None
                 </span>}

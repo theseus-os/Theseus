@@ -273,12 +273,12 @@
 <span class="kw">extern crate </span>smoltcp;
 <span class="kw">extern crate </span>network_interface_card;
 <span class="kw">extern crate </span>nic_buffers;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>network_manager;
 
 
 <span class="kw">use </span>alloc::collections::BTreeMap;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>smoltcp::{
     socket::SocketSet,
     time::Instant,
@@ -343,7 +343,7 @@
     /// Currently, `static_ip` and `gateway_ip` are required because we don&#39;t yet support DHCP.
     /// 
     </span><span class="kw">pub fn </span>new&lt;G: Into&lt;IpAddress&gt;&gt;(
-        nic: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
+        nic: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;N&gt;,
         static_ip: <span class="prelude-ty">Option</span>&lt;IpCidr&gt;,
         gateway_ip: <span class="prelude-ty">Option</span>&lt;G&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;EthernetNetworkInterface&lt;N&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
@@ -388,7 +388,7 @@
     /// * `static_ip`: ip address to be assigned to this interface
     /// * `gateway_ip`: ipv4 gateway address for this interface
     </span><span class="kw">pub fn </span>new_ipv4_interface(
-        nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
+        nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;N&gt;,
         static_ip: <span class="kw-2">&amp;</span>str, 
         gateway_ip: <span class="kw-2">&amp;</span>[u8]
     ) -&gt; <span class="prelude-ty">Result</span>&lt;EthernetNetworkInterface&lt;N&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
@@ -405,11 +405,11 @@
 /// to use our existing ethernet driver.
 /// An instance of this `EthernetDevice` can be used in smoltcp&#39;s `EthernetInterface`.
 </span><span class="kw">pub struct </span>EthernetDevice&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; { 
-    nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
+    nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;N&gt;,
 }
 <span class="kw">impl</span>&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; EthernetDevice&lt;N&gt; {
     <span class="doccomment">/// Create a new instance of the `EthernetDevice`.
-    </span><span class="kw">pub fn </span>new(nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;) -&gt; EthernetDevice&lt;N&gt; {
+    </span><span class="kw">pub fn </span>new(nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;N&gt;) -&gt; EthernetDevice&lt;N&gt; {
         EthernetDevice {
             nic_ref,
         }
@@ -478,7 +478,7 @@
 <span class="doccomment">/// The transmit token type used by smoltcp, which contains only a reference to the relevant NIC 
 /// because the actual transmit buffer is allocated lazily only when it needs to be consumed.
 </span><span class="kw">pub struct </span>TxToken&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; {
-    nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;N&gt;,
+    nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;N&gt;,
 }
 <span class="kw">impl</span>&lt;N: NetworkInterfaceCard + <span class="lifetime">&#39;static</span>&gt; smoltcp::phy::TxToken <span class="kw">for </span>TxToken&lt;N&gt; {
     <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="self">self</span>, _timestamp: Instant, len: usize, f: F) -&gt; smoltcp::Result&lt;R&gt;

@@ -518,7 +518,7 @@
 <span class="kw">extern crate </span>zerocopy;
 <span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>spin;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>kernel_config;
 <span class="kw">extern crate </span>memory;
 <span class="kw">extern crate </span>pci; 
@@ -540,7 +540,7 @@
 
 <span class="kw">use </span>spin::Once; 
 <span class="kw">use </span>alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_frame_range, MMIO_FLAGS};
 <span class="kw">use </span>pci::{PciDevice, PciConfigSpaceAccessMechanism};
 <span class="kw">use </span>kernel_config::memory::PAGE_SIZE;
@@ -570,11 +570,11 @@
 <span class="doccomment">/// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-</span><span class="kw">static </span>E1000_NIC: Once&lt;MutexIrqSafe&lt;E1000Nic&gt;&gt; = Once::new();
+</span><span class="kw">static </span>E1000_NIC: Once&lt;IrqSafeMutex&lt;E1000Nic&gt;&gt; = Once::new();
 
-<span class="doccomment">/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
+<span class="doccomment">/// Returns a reference to the E1000Nic wrapped in a IrqSafeMutex,
 /// if it exists and has been initialized.
-</span><span class="kw">pub fn </span>get_e1000_nic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;E1000Nic&gt;&gt; {
+</span><span class="kw">pub fn </span>get_e1000_nic() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;E1000Nic&gt;&gt; {
     E1000_NIC.get()
 }
 
@@ -682,7 +682,7 @@
     <span class="doccomment">/// Initializes the new E1000 network interface card that is connected as the given PciDevice.
     ///
     /// `enable_interrupts` must be called after the NIC has been registered with the `net` subsystem.
-    </span><span class="kw">pub fn </span>init(e1000_pci_dev: <span class="kw-2">&amp;</span>PciDevice) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;E1000Nic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>init(e1000_pci_dev: <span class="kw-2">&amp;</span>PciDevice) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;E1000Nic&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">use </span>interrupts::IRQ_BASE_OFFSET;
 
         <span class="comment">//debug!(&quot;e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}&quot;, e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
@@ -762,7 +762,7 @@
             deferred_task: <span class="prelude-val">None</span>,
         };
         
-        <span class="kw">let </span>nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
+        <span class="kw">let </span>nic_ref = E1000_NIC.call_once(|| IrqSafeMutex::new(e1000_nic));
         <span class="prelude-val">Ok</span>(nic_ref)
     }
     

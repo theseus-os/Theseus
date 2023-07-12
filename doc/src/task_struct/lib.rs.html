@@ -687,7 +687,7 @@
 };
 <span class="kw">use </span>cpu::{CpuId, OptionalCpuId};
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>log::{warn, trace};
 <span class="kw">use </span>memory::MmiRef;
 <span class="kw">use </span>stack::Stack;
@@ -870,7 +870,7 @@
     /// because the other fields aside from this one are primarily read, not written.
     ///
     /// This must not be public because it permits interior mutability of key task states.
-    </span>inner: MutexIrqSafe&lt;TaskInner&gt;,
+    </span>inner: IrqSafeMutex&lt;TaskInner&gt;,
 
     <span class="doccomment">/// The unique identifier of this Task.
     </span><span class="kw">pub </span>id: usize,
@@ -982,7 +982,7 @@
         </span><span class="kw">let </span>tls_area = namespace.get_tls_initializer_data();
 
         <span class="prelude-val">Ok</span>(Task {
-            inner: MutexIrqSafe::new(TaskInner {
+            inner: IrqSafeMutex::new(TaskInner {
                 saved_sp: <span class="number">0</span>,
                 kstack,
                 pinned_cpu: <span class="prelude-val">None</span>,
@@ -1256,7 +1256,7 @@
 <span class="comment">// Here we simply expose accessors for all private fields of `Task`.
 </span><span class="kw">impl </span>ExposedTask {
     <span class="attr">#[inline(always)]
-    </span><span class="kw">pub fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>MutexIrqSafe&lt;TaskInner&gt; {
+    </span><span class="kw">pub fn </span>inner(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>IrqSafeMutex&lt;TaskInner&gt; {
         <span class="kw-2">&amp;</span><span class="self">self</span>.inner
     }
     <span class="attr">#[inline(always)]

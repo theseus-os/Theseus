@@ -190,7 +190,7 @@
 
 </span><span class="attr">#![no_std]
 </span><span class="kw">extern crate </span>task;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>alloc;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>lazy_static;
 <span class="kw">extern crate </span>time;
@@ -198,7 +198,7 @@
 
 <span class="kw">use </span>core::task::Waker;
 <span class="kw">use </span>alloc::collections::binary_heap::BinaryHeap;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>task::{get_my_current_task, TaskRef, RunState};
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 <span class="kw">use </span>time::{now, Instant, Monotonic};
@@ -257,8 +257,8 @@
 <span class="macro">lazy_static! </span>{
     <span class="doccomment">/// List of all delayed tasks in the system
     /// Implemented as a min-heap of `SleepingTaskNode` sorted in increasing order of `resume_time`
-    </span><span class="kw">static </span><span class="kw-2">ref </span>DELAYED_TASKLIST: MutexIrqSafe&lt;BinaryHeap&lt;SleepingTaskNode&gt;&gt; 
-        = MutexIrqSafe::new(BinaryHeap::new());
+    </span><span class="kw">static </span><span class="kw-2">ref </span>DELAYED_TASKLIST: IrqSafeMutex&lt;BinaryHeap&lt;SleepingTaskNode&gt;&gt; 
+        = IrqSafeMutex::new(BinaryHeap::new());
 }
 
 <span class="doccomment">/// Keeps track of the next task that needs to unblock, by default, it is the maximum time

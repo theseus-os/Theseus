@@ -196,7 +196,7 @@
 <span class="kw">use </span>async_channel::Receiver;
 <span class="kw">use </span>core::sync::atomic::{AtomicU16, Ordering};
 <span class="kw">use </span>core2::io::Write;
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>log::{error, info, warn};
 <span class="kw">use </span>serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
 <span class="kw">use </span>task::{JoinableTaskRef, KillReason};
@@ -281,7 +281,7 @@
 
 <span class="kw">fn </span>shell_loop(
     (port, address, receiver): (
-        Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;,
+        Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;,
         SerialPortAddress,
         Receiver&lt;DataChunk&gt;,
     ),
@@ -342,7 +342,7 @@
     </span><span class="prelude-val">Ok</span>(())
 }
 
-<span class="kw">fn </span>tty_to_port_loop((port, master): (Arc&lt;MutexIrqSafe&lt;SerialPort&gt;&gt;, tty::Master)) {
+<span class="kw">fn </span>tty_to_port_loop((port, master): (Arc&lt;IrqSafeMutex&lt;SerialPort&gt;&gt;, tty::Master)) {
     <span class="kw">let </span><span class="kw-2">mut </span>data = [<span class="number">0</span>; <span class="number">256</span>];
     <span class="kw">loop </span>{
         <span class="kw">let </span>len = <span class="kw">match </span>master.read(<span class="kw-2">&amp;mut </span>data) {

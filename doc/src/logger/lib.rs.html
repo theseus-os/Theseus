@@ -427,12 +427,12 @@
 </span><span class="kw">extern crate </span>alloc;
 <span class="kw">extern crate </span>crossbeam_utils;
 <span class="kw">extern crate </span>log;
-<span class="kw">extern crate </span>irq_safety;
+<span class="kw">extern crate </span>sync_irq;
 <span class="kw">extern crate </span>serial_port_basic;
 
 <span class="kw">use </span>log::{Record, Level, Metadata, Log};
 <span class="kw">use </span>core::{borrow::Borrow, fmt::{<span class="self">self</span>, Write}, ops::Deref};
-<span class="kw">use </span>irq_safety::MutexIrqSafe;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>serial_port_basic::SerialPort;
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
 
@@ -452,21 +452,21 @@
 };
 
 <span class="doccomment">/// The early logger used before dynamic heap allocation is available.
-</span><span class="kw">static </span>EARLY_LOGGER: MutexIrqSafe&lt;EarlyLogger&gt; = MutexIrqSafe::new(EarlyLogger::new());
+</span><span class="kw">static </span>EARLY_LOGGER: IrqSafeMutex&lt;EarlyLogger&gt; = IrqSafeMutex::new(EarlyLogger::new());
 
 <span class="doccomment">/// The early log buffer.
 ///
 /// This is separate from the `EARLY_LOGGER` in order for it to be placed
 /// in `.bss` instead of `.data`, saving space in the executable.
-</span><span class="kw">static </span>EARLY_LOG_BUFFER: MutexIrqSafe&lt;EarlyLogBuffer&lt;EARLY_LOG_BUFFER_SIZE&gt;&gt; =
-    MutexIrqSafe::new(EarlyLogBuffer::new());
+</span><span class="kw">static </span>EARLY_LOG_BUFFER: IrqSafeMutex&lt;EarlyLogBuffer&lt;EARLY_LOG_BUFFER_SIZE&gt;&gt; =
+    IrqSafeMutex::new(EarlyLogBuffer::new());
 
 <span class="doccomment">/// The real logger instance where log states are kept.
 ///
 /// This is accessed in the [`DummyLogger`]&#39;s log/write methods,
 /// it is not called directly by the `log` crate.
 /// If `None`, it is uninitialized, and the [`EARLY_LOGGER`] will be used as a fallback.
-</span><span class="kw">static </span>LOGGER: MutexIrqSafe&lt;<span class="prelude-ty">Option</span>&lt;Logger&gt;&gt; = MutexIrqSafe::new(<span class="prelude-val">None</span>);
+</span><span class="kw">static </span>LOGGER: IrqSafeMutex&lt;<span class="prelude-ty">Option</span>&lt;Logger&gt;&gt; = IrqSafeMutex::new(<span class="prelude-val">None</span>);
 
 <span class="doccomment">/// An early logger that can only write to a fixed number of [`SerialPort`]s,
 /// intended for basic use before dynamic heap allocation is available.
@@ -531,7 +531,7 @@
 ///
 /// This is the &quot;backend&quot; for the `log` crate that allows Theseus to use its `log!()` macros.
 </span><span class="kw">struct </span>Logger {
-    writers: Vec&lt;Arc&lt;MutexIrqSafe&lt;<span class="kw">dyn </span>Write + Send&gt;&gt;&gt;,
+    writers: Vec&lt;Arc&lt;IrqSafeMutex&lt;<span class="kw">dyn </span>Write + Send&gt;&gt;&gt;,
 }
 
 <span class="doccomment">/// Removes all of the writers (output streams) from the early logger and returns them.
@@ -723,12 +723,12 @@
 </span><span class="kw">pub fn </span>init&lt;I, W&gt;(log_level: <span class="prelude-ty">Option</span>&lt;Level&gt;, writers: <span class="kw">impl </span>IntoIterator&lt;Item = I&gt;)
 <span class="kw">where
     </span>W: Write + Send + <span class="lifetime">&#39;static</span>,
-    I: Into&lt;Arc&lt;MutexIrqSafe&lt;W&gt;&gt;&gt;,
+    I: Into&lt;Arc&lt;IrqSafeMutex&lt;W&gt;&gt;&gt;,
 {
     <span class="comment">// Populate the fields of the real logger instance
     </span><span class="kw">let </span>logger = Logger {
         writers: writers.into_iter()
-            .map(|i| i.into() <span class="kw">as </span>Arc&lt;MutexIrqSafe&lt;<span class="kw">dyn </span>Write + Send&gt;&gt;)
+            .map(|i| i.into() <span class="kw">as </span>Arc&lt;IrqSafeMutex&lt;<span class="kw">dyn </span>Write + Send&gt;&gt;)
             .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;(),
     };
     <span class="kw-2">*</span>LOGGER.lock() = <span class="prelude-val">Some</span>(logger);

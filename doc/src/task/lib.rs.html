@@ -1257,6 +1257,7 @@
 <a href="#1257" id="1257">1257</a>
 <a href="#1258" id="1258">1258</a>
 <a href="#1259" id="1259">1259</a>
+<a href="#1260" id="1260">1260</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1305,13 +1306,14 @@
 };
 <span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
-<span class="kw">use </span>irq_safety::{hold_interrupts, MutexIrqSafe};
+<span class="kw">use </span>irq_safety::hold_interrupts;
 <span class="kw">use </span>log::error;
 <span class="kw">use </span>environment::Environment;
 <span class="kw">use </span>memory::MmiRef;
 <span class="kw">use </span>no_drop::NoDrop;
 <span class="kw">use </span>cpu_local_preemption::PreemptionGuard;
 <span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>task_struct::ExposedTask;
 
@@ -1326,7 +1328,7 @@
 
 
 <span class="doccomment">/// The list of all Tasks in the system.
-</span><span class="kw">static </span>TASKLIST: MutexIrqSafe&lt;BTreeMap&lt;usize, TaskRef&gt;&gt; = MutexIrqSafe::new(BTreeMap::new());
+</span><span class="kw">static </span>TASKLIST: IrqSafeMutex&lt;BTreeMap&lt;usize, TaskRef&gt;&gt; = IrqSafeMutex::new(BTreeMap::new());
 
 <span class="doccomment">/// Returns a `WeakTaskRef` (shared reference) to the `Task` specified by the given `task_id`.
 </span><span class="kw">pub fn </span>get_task(task_id: usize) -&gt; <span class="prelude-ty">Option</span>&lt;WeakTaskRef&gt; {

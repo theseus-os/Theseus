@@ -140,7 +140,7 @@
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>irq_safety::MutexIrqSafe;
+</span><span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="attr">#[cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, path = <span class="string">&quot;x86_64.rs&quot;</span>)]
 #[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, path = <span class="string">&quot;aarch64.rs&quot;</span>)]
@@ -150,7 +150,7 @@
 
 <span class="kw">impl </span>SerialPortAddress {
     <span class="doccomment">/// Returns a reference to the static instance of this serial port.
-    </span><span class="kw">fn </span>to_static_port(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; {
+    </span><span class="kw">fn </span>to_static_port(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;TriState&lt;SerialPort&gt;&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             SerialPortAddress::COM1 =&gt; <span class="kw-2">&amp;</span>COM1_SERIAL_PORT,
             SerialPortAddress::COM2 =&gt; <span class="kw-2">&amp;</span>COM2_SERIAL_PORT,
@@ -181,10 +181,10 @@
 
 <span class="comment">// Serial ports cannot be reliably probed (discovered dynamically), thus,
 // we ensure they are exposed safely as singletons through the below static instances.
-</span><span class="kw">static </span>COM1_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-<span class="kw">static </span>COM2_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-<span class="kw">static </span>COM3_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
-<span class="kw">static </span>COM4_SERIAL_PORT: MutexIrqSafe&lt;TriState&lt;SerialPort&gt;&gt; = MutexIrqSafe::new(TriState::Uninited);
+</span><span class="kw">static </span>COM1_SERIAL_PORT: IrqSafeMutex&lt;TriState&lt;SerialPort&gt;&gt; = IrqSafeMutex::new(TriState::Uninited);
+<span class="kw">static </span>COM2_SERIAL_PORT: IrqSafeMutex&lt;TriState&lt;SerialPort&gt;&gt; = IrqSafeMutex::new(TriState::Uninited);
+<span class="kw">static </span>COM3_SERIAL_PORT: IrqSafeMutex&lt;TriState&lt;SerialPort&gt;&gt; = IrqSafeMutex::new(TriState::Uninited);
+<span class="kw">static </span>COM4_SERIAL_PORT: IrqSafeMutex&lt;TriState&lt;SerialPort&gt;&gt; = IrqSafeMutex::new(TriState::Uninited);
 
 <span class="doccomment">/// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
 ///

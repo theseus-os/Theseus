@@ -41,7 +41,7 @@
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>irq_safety::{MutexIrqSafe, MutexIrqSafeGuard};
+</span><span class="kw">use </span>sync_irq::{IrqSafeMutex, IrqSafeMutexGuard};
 <span class="kw">use </span>x86_64::structures::idt::InterruptDescriptorTable;
 
 <span class="doccomment">/// A thread-safe and interrupt-safe wrapper around [`InterruptDescriptorTable`]. 
@@ -50,13 +50,13 @@
 /// but preserves safety by guaranteeing that only a static object can be loaded.
 </span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>LockedIdt {
-    idt: MutexIrqSafe&lt;InterruptDescriptorTable&gt;,
+    idt: IrqSafeMutex&lt;InterruptDescriptorTable&gt;,
 }
 <span class="kw">impl </span>LockedIdt {
     <span class="doccomment">/// Creates a new IDT filled with non-present entries.
     </span><span class="kw">pub const fn </span>new() -&gt; LockedIdt {
         LockedIdt {
-            idt: MutexIrqSafe::new(InterruptDescriptorTable::new()),
+            idt: IrqSafeMutex::new(InterruptDescriptorTable::new()),
         }
     }
 
@@ -72,7 +72,7 @@
     /// at which point they are re-enabled iff they were previously enabled
     /// when this function was invoked. 
     /// and the lock will be dropped when the guard falls out of scope.
-    </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; MutexIrqSafeGuard&lt;InterruptDescriptorTable&gt; {
+    </span><span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; IrqSafeMutexGuard&lt;InterruptDescriptorTable&gt; {
         <span class="self">self</span>.idt.lock()
     }
 }
