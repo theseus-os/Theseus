@@ -2671,25 +2671,9 @@ name = "ping"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "byteorder",
- "getopts",
- "hashbrown",
- "hpet",
- "log",
- "network_manager",
- "ota_update_client",
- "smoltcp 0.5.0",
- "smoltcp_helper",
- "upd",
-]
-
-[[package]]
-name = "ping_2"
-version = "0.1.0"
-dependencies = [
- "app_io",
  "getopts",
  "net",
+ "time",
 ]
 
 [[package]]
@@ -4053,7 +4037,6 @@ dependencies = [
  "mkdir",
  "ns",
  "ping",
- "ping_2",
  "pmu_sample_start",
  "pmu_sample_stop",
  "print_fault_log",

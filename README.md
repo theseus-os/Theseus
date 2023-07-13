@@ -193,6 +193,11 @@ On Mac, manually select `VGA` or `compact_monitor0` under `View` from the QEMU m
 
 To access/expose a PCI device in QEMU using PCI passthrough via VFIO, see [these instructions](https://theseus-os.github.io/Theseus/book/running/virtual_machine/pci_passthrough.html).
 
+Linux does not support the ICMP protocol (for `ping`) for guest OSes in QEMU by default, so to allow `ping` to work on Theseus, you may need to run the following in your Linux host machine:
+```sh
+sudo sh -c "echo \"0 2147483647\" > /proc/sys/net/ipv4/ping_group_range"
+```
+
 ### KVM Support
 While not strictly required, KVM will speed up the execution of QEMU.
 To install KVM, run the following command:    
