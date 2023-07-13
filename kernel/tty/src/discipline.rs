@@ -4,7 +4,7 @@ use crate::Channel;
 use alloc::vec::Vec;
 use async_channel::{new_channel, Receiver, Sender};
 use core2::io::Result;
-use mutex_sleep::MutexSleep as Mutex;
+use sync_block::Mutex;
 
 // FIXME: Ctrl+C, Ctrl+Z, etc.
 
@@ -99,7 +99,7 @@ impl LineDiscipline {
     ///
     /// This is equivalent to `ICANON | ICRNL` on Linux.
     pub fn canonical(&self) -> bool {
-        self.canonical.lock().unwrap().is_some()
+        self.canonical.lock().is_some()
     }
 
     pub fn event_receiver(&self) -> Receiver<Event> {
@@ -116,10 +116,10 @@ impl LineDiscipline {
     /// This is equivalent to `ICANON` on Linux.
     pub fn set_canonical(&self, canonical: bool) {
         if canonical {
-            *self.canonical.lock().unwrap() = Some(Vec::new());
+            *self.canonical.lock() = Some(Vec::new());
         } else {
             // TODO: Flush buffer?
-            *self.canonical.lock().unwrap() = None;
+            *self.canonical.lock() = None;
         }
     }
 
@@ -135,7 +135,7 @@ impl LineDiscipline {
         master: &Channel,
         slave: &Channel,
     ) -> Result<()> {
-        let mut canonical = self.canonical.lock().unwrap();
+        let mut canonical = self.canonical.lock();
         self.process_input_byte_internal(byte, master, slave, (*canonical).as_mut())
     }
 
@@ -226,7 +226,7 @@ impl LineDiscipline {
         master: &Channel,
         slave: &Channel,
     ) -> Result<()> {
-        let mut canonical = self.canonical.lock().unwrap();
+        let mut canonical = self.canonical.lock();
         for byte in buf {
             self.process_input_byte_internal(*byte, master, slave, (*canonical).as_mut())?;
         }

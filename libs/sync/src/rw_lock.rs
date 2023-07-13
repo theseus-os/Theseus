@@ -1,5 +1,6 @@
 use crate::spin;
 use core::{
+    fmt,
     mem::ManuallyDrop,
     ops::{Deref, DerefMut},
 };
@@ -68,8 +69,8 @@ where
     #[inline]
     pub const fn new(value: T) -> Self {
         Self {
-            inner: spin::RwLock::new(value),
             data: F::INIT,
+            inner: spin::RwLock::new(value),
         }
     }
 
@@ -146,6 +147,41 @@ where
             data: &self.data,
             _guard: guard,
         }
+    }
+}
+
+impl<T, F> fmt::Debug for RwLock<T, F>
+where
+    T: ?Sized + fmt::Debug,
+    F: RwLockFlavor,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut d = f.debug_struct("RwLock");
+        match self.try_read() {
+            Some(guard) => {
+                d.field("data", &&*guard);
+            }
+            None => {
+                struct LockedPlaceholder;
+                impl fmt::Debug for LockedPlaceholder {
+                    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                        f.write_str("<locked>")
+                    }
+                }
+                d.field("data", &LockedPlaceholder);
+            }
+        }
+        d.finish_non_exhaustive()
+    }
+}
+
+impl<T, F> Default for RwLock<T, F>
+where
+    T: Default,
+    F: RwLockFlavor,
+{
+    fn default() -> Self {
+        Self::new(T::default())
     }
 }
 

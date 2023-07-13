@@ -1,8 +1,8 @@
 use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use mutex_sleep::MutexSleep;
 use smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
+use sync_block::Mutex;
 use sync_irq::IrqSafeMutex;
 
 pub use smoltcp::iface::SocketSet;
@@ -13,9 +13,9 @@ pub use wire::{IpAddress, IpCidr};
 /// This is a wrapper around a network device which provides higher level
 /// abstractions such as polling sockets.
 pub struct NetworkInterface {
-    inner: MutexSleep<iface::Interface<'static>>,
+    inner: Mutex<iface::Interface<'static>>,
     device: &'static IrqSafeMutex<dyn crate::NetworkDevice>,
-    sockets: MutexSleep<SocketSet<'static>>,
+    sockets: Mutex<SocketSet<'static>>,
 }
 
 impl NetworkInterface {
@@ -36,7 +36,7 @@ impl NetworkInterface {
         let mut wrapper = DeviceWrapper {
             inner: &mut *device.lock(),
         };
-        let inner = MutexSleep::new(
+        let inner = Mutex::new(
             iface::InterfaceBuilder::new()
                 .random_seed(random::next_u64())
                 .hardware_addr(hardware_addr)
@@ -46,7 +46,7 @@ impl NetworkInterface {
                 .finalize(&mut wrapper),
         );
 
-        let sockets = MutexSleep::new(SocketSet::new(Vec::new()));
+        let sockets = Mutex::new(SocketSet::new(Vec::new()));
 
         Self {
             inner,
@@ -60,11 +60,7 @@ impl NetworkInterface {
     where
         T: AnySocket<'static>,
     {
-        let handle = self
-            .sockets
-            .lock()
-            .expect("failed to lock sockets")
-            .add(socket);
+        let handle = self.sockets.lock().add(socket);
         Socket {
             handle,
             sockets: &self.sockets,
@@ -74,11 +70,11 @@ impl NetworkInterface {
 
     /// Polls the sockets associated with the interface.
     pub fn poll(&self) -> Result<()> {
-        let mut inner = self.inner.lock().expect("failed to lock inner interface");
+        let mut inner = self.inner.lock();
         let mut wrapper = DeviceWrapper {
             inner: &mut *self.device.lock(),
         };
-        let mut sockets = self.sockets.lock().expect("failed to lock sockets");
+        let mut sockets = self.sockets.lock();
 
         inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut sockets)?;
 

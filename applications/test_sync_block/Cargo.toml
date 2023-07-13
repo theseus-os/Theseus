@@ -1,8 +1,9 @@
 [package]
-name = "test_mutex_sleep"
+name = "test_sync_block"
 version = "0.1.0"
 description = "Tests the blocking sleeping mutex with multiple tasks"
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
 
 [dependencies.log]
 version = "0.4.8"
@@ -19,5 +20,5 @@ path = "../../kernel/cpu"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.mutex_sleep]
-path = "../../kernel/mutex_sleep"
+[dependencies.sync_block]
+path = "../../kernel/sync_block"

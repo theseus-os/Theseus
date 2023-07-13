@@ -7,10 +7,10 @@ edition = "2021"
 [dependencies]
 heapless = "0.7.8"
 log = "0.4.8"
-mutex_sleep = { path = "../mutex_sleep" }
 nic_buffers = { path = "../nic_buffers" }
 random = { path = "../random" }
 spin = "0.9"
+sync_block = { path = "../sync_block" }
 sync_irq = { path = "../../libs/sync_irq" }
 
 [dependencies.smoltcp]
