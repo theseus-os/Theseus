@@ -5,8 +5,8 @@ description = "Logs all exceptions occuring in Theseus"
 authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
 edition = "2021"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.memory]
 path = "../memory"

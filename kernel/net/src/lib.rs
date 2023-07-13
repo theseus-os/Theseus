@@ -3,9 +3,9 @@
 extern crate alloc;
 
 use alloc::{sync::Arc, vec::Vec};
-use irq_safety::MutexIrqSafe;
 use smoltcp::wire::Ipv4Address;
 use spin::Mutex;
+use sync_irq::IrqSafeMutex;
 
 mod device;
 mod error;
@@ -41,7 +41,7 @@ static NETWORK_INTERFACES: Mutex<Vec<Arc<NetworkInterface>>> = Mutex::new(Vec::n
 ///
 /// The function will convert the device to an interface and it will then be
 /// accessible using [`get_interfaces()`].
-pub fn register_device<T>(device: &'static MutexIrqSafe<T>) -> Arc<NetworkInterface>
+pub fn register_device<T>(device: &'static IrqSafeMutex<T>) -> Arc<NetworkInterface>
 where
     T: 'static + NetworkDevice + Send,
 {

@@ -10,6 +10,7 @@ log = "0.4.8"
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 memory = { path = "../memory" }
 cpu = { path = "../cpu" }
+sync_irq = { path = "../../libs/sync_irq" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 memory_x86_64 = { path = "../memory_x86_64" }

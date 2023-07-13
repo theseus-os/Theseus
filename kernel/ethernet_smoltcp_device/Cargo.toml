@@ -22,8 +22,8 @@ features = [
     "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
 ]
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.memory]
 path = "../memory"

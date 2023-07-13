@@ -6,7 +6,7 @@
 #![no_std]
 
 extern crate alloc;
-extern crate irq_safety; 
+extern crate sync_irq; 
 extern crate spin;
 extern crate memory;
 extern crate kernel_config;
@@ -15,7 +15,7 @@ extern crate block_allocator;
 use alloc::alloc::{GlobalAlloc, Layout};
 use memory::PteFlags;
 use kernel_config::memory::{KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SIZE};
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use spin::Once;
 use alloc::boxed::Box;
 use block_allocator::FixedSizeBlockAllocator;
@@ -62,7 +62,7 @@ pub fn set_allocator(allocator: Box<dyn GlobalAlloc + Send + Sync>) {
 /// It starts off with one basic fixed size allocator, the `initial allocator`. 
 /// When a more complex heap is created and set as the `DEFAULT_ALLOCATOR`, then it is used.
 pub struct Heap {
-    initial_allocator: MutexIrqSafe<block_allocator::FixedSizeBlockAllocator>, 
+    initial_allocator: IrqSafeMutex<block_allocator::FixedSizeBlockAllocator>, 
 }
 
 
@@ -70,7 +70,7 @@ impl Heap {
     /// Returns a heap in which only an empty initial allocator has been created.
     pub const fn empty() -> Heap {
         Heap {
-            initial_allocator: MutexIrqSafe::new(FixedSizeBlockAllocator::new()),
+            initial_allocator: IrqSafeMutex::new(FixedSizeBlockAllocator::new()),
         }
     }
 }

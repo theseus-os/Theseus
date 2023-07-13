@@ -14,15 +14,15 @@ extern crate network_interface_card;
 extern crate physical_nic;
 extern crate intel_ethernet;
 extern crate alloc;
-extern crate irq_safety;
+extern crate sync_irq;
 
 use nic_buffers::{TransmitBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-use network_interface_card::{NetworkInterfaceCard};
+use network_interface_card::NetworkInterfaceCard;
 use intel_ethernet::descriptors::{TxDescriptor, RxDescriptor};
 use physical_nic::PhysicalNic;
 use alloc::vec::Vec;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 
 /// A structure that contains a set of `RxQueue`s and `TxQueue`s that can be used to send and receive packets.
 pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, U: TxQueueRegisters + 'static, V: TxDescriptor + 'static> {
@@ -39,7 +39,7 @@ pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, 
     /// MAC address of the NIC
     mac_address: [u8; 6],
     /// Reference to the physical NIC that Rx/Tx queues will be returned to.
-    physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>
+    physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S,T,U,V>>
 }
 
 impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> VirtualNic<S,T,U,V> {
@@ -51,7 +51,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
         tx_queues: Vec<TxQueue<U,V>>,
         default_tx_queue: usize, 
         mac_address: [u8; 6], 
-        physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>
+        physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S,T,U,V>>
     ) -> Result<VirtualNic<S,T,U,V>, &'static str> {
 
         if rx_queues.is_empty() || tx_queues.is_empty() { 
