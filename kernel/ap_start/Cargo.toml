@@ -9,6 +9,7 @@ edition = "2021"
 log = "0.4.8"
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync_irq = { path = "../../libs/sync_irq" }
 memory = { path = "../memory" }
 stack = { path = "../stack" }
 interrupts = { path = "../interrupts" }

@@ -10,11 +10,10 @@ crossbeam-utils = { version = "0.8.12", default-features = false }
 log = "0.4.8"
 spin = "0.9.4"
 
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
-
 cpu = { path = "../cpu" }
 environment = { path = "../environment" }
 kernel_config = { path = "../kernel_config" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
 stack = { path = "../stack" }
+sync_irq = { path = "../../libs/sync_irq" }

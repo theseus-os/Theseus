@@ -16,8 +16,8 @@ path = "../apic"
 [dependencies.cpu]
 path = "../cpu"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.lazy_static]
 features = ["spin_no_std"]

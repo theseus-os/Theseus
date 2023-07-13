@@ -13,8 +13,8 @@ version = "0.4.8"
 [dependencies.debugit]
 path = "../../libs/debugit"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.task]
 path = "../task"

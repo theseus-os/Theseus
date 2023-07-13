@@ -10,7 +10,7 @@
 
 #![no_std]
 extern crate task;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate alloc;
 #[macro_use] extern crate lazy_static;
 extern crate time;
@@ -18,7 +18,7 @@ extern crate crossbeam_utils;
 
 use core::task::Waker;
 use alloc::collections::binary_heap::BinaryHeap;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use task::{get_my_current_task, TaskRef, RunState};
 use crossbeam_utils::atomic::AtomicCell;
 use time::{now, Instant, Monotonic};
@@ -77,8 +77,8 @@ impl PartialOrd for SleepingTaskNode {
 lazy_static! {
     /// List of all delayed tasks in the system
     /// Implemented as a min-heap of `SleepingTaskNode` sorted in increasing order of `resume_time`
-    static ref DELAYED_TASKLIST: MutexIrqSafe<BinaryHeap<SleepingTaskNode>> 
-        = MutexIrqSafe::new(BinaryHeap::new());
+    static ref DELAYED_TASKLIST: IrqSafeMutex<BinaryHeap<SleepingTaskNode>> 
+        = IrqSafeMutex::new(BinaryHeap::new());
 }
 
 /// Keeps track of the next task that needs to unblock, by default, it is the maximum time

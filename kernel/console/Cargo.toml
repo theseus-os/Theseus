@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.8"
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
 
 app_io = { path = "../app_io" }
@@ -17,6 +16,7 @@ mod_mgmt = { path = "../mod_mgmt" }
 path = { path = "../path" }
 serial_port = { path = "../serial_port" }
 spawn = { path = "../spawn" }
+sync_irq = { path = "../../libs/sync_irq" }
 task = { path = "../task" }
 tty = { path = "../tty" }
 

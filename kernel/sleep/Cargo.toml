@@ -13,8 +13,8 @@ version = "1.2.0"
 [dependencies.task]
 path = "../task"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety" 
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.time]
 path = "../time"

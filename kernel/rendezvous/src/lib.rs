@@ -22,7 +22,7 @@ extern crate alloc;
 #[cfg(trace_channel)] 
 #[macro_use] extern crate debugit;
 extern crate spin;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate wait_queue;
 extern crate wait_guard;
 extern crate task;
@@ -32,7 +32,7 @@ extern crate sync_spin;
 
 use core::fmt;
 use alloc::sync::Arc;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use spin::Mutex;
 use wait_queue::WaitQueue;
 use wait_guard::WaitGuard;
@@ -41,9 +41,9 @@ use sync_spin::Spin;
 
 
 /// A wrapper type for an `ExchangeSlot` that is used for sending only.
-struct SenderSlot<T>(Arc<MutexIrqSafe<ExchangeState<T>>>);
+struct SenderSlot<T>(Arc<IrqSafeMutex<ExchangeState<T>>>);
 /// A wrapper type for an `ExchangeSlot` that is used for receiving only.
-struct ReceiverSlot<T>(Arc<MutexIrqSafe<ExchangeState<T>>>);
+struct ReceiverSlot<T>(Arc<IrqSafeMutex<ExchangeState<T>>>);
 
 
 /// An `ExchangeSlot` consists of two references to a shared state
@@ -57,7 +57,7 @@ struct ExchangeSlot<T> {
 }
 impl<T> ExchangeSlot<T> {
     fn new() -> ExchangeSlot<T> {
-        let inner = Arc::new(MutexIrqSafe::new(ExchangeState::Init));
+        let inner = Arc::new(IrqSafeMutex::new(ExchangeState::Init));
         ExchangeSlot {
             sender: Mutex::new(Some(SenderSlot(inner.clone()))),
             receiver: Mutex::new(Some(ReceiverSlot(inner))),
@@ -243,7 +243,7 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
             match current_state {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
-                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    // which is currently done automatically because the slot uses a IrqSafeMutex.
                     let curr = task::get_my_current_task().ok_or("couldn't get current task")?;
                     *exchange_state = ExchangeState::WaitingForReceiver(
                         WaitGuard::new(curr).map_err(|_| "failed to create wait guard")?,
@@ -343,13 +343,13 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
             let current_state = core::mem::replace(&mut *wait_entry, RendezvousState::Init);
             match current_state {
                 RendezvousState::Init => {
-                    let _held_interrupts = irq_safety::hold_interrupts();
+                    let _held_interrupts = sync_irq::hold_interrupts();
                     *wait_entry = RendezvousState::Waiting(WaitGuard::new(curr_task.clone()), Some(msg));
                     // interrupts are re-enabled here
                 }
                 RendezvousState::Waiting(task_to_notify, dest) => {
                     *dest = Some(msg);
-                    let _held_interrupts = irq_safety::hold_interrupts();
+                    let _held_interrupts = sync_irq::hold_interrupts();
                     *task_to_notify = WaitGuard::new(curr_task.clone());
                     drop(task_to_notify); // notifies the receiver
                 }
@@ -397,7 +397,7 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
             match current_state {
                 ExchangeState::Init => {
                     // Hold interrupts to avoid blocking & descheduling this task until we release the slot lock,
-                    // which is currently done automatically because the slot uses a MutexIrqSafe.
+                    // which is currently done automatically because the slot uses a IrqSafeMutex.
                     *exchange_state = ExchangeState::WaitingForSender(WaitGuard::new(curr_task.clone()).map_err(|_| "failed to create wait guard")?);
                     None
                 }

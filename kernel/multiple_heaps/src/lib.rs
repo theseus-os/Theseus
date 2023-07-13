@@ -22,7 +22,7 @@
 #![feature(allocator_api)]
 #![no_std]
 
-extern crate irq_safety; 
+extern crate sync_irq; 
 #[macro_use] extern crate log;
 extern crate memory;
 extern crate page_allocator;
@@ -50,7 +50,7 @@ use kernel_config::memory::{PAGE_SIZE, KERNEL_HEAP_START, KERNEL_HEAP_INITIAL_SI
 use core::ops::Deref;
 use core::ptr;
 use heap::HEAP_FLAGS;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use page_allocator::{DeferredAllocAction, allocate_pages_by_bytes_deferred};
 
 #[cfg(all(not(unsafe_heap), not(safe_heap)))]
@@ -194,7 +194,7 @@ if #[cfg(unsafe_heap)] {
         *heap_end = heap_end_addr;
 
         // store the newly created allocator in the multiple heaps object
-        if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+        if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(IrqSafeMutex::new(zone_allocator))) {
             return Err("New heap created with a previously used id");
         }
         trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
@@ -242,7 +242,7 @@ if #[cfg(unsafe_heap)] {
         *heap_end = heap_end_addr;
 
         // store the newly created allocator in the multiple heaps object
-        if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(MutexIrqSafe::new(zone_allocator))) {
+        if let Some(_heap) = multiple_heaps.heaps.insert(key, LockedHeap(IrqSafeMutex::new(zone_allocator))) {
             return Err("New heap created with a previously used id");
         }
         trace!("Created heap {} with max alloc size: {} bytes", key, ZoneAllocator::MAX_ALLOC_SIZE);
@@ -267,21 +267,21 @@ fn get_key() -> usize {
 cfg_if! {
 if #[cfg(safe_heap)] {
     #[repr(align(64))]
-    struct LockedHeap (MutexIrqSafe<ZoneAllocator>);
+    struct LockedHeap (IrqSafeMutex<ZoneAllocator>);
 
     impl Deref for LockedHeap {
-        type Target = MutexIrqSafe<ZoneAllocator>;
-        fn deref(&self) -> &MutexIrqSafe<ZoneAllocator> {
+        type Target = IrqSafeMutex<ZoneAllocator>;
+        fn deref(&self) -> &IrqSafeMutex<ZoneAllocator> {
             &self.0
         }
     }
 } else {
     #[repr(align(64))]
-    struct LockedHeap (MutexIrqSafe<ZoneAllocator<'static>>);
+    struct LockedHeap (IrqSafeMutex<ZoneAllocator<'static>>);
 
     impl Deref for LockedHeap {
-        type Target = MutexIrqSafe<ZoneAllocator<'static>>;
-        fn deref(&self) -> &MutexIrqSafe<ZoneAllocator<'static>> {
+        type Target = IrqSafeMutex<ZoneAllocator<'static>>;
+        fn deref(&self) -> &IrqSafeMutex<ZoneAllocator<'static>> {
             &self.0
         }
     }
@@ -296,14 +296,14 @@ pub struct MultipleHeaps{
     heaps: HashMap<usize,LockedHeap>,
     /// Red-black tree to store large allocations
     #[cfg(not(unsafe_large_allocations))]    
-    large_allocations: MutexIrqSafe<RBTree<LargeAllocationAdapter>>,
+    large_allocations: IrqSafeMutex<RBTree<LargeAllocationAdapter>>,
     /// We currently don't return memory back to the OS. Because of this all memory in the heap is contiguous
     /// and extra memory for the heap is always allocated from the end.
     /// The Mutex also serves the purpose of helping to synchronize new allocations.
-    end: MutexIrqSafe<VirtualAddress>, 
+    end: IrqSafeMutex<VirtualAddress>, 
     /// The mapped pages for the unsafe heap are stored here so that they are not dropped and unmapped.
     #[cfg(unsafe_heap)]    
-    mp: Once<MutexIrqSafe<MappedPages>>
+    mp: Once<IrqSafeMutex<MappedPages>>
 }
 
 // The grow_heap() function for the MultipleHeaps changes depending on the slabmalloc version used.
@@ -320,9 +320,9 @@ if #[cfg(unsafe_heap)] {
                 heaps: HashMap::new(),
 
                 #[cfg(not(unsafe_large_allocations))]
-                large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+                large_allocations: IrqSafeMutex::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE)),
+                end: IrqSafeMutex::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE)),
 
                 mp: Once::new()
             }
@@ -372,7 +372,7 @@ if #[cfg(unsafe_heap)] {
             if let Some(heap_mp) = self.mp.get() {
                 heap_mp.lock().merge(mp).map_err(|(e, _mp)| e)?;
             } else {
-                self.mp.call_once(|| MutexIrqSafe::new(mp));
+                self.mp.call_once(|| IrqSafeMutex::new(mp));
             }
             Ok(())
         }
@@ -384,9 +384,9 @@ if #[cfg(unsafe_heap)] {
                 heaps: HashMap::new(),
 
                 #[cfg(not(unsafe_large_allocations))]
-                large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+                large_allocations: IrqSafeMutex::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
+                end: IrqSafeMutex::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
             }
         }
 
@@ -432,9 +432,9 @@ if #[cfg(unsafe_heap)] {
                 heaps: HashMap::new(),
 
                 #[cfg(not(unsafe_large_allocations))]
-                large_allocations: MutexIrqSafe::new(RBTree::new(LargeAllocationAdapter::new())),
+                large_allocations: IrqSafeMutex::new(RBTree::new(LargeAllocationAdapter::new())),
 
-                end: MutexIrqSafe::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
+                end: IrqSafeMutex::new(VirtualAddress::new_canonical(KERNEL_HEAP_START + KERNEL_HEAP_INITIAL_SIZE))
             }
         }
 
