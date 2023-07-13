@@ -5,7 +5,7 @@
 
 pub use crate::{MutexGuard, RwLockReadGuard, RwLockWriteGuard};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Mutex<T> {
     inner: crate::Mutex<T>,
 }
