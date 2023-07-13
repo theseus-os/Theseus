@@ -316,6 +316,10 @@
 <a href="#316" id="316">316</a>
 <a href="#317" id="317">317</a>
 <a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate contains abstractions to interact with hardware clocks.
 
 </span><span class="attr">#![no_std]
@@ -354,6 +358,10 @@
 
     <span class="kw">pub fn </span>new(counter: u64) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ counter }
+    }
+
+    <span class="kw">pub fn </span>now() -&gt; <span class="self">Self </span>{
+        now::&lt;Monotonic&gt;()
     }
 
     <span class="doccomment">/// Returns the amount of time elapsed from another instant to this one, or
