@@ -1,3 +1,9 @@
+//! To run this application in QEMU, ICMP must be enabled using the following
+//! command:
+//! ```sh
+//! sudo sh -c "echo \"0 2147483647\" > /proc/sys/net/ipv4/ping_group_range"
+//! ```
+
 #![no_std]
 
 extern crate alloc;
