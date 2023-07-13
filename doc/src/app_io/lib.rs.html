@@ -310,7 +310,7 @@
 <span class="kw">mod </span>shared_maps {
     <span class="kw">use </span><span class="kw">super</span>::IoStreams;
     <span class="kw">use </span>hashbrown::HashMap;
-    <span class="kw">use </span>mutex_sleep::{MutexSleep <span class="kw">as </span>Mutex, MutexSleepGuard <span class="kw">as </span>MutexGuard};
+    <span class="kw">use </span>sync_block::{Mutex, MutexGuard};
 
     <span class="macro">lazy_static::lazy_static! </span>{
         <span class="doccomment">/// Map a task id to its IoStreams structure.
@@ -325,7 +325,7 @@
     /// `lock_all_maps()` if you want to lock both of the maps to avoid
     /// deadlock.
     </span><span class="kw">pub fn </span>lock_stream_map() -&gt; MutexGuard&lt;<span class="lifetime">&#39;static</span>, HashMap&lt;usize, IoStreams&gt;&gt; {
-        APP_IO_STREAMS.lock().unwrap()
+        APP_IO_STREAMS.lock()
     }
 }
 

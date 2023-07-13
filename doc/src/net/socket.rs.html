@@ -67,11 +67,11 @@
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-<span class="kw">use </span>mutex_sleep::{MutexSleep, MutexSleepGuard};
 <span class="kw">use </span>smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::AnySocket,
 };
+<span class="kw">use </span>sync_block::{Mutex, MutexGuard};
 
 <span class="doccomment">/// A network socket.
 ///
@@ -83,7 +83,7 @@
     </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt; + <span class="question-mark">?</span>Sized,
 {
     <span class="kw">pub</span>(<span class="kw">crate</span>) handle: SocketHandle,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) sockets: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>MutexSleep&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) sockets: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Mutex&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) phantom_data: PhantomData&lt;T&gt;,
 }
 
@@ -92,7 +92,7 @@
     </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt; + <span class="question-mark">?</span>Sized,
 {
     handle: SocketHandle,
-    sockets: MutexSleepGuard&lt;<span class="lifetime">&#39;a</span>, SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    sockets: MutexGuard&lt;<span class="lifetime">&#39;a</span>, SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
     phantom_data: PhantomData&lt;T&gt;,
 }
 
@@ -123,7 +123,7 @@
     <span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>DerefMut&lt;Target = T&gt; + <span class="lifetime">&#39;a </span>{
         LockedSocket {
             handle: <span class="self">self</span>.handle,
-            sockets: <span class="self">self</span>.sockets.lock().expect(<span class="string">&quot;failed to lock sockets&quot;</span>),
+            sockets: <span class="self">self</span>.sockets.lock(),
             phantom_data: PhantomData,
         }
     }

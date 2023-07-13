@@ -85,15 +85,11 @@
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
-<a href="#88" id="88">88</a>
-<a href="#89" id="89">89</a>
-<a href="#90" id="90">90</a>
-<a href="#91" id="91">91</a>
 </pre></div><pre class="rust"><code><span class="kw">use crate</span>::{device::DeviceWrapper, NetworkDevice, <span class="prelude-ty">Result</span>, Socket};
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::marker::PhantomData;
-<span class="kw">use </span>mutex_sleep::MutexSleep;
 <span class="kw">use </span>smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
+<span class="kw">use </span>sync_block::Mutex;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="kw">pub use </span>smoltcp::iface::SocketSet;
@@ -104,9 +100,9 @@
 /// This is a wrapper around a network device which provides higher level
 /// abstractions such as polling sockets.
 </span><span class="kw">pub struct </span>NetworkInterface {
-    inner: MutexSleep&lt;iface::Interface&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    inner: Mutex&lt;iface::Interface&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
     device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span><span class="kw">crate</span>::NetworkDevice&gt;,
-    sockets: MutexSleep&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    sockets: Mutex&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
 }
 
 <span class="kw">impl </span>NetworkInterface {
@@ -127,7 +123,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>wrapper = DeviceWrapper {
             inner: <span class="kw-2">&amp;mut *</span>device.lock(),
         };
-        <span class="kw">let </span>inner = MutexSleep::new(
+        <span class="kw">let </span>inner = Mutex::new(
             iface::InterfaceBuilder::new()
                 .random_seed(random::next_u64())
                 .hardware_addr(hardware_addr)
@@ -137,7 +133,7 @@
                 .finalize(<span class="kw-2">&amp;mut </span>wrapper),
         );
 
-        <span class="kw">let </span>sockets = MutexSleep::new(SocketSet::new(Vec::new()));
+        <span class="kw">let </span>sockets = Mutex::new(SocketSet::new(Vec::new()));
 
         <span class="self">Self </span>{
             inner,
@@ -151,11 +147,7 @@
     <span class="kw">where
         </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt;,
     {
-        <span class="kw">let </span>handle = <span class="self">self
-            </span>.sockets
-            .lock()
-            .expect(<span class="string">&quot;failed to lock sockets&quot;</span>)
-            .add(socket);
+        <span class="kw">let </span>handle = <span class="self">self</span>.sockets.lock().add(socket);
         Socket {
             handle,
             sockets: <span class="kw-2">&amp;</span><span class="self">self</span>.sockets,
@@ -165,11 +157,11 @@
 
     <span class="doccomment">/// Polls the sockets associated with the interface.
     </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>inner = <span class="self">self</span>.inner.lock().expect(<span class="string">&quot;failed to lock inner interface&quot;</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>inner = <span class="self">self</span>.inner.lock();
         <span class="kw">let </span><span class="kw-2">mut </span>wrapper = DeviceWrapper {
             inner: <span class="kw-2">&amp;mut *</span><span class="self">self</span>.device.lock(),
         };
-        <span class="kw">let </span><span class="kw-2">mut </span>sockets = <span class="self">self</span>.sockets.lock().expect(<span class="string">&quot;failed to lock sockets&quot;</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>sockets = <span class="self">self</span>.sockets.lock();
 
         inner.poll(smoltcp::time::Instant::ZERO, <span class="kw-2">&amp;mut </span>wrapper, <span class="kw-2">&amp;mut </span>sockets)<span class="question-mark">?</span>;
 

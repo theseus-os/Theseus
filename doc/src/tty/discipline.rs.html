@@ -280,7 +280,7 @@
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>async_channel::{new_channel, Receiver, Sender};
 <span class="kw">use </span>core2::io::Result;
-<span class="kw">use </span>mutex_sleep::MutexSleep <span class="kw">as </span>Mutex;
+<span class="kw">use </span>sync_block::Mutex;
 
 <span class="comment">// FIXME: Ctrl+C, Ctrl+Z, etc.
 
@@ -375,7 +375,7 @@
     ///
     /// This is equivalent to `ICANON | ICRNL` on Linux.
     </span><span class="kw">pub fn </span>canonical(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
-        <span class="self">self</span>.canonical.lock().unwrap().is_some()
+        <span class="self">self</span>.canonical.lock().is_some()
     }
 
     <span class="kw">pub fn </span>event_receiver(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Receiver&lt;Event&gt; {
@@ -392,10 +392,10 @@
     /// This is equivalent to `ICANON` on Linux.
     </span><span class="kw">pub fn </span>set_canonical(<span class="kw-2">&amp;</span><span class="self">self</span>, canonical: bool) {
         <span class="kw">if </span>canonical {
-            <span class="kw-2">*</span><span class="self">self</span>.canonical.lock().unwrap() = <span class="prelude-val">Some</span>(Vec::new());
+            <span class="kw-2">*</span><span class="self">self</span>.canonical.lock() = <span class="prelude-val">Some</span>(Vec::new());
         } <span class="kw">else </span>{
             <span class="comment">// TODO: Flush buffer?
-            </span><span class="kw-2">*</span><span class="self">self</span>.canonical.lock().unwrap() = <span class="prelude-val">None</span>;
+            </span><span class="kw-2">*</span><span class="self">self</span>.canonical.lock() = <span class="prelude-val">None</span>;
         }
     }
 
@@ -411,7 +411,7 @@
         master: <span class="kw-2">&amp;</span>Channel,
         slave: <span class="kw-2">&amp;</span>Channel,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>canonical = <span class="self">self</span>.canonical.lock().unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>canonical = <span class="self">self</span>.canonical.lock();
         <span class="self">self</span>.process_input_byte_internal(byte, master, slave, (<span class="kw-2">*</span>canonical).as_mut())
     }
 
@@ -502,7 +502,7 @@
         master: <span class="kw-2">&amp;</span>Channel,
         slave: <span class="kw-2">&amp;</span>Channel,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>canonical = <span class="self">self</span>.canonical.lock().unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>canonical = <span class="self">self</span>.canonical.lock();
         <span class="kw">for </span>byte <span class="kw">in </span>buf {
             <span class="self">self</span>.process_input_byte_internal(<span class="kw-2">*</span>byte, master, slave, (<span class="kw-2">*</span>canonical).as_mut())<span class="question-mark">?</span>;
         }
