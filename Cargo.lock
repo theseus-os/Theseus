@@ -51,16 +51,7 @@ version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e61f2b7f93d2c7d2b08263acaa4a363b3e276806c68af6134c44f523bf1aacd"
 dependencies = [
- "gimli 0.25.0",
-]
-
-[[package]]
-name = "addr2line"
-version = "0.17.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9ecd88a8c8378ca913a680cd98f0f13ac67383d35993f86c90a70e3f137816b"
-dependencies = [
- "gimli 0.26.2",
+ "gimli",
 ]
 
 [[package]]
@@ -218,13 +209,19 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 name = "backtrace"
 version = "0.3.64"
 dependencies = [
- "addr2line 0.17.0",
+ "addr2line",
  "cc",
  "cfg-if 1.0.0",
  "libc",
+ "memory",
  "miniz_oxide",
- "object 0.27.1",
+ "object",
  "rustc-demangle",
+ "spin 0.9.4",
+ "stack_trace",
+ "sync_block",
+ "theseus_std",
+ "thread_local_macro",
 ]
 
 [[package]]
@@ -244,19 +241,19 @@ checksum = "f8fe8f5a8a398345e52358e18ff07cc17a568fbca5c6f73873d3a62056309603"
 
 [[package]]
 name = "bincode"
-version = "1.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1f45e9417d87227c7a56d22e471c6206462cba514c7590c09aff4cf6d1ddcad"
+version = "2.0.0-rc.1"
+source = "git+https://github.com/bincode-org/bincode#1ca82752cf8c0391a4d49b8f881b5257f8c81fe8"
 dependencies = [
+ "bincode_derive",
  "serde",
 ]
 
 [[package]]
-name = "bincode"
+name = "bincode_derive"
 version = "2.0.0-rc.1"
 source = "git+https://github.com/bincode-org/bincode#1ca82752cf8c0391a4d49b8f881b5257f8c81fe8"
 dependencies = [
- "serde",
+ "virtue",
 ]
 
 [[package]]
@@ -778,7 +775,7 @@ dependencies = [
  "by_address",
  "crate_metadata",
  "fs_node",
- "gimli 0.25.0",
+ "gimli",
  "goblin",
  "hashbrown",
  "log",
@@ -1032,27 +1029,6 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
-]
-
-[[package]]
-name = "errno"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f639046355ee4f37944e44f60642c6f3a7efa3cf6b78c78a0d989a8ce6c396a1"
-dependencies = [
- "errno-dragonfly",
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "errno-dragonfly"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa68f1b12764fab894d2755d2518754e71b4fd80ecfb822714a1206c2aab39bf"
-dependencies = [
- "cc",
- "libc",
 ]
 
 [[package]]
@@ -1403,16 +1379,6 @@ name = "gimli"
 version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0a01e0497841a3b2db4f8afa483cce65f7e96a3498bd6c541734792aeac8fe7"
-dependencies = [
- "fallible-iterator",
- "stable_deref_trait",
-]
-
-[[package]]
-name = "gimli"
-version = "0.26.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22030e2c5a68ec659fde1e949a745124b48e6fa8b045b7ed5bd1fe4ccc5c4e5d"
 
 [[package]]
 name = "goblin"
@@ -1653,16 +1619,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "io-lifetimes"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "278e90d6f8a6c76a8334b336e306efa3c5f2b604048cbfd486d6f49878e3af14"
-dependencies = [
- "rustc_version 0.4.0",
- "winapi",
-]
-
-[[package]]
 name = "ioapic"
 version = "0.1.0"
 dependencies = [
@@ -1704,12 +1660,6 @@ checksum = "0d47946d458e94a1b7bcabbf6521ea7c037062c81f534615abcad76e84d4970d"
 dependencies = [
  "either",
 ]
-
-[[package]]
-name = "itoa"
-version = "0.4.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b71991ff56294aa922b450139ee08b3bfc70982c6b2c7562771375cf73542dd4"
 
 [[package]]
 name = "ixgbe"
@@ -1870,12 +1820,6 @@ name = "linked_list_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "549ce1740e46b291953c4340adcd74c59bcf4308f4cac050fd33ba91b7168f4a"
-
-[[package]]
-name = "linux-raw-sys"
-version = "0.0.28"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "687387ff42ec7ea4f2149035a5675fedb675d26f98db90a1846ac63d3addb5f5"
 
 [[package]]
 name = "loadc"
@@ -2184,7 +2128,7 @@ dependencies = [
 name = "mod_mgmt"
 version = "0.1.0"
 dependencies = [
- "bincode 2.0.0-rc.1",
+ "bincode",
  "bootloader_modules",
  "const_format",
  "cow_arc",
@@ -2525,21 +2469,13 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.26.2"
+version = "0.28.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39f37e50073ccad23b6d09bcb5b263f4e76d3bb6038e4a3c08e52162ffa8abc2"
+checksum = "e42c982f2d955fac81dd7e1d0e1426a7d702acd9c98d19ab01083a6a0328c424"
 dependencies = [
  "crc32fast",
+ "hashbrown",
  "indexmap",
- "memchr",
-]
-
-[[package]]
-name = "object"
-version = "0.27.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67ac1d3f9a1d3616fd9a60c8d74296f22406a238b6a72f5cc1e6f314df4ffbf9"
-dependencies = [
  "memchr",
 ]
 
@@ -2950,8 +2886,6 @@ version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
 dependencies = [
- "libc",
- "rand_chacha",
  "rand_core",
 ]
 
@@ -2970,9 +2904,6 @@ name = "rand_core"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34f1408f55294453790c48b2f1ebbb1c5b4b7563eb1f418bcfcfdbb06ebb4e7"
-dependencies = [
- "getrandom",
-]
 
 [[package]]
 name = "random"
@@ -3041,13 +2972,13 @@ checksum = "a3f87b73ce11b1619a3c6332f45341e0047173771e8b8b73f87bfeefb7b56244"
 
 [[package]]
 name = "region"
-version = "2.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "877e54ea2adcd70d80e9179344c97f93ef0dffd6b03e1f4529e6e83ab2fa9ae0"
+version = "3.0.0"
 dependencies = [
  "bitflags",
+ "core2",
  "libc",
  "mach",
+ "memory",
  "winapi",
 ]
 
@@ -3164,23 +3095,6 @@ dependencies = [
  "acpi_table",
  "memory",
  "sdt",
-]
-
-[[package]]
-name = "rsix"
-version = "0.23.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f64c5788d5aab8b75441499d99576a24eb09f76fb267b36fec7e3d970c66431"
-dependencies = [
- "bitflags",
- "cc",
- "errno",
- "io-lifetimes",
- "itoa",
- "libc",
- "linux-raw-sys",
- "once_cell",
- "rustc_version 0.4.0",
 ]
 
 [[package]]
@@ -4185,19 +4099,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "thiserror"
-version = "1.0.39"
+name = "thiserror_core2"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a5ab016db510546d856297882807df8da66a16fb8c4101cb8b30054b0d5b2d9c"
+checksum = "39f6f9e5af7ca0861a5eae30fe6e95405338f0e92c54424bb66160b01e682243"
 dependencies = [
- "thiserror-impl",
+ "core2",
+ "thiserror_core2-impl",
 ]
 
 [[package]]
-name = "thiserror-impl"
-version = "1.0.39"
+name = "thiserror_core2-impl"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5420d42e90af0c38c3290abcca25b9b3bdf379fc9f55c528f53a269d9c9a267e"
+checksum = "9c64183aeaddf559344af98f444cd2ea6685ea0136a59c17587a2c759362e523"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4343,7 +4258,7 @@ version = "0.1.0"
 dependencies = [
  "external_unwind_info",
  "fallible-iterator",
- "gimli 0.25.0",
+ "gimli",
  "interrupts",
  "log",
  "memory",
@@ -4428,6 +4343,12 @@ dependencies = [
  "physical_nic",
  "sync_irq",
 ]
+
+[[package]]
+name = "virtue"
+version = "0.0.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b60dcd6a64dd45abf9bd426970c9843726da7fc08f44cd6fcebf68c21220a63"
 
 [[package]]
 name = "void"
@@ -4599,20 +4520,25 @@ version = "0.30.0"
 dependencies = [
  "anyhow",
  "backtrace",
- "bincode 1.3.3",
+ "bincode",
+ "catch_unwind",
  "cfg-if 1.0.0",
+ "core2",
  "cpp_demangle",
+ "hashbrown",
  "indexmap",
  "lazy_static",
  "libc",
  "log",
- "object 0.26.2",
+ "object",
  "paste",
  "psm",
  "region",
  "rustc-demangle",
  "serde",
+ "sync_block",
  "target-lexicon",
+ "theseus_std",
  "wasmparser",
  "wasmtime-environ",
  "wasmtime-jit",
@@ -4626,15 +4552,17 @@ version = "0.30.0"
 dependencies = [
  "anyhow",
  "cfg-if 1.0.0",
+ "core2",
  "cranelift-entity",
- "gimli 0.25.0",
+ "gimli",
+ "hashbrown",
  "indexmap",
  "log",
  "more-asserts",
- "object 0.26.2",
+ "object",
  "serde",
  "target-lexicon",
- "thiserror",
+ "thiserror_core2",
  "wasmparser",
  "wasmtime-types",
 ]
@@ -4643,18 +4571,21 @@ dependencies = [
 name = "wasmtime-jit"
 version = "0.30.0"
 dependencies = [
- "addr2line 0.16.0",
+ "addr2line",
  "anyhow",
- "bincode 1.3.3",
+ "bincode",
  "cfg-if 1.0.0",
- "gimli 0.25.0",
+ "core2",
+ "external_unwind_info",
+ "gimli",
  "log",
  "more-asserts",
- "object 0.26.2",
+ "object",
  "region",
  "serde",
  "target-lexicon",
- "thiserror",
+ "theseus_std",
+ "thiserror_core2",
  "wasmparser",
  "wasmtime-environ",
  "wasmtime-runtime",
@@ -4667,19 +4598,28 @@ version = "0.30.0"
 dependencies = [
  "anyhow",
  "backtrace",
+ "catch_unwind",
  "cc",
  "cfg-if 1.0.0",
+ "core2",
+ "hashbrown",
  "indexmap",
  "lazy_static",
  "libc",
  "log",
  "mach",
  "memoffset 0.6.5",
+ "memory",
  "more-asserts",
  "rand",
  "region",
- "rsix",
- "thiserror",
+ "signal_handler",
+ "spin 0.9.4",
+ "sync_block",
+ "task",
+ "theseus_std",
+ "thiserror_core2",
+ "thread_local_macro",
  "wasmtime-environ",
  "winapi",
 ]
@@ -4688,9 +4628,10 @@ dependencies = [
 name = "wasmtime-types"
 version = "0.30.0"
 dependencies = [
+ "core2",
  "cranelift-entity",
  "serde",
- "thiserror",
+ "thiserror_core2",
  "wasmparser",
 ]
 
@@ -4816,7 +4757,3 @@ dependencies = [
  "syn",
  "synstructure",
 ]
-
-[[patch.unused]]
-name = "region"
-version = "3.0.0"
