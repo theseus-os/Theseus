@@ -88,6 +88,7 @@ pub struct HttpClient<'a> {
 
 impl<'a> HttpClient<'a> {
     // TODO: Use per-request destination rather than per-client.
+    /// Creates a new HTTP client connected to the given remote endpoint.
     pub fn new(
         interface: &'a Arc<NetworkInterface>,
         local_port: u16,
@@ -105,10 +106,12 @@ impl<'a> HttpClient<'a> {
         Ok(Self { interface, socket })
     }
 
+    /// Returns whether the connection used by the client is closed.
     pub fn is_closed(&self) -> bool {
         self.socket.lock().state() == tcp::State::Closed
     }
 
+    /// Aborts the connection.
     pub fn abort(&self) -> Result<(), &'static str> {
         self.socket.lock().abort();
 
@@ -117,6 +120,7 @@ impl<'a> HttpClient<'a> {
             .map_err(|_| "failed to poll interface after sending")
     }
 
+    /// Sends an HTTP request with an optional timeout.
     pub fn send(
         &mut self,
         request: HttpRequest,
