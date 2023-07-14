@@ -5,10 +5,6 @@
 
 extern crate alloc;
 
-mod error;
-
-pub use error::{ClientInitialisationError, RequestError};
-
 use alloc::{string::String, sync::Arc, vec, vec::Vec};
 use core::str;
 use log::{debug, error, trace};
@@ -85,23 +81,40 @@ impl HttpResponse {
     }
 }
 
-pub struct HttpClient {
-    interface: Arc<NetworkInterface>,
+pub struct HttpClient<'a> {
+    interface: &'a Arc<NetworkInterface>,
     socket: Socket<tcp::Socket<'static>>,
 }
 
-impl HttpClient {
+impl<'a> HttpClient<'a> {
     // TODO: Use per-request destination rather than per-client.
-    pub fn new(endpoint: IpEndpoint) -> Result<Self, ClientInitialisationError> {
-        let interface = net::get_default_interface().ok_or("no network iterfaces available")?;
-
+    pub fn new(
+        interface: &'a Arc<NetworkInterface>,
+        local_port: u16,
+        remote_endpoint: IpEndpoint,
+    ) -> Result<Self, &'static str> {
         let rx_buffer = tcp::SocketBuffer::new(vec![0; 256]);
         let tx_buffer = tcp::SocketBuffer::new(vec![0; 256]);
 
         let socket = interface.add_socket(tcp::Socket::new(rx_buffer, tx_buffer));
-        socket.lock().connect(endpoint, 100);
+        socket
+            .lock()
+            .connect(remote_endpoint, local_port)
+            .map_err(|_| "failed to connect socket")?;
 
         Ok(Self { interface, socket })
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.socket.lock().state() == tcp::State::Closed
+    }
+
+    pub fn abort(&self) -> Result<(), &'static str> {
+        self.socket.lock().abort();
+
+        self.interface
+            .poll()
+            .map_err(|_| "failed to poll interface after sending")
     }
 
     pub fn send(

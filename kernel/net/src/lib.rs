@@ -21,7 +21,7 @@ pub use smoltcp::{
     time::Instant,
     wire::{self, IpEndpoint},
 };
-pub use socket::Socket;
+pub use socket::{LockedSocket, Socket};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 ///
@@ -62,7 +62,22 @@ pub fn get_interfaces() -> &'static Mutex<Vec<Arc<NetworkInterface>>> {
     &NETWORK_INTERFACES
 }
 
-/// Gets the first available interface.
+/// Returns the first available interface.
 pub fn get_default_interface() -> Option<Arc<NetworkInterface>> {
     NETWORK_INTERFACES.lock().get(0).cloned()
+}
+
+/// Returns a port in the range reserved for private, dynamic, and ephemeral
+/// ports.
+pub fn get_ephemeral_port() -> u16 {
+    use rand::Rng;
+
+    // FIXME: Keep track of taken ports.
+
+    const RANGE_START: u16 = 49152;
+    const RANGE_END: u16 = u16::MAX;
+
+    // TODO: Does this need to be cryptographically secure?
+    let mut rng = random::init_rng::<rand_chacha::ChaChaRng>().unwrap();
+    rng.gen_range(RANGE_START..=RANGE_END)
 }

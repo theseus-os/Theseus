@@ -28,7 +28,7 @@ where
     pub(crate) phantom_data: PhantomData<T>,
 }
 
-struct LockedSocket<'a, T>
+pub struct LockedSocket<'a, T>
 where
     T: AnySocket<'static> + ?Sized,
 {
@@ -39,16 +39,18 @@ where
 }
 
 impl<'a> LockedSocket<'a, smoltcp::socket::tcp::Socket<'static>> {
-    pub fn connect<R, L>(&self, remote_endpoint: R, local_endpoint: L) -> Result<(), ConnectError>
+    pub fn connect<R, L>(
+        &mut self,
+        remote_endpoint: R,
+        local_endpoint: L,
+    ) -> Result<(), ConnectError>
     where
         R: Into<IpEndpoint>,
         L: Into<IpListenEndpoint>,
     {
-        (**self).connect(
-            self.interface.inner.lock().ctx(),
-            remote_endpoint,
-            local_endpoint,
-        )
+        let mut interface = self.interface.inner.lock().unwrap();
+        let context = interface.context();
+        (**self).connect(context, remote_endpoint, local_endpoint)
     }
 }
 
@@ -76,7 +78,7 @@ impl<T> Socket<T>
 where
     T: AnySocket<'static>,
 {
-    pub fn lock(&self) -> impl DerefMut<Target = T> + '_ {
+    pub fn lock(&self) -> LockedSocket<'_, T> {
         LockedSocket {
             handle: self.handle,
             sockets: self
