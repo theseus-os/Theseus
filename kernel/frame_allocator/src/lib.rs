@@ -157,6 +157,19 @@ pub fn init<F, R, P>(
         }
     }
 
+    // needed for Acer Aspire 7745G:
+    // removes the single free chunk at 0x9F7FF000, which allows
+    // `add_reserved_region` to merge it in
+    let mut hacky_free_list: [Option<Chunk>; 32] = Default::default();
+    for (idx, chunk) in free_list.iter().enumerate() {
+        if let Some(chunky) = chunk {
+            if chunky.start_address().value() != 0x9F7FF000 {
+                hacky_free_list[idx] = chunk.clone();
+            }
+        }
+    }
+    let free_list = hacky_free_list;
+
     *FREE_GENERAL_FRAMES_LIST.lock()  = StaticArrayRBTree::new(free_list.clone());
     *FREE_RESERVED_FRAMES_LIST.lock() = StaticArrayRBTree::new(reserved_list.clone());
     *GENERAL_REGIONS.lock()           = StaticArrayRBTree::new(free_list);
