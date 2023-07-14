@@ -136,8 +136,8 @@ dependencies = [
  "hashbrown",
  "lazy_static",
  "logger",
- "mutex_sleep",
  "stdio",
+ "sync_block",
  "task",
  "tty",
 ]
@@ -215,11 +215,11 @@ dependencies = [
  "libc",
  "memory",
  "miniz_oxide",
- "mutex_sleep",
  "object",
  "rustc-demangle",
  "spin 0.9.4",
  "stack_trace",
+ "sync_block",
  "theseus_std",
  "thread_local_macro",
 ]
@@ -2273,17 +2273,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mutex_sleep"
-version = "0.1.0"
-dependencies = [
- "lockable",
- "log",
- "spin 0.9.4",
- "task",
- "wait_queue",
-]
-
-[[package]]
 name = "nano_core"
 version = "0.1.0"
 dependencies = [
@@ -2331,13 +2320,13 @@ version = "0.1.0"
 dependencies = [
  "heapless",
  "log",
- "mutex_sleep",
  "nic_buffers",
  "rand",
  "rand_chacha",
  "random",
  "smoltcp 0.8.1",
  "spin 0.9.4",
+ "sync_block",
  "sync_irq",
 ]
 
@@ -2668,25 +2657,9 @@ name = "ping"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "byteorder",
- "getopts",
- "hashbrown",
- "hpet",
- "log",
- "network_manager",
- "ota_update_client",
- "smoltcp 0.5.0",
- "smoltcp_helper",
- "upd",
-]
-
-[[package]]
-name = "ping_2"
-version = "0.1.0"
-dependencies = [
- "app_io",
  "getopts",
  "net",
+ "time",
 ]
 
 [[package]]
@@ -3880,18 +3853,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_mutex_sleep"
-version = "0.1.0"
-dependencies = [
- "cpu",
- "log",
- "mutex_sleep",
- "scheduler",
- "spawn",
- "task",
-]
-
-[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
@@ -3955,6 +3916,18 @@ dependencies = [
  "core2",
  "log",
  "theseus_std",
+]
+
+[[package]]
+name = "test_sync_block"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "log",
+ "scheduler",
+ "spawn",
+ "sync_block",
+ "task",
 ]
 
 [[package]]
@@ -4050,7 +4023,6 @@ dependencies = [
  "mkdir",
  "ns",
  "ping",
- "ping_2",
  "pmu_sample_start",
  "pmu_sample_stop",
  "print_fault_log",
@@ -4073,13 +4045,13 @@ dependencies = [
  "test_ixgbe",
  "test_libc",
  "test_mlx5",
- "test_mutex_sleep",
  "test_panic",
  "test_priority_scheduler",
  "test_restartable",
  "test_scheduler",
  "test_serial_echo",
  "test_std_fs",
+ "test_sync_block",
  "test_task_cancel",
  "test_thread_local",
  "test_wait_queue",
@@ -4210,7 +4182,7 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "core2",
- "mutex_sleep",
+ "sync_block",
 ]
 
 [[package]]
@@ -4537,13 +4509,13 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "mutex_sleep",
  "object",
  "paste",
  "psm",
  "region",
  "rustc-demangle",
  "serde",
+ "sync_block",
  "target-lexicon",
  "theseus_std",
  "wasmparser",
@@ -4618,11 +4590,11 @@ dependencies = [
  "memoffset 0.6.5",
  "memory",
  "more-asserts",
- "mutex_sleep",
  "rand",
  "region",
  "signal_handler",
  "spin 0.9.4",
+ "sync_block",
  "task",
  "theseus_std",
  "thiserror_core2",

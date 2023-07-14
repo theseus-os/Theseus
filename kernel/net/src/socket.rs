@@ -4,12 +4,12 @@ use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
-use mutex_sleep::MutexSleepGuard;
 use smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::AnySocket,
     wire::{IpEndpoint, IpListenEndpoint},
 };
+use sync_block::MutexGuard;
 
 pub use smoltcp::socket::tcp::ConnectError;
 
@@ -33,7 +33,7 @@ where
     T: AnySocket<'static> + ?Sized,
 {
     handle: SocketHandle,
-    sockets: MutexSleepGuard<'a, SocketSet<'static>>,
+    sockets: MutexGuard<'a, SocketSet<'static>>,
     interface: &'a Arc<NetworkInterface>,
     phantom_data: PhantomData<T>,
 }
@@ -48,7 +48,7 @@ impl<'a> LockedSocket<'a, smoltcp::socket::tcp::Socket<'static>> {
         R: Into<IpEndpoint>,
         L: Into<IpListenEndpoint>,
     {
-        let mut interface = self.interface.inner.lock().unwrap();
+        let mut interface = self.interface.inner.lock();
         let context = interface.context();
         (**self).connect(context, remote_endpoint, local_endpoint)
     }
@@ -81,11 +81,7 @@ where
     pub fn lock(&self) -> LockedSocket<'_, T> {
         LockedSocket {
             handle: self.handle,
-            sockets: self
-                .interface
-                .sockets
-                .lock()
-                .expect("failed to lock sockets"),
+            sockets: self.interface.sockets.lock(),
             interface: &self.interface,
             phantom_data: PhantomData,
         }

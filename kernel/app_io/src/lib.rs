@@ -85,7 +85,7 @@ pub struct IoStreams {
 mod shared_maps {
     use super::IoStreams;
     use hashbrown::HashMap;
-    use mutex_sleep::{MutexSleep as Mutex, MutexSleepGuard as MutexGuard};
+    use sync_block::{Mutex, MutexGuard};
 
     lazy_static::lazy_static! {
         /// Map a task id to its IoStreams structure.
@@ -100,7 +100,7 @@ mod shared_maps {
     /// `lock_all_maps()` if you want to lock both of the maps to avoid
     /// deadlock.
     pub fn lock_stream_map() -> MutexGuard<'static, HashMap<usize, IoStreams>> {
-        APP_IO_STREAMS.lock().unwrap()
+        APP_IO_STREAMS.lock()
     }
 }
 

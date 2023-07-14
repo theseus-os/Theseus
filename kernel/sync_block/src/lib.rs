@@ -9,6 +9,9 @@ use wait_queue::WaitQueue;
 
 pub use condvar::Condvar;
 
+#[cfg(feature = "std-api")]
+pub mod std_api;
+
 pub type Mutex<T> = sync::Mutex<T, Block>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, Block>;
 
