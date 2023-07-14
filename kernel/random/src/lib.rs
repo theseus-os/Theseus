@@ -103,7 +103,7 @@ fn tsc_seed() -> [u8; 32] {
 
     for s in &mut seed {
         // The last byte is the _most_ random.
-        *s = u128::from(tsc::tsc_ticks()).to_be_bytes()[15];
+        *s = tsc::tsc_value().to_be_bytes().into_iter().last().unwrap();
     }
 
     // The TSC isn't a high quality source of randomness.

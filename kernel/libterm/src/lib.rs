@@ -19,7 +19,7 @@ extern crate font;
 extern crate framebuffer;
 extern crate framebuffer_drawer;
 extern crate framebuffer_printer;
-extern crate tsc;
+extern crate time;
 extern crate window_manager;
 extern crate window;
 extern crate text_display;
@@ -35,16 +35,16 @@ use displayable::Displayable;
 use event_types::Event;
 use font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 use framebuffer::{Framebuffer, Pixel};
-use color::{Color};
+use color::Color;
 use shapes::{Coord, Rectangle};
-use tsc::{tsc_ticks, TscTicks};
 use window::Window;
+use time::Duration;
 
 pub mod cursor;
 
 pub const FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
 pub const FONT_BACKGROUND_COLOR: Color = color::BLACK;
-const DEFAULT_CURSOR_FREQ: u128 = 400000000;
+const DEFAULT_CURSOR_FREQ: Duration = Duration::from_millis(530);
 
 /// Error type for tracking different scroll errors that a terminal
 /// application could encounter.

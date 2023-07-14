@@ -2,10 +2,10 @@
 
 #![no_std]
 
-use core::ops;
-use crossbeam_utils::atomic::AtomicCell;
-
 mod dummy;
+
+use core::{fmt, ops};
+use crossbeam_utils::atomic::AtomicCell;
 
 pub use core::time::Duration;
 
@@ -144,6 +144,12 @@ impl From<u64> for Period {
     /// Creates a new period with the specified femtoseconds.
     fn from(period: u64) -> Self {
         Self(period)
+    }
+}
+
+impl fmt::Display for Period {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} fs", self.0)
     }
 }
 

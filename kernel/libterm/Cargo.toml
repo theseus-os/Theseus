@@ -48,8 +48,8 @@ path = "../window_manager"
 [dependencies.window]
 path = "../window"
 
-[dependencies.tsc]
-path = "../tsc"
+[dependencies.time]
+path = "../time"
 
 [dependencies.font]
 path = "../font"

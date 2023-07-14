@@ -1,4 +1,5 @@
 use super::*;
+use time::{Duration, Instant};
 
 /// The cursor structure used in the terminal.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
@@ -7,9 +8,9 @@ pub struct Cursor {
     /// Whether the cursor is enabled in the terminal.
     enabled: bool,
     /// The blinking frequency.
-    freq: u128,
+    freq: Duration,
     /// The last time it blinks.
-    time: TscTicks,
+    time: Instant,
     /// The current blinking state show/hidden
     show: bool,
     /// The color of the cursor
@@ -25,7 +26,7 @@ impl Cursor {
     /// Reset the state of the cursor as unseen
     pub fn reset(&mut self) {
         self.show = true;
-        self.time = tsc_ticks();
+        self.time = Instant::now();
     }
 
     /// Enable a cursor
@@ -42,15 +43,12 @@ impl Cursor {
     /// Let a cursor blink. It is invoked in a loop.
     pub fn blink(&mut self) -> bool {
         if self.enabled {
-            let time = tsc_ticks();
-            if let Some(duration) = time.sub(&self.time) {
-                if let Some(ns) = duration.to_ns() {
-                    if ns >= self.freq {
-                        self.time = time;
-                        self.show = !self.show;
-                        return true;
-                    }
-                }
+            let time = Instant::now();
+
+            if time >= self.time + self.freq {
+                self.time = time;
+                self.show = !self.show;
+                return true;
             }
         }
         true
@@ -142,7 +140,7 @@ impl Default for Cursor  {
         Cursor {
             enabled: true,
             freq: DEFAULT_CURSOR_FREQ,
-            time: tsc_ticks(),
+            time: Instant::now(),
             show: true,
             color: FONT_FOREGROUND_COLOR,
             offset_from_end: 0,
