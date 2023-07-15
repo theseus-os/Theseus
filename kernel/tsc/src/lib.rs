@@ -34,5 +34,8 @@ pub fn get_tsc_period() -> Option<Period> {
 #[doc(hidden)]
 pub fn tsc_value() -> u64 {
     let mut _aux = 0;
+    // SAFETY: Reading the TSC value is a platform-specific intrinsic that has no
+    // side effects or dangerous behavior, and is supported on all modern x86_64
+    // hardware.
     unsafe { core::arch::x86_64::__rdtscp(&mut _aux) }
 }
