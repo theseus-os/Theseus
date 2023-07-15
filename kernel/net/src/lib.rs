@@ -72,12 +72,13 @@ pub fn get_default_interface() -> Option<Arc<NetworkInterface>> {
 pub fn get_ephemeral_port() -> u16 {
     use rand::Rng;
 
-    // FIXME: Keep track of taken ports.
-
     const RANGE_START: u16 = 49152;
     const RANGE_END: u16 = u16::MAX;
 
-    // TODO: Does this need to be cryptographically secure?
+    // TODO: Doesn't need to be random (especially cryptographically random) but
+    // reduces the likelihood of port clashes. Can remove randmoness after
+    // implementing some kind of tracking of used ports.
+
     let mut rng = random::init_rng::<rand_chacha::ChaChaRng>().unwrap();
     rng.gen_range(RANGE_START..=RANGE_END)
 }
