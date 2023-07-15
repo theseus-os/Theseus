@@ -11,38 +11,34 @@ use log::{debug, error, trace};
 use net::{tcp, IpEndpoint, NetworkInterface, Socket};
 use time::{Duration, Instant};
 
-/// The states that implement the finite state machine for sending and receiving
-/// the HTTP request and response, respectively.
+/// The states that implement the finite state machine for sending and receiving the HTTP request
+/// and response, respectively.
 #[derive(Debug)]
 enum HttpState {
     /// The socket is connected, but the HTTP request has not yet been sent.
     Requesting,
-    /// The HTTP request has been sent, but the response has not yet been fully
-    /// received.
+    /// The HTTP request has been sent, but the response has not yet been fully received.
     ReceivingResponse,
-    /// The response has been received in full, including the headers and the
-    /// entire content.
+    /// The response has been received in full, including the headers and the entire content.
     Responded,
 }
 
-/// Checks to see if the provided HTTP request can be properly parsed, and
-/// returns true if so.
+/// Checks to see if the provided HTTP request can be properly parsed, and returns true if so.
 pub fn check_http_request(request_bytes: &[u8]) -> bool {
     let mut headers = [httparse::EMPTY_HEADER; 64];
     let mut request = httparse::Request::new(&mut headers);
     request.parse(request_bytes).is_ok() && request_bytes.ends_with(b"\r\n\r\n")
 }
 
-/// TODO: create a proper HttpRequest type with header creation fields and
-/// actual verification
+/// TODO: create a proper HttpRequest type with header creation fields and actual verification
 pub type HttpRequest = String;
 
 /// An HttpResponse that has been fully received from a remote server.
 ///
 /// TODO: revamp this structure to not store redundant data
 pub struct HttpResponse {
-    /// The actual array of raw bytes received from the server,
-    /// including all of the headers and body.
+    /// The actual array of raw bytes received from the server, including all of the headers and
+    /// body.
     pub packet: Vec<u8>,
     /// The length of all headers
     pub header_length: usize,
@@ -61,9 +57,8 @@ impl HttpResponse {
         &self.packet[self.header_length..]
     }
 
-    /// Returns the content of this `HttpResponse` as a `Result`,
-    /// in which `Ok(content)` is returned if the status code is 200 (Ok),
-    /// and `Err((status_code, reason))` is returned otherwise.
+    /// Returns the content of this `HttpResponse` as a `Result`, in which `Ok(content)` is returned
+    /// if the status code is 200 (Ok), and `Err((status_code, reason))` is returned otherwise.
     pub fn as_result(&self) -> Result<&[u8], (u16, &str)> {
         if self.status_code == 200 {
             Ok(self.content())
