@@ -166,7 +166,7 @@ impl<'a> HttpClient<'a> {
                     socket
                         .lock()
                         .send_slice(request.as_ref())
-                        .expect("http_client: cannot send request");
+                        .map_err(|_| "cannot send request")?;
                     // Poll the socket to send the packet. Once we have a custom socket type this
                     // won't be necessary.
                     interface
