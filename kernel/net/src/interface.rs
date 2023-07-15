@@ -56,14 +56,14 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(self: &Arc<Self>, socket: T) -> Socket<T>
+    pub fn add_socket<T>(self: Arc<Self>, socket: T) -> Socket<T>
     where
         T: AnySocket<'static>,
     {
         let handle = self.sockets.lock().add(socket);
         Socket {
             handle,
-            interface: self.clone(),
+            interface: self,
             phantom_data: PhantomData,
         }
     }

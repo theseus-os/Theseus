@@ -92,7 +92,9 @@ impl<'a> HttpClient<'a> {
         let rx_buffer = tcp::SocketBuffer::new(vec![0; 256]);
         let tx_buffer = tcp::SocketBuffer::new(vec![0; 256]);
 
-        let socket = interface.add_socket(tcp::Socket::new(rx_buffer, tx_buffer));
+        let socket = interface
+            .clone()
+            .add_socket(tcp::Socket::new(rx_buffer, tx_buffer));
         socket
             .lock()
             .connect(remote_endpoint, local_port)
