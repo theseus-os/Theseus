@@ -1,5 +1,5 @@
 use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core::marker::PhantomData;
 use smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
 use sync_block::Mutex;
@@ -13,9 +13,9 @@ pub use wire::{IpAddress, IpCidr};
 /// This is a wrapper around a network device which provides higher level
 /// abstractions such as polling sockets.
 pub struct NetworkInterface {
-    inner: Mutex<iface::Interface<'static>>,
+    pub(crate) inner: Mutex<iface::Interface<'static>>,
     device: &'static IrqSafeMutex<dyn crate::NetworkDevice>,
-    sockets: Mutex<SocketSet<'static>>,
+    pub(crate) sockets: Mutex<SocketSet<'static>>,
 }
 
 impl NetworkInterface {
@@ -56,14 +56,14 @@ impl NetworkInterface {
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(&self, socket: T) -> Socket<T>
+    pub fn add_socket<T>(self: Arc<Self>, socket: T) -> Socket<T>
     where
         T: AnySocket<'static>,
     {
         let handle = self.sockets.lock().add(socket);
         Socket {
             handle,
-            sockets: &self.sockets,
+            interface: self,
             phantom_data: PhantomData,
         }
     }

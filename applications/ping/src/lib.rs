@@ -101,7 +101,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
     let tx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
 
     let socket = Socket::new(rx_buffer, tx_buffer);
-    let socket = interface.add_socket(socket);
+    let socket = interface.clone().add_socket(socket);
 
     let mut num_sent = 0;
     let mut num_received = 0;

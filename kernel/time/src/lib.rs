@@ -42,6 +42,10 @@ impl Instant {
         now::<Monotonic>()
     }
 
+    pub fn elapsed(&self) -> Duration {
+        Self::now().duration_since(*self)
+    }
+
     /// Returns the amount of time elapsed from another instant to this one, or
     /// zero duration if that instant is later than this one.
     pub fn duration_since(&self, earlier: Self) -> Duration {

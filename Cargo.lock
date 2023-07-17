@@ -1490,13 +1490,11 @@ dependencies = [
 name = "http_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "httparse",
  "log",
- "network_manager",
+ "net",
  "percent-encoding",
- "smoltcp 0.5.0",
- "smoltcp_helper",
+ "time",
 ]
 
 [[package]]
@@ -2323,6 +2321,8 @@ dependencies = [
  "heapless",
  "log",
  "nic_buffers",
+ "rand",
+ "rand_chacha",
  "random",
  "smoltcp 0.8.1",
  "spin 0.9.4",
@@ -2489,20 +2489,17 @@ checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 name = "ota_update_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "http_client",
  "httparse",
  "irq_safety",
  "itertools",
  "log",
- "network_manager",
+ "net",
  "percent-encoding",
- "rand",
  "sha3",
- "smoltcp 0.5.0",
- "smoltcp_helper",
  "spawn",
  "task",
+ "time",
 ]
 
 [[package]]
@@ -4271,10 +4268,9 @@ dependencies = [
  "memfs",
  "memory",
  "mod_mgmt",
- "network_manager",
+ "net",
  "ota_update_client",
  "path",
- "smoltcp 0.5.0",
  "spin 0.9.4",
  "task",
  "vfs_node",
