@@ -40,8 +40,10 @@ fn split_at_beginning() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 
@@ -55,8 +57,10 @@ fn split_at_middle() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 #[test]
@@ -69,8 +73,10 @@ fn split_at_end() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 
@@ -84,8 +90,10 @@ fn split_after_end() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 
@@ -131,8 +139,10 @@ fn split_at_beginning_zero() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 #[test]
@@ -145,8 +155,10 @@ fn split_at_beginning_one() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 #[test]
@@ -159,8 +171,10 @@ fn split_at_beginning_max_length_one() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 #[test]
@@ -173,8 +187,10 @@ fn split_at_end_max_length_two() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 
@@ -188,8 +204,10 @@ fn split_after_end_max() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }
 
 #[test]
@@ -202,6 +220,8 @@ fn split_at_beginning_max() {
     let result = original.split_at(split_at);
     dbg!(&result);
     let (result1, result2) = result.unwrap();
-    assert_eq!(result1, first);
-    assert_eq!(result2, second);
+    assert_eq!(result1.start(), first.start());
+    assert_eq!(result1.end(), first.end());
+    assert_eq!(result2.start(), second.start());
+    assert_eq!(result2.end(), second.end());
 }

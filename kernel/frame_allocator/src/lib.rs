@@ -588,9 +588,11 @@ impl<const S: FrameState> Frames<S> {
     /// then `self` is not changed and we return (self, None, None).
     pub fn split(
         self,
-        start_frame: Frame,
-        num_frames: usize,
+        frames: FrameRange
     ) -> (Self, Option<Self>, Option<Self>) {
+        let start_frame = *frames.start();
+        let num_frames = frames.size_in_frames();
+
         if (start_frame < *self.start()) || (start_frame + (num_frames - 1) > *self.end()) || (num_frames == 0) {
             return (self, None, None);
         }
@@ -674,17 +676,9 @@ impl<const S: FrameState> PartialOrd for Frames<S> {
         Some(self.cmp(other))
     }
 }
-// To Do: will this be an issue as now this applies to Chunk as well as AllocatedFrames?
-#[cfg(not(test))]
 impl<const S: FrameState> PartialEq for Frames<S> {
     fn eq(&self, other: &Self) -> bool {
         self.frames.start() == other.frames.start()
-    }
-}
-#[cfg(test)]
-impl<const S: FrameState> PartialEq for Frames<S> {
-    fn eq(&self, other: &Self) -> bool {
-        self.frames == other.frames
     }
 }
 impl<const S: FrameState> Borrow<Frame> for &'_ Frames<S> {
@@ -809,7 +803,7 @@ fn find_specific_chunk(
                 if let Some(chunk) = elem {
                     if requested_frame >= *chunk.start() && requested_end_frame <= *chunk.end() {
                         // Here: `chunk` was big enough and did contain the requested address.
-                        return allocate_from_chosen_chunk(requested_frame, num_frames, ValueRefMut::Array(elem));
+                        return allocate_from_chosen_chunk(FrameRange::new(requested_frame, requested_frame + num_frames - 1), ValueRefMut::Array(elem));
                     }
                 }
             }
@@ -819,7 +813,7 @@ fn find_specific_chunk(
             if let Some(chunk) = cursor_mut.get().map(|w| w.deref().deref().clone()) {
                 if chunk.contains(&requested_frame) {
                     if requested_end_frame <= *chunk.end() {
-                        return allocate_from_chosen_chunk(requested_frame, num_frames, ValueRefMut::RBTree(cursor_mut));
+                        return allocate_from_chosen_chunk(FrameRange::new(requested_frame, requested_frame + num_frames - 1), ValueRefMut::RBTree(cursor_mut));
                     } else {
                         // We found the chunk containing the requested address, but it was too small to cover all of the requested frames.
                         // Let's try to merge the next-highest contiguous chunk to see if those two chunks together 
@@ -864,7 +858,7 @@ fn find_specific_chunk(
                             // We would like to merge it into the initial chunk with just the reference (since we have a cursor pointing to it already),
                             // but we can't get a mutable reference to the element the cursor is pointing to.
                             // So both chunks will be removed and then merged. 
-                            return merge_contiguous_chunks_and_allocate(requested_frame, num_frames, ValueRefMut::RBTree(cursor_mut), next_chunk);
+                            return merge_contiguous_chunks_and_allocate(FrameRange::new(requested_frame, requested_frame + num_frames -1), ValueRefMut::RBTree(cursor_mut), next_chunk);
                         }
                     }
                 }
@@ -891,7 +885,7 @@ fn find_any_chunk(
                         continue;
                     } 
                     else {
-                        return allocate_from_chosen_chunk(*chunk.start(), num_frames, ValueRefMut::Array(elem));
+                        return allocate_from_chosen_chunk(FrameRange::new(*chunk.start(), *chunk.start() + num_frames - 1), ValueRefMut::Array(elem));
                     }
                 }
             }
@@ -903,7 +897,7 @@ fn find_any_chunk(
             let mut cursor = tree.upper_bound_mut(Bound::<&Frames<{FrameState::Unmapped}>>::Unbounded);
             while let Some(chunk) = cursor.get().map(|w| w.deref()) {
                 if num_frames <= chunk.size_in_frames() && chunk.typ() == MemoryRegionType::Free {
-                    return allocate_from_chosen_chunk(*chunk.start(), num_frames, ValueRefMut::RBTree(cursor));
+                    return allocate_from_chosen_chunk(FrameRange::new(*chunk.start(), *chunk.start() + num_frames - 1), ValueRefMut::RBTree(cursor));
                 }
                 warn!("Frame allocator: inefficient scenario: had to search multiple chunks \
                     (skipping {:?}) while trying to allocate {} frames at any address.",
@@ -942,8 +936,7 @@ fn retrieve_frames_from_ref(mut frames_ref: ValueRefMut<Frames<{FrameState::Unma
 /// This function merges two chunks and then breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
 /// from (part of) that chunk, ranging from `start_frame` to `start_frame + num_frames`.
 fn merge_contiguous_chunks_and_allocate(
-    start_frame: Frame,
-    num_frames: usize,
+    frames_to_allocate: FrameRange,
     initial_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
     next_chunk: Frames<{FrameState::Unmapped}>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
@@ -952,7 +945,7 @@ fn merge_contiguous_chunks_and_allocate(
     // This should always succeed, since we've already checked the conditions for a merge
     // We should return the next_chunk back to the list, but a failure at this point implies a bug in the frame allocator.
     chosen_chunk.merge(next_chunk).map_err(|_| AllocationError::ChunkOperationFailed)?; 
-    let (new_allocation, before, after) = chosen_chunk.split(start_frame, num_frames);
+    let (new_allocation, before, after) = chosen_chunk.split(frames_to_allocate);
 
     // TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
     // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
@@ -968,15 +961,14 @@ fn merge_contiguous_chunks_and_allocate(
 /// into multiple smaller chunks, thereby "allocating" frames from it.
 ///
 /// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
-/// from (part of) that chunk, ranging from `start_frame` to `start_frame + num_frames`.
+/// from (part of) that chunk, ranging in the frames represented by `frames_to_allocate`.
 fn allocate_from_chosen_chunk(
-    start_frame: Frame,
-    num_frames: usize,
+    frames_to_allocate: FrameRange,
     chosen_chunk_ref: ValueRefMut<Frames<{FrameState::Unmapped}>>,
 ) -> Result<(AllocatedFrames, DeferredAllocAction<'static>), AllocationError> {
     // Remove the chosen chunk from the free frame list.
     let chosen_chunk = retrieve_frames_from_ref(chosen_chunk_ref).ok_or(AllocationError::ChunkRemovalFailed)?;
-    let (new_allocation, before, after) = chosen_chunk.split(start_frame, num_frames);
+    let (new_allocation, before, after) = chosen_chunk.split(frames_to_allocate);
 
     // TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
     // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
