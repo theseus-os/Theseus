@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["check_http_request","send_request"],"struct":["ConnectedTcpSocket","HttpResponse"],"type":["HttpRequest"]};
+window.SIDEBAR_ITEMS = {"fn":["check_http_request"],"struct":["HttpClient","HttpResponse"],"type":["HttpRequest"]};

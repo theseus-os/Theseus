@@ -66,6 +66,22 @@
 <a href="#66" id="66">66</a>
 <a href="#67" id="67">67</a>
 <a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -87,9 +103,9 @@
     phy,
     socket::{icmp, tcp, udp},
     time::Instant,
-    wire,
+    wire::{<span class="self">self</span>, IpEndpoint},
 };
-<span class="kw">pub use </span>socket::Socket;
+<span class="kw">pub use </span>socket::{LockedSocket, Socket};
 
 <span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.
 ///
@@ -130,8 +146,24 @@
     <span class="kw-2">&amp;</span>NETWORK_INTERFACES
 }
 
-<span class="doccomment">/// Gets the first available interface.
+<span class="doccomment">/// Returns the first available interface.
 </span><span class="kw">pub fn </span>get_default_interface() -&gt; <span class="prelude-ty">Option</span>&lt;Arc&lt;NetworkInterface&gt;&gt; {
     NETWORK_INTERFACES.lock().get(<span class="number">0</span>).cloned()
+}
+
+<span class="doccomment">/// Returns a port in the range reserved for private, dynamic, and ephemeral
+/// ports.
+</span><span class="kw">pub fn </span>get_ephemeral_port() -&gt; u16 {
+    <span class="kw">use </span>rand::Rng;
+
+    <span class="kw">const </span>RANGE_START: u16 = <span class="number">49152</span>;
+    <span class="kw">const </span>RANGE_END: u16 = u16::MAX;
+
+    <span class="comment">// TODO: Doesn&#39;t need to be random (especially cryptographically random) but
+    // reduces the likelihood of port clashes. Can remove randmoness after
+    // implementing some kind of tracking of used ports.
+
+    </span><span class="kw">let </span><span class="kw-2">mut </span>rng = random::init_rng::&lt;rand_chacha::ChaChaRng&gt;().unwrap();
+    rng.gen_range(RANGE_START..=RANGE_END)
 }
 </code></pre></div></section></main></body></html>

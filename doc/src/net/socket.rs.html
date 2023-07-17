@@ -63,37 +63,84 @@
 <a href="#63" id="63">63</a>
 <a href="#64" id="64">64</a>
 <a href="#65" id="65">65</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>core::{
+<a href="#66" id="66">66</a>
+<a href="#67" id="67">67</a>
+<a href="#68" id="68">68</a>
+<a href="#69" id="69">69</a>
+<a href="#70" id="70">70</a>
+<a href="#71" id="71">71</a>
+<a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
+<a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::NetworkInterface;
+<span class="kw">use </span>alloc::sync::Arc;
+<span class="kw">use </span>core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
 };
 <span class="kw">use </span>smoltcp::{
     iface::{SocketHandle, SocketSet},
     socket::AnySocket,
+    wire::{IpEndpoint, IpListenEndpoint},
 };
-<span class="kw">use </span>sync_block::{Mutex, MutexGuard};
+<span class="kw">use </span>sync_block::MutexGuard;
+
+<span class="kw">pub use </span>smoltcp::socket::tcp::ConnectError;
 
 <span class="doccomment">/// A network socket.
 ///
 /// In order to use the socket, it must be locked using the [`lock`] method.
 /// This will lock the interface&#39;s list of sockets, and so the guard returned by
 /// [`lock`] must be dropped before calling [`Interface::poll`].
-</span><span class="kw">pub struct </span>Socket&lt;<span class="lifetime">&#39;a</span>, T&gt;
+</span><span class="kw">pub struct </span>Socket&lt;T&gt;
 <span class="kw">where
+    </span><span class="comment">// TODO: Relax &#39;static lifetime.
     </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt; + <span class="question-mark">?</span>Sized,
 {
     <span class="kw">pub</span>(<span class="kw">crate</span>) handle: SocketHandle,
-    <span class="kw">pub</span>(<span class="kw">crate</span>) sockets: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Mutex&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) interface: Arc&lt;NetworkInterface&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) phantom_data: PhantomData&lt;T&gt;,
 }
 
-<span class="kw">struct </span>LockedSocket&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">pub struct </span>LockedSocket&lt;<span class="lifetime">&#39;a</span>, T&gt;
 <span class="kw">where
     </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt; + <span class="question-mark">?</span>Sized,
 {
     handle: SocketHandle,
     sockets: MutexGuard&lt;<span class="lifetime">&#39;a</span>, SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    interface: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>Arc&lt;NetworkInterface&gt;,
     phantom_data: PhantomData&lt;T&gt;,
+}
+
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; LockedSocket&lt;<span class="lifetime">&#39;a</span>, smoltcp::socket::tcp::Socket&lt;<span class="lifetime">&#39;static</span>&gt;&gt; {
+    <span class="kw">pub fn </span>connect&lt;R, L&gt;(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        remote_endpoint: R,
+        local_endpoint: L,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), ConnectError&gt;
+    <span class="kw">where
+        </span>R: Into&lt;IpEndpoint&gt;,
+        L: Into&lt;IpListenEndpoint&gt;,
+    {
+        <span class="kw">let </span><span class="kw-2">mut </span>interface = <span class="self">self</span>.interface.inner.lock();
+        <span class="kw">let </span>context = interface.context();
+        (<span class="kw-2">**</span><span class="self">self</span>).connect(context, remote_endpoint, local_endpoint)
+    }
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; Deref <span class="kw">for </span>LockedSocket&lt;<span class="lifetime">&#39;a</span>, T&gt;
@@ -116,14 +163,15 @@
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T&gt; Socket&lt;<span class="lifetime">&#39;a</span>, T&gt;
+<span class="kw">impl</span>&lt;T&gt; Socket&lt;T&gt;
 <span class="kw">where
-    </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt; + <span class="lifetime">&#39;a</span>,
+    </span>T: AnySocket&lt;<span class="lifetime">&#39;static</span>&gt;,
 {
-    <span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">impl </span>DerefMut&lt;Target = T&gt; + <span class="lifetime">&#39;a </span>{
+    <span class="kw">pub fn </span>lock(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LockedSocket&lt;<span class="lifetime">&#39;_</span>, T&gt; {
         LockedSocket {
             handle: <span class="self">self</span>.handle,
-            sockets: <span class="self">self</span>.sockets.lock(),
+            sockets: <span class="self">self</span>.interface.sockets.lock(),
+            interface: <span class="kw-2">&amp;</span><span class="self">self</span>.interface,
             phantom_data: PhantomData,
         }
     }

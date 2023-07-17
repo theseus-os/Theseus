@@ -392,77 +392,6 @@
 <a href="#392" id="392">392</a>
 <a href="#393" id="393">393</a>
 <a href="#394" id="394">394</a>
-<a href="#395" id="395">395</a>
-<a href="#396" id="396">396</a>
-<a href="#397" id="397">397</a>
-<a href="#398" id="398">398</a>
-<a href="#399" id="399">399</a>
-<a href="#400" id="400">400</a>
-<a href="#401" id="401">401</a>
-<a href="#402" id="402">402</a>
-<a href="#403" id="403">403</a>
-<a href="#404" id="404">404</a>
-<a href="#405" id="405">405</a>
-<a href="#406" id="406">406</a>
-<a href="#407" id="407">407</a>
-<a href="#408" id="408">408</a>
-<a href="#409" id="409">409</a>
-<a href="#410" id="410">410</a>
-<a href="#411" id="411">411</a>
-<a href="#412" id="412">412</a>
-<a href="#413" id="413">413</a>
-<a href="#414" id="414">414</a>
-<a href="#415" id="415">415</a>
-<a href="#416" id="416">416</a>
-<a href="#417" id="417">417</a>
-<a href="#418" id="418">418</a>
-<a href="#419" id="419">419</a>
-<a href="#420" id="420">420</a>
-<a href="#421" id="421">421</a>
-<a href="#422" id="422">422</a>
-<a href="#423" id="423">423</a>
-<a href="#424" id="424">424</a>
-<a href="#425" id="425">425</a>
-<a href="#426" id="426">426</a>
-<a href="#427" id="427">427</a>
-<a href="#428" id="428">428</a>
-<a href="#429" id="429">429</a>
-<a href="#430" id="430">430</a>
-<a href="#431" id="431">431</a>
-<a href="#432" id="432">432</a>
-<a href="#433" id="433">433</a>
-<a href="#434" id="434">434</a>
-<a href="#435" id="435">435</a>
-<a href="#436" id="436">436</a>
-<a href="#437" id="437">437</a>
-<a href="#438" id="438">438</a>
-<a href="#439" id="439">439</a>
-<a href="#440" id="440">440</a>
-<a href="#441" id="441">441</a>
-<a href="#442" id="442">442</a>
-<a href="#443" id="443">443</a>
-<a href="#444" id="444">444</a>
-<a href="#445" id="445">445</a>
-<a href="#446" id="446">446</a>
-<a href="#447" id="447">447</a>
-<a href="#448" id="448">448</a>
-<a href="#449" id="449">449</a>
-<a href="#450" id="450">450</a>
-<a href="#451" id="451">451</a>
-<a href="#452" id="452">452</a>
-<a href="#453" id="453">453</a>
-<a href="#454" id="454">454</a>
-<a href="#455" id="455">455</a>
-<a href="#456" id="456">456</a>
-<a href="#457" id="457">457</a>
-<a href="#458" id="458">458</a>
-<a href="#459" id="459">459</a>
-<a href="#460" id="460">460</a>
-<a href="#461" id="461">461</a>
-<a href="#462" id="462">462</a>
-<a href="#463" id="463">463</a>
-<a href="#464" id="464">464</a>
-<a href="#465" id="465">465</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Functions to communicate with a network server that provides over-the-air live update functionality.
 //! 
 
@@ -471,41 +400,28 @@
 
 #[macro_use] </span><span class="kw">extern crate </span>log;
 <span class="attr">#[macro_use] </span><span class="kw">extern crate </span>alloc;
-<span class="kw">extern crate </span>smoltcp;
-<span class="kw">extern crate </span>network_manager;
-<span class="kw">extern crate </span>hpet;
 <span class="kw">extern crate </span>spawn;
 <span class="kw">extern crate </span>task;
 <span class="kw">extern crate </span>sha3;
 <span class="kw">extern crate </span>percent_encoding;
-<span class="kw">extern crate </span>rand;
 <span class="kw">extern crate </span>http_client;
 <span class="kw">extern crate </span>itertools;
-<span class="attr">#[macro_use] </span><span class="kw">extern crate </span>smoltcp_helper;
-
+<span class="kw">extern crate </span>time;
+<span class="kw">extern crate </span>net;
 
 <span class="kw">use </span>core::str;
 <span class="kw">use </span>alloc::{
     vec::Vec,
     collections::BTreeSet,
     string::{String, ToString},
+    sync::Arc,
 };
 <span class="kw">use </span>itertools::Itertools;
-<span class="kw">use </span>hpet::get_hpet;
-<span class="kw">use </span>smoltcp::{
-    wire::{Ipv4Address, IpEndpoint},
-    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
-};
 <span class="kw">use </span>sha3::{Digest, Sha3_512};
 <span class="kw">use </span>percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
-<span class="kw">use </span>network_manager::{NetworkInterfaceRef};
-<span class="kw">use </span>rand::{
-    SeedableRng,
-    RngCore,
-    rngs::SmallRng
-};
-<span class="kw">use </span>http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
-<span class="kw">use </span>smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
+<span class="kw">use </span>http_client::{HttpResponse, HttpClient, check_http_request};
+<span class="kw">use </span>time::{Duration, Instant};
+<span class="kw">use </span>net::{IpEndpoint, wire::Ipv4Address, NetworkInterface};
 
 <span class="doccomment">/// The IP address of the update server.
 </span><span class="kw">const </span>DEFAULT_DESTINATION_IP_ADDR: [u8; <span class="number">4</span>] = [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the IP of the host machine when running on QEMU.
@@ -522,7 +438,7 @@
 }
 
 <span class="doccomment">/// The time limit in milliseconds to wait for a response to an HTTP request.
-</span><span class="kw">const </span>HTTP_REQUEST_TIMEOUT_MILLIS: u64 = <span class="number">10000</span>;
+</span><span class="kw">const </span>HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(<span class="number">10</span>);
 
 <span class="doccomment">/// The path of the update builds file, located at the root of the build server.
 /// This file contains the list of all update build instances available,
@@ -577,7 +493,7 @@
 /// and downloads the list of available update builds.
 /// An update build is a compiled instance of Theseus that contains all crates&#39; object files.
 </span><span class="kw">pub fn </span>download_available_update_builds(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;,
     remote_endpoint: IpEndpoint,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     download_string_file(iface, remote_endpoint, UPDATE_BUILDS_PATH)
@@ -587,7 +503,7 @@
 <span class="doccomment">/// Connects to the update server over the given network interface
 /// and downloads the list of crates present in the given update build.
 </span><span class="kw">pub fn </span>download_listing(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;,
     remote_endpoint: IpEndpoint,
     update_build: <span class="kw-2">&amp;</span>str,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -599,7 +515,7 @@
 /// and downloads the diff file in the given update build,
 /// which dictates which crates should be swapped.
 </span><span class="kw">pub fn </span>download_diff(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;,
     remote_endpoint: IpEndpoint,
     update_build: <span class="kw-2">&amp;</span>str,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -609,7 +525,7 @@
 
 <span class="doccomment">/// Convenience function for downloading files and returning their contents as Strings per line. 
 </span><span class="kw">fn </span>download_string_file(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;,
     remote_endpoint: IpEndpoint,
     file_path: <span class="kw-2">&amp;</span>str,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;String&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -706,7 +622,7 @@
 /// 
 /// Returns the list of crate object files (as `DownloadedFile`s) in the given `update_build`.
 </span><span class="kw">pub fn </span>download_crates(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef, 
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;, 
     remote_endpoint: IpEndpoint,
     update_build: <span class="kw-2">&amp;</span>str,
     crates: BTreeSet&lt;String&gt;,
@@ -761,7 +677,7 @@
 
 <span class="doccomment">/// A convenience function for downloading just one file. See `download_files()`.
 </span><span class="kw">fn </span>download_file&lt;S: AsRef&lt;str&gt;&gt;(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;,
     remote_endpoint: IpEndpoint, 
     absolute_path: S,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;DownloadedFile, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -779,7 +695,7 @@
 /// Returns an error if any of the given `absolute_paths` didn&#39;t exist, 
 /// or if there was any other error on the remote server.
 </span><span class="kw">fn </span>download_files&lt;S: AsRef&lt;str&gt;&gt;(
-    iface: <span class="kw-2">&amp;</span>NetworkInterfaceRef,
+    iface: <span class="kw-2">&amp;</span>Arc&lt;NetworkInterface&gt;,
     remote_endpoint: IpEndpoint,
     absolute_paths: Vec&lt;S&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;DownloadedFile&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -787,20 +703,10 @@
         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;no download paths given&quot;</span>);
     }
 
-    <span class="kw">let </span>startup_time = <span class="macro">hpet_ticks!</span>();
-    <span class="kw">let </span><span class="kw-2">mut </span>rng = SmallRng::seed_from_u64(startup_time);
-    <span class="kw">let </span>rng_upper_bound = u16::max_value() - STARTING_FREE_PORT;
+    <span class="kw">let </span>local_port = net::get_ephemeral_port();
 
-    <span class="comment">// the below items may be overwritten on each loop iteration, if the socket was closed and we need to create a new one
-    </span><span class="kw">let </span><span class="kw-2">mut </span>local_port = STARTING_FREE_PORT + (rng.next_u32() <span class="kw">as </span>u16 % rng_upper_bound);
-    <span class="kw">let </span><span class="kw-2">mut </span>tcp_rx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-    <span class="kw">let </span><span class="kw-2">mut </span>tcp_tx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-    <span class="kw">let </span><span class="kw-2">mut </span>tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-    <span class="kw">let </span><span class="kw-2">mut </span>sockets = SocketSet::new(Vec::with_capacity(<span class="number">1</span>));
-    <span class="kw">let </span><span class="kw-2">mut </span>tcp_handle = sockets.add(tcp_socket);
+    <span class="kw">let </span><span class="kw-2">mut </span>http_client = HttpClient::new(iface, local_port, remote_endpoint).map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to create http client&quot;</span>)<span class="question-mark">?</span>;
 
-    <span class="comment">// first, attempt to connect the socket to the remote server
-    </span>connect(iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle, remote_endpoint, local_port, startup_time)<span class="question-mark">?</span>;
     <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket connected successfully!&quot;</span>);
 
     <span class="comment">// iterate over the provided list of file paths, and retrieve each one via HTTP
@@ -828,34 +734,8 @@
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;ota_update_client: created improper/incomplete HTTP request&quot;</span>);
         }
 
-        <span class="comment">// Check that the socket is still connected. If not, we need to create a new one and connect it before use. 
-        // if !is_connected(&amp;mut sockets, tcp_handle) {
-        // for now, we just always close the old socket and connect a new one
-        </span>{
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: remote endpoint closed socket after response, opening a new socket.&quot;</span>);
-            <span class="comment">// first, close the existing socket
-            </span>{
-                <span class="kw">let </span><span class="kw-2">mut </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
-                socket.close(); 
-                socket.abort(); 
-            }
-            <span class="kw">let </span>_packet_io_occurred = poll_iface(iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
-            
-            <span class="comment">// second, create an entirely new socket and connect it
-            </span>local_port = STARTING_FREE_PORT + (rng.next_u32() <span class="kw">as </span>u16 % rng_upper_bound);
-            tcp_rx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-            tcp_tx_buffer = TcpSocketBuffer::new(<span class="macro">vec!</span>[<span class="number">0</span>; <span class="number">4096</span>]);
-            tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-            sockets = SocketSet::new(Vec::with_capacity(<span class="number">1</span>));
-            tcp_handle = sockets.add(tcp_socket);
-            connect(iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle, remote_endpoint, local_port, startup_time)<span class="question-mark">?</span>;
-        }
-
         <span class="comment">// send the HTTP request and obtain a response
-        </span><span class="kw">let </span>response = {
-            <span class="kw">let </span><span class="kw-2">mut </span>connected_tcp_socket = ConnectedTcpSocket::new(iface, <span class="kw-2">&amp;mut </span>sockets, tcp_handle)<span class="question-mark">?</span>;
-            send_request(http_request, <span class="kw-2">&amp;mut </span>connected_tcp_socket, <span class="prelude-val">Some</span>(HTTP_REQUEST_TIMEOUT_MILLIS))<span class="question-mark">?
-        </span>};
+        </span><span class="kw">let </span>response = http_client.send(http_request, <span class="prelude-val">Some</span>(HTTP_REQUEST_TIMEOUT))<span class="question-mark">?</span>;
 
         <span class="kw">if </span>response.status_code != <span class="number">200 </span>{
             <span class="macro">error!</span>(<span class="string">&quot;ota_update_client: failed to download {:?}, Error {}: {}&quot;</span>, path, response.status_code, response.reason);
@@ -869,41 +749,19 @@
     }
 
 
-    <span class="kw">let </span><span class="kw-2">mut </span>_loop_ctr = <span class="number">0</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>issued_close = <span class="bool-val">false</span>;
-    <span class="kw">let </span>timeout_millis = <span class="number">3000</span>; <span class="comment">// 3 second timeout
-    </span><span class="kw">let </span>start = <span class="macro">hpet_ticks!</span>();
+    <span class="kw">let </span>timeout = Duration::from_secs(<span class="number">3</span>);
+    <span class="kw">let </span>start = Instant::now();
     <span class="kw">loop </span>{
-        _loop_ctr += <span class="number">1</span>;
-
-        <span class="kw">let </span>_packet_io_occurred = poll_iface(iface, <span class="kw-2">&amp;mut </span>sockets, startup_time)<span class="question-mark">?</span>;
-
-        <span class="kw">let </span><span class="kw-2">mut </span>socket = sockets.get::&lt;TcpSocket&gt;(tcp_handle);
-        <span class="kw">if </span>!issued_close {
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state is {:?}&quot;</span>, socket.state());
-
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: closing socket...&quot;</span>);
-            socket.close();
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state (after close) is now {:?}&quot;</span>, socket.state());
-            issued_close = <span class="bool-val">true</span>;
-        }
-
-        <span class="kw">if </span>socket.state() == TcpState::Closed {
+        <span class="kw">if </span>http_client.is_closed() {
             <span class="kw">break</span>;
         }
 
-        <span class="kw">if </span>_loop_ctr % <span class="number">50000 </span>== <span class="number">0 </span>{
-            <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: socket state (looping) is now {:?}&quot;</span>, socket.state());
-        }
-
         <span class="comment">// check to make sure we haven&#39;t timed out
-        </span><span class="kw">if </span>millis_since(start)<span class="question-mark">? </span>&gt; timeout_millis {
+        </span><span class="kw">if </span>start.elapsed() &gt;= timeout {
             <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: timed out waiting to close socket, closing it manually with an abort.&quot;</span>);
-            socket.abort();
-            <span class="comment">// Don&#39;t break out of the loop here!  we need to let this socket actually send the close msg
-            // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
-            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
-        </span>}
+            http_client.abort()<span class="question-mark">?</span>;
+            <span class="kw">break</span>;
+        }
     }
 
     <span class="kw">if </span>downloaded_files.len() != absolute_paths.len() {
