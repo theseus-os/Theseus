@@ -324,14 +324,20 @@
 <a href="#324" id="324">324</a>
 <a href="#325" id="325">325</a>
 <a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate contains abstractions to interact with hardware clocks.
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>core::ops;
-<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
+</span><span class="kw">mod </span>dummy;
 
-<span class="kw">mod </span>dummy;
+<span class="kw">use </span>core::{fmt, ops};
+<span class="kw">use </span>crossbeam_utils::atomic::AtomicCell;
 
 <span class="kw">pub use </span>core::time::Duration;
 
@@ -474,6 +480,12 @@
     <span class="doccomment">/// Creates a new period with the specified femtoseconds.
     </span><span class="kw">fn </span>from(period: u64) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>(period)
+    }
+}
+
+<span class="kw">impl </span>fmt::Display <span class="kw">for </span>Period {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">&quot;{} fs&quot;</span>, <span class="self">self</span>.<span class="number">0</span>)
     }
 }
 

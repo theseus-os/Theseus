@@ -149,9 +149,8 @@
 <a href="#149" id="149">149</a>
 <a href="#150" id="150">150</a>
 <a href="#151" id="151">151</a>
-<a href="#152" id="152">152</a>
-<a href="#153" id="153">153</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span>time::{Duration, Instant};
 
 <span class="doccomment">/// The cursor structure used in the terminal.
 /// A cursor is a special symbol shown in the text box of a terminal. It indicates the position of character where the next input would be put or the delete operation works on.
@@ -160,9 +159,9 @@
     <span class="doccomment">/// Whether the cursor is enabled in the terminal.
     </span>enabled: bool,
     <span class="doccomment">/// The blinking frequency.
-    </span>freq: u128,
+    </span>freq: Duration,
     <span class="doccomment">/// The last time it blinks.
-    </span>time: TscTicks,
+    </span>time: Instant,
     <span class="doccomment">/// The current blinking state show/hidden
     </span>show: bool,
     <span class="doccomment">/// The color of the cursor
@@ -178,7 +177,7 @@
     <span class="doccomment">/// Reset the state of the cursor as unseen
     </span><span class="kw">pub fn </span>reset(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
         <span class="self">self</span>.show = <span class="bool-val">true</span>;
-        <span class="self">self</span>.time = tsc_ticks();
+        <span class="self">self</span>.time = Instant::now();
     }
 
     <span class="doccomment">/// Enable a cursor
@@ -195,15 +194,12 @@
     <span class="doccomment">/// Let a cursor blink. It is invoked in a loop.
     </span><span class="kw">pub fn </span>blink(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; bool {
         <span class="kw">if </span><span class="self">self</span>.enabled {
-            <span class="kw">let </span>time = tsc_ticks();
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(duration) = time.sub(<span class="kw-2">&amp;</span><span class="self">self</span>.time) {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(ns) = duration.to_ns() {
-                    <span class="kw">if </span>ns &gt;= <span class="self">self</span>.freq {
-                        <span class="self">self</span>.time = time;
-                        <span class="self">self</span>.show = !<span class="self">self</span>.show;
-                        <span class="kw">return </span><span class="bool-val">true</span>;
-                    }
-                }
+            <span class="kw">let </span>time = Instant::now();
+
+            <span class="kw">if </span>time &gt;= <span class="self">self</span>.time + <span class="self">self</span>.freq {
+                <span class="self">self</span>.time = time;
+                <span class="self">self</span>.show = !<span class="self">self</span>.show;
+                <span class="kw">return </span><span class="bool-val">true</span>;
             }
         }
         <span class="bool-val">true
@@ -295,7 +291,7 @@
         Cursor {
             enabled: <span class="bool-val">true</span>,
             freq: DEFAULT_CURSOR_FREQ,
-            time: tsc_ticks(),
+            time: Instant::now(),
             show: <span class="bool-val">true</span>,
             color: FONT_FOREGROUND_COLOR,
             offset_from_end: <span class="number">0</span>,

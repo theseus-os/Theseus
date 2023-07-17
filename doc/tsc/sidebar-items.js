@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["get_tsc_frequency","tsc_ticks"],"struct":["TscTicks"]};
+window.SIDEBAR_ITEMS = {"fn":["get_tsc_period"],"struct":["Tsc"]};

@@ -675,7 +675,7 @@
 <span class="kw">extern crate </span>framebuffer;
 <span class="kw">extern crate </span>framebuffer_drawer;
 <span class="kw">extern crate </span>framebuffer_printer;
-<span class="kw">extern crate </span>tsc;
+<span class="kw">extern crate </span>time;
 <span class="kw">extern crate </span>window_manager;
 <span class="kw">extern crate </span>window;
 <span class="kw">extern crate </span>text_display;
@@ -691,16 +691,16 @@
 <span class="kw">use </span>event_types::Event;
 <span class="kw">use </span>font::{CHARACTER_HEIGHT, CHARACTER_WIDTH};
 <span class="kw">use </span>framebuffer::{Framebuffer, Pixel};
-<span class="kw">use </span>color::{Color};
+<span class="kw">use </span>color::Color;
 <span class="kw">use </span>shapes::{Coord, Rectangle};
-<span class="kw">use </span>tsc::{tsc_ticks, TscTicks};
 <span class="kw">use </span>window::Window;
+<span class="kw">use </span>time::Duration;
 
 <span class="kw">pub mod </span>cursor;
 
 <span class="kw">pub const </span>FONT_FOREGROUND_COLOR: Color = color::LIGHT_GREEN;
 <span class="kw">pub const </span>FONT_BACKGROUND_COLOR: Color = color::BLACK;
-<span class="kw">const </span>DEFAULT_CURSOR_FREQ: u128 = <span class="number">400000000</span>;
+<span class="kw">const </span>DEFAULT_CURSOR_FREQ: Duration = Duration::from_millis(<span class="number">530</span>);
 
 <span class="doccomment">/// Error type for tracking different scroll errors that a terminal
 /// application could encounter.

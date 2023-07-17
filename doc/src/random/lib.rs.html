@@ -255,7 +255,7 @@
 
     <span class="kw">for </span>s <span class="kw">in </span><span class="kw-2">&amp;mut </span>seed {
         <span class="comment">// The last byte is the _most_ random.
-        </span><span class="kw-2">*</span>s = u128::from(tsc::tsc_ticks()).to_be_bytes()[<span class="number">15</span>];
+        </span><span class="kw-2">*</span>s = tsc::tsc_value().to_be_bytes().into_iter().last().unwrap();
     }
 
     <span class="comment">// The TSC isn&#39;t a high quality source of randomness.

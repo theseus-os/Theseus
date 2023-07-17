@@ -230,6 +230,9 @@
 <a href="#230" id="230">230</a>
 <a href="#231" id="231">231</a>
 <a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -319,10 +322,13 @@
     <span class="comment">// calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-    </span><span class="kw">let </span>_tsc_freq = tsc::get_tsc_frequency()<span class="question-mark">?</span>;
-    <span class="comment">// info!(&quot;TSC frequency calculated: {}&quot;, _tsc_freq);
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(period) = tsc::get_tsc_period() {
+        time::register_clock_source::&lt;tsc::Tsc&gt;(period);
+    } <span class="kw">else </span>{
+        <span class="macro">log::warn!</span>(<span class="string">&quot;Couldn&#39;t get TSC period&quot;</span>);
+    }
 
-    // now we initialize early driver stuff, like APIC/ACPI
+    <span class="comment">// now we initialize early driver stuff, like APIC/ACPI
     // arch-gate: device_manager currently detects PCI &amp; PS2 devices,
     // which are unsupported on aarch64 at this point
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
