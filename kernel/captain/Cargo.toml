@@ -34,6 +34,7 @@ first_application = { path = "../first_application" }
 window_manager = { path = "../window_manager" }
 exceptions_full = { path = "../exceptions_full" }
 multiple_heaps = { path = "../multiple_heaps" }
+time = { path = "../time" }
 tsc = { path = "../tsc" }
 acpi = { path = "../acpi" }
 page_attribute_table = { path = "../page_attribute_table" }

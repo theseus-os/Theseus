@@ -396,6 +396,7 @@ dependencies = [
  "stack",
  "task",
  "task_fs",
+ "time",
  "tlb_shootdown",
  "tsc",
  "window_manager",
@@ -1790,7 +1791,7 @@ dependencies = [
  "root",
  "shapes",
  "text_display",
- "tsc",
+ "time",
  "window",
  "window_manager",
 ]
@@ -4162,6 +4163,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "pit_clock_basic",
+ "time",
 ]
 
 [[package]]
