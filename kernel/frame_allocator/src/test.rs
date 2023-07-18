@@ -1,4 +1,4 @@
-//! Tests for the AllocatedFrames type, mainly the `split` method.
+//! Tests for the `Frames` type, mainly the `split` method.
 
 extern crate std;
 
@@ -6,8 +6,8 @@ use self::std::dbg;
 
 use super::*;
 
-fn from_addr(start_addr: usize, end_addr: usize) -> AllocatedFrames {
-    AllocatedFrames::new(
+fn from_addr(start_addr: usize, end_addr: usize) -> FreeFrames {
+    FreeFrames::new(
         MemoryRegionType::Free,
         FrameRange::new(
             Frame::containing_address(PhysicalAddress::new_canonical(start_addr)),
