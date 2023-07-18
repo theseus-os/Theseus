@@ -34,7 +34,7 @@ use core::{borrow::Borrow, cmp::{Ordering, min, max}, ops::{Deref, DerefMut}, fm
 use intrusive_collections::Bound;
 use kernel_config::memory::*;
 use log::{error, warn, debug, trace};
-use memory_structs::{PhysicalAddress, Frame, FrameRange};
+use memory_structs::{PhysicalAddress, Frame, FrameRange, MemoryState};
 use spin::Mutex;
 use static_array_rb_tree::*;
 use static_assertions::assert_not_impl_any;
@@ -320,16 +320,9 @@ pub enum MemoryRegionType {
     Unknown,
 }
 
-pub type FreeFrames = Frames<{FrameState::Free}>;
-pub type AllocatedFrames = Frames<{FrameState::Allocated}>;
-pub type MappedFrames = Frames<{FrameState::Mapped}>;
-
-#[derive(PartialEq, Eq, ConstParamTy)]
-pub enum FrameState {
-    Free,
-    Allocated,
-    Mapped
-}
+pub type FreeFrames = Frames<{MemoryState::Free}>;
+pub type AllocatedFrames = Frames<{MemoryState::Allocated}>;
+pub type MappedFrames = Frames<{MemoryState::Mapped}>;
 
 /// A range of contiguous frames.
 /// Owning a `Frames` object gives ownership of the range of frames it references.
@@ -351,7 +344,7 @@ pub enum FrameState {
 /// Thus, comparing two `Frames` with the `==` or `!=` operators may not work as expected.
 /// since it ignores their actual range of frames.
 #[derive(Eq)]
-pub struct Frames<const S: FrameState> {
+pub struct Frames<const S: MemoryState> {
     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
     typ: MemoryRegionType,
     /// The Frames covered by this chunk, an inclusive range.
@@ -359,9 +352,9 @@ pub struct Frames<const S: FrameState> {
 }
 
 // Frames must not be Cloneable, and it must not expose its inner frames as mutable.
-assert_not_impl_any!(Frames<{FrameState::Free}>: DerefMut, Clone);
-assert_not_impl_any!(Frames<{FrameState::Allocated}>: DerefMut, Clone);
-assert_not_impl_any!(Frames<{FrameState::Mapped}>: DerefMut, Clone);
+assert_not_impl_any!(Frames<{MemoryState::Free}>: DerefMut, Clone);
+assert_not_impl_any!(Frames<{MemoryState::Allocated}>: DerefMut, Clone);
+assert_not_impl_any!(Frames<{MemoryState::Mapped}>: DerefMut, Clone);
 
 
 impl FreeFrames {
@@ -428,10 +421,10 @@ pub(crate) fn into_allocated_frames(frames: FrameRange) -> AllocatedFrames {
     Frames{ typ, frames}
 }
 
-impl<const S: FrameState> Drop for Frames<S> {
+impl<const S: MemoryState> Drop for Frames<S> {
     fn drop(&mut self) {
         match S {
-            FrameState::Free => {
+            MemoryState::Free => {
                 if self.size_in_frames() == 0 { return; }
         
                 let unmapped_frames: FreeFrames = Frames {
@@ -459,8 +452,8 @@ impl<const S: FrameState> Drop for Frames<S> {
                 // a requested address is in a chunk that needs to be merged.
                 // Thus, for performance, we save that for those future situations.
             },
-            FrameState::Allocated => { FreeFrames::new(self.typ, self.frames.clone()); }, //ToDo: Check drop handler correctness
-            FrameState::Mapped => panic!("We should never drop a mapped frame! It should be forgotten instead."),
+            MemoryState::Allocated => { FreeFrames::new(self.typ, self.frames.clone()); }, //ToDo: Check drop handler correctness
+            MemoryState::Mapped => panic!("We should never drop a mapped frame! It should be forgotten instead."),
         }
     }
 }
@@ -517,19 +510,19 @@ impl<'f> Deref for AllocatedFrame<'f> {
 }
 assert_not_impl_any!(AllocatedFrame: DerefMut, Clone);
 
-pub struct SplitFrames<const S: FrameState>  {
+pub struct SplitFrames<const S: MemoryState>  {
     before_start: Option<Frames<S>>,
     start_to_end:  Frames<S>,
     after_end:    Option<Frames<S>>,
 }
 
-impl<const S: FrameState> SplitFrames<S> {
+impl<const S: MemoryState> SplitFrames<S> {
     fn destucture(self) -> (Option<Frames<S>>, Frames<S>, Option<Frames<S>>) {
         (self.before_start, self.start_to_end, self.after_end)
     }
 }
 
-impl<const S: FrameState> Frames<S> {
+impl<const S: MemoryState> Frames<S> {
     #[allow(dead_code)]
     pub(crate) fn frames(&self) -> FrameRange {
         self.frames.clone()
@@ -661,34 +654,34 @@ impl<const S: FrameState> Frames<S> {
     }
 }
 
-impl<const S: FrameState> Deref for Frames<S> {
+impl<const S: MemoryState> Deref for Frames<S> {
     type Target = FrameRange;
     fn deref(&self) -> &FrameRange {
         &self.frames
     }
 }
-impl<const S: FrameState> Ord for Frames<S> {
+impl<const S: MemoryState> Ord for Frames<S> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.frames.start().cmp(other.frames.start())
     }
 }
-impl<const S: FrameState> PartialOrd for Frames<S> {
+impl<const S: MemoryState> PartialOrd for Frames<S> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
-impl<const S: FrameState> PartialEq for Frames<S> {
+impl<const S: MemoryState> PartialEq for Frames<S> {
     fn eq(&self, other: &Self) -> bool {
         self.frames.start() == other.frames.start()
     }
 }
-impl<const S: FrameState> Borrow<Frame> for &'_ Frames<S> {
+impl<const S: MemoryState> Borrow<Frame> for &'_ Frames<S> {
     fn borrow(&self) -> &Frame {
         self.frames.start()
     }
 }
 
-impl<const S: FrameState> fmt::Debug for Frames<S> {
+impl<const S: MemoryState> fmt::Debug for Frames<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Frames({:?}, {:?})", self.typ, self.frames)
     }

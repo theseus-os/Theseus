@@ -7,18 +7,28 @@
 
 #![no_std]
 #![feature(step_trait)]
+#![allow(incomplete_features)]
+#![feature(adt_const_params)]
 
 use core::{
     cmp::{min, max},
     fmt,
     iter::Step,
-    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign}
+    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
+    marker::ConstParamTy
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
 use paste::paste;
 use derive_more::*;
 use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
+
+#[derive(PartialEq, Eq, ConstParamTy)]
+pub enum MemoryState {
+    Free,
+    Allocated,
+    Mapped
+}
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
