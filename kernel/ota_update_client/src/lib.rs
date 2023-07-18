@@ -6,41 +6,28 @@
 
 #[macro_use] extern crate log;
 #[macro_use] extern crate alloc;
-extern crate smoltcp;
-extern crate network_manager;
-extern crate hpet;
 extern crate spawn;
 extern crate task;
 extern crate sha3;
 extern crate percent_encoding;
-extern crate rand;
 extern crate http_client;
 extern crate itertools;
-#[macro_use] extern crate smoltcp_helper;
-
+extern crate time;
+extern crate net;
 
 use core::str;
 use alloc::{
     vec::Vec,
     collections::BTreeSet,
     string::{String, ToString},
+    sync::Arc,
 };
 use itertools::Itertools;
-use hpet::get_hpet;
-use smoltcp::{
-    wire::{Ipv4Address, IpEndpoint},
-    socket::{SocketSet, TcpSocket, TcpSocketBuffer, TcpState},
-};
 use sha3::{Digest, Sha3_512};
 use percent_encoding::{DEFAULT_ENCODE_SET, utf8_percent_encode};
-use network_manager::{NetworkInterfaceRef};
-use rand::{
-    SeedableRng,
-    RngCore,
-    rngs::SmallRng
-};
-use http_client::{HttpResponse, ConnectedTcpSocket, send_request, check_http_request};
-use smoltcp_helper::{STARTING_FREE_PORT, connect, millis_since, poll_iface};
+use http_client::{HttpResponse, HttpClient, check_http_request};
+use time::{Duration, Instant};
+use net::{IpEndpoint, wire::Ipv4Address, NetworkInterface};
 
 /// The IP address of the update server.
 const DEFAULT_DESTINATION_IP_ADDR: [u8; 4] = [10, 0, 2, 2]; // the IP of the host machine when running on QEMU.
@@ -57,7 +44,7 @@ pub fn default_remote_endpoint() -> IpEndpoint {
 }
 
 /// The time limit in milliseconds to wait for a response to an HTTP request.
-const HTTP_REQUEST_TIMEOUT_MILLIS: u64 = 10000;
+const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// The path of the update builds file, located at the root of the build server.
 /// This file contains the list of all update build instances available,
@@ -112,7 +99,7 @@ impl CrateSet {
 /// and downloads the list of available update builds.
 /// An update build is a compiled instance of Theseus that contains all crates' object files.
 pub fn download_available_update_builds(
-    iface: &NetworkInterfaceRef,
+    iface: &Arc<NetworkInterface>,
     remote_endpoint: IpEndpoint,
 ) -> Result<Vec<String>, &'static str> {
     download_string_file(iface, remote_endpoint, UPDATE_BUILDS_PATH)
@@ -122,7 +109,7 @@ pub fn download_available_update_builds(
 /// Connects to the update server over the given network interface
 /// and downloads the list of crates present in the given update build.
 pub fn download_listing(
-    iface: &NetworkInterfaceRef,
+    iface: &Arc<NetworkInterface>,
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
@@ -134,7 +121,7 @@ pub fn download_listing(
 /// and downloads the diff file in the given update build,
 /// which dictates which crates should be swapped.
 pub fn download_diff(
-    iface: &NetworkInterfaceRef,
+    iface: &Arc<NetworkInterface>,
     remote_endpoint: IpEndpoint,
     update_build: &str,
 ) -> Result<Vec<String>, &'static str> {
@@ -144,7 +131,7 @@ pub fn download_diff(
 
 /// Convenience function for downloading files and returning their contents as Strings per line. 
 fn download_string_file(
-    iface: &NetworkInterfaceRef,
+    iface: &Arc<NetworkInterface>,
     remote_endpoint: IpEndpoint,
     file_path: &str,
 ) -> Result<Vec<String>, &'static str> {
@@ -241,7 +228,7 @@ pub fn parse_diff_lines(diffs: &Vec<String>) -> Result<Diff, &'static str> {
 /// 
 /// Returns the list of crate object files (as `DownloadedFile`s) in the given `update_build`.
 pub fn download_crates(
-    iface: &NetworkInterfaceRef, 
+    iface: &Arc<NetworkInterface>, 
     remote_endpoint: IpEndpoint,
     update_build: &str,
     crates: BTreeSet<String>,
@@ -296,7 +283,7 @@ pub fn download_crates(
 
 /// A convenience function for downloading just one file. See `download_files()`.
 fn download_file<S: AsRef<str>>(
-    iface: &NetworkInterfaceRef,
+    iface: &Arc<NetworkInterface>,
     remote_endpoint: IpEndpoint, 
     absolute_path: S,
 ) -> Result<DownloadedFile, &'static str> {
@@ -314,7 +301,7 @@ fn download_file<S: AsRef<str>>(
 /// Returns an error if any of the given `absolute_paths` didn't exist, 
 /// or if there was any other error on the remote server.
 fn download_files<S: AsRef<str>>(
-    iface: &NetworkInterfaceRef,
+    iface: &Arc<NetworkInterface>,
     remote_endpoint: IpEndpoint,
     absolute_paths: Vec<S>,
 ) -> Result<Vec<DownloadedFile>, &'static str> {
@@ -322,20 +309,10 @@ fn download_files<S: AsRef<str>>(
         return Err("no download paths given");
     }
 
-    let startup_time = hpet_ticks!();
-    let mut rng = SmallRng::seed_from_u64(startup_time);
-    let rng_upper_bound = u16::max_value() - STARTING_FREE_PORT;
+    let local_port = net::get_ephemeral_port();
 
-    // the below items may be overwritten on each loop iteration, if the socket was closed and we need to create a new one
-    let mut local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
-    let mut tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    let mut tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-    let mut tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-    let mut sockets = SocketSet::new(Vec::with_capacity(1));
-    let mut tcp_handle = sockets.add(tcp_socket);
+    let mut http_client = HttpClient::new(iface, local_port, remote_endpoint).map_err(|_| "failed to create http client")?;
 
-    // first, attempt to connect the socket to the remote server
-    connect(iface, &mut sockets, tcp_handle, remote_endpoint, local_port, startup_time)?;
     debug!("ota_update_client: socket connected successfully!");
 
     // iterate over the provided list of file paths, and retrieve each one via HTTP
@@ -363,34 +340,8 @@ fn download_files<S: AsRef<str>>(
             return Err("ota_update_client: created improper/incomplete HTTP request");
         }
 
-        // Check that the socket is still connected. If not, we need to create a new one and connect it before use. 
-        // if !is_connected(&mut sockets, tcp_handle) {
-        // for now, we just always close the old socket and connect a new one
-        {
-            debug!("ota_update_client: remote endpoint closed socket after response, opening a new socket.");
-            // first, close the existing socket
-            {
-                let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-                socket.close(); 
-                socket.abort(); 
-            }
-            let _packet_io_occurred = poll_iface(iface, &mut sockets, startup_time)?;
-            
-            // second, create an entirely new socket and connect it
-            local_port = STARTING_FREE_PORT + (rng.next_u32() as u16 % rng_upper_bound);
-            tcp_rx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-            tcp_tx_buffer = TcpSocketBuffer::new(vec![0; 4096]);
-            tcp_socket = TcpSocket::new(tcp_rx_buffer, tcp_tx_buffer);
-            sockets = SocketSet::new(Vec::with_capacity(1));
-            tcp_handle = sockets.add(tcp_socket);
-            connect(iface, &mut sockets, tcp_handle, remote_endpoint, local_port, startup_time)?;
-        }
-
         // send the HTTP request and obtain a response
-        let response = {
-            let mut connected_tcp_socket = ConnectedTcpSocket::new(iface, &mut sockets, tcp_handle)?;
-            send_request(http_request, &mut connected_tcp_socket, Some(HTTP_REQUEST_TIMEOUT_MILLIS))?
-        };
+        let response = http_client.send(http_request, Some(HTTP_REQUEST_TIMEOUT))?;
 
         if response.status_code != 200 {
             error!("ota_update_client: failed to download {:?}, Error {}: {}", path, response.status_code, response.reason);
@@ -404,40 +355,18 @@ fn download_files<S: AsRef<str>>(
     }
 
 
-    let mut _loop_ctr = 0;
-    let mut issued_close = false;
-    let timeout_millis = 3000; // 3 second timeout
-    let start = hpet_ticks!();
+    let timeout = Duration::from_secs(3);
+    let start = Instant::now();
     loop {
-        _loop_ctr += 1;
-
-        let _packet_io_occurred = poll_iface(iface, &mut sockets, startup_time)?;
-
-        let mut socket = sockets.get::<TcpSocket>(tcp_handle);
-        if !issued_close {
-            debug!("ota_update_client: socket state is {:?}", socket.state());
-
-            debug!("ota_update_client: closing socket...");
-            socket.close();
-            debug!("ota_update_client: socket state (after close) is now {:?}", socket.state());
-            issued_close = true;
-        }
-
-        if socket.state() == TcpState::Closed {
+        if http_client.is_closed() {
             break;
         }
 
-        if _loop_ctr % 50000 == 0 {
-            debug!("ota_update_client: socket state (looping) is now {:?}", socket.state());
-        }
-
         // check to make sure we haven't timed out
-        if millis_since(start)? > timeout_millis {
+        if start.elapsed() >= timeout {
             debug!("ota_update_client: timed out waiting to close socket, closing it manually with an abort.");
-            socket.abort();
-            // Don't break out of the loop here!  we need to let this socket actually send the close msg
-            // to the remote endpoint, which requires another call to poll_iface (which will happen at the top of the loop).
-            // Then, the socket will be in the Closed state, and that conditional above will break out of the loop. 
+            http_client.abort()?;
+            break;
         }
     }
 

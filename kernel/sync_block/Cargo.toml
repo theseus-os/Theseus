@@ -13,3 +13,6 @@ sync = { path = "../../libs/sync" }
 task = { path = "../task" }
 sync_spin = { path = "../../libs/sync_spin" }
 wait_queue = { path = "../wait_queue" }
+
+[features]
+std-api = []

@@ -13,7 +13,6 @@ extern crate xmas_elf;
 extern crate goblin;
 extern crate memory;
 extern crate fs_node;
-extern crate owning_ref;
 extern crate crate_metadata;
 extern crate mod_mgmt;
 extern crate hashbrown;
@@ -29,8 +28,7 @@ use alloc::{
     sync::Arc,
 };
 use fs_node::WeakFileRef;
-use owning_ref::ArcRef;
-use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags};
+use memory::{MappedPages, VirtualAddress, MmiRef, allocate_pages_by_bytes, PteFlags, BorrowedSliceMappedPages, Immutable};
 use xmas_elf::{
     ElfFile,
     sections::{SectionData, SectionData::Rela64, ShType},
@@ -803,9 +801,13 @@ impl DebugSymbols {
         let debug_sections_mp = Arc::new(debug_sections_mp);
 
         let create_debug_section_slice = |debug_sec: DebugSection| -> Result<DebugSectionSlice, &'static str> {
-            ArcRef::new(Arc::clone(&debug_sections_mp))
-                .try_map(|mp| mp.as_slice::<u8>(debug_sec.mp_offset, debug_sec.size))
-                .map(DebugSectionSlice)
+            BorrowedSliceMappedPages::from(
+                Arc::clone(&debug_sections_mp),
+                debug_sec.mp_offset,
+                debug_sec.size
+            )
+            .map_err(|(_mp, err_str)| err_str)
+            .map(DebugSectionSlice)
         };
 
         let loaded = DebugSections {
@@ -911,7 +913,7 @@ struct DebugSection {
 }
 
 /// A slice that contains the exact byte range of fully-linked debug section.
-struct DebugSectionSlice(ArcRef<MappedPages, [u8]>);
+struct DebugSectionSlice(BorrowedSliceMappedPages<u8, Immutable, Arc<MappedPages>>);
 
 
 

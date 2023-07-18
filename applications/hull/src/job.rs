@@ -1,15 +1,22 @@
 //! Shell job control.
 
+use core::fmt;
+
 use crate::{Error, Result};
-use alloc::vec::Vec;
-use task::{ExitValue, JoinableTaskRef, KillReason, RunState};
+use alloc::{string::String, vec::Vec};
+use task::{KillReason, TaskRef};
 
 /// A shell job consisting of multiple parts.
 ///
 /// E.g. `sleep 5 | sleep 10` is one job consisting of two job parts.
-#[derive(Debug)]
+///
+/// Backgrounded tasks (e.g. `sleep 1` in `sleep 1 & sleep 2`) are a separate
+/// job.
+#[derive(Debug, Default)]
 pub(crate) struct Job {
+    pub(crate) string: String,
     pub(crate) parts: Vec<JobPart>,
+    pub(crate) current: bool,
 }
 
 impl Job {
@@ -18,10 +25,11 @@ impl Job {
             part.task
                 .kill(KillReason::Requested)
                 .map_err(|_| Error::KillFailed)?;
-            part.state = State::Complete(130);
+            part.state = State::Done(130);
         }
         Ok(())
     }
+    #[allow(unused)]
     pub(crate) fn suspend(&mut self) {
         for part in self.parts.iter_mut() {
             part.task.suspend();
@@ -36,42 +44,17 @@ impl Job {
         }
     }
 
-    pub(crate) fn unblock(&mut self) -> Result<()> {
-        for part in self.parts.iter_mut() {
-            part.task.unblock().map_err(Error::UnblockFailed)?;
-            part.state = State::Running;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn update(&mut self) -> Option<isize> {
-        for part in self.parts.iter_mut() {
-            if part.state == State::Running && part.task.runstate() == RunState::Exited {
-                let exit_value = match part.task.join().unwrap() {
-                    ExitValue::Completed(status) => {
-                        match status.downcast_ref::<isize>() {
-                            Some(num) => *num,
-                            // FIXME: Document/decide on a number for when app doesn't
-                            // return isize.
-                            None => 210,
-                        }
-                    }
-                    ExitValue::Killed(reason) => match reason {
-                        // FIXME: Document/decide on a number. This is used by bash.
-                        KillReason::Requested => 130,
-                        KillReason::Panic(_) => 1,
-                        KillReason::Exception(num) => num.into(),
-                    },
-                };
-                part.state = State::Complete(exit_value);
-            }
-        }
-        self.exit_value()
-    }
-
     pub(crate) fn exit_value(&mut self) -> Option<isize> {
-        if let State::Complete(value) = self.parts.last()?.state {
-            Some(value)
+        if self
+            .parts
+            .iter()
+            .all(|part| matches!(part.state, State::Done(_)))
+        {
+            if let State::Done(value) = self.parts.last()?.state {
+                Some(value)
+            } else {
+                unreachable!("tried to get exit value of empty job: {self:?}");
+            }
         } else {
             None
         }
@@ -81,21 +64,32 @@ impl Job {
 #[derive(Debug)]
 pub(crate) struct JobPart {
     pub(crate) state: State,
-    pub(crate) task: JoinableTaskRef,
+    pub(crate) task: TaskRef,
 }
 
 #[derive(Debug)]
 pub(crate) enum State {
-    Complete(isize),
+    Done(isize),
+    #[allow(unused)]
     Suspended,
     Running,
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::Done(_) => "done",
+            Self::Suspended => "suspended",
+            Self::Running => "running",
+        })
+    }
 }
 
 impl core::cmp::PartialEq for State {
     fn eq(&self, other: &Self) -> bool {
         matches!(
             (self, other),
-            (State::Complete(_), State::Complete(_))
+            (State::Done(_), State::Done(_))
                 | (State::Suspended, State::Suspended)
                 | (State::Running, State::Running)
         )

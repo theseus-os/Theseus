@@ -64,13 +64,11 @@ const T_UNIT: &str = "nano sec";
 
 
 macro_rules! printlninfo {
-	($fmt:expr) => (println!(concat!("BM-INFO: ", $fmt)));
-	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-INFO: ", $fmt), $($arg)*));
+	($($arg:tt)*) => (println!("BM-INFO: {}", format_args!($($arg)*)));
 }
 
 macro_rules! printlnwarn {
-	($fmt:expr) => (println!(concat!("BM-WARN: ", $fmt)));
-	($fmt:expr, $($arg:tt)*) => (println!(concat!("BM-WARN: ", $fmt), $($arg)*));
+	($($arg:tt)*) => (println!("BM-WARN: {}", format_args!($($arg)*)));
 }
 
 

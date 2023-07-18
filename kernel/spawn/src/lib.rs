@@ -270,6 +270,7 @@ pub fn new_application_task_builder(
 /// 
 /// [tb]:  fn.new_task_builder.html
 /// [atb]: fn.new_application_task_builder.html
+#[must_use = "a `TaskBuilder` does nothing until `spawn()` is invoked on it"]
 pub struct TaskBuilder<F, A, R> {
     func: F,
     argument: A,

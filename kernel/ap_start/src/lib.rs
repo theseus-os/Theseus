@@ -10,7 +10,8 @@ use alloc::collections::BTreeMap;
 use core::sync::atomic::{AtomicBool, Ordering};
 use log::{error, info};
 use cpu::CpuId;
-use irq_safety::{enable_interrupts, MutexIrqSafe};
+use irq_safety::enable_interrupts;
+use sync_irq::IrqSafeMutex; 
 use memory::{VirtualAddress, get_kernel_mmi_ref};
 use stack::Stack;
 use no_drop::NoDrop;
@@ -28,7 +29,7 @@ pub static AP_READY_FLAG: AtomicBool = AtomicBool::new(false);
 
 /// Temporary storage for transferring allocated `Stack`s from 
 /// the main bootstrap processor (BSP) to the AP processor being booted in `kstart_ap()` below.
-static AP_STACKS: MutexIrqSafe<BTreeMap<u32, NoDrop<Stack>>> = MutexIrqSafe::new(BTreeMap::new());
+static AP_STACKS: IrqSafeMutex<BTreeMap<u32, NoDrop<Stack>>> = IrqSafeMutex::new(BTreeMap::new());
 
 /// Insert a new stack that was allocated for the AP with the given `cpu_id`.
 pub fn insert_ap_stack(cpu_id: u32, stack: Stack) {

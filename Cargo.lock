@@ -104,6 +104,7 @@ dependencies = [
  "scheduler",
  "spawn",
  "stack",
+ "sync_irq",
 ]
 
 [[package]]
@@ -114,7 +115,6 @@ dependencies = [
  "bit_field 0.7.0",
  "crossbeam-utils",
  "derive_more",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
@@ -122,6 +122,7 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
+ "sync_irq",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -135,8 +136,8 @@ dependencies = [
  "hashbrown",
  "lazy_static",
  "logger",
- "mutex_sleep",
  "stdio",
+ "sync_block",
  "task",
  "tty",
 ]
@@ -214,11 +215,11 @@ dependencies = [
  "libc",
  "memory",
  "miniz_oxide",
- "mutex_sleep",
  "object",
  "rustc-demangle",
  "spin 0.9.4",
  "stack_trace",
+ "sync_block",
  "theseus_std",
  "thread_local_macro",
 ]
@@ -395,6 +396,7 @@ dependencies = [
  "stack",
  "task",
  "task_fs",
+ "time",
  "tlb_shootdown",
  "tsc",
  "window_manager",
@@ -488,12 +490,12 @@ dependencies = [
  "core2",
  "hull",
  "io",
- "irq_safety",
  "log",
  "mod_mgmt",
  "path",
  "serial_port",
  "spawn",
+ "sync_irq",
  "task",
  "tty",
 ]
@@ -624,7 +626,7 @@ dependencies = [
  "arm_boards",
  "cortex-a",
  "derive_more",
- "irq_safety",
+ "sync_irq",
  "tock-registers",
 ]
 
@@ -780,7 +782,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "owning_ref",
  "rustc-demangle",
  "xmas-elf",
 ]
@@ -964,7 +965,6 @@ dependencies = [
  "deferred_interrupt_tasks",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -977,6 +977,7 @@ dependencies = [
  "nic_queues",
  "pci",
  "spin 0.9.4",
+ "sync_irq",
  "task",
  "volatile 0.2.7",
  "x86_64",
@@ -1035,7 +1036,6 @@ dependencies = [
 name = "ethernet_smoltcp_device"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "lazy_static",
  "log",
  "memory",
@@ -1043,6 +1043,7 @@ dependencies = [
  "network_manager",
  "nic_buffers",
  "smoltcp 0.5.0",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1155,9 +1156,9 @@ dependencies = [
  "app_io",
  "cpu",
  "early_printer",
- "irq_safety",
  "log",
  "memory",
+ "sync_irq",
  "task",
 ]
 
@@ -1415,11 +1416,11 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1462,7 +1463,7 @@ dependencies = [
  "hash32",
  "rustc_version 0.4.0",
  "spin 0.9.4",
- "stable_deref_trait 1.2.0",
+ "stable_deref_trait",
 ]
 
 [[package]]
@@ -1491,13 +1492,11 @@ dependencies = [
 name = "http_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "httparse",
  "log",
- "network_manager",
+ "net",
  "percent-encoding",
- "smoltcp 0.5.0",
- "smoltcp_helper",
+ "time",
 ]
 
 [[package]]
@@ -1514,12 +1513,16 @@ dependencies = [
  "core2",
  "embedded-hal",
  "hashbrown",
+ "log",
  "mod_mgmt",
  "nb 1.0.0",
  "noline",
  "path",
  "root",
+ "scheduler",
  "spawn",
+ "stdio",
+ "sync_block",
  "task",
  "tty",
 ]
@@ -1563,9 +1566,9 @@ dependencies = [
  "cpu",
  "gic",
  "ioapic",
- "irq_safety",
  "log",
  "memory",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1581,13 +1584,13 @@ dependencies = [
  "gdt",
  "gic",
  "interrupt_controller",
- "irq_safety",
  "kernel_config",
  "locked_idt",
  "log",
  "memory",
  "pic",
  "spin 0.9.4",
+ "sync_irq",
  "time",
  "tock-registers",
  "tss",
@@ -1633,10 +1636,10 @@ name = "iommu"
 version = "0.1.0"
 dependencies = [
  "bitflags",
- "irq_safety",
  "log",
  "memory",
  "spin 0.9.4",
+ "sync_irq",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -1644,11 +1647,9 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#39ef02580d199b32ac6336fc35ae73682b95bf89"
+source = "git+https://github.com/theseus-os/irq_safety#0e32fe775fdb93be1fc6f85b306d109aea5d920e"
 dependencies = [
- "owning_ref",
  "spin 0.9.4",
- "stable_deref_trait 1.1.1",
 ]
 
 [[package]]
@@ -1670,7 +1671,6 @@ dependencies = [
  "hpet",
  "intel_ethernet",
  "interrupts",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -1688,6 +1688,7 @@ dependencies = [
  "rand",
  "runqueue",
  "spin 0.9.4",
+ "sync_irq",
  "virtual_nic",
  "volatile 0.2.7",
  "zerocopy",
@@ -1791,7 +1792,7 @@ dependencies = [
  "root",
  "shapes",
  "text_display",
- "tsc",
+ "time",
  "window",
  "window_manager",
 ]
@@ -1851,15 +1852,15 @@ dependencies = [
 name = "lockable"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
 name = "locked_idt"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "sync_irq",
  "x86_64",
 ]
 
@@ -1877,9 +1878,9 @@ name = "logger"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
- "irq_safety",
  "log",
  "serial_port_basic",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1989,7 +1990,6 @@ dependencies = [
  "bitflags",
  "boot_info",
  "frame_allocator",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -2002,6 +2002,8 @@ dependencies = [
  "page_table_entry",
  "pte_flags",
  "spin 0.9.4",
+ "static_assertions",
+ "sync_irq",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -2090,7 +2092,6 @@ dependencies = [
 name = "mlx5"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "libm",
@@ -2103,6 +2104,7 @@ dependencies = [
  "nic_initialization",
  "pci",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -2261,7 +2263,6 @@ dependencies = [
  "hashbrown",
  "heap",
  "intrusive-collections",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
@@ -2270,17 +2271,7 @@ dependencies = [
  "slabmalloc_safe",
  "slabmalloc_unsafe",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "mutex_sleep"
-version = "0.1.0"
-dependencies = [
- "lockable",
- "log",
- "spin 0.9.4",
- "task",
- "wait_queue",
+ "sync_irq",
 ]
 
 [[package]]
@@ -2330,13 +2321,15 @@ name = "net"
 version = "0.1.0"
 dependencies = [
  "heapless",
- "irq_safety",
  "log",
- "mutex_sleep",
  "nic_buffers",
+ "rand",
+ "rand_chacha",
  "random",
  "smoltcp 0.8.1",
  "spin 0.9.4",
+ "sync_block",
+ "sync_irq",
 ]
 
 [[package]]
@@ -2498,34 +2491,22 @@ checksum = "da32515d9f6e6e489d7bc9d84c71b060db7247dc035bbe44eac88cf87486d8d5"
 name = "ota_update_client"
 version = "0.1.0"
 dependencies = [
- "hpet",
  "http_client",
  "httparse",
  "irq_safety",
  "itertools",
  "log",
- "network_manager",
+ "net",
  "percent-encoding",
- "rand",
  "sha3",
- "smoltcp 0.5.0",
- "smoltcp_helper",
  "spawn",
  "task",
+ "time",
 ]
 
 [[package]]
 name = "owned_borrowed_trait"
 version = "0.1.0"
-
-[[package]]
-name = "owning_ref"
-version = "0.4.1"
-source = "git+https://github.com/theseus-os/owning-ref-rs#0d2dcdcffd75b80157d0e72fb82593a8696a9c49"
-dependencies = [
- "spin 0.9.4",
- "stable_deref_trait 1.1.1",
-]
 
 [[package]]
 name = "page_allocator"
@@ -2678,25 +2659,9 @@ name = "ping"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "byteorder",
- "getopts",
- "hashbrown",
- "hpet",
- "log",
- "network_manager",
- "ota_update_client",
- "smoltcp 0.5.0",
- "smoltcp_helper",
- "upd",
-]
-
-[[package]]
-name = "ping_2"
-version = "0.1.0"
-dependencies = [
- "app_io",
  "getopts",
  "net",
+ "time",
 ]
 
 [[package]]
@@ -2760,7 +2725,6 @@ dependencies = [
  "apic",
  "bit_field 0.10.1",
  "cpu",
- "irq_safety",
  "lazy_static",
  "log",
  "memory",
@@ -2770,6 +2734,7 @@ dependencies = [
  "port_io",
  "raw-cpuid",
  "spin 0.9.4",
+ "sync_irq",
  "task",
  "x86_64",
 ]
@@ -3005,11 +2970,11 @@ name = "rendezvous"
 version = "0.1.0"
 dependencies = [
  "debugit",
- "irq_safety",
  "log",
  "scheduler",
  "spin 0.9.4",
  "sync",
+ "sync_irq",
  "sync_spin",
  "task",
  "wait_guard",
@@ -3349,10 +3314,10 @@ dependencies = [
  "core2",
  "deferred_interrupt_tasks",
  "interrupts",
- "irq_safety",
  "log",
  "serial_port_basic",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -3360,11 +3325,11 @@ name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
  "arm_boards",
- "irq_safety",
  "memory",
  "pl011",
  "port_io",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -3487,8 +3452,8 @@ name = "sleep"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
- "irq_safety",
  "lazy_static",
+ "sync_irq",
  "task",
  "time",
 ]
@@ -3574,14 +3539,6 @@ dependencies = [
 name = "spin"
 version = "0.9.8"
 source = "git+https://github.com/theseus-os/spin-rs#5c4470db034ad11f6cc7a8a5c400607c024e9392"
-
-[[package]]
-name = "stable_deref_trait"
-version = "1.1.1"
-source = "git+https://github.com/theseus-os/stable_deref_trait.git?branch=spin#e006c79280042e27c4f16c7d29633eb2273752ee"
-dependencies = [
- "spin 0.9.4",
-]
 
 [[package]]
 name = "stable_deref_trait"
@@ -3719,6 +3676,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync_irq"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "sync",
+]
+
+[[package]]
 name = "sync_preemption"
 version = "0.1.0"
 dependencies = [
@@ -3767,6 +3732,7 @@ dependencies = [
  "spin 0.9.4",
  "stack",
  "static_assertions",
+ "sync_irq",
  "task_struct",
  "waker_generic",
 ]
@@ -3802,13 +3768,13 @@ dependencies = [
  "cpu",
  "crossbeam-utils",
  "environment",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
  "mod_mgmt",
  "spin 0.9.4",
  "stack",
+ "sync_irq",
 ]
 
 [[package]]
@@ -3900,18 +3866,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_mutex_sleep"
-version = "0.1.0"
-dependencies = [
- "cpu",
- "log",
- "mutex_sleep",
- "scheduler",
- "spawn",
- "task",
-]
-
-[[package]]
 name = "test_panic"
 version = "0.1.0"
 dependencies = [
@@ -3961,9 +3915,9 @@ dependencies = [
  "app_io",
  "core2",
  "io",
- "irq_safety",
  "log",
  "serial_port",
+ "sync_irq",
  "task",
 ]
 
@@ -3975,6 +3929,18 @@ dependencies = [
  "core2",
  "log",
  "theseus_std",
+]
+
+[[package]]
+name = "test_sync_block"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "log",
+ "scheduler",
+ "spawn",
+ "sync_block",
+ "task",
 ]
 
 [[package]]
@@ -4070,7 +4036,6 @@ dependencies = [
  "mkdir",
  "ns",
  "ping",
- "ping_2",
  "pmu_sample_start",
  "pmu_sample_stop",
  "print_fault_log",
@@ -4093,13 +4058,13 @@ dependencies = [
  "test_ixgbe",
  "test_libc",
  "test_mlx5",
- "test_mutex_sleep",
  "test_panic",
  "test_priority_scheduler",
  "test_restartable",
  "test_scheduler",
  "test_serial_echo",
  "test_std_fs",
+ "test_sync_block",
  "test_task_cancel",
  "test_thread_local",
  "test_wait_queue",
@@ -4171,6 +4136,7 @@ dependencies = [
  "memory",
  "memory_aarch64",
  "memory_x86_64",
+ "sync_irq",
 ]
 
 [[package]]
@@ -4209,6 +4175,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "pit_clock_basic",
+ "time",
 ]
 
 [[package]]
@@ -4229,7 +4196,7 @@ version = "0.1.0"
 dependencies = [
  "async_channel",
  "core2",
- "mutex_sleep",
+ "sync_block",
 ]
 
 [[package]]
@@ -4315,10 +4282,9 @@ dependencies = [
  "memfs",
  "memory",
  "mod_mgmt",
- "network_manager",
+ "net",
  "ota_update_client",
  "path",
- "smoltcp 0.5.0",
  "spin 0.9.4",
  "task",
  "vfs_node",
@@ -4364,11 +4330,11 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "irq_safety",
  "network_interface_card",
  "nic_buffers",
  "nic_queues",
  "physical_nic",
+ "sync_irq",
 ]
 
 [[package]]
@@ -4557,13 +4523,13 @@ dependencies = [
  "lazy_static",
  "libc",
  "log",
- "mutex_sleep",
  "object",
  "paste",
  "psm",
  "region",
  "rustc-demangle",
  "serde",
+ "sync_block",
  "target-lexicon",
  "theseus_std",
  "wasmparser",
@@ -4638,11 +4604,11 @@ dependencies = [
  "memoffset 0.6.5",
  "memory",
  "more-asserts",
- "mutex_sleep",
  "rand",
  "region",
  "signal_handler",
  "spin 0.9.4",
+ "sync_block",
  "task",
  "theseus_std",
  "thiserror_core2",

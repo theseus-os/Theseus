@@ -2,7 +2,7 @@
 
 #![no_std]
 
-use irq_safety::{MutexIrqSafe, MutexIrqSafeGuard};
+use sync_irq::{IrqSafeMutex, IrqSafeMutexGuard};
 use x86_64::structures::idt::InterruptDescriptorTable;
 
 /// A thread-safe and interrupt-safe wrapper around [`InterruptDescriptorTable`]. 
@@ -11,13 +11,13 @@ use x86_64::structures::idt::InterruptDescriptorTable;
 /// but preserves safety by guaranteeing that only a static object can be loaded.
 #[derive(Debug)]
 pub struct LockedIdt {
-    idt: MutexIrqSafe<InterruptDescriptorTable>,
+    idt: IrqSafeMutex<InterruptDescriptorTable>,
 }
 impl LockedIdt {
     /// Creates a new IDT filled with non-present entries.
     pub const fn new() -> LockedIdt {
         LockedIdt {
-            idt: MutexIrqSafe::new(InterruptDescriptorTable::new()),
+            idt: IrqSafeMutex::new(InterruptDescriptorTable::new()),
         }
     }
 
@@ -33,7 +33,7 @@ impl LockedIdt {
     /// at which point they are re-enabled iff they were previously enabled
     /// when this function was invoked. 
     /// and the lock will be dropped when the guard falls out of scope.
-    pub fn lock(&self) -> MutexIrqSafeGuard<InterruptDescriptorTable> {
+    pub fn lock(&self) -> IrqSafeMutexGuard<InterruptDescriptorTable> {
         self.idt.lock()
     }
 }

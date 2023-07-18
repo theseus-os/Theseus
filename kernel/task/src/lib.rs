@@ -46,13 +46,14 @@ use core::{
 };
 use cpu::CpuId;
 use crossbeam_utils::atomic::AtomicCell;
-use irq_safety::{hold_interrupts, MutexIrqSafe};
+use irq_safety::hold_interrupts;
 use log::error;
 use environment::Environment;
 use memory::MmiRef;
 use no_drop::NoDrop;
 use cpu_local_preemption::PreemptionGuard;
 use spin::Mutex;
+use sync_irq::IrqSafeMutex;
 use stack::Stack;
 use task_struct::ExposedTask;
 
@@ -67,7 +68,7 @@ pub use task_struct::SimdExt;
 
 
 /// The list of all Tasks in the system.
-static TASKLIST: MutexIrqSafe<BTreeMap<usize, TaskRef>> = MutexIrqSafe::new(BTreeMap::new());
+static TASKLIST: IrqSafeMutex<BTreeMap<usize, TaskRef>> = IrqSafeMutex::new(BTreeMap::new());
 
 /// Returns a `WeakTaskRef` (shared reference) to the `Task` specified by the given `task_id`.
 pub fn get_task(task_id: usize) -> Option<WeakTaskRef> {

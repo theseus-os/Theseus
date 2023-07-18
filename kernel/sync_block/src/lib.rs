@@ -9,6 +9,9 @@ use wait_queue::WaitQueue;
 
 pub use condvar::Condvar;
 
+#[cfg(feature = "std-api")]
+pub mod std_api;
+
 pub type Mutex<T> = sync::Mutex<T, Block>;
 pub type MutexGuard<'a, T> = sync::MutexGuard<'a, T, Block>;
 
@@ -89,18 +92,28 @@ impl MutexFlavor for Block {
             // Holder is either no longer running, or has released the lock.
             // Either way we will try the fast path one more time before moving
             // onto the slow path.
+
+            if let Some(guards) = Self::try_lock(mutex, data) {
+                return guards;
+            }
+
+            // Slow path
+            #[cfg(priority_inheritance)]
+            let _priority_guard = scheduler::inherit_priority(&holder_task);
+
+            data.queue.wait_until(|| Self::try_lock(mutex, data))
         } else {
             // Unlikely case that another thread just acquired the lock, but hasn't yet set
             // data.holder.
             log::warn!("could not get holder task for mutex middle path");
-        }
 
-        if let Some(guards) = Self::try_lock(mutex, data) {
-            return guards;
-        }
+            if let Some(guards) = Self::try_lock(mutex, data) {
+                return guards;
+            }
 
-        // Slow path
-        data.queue.wait_until(|| Self::try_lock(mutex, data))
+            // Slow path
+            data.queue.wait_until(|| Self::try_lock(mutex, data))
+        }
     }
 
     #[inline]

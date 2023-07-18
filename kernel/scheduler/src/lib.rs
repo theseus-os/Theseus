@@ -125,3 +125,7 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
         None
     }
 }
+
+pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
+    scheduler::inherit_priority(task)
+}

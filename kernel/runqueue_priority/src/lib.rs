@@ -5,6 +5,7 @@
 //! a `TaskRef` representing an underlying task and as well as a `period` value.
 
 #![no_std]
+#![feature(let_chains)]
 
 extern crate alloc;
 
@@ -258,5 +259,63 @@ pub fn set_priority(task: &TaskRef, priority: u8) {
         if run_queue.write().set_priority(task, priority) {
             break;
         }
+    }
+}
+
+/// Lowers the task's priority to its previous value when dropped.
+pub struct PriorityInheritanceGuard<'a> {
+    inner: Option<(&'a TaskRef, u8)>,
+}
+
+impl<'a> Drop for PriorityInheritanceGuard<'a> {
+    fn drop(&mut self) {
+        if let Some((task, priority)) = self.inner {
+            set_priority(task, priority)
+        }
+    }
+}
+
+/// Modifies the given task's priority to be the maximum of its priority and the
+/// current task's priority.
+///
+/// Returns a guard which reverts the change when dropped.
+pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
+    let current_task = task::get_my_current_task().unwrap();
+
+    let mut current_priority = None;
+    let mut other_priority = None;
+
+    'outer: for (core, run_queue) in RUNQUEUES.iter() {
+        for epoch_task in run_queue.read().iter() {
+            if epoch_task.task == current_task {
+                current_priority = Some(epoch_task.priority);
+                if other_priority.is_some() {
+                    break 'outer;
+                }
+            } else if &epoch_task.task == task {
+                other_priority = Some((core, epoch_task.priority));
+                if current_priority.is_some() {
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    if let (Some(current_priority), Some((core, other_priority))) =
+        (current_priority, other_priority) && current_priority > other_priority
+    {
+        // NOTE: This assumes no task migration.
+        debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task, current_priority));
+    }
+
+    PriorityInheritanceGuard {
+        inner: if let (Some(current_priority), Some((_, other_priority))) =
+            (current_priority, other_priority)
+            && current_priority > other_priority
+        {
+            Some((task, other_priority))
+        } else {
+            None
+        },
     }
 }

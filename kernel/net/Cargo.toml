@@ -6,12 +6,14 @@ edition = "2021"
 
 [dependencies]
 heapless = "0.7.8"
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 log = "0.4.8"
-mutex_sleep = { path = "../mutex_sleep" }
 nic_buffers = { path = "../nic_buffers" }
+rand = { version = "0.8.5", default-features = false }
 random = { path = "../random" }
+rand_chacha = { version = "0.3.1", default-features = false }
 spin = "0.9"
+sync_block = { path = "../sync_block" }
+sync_irq = { path = "../../libs/sync_irq" }
 
 [dependencies.smoltcp]
 # TODO: move to patch in root Cargo.toml after removing legacy net interface

@@ -1,9 +1,0 @@
-[package]
-name = "ping_2"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-app_io = { path = "../../kernel/app_io" }
-getopts = "0.2.21"
-net = { path = "../../kernel/net" }

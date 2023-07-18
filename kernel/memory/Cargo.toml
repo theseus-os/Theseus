@@ -13,6 +13,7 @@ bit_field = "0.7.0"
 zerocopy = "0.5.0"
 log = "0.4.8"
 lazy_static = { features = ["spin_no_std"], version = "1.4.0" }
+static_assertions = "1.1.0"
 
 atomic_linked_list = { path = "../../libs/atomic_linked_list" }
 boot_info = { path = "../boot_info" }
@@ -24,8 +25,7 @@ page_allocator = { path = "../page_allocator" }
 frame_allocator = { path = "../frame_allocator" }
 no_drop = { path = "../no_drop" }
 owned_borrowed_trait = { path = "../../libs/owned_borrowed_trait" }
-
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync_irq = { path = "../../libs/sync_irq" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"

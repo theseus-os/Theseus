@@ -67,7 +67,7 @@ extern crate msr;
 extern crate raw_cpuid;
 extern crate task;
 extern crate memory;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate alloc;
 extern crate apic;
 extern crate cpu;
@@ -79,7 +79,7 @@ use msr::*;
 use x86_64::{VirtAddr, registers::model_specific::Msr, structures::idt::InterruptStackFrame};
 use raw_cpuid::CpuId as X86CpuIdInstr;
 use spin::Once;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use alloc::{
     collections::{BTreeMap, BTreeSet},
     string::{String, ToString},
@@ -148,9 +148,9 @@ lazy_static! {
 }
 
 /// Set to store the cores that the PMU has already been initialized on
-static CORES_INITIALIZED: MutexIrqSafe<BTreeSet<u8>> = MutexIrqSafe::new(BTreeSet::new());
+static CORES_INITIALIZED: IrqSafeMutex<BTreeSet<u8>> = IrqSafeMutex::new(BTreeSet::new());
 /// The sampling information for each core
-static SAMPLING_INFO: MutexIrqSafe<BTreeMap<u8, SampledEvents>> =  MutexIrqSafe::new(BTreeMap::new());
+static SAMPLING_INFO: IrqSafeMutex<BTreeMap<u8, SampledEvents>> =  IrqSafeMutex::new(BTreeMap::new());
 
 /// Used to select the event type to count. Event types are described in the Intel SDM 18.2.1 for PMU Version 1.
 /// The discriminant value for each event type is the value written to the event select register for a general purpose PMC.

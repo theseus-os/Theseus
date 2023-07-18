@@ -13,7 +13,7 @@ use tock_registers::registers::InMemoryRegister;
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use gic::{ArmGic, IpiTargetCpu, Version as GicVersion, SpiDestination};
 use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
-use irq_safety::{RwLockIrqSafe, MutexIrqSafe};
+use sync_irq::{IrqSafeRwLock, IrqSafeMutex};
 use memory::get_kernel_mmi_ref;
 use log::{info, error};
 use spin::Once;
@@ -26,7 +26,7 @@ pub use gic::InterruptNumber;
 global_asm!(include_str!("table.s"));
 
 // The global Generic Interrupt Controller singleton
-static INTERRUPT_CONTROLLER: MutexIrqSafe<Option<ArmGic>> = MutexIrqSafe::new(None);
+static INTERRUPT_CONTROLLER: IrqSafeMutex<Option<ArmGic>> = IrqSafeMutex::new(None);
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
@@ -53,7 +53,7 @@ const MAX_IRQ_NUM: usize = 256;
 // it's an array of function pointers which are meant to handle IRQs.
 // Synchronous Exceptions (including syscalls) are not IRQs on aarch64;
 // this crate doesn't expose any way to handle them at the moment.
-static IRQ_HANDLERS: RwLockIrqSafe<[InterruptHandler; MAX_IRQ_NUM]> = RwLockIrqSafe::new([default_irq_handler; MAX_IRQ_NUM]);
+static IRQ_HANDLERS: IrqSafeRwLock<[InterruptHandler; MAX_IRQ_NUM]> = IrqSafeRwLock::new([default_irq_handler; MAX_IRQ_NUM]);
 
 /// The Saved Program Status Register at the time of the exception.
 #[repr(transparent)]

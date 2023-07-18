@@ -87,8 +87,11 @@ pub fn init(
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
     #[cfg(target_arch = "x86_64")]
-    let _tsc_freq = tsc::get_tsc_frequency()?;
-    // info!("TSC frequency calculated: {}", _tsc_freq);
+    if let Some(period) = tsc::get_tsc_period() {
+        time::register_clock_source::<tsc::Tsc>(period);
+    } else {
+        log::warn!("Couldn't get TSC period");
+    }
 
     // now we initialize early driver stuff, like APIC/ACPI
     // arch-gate: device_manager currently detects PCI & PS2 devices,
@@ -175,14 +178,17 @@ pub fn init(
 
     // arch-gate: no windowing/input support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
-    let (key_producer, mouse_producer) = window_manager::init()?;
+    match window_manager::init() {
+        Ok((key_producer, mouse_producer)) => {
+            device_manager::init(key_producer, mouse_producer)?;
+        },
+        Err(error) => {
+            error!("Failed to init window manager (expected if using nographic): {error}");
+        }
+    }
 
-    device_manager::init(
-        #[cfg(target_arch = "x86_64")]
-        key_producer,
-        #[cfg(target_arch = "x86_64")]
-        mouse_producer,
-    )?;
+    #[cfg(target_arch = "aarch64")]
+    device_manager::init()?;
 
     task_fs::init()?;
 

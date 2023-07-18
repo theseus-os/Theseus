@@ -11,7 +11,7 @@ extern crate volatile;
 extern crate zerocopy;
 extern crate alloc;
 extern crate spin;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
@@ -33,7 +33,7 @@ use regs::*;
 
 use spin::Once; 
 use alloc::{collections::VecDeque, format, sync::Arc, vec::Vec};
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use memory::{PhysicalAddress, BorrowedMappedPages, BorrowedSliceMappedPages, Mutable, map_frame_range, MMIO_FLAGS};
 use pci::{PciDevice, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
@@ -63,11 +63,11 @@ const INT_RX:               u32 = 0x80;
 /// The single instance of the E1000 NIC.
 /// TODO: in the future, we should support multiple NICs all stored elsewhere,
 /// e.g., on the PCI bus or somewhere else.
-static E1000_NIC: Once<MutexIrqSafe<E1000Nic>> = Once::new();
+static E1000_NIC: Once<IrqSafeMutex<E1000Nic>> = Once::new();
 
-/// Returns a reference to the E1000Nic wrapped in a MutexIrqSafe,
+/// Returns a reference to the E1000Nic wrapped in a IrqSafeMutex,
 /// if it exists and has been initialized.
-pub fn get_e1000_nic() -> Option<&'static MutexIrqSafe<E1000Nic>> {
+pub fn get_e1000_nic() -> Option<&'static IrqSafeMutex<E1000Nic>> {
     E1000_NIC.get()
 }
 
@@ -175,7 +175,7 @@ impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
     ///
     /// `enable_interrupts` must be called after the NIC has been registered with the `net` subsystem.
-    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static MutexIrqSafe<E1000Nic>, &'static str> {
+    pub fn init(e1000_pci_dev: &PciDevice) -> Result<&'static IrqSafeMutex<E1000Nic>, &'static str> {
         use interrupts::IRQ_BASE_OFFSET;
 
         //debug!("e1000_nc bar_type: {0}, mem_base: {1}, io_base: {2}", e1000_nc.bar_type, e1000_nc.mem_base, e1000_nc.io_base);
@@ -255,7 +255,7 @@ impl E1000Nic {
             deferred_task: None,
         };
         
-        let nic_ref = E1000_NIC.call_once(|| MutexIrqSafe::new(e1000_nic));
+        let nic_ref = E1000_NIC.call_once(|| IrqSafeMutex::new(e1000_nic));
         Ok(nic_ref)
     }
     

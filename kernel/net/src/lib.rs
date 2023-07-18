@@ -3,9 +3,9 @@
 extern crate alloc;
 
 use alloc::{sync::Arc, vec::Vec};
-use irq_safety::MutexIrqSafe;
 use smoltcp::wire::Ipv4Address;
 use spin::Mutex;
+use sync_irq::IrqSafeMutex;
 
 mod device;
 mod error;
@@ -19,9 +19,9 @@ pub use smoltcp::{
     phy,
     socket::{icmp, tcp, udp},
     time::Instant,
-    wire,
+    wire::{self, IpEndpoint},
 };
-pub use socket::Socket;
+pub use socket::{LockedSocket, Socket};
 
 /// A randomly chosen IP address that must be outside of the DHCP range.
 ///
@@ -41,7 +41,7 @@ static NETWORK_INTERFACES: Mutex<Vec<Arc<NetworkInterface>>> = Mutex::new(Vec::n
 ///
 /// The function will convert the device to an interface and it will then be
 /// accessible using [`get_interfaces()`].
-pub fn register_device<T>(device: &'static MutexIrqSafe<T>) -> Arc<NetworkInterface>
+pub fn register_device<T>(device: &'static IrqSafeMutex<T>) -> Arc<NetworkInterface>
 where
     T: 'static + NetworkDevice + Send,
 {
@@ -62,7 +62,23 @@ pub fn get_interfaces() -> &'static Mutex<Vec<Arc<NetworkInterface>>> {
     &NETWORK_INTERFACES
 }
 
-/// Gets the first available interface.
+/// Returns the first available interface.
 pub fn get_default_interface() -> Option<Arc<NetworkInterface>> {
     NETWORK_INTERFACES.lock().get(0).cloned()
+}
+
+/// Returns a port in the range reserved for private, dynamic, and ephemeral
+/// ports.
+pub fn get_ephemeral_port() -> u16 {
+    use rand::Rng;
+
+    const RANGE_START: u16 = 49152;
+    const RANGE_END: u16 = u16::MAX;
+
+    // TODO: Doesn't need to be random (especially cryptographically random) but
+    // reduces the likelihood of port clashes. Can remove randmoness after
+    // implementing some kind of tracking of used ports.
+
+    let mut rng = random::init_rng::<rand_chacha::ChaChaRng>().unwrap();
+    rng.gen_range(RANGE_START..=RANGE_END)
 }
