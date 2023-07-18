@@ -92,7 +92,7 @@ interrupt_handler!(timer_tick_handler, None, mut stack_frame, {
     if let Some(current_task) = task::get_my_current_task()  {
         if current_task.is_cancelled() {
             // Trigger a debug interrupt on the next instruction which will invoke task_cancel::interrupt_handler.
-            task_cancel::set_trap_flag(&mut stack_frame);
+            task_cancel::set_trap_flag(stack_frame);
         }
     }
 
