@@ -27,7 +27,8 @@ use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 pub enum MemoryState {
     Free,
     Allocated,
-    Mapped
+    Mapped,
+    Unmapped
 }
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
