@@ -81,7 +81,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn get_destination(
         &self,
         interrupt_num: InterruptNumber,
-    ) -> Result<(Vec<InterruptDestination>, Priority), &'static str> {
+    ) -> Result<(Vec<CpuId>, Priority), &'static str> {
         assert!(interrupt_num >= 32, "shared peripheral interrupts have a number >= 32");
         let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
         let int_ctlr = int_ctlr
@@ -90,18 +90,12 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
         let priority = int_ctlr.get_interrupt_priority(interrupt_num as _);
         let vec = match int_ctlr.get_spi_target(interrupt_num as _)?.canonicalize() {
-            SpiDestination::Specific(cpu) => [InterruptDestination {
-                cpu,
-            }].to_vec(),
-            SpiDestination::AnyCpuAvailable => BOARD_CONFIG.cpu_ids.map(|mpidr| InterruptDestination {
-                cpu: mpidr.into(),
-            }).to_vec(),
+            SpiDestination::Specific(cpu) => [cpu].to_vec(),
+            SpiDestination::AnyCpuAvailable => BOARD_CONFIG.cpu_ids.map(|mpidr| mpidr.into()).to_vec(),
             SpiDestination::GICv2TargetList(list) => {
                 let mut vec = Vec::with_capacity(8);
                 for result in list.iter() {
-                    vec.push(InterruptDestination {
-                        cpu: result?,
-                    });
+                    vec.push(result?);
                 }
                 vec
             }
@@ -113,7 +107,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: InterruptDestination,
+        destination: CpuId,
         priority: Priority,
     ) -> Result<(), &'static str> {
         assert!(sys_int_num >= 32, "shared peripheral interrupts have a number >= 32");
@@ -122,7 +116,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
             .as_mut()
             .expect("BUG: set_destination(): INTERRUPT_CONTROLLER was uninitialized");
 
-        int_ctlr.set_spi_target(sys_int_num as _, SpiDestination::Specific(destination.cpu));
+        int_ctlr.set_spi_target(sys_int_num as _, SpiDestination::Specific(destination));
         int_ctlr.set_interrupt_priority(sys_int_num as _, priority);
 
         Ok(())
@@ -188,16 +182,18 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         int_ctlr.set_interrupt_state(num as _, enabled);
     }
 
-    fn send_ipi(&self, num: InterruptNumber, dest: Option<CpuId>) {
+    fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
+        use InterruptDestination::*;
         assert!(num < 16, "IPIs have a number < 16");
+
         let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
         let int_ctlr = int_ctlr
             .as_mut()
             .expect("BUG: send_ipi(): INTERRUPT_CONTROLLER was uninitialized");
 
         int_ctlr.send_ipi(num as _, match dest {
-            Some(cpu) => IpiTargetCpu::Specific(cpu),
-            None => IpiTargetCpu::AllOtherCpus,
+            SpecificCpu(cpu) => IpiTargetCpu::Specific(cpu),
+            AllOtherCpus => IpiTargetCpu::AllOtherCpus,
         });
     }
 

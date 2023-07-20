@@ -14,7 +14,7 @@ pub struct LocalInterruptControllerId(pub u32);
 #[derive(Debug, Copy, Clone)]
 pub struct Priority;
 
-    /// Initializes the interrupt controller, on aarch64
+/// Initializes the interrupt controller, on aarch64
 pub fn init() -> Result<(), &'static str> { Ok(()) }
 
 /// Structure representing a top-level/system-wide interrupt controller chip,
@@ -44,7 +44,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn get_destination(
         &self,
         interrupt_num: InterruptNumber,
-    ) -> Result<(Vec<InterruptDestination>, Priority), &'static str> {
+    ) -> Result<(Vec<CpuId>, Priority), &'static str> {
         // no way to read the destination for an IRQ number in IoApic
         unimplemented!()
     }
@@ -52,7 +52,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: InterruptDestination,
+        destination: CpuId,
         priority: Priority,
     ) -> Result<(), &'static str> {
         let mut int_ctlr = get_ioapic(self.id).expect("BUG: set_destination(): get_ioapic() returned None");
@@ -60,7 +60,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         // no support for priority on x86_64
         let _ = priority;
 
-        int_ctlr.set_irq(sys_int_num, destination.cpu.into(), destination.local_number)
+        int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num /* <- is this correct? */)
     }
 }
 
@@ -94,12 +94,14 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         todo!()
     }
 
-    fn send_ipi(&self, num: InterruptNumber, dest: Option<CpuId>) {
+    fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
+        use InterruptDestination::*;
+
         let mut int_ctlr = get_my_apic().expect("BUG: send_ipi(): get_my_apic() returned None");
         let mut int_ctlr = int_ctlr.write();
         int_ctlr.send_ipi(num, match dest {
-            Some(cpu) => LapicIpiDestination::One(cpu.into()),
-            None => LapicIpiDestination::AllButMe,
+            SpecificCpu(cpu) => LapicIpiDestination::One(cpu.into()),
+            AllOtherCpus => LapicIpiDestination::AllButMe,
         });
     }
 

@@ -10,8 +10,8 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use interrupt_controller::{
-    LocalInterruptController, SystemInterruptController,
-    InterruptDestination, LocalInterruptControllerApi, SystemInterruptControllerApi,
+    LocalInterruptController, SystemInterruptController, InterruptDestination,
+    LocalInterruptControllerApi, SystemInterruptControllerApi,
 };
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
@@ -210,9 +210,7 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
 /// Enables the PL011 "RX" SPI and routes it to the current CPU.
 pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
     let int_ctrl = SystemInterruptController;
-    int_ctrl.set_destination(PL011_RX_SPI, InterruptDestination {
-        cpu: current_cpu(),
-    }, u8::MAX)
+    int_ctrl.set_destination(PL011_RX_SPI, current_cpu(), u8::MAX)
 }
 
 /// Disables the timer, schedules its next tick, and re-enables it
@@ -298,7 +296,7 @@ pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) ->
 /// cores in the system
 pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
     let int_ctrl = LocalInterruptController;
-    int_ctrl.send_ipi(irq_num, None);
+    int_ctrl.send_ipi(irq_num, InterruptDestination::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that

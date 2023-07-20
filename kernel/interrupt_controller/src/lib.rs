@@ -32,10 +32,9 @@ pub type InterruptNumber = u8;
 /// On aarch64, there is no `local_number` field as the system interrupt
 /// number and the local interrupt number must be the same.
 #[derive(Debug, Copy, Clone)]
-pub struct InterruptDestination {
-    pub cpu: CpuId,
-    #[cfg(target_arch = "x86_64")]
-    pub local_number: InterruptNumber,
+pub enum InterruptDestination {
+    SpecificCpu(CpuId),
+    AllOtherCpus,
 }
 
 pub trait SystemInterruptControllerApi {
@@ -45,12 +44,12 @@ pub trait SystemInterruptControllerApi {
     fn get_destination(
         &self,
         interrupt_num: InterruptNumber,
-    ) -> Result<(Vec<InterruptDestination>, Priority), &'static str>;
+    ) -> Result<(Vec<CpuId>, Priority), &'static str>;
 
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: InterruptDestination,
+        destination: CpuId,
         priority: Priority,
     ) -> Result<(), &'static str>;
 }
@@ -73,7 +72,7 @@ pub trait LocalInterruptControllerApi {
     ///
     /// If `dest` is Some, the interrupt is sent to a specific CPU.
     /// If it's None, all CPUs except the sender receive the interrupt.
-    fn send_ipi(&self, num: InterruptNumber, dest: Option<CpuId>);
+    fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination);
 
     /// Reads the minimum priority for an interrupt to reach this CPU.
     ///
