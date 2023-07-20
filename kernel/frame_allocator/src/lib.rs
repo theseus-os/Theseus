@@ -563,11 +563,6 @@ pub struct SplitFrames<const S: MemoryState>  {
     after_end:    Option<Frames<S>>,
 }
 
-impl<const S: MemoryState> SplitFrames<S> {
-    fn destucture(self) -> (Option<Frames<S>>, Frames<S>, Option<Frames<S>>) {
-        (self.before_start, self.start_to_end, self.after_end)
-    }
-}
 
 impl<const S: MemoryState> Frames<S> {
     #[allow(dead_code)]
@@ -627,32 +622,31 @@ impl<const S: MemoryState> Frames<S> {
     /// 3. The range of frames in the `self` that came after the end of the requested frame range.
     /// 
     /// If `frames` is not contained within `self`, then `self` is not changed and we return it within an Err.
-    pub fn extract_frames_with_range(
+    pub fn split_range(
         self,
-        frames: FrameRange
+        frames_to_extract: FrameRange
     ) -> Result<SplitFrames<S>, Self> {
-        let start_frame = *frames.start();
-        let num_frames = frames.size_in_frames();
-
-        if (start_frame < *self.start()) || (start_frame + (num_frames - 1) > *self.end()) || (num_frames == 0) {
+        
+        if !self.contains_range(&frames_to_extract) {
             return Err(self);
         }
-
-        let new_allocation = Frames{ frames, ..self };
+        
+        let start_frame = *frames_to_extract.start();
+        let start_to_end = Frames{ frames: frames_to_extract, ..self };
         let before_start = if start_frame == MIN_FRAME || start_frame == *self.start() {
             None
         } else {
-            Some(Frames{ frames: FrameRange::new(*self.start(), *new_allocation.start() - 1), ..self })
+            Some(Frames{ frames: FrameRange::new(*self.start(), *start_to_end.start() - 1), ..self })
         };
 
-        let after_end = if *new_allocation.end() == MAX_FRAME || *new_allocation.end() == *self.end(){
+        let after_end = if *start_to_end.end() == MAX_FRAME || *start_to_end.end() == *self.end(){
             None
         } else {
-            Some(Frames{ frames: FrameRange::new(*new_allocation.end() + 1, *self.end()), ..self })
+            Some(Frames{ frames: FrameRange::new(*start_to_end.end() + 1, *self.end()), ..self })
         };
 
         core::mem::forget(self);
-        Ok(SplitFrames{ before_start, start_to_end: new_allocation, after_end})
+        Ok(SplitFrames{ before_start, start_to_end, after_end})
     }
 
     /// Splits this `Frames` into two separate `Frames` objects:
@@ -986,16 +980,15 @@ fn allocate_from_chosen_chunk(
         chosen_chunk.merge(chunk).expect("BUG: Failed to merge adjacent chunks");
     }
 
-    let ( before, new_allocation, after) = chosen_chunk.extract_frames_with_range(frames_to_allocate)
-        .expect("BUG: Failed to split merged chunk")
-        .destucture();
+    let SplitFrames{ before_start, start_to_end: new_allocation, after_end } = chosen_chunk.split_range(frames_to_allocate)
+        .expect("BUG: Failed to split merged chunk");
 
     // TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
     // if let RemovedValue::RBTree(Some(wrapper_adapter)) = _removed_chunk { ... }
 
     Ok((
         new_allocation.into_allocated_frames(),
-        DeferredAllocAction::new(before, after),
+        DeferredAllocAction::new(before_start, after_end),
     ))
 
 }
@@ -1033,146 +1026,65 @@ fn contains_any(
     false
 }
 
-trait IntoFrameRange {
-    fn into_frame_range(&self) -> FrameRange;
-}
-
-// /// Returns `true` if the given list contains *any* of the given `frames`.
-// fn contains_any_generic<T: Ord + IntoFrameRange> (
-//     list: &StaticArrayRBTree<T>,
-//     frames: &FrameRange,
-// ) -> bool {
-//     match &list.0 {
-//         Inner::Array(ref arr) => {
-//             for chunk in arr.iter().flatten() {
-//                 if chunk.into_frame_range().overlap(frames).is_some() {
-//                     return true;
-//                 }
-//             }
-//         }
-//         Inner::RBTree(ref tree) => {
-//             let mut cursor = tree.upper_bound(Bound::Included(frames.start()));
-//             while let Some(chunk) = cursor.get() {
-//                 if chunk.into_frame_range().start() > frames.end() {
-//                     // We're iterating in ascending order over a sorted tree, so we can stop
-//                     // looking for overlapping regions once we pass the end of `frames`.
-//                     break;
-//                 }
-
-//                 if chunk.into_frame_range().overlap(frames).is_some() {
-//                     return true;
-//                 }
-//                 cursor.move_next();
-//             }
-//         }
-//     }
-//     false
-// }
-
-
-/// Adds the given `frames` to the given `list` as a Chunk of reserved frames. 
+/// Adds the given `frames` to the given `regions_list` and `frames_list` as a Chunk of reserved frames. 
 /// 
-/// Returns the range of **new** frames that were added to the list, 
+/// Returns the range of **new** frames that were added to the lists, 
 /// which will be a subset of the given input `frames`.
 ///
 /// Currently, this function adds no new frames at all if any frames within the given `frames` list
 /// overlap any existing regions at all. 
 /// TODO: handle partially-overlapping regions by extending existing regions on either end.
-fn add_reserved_region_to_frames_list(
-    list: &mut StaticArrayRBTree<FreeFrames>,
+fn add_reserved_region_to_lists(
+    regions_list: &mut StaticArrayRBTree<PhysicalMemoryRegion>,
+    frames_list: &mut StaticArrayRBTree<FreeFrames>,
     frames: FrameRange,
 ) -> Result<FrameRange, &'static str> {
 
-    // Check whether the reserved region overlaps any existing regions.
-    match &mut list.0 {
-        Inner::Array(ref mut arr) => {
-            for chunk in arr.iter().flatten() {
-                if let Some(_overlap) = chunk.overlap(&frames) {
-                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                    //     frames, _overlap, chunk
-                    // );
-                    return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
+    if !contains_any(&regions_list, &frames){
+        // Check whether the reserved region overlaps any existing regions.
+        match &mut frames_list.0 {
+            Inner::Array(ref mut arr) => {
+                for chunk in arr.iter().flatten() {
+                    if let Some(_overlap) = chunk.overlap(&frames) {
+                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                        //     frames, _overlap, chunk
+                        // );
+                        return Err("Failed to add free franes that overlapped with existing frames (array).");
+                    }
+                }
+            }
+            Inner::RBTree(ref mut tree) => {
+                let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
+                while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
+                    if chunk.start() > frames.end() {
+                        // We're iterating in ascending order over a sorted tree,
+                        // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
+                        break;
+                    }
+                    if let Some(_overlap) = chunk.overlap(&frames) {
+                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                        //     frames, _overlap, chunk
+                        // );
+                        return Err("Failed to add free frames that overlapped with existing frames (RBTree).");
+                    }
+                    cursor_mut.move_next();
                 }
             }
         }
-        Inner::RBTree(ref mut tree) => {
-            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
-            while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-                if chunk.start() > frames.end() {
-                    // We're iterating in ascending order over a sorted tree,
-                    // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
-                    break;
-                }
-                if let Some(_overlap) = chunk.overlap(&frames) {
-                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                    //     frames, _overlap, chunk
-                    // );
-                    return Err("Failed to add reserved region that overlapped with existing reserved regions (RBTree).");
-                }
-                cursor_mut.move_next();
-            }
-        }
+        
+        regions_list.insert(PhysicalMemoryRegion {
+                typ: MemoryRegionType::Reserved,
+                frames: frames.clone(),
+        }).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+
+        frames_list.insert(Frames::new(
+            MemoryRegionType::Reserved,
+            frames.clone(),
+        )).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+    } else {
+        return Err("Failed to add reserved region that overlapped with existing reserved regions.");
     }
-
-    list.insert(Frames::new(
-        MemoryRegionType::Reserved,
-        frames.clone(),
-    )).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
-
-    Ok(frames)
-}
-
-/// Adds the given `frames` to the given `list` as a Region of reserved frames. 
-/// 
-/// Returns the range of **new** frames that were added to the list, 
-/// which will be a subset of the given input `frames`.
-///
-/// Currently, this function adds no new frames at all if any frames within the given `frames` list
-/// overlap any existing regions at all. 
-/// TODO: handle partially-overlapping regions by extending existing regions on either end.
-/// 
-/// TODO: combine both functions for adding reserved regions/ frames using a trait OR make one function which adds to both lists, since they are always called together.
-fn add_reserved_region_to_regions_list(
-    list: &mut StaticArrayRBTree<PhysicalMemoryRegion>,
-    frames: FrameRange,
-) -> Result<FrameRange, &'static str> {
-
-    // Check whether the reserved region overlaps any existing regions.
-    match &mut list.0 {
-        Inner::Array(ref mut arr) => {
-            for chunk in arr.iter().flatten() {
-                if let Some(_overlap) = chunk.overlap(&frames) {
-                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                    //     frames, _overlap, chunk
-                    // );
-                    return Err("Failed to add reserved region that overlapped with existing reserved regions (array).");
-                }
-            }
-        }
-        Inner::RBTree(ref mut tree) => {
-            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
-            while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-                if chunk.start() > frames.end() {
-                    // We're iterating in ascending order over a sorted tree,
-                    // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
-                    break;
-                }
-                if let Some(_overlap) = chunk.overlap(&frames) {
-                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                    //     frames, _overlap, chunk
-                    // );
-                    return Err("Failed to add reserved region that overlapped with existing reserved regions (RBTree).");
-                }
-                cursor_mut.move_next();
-            }
-        }
-    }
-
-    list.insert(PhysicalMemoryRegion {
-        typ: MemoryRegionType::Reserved,
-        frames: frames.clone(),
-    }).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
-
+    
     Ok(frames)
 }
 
@@ -1240,11 +1152,7 @@ pub fn allocate_frames_deferred(
         // but ONLY if those frames are *NOT* in the general-purpose region.
         let requested_frames = FrameRange::new(requested_start_frame, requested_start_frame + (requested_num_frames - 1));
         if !contains_any(&GENERAL_REGIONS.lock(), &requested_frames) {
-            let new_reserved_frames = add_reserved_region_to_regions_list(&mut RESERVED_REGIONS.lock(), requested_frames)?;
-            // If we successfully added a new reserved region,
-            // then add those frames to the actual list of *available* reserved regions.
-            let _new_free_reserved_frames = add_reserved_region_to_frames_list(&mut free_reserved_frames_list, new_reserved_frames.clone())?;
-            assert_eq!(new_reserved_frames, _new_free_reserved_frames);
+            let _new_reserved_frames = add_reserved_region_to_lists(&mut RESERVED_REGIONS.lock(), &mut free_reserved_frames_list, requested_frames)?;
             find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames)
         } 
         else {

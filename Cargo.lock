@@ -1183,7 +1183,7 @@ dependencies = [
 name = "frame_allocator"
 version = "0.1.0"
 dependencies = [
- "intrusive-collections",
+ "intrusive-collections 0.9.5",
  "kernel_config",
  "log",
  "memory_structs",
@@ -1603,6 +1603,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "intrusive-collections"
+version = "0.9.5"
+source = "git+https://github.com/Ramla-I/intrusive-rs#bfae69d5209c082b642a26e30c1345e5c50a1e88"
+dependencies = [
+ "memoffset 0.9.0",
+]
+
+[[package]]
 name = "io"
 version = "0.1.0"
 dependencies = [
@@ -1980,6 +1988,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a634b1c61a95585bd15607c6ab0c4e5b226e695ff2800ba0cdccddf208c406c"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "memory"
 version = "0.1.0"
 dependencies = [
@@ -2259,7 +2276,7 @@ dependencies = [
  "cfg-if 0.1.10",
  "hashbrown",
  "heap",
- "intrusive-collections",
+ "intrusive-collections 0.9.0",
  "irq_safety",
  "kernel_config",
  "log",
@@ -2530,7 +2547,7 @@ dependencies = [
 name = "page_allocator"
 version = "0.1.0"
 dependencies = [
- "intrusive-collections",
+ "intrusive-collections 0.9.0",
  "kernel_config",
  "log",
  "memory_structs",
