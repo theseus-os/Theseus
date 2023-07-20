@@ -44,7 +44,7 @@ where
     /// MAC address of the NIC
     mac_address: [u8; 6],
     /// Reference to the physical NIC that Rx/Tx queues will be returned to.
-    physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S, T, U, V>>
+    physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S, T, U, V> + Send>
 }
 
 impl<S, T, U, V> VirtualNic<S, T, U, V>
@@ -62,7 +62,7 @@ where
         tx_queues: Vec<TxQueue<U,V>>,
         default_tx_queue: usize, 
         mac_address: [u8; 6], 
-        physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S,T,U,V>>
+        physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S,T,U,V> + Send>
     ) -> Result<VirtualNic<S,T,U,V>, &'static str> {
 
         if rx_queues.is_empty() || tx_queues.is_empty() { 
