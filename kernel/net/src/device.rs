@@ -87,7 +87,7 @@ impl phy::RxToken for RxToken {
             .inner
             .0
             .first_mut()
-            .expect("received frame with spanning no buffers");
+            .expect("received frame spanning no buffers");
         f(slice)
     }
 }
@@ -102,8 +102,12 @@ impl<'a> phy::TxToken for TxToken<'a> {
     where
         F: FnOnce(&mut [u8]) -> R,
     {
-        // TODO: Explain error cases.
-        let mut transmit_buffer = TransmitBuffer::new(len as u16).unwrap();
+        // This will only fail if the underlying memory allocation fails.
+        //
+        // TODO: Arguably `TransmitBuffer::new` should panic instead, similar to other
+        // data structures (e.g. `Vec`).
+        let mut transmit_buffer =
+            TransmitBuffer::new(len as u16).expect("failed to allocate transmit buffer");
         let ret = f(&mut transmit_buffer);
         self.device.send(transmit_buffer);
         ret
