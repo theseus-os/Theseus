@@ -18,6 +18,7 @@ use core::{
     slice,
 };
 use log::{error, warn, debug, trace};
+use memory_structs::{PAGE_4KB_SIZE, PAGE_2MB_SIZE, PAGE_1GB_SIZE};
 use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
 use crate::paging::{
     get_current_p4,
@@ -205,7 +206,7 @@ impl Mapper {
 
         // Only the lowest-level P1 entry can be considered exclusive, and only when
         // we are mapping it exclusively (i.e., owned `AllocatedFrames` are passed in).
-        let actual_flags = flags
+        let mut actual_flags = flags
             .valid(true)
             .exclusive(Frames::OWNED);
 
@@ -218,19 +219,68 @@ impl Mapper {
             return Err("map_allocated_pages_to(): page count must equal frame count");
         }
 
-        // iterate over pages and frames in lockstep
-        for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
 
-            if !p1[page.p1_index()].is_unused() {
-                error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
-                return Err("map_allocated_pages_to(): page was already in use");
-            } 
+        match pages.page_size() {
+            PAGE_4KB_SIZE => {
+                // iterate over pages and frames in lockstep
+                for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
+                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+                    let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+                    let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
 
-            p1[page.p1_index()].set_entry(frame, actual_flags);
+                    if !p1[page.p1_index()].is_unused() {
+                        error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                        return Err("map_allocated_pages_to(): page was already in use");
+                    } 
+
+                    p1[page.p1_index()].set_entry(frame, actual_flags);
+                }
+            }
+            PAGE_2MB_SIZE => {
+                for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
+                    actual_flags = actual_flags.huge(true);
+                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+                    let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+
+                    if !p2[page.p2_index()].is_unused() {
+                        error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                        return Err("map_allocated_pages_to(): page was already in use");
+                    } 
+
+                    p2[page.p2_index()].set_entry(frame, actual_flags);
+                }
+            }
+            PAGE_1GB_SIZE => {
+                for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
+                    actual_flags = actual_flags.huge(true);
+                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+
+                    if !p3[page.p3_index()].is_unused() {
+                        error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                        return Err("map_allocated_pages_to(): page was already in use");
+                    } 
+
+                    p3[page.p3_index()].set_entry(frame, actual_flags);
+                }
+            }
+            _ => {
+                return Err("map_allocated_pages_to(): page has incorrect size");
+            }
         }
+
+        // // iterate over pages and frames in lockstep
+        // for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
+        //     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+        //     let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+        //     let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
+
+        //     if !p1[page.p1_index()].is_unused() {
+        //         error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+        //         return Err("map_allocated_pages_to(): page was already in use");
+        //     } 
+
+        //     p1[page.p1_index()].set_entry(frame, actual_flags);
+        // }
 
         Ok((
             MappedPages {
@@ -281,23 +331,70 @@ impl Mapper {
             .valid(true)
             .exclusive(true);
 
-        for page in pages.range().clone() {
-            let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+        match pages.page_size() {
+            PAGE_4KB_SIZE => {
+                for page in pages.range().clone() {
+                    let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+        
+                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+                    let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+                    let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
+        
+                    if !p1[page.p1_index()].is_unused() {
+                        error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
+                            page.start_address(), af.start_address()
+                        );
+                        return Err("map_allocated_pages(): page was already in use");
+                    } 
+        
+                    p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags);
+                    core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
+                }
+            }
+            PAGE_2MB_SIZE => {
+                for page in pages.range_2mb().iter().step_by(512) {
+                    // This is just one frame for now, as you can only use set_entry on a single frame
+                    //let af = frame_allocator::allocate_frames(512).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+                    let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
-            let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-            let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
-            let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
+                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+                    let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+                    trace!("Attempting to map to level 2 PTE: {:?}", p2[page.p2_index()].flags());
 
-            if !p1[page.p1_index()].is_unused() {
-                error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
-                    page.start_address(), af.start_address()
-                );
-                return Err("map_allocated_pages(): page was already in use");
-            } 
+                    if !p2[page.p2_index()].is_unused() {
+                        error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
+                            page.start_address(), af.start_address()
+                        );
+                        return Err("map_allocated_pages(): page was already in use");
+                    }
+        
+                    p2[page.p2_index()].set_entry(af.as_allocated_frame(), actual_flags);
+                    core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
+                }
+            }
+            PAGE_1GB_SIZE => {
+                for page in pages.range_1gb() {
+                    //let af = frame_allocator::allocate_frames(262114).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+                    let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
+                    trace!("Attempting to map to PTE: {:?}", p3[page.p3_index()].flags());
 
-            p1[page.p1_index()].set_entry(af.as_allocated_frame(), actual_flags);
-            core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
+                    if !p3[page.p1_index()].is_unused() {
+                        error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
+                            page.start_address(), af.start_address()
+                        );
+                        return Err("map_allocated_pages(): page was already in use");
+                    } 
+        
+                    p3[page.p3_index()].set_entry(af.as_allocated_frame(), actual_flags);
+                    core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
+                }
+            }
+            _ => {
+                return Err("map_allocated_pages(): page has incorrect size");
+            }
         }
+
 
         Ok(MappedPages {
             page_table_p4: self.target_p4,
@@ -537,17 +634,59 @@ impl MappedPages {
             return Ok(());
         }
 
-        for page in self.pages.range().clone() {
-            let p1 = active_table_mapper.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")?;
-            
-            p1[page.p1_index()].set_flags(new_flags);
+        match self.pages.page_size() {
+            PAGE_4KB_SIZE => {
+                for page in self.pages.range().clone() {
+                    let p1 = active_table_mapper.p4_mut()
+                        .next_table_mut(page.p4_index())
+                        .and_then(|p3| p3.next_table_mut(page.p3_index()))
+                        .and_then(|p2| p2.next_table_mut(page.p2_index()))
+                        .ok_or("mapping code does not support huge pages")?;
 
-            tlb_flush_virt_addr(page.start_address());
+                    p1[page.p1_index()].set_flags(new_flags);
+
+                    tlb_flush_virt_addr(page.start_address());
+                }
+            }
+            PAGE_2MB_SIZE => {
+                for page in self.pages.range_2mb().clone() {
+                    let p2 = active_table_mapper.p4_mut()
+                        .next_table_mut(page.p4_index())
+                        .and_then(|p3| p3.next_table_mut(page.p3_index()))
+                        .ok_or("mapping code does not support huge pages")?;
+
+                    //p1[page.p1_index()].set_flags(new_flags);
+                    p2[page.p2_index()].set_flags(new_flags);
+
+                    tlb_flush_virt_addr(page.start_address());
+                }
+            }
+            PAGE_1GB_SIZE => {
+                for page in self.pages.range_1gb().clone() {
+                    let p3 = active_table_mapper.p4_mut()
+                        .next_table_mut(page.p4_index())
+                        .ok_or("mapping code does not support huge pages")?;
+
+                    //p1[page.p1_index()].set_flags(new_flags);
+                    p3[page.p3_index()].set_flags(new_flags);
+
+                    tlb_flush_virt_addr(page.start_address());
+                }
+            }
+            _ => {}
         }
+
+        // for page in self.pages.range().clone() {
+        //     let p1 = active_table_mapper.p4_mut()
+        //         .next_table_mut(page.p4_index())
+        //         .and_then(|p3| p3.next_table_mut(page.p3_index()))
+        //         .and_then(|p2| p2.next_table_mut(page.p2_index()))
+        //         .ok_or("mapping code does not support huge pages")?;
+            
+        //     p1[page.p1_index()].set_flags(new_flags);
+
+        //     tlb_flush_virt_addr(page.start_address());
+        // }
         
         if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
             func(self.pages.range().clone());
@@ -1324,3 +1463,4 @@ impl Mutability for Mutable { }
 mod private {
     pub trait Sealed { }
 }
+

@@ -3824,6 +3824,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_huge_pages"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "memory",
+]
+
+[[package]]
 name = "test_ixgbe"
 version = "0.1.0"
 dependencies = [

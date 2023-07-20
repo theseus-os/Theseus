@@ -223,6 +223,12 @@ impl PteFlagsX86_64 {
         self.set(Self::DIRTY, enable);
         self
     }
+    
+    #[must_use]
+    pub fn huge(mut self, enable: bool) -> Self {
+        self.set(Self::HUGE_PAGE, enable);
+        self
+    }
 
     #[doc(alias("present"))]
     pub const fn is_valid(&self) -> bool {
