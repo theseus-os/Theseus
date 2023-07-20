@@ -14,7 +14,6 @@ rand_chacha = { version = "0.3.1", default-features = false }
 spin = "0.9"
 sync_block = { path = "../sync_block" }
 sync_irq = { path = "../../libs/sync_irq" }
-time = { path = "../time" }
 
 [dependencies.smoltcp]
 version = "0.10"
