@@ -1,4 +1,4 @@
-use core::any::Any;
+use alloc::vec;
 
 use log::error;
 use nic_buffers::{ReceivedFrame, TransmitBuffer};
@@ -18,7 +18,7 @@ const STANDARD_MTU: usize = 1500;
 ///
 /// [`register_device`]: crate::register_device
 /// [`NetworkInterface`]: crate::NetworkInterface.
-pub trait NetworkDevice: Send + Sync + Any {
+pub trait NetworkDevice: Send + Sync {
     /// Sends a buffer on the device.
     ///
     /// In the case of an error, the packet is dropped and the error is handled
@@ -108,23 +108,21 @@ impl<'a> phy::TxToken for TxToken<'a> {
         F: FnOnce(&mut [u8]) -> R,
     {
         match u16::try_from(len) {
-            Some(len) => {
+            Ok(len) => {
                 // This will only fail if the underlying memory allocation fails.
                 //
                 // TODO: Arguably `TransmitBuffer::new` should panic instead, similar to other
                 // data structures (e.g. `Vec`).
-                let mut transmit_buffer =
-                    TransmitBuffer::new(len).expect("failed to allocate transmit buffer");
-                let ret = f(&mut transmit_buffer);
-                self.device.send(transmit_buffer);
+                let mut buf = TransmitBuffer::new(len).expect("failed to allocate transmit buffer");
+                let ret = f(&mut buf);
+                self.device.send(buf);
                 ret
             }
-            None => {
+            Err(_) => {
                 // https://github.com/smoltcp-rs/smoltcp/blob/fa7fd3c321b8a3bbe1a8a4ee2ee5dc1b63231d6b/CHANGELOG.md?plain=1#L57
                 error!("packet too large: dropping packet");
-                let buffer = vec![0; len];
-                let ret = f(&mut transmit_buffer);
-                ret
+                let mut buf = vec![0; len];
+                f(&mut buf)
             }
         }
     }
