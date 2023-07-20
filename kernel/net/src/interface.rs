@@ -38,6 +38,8 @@ impl NetworkInterface {
         let mut interface =
             iface::Interface::new(config, &mut wrapper, smoltcp::time::Instant::ZERO);
         interface.update_ip_addrs(|ip_addrs| {
+            // NOTE: This won't fail as ip_addrs has a capacity of 2 (defined in smoltcp)
+            // and this is the only address we are pushing.
             ip_addrs.push(ip).unwrap();
         });
         match gateway {

@@ -2,8 +2,8 @@ use core::any::Any;
 
 use log::error;
 use nic_buffers::{ReceivedFrame, TransmitBuffer};
-pub use phy::DeviceCapabilities;
 use smoltcp::phy;
+pub use smoltcp::phy::DeviceCapabilities;
 
 /// Standard maximum transition unit for ethernet cards.
 const STANDARD_MTU: usize = 1500;
@@ -19,8 +19,13 @@ const STANDARD_MTU: usize = 1500;
 /// [`register_device`]: crate::register_device
 /// [`NetworkInterface`]: crate::NetworkInterface.
 pub trait NetworkDevice: Send + Sync + Any {
+    /// Sends a buffer on the device.
+    ///
+    /// In the case of an error, the packet is dropped and the error is handled
+    /// by the device driver.
     fn send(&mut self, buf: TransmitBuffer);
 
+    /// Receives a frame from the device.
     fn receive(&mut self) -> Option<ReceivedFrame>;
 
     /// Returns the MAC address.
@@ -102,14 +107,25 @@ impl<'a> phy::TxToken for TxToken<'a> {
     where
         F: FnOnce(&mut [u8]) -> R,
     {
-        // This will only fail if the underlying memory allocation fails.
-        //
-        // TODO: Arguably `TransmitBuffer::new` should panic instead, similar to other
-        // data structures (e.g. `Vec`).
-        let mut transmit_buffer =
-            TransmitBuffer::new(len as u16).expect("failed to allocate transmit buffer");
-        let ret = f(&mut transmit_buffer);
-        self.device.send(transmit_buffer);
-        ret
+        match u16::try_from(len) {
+            Some(len) => {
+                // This will only fail if the underlying memory allocation fails.
+                //
+                // TODO: Arguably `TransmitBuffer::new` should panic instead, similar to other
+                // data structures (e.g. `Vec`).
+                let mut transmit_buffer =
+                    TransmitBuffer::new(len).expect("failed to allocate transmit buffer");
+                let ret = f(&mut transmit_buffer);
+                self.device.send(transmit_buffer);
+                ret
+            }
+            None => {
+                // https://github.com/smoltcp-rs/smoltcp/blob/fa7fd3c321b8a3bbe1a8a4ee2ee5dc1b63231d6b/CHANGELOG.md?plain=1#L55-L57
+                error!("packet too large: dropping packet");
+                let buffer = vec![0; len];
+                let ret = f(&mut transmit_buffer);
+                ret
+            }
+        }
     }
 }
