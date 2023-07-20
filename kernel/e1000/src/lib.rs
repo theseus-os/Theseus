@@ -18,7 +18,6 @@ extern crate pci;
 extern crate interrupts;
 extern crate x86_64;
 extern crate mpmc;
-extern crate network_interface_card;
 extern crate intel_ethernet;
 extern crate nic_buffers;
 extern crate nic_queues;
@@ -39,7 +38,6 @@ use pci::{PciDevice, PciConfigSpaceAccessMechanism};
 use kernel_config::memory::PAGE_SIZE;
 use interrupts::{eoi, InterruptNumber};
 use x86_64::structures::idt::InterruptStackFrame;
-use network_interface_card:: NetworkInterfaceCard;
 use nic_initialization::{init_rx_buf_pool, init_rx_queue, init_tx_queue};
 use intel_ethernet::descriptors::{LegacyRxDescriptor, LegacyTxDescriptor};
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
@@ -147,29 +145,6 @@ pub struct E1000Nic {
     deferred_task: Option<task::JoinableTaskRef>,
 }
 
-
-impl NetworkInterfaceCard for E1000Nic {
-
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        self.tx_queue.send_on_queue(transmit_buffer);
-        Ok(())
-    }
-
-    fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        self.rx_queue.received_frames.pop_front()
-    }
-
-    fn poll_receive(&mut self) -> Result<(), &'static str> {
-        self.rx_queue.poll_queue_and_store_received_packets()  
-    }
-
-    fn mac_address(&self) -> [u8; 6] {
-        self.mac_spoofed.unwrap_or(self.mac_hardware)
-    }
-}
-
-
-
 /// Functions that setup the NIC struct and handle the sending and receiving of packets.
 impl E1000Nic {
     /// Initializes the new E1000 network interface card that is connected as the given PciDevice.
@@ -272,7 +247,10 @@ impl E1000Nic {
         let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
             self.interrupt_num,
             e1000_handler,
-            poll_interface,
+            |interface| {
+                interface.poll();
+                Ok::<(), ()>(())
+            },
             interface,
             Some(format!("e1000_deferred_task_irq_{:#X}", self.interrupt_num)),
         )
@@ -448,7 +426,7 @@ impl E1000Nic {
         // receiver timer interrupt
         if (status & INT_RX) == INT_RX {
             // debug!("e1000::handle_interrupt(): receive interrupt");
-            self.poll_receive()?;
+            self.rx_queue.poll_queue_and_store_received_packets()?;
             handled = true;
         }
 
@@ -467,14 +445,8 @@ impl E1000Nic {
 }
 
 impl net::NetworkDevice for E1000Nic {
-    fn send(&mut self, buf: &[u8]) -> net::Result<()> {
-        // TODO: This is just a workaround to make the new API work with the old machinery.
-        let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
-        let transmit_buffer_mut = &mut transmit_buffer;
-        transmit_buffer_mut.clone_from_slice(buf);
-        // TODO: Return specific error.
-        self.send_packet(transmit_buffer).map_err(|_| net::Error::Unknown)?;
-        Ok(())
+    fn send(&mut self, buf: TransmitBuffer) {
+        self.tx_queue.send_on_queue(buf);
     }
 
     fn receive(&mut self) -> Option<ReceivedFrame> {
@@ -497,11 +469,4 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }
-}
-
-/// This function is used as a deferred interrupt task.
-///
-/// After processing the interrupt, the network interface associated with the `e1000` NIC will be polled to process the received data.
-fn poll_interface(interface: &Arc<net::NetworkInterface>) -> Result<(), net::Error> {
-    interface.poll()
 }

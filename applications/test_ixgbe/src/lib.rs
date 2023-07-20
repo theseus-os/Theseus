@@ -17,24 +17,18 @@
 //! e.g."sudo arp -i eno1 -s 192.168.0.20 0c:c4:7a:d2:ee:1a"
 
 #![no_std]
-#[macro_use] extern crate alloc;
-// #[macro_use] extern crate log;
-#[macro_use] extern crate app_io;
-extern crate network_interface_card;
-extern crate ixgbe;
-extern crate spawn;
-extern crate getopts;
 
-use alloc::vec::Vec;
-use alloc::string::String;
+extern crate alloc;
+
+use alloc::{string::String, vec::Vec, vec};
 use ixgbe::{
     virtual_function, get_ixgbe_nics_list,
     test_packets::create_raw_packet,
     IXGBE_NUM_RX_QUEUES_ENABLED, IXGBE_NUM_TX_QUEUES_ENABLED, tx_send_mq, rx_poll_mq
 };
-use network_interface_card::NetworkInterfaceCard;
 use getopts::{Matches, Options};
-
+use app_io::println;
+use net::NetworkDevice;
 
 const DEST_MAC_ADDR: [u8; 6] = [0xa0, 0x36, 0x9f, 0x1d, 0x94, 0x4c];
 
@@ -99,14 +93,13 @@ fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     
         for nic in &mut nics {
             let buffer = create_raw_packet(&DEST_MAC_ADDR, &mac_address, &[1;46])?;
-            nic.send_packet(buffer)?;
+            nic.send(buffer);
         }
         
         if matches.opt_present("r") {
             loop {
                 for nic in &mut nics {
-                    nic.poll_receive()?;
-                    if let Some(_buffer) = nic.get_received_frame() {
+                    if let Some(_buffer) = nic.receive() {
                         println!("Received packet on vnic {}", nic.id());
                     }
                 }

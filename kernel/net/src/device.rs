@@ -1,12 +1,9 @@
-use alloc::vec;
 use core::any::Any;
+
 use log::error;
-use nic_buffers::ReceivedFrame;
-use smoltcp::phy;
-
+use nic_buffers::{ReceivedFrame, TransmitBuffer};
 pub use phy::DeviceCapabilities;
-
-use crate::Error;
+use smoltcp::phy;
 
 /// Standard maximum transition unit for ethernet cards.
 const STANDARD_MTU: usize = 1500;
@@ -22,7 +19,7 @@ const STANDARD_MTU: usize = 1500;
 /// [`register_device`]: crate::register_device
 /// [`NetworkInterface`]: crate::NetworkInterface.
 pub trait NetworkDevice: Send + Sync + Any {
-    fn send(&mut self, buf: &[u8]) -> core::result::Result<(), crate::Error>;
+    fn send(&mut self, buf: TransmitBuffer);
 
     fn receive(&mut self) -> Option<ReceivedFrame>;
 
@@ -53,12 +50,15 @@ impl<'a> phy::Device for DeviceWrapper<'a> {
 
     type TxToken<'c> = TxToken<'c> where Self: 'c;
 
-    fn receive(&mut self) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
+    fn receive(
+        &mut self,
+        _: smoltcp::time::Instant,
+    ) -> Option<(Self::RxToken<'_>, Self::TxToken<'_>)> {
         let frame = self.inner.receive()?;
         Some((RxToken { inner: frame }, TxToken { device: self.inner }))
     }
 
-    fn transmit(&mut self) -> Option<Self::TxToken<'_>> {
+    fn transmit(&mut self, _: smoltcp::time::Instant) -> Option<Self::TxToken<'_>> {
         Some(TxToken { device: self.inner })
     }
 
@@ -73,9 +73,9 @@ pub(crate) struct RxToken {
 }
 
 impl phy::RxToken for RxToken {
-    fn consume<R, F>(mut self, _timestamp: smoltcp::time::Instant, f: F) -> smoltcp::Result<R>
+    fn consume<R, F>(mut self, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
+        F: FnOnce(&mut [u8]) -> R,
     {
         if self.inner.0.len() > 1 {
             error!(
@@ -83,7 +83,11 @@ impl phy::RxToken for RxToken {
                 self.inner.0.len()
             );
         }
-        let slice = self.inner.0.first_mut().ok_or(Error::Exhausted)?;
+        let slice = self
+            .inner
+            .0
+            .first_mut()
+            .expect("received frame with spanning no buffers");
         f(slice)
     }
 }
@@ -94,18 +98,14 @@ pub(crate) struct TxToken<'a> {
 }
 
 impl<'a> phy::TxToken for TxToken<'a> {
-    fn consume<R, F>(
-        self,
-        _timestamp: smoltcp::time::Instant,
-        len: usize,
-        f: F,
-    ) -> smoltcp::Result<R>
+    fn consume<R, F>(self, len: usize, f: F) -> R
     where
-        F: FnOnce(&mut [u8]) -> smoltcp::Result<R>,
+        F: FnOnce(&mut [u8]) -> R,
     {
-        let mut buf = vec![0; len];
-        let ret = f(&mut buf)?;
-        self.device.send(&buf)?;
-        Ok(ret)
+        // TODO: Explain error cases.
+        let mut transmit_buffer = TransmitBuffer::new(len as u16).unwrap();
+        let ret = f(&mut transmit_buffer);
+        self.device.send(transmit_buffer);
+        ret
     }
 }
