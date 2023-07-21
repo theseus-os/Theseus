@@ -24,10 +24,15 @@ use derive_more::*;
 use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 
 #[derive(PartialEq, Eq, ConstParamTy)]
+/// The possible states of a page or frame in virtual and physical memory.
 pub enum MemoryState {
+    /// Memory is free and owned by the allocator
     Free,
+    /// Memory is allocated and can be used for a mapping
     Allocated,
+    /// Memory is mapped (PTE has been set)
     Mapped,
+    /// Memory has been unmapped (PTE has been cleared)
     Unmapped
 }
 

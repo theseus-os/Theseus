@@ -14,9 +14,10 @@
 //! but there are several convenience functions that offer simpler interfaces for general usage. 
 //!
 //! # Notes and Missing Features
-//! This allocator currently does **not** merge freed chunks (de-fragmentation). 
-//! We don't need to do so until we actually run out of address space or until 
-//! a requested address is in a chunk that needs to be merged.
+//! This allocator only makes one attempt to merge deallocated frames into existing
+//! free chunks for de-fragmentation. It does not iteratively merge adjacent chunks in order to
+//! maximally combine separate chunks into the biggest single chunk.
+//! Instead, free chunks are merged only when they are dropped or when needed to fulfill a specific request.
 
 #![no_std]
 #![allow(clippy::blocks_in_if_conditions)]
@@ -245,7 +246,7 @@ fn check_and_add_free_region<P, R>(
 }
 
 
-/// `PhysicalMemoryRegion` represents a range of contiguous frames in phsical memory for bookkeeping purposes.
+/// `PhysicalMemoryRegion` represents a range of contiguous frames in physical memory for bookkeeping purposes.
 /// It does not give access to the underlying frames.
 ///
 /// # Ordering and Equality
@@ -320,21 +321,23 @@ pub enum MemoryRegionType {
     Unknown,
 }
 
-pub type FreeFrames = Frames<{MemoryState::Free}>;
-pub type AllocatedFrames = Frames<{MemoryState::Allocated}>;
-pub type MappedFrames = Frames<{MemoryState::Mapped}>;
-pub type UnmappedFrames = Frames<{MemoryState::Unmapped}>;
-
 /// A range of contiguous frames.
 /// Owning a `Frames` object gives ownership of the range of frames it references.
 /// 
-/// The frames can be in an unmapped or mapped state. In the unmapped state, the frames are not
-/// immediately accessible because they're not yet mapped by any virtual memory pages.
-/// They are converted into a mapped state once they are used to create a `MappedPages` object.
+/// The frames can be in a free, allocated, mapped or unmapped state. 
+/// In the free state, frames are owned by the frame allocator and have not been allocated for a mapping.
+/// In the allocated state, frames have been removed from the free list and can be used for a mapping.
+/// In the mapped state, frames have been mapped to a virtual memory page and are in use.
+/// In the unmapped state, frames have been unmapped and can be retured to the frame allocator.
 /// 
-/// When a `Frames` object in an unmapped state is dropped, it is deallocated and returned to the free frames list.
-/// We expect that `Frames` in a mapped state will never be dropped, but instead will be forgotten.
+/// When a `Frames` object in a free state is dropped, it will be added back to the free list.
+/// When a `Frames` object in an allocated state is dropped, it is transitioned to a free state. 
+/// When a `Frames` obect in an unmapped state is dropped, it is transitioned to an allocated state.
+/// We expect that `Frames` in a mapped state will never be dropped, but instead will be forgotten and then 
+/// recreated in an unmapped state when it's frames are cleared from the page table.
 ///
+///     (Free) <--> (Allocated) -> (Mapped) -> (Unmapped) -> (Allocated)
+/// 
 /// # Ordering and Equality
 ///
 /// `Frames` implements the `Ord` trait, and its total ordering is ONLY based on
@@ -351,6 +354,12 @@ pub struct Frames<const S: MemoryState> {
     /// The Frames covered by this chunk, an inclusive range.
     frames: FrameRange
 }
+
+// Type aliases for the Frames in each state
+pub type FreeFrames = Frames<{MemoryState::Free}>;
+pub type AllocatedFrames = Frames<{MemoryState::Allocated}>;
+pub type MappedFrames = Frames<{MemoryState::Mapped}>;
+pub type UnmappedFrames = Frames<{MemoryState::Unmapped}>;
 
 // Frames must not be Cloneable, and it must not expose its inner frames as mutable.
 assert_not_impl_any!(Frames<{MemoryState::Free}>: DerefMut, Clone);
@@ -420,7 +429,7 @@ impl UnmappedFrames {
 
 /// This function is a callback used to convert `UnmappedFramesInfo` into `UnmappedFrames`.
 /// `UnmappedFrames` represents frames that have been unmapped from a page that had
-/// exclusively mapped them, indicating that no others pages have been mapped 
+/// exclusively mapped to them, indicating that no others pages have been mapped 
 /// to those same frames, and thus, they can be safely deallocated.
 /// 
 /// This exists to break the cyclic dependency cycle between this crate and
@@ -461,14 +470,15 @@ impl<const S: MemoryState> Drop for Frames<S> {
                     }
                     
                     // For full-fledged deallocations, use the entry API to efficiently determine if
-                    // we can merge the deallocated pages with an existing contiguously-adjactent chunk
+                    // we can merge the deallocated frames with an existing contiguously-adjacent chunk
                     // or if we need to insert a new chunk.
                     Inner::RBTree(ref mut tree) => {
                         let mut cursor_mut = tree.lower_bound_mut(Bound::Included(free_frames.start()));
                         if let Some(next_frames) = cursor_mut.get_mut() {
                             if *free_frames.end() + 1 == *next_frames.start() {
-                                trace!("Prepending {:?} onto beg of next {:?}", free_frames, next_frames.deref().deref());
+                                // trace!("Prepending {:?} onto beg of next {:?}", free_frames, next_frames.deref().deref());
                                 if next_frames.merge(free_frames).is_ok() {
+                                    // trace!("newly merged next chunk: {:?}", next_frames);
                                     return;
                                 } else {
                                     panic!("BUG: couldn't merge deallocated chunk into next chunk");
@@ -477,10 +487,11 @@ impl<const S: MemoryState> Drop for Frames<S> {
                         }
                         if let Some(prev_frames) = cursor_mut.peek_prev().get() {
                             if *prev_frames.end() + 1 == *free_frames.start() {
-                                trace!("Appending {:?} onto end of prev {:?}", free_frames, prev_frames.deref());
+                                // trace!("Appending {:?} onto end of prev {:?}", free_frames, prev_frames.deref());
                                 cursor_mut.move_prev();
                                 if let Some(prev_frames) = cursor_mut.get_mut() {
                                     if prev_frames.merge(free_frames).is_ok() {
+                                        // trace!("newly merged prev chunk: {:?}", prev_frames);
                                         return;
                                     } else {
                                         panic!("BUG: couldn't merge deallocated chunk into prev chunk");
@@ -489,14 +500,14 @@ impl<const S: MemoryState> Drop for Frames<S> {
                             }
                         }
 
-                        trace!("Inserting new chunk for deallocated {:?} ", free_frames);
+                        // trace!("Inserting new chunk for deallocated {:?} ", free_frames);
                         cursor_mut.insert(Wrapper::new_link(free_frames));
                         return;
                     }
                 }
             },
             MemoryState::Allocated => { 
-                trace!("Converting AllocatedFrames to FreeFrames. Drop handler should be called again {:?}", self.frames);
+                // trace!("Converting AllocatedFrames to FreeFrames. Drop handler should be called again {:?}", self.frames);
                 FreeFrames::new(self.typ, self.frames.clone()); 
             },
             MemoryState::Mapped => panic!("We should never drop a mapped frame! It should be forgotten instead."),
@@ -557,12 +568,12 @@ impl<'f> Deref for AllocatedFrame<'f> {
 }
 assert_not_impl_any!(AllocatedFrame: DerefMut, Clone);
 
+/// The result of splitting a `Frames` object into multiple smaller `Frames` objects.
 pub struct SplitFrames<const S: MemoryState>  {
     before_start: Option<Frames<S>>,
     start_to_end:  Frames<S>,
     after_end:    Option<Frames<S>>,
 }
-
 
 impl<const S: MemoryState> Frames<S> {
     #[allow(dead_code)]
@@ -616,12 +627,12 @@ impl<const S: MemoryState> Frames<S> {
 
     /// Splits up the given `Frames` into multiple smaller `Frames`.
     /// 
-    /// Returns a tuple of three `Frames`:
+    /// Returns a `SplitFrames` instance containing three `Frames`:
     /// 2. The range of frames in the `self` that came before the beginning of the requested frame range.
-    /// 1. The `Frames` containing the requested range of frames starting at `frames.start`.
+    /// 1. The `Frames` containing the requested range of frames, `frames_to_extract`.
     /// 3. The range of frames in the `self` that came after the end of the requested frame range.
     /// 
-    /// If `frames` is not contained within `self`, then `self` is not changed and we return it within an Err.
+    /// If `frames_to_extract` is not contained within `self`, then `self` is not changed and we return it within an Err.
     pub fn split_range(
         self,
         frames_to_extract: FrameRange
@@ -633,6 +644,7 @@ impl<const S: MemoryState> Frames<S> {
         
         let start_frame = *frames_to_extract.start();
         let start_to_end = Frames{ frames: frames_to_extract, ..self };
+        
         let before_start = if start_frame == MIN_FRAME || start_frame == *self.start() {
             None
         } else {
@@ -646,7 +658,7 @@ impl<const S: MemoryState> Frames<S> {
         };
 
         core::mem::forget(self);
-        Ok(SplitFrames{ before_start, start_to_end, after_end})
+        Ok( SplitFrames{ before_start, start_to_end, after_end} )
     }
 
     /// Splits this `Frames` into two separate `Frames` objects:
@@ -974,7 +986,7 @@ fn allocate_from_chosen_chunk(
         .expect("BUG: Failed to retrieve chunk from free list");
     
     // This should always succeed, since we've already checked the conditions for a merge and split.
-    // We should return the next_chunk back to the list, but a failure at this point implies a bug in the frame allocator.
+    // We should return the chunks back to the list, but a failure at this point implies a bug in the frame allocator.
 
     if let Some(chunk) = next_chunk {
         chosen_chunk.merge(chunk).expect("BUG: Failed to merge adjacent chunks");
@@ -1026,7 +1038,7 @@ fn contains_any(
     false
 }
 
-/// Adds the given `frames` to the given `regions_list` and `frames_list` as a Chunk of reserved frames. 
+/// Adds the given `frames` to the given `regions_list` and `frames_list` as a chunk of reserved frames. 
 /// 
 /// Returns the range of **new** frames that were added to the lists, 
 /// which will be a subset of the given input `frames`.
@@ -1040,6 +1052,7 @@ fn add_reserved_region_to_lists(
     frames: FrameRange,
 ) -> Result<FrameRange, &'static str> {
 
+    // first check the regions list for overlaps and proceed only if there are none.
     if !contains_any(&regions_list, &frames){
         // Check whether the reserved region overlaps any existing regions.
         match &mut frames_list.0 {
@@ -1049,7 +1062,7 @@ fn add_reserved_region_to_lists(
                         // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
                         //     frames, _overlap, chunk
                         // );
-                        return Err("Failed to add free franes that overlapped with existing frames (array).");
+                        return Err("Failed to add free frames that overlapped with existing frames (array).");
                     }
                 }
             }
