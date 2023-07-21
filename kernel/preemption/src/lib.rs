@@ -46,6 +46,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     // Create an initial preemption guard such that we can call `CpuLocal::with_preempt()`,
     // but don't allow it to be dropped until we actually disable preemption below.
     PREEMPTION_COUNT.increment();
+    // Not a race condition because preemption is disabled.
     let prev_val = PREEMPTION_COUNT.load() - 1;
 
     let guard = PreemptionGuard {
@@ -123,8 +124,9 @@ impl Drop for PreemptionGuard {
             This indicates an unexpected task migration across CPUs."
         );
 
+        // Not a race condition because preemption is disabled.
+        let prev_val = PREEMPTION_COUNT.load();
         PREEMPTION_COUNT.decrement();
-        let prev_val = PREEMPTION_COUNT.load() + 1;
 
         if prev_val == 1 {
             // log::trace!("CPU {}: re-enabling local timer interrupt", cpu_id);
