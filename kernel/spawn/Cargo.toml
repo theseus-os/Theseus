@@ -18,7 +18,7 @@ debugit = { path = "../../libs/debugit" }
 memory = { path = "../memory" }
 stack = { path = "../stack" }
 cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
+preemption = { path = "../preemption" }
 task = { path = "../task" }
 runqueue = { path = "../runqueue" }
 scheduler = { path = "../scheduler" }

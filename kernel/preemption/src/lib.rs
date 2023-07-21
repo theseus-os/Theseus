@@ -3,30 +3,14 @@
 //! Supports enabling and disabling preemption for the purpose of 
 //! safe task state management, e.g., through preemption-safe locks.
 
-use core::sync::atomic::{AtomicU8, Ordering};
+#![no_std]
+#![feature(negative_impls, thread_local)]
+
 use cpu::CpuId;
-use crate::cpu_local::{CpuLocal, CpuLocalField, PerCpuField};
-use no_drop::NoDrop;
 
-/// The preemption count for the current CPU.
-static PREEMPTION_COUNT: CpuLocal<PreemptionCount> = CpuLocal::new(PerCpuField::PreemptionCount);
-
-/// A type wrapper around [`AtomicU8`] that represents a CPU-local preemption count.
-///
-/// If a CPU's preemption count is `0`, preemption is enabled.
-/// If a CPU's preemption count is greater than `0`, preemption is disabled.
-pub struct PreemptionCount(AtomicU8);
-impl PreemptionCount {
-    /// Creates a new `PreemptionCount` with an initial value of `0`.
-    pub const fn new() -> Self {
-        PreemptionCount(AtomicU8::new(0))
-    }
-}
-// SAFETY: The `PreemptionCount` type corresponds to a field in `PerCpuData`
-//         with the offset specified by `PerCpuField::PreemptionCount`.
-unsafe impl CpuLocalField for PreemptionCount {
-    const FIELD: PerCpuField = PerCpuField::PreemptionCount;
-}
+// NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
+#[cls::cpu_local(12)]
+static PREEMPTION_COUNT: u8 = 0;
 
 /// Prevents preemption (preemptive task switching) from occurring
 /// until the returned guard object is dropped.
@@ -58,25 +42,18 @@ pub fn hold_preemption_no_timer_disable() -> PreemptionGuard {
 /// will be disabled upon a transition from preemption being enabled to being disabled.
 fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     let cpu_id = cpu::current_cpu();
+
     // Create an initial preemption guard such that we can call `CpuLocal::with_preempt()`,
     // but don't allow it to be dropped until we actually disable preemption below.
-    let mut guard_placeholder = NoDrop::new(PreemptionGuard {
-        cpu_id,
-        preemption_was_enabled: false, // updated below
-    });
-    let prev_val = PREEMPTION_COUNT.with_preempt(
-        &guard_placeholder,
-        |count| count.0.fetch_add(1, Ordering::Relaxed)
-    );
-    // If the previous counter value was 0, that indicates we are transitioning
-    // from preemption being enabled to disabled on this CPU.
-    let preemption_was_enabled = prev_val == 0;
-    // Create a real guard here immediately after incrementing the counter,
-    // in order to guarantee that a failure below will drop it and decrement the counter.
-    guard_placeholder.preemption_was_enabled = preemption_was_enabled;
-    let guard = guard_placeholder.into_inner();
+    PREEMPTION_COUNT.increment();
+    let prev_val = PREEMPTION_COUNT.load() - 1;
 
-    if DISABLE_TIMER && preemption_was_enabled {
+    let guard = PreemptionGuard {
+        cpu_id,
+        preemption_was_enabled: prev_val == 0,
+    };
+
+    if DISABLE_TIMER && guard.preemption_was_enabled {
         // log::trace!(" CPU {}:   disabling local timer interrupt", cpu_id);
         
         // When transitioning from preemption being enabled to disabled,
@@ -146,10 +123,9 @@ impl Drop for PreemptionGuard {
             This indicates an unexpected task migration across CPUs."
         );
 
-        let prev_val = PREEMPTION_COUNT.with_preempt(
-            self,
-            |count| count.0.fetch_sub(1, Ordering::Relaxed)
-        );
+        PREEMPTION_COUNT.decrement();
+        let prev_val = PREEMPTION_COUNT.load() + 1;
+
         if prev_val == 1 {
             // log::trace!("CPU {}: re-enabling local timer interrupt", cpu_id);
 
@@ -175,6 +151,5 @@ impl Drop for PreemptionGuard {
 /// as it is just a snapshot that offers no guarantee that preemption
 /// will continue to be enabled or disabled immediately after returning.
 pub fn preemption_enabled() -> bool {
-    let val = PREEMPTION_COUNT.with(|count| count.0.load(Ordering::Relaxed));
-    val == 0
+    PREEMPTION_COUNT.load() == 0
 }

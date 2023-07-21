@@ -1,0 +1,14 @@
+[package]
+name = "cls_macros"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+convert_case = "0.6.0"
+proc-macro2 = "1.0.56"
+quote = "1.0.26"
+# full feature necessary to parse unsafe blocks
+syn = { version = "2.0.13", features = ["full", "extra-traits"] }

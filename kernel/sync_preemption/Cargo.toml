@@ -5,5 +5,5 @@ description = "Preemption-disabling synchronisation primitives"
 edition = "2021"
 
 [dependencies]
-cpu_local_preemption = { path = "../cpu_local_preemption" }
+preemption = { path = "../preemption" }
 sync = { path = "../../libs/sync" }

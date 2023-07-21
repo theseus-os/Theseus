@@ -56,6 +56,7 @@ test_ixgbe = { path = "../applications/test_ixgbe", optional = true }
 test_libc = { path = "../applications/test_libc", optional = true }
 test_mlx5 = { path = "../applications/test_mlx5", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
+test_preemption_counter = { path = "../applications/test_preemption_counter", optional = true }
 test_priority_scheduler = { path = "../applications/test_priority_scheduler", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_scheduler = { path = "../applications/test_scheduler", optional = true }
@@ -153,6 +154,7 @@ theseus_tests = [
     "test_libc",
     "test_mlx5",
     "test_panic",
+    "test_preemption_counter",
     "test_priority_scheduler",
     "test_restartable",
     "test_scheduler",

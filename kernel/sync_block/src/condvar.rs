@@ -1,5 +1,5 @@
 use crate::MutexGuard;
-use cpu_local_preemption::hold_preemption_no_timer_disable;
+use preemption::hold_preemption_no_timer_disable;
 use mpmc_queue::Queue;
 use sync::DeadlockPrevention;
 use sync_spin::Spin;

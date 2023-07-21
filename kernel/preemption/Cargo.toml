@@ -1,0 +1,11 @@
+[package]
+name = "preemption"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cls = { path = "../cls" }
+cpu = { path = "../cpu" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic" }
