@@ -96,7 +96,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     let x64_width_modifier = format!("{x64_asm_width} ptr ");
     let x64_cls_location = format!("gs:[{offset}]");
 
-    let ret = quote! {
+    quote! {
         #(#attributes)*
         #[thread_local]
         // #[link_section = ".cls"]
@@ -255,9 +255,6 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
         }
-    };
-    // .into();
-
-    println!("{ret}");
-    ret.into()
+    }
+    .into()
 }
