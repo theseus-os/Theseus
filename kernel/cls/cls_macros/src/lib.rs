@@ -79,22 +79,24 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let (asm_width, reg_class) = match ty.to_token_stream().to_string().as_ref() {
-        "u8" => ("byte", quote! { reg_byte }),
-        "u16" => ("word", quote! { reg }),
-        "u32" => ("dword", quote! { reg }),
-        "u64" => ("qword", quote! { reg }),
-        _ => {
-            Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid type")
-                .help("CPU locals only support these types: `u8`, `u16`, `u32`, `u64`")
-                .emit();
-            return TokenStream::new();
-        }
-    };
+    let ((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
+        match ty.to_token_stream().to_string().as_ref() {
+            "u8" => (("byte", quote! { reg_byte }), (":w", "b")),
+            "u16" => (("word", quote! { reg }), (":w", "w")),
+            "u32" => (("dword", quote! { reg }), (":w", "")),
+            "u64" => (("qword", quote! { reg }), ("", "")),
+            _ => {
+                Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid type")
+                    .help("CPU locals only support these types: `u8`, `u16`, `u32`, `u64`")
+                    .emit();
+                return TokenStream::new();
+            }
+        };
 
-    let unary_functions = unary_functions(asm_width, offset.clone());
+    let x64_width_modifier = format!("{x64_asm_width} ptr ");
+    let x64_cls_location = format!("gs:[{offset}]");
 
-    quote! {
+    let ret = quote! {
         #(#attributes)*
         #[thread_local]
         // #[link_section = ".cls"]
@@ -108,50 +110,154 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             _inner: ::core::cell::UnsafeCell<#ty>,
         }
 
+        #[cfg(target_arch = "x86_64")]
         impl #struct_name {
-            #unary_functions
-
-            #[inline(always)]
+            #[inline]
             pub fn load(&self) -> #ty {
                 let ret;
                 unsafe {
                     ::core::arch::asm!(
-                        concat!("mov {}, gs:[", stringify!(#offset), "]"),
-                        out(#reg_class) ret,
+                        ::core::concat!("mov {}, ", #x64_cls_location),
+                        out(#x64_reg_class) ret,
                         options(preserves_flags, nostack),
                     )
                 };
                 ret
             }
 
-            // #[inline(always)]
-            // pub fn exchange(&self, other: #ty) -> #ty {
-            //     use crate::RawRepresentation;
-            //     let mut raw = other.into_raw();
-            //     unsafe {
-            //         ::core::arch::asm!("xchg {} gs:{}", inout(reg) raw, sym #name);
-            //     }
-            //     RawRepresentation::from_raw(raw)
-            // }
-        }
-    }
-    .into()
-}
+            #[inline]
+            pub fn increment(&self) {
+                unsafe {
+                    ::core::arch::asm!(
+                        ::core::concat!("inc ", #x64_width_modifier, #x64_cls_location),
+                        options(preserves_flags, nostack),
+                    )
+                };
+            }
 
-fn unary_functions(asm_width: &'static str, offset: LitInt) -> proc_macro2::TokenStream {
-    const UNARY_OPERATORS: [(&str, &str); 2] = [("increment", "inc"), ("decrement", "dec")];
-
-    let functions = UNARY_OPERATORS.iter().map(|(rust_name, asm_name)| {
-        let rust_name = Ident::new(rust_name, Span::call_site().into());
-        let asm_string = format!("{asm_name} {asm_width} ptr gs:[{offset}]");
-
-        quote! {
-            #[inline(always)]
-            pub fn #rust_name(&self) {
-                unsafe { ::core::arch::asm!(#asm_string, options(preserves_flags, nostack)) };
+            #[inline]
+            pub fn decrement(&self) {
+                unsafe {
+                    ::core::arch::asm!(
+                        ::core::concat!("dec ", #x64_width_modifier, #x64_cls_location),
+                        options(preserves_flags, nostack),
+                    )
+                }
             }
         }
-    });
 
-    functions.collect()
+        #[cfg(target_arch = "aarch64")]
+        impl #struct_name {
+            #[inline]
+            pub fn load(&self) -> #ty {
+                let ret;
+                unsafe {
+                    ::core::arch::asm!(
+                        "1:",
+                        // Load value.
+                        "mrs {tp_1}, tpidr_el1",
+                        concat!(
+                            "ldr", #aarch64_instr_width,
+                            " {ret", #aarch64_reg_modifier,"},",
+                            " [{tp_1},#", stringify!(#offset), "]",
+                        ),
+
+                        // Make sure task wasn't migrated between mrs and ldxr.
+                        "mrs {tp_2}, tpidr_el1",
+                        "cmp {tp_1}, {tp_2}",
+                        "b.ne 1b",
+
+                        tp_1 = out(reg) _,
+                        ret = out(reg) ret,
+                        tp_2 = out(reg) _,
+                    )
+                };
+                ret
+            }
+
+            #[inline]
+            pub fn add(&self, operand: #ty) {
+                unsafe {
+                    ::core::arch::asm!(
+                        "1:",
+                        // Load value.
+                        // TODO: Can we add offset and load in one instruction?
+                        "mrs {tp_1}, tpidr_el1",
+                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                        concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
+
+                        // Make sure task wasn't migrated between msr and ldxr.
+                        "mrs {tp_2}, tpidr_el1",
+                        "cmp {tp_1}, {tp_2}",
+                        "b.ne 1b",
+
+                        // Compute and store value.
+                        "add {value}, {value}, {operand}",
+                        concat!("stxr", #aarch64_instr_width, " {cond:w}, {value", #aarch64_reg_modifier,"}, [{ptr}]"),
+
+                        // Make sure task wasn't migrated between ldxr and stxr.
+                        "cbnz {cond}, 1b",
+
+                        tp_1 = out(reg) _,
+                        ptr = out(reg) _,
+                        value = out(reg) _,
+                        tp_2 = out(reg) _,
+                        operand = in(reg) operand,
+                        cond = out(reg) _,
+
+                        options(nostack),
+                    );
+                }
+            }
+
+            pub fn sub(&self, operand: #ty) {
+                unsafe {
+                    ::core::arch::asm!(
+                        "1:",
+                        // Load value.
+                        // TODO: Can we add offset and load in one instruction?
+                        "mrs {tp_1}, tpidr_el1",
+                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                        concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
+
+                        // Make sure task wasn't migrated between msr and ldxr.
+                        "mrs {tp_2}, tpidr_el1",
+                        "cmp {tp_1}, {tp_2}",
+                        "b.ne 1b",
+
+                        // Compute and store value.
+                        "sub {value}, {value}, {operand}",
+                        concat!("stxr", #aarch64_instr_width, " {cond:w}, {value", #aarch64_reg_modifier,"}, [{ptr}]"),
+
+                        // Make sure task wasn't migrated between ldxr and stxr.
+                        "cbnz {cond}, 1b",
+
+                        tp_1 = out(reg) _,
+                        ptr = out(reg) _,
+                        value = out(reg) _,
+                        tp_2 = out(reg) _,
+                        operand = in(reg) operand,
+                        cond = out(reg) _,
+
+                        options(nostack),
+                    );
+                }
+            }
+
+            #[inline]
+            pub fn increment(&self) {
+                self.add(1);
+            }
+
+            #[inline]
+            pub fn decrement(&self) {
+                self.sub(1);
+            }
+
+        }
+    };
+    // .into();
+
+    println!("{ret}");
+    ret.into()
 }

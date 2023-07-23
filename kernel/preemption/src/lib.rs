@@ -146,12 +146,11 @@ impl Drop for PreemptionGuard {
     }
 }
 
-
 /// Returns `true` if preemption is currently enabled on this CPU.
 ///
-/// Note that this value can't be used as a lock indicator or property,
-/// as it is just a snapshot that offers no guarantee that preemption
-/// will continue to be enabled or disabled immediately after returning.
+/// Note that unless preemption or interrupts are disabled, this value can't be used as a lock
+/// indicator or property. It is just a snapshot that offers no guarantee that preemption will
+/// continue to be enabled or disabled immediately after returning.
 pub fn preemption_enabled() -> bool {
     PREEMPTION_COUNT.load() == 0
 }
