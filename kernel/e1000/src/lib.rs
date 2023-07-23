@@ -247,10 +247,7 @@ impl E1000Nic {
         let deferred_task = deferred_interrupt_tasks::register_interrupt_handler(
             self.interrupt_num,
             e1000_handler,
-            |interface| {
-                interface.poll();
-                Ok::<(), ()>(())
-            },
+            poll_interface,
             interface,
             Some(format!("e1000_deferred_task_irq_{:#X}", self.interrupt_num)),
         )
@@ -469,4 +466,16 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }
+}
+
+/// This function is used as a deferred interrupt task.
+///
+/// After processing the interrupt, the network interface associated with the `e1000` NIC will be
+/// polled to process the received data.
+///
+/// Returns a result to comply with `deferred_interrupt_task::register_interrupt_handler`'s
+/// signature.
+fn poll_interface(interface: &Arc<net::NetworkInterface>) -> Result<(), ()> {
+    interface.poll();
+    Ok(())
 }
