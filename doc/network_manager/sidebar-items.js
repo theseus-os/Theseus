@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["add_to_network_interfaces"],"static":["NETWORK_INTERFACES"],"trait":["NetworkInterface"],"type":["NetworkInterfaceRef"]};

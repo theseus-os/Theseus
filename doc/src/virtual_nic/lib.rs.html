@@ -135,6 +135,24 @@
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
+<a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate defines a struct that enables language-level virtualization of the NIC.
 //! A `VirtualNIC` contains a subset of physical NIC resources that are sufficient for an application,
 //! that has mutable access to a `VirtualNIC`, to send and receive packets without kernel mediation.
@@ -147,7 +165,7 @@
 
 </span><span class="kw">extern crate </span>nic_buffers;
 <span class="kw">extern crate </span>nic_queues;
-<span class="kw">extern crate </span>network_interface_card;
+<span class="kw">extern crate </span>net;
 <span class="kw">extern crate </span>physical_nic;
 <span class="kw">extern crate </span>intel_ethernet;
 <span class="kw">extern crate </span>alloc;
@@ -155,14 +173,19 @@
 
 <span class="kw">use </span>nic_buffers::{TransmitBuffer, ReceivedFrame};
 <span class="kw">use </span>nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-<span class="kw">use </span>network_interface_card::NetworkInterfaceCard;
 <span class="kw">use </span>intel_ethernet::descriptors::{TxDescriptor, RxDescriptor};
 <span class="kw">use </span>physical_nic::PhysicalNic;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="doccomment">/// A structure that contains a set of `RxQueue`s and `TxQueue`s that can be used to send and receive packets.
-</span><span class="kw">pub struct </span>VirtualNic&lt;S: RxQueueRegisters + <span class="lifetime">&#39;static</span>, T: RxDescriptor + <span class="lifetime">&#39;static</span>, U: TxQueueRegisters + <span class="lifetime">&#39;static</span>, V: TxDescriptor + <span class="lifetime">&#39;static</span>&gt; {
+</span><span class="kw">pub struct </span>VirtualNic&lt;S, T, U, V&gt;
+<span class="kw">where
+    </span>S: RxQueueRegisters + <span class="lifetime">&#39;static</span>,
+    T: RxDescriptor + <span class="lifetime">&#39;static</span>,
+    U: TxQueueRegisters + <span class="lifetime">&#39;static</span>,
+    V: TxDescriptor + <span class="lifetime">&#39;static</span>,
+{
     <span class="doccomment">/// The virtual NIC id is set to the id of its first receive queue
     </span>id: u8, 
     <span class="doccomment">/// Set of `RxQueue`s assigned to a virtual NIC
@@ -176,10 +199,16 @@
     <span class="doccomment">/// MAC address of the NIC
     </span>mac_address: [u8; <span class="number">6</span>],
     <span class="doccomment">/// Reference to the physical NIC that Rx/Tx queues will be returned to.
-    </span>physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt;&gt;
+    </span>physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span>PhysicalNic&lt;S, T, U, V&gt; + Send&gt;
 }
 
-<span class="kw">impl</span>&lt;S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor&gt; VirtualNic&lt;S,T,U,V&gt; {
+<span class="kw">impl</span>&lt;S, T, U, V&gt; VirtualNic&lt;S, T, U, V&gt;
+<span class="kw">where
+    </span>S: RxQueueRegisters + <span class="lifetime">&#39;static</span>,
+    T: RxDescriptor + <span class="lifetime">&#39;static</span>,
+    U: TxQueueRegisters + <span class="lifetime">&#39;static</span>,
+    V: TxDescriptor + <span class="lifetime">&#39;static</span>,
+{
     <span class="doccomment">/// Create a new `VirtualNIC` with the given parameters.
     /// For now we require that there is at least one Rx and one Tx queue.
     </span><span class="kw">pub fn </span>new(
@@ -188,7 +217,7 @@
         tx_queues: Vec&lt;TxQueue&lt;U,V&gt;&gt;,
         default_tx_queue: usize, 
         mac_address: [u8; <span class="number">6</span>], 
-        physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt;&gt;
+        physical_nic_ref: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span>PhysicalNic&lt;S,T,U,V&gt; + Send&gt;
     ) -&gt; <span class="prelude-ty">Result</span>&lt;VirtualNic&lt;S,T,U,V&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
 
         <span class="kw">if </span>rx_queues.is_empty() || tx_queues.is_empty() { 
@@ -235,20 +264,21 @@
     }
 }
 
-<span class="kw">impl</span>&lt;S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor&gt; NetworkInterfaceCard <span class="kw">for </span>VirtualNic&lt;S,T,U,V&gt; {
-    <span class="kw">fn </span>send_packet(<span class="kw-2">&amp;mut </span><span class="self">self</span>, transmit_buffer: TransmitBuffer) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="self">self</span>.tx_queues[<span class="self">self</span>.default_tx_queue].send_on_queue(transmit_buffer);
-        <span class="prelude-val">Ok</span>(())
+<span class="kw">impl</span>&lt;S, T, U, V&gt; net::NetworkDevice <span class="kw">for </span>VirtualNic&lt;S, T, U, V&gt;
+<span class="kw">where
+    </span>S: RxQueueRegisters + Send + Sync + <span class="lifetime">&#39;static</span>,
+    T: RxDescriptor + Send + Sync + <span class="lifetime">&#39;static</span>,
+    U: TxQueueRegisters + Send + Sync + <span class="lifetime">&#39;static</span>,
+    V: TxDescriptor + Send + Sync + <span class="lifetime">&#39;static</span>,
+{
+    <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: TransmitBuffer) {
+        <span class="self">self</span>.tx_queues[<span class="self">self</span>.default_tx_queue].send_on_queue(buf);
     }
 
-    <span class="kw">fn </span>get_received_frame(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt; {
-        <span class="comment">// return one frame from the queue&#39;s received frames
-        </span><span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue].received_frames.pop_front()
-    }
-
-    <span class="kw">fn </span>poll_receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue].poll_queue_and_store_received_packets()<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(())
+    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt; {
+        <span class="comment">// TODO: Describe errors
+        </span><span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue].poll_queue_and_store_received_packets().unwrap();
+        <span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue].received_frames.pop_front()
     }
 
     <span class="kw">fn </span>mac_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">6</span>] {
@@ -256,7 +286,13 @@
     }
 }
 
-<span class="kw">impl</span>&lt;S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor&gt; Drop <span class="kw">for </span>VirtualNic&lt;S,T,U,V&gt; {
+<span class="kw">impl</span>&lt;S, T, U, V&gt; Drop <span class="kw">for </span>VirtualNic&lt;S, T, U, V&gt;
+<span class="kw">where
+    </span>S: RxQueueRegisters + <span class="lifetime">&#39;static</span>,
+    T: RxDescriptor + <span class="lifetime">&#39;static</span>,
+    U: TxQueueRegisters + <span class="lifetime">&#39;static</span>,
+    V: TxDescriptor + <span class="lifetime">&#39;static</span>,
+{
     <span class="comment">// Right now we assume that a `virtualNIC` is only dropped when all packets have been removed from queues.
     // TODO: check that queues are empty before returning to the NIC.
     </span><span class="kw">fn </span>drop(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {

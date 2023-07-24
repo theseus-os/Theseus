@@ -63,7 +63,7 @@ value (64).</p>
 if the port in the given endpoint is zero.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.connect" class="method"><h4 class="code-header">pub fn <a href="#method.connect" class="fn">connect</a>&lt;T, U&gt;(
     &amp;mut self,
-    cx: &amp;mut InterfaceInner&lt;'_&gt;,
+    cx: &amp;mut InterfaceInner,
     remote_endpoint: T,
     local_endpoint: U
 ) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.unit.html">()</a>, <a class="enum" href="enum.ConnectError.html" title="enum net::tcp::ConnectError">ConnectError</a>&gt;<span class="where fmt-newline">where
@@ -72,7 +72,11 @@ if the port in the given endpoint is zero.</p>
 <p>The local port must be provided explicitly. Assuming <code>fn get_ephemeral_port() -&gt; u16</code>
 allocates a port between 49152 and 65535, a connection may be established as follows:</p>
 
-<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code>socket.connect((IpAddress::v4(<span class="number">10</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>), <span class="number">80</span>), get_ephemeral_port())</code></pre></div>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code>socket.connect(
+    iface.context(),
+    (IpAddress::v4(<span class="number">10</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">1</span>), <span class="number">80</span>),
+    get_ephemeral_port()
+).unwrap();</code></pre></div>
 <p>The local address may optionally be provided.</p>
 <p>This function returns an error if the socket was open; see <a href="#method.is_open">is_open</a>.
 It also returns an error if the local or remote port is zero, or if the remote address

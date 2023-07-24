@@ -109,15 +109,28 @@
 <a href="#109" id="109">109</a>
 <a href="#110" id="110">110</a>
 <a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::vec;
-<span class="kw">use </span>core::any::Any;
+
 <span class="kw">use </span>log::error;
-<span class="kw">use </span>nic_buffers::ReceivedFrame;
+<span class="kw">use </span>nic_buffers::{ReceivedFrame, TransmitBuffer};
 <span class="kw">use </span>smoltcp::phy;
-
-<span class="kw">pub use </span>phy::DeviceCapabilities;
-
-<span class="kw">use </span><span class="kw">crate</span>::Error;
+<span class="kw">pub use </span>smoltcp::phy::DeviceCapabilities;
 
 <span class="doccomment">/// Standard maximum transition unit for ethernet cards.
 </span><span class="kw">const </span>STANDARD_MTU: usize = <span class="number">1500</span>;
@@ -132,10 +145,15 @@
 ///
 /// [`register_device`]: crate::register_device
 /// [`NetworkInterface`]: crate::NetworkInterface.
-</span><span class="kw">pub trait </span>NetworkDevice: Send + Sync + Any {
-    <span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: <span class="kw-2">&amp;</span>[u8]) -&gt; core::result::Result&lt;(), <span class="kw">crate</span>::Error&gt;;
+</span><span class="kw">pub trait </span>NetworkDevice: Send + Sync {
+    <span class="doccomment">/// Sends a buffer on the device.
+    ///
+    /// In the case of an error, the packet is dropped and the error is handled
+    /// by the device driver.
+    </span><span class="kw">fn </span>send(<span class="kw-2">&amp;mut </span><span class="self">self</span>, buf: TransmitBuffer);
 
-    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt;;
+    <span class="doccomment">/// Receives a frame from the device.
+    </span><span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt;;
 
     <span class="doccomment">/// Returns the MAC address.
     </span><span class="kw">fn </span>mac_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; [u8; <span class="number">6</span>];
@@ -164,12 +182,15 @@
 
     <span class="kw">type </span>TxToken&lt;<span class="lifetime">&#39;c</span>&gt; = TxToken&lt;<span class="lifetime">&#39;c</span>&gt; <span class="kw">where </span><span class="self">Self</span>: <span class="lifetime">&#39;c</span>;
 
-    <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="self">Self</span>::RxToken&lt;<span class="lifetime">&#39;_</span>&gt;, <span class="self">Self</span>::TxToken&lt;<span class="lifetime">&#39;_</span>&gt;)&gt; {
+    <span class="kw">fn </span>receive(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        <span class="kw">_</span>: smoltcp::time::Instant,
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(<span class="self">Self</span>::RxToken&lt;<span class="lifetime">&#39;_</span>&gt;, <span class="self">Self</span>::TxToken&lt;<span class="lifetime">&#39;_</span>&gt;)&gt; {
         <span class="kw">let </span>frame = <span class="self">self</span>.inner.receive()<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>((RxToken { inner: frame }, TxToken { device: <span class="self">self</span>.inner }))
     }
 
-    <span class="kw">fn </span>transmit(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::TxToken&lt;<span class="lifetime">&#39;_</span>&gt;&gt; {
+    <span class="kw">fn </span>transmit(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw">_</span>: smoltcp::time::Instant) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::TxToken&lt;<span class="lifetime">&#39;_</span>&gt;&gt; {
         <span class="prelude-val">Some</span>(TxToken { device: <span class="self">self</span>.inner })
     }
 
@@ -184,9 +205,9 @@
 }
 
 <span class="kw">impl </span>phy::RxToken <span class="kw">for </span>RxToken {
-    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="kw-2">mut </span><span class="self">self</span>, _timestamp: smoltcp::time::Instant, f: F) -&gt; smoltcp::Result&lt;R&gt;
+    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="kw-2">mut </span><span class="self">self</span>, f: F) -&gt; R
     <span class="kw">where
-        </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; smoltcp::Result&lt;R&gt;,
+        </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; R,
     {
         <span class="kw">if </span><span class="self">self</span>.inner.<span class="number">0</span>.len() &gt; <span class="number">1 </span>{
             <span class="macro">error!</span>(
@@ -194,7 +215,11 @@
                 <span class="self">self</span>.inner.<span class="number">0</span>.len()
             );
         }
-        <span class="kw">let </span>slice = <span class="self">self</span>.inner.<span class="number">0</span>.first_mut().ok_or(Error::Exhausted)<span class="question-mark">?</span>;
+        <span class="kw">let </span>slice = <span class="self">self
+            </span>.inner
+            .<span class="number">0
+            </span>.first_mut()
+            .expect(<span class="string">&quot;received frame spanning no buffers&quot;</span>);
         f(slice)
     }
 }
@@ -205,19 +230,26 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; phy::TxToken <span class="kw">for </span>TxToken&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">fn </span>consume&lt;R, F&gt;(
-        <span class="self">self</span>,
-        _timestamp: smoltcp::time::Instant,
-        len: usize,
-        f: F,
-    ) -&gt; smoltcp::Result&lt;R&gt;
+    <span class="kw">fn </span>consume&lt;R, F&gt;(<span class="self">self</span>, len: usize, f: F) -&gt; R
     <span class="kw">where
-        </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; smoltcp::Result&lt;R&gt;,
+        </span>F: FnOnce(<span class="kw-2">&amp;mut </span>[u8]) -&gt; R,
     {
-        <span class="kw">let </span><span class="kw-2">mut </span>buf = <span class="macro">vec!</span>[<span class="number">0</span>; len];
-        <span class="kw">let </span>ret = f(<span class="kw-2">&amp;mut </span>buf)<span class="question-mark">?</span>;
-        <span class="self">self</span>.device.send(<span class="kw-2">&amp;</span>buf)<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(ret)
+        <span class="kw">match </span>u16::try_from(len) {
+            <span class="prelude-val">Ok</span>(len) =&gt; {
+                <span class="comment">// This will only fail if the underlying memory allocation fails.
+                </span><span class="kw">let </span><span class="kw-2">mut </span>buf = TransmitBuffer::new(len).expect(<span class="string">&quot;failed to allocate transmit buffer&quot;</span>);
+                <span class="kw">let </span>ret = f(<span class="kw-2">&amp;mut </span>buf);
+                <span class="self">self</span>.device.send(buf);
+                ret
+            }
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+                <span class="comment">// For appropriate behavior on an error, see this smoltcp changelog entry:
+                // &lt;https://github.com/smoltcp-rs/smoltcp/blob/fa7fd3c321b8a3bbe1a8a4ee2ee5dc1b63231d6b/CHANGELOG.md?plain=1#L57&gt;
+                </span><span class="macro">error!</span>(<span class="string">&quot;packet too large: dropping packet&quot;</span>);
+                <span class="kw">let </span><span class="kw-2">mut </span>buf = <span class="macro">vec!</span>[<span class="number">0</span>; len];
+                f(<span class="kw-2">&amp;mut </span>buf)
+            }
+        }
     }
 }
 </code></pre></div></section></main></body></html>

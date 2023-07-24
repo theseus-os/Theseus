@@ -81,23 +81,21 @@
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
-<a href="#84" id="84">84</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
 
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
+
 <span class="kw">use </span>smoltcp::wire::Ipv4Address;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
 
 <span class="kw">mod </span>device;
-<span class="kw">mod </span>error;
 <span class="kw">mod </span>interface;
 <span class="kw">mod </span>socket;
 
 <span class="kw">pub use </span>device::{DeviceCapabilities, NetworkDevice};
-<span class="kw">pub use </span>error::{Error, <span class="prelude-ty">Result</span>};
 <span class="kw">pub use </span>interface::{IpAddress, IpCidr, NetworkInterface, SocketSet};
 <span class="kw">pub use </span>smoltcp::{
     phy,

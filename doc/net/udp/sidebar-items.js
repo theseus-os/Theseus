@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["BindError","RecvError","SendError"],"struct":["Socket"],"type":["PacketBuffer","PacketMetadata"]};
+window.SIDEBAR_ITEMS = {"enum":["BindError","RecvError","SendError"],"struct":["Socket","UdpMetadata"],"type":["PacketBuffer","PacketMetadata"]};

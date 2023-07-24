@@ -4,14 +4,14 @@ easily human readable packet listings.</p>
 <h2 id="example"><a href="#example">Example</a></h2>
 <p>A packet can be formatted using the <code>PrettyPrinter</code> wrapper:</p>
 
-<div class="example-wrap ignore"><a href="#" class="tooltip" title="This example is not tested">ⓘ</a><pre class="rust rust-example-rendered"><code><span class="kw">use </span>smoltcp::wire::<span class="kw-2">*</span>;
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>smoltcp::wire::<span class="kw-2">*</span>;
 <span class="kw">let </span>buffer = <span class="macro">vec!</span>[
     <span class="comment">// Ethernet II
     </span><span class="number">0x01</span>, <span class="number">0x02</span>, <span class="number">0x03</span>, <span class="number">0x04</span>, <span class="number">0x05</span>, <span class="number">0x06</span>,
     <span class="number">0x11</span>, <span class="number">0x12</span>, <span class="number">0x13</span>, <span class="number">0x14</span>, <span class="number">0x15</span>, <span class="number">0x16</span>,
     <span class="number">0x08</span>, <span class="number">0x00</span>,
     <span class="comment">// IPv4
-    </span><span class="number">0x45</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x18</span>,
+    </span><span class="number">0x45</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x20</span>,
     <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0x40</span>, <span class="number">0x00</span>,
     <span class="number">0x40</span>, <span class="number">0x01</span>, <span class="number">0xd2</span>, <span class="number">0x79</span>,
     <span class="number">0x11</span>, <span class="number">0x12</span>, <span class="number">0x13</span>, <span class="number">0x14</span>,
@@ -21,5 +21,16 @@ easily human readable packet listings.</p>
     <span class="number">0x12</span>, <span class="number">0x34</span>, <span class="number">0xab</span>, <span class="number">0xcd</span>,
     <span class="number">0xaa</span>, <span class="number">0x00</span>, <span class="number">0x00</span>, <span class="number">0xff
 </span>];
-<span class="macro">print!</span>(<span class="string">&quot;{}&quot;</span>, PrettyPrinter::&lt;EthernetFrame&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt;&gt;::new(<span class="string">&quot;&quot;</span>, <span class="kw-2">&amp;</span>buffer));</code></pre></div>
+
+<span class="kw">let </span>result = <span class="string">&quot;\
+EthernetII src=11-12-13-14-15-16 dst=01-02-03-04-05-06 type=IPv4\n\
+\\ IPv4 src=17.18.19.20 dst=33.34.35.36 proto=ICMP (checksum incorrect)\n \
+ \\ ICMPv4 echo request id=4660 seq=43981 len=4\
+&quot;</span>;
+
+<span class="attr">#[cfg(all(feature = <span class="string">&quot;medium-ethernet&quot;</span>, feature = <span class="string">&quot;proto-ipv4&quot;</span>))]
+</span><span class="macro">assert_eq!</span>(
+    result,
+    <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">&quot;{}&quot;</span>, PrettyPrinter::&lt;EthernetFrame&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>[u8]&gt;&gt;::new(<span class="string">&quot;&quot;</span>, <span class="kw-2">&amp;</span>buffer))
+);</code></pre></div>
 </div></details><h2 id="structs" class="small-section-header"><a href="#structs">Structs</a></h2><ul class="item-table"><li><div class="item-name"><a class="struct" href="struct.PrettyIndent.html" title="struct net::wire::pretty_print::PrettyIndent">PrettyIndent</a></div><div class="desc docblock-short">Indentation state.</div></li><li><div class="item-name"><a class="struct" href="struct.PrettyPrinter.html" title="struct net::wire::pretty_print::PrettyPrinter">PrettyPrinter</a></div><div class="desc docblock-short">Wrapper for using a <code>PrettyPrint</code> where a <code>Display</code> is expected.</div></li></ul><h2 id="traits" class="small-section-header"><a href="#traits">Traits</a></h2><ul class="item-table"><li><div class="item-name"><a class="trait" href="trait.PrettyPrint.html" title="trait net::wire::pretty_print::PrettyPrint">PrettyPrint</a></div><div class="desc docblock-short">Interface for printing listings.</div></li></ul></section></div></main></body></html>

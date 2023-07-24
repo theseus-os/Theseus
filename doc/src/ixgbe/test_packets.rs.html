@@ -74,16 +74,20 @@
 <a href="#74" id="74">74</a>
 <a href="#75" id="75">75</a>
 <a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A set of functions to create packets for testing the NIC transmission functionality.
 
-</span><span class="kw">use super</span>::{get_ixgbe_nic, NetworkInterfaceCard, TransmitBuffer};
+</span><span class="kw">use super</span>::{get_ixgbe_nic, TransmitBuffer};
 <span class="kw">use </span>pci::PciLocation;
+<span class="kw">use </span>net::NetworkDevice;
 
 <span class="doccomment">/// Sends a dhcp request packet on the ixgbe NIC.
 </span><span class="kw">pub fn </span>dhcp_request_packet(nic_id: PciLocation) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="kw">let </span>transmit_buffer = create_dhcp_test_packet()<span class="question-mark">?</span>;
-    <span class="kw">let </span>ixgbe_nc = get_ixgbe_nic(nic_id)<span class="question-mark">?</span>;
-    ixgbe_nc.lock().send_packet(transmit_buffer)
+    <span class="kw">let </span>ixgbe_nic = get_ixgbe_nic(nic_id)<span class="question-mark">?</span>;
+    ixgbe_nic.lock().send(transmit_buffer);
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="doccomment">/// Creates a `TransmitBuffer` containing a dhcp packet.

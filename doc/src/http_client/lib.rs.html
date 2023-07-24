@@ -331,11 +331,6 @@
 <a href="#331" id="331">331</a>
 <a href="#332" id="332">332</a>
 <a href="#333" id="333">333</a>
-<a href="#334" id="334">334</a>
-<a href="#335" id="335">335</a>
-<a href="#336" id="336">336</a>
-<a href="#337" id="337">337</a>
-<a href="#338" id="338">338</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Functions for creating and sending HTTP requests and receiving responses.
 
 </span><span class="attr">#![no_std]
@@ -447,12 +442,9 @@
     }
 
     <span class="doccomment">/// Aborts the connection.
-    </span><span class="kw">pub fn </span>abort(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    </span><span class="kw">pub fn </span>abort(<span class="kw-2">&amp;</span><span class="self">self</span>) {
         <span class="self">self</span>.socket.lock().abort();
-
-        <span class="self">self</span>.interface
-            .poll()
-            .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to poll interface after sending&quot;</span>)
+        <span class="self">self</span>.interface.poll();
     }
 
     <span class="doccomment">/// Sends an HTTP request with an optional timeout.
@@ -504,9 +496,7 @@
                         .map_err(|<span class="kw">_</span>| <span class="string">&quot;cannot send request&quot;</span>)<span class="question-mark">?</span>;
                     <span class="comment">// Poll the socket to send the packet. Once we have a custom socket type this
                     // won&#39;t be necessary.
-                    </span>interface
-                        .poll()
-                        .map_err(|<span class="kw">_</span>| <span class="string">&quot;failed to poll interface after sending&quot;</span>)<span class="question-mark">?</span>;
+                    </span>interface.poll();
                     latest_packet_timestamp = Instant::now();
                     HttpState::ReceivingResponse
                 }

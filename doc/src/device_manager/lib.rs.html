@@ -290,27 +290,6 @@
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
-<a href="#300" id="300">300</a>
-<a href="#301" id="301">301</a>
-<a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a>
-<a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(trait_alias))]
 
@@ -324,8 +303,6 @@
     mpmc::Queue,
     event_types::Event,
     memory::MemoryManagementInfo,
-    ethernet_smoltcp_device::EthernetNetworkInterface,
-    network_manager::add_to_network_interfaces,
     alloc::vec::Vec,
     io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter},
     storage_manager::StorageDevice,
@@ -333,17 +310,7 @@
     serial_port::{SerialPortAddress, init_serial_port, take_serial_port_basic},
 };
 
-<span class="doccomment">/// A randomly chosen IP address that must be outside of the DHCP range.
-/// TODO: use DHCP to acquire an IP address.
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">const </span>DEFAULT_LOCAL_IP: <span class="kw-2">&amp;</span>str = <span class="string">&quot;10.0.2.15/24&quot;</span>; <span class="comment">// the default QEMU user-slirp network gives IP addresses of &quot;10.0.2.*&quot;
-
-</span><span class="doccomment">/// Standard home router address.
-/// TODO: use DHCP to acquire gateway IP
-</span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">const </span>DEFAULT_GATEWAY_IP: [u8; <span class="number">4</span>] = [<span class="number">10</span>, <span class="number">0</span>, <span class="number">2</span>, <span class="number">2</span>]; <span class="comment">// the default QEMU user-slirp networking gateway IP
-
-</span><span class="doccomment">/// Performs early-stage initialization for simple devices needed during early boot.
+<span class="doccomment">/// Performs early-stage initialization for simple devices needed during early boot.
 ///
 /// This includes:
 /// * local APICs ([`apic`]),
@@ -453,9 +420,6 @@
                 <span class="kw">let </span>interface = net::register_device(nic);
                 nic.lock().init_interrupts(interface)<span class="question-mark">?</span>;
 
-                <span class="kw">let </span>e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP)<span class="question-mark">?</span>;
-                add_to_network_interfaces(e1000_interface);
-                
                 <span class="kw">continue</span>;
             }
             <span class="kw">if </span>dev.vendor_id == ixgbe::INTEL_VEND &amp;&amp; dev.device_id == ixgbe::INTEL_82599 {
@@ -501,17 +465,11 @@
     <span class="comment">// Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
     </span><span class="kw">let </span>ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
     <span class="kw">for </span>ixgbe_nic_ref <span class="kw">in </span>ixgbe_nics.iter() {
-        <span class="kw">let </span>ixgbe_interface = EthernetNetworkInterface::new_ipv4_interface(
-            ixgbe_nic_ref, 
-            DEFAULT_LOCAL_IP, 
-            <span class="kw-2">&amp;</span>DEFAULT_GATEWAY_IP
-        )<span class="question-mark">?</span>;
-        add_to_network_interfaces(ixgbe_interface);
         net::register_device(ixgbe_nic_ref);
     }
 
     <span class="comment">// Convenience notification for developers to inform them of no networking devices
-    </span><span class="kw">if </span>network_manager::NETWORK_INTERFACES.lock().is_empty() {
+    </span><span class="kw">if </span>net::get_default_interface().is_none() {
         <span class="macro">warn!</span>(<span class="string">&quot;Note: no network devices found on this system.&quot;</span>);
     }
 

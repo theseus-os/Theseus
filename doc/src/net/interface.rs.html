@@ -85,22 +85,26 @@
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
-</pre></div><pre class="rust"><code><span class="kw">use crate</span>::{device::DeviceWrapper, NetworkDevice, <span class="prelude-ty">Result</span>, Socket};
-<span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
+<a href="#88" id="88">88</a>
+</pre></div><pre class="rust"><code><span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
 <span class="kw">use </span>core::marker::PhantomData;
+
 <span class="kw">use </span>smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
+<span class="kw">pub use </span>smoltcp::{
+    iface::SocketSet,
+    wire::{IpAddress, IpCidr},
+};
 <span class="kw">use </span>sync_block::Mutex;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
 
-<span class="kw">pub use </span>smoltcp::iface::SocketSet;
-<span class="kw">pub use </span>wire::{IpAddress, IpCidr};
+<span class="kw">use crate</span>::{device::DeviceWrapper, NetworkDevice, Socket};
 
 <span class="doccomment">/// A network interface.
 ///
 /// This is a wrapper around a network device which provides higher level
 /// abstractions such as polling sockets.
 </span><span class="kw">pub struct </span>NetworkInterface {
-    <span class="kw">pub</span>(<span class="kw">crate</span>) inner: Mutex&lt;iface::Interface&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
+    <span class="kw">pub</span>(<span class="kw">crate</span>) inner: Mutex&lt;iface::Interface&gt;,
     device: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeMutex&lt;<span class="kw">dyn </span><span class="kw">crate</span>::NetworkDevice&gt;,
     <span class="kw">pub</span>(<span class="kw">crate</span>) sockets: Mutex&lt;SocketSet&lt;<span class="lifetime">&#39;static</span>&gt;&gt;,
 }
@@ -112,33 +116,30 @@
     {
         <span class="kw">let </span>hardware_addr = wire::EthernetAddress(device.lock().mac_address()).into();
 
-        <span class="kw">let </span><span class="kw-2">mut </span>routes = iface::Routes::new();
-
-        <span class="kw">match </span>gateway {
-            IpAddress::Ipv4(addr) =&gt; routes.add_default_ipv4_route(addr),
-            IpAddress::Ipv6(addr) =&gt; routes.add_default_ipv6_route(addr),
-        }
-        .expect(<span class="string">&quot;btree map route storage exhausted&quot;</span>);
-
         <span class="kw">let </span><span class="kw-2">mut </span>wrapper = DeviceWrapper {
             inner: <span class="kw-2">&amp;mut *</span>device.lock(),
         };
-        <span class="kw">let </span>inner = Mutex::new(
-            iface::InterfaceBuilder::new()
-                .random_seed(random::next_u64())
-                .hardware_addr(hardware_addr)
-                .ip_addrs(heapless::Vec::&lt;<span class="kw">_</span>, <span class="number">5</span>&gt;::from_slice(<span class="kw-2">&amp;</span>[ip]).unwrap())
-                .routes(routes)
-                .neighbor_cache(iface::NeighborCache::new())
-                .finalize(<span class="kw-2">&amp;mut </span>wrapper),
-        );
 
-        <span class="kw">let </span>sockets = Mutex::new(SocketSet::new(Vec::new()));
+        <span class="kw">let </span><span class="kw-2">mut </span>config = iface::Config::new(hardware_addr);
+        config.random_seed = random::next_u64();
+
+        <span class="kw">let </span><span class="kw-2">mut </span>interface =
+            iface::Interface::new(config, <span class="kw-2">&amp;mut </span>wrapper, smoltcp::time::Instant::ZERO);
+        interface.update_ip_addrs(|ip_addrs| {
+            <span class="comment">// NOTE: This won&#39;t fail as ip_addrs has a capacity of 2 (defined in smoltcp)
+            // and this is the only address we are pushing.
+            </span>ip_addrs.push(ip).unwrap();
+        });
+        <span class="kw">match </span>gateway {
+            IpAddress::Ipv4(addr) =&gt; interface.routes_mut().add_default_ipv4_route(addr),
+            IpAddress::Ipv6(addr) =&gt; interface.routes_mut().add_default_ipv6_route(addr),
+        }
+        .expect(<span class="string">&quot;btree map route storage exhausted&quot;</span>);
 
         <span class="self">Self </span>{
-            inner,
+            inner: Mutex::new(interface),
             device,
-            sockets,
+            sockets: Mutex::new(SocketSet::new(Vec::new())),
         }
     }
 
@@ -156,16 +157,17 @@
     }
 
     <span class="doccomment">/// Polls the sockets associated with the interface.
-    </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+    ///
+    /// Returns a boolean indicating whether the readiness of any socket may
+    /// have changed.
+    </span><span class="kw">pub fn </span>poll(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="kw">let </span><span class="kw-2">mut </span>inner = <span class="self">self</span>.inner.lock();
         <span class="kw">let </span><span class="kw-2">mut </span>wrapper = DeviceWrapper {
             inner: <span class="kw-2">&amp;mut *</span><span class="self">self</span>.device.lock(),
         };
         <span class="kw">let </span><span class="kw-2">mut </span>sockets = <span class="self">self</span>.sockets.lock();
 
-        inner.poll(smoltcp::time::Instant::ZERO, <span class="kw-2">&amp;mut </span>wrapper, <span class="kw-2">&amp;mut </span>sockets)<span class="question-mark">?</span>;
-
-        <span class="prelude-val">Ok</span>(())
+        inner.poll(smoltcp::time::Instant::ZERO, <span class="kw-2">&amp;mut </span>wrapper, <span class="kw-2">&amp;mut </span>sockets)
     }
 
     <span class="kw">pub fn </span>capabilities(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; DeviceCapabilities {

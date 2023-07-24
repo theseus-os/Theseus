@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Checksum","Medium","PcapLinkType","PcapMode"],"struct":["ChecksumCapabilities","DeviceCapabilities","FaultInjector","FuzzInjector","Loopback","PcapWriter","Tracer"],"trait":["Device","Fuzzer","PcapSink","RxToken","TxToken"]};
+window.SIDEBAR_ITEMS = {"enum":["Checksum","Medium","PcapLinkType","PcapMode"],"struct":["ChecksumCapabilities","DeviceCapabilities","FaultInjector","FuzzInjector","Loopback","PacketMeta","PcapWriter","Tracer"],"trait":["Device","Fuzzer","PcapSink","RxToken","TxToken"]};

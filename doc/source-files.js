@@ -43,7 +43,6 @@ var sourcesIndex = JSON.parse('{\
 "early_printer":["",[],["lib.rs"]],\
 "early_tls":["",[],["lib.rs"]],\
 "environment":["",[],["lib.rs"]],\
-"ethernet_smoltcp_device":["",[],["lib.rs"]],\
 "event_types":["",[],["lib.rs"]],\
 "exceptions_early":["",[],["lib.rs"]],\
 "exceptions_full":["",[],["lib.rs"]],\
@@ -96,9 +95,7 @@ var sourcesIndex = JSON.parse('{\
 "multicore_bringup":["",[],["lib.rs","x86_64.rs"]],\
 "multiple_heaps":["",[],["lib.rs"]],\
 "nano_core":["",[],["bios.rs","lib.rs","libm.rs","stack_smash_protection.rs"]],\
-"net":["",[],["device.rs","error.rs","interface.rs","lib.rs","socket.rs"]],\
-"network_interface_card":["",[],["lib.rs"]],\
-"network_manager":["",[],["lib.rs"]],\
+"net":["",[],["device.rs","interface.rs","lib.rs","socket.rs"]],\
 "nic_buffers":["",[],["lib.rs"]],\
 "nic_initialization":["",[],["lib.rs"]],\
 "nic_queues":["",[],["lib.rs"]],\
@@ -150,7 +147,6 @@ var sourcesIndex = JSON.parse('{\
 "slabmalloc_safe":["",[],["lib.rs","pages.rs","sc.rs","zone.rs"]],\
 "slabmalloc_unsafe":["",[],["lib.rs","pages.rs","sc.rs","zone.rs"]],\
 "sleep":["",[],["lib.rs"]],\
-"smoltcp_helper":["",[],["lib.rs"]],\
 "spawn":["",[],["lib.rs"]],\
 "stack":["",[],["lib.rs"]],\
 "stack_trace":["",[],["lib.rs"]],\

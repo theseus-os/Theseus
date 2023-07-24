@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["STARTING_FREE_PORT"],"fn":["connect","get_default_iface","millis_since","poll_iface"],"macro":["hpet_ticks"]};

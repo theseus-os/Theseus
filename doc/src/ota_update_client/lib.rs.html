@@ -759,7 +759,7 @@
         <span class="comment">// check to make sure we haven&#39;t timed out
         </span><span class="kw">if </span>start.elapsed() &gt;= timeout {
             <span class="macro">debug!</span>(<span class="string">&quot;ota_update_client: timed out waiting to close socket, closing it manually with an abort.&quot;</span>);
-            http_client.abort()<span class="question-mark">?</span>;
+            http_client.abort();
             <span class="kw">break</span>;
         }
     }
