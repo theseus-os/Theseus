@@ -153,6 +153,10 @@
 <a href="#153" id="153">153</a>
 <a href="#154" id="154">154</a>
 <a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate defines a struct that enables language-level virtualization of the NIC.
 //! A `VirtualNIC` contains a subset of physical NIC resources that are sufficient for an application,
 //! that has mutable access to a `VirtualNIC`, to send and receive packets without kernel mediation.
@@ -276,8 +280,12 @@
     }
 
     <span class="kw">fn </span>receive(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;ReceivedFrame&gt; {
-        <span class="comment">// TODO: Describe errors
-        </span><span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue].poll_queue_and_store_received_packets().unwrap();
+        <span class="comment">// poll_queue_and_store_received_packets will only return an error if it fails
+        // to create a contiguous mapping, or if the mapping created is of the wrong
+        // length, indicating a logic bug.
+        </span><span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue]
+            .poll_queue_and_store_received_packets()
+            .expect(<span class="string">&quot;failed to poll virtual NIC queue&quot;</span>);
         <span class="self">self</span>.rx_queues[<span class="self">self</span>.default_rx_queue].received_frames.pop_front()
     }
 
