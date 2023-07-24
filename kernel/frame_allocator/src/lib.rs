@@ -427,7 +427,7 @@ impl AllocatedFrames {
 }
 
 impl UnmappedFrames {
-    /// Consumes the `Frames` in an unmapped state and converts them to `Frames` in an allocated state.
+    /// Consumes this `Frames` in the `Unmapped` state and converts them into the `Allocated` state.
     pub fn into_allocated_frames(self) -> AllocatedFrames {    
         let f = Frames {
             typ: self.typ,
