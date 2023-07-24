@@ -482,8 +482,8 @@ impl<const S: MemoryState> Drop for Frames<S> {
                 match &mut list.0 {
                     // For early allocations, just add the deallocated chunk to the free pages list.
                     Inner::Array(_) => {
-                        if list.insert(free_frames).is_err() {
-                            panic!("BUG: Failed to insert frames into list(array) in the drop handler");
+                        if list.insert(free_frames).is_ok() {
+                            return;
                         }
                     }
                     
@@ -540,8 +540,10 @@ impl<const S: MemoryState> Drop for Frames<S> {
 
                         // trace!("Inserting new chunk for deallocated {:?} ", free_frames);
                         cursor_mut.insert(Wrapper::new_link(free_frames));
+                        return;
                     }
                 }
+                log::error!("BUG: couldn't insert deallocated {:?} into free frames list", self.frames);
             },
             MemoryState::Allocated => { 
                 // trace!("Converting AllocatedFrames to FreeFrames. Drop handler should be called again {:?}", self.frames);
