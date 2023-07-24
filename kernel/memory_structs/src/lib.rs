@@ -23,8 +23,8 @@ use paste::paste;
 use derive_more::*;
 use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 
+/// The possible states that a range of exclusively-owned pages or frames can be in.
 #[derive(PartialEq, Eq, ConstParamTy)]
-/// The possible states of a page or frame in virtual and physical memory.
 pub enum MemoryState {
     /// Memory is free and owned by the allocator
     Free,
