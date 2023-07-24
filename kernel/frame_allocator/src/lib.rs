@@ -640,11 +640,11 @@ impl<const S: MemoryState> Frames<S> {
     /// Splits up the given `Frames` into multiple smaller `Frames`.
     /// 
     /// Returns a `SplitFrames` instance containing three `Frames`:
-    /// 2. The range of frames in the `self` that came before the beginning of the requested frame range.
-    /// 1. The `Frames` containing the requested range of frames, `frames_to_extract`.
-    /// 3. The range of frames in the `self` that came after the end of the requested frame range.
+    /// 1. The range of frames in `self` that are before the beginning of `frames_to_extract`.
+    /// 2. The `Frames` containing the requested range of frames, `frames_to_extract`.
+    /// 3. The range of frames in `self` that are after the end of `frames_to_extract`.
     /// 
-    /// If `frames_to_extract` is not contained within `self`, then `self` is not changed and we return it within an Err.
+    /// If `frames_to_extract` is not contained within `self`, then `self` is returned unchanged within an `Err`.
     pub fn split_range(
         self,
         frames_to_extract: FrameRange
