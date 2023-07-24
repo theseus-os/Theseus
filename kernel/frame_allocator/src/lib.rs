@@ -386,7 +386,8 @@ assert_not_impl_any!(Frames<{MemoryState::Unmapped}>: DerefMut, Clone);
 
 impl FreeFrames {
     /// Creates a new `Frames` object in the `Free` state.
-    /// The frame allocator is reponsible for making sure no two `Frames` objects overlap.
+    ///
+    /// The frame allocator logic is responsible for ensuring that no two `Frames` objects overlap.
     pub(crate) fn new(typ: MemoryRegionType, frames: FrameRange) -> Self {
         Frames {
             typ,
@@ -395,7 +396,6 @@ impl FreeFrames {
     }
 
     /// Consumes this `Frames` in the `Free` state and converts them into the `Allocated` state.
-
     pub fn into_allocated_frames(self) -> AllocatedFrames {    
         let f = Frames {
             typ: self.typ,
@@ -419,7 +419,7 @@ impl AllocatedFrames {
     }
 
     /// Returns an `AllocatedFrame` if this `AllocatedFrames` object contains only one frame.
-    /// 
+    ///
     /// ## Panic
     /// Panics if this `AllocatedFrame` contains multiple frames or zero frames.
     pub fn as_allocated_frame(&self) -> AllocatedFrame {
@@ -445,11 +445,12 @@ impl UnmappedFrames {
 
 
 /// This function is a callback used to convert `UnmappedFrameRange` into `UnmappedFrames`.
-/// `UnmappedFrames` represents frames that have been unmapped from a page that had
-/// exclusively mapped to them, indicating that no others pages have been mapped 
-/// to those same frames, and thus, they can be safely deallocated.
-/// 
-/// This exists to break the cyclic dependency cycle between this crate and
+///
+/// `UnmappedFrames` represents frames that have been unmapped by a page that had
+/// previously exclusively mapped them, indicating that no others pages have been mapped 
+/// to those same frames, and thus, those frames can be safely deallocated.
+///
+/// This exists to break the cyclic dependency chain between this crate and
 /// the `page_table_entry` crate, since `page_table_entry` must depend on types
 /// from this crate in order to enforce safety when modifying page table entries.
 pub(crate) fn into_unmapped_frames(frames: FrameRange) -> UnmappedFrames {
@@ -544,13 +545,15 @@ impl<const S: MemoryState> Drop for Frames<S> {
                     }
                 }
                 log::error!("BUG: couldn't insert deallocated {:?} into free frames list", self.frames);
-            },
+            }
             MemoryState::Allocated => { 
-                // trace!("Converting AllocatedFrames to FreeFrames. Drop handler should be called again {:?}", self.frames);
-                FreeFrames::new(self.typ, self.frames.clone()); 
-            },
+                // trace!("Converting AllocatedFrames to FreeFrames. Drop handler will be called again {:?}", self.frames);
+                let _to_drop = FreeFrames::new(self.typ, self.frames.clone()); 
+            }
             MemoryState::Mapped => panic!("We should never drop a mapped frame! It should be forgotten instead."),
-            MemoryState::Unmapped => { AllocatedFrames{ typ: self.typ, frames: self.frames.clone() }; },
+            MemoryState::Unmapped => {
+                let _to_drop = AllocatedFrames { typ: self.typ, frames: self.frames.clone() };
+            }
         }
     }
 }
@@ -628,8 +631,9 @@ impl<const S: MemoryState> Frames<S> {
         }
     }
 
-    /// Merges the given `Frames` object `other` into this `Frames` object (`self`).
-    /// This is just for convenience and usability purposes, it performs no allocation or remapping.
+    /// Merges the given `other` `Frames` object into this `Frames` object (`self`).
+    ///
+    /// This function performs no allocation or re-mapping, it exists for convenience and usability purposes.
     ///
     /// The given `other` must be physically contiguous with `self`, i.e., come immediately before or after `self`.
     /// That is, either `self.start == other.end + 1` or `self.end + 1 == other.start` must be true. 
