@@ -9,7 +9,7 @@ use virtual_nic::VirtualNic;
 use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};
 use nic_queues::{RxQueue, TxQueue};
 use alloc::vec::Vec;
-use network_interface_card::NetworkInterfaceCard;
+use net::NetworkDevice;
 use pci::PciLocation;
 
 /// Create a virtual NIC from the ixgbe device.

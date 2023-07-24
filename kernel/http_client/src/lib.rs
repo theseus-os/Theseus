@@ -109,12 +109,9 @@ impl<'a> HttpClient<'a> {
     }
 
     /// Aborts the connection.
-    pub fn abort(&self) -> Result<(), &'static str> {
+    pub fn abort(&self) {
         self.socket.lock().abort();
-
-        self.interface
-            .poll()
-            .map_err(|_| "failed to poll interface after sending")
+        self.interface.poll();
     }
 
     /// Sends an HTTP request with an optional timeout.
@@ -166,9 +163,7 @@ impl<'a> HttpClient<'a> {
                         .map_err(|_| "cannot send request")?;
                     // Poll the socket to send the packet. Once we have a custom socket type this
                     // won't be necessary.
-                    interface
-                        .poll()
-                        .map_err(|_| "failed to poll interface after sending")?;
+                    interface.poll();
                     latest_packet_timestamp = Instant::now();
                     HttpState::ReceivingResponse
                 }
