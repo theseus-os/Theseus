@@ -363,10 +363,13 @@ pub struct Frames<const S: MemoryState> {
     frames: FrameRange
 }
 
-// Type aliases for the Frames in each state
+/// A type alias for `Frames` in the `Free` state.
 pub type FreeFrames = Frames<{MemoryState::Free}>;
+/// A type alias for `Frames` in the `Allocated` state.
 pub type AllocatedFrames = Frames<{MemoryState::Allocated}>;
+/// A type alias for `Frames` in the `Mapped` state.
 pub type MappedFrames = Frames<{MemoryState::Mapped}>;
+/// A type alias for `Frames` in the `Unmapped` state.
 pub type UnmappedFrames = Frames<{MemoryState::Unmapped}>;
 
 // Frames must not be Cloneable, and it must not expose its inner frames as mutable.
