@@ -121,8 +121,12 @@ where
     }
 
     fn receive(&mut self) -> Option<ReceivedFrame> {
-        // TODO: Describe errors
-        self.rx_queues[self.default_rx_queue].poll_queue_and_store_received_packets().unwrap();
+        // poll_queue_and_store_received_packets will only return an error if it fails
+        // to create a contiguous mapping, or if the mapping created is of the wrong
+        // length, indicating a logic bug.
+        self.rx_queues[self.default_rx_queue]
+            .poll_queue_and_store_received_packets()
+            .expect("failed to poll virtual NIC queue");
         self.rx_queues[self.default_rx_queue].received_frames.pop_front()
     }
 
