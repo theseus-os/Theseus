@@ -389,7 +389,8 @@ impl FreeFrames {
         }
     }
 
-    /// Consumes the `Frames` in an free state and converts them to `Frames` in a allocated state.
+    /// Consumes this `Frames` in the `Free` state and converts them into the `Allocated` state.
+
     pub fn into_allocated_frames(self) -> AllocatedFrames {    
         let f = Frames {
             typ: self.typ,
