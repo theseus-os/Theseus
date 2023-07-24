@@ -402,7 +402,7 @@ impl FreeFrames {
 }
 
 impl AllocatedFrames {
-    /// Consumes the `Frames` in an allocated state and converts them to `Frames` in a mapped state.
+    /// Consumes this `Frames` in the `Allocated` state and converts them into the `Mapped` state.
     /// This should only be called once a `MappedPages` has been created from the `Frames`.
     pub fn into_mapped_frames(self) -> MappedFrames {    
         let f = Frames {
