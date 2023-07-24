@@ -14,8 +14,8 @@ use core::{
     cmp::{min, max},
     fmt,
     iter::Step,
+    marker::ConstParamTy,
     ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
-    marker::ConstParamTy
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
