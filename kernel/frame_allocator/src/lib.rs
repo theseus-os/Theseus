@@ -444,7 +444,7 @@ impl UnmappedFrames {
 }
 
 
-/// This function is a callback used to convert `UnmappedFramesInfo` into `UnmappedFrames`.
+/// This function is a callback used to convert `UnmappedFrameRange` into `UnmappedFrames`.
 /// `UnmappedFrames` represents frames that have been unmapped from a page that had
 /// exclusively mapped to them, indicating that no others pages have been mapped 
 /// to those same frames, and thus, they can be safely deallocated.
@@ -460,6 +460,7 @@ pub(crate) fn into_unmapped_frames(frames: FrameRange) -> UnmappedFrames {
     };
     Frames{ typ, frames }
 }
+
 
 impl<const S: MemoryState> Drop for Frames<S> {
     fn drop(&mut self) {
@@ -481,8 +482,8 @@ impl<const S: MemoryState> Drop for Frames<S> {
                 match &mut list.0 {
                     // For early allocations, just add the deallocated chunk to the free pages list.
                     Inner::Array(_) => {
-                        if list.insert(free_frames).is_ok() {
-                            return;
+                        if list.insert(free_frames).is_err() {
+                            panic!("BUG: Failed to insert frames into list(array) in the drop handler");
                         }
                     }
                     
@@ -539,7 +540,6 @@ impl<const S: MemoryState> Drop for Frames<S> {
 
                         // trace!("Inserting new chunk for deallocated {:?} ", free_frames);
                         cursor_mut.insert(Wrapper::new_link(free_frames));
-                        return;
                     }
                 }
             },
@@ -1085,7 +1085,7 @@ fn add_reserved_region_to_lists(
 ) -> Result<FrameRange, &'static str> {
 
     // first check the regions list for overlaps and proceed only if there are none.
-    if contains_any(&regions_list, &frames){
+    if contains_any(regions_list, &frames){
         return Err("Failed to add reserved region that overlapped with existing reserved regions.");
     } else {
         // Check whether the reserved region overlaps any existing regions.

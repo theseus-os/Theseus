@@ -226,7 +226,7 @@ pub fn init(
     into_unmapped_frames_fn: fn(FrameRange) -> UnmappedFrames,
 ) -> Result<InitialMemoryMappings, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
-    // `page_table_entry::UnmappedFramesInfo` back into `UnmappedFrames`.
+    // `page_table_entry::UnmappedFrameRange` back into `UnmappedFrames`.
     mapper::INTO_UNMAPPED_FRAMES_FUNC.call_once(|| into_unmapped_frames_fn);
 
     // bootstrap a PageTable from the currently-loaded page table

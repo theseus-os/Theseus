@@ -34,11 +34,11 @@ use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
 #[cfg(target_arch = "x86_64")]
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
-/// This is a private callback used to convert `UnmappedFramesInfo` into `UnmappedFrames`.
+/// This is a private callback used to convert `UnmappedFrameRange` into `UnmappedFrames`.
 /// 
 /// This exists to break the cyclic dependency cycle between `page_table_entry` and
 /// `frame_allocator`, which depend on each other as such:
-/// * `frame_allocator` needs to `impl Into<Frames> for UnmappedFramesInfo`
+/// * `frame_allocator` needs to `impl Into<Frames> for UnmappedFrameRange`
 ///    in order to allow unmapped exclusive frames to be safely deallocated
 /// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow
 ///   page table entry values to be set safely to a real physical frame that is owned and exists.
@@ -49,7 +49,7 @@ use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 /// 
 /// This is safe because the frame allocator can only be initialized once, and also because
 /// only this crate has access to that function callback and can thus guarantee
-/// that it is only invoked for `UnmappedFramesInfo`.
+/// that it is only invoked for `UnmappedFrameRange`.
 pub(super) static INTO_UNMAPPED_FRAMES_FUNC: Once<fn(FrameRange) -> UnmappedFrames> = Once::new();
 
 /// A convenience function to translate the given virtual address into a
