@@ -748,7 +748,7 @@ impl<const S: MemoryState> Borrow<Frame> for &'_ Frames<S> {
 
 impl<const S: MemoryState> fmt::Debug for Frames<S> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Frames({:?}, {:?})", self.typ, self.frames)
+        write!(f, "Frames({:?}, {:?})", self.frames, self.typ)
     }
 }
 
