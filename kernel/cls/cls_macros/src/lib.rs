@@ -39,6 +39,12 @@ impl Parse for CpuLocal {
     }
 }
 
+/// A macro for declaring CPU-local variables.
+///
+/// Variables must be an unsigned integer, bar `u128`.
+///
+/// The initialisation expression has no effect; to set the initial value,
+/// `per_cpu::PerCpuData::new` must be modified.
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     // if !args.is_empty() {
