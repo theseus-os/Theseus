@@ -3759,9 +3759,9 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "cls",
  "context_switch",
  "cpu",
- "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",
