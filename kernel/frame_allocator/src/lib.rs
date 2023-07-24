@@ -321,10 +321,10 @@ pub enum MemoryRegionType {
     Unknown,
 }
 
-/// A range of contiguous frames.
+/// A range of contiguous frames in physical memory.
 ///
-/// Owning a `Frames` object implies globally-exclusive ownership of and access to
-/// the range of frames it contains.
+/// Each `Frames` object is globally unique, meaning that the owner of a `Frames` object
+/// has globally-exclusive access to the range of frames it contains.
 /// 
 /// A `Frames` object can be in one of four states:
 /// * `Free`: frames are owned by the frame allocator and have not been allocated for any use.
