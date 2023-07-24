@@ -322,21 +322,29 @@ pub enum MemoryRegionType {
 }
 
 /// A range of contiguous frames.
-/// Owning a `Frames` object gives ownership of the range of frames it references.
-/// 
-/// The frames can be in a free, allocated, mapped or unmapped state. 
-/// In the free state, frames are owned by the frame allocator and have not been allocated for a mapping.
-/// In the allocated state, frames have been removed from the free list and can be used for a mapping.
-/// In the mapped state, frames have been mapped to a virtual memory page and are in use.
-/// In the unmapped state, frames have been unmapped and can be retured to the frame allocator.
-/// 
-/// When a `Frames` object in a free state is dropped, it will be added back to the free list.
-/// When a `Frames` object in an allocated state is dropped, it is transitioned to a free state. 
-/// When a `Frames` obect in an unmapped state is dropped, it is transitioned to an allocated state.
-/// We expect that `Frames` in a mapped state will never be dropped, but instead will be forgotten and then 
-/// recreated in an unmapped state when it's frames are cleared from the page table.
 ///
-///     (Free) <--> (Allocated) -> (Mapped) -> (Unmapped) -> (Allocated)
+/// Owning a `Frames` object implies globally-exclusive ownership of and access to
+/// the range of frames it contains.
+/// 
+/// A `Frames` object can be in one of four states:
+/// * `Free`: frames are owned by the frame allocator and have not been allocated for any use.
+/// * `Allocated`: frames have been removed from the allocator's free list and are owned elsewhere;
+///    they can now be used for mapping purposes.
+/// * `Mapped`: frames have been (and are currently) mapped by a range of virtual memory pages.
+/// * `Unmapped`: frames have been unmapped and can be returned to the frame allocator.
+///
+/// The drop behavior for a `Frames` object is based on its state:
+/// * `Free`:  the frames will be added back to the frame allocator's free list.
+/// * `Allocated`: the frames will be transitioned into the `Free` state.
+/// * `Unmapped`: the frames will be transitioned into the `Allocated` state.
+/// * `Mapped`: currently, Theseus does not actually drop mapped `Frames`, but rather they are forgotten
+///    when they are mapped by virtual pages, and then re-created in the `Unmapped` state
+///    after being unmapped from the page tables.
+///
+/// As such, one can visualize the `Frames` state diagram as such:
+/// ```
+/// (Free) <---> (Allocated) --> (Mapped) --> (Unmapped) --> (Allocated) <---> (Free)
+/// ```
 /// 
 /// # Ordering and Equality
 ///
