@@ -355,6 +355,11 @@ pub enum MemoryRegionType {
 /// both of which are also based ONLY on the **starting** `Frame` of the `Frames`.
 /// Thus, comparing two `Frames` with the `==` or `!=` operators may not work as expected.
 /// since it ignores their actual range of frames.
+/// 
+/// Similarly, `Frames` implements the `Borrow` trait to return a `Frame`,
+/// not a `FrameRange`. This is required so we can search for `Frames` in a sorted collection
+/// using a `Frame` value.
+/// It differs from the behavior of the `Deref` trait which returns a `FrameRange`.
 #[derive(Eq)]
 pub struct Frames<const S: MemoryState> {
     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
@@ -462,7 +467,7 @@ impl<const S: MemoryState> Drop for Frames<S> {
             MemoryState::Free => {
                 if self.size_in_frames() == 0 { return; }
         
-                let free_frames: FreeFrames = Frames {
+                let mut free_frames: FreeFrames = Frames {
                     typ: self.typ,
                     frames: self.frames.clone(),
                 };
@@ -486,25 +491,45 @@ impl<const S: MemoryState> Drop for Frames<S> {
                     // or if we need to insert a new chunk.
                     Inner::RBTree(ref mut tree) => {
                         let mut cursor_mut = tree.lower_bound_mut(Bound::Included(free_frames.start()));
-                        if let Some(next_frames) = cursor_mut.get_mut() {
-                            if *free_frames.end() + 1 == *next_frames.start() {
-                                // trace!("Prepending {:?} onto beg of next {:?}", free_frames, next_frames.deref().deref());
+                        if let Some(next_frames_ref) = cursor_mut.get() {
+                            if *free_frames.end() + 1 == *next_frames_ref.start() {
+                                // extract the next chunk from the list
+                                let mut next_frames = cursor_mut
+                                    .replace_with(Wrapper::new_link(Frames::empty()))
+                                    .expect("BUG: couldn't remove next frames from free list in drop handler")
+                                    .into_inner();
+
+                                // trace!("Prepending {:?} onto beg of next {:?}", free_frames, next_frames);
                                 if next_frames.merge(free_frames).is_ok() {
                                     // trace!("newly merged next chunk: {:?}", next_frames);
-                                    return;
+                                    // now return newly merged chunk into list
+                                    match cursor_mut.replace_with(Wrapper::new_link(next_frames)) { 
+                                        Ok(_) => { return; }
+                                        Err(f) => free_frames = f.into_inner(), 
+                                    }
                                 } else {
                                     panic!("BUG: couldn't merge deallocated chunk into next chunk");
                                 }
                             }
                         }
-                        if let Some(prev_frames) = cursor_mut.peek_prev().get() {
-                            if *prev_frames.end() + 1 == *free_frames.start() {
+                        if let Some(prev_frames_ref) = cursor_mut.peek_prev().get() {
+                            if *prev_frames_ref.end() + 1 == *free_frames.start() {
                                 // trace!("Appending {:?} onto end of prev {:?}", free_frames, prev_frames.deref());
                                 cursor_mut.move_prev();
-                                if let Some(prev_frames) = cursor_mut.get_mut() {
+                                if let Some(_prev_frames_ref) = cursor_mut.get() {
+                                    // extract the next chunk from the list
+                                    let mut prev_frames = cursor_mut
+                                        .replace_with(Wrapper::new_link(Frames::empty()))
+                                        .expect("BUG: couldn't remove next frames from free list in drop handler")
+                                        .into_inner();
+
                                     if prev_frames.merge(free_frames).is_ok() {
                                         // trace!("newly merged prev chunk: {:?}", prev_frames);
-                                        return;
+                                        // now return newly merged chunk into list
+                                        match cursor_mut.replace_with(Wrapper::new_link(prev_frames)) { 
+                                            Ok(_) => { return; }
+                                            Err(f) => free_frames = f.into_inner(), 
+                                        }
                                     } else {
                                         panic!("BUG: couldn't merge deallocated chunk into prev chunk");
                                     }
@@ -582,17 +607,12 @@ assert_not_impl_any!(AllocatedFrame: DerefMut, Clone);
 
 /// The result of splitting a `Frames` object into multiple smaller `Frames` objects.
 pub struct SplitFrames<const S: MemoryState>  {
-    before_start: Option<Frames<S>>,
-    start_to_end:  Frames<S>,
-    after_end:    Option<Frames<S>>,
+    before_start:   Option<Frames<S>>,
+    start_to_end:   Frames<S>,
+    after_end:      Option<Frames<S>>,
 }
 
 impl<const S: MemoryState> Frames<S> {
-    #[allow(dead_code)]
-    pub(crate) fn frames(&self) -> FrameRange {
-        self.frames.clone()
-    }
-
     pub(crate) fn typ(&self) -> MemoryRegionType {
         self.typ
     }
@@ -1065,7 +1085,9 @@ fn add_reserved_region_to_lists(
 ) -> Result<FrameRange, &'static str> {
 
     // first check the regions list for overlaps and proceed only if there are none.
-    if !contains_any(&regions_list, &frames){
+    if contains_any(&regions_list, &frames){
+        return Err("Failed to add reserved region that overlapped with existing reserved regions.");
+    } else {
         // Check whether the reserved region overlaps any existing regions.
         match &mut frames_list.0 {
             Inner::Array(ref mut arr) => {
@@ -1106,10 +1128,7 @@ fn add_reserved_region_to_lists(
             MemoryRegionType::Reserved,
             frames.clone(),
         )).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
-    } else {
-        return Err("Failed to add reserved region that overlapped with existing reserved regions.");
     }
-    
     Ok(frames)
 }
 

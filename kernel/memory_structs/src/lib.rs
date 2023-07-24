@@ -489,12 +489,7 @@ macro_rules! implement_page_frame_range {
 
                 #[doc = "Returns true if `other` is contained within the `" $TypeName "`."]
                 pub fn contains_range(&self, other: &$TypeName) -> bool {
-                    if !other.is_empty() && (other.start() >= self.start()) && (other.end() <= self.end()) 
-                    {
-                        true
-                    } else {
-                        false
-                    }
+                    !other.is_empty() && (other.start() >= self.start()) && (other.end() <= self.end())
                 }
             }
             impl fmt::Debug for $TypeName {
