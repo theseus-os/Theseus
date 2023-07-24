@@ -655,22 +655,22 @@ impl<const S: MemoryState> Frames<S> {
         }
         
         let start_frame = *frames_to_extract.start();
-        let start_to_end = Frames{ frames: frames_to_extract, ..self };
+        let start_to_end = Frames { frames: frames_to_extract, ..self };
         
         let before_start = if start_frame == MIN_FRAME || start_frame == *self.start() {
             None
         } else {
-            Some(Frames{ frames: FrameRange::new(*self.start(), *start_to_end.start() - 1), ..self })
+            Some(Frames { frames: FrameRange::new(*self.start(), *start_to_end.start() - 1), ..self })
         };
 
-        let after_end = if *start_to_end.end() == MAX_FRAME || *start_to_end.end() == *self.end(){
+        let after_end = if *start_to_end.end() == MAX_FRAME || *start_to_end.end() == *self.end() {
             None
         } else {
-            Some(Frames{ frames: FrameRange::new(*start_to_end.end() + 1, *self.end()), ..self })
+            Some(Frames { frames: FrameRange::new(*start_to_end.end() + 1, *self.end()), ..self })
         };
 
         core::mem::forget(self);
-        Ok( SplitFrames{ before_start, start_to_end, after_end} )
+        Ok(SplitFrames { before_start, start_to_end, after_end })
     }
 
     /// Splits this `Frames` into two separate `Frames` objects:
