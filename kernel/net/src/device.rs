@@ -110,16 +110,14 @@ impl<'a> phy::TxToken for TxToken<'a> {
         match u16::try_from(len) {
             Ok(len) => {
                 // This will only fail if the underlying memory allocation fails.
-                //
-                // TODO: Arguably `TransmitBuffer::new` should panic instead, similar to other
-                // data structures (e.g. `Vec`).
                 let mut buf = TransmitBuffer::new(len).expect("failed to allocate transmit buffer");
                 let ret = f(&mut buf);
                 self.device.send(buf);
                 ret
             }
             Err(_) => {
-                // https://github.com/smoltcp-rs/smoltcp/blob/fa7fd3c321b8a3bbe1a8a4ee2ee5dc1b63231d6b/CHANGELOG.md?plain=1#L57
+                // For appropriate behavior on an error, see this smoltcp changelog entry:
+                // <https://github.com/smoltcp-rs/smoltcp/blob/fa7fd3c321b8a3bbe1a8a4ee2ee5dc1b63231d6b/CHANGELOG.md?plain=1#L57>
                 error!("packet too large: dropping packet");
                 let mut buf = vec![0; len];
                 f(&mut buf)
