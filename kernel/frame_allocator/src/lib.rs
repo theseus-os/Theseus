@@ -380,7 +380,7 @@ assert_not_impl_any!(Frames<{MemoryState::Unmapped}>: DerefMut, Clone);
 
 
 impl FreeFrames {
-    /// Creates a new `Frames` object in an free state.
+    /// Creates a new `Frames` object in the `Free` state.
     /// The frame allocator is reponsible for making sure no two `Frames` objects overlap.
     pub(crate) fn new(typ: MemoryRegionType, frames: FrameRange) -> Self {
         Frames {
