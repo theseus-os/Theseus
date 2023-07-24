@@ -1100,7 +1100,7 @@ fn add_reserved_region_to_lists(
         regions_list.insert(PhysicalMemoryRegion {
                 typ: MemoryRegionType::Reserved,
                 frames: frames.clone(),
-        }).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+        }).map_err(|_c| "BUG: Failed to insert non-overlapping physical memory region into reserved regions list.")?;
 
         frames_list.insert(Frames::new(
             MemoryRegionType::Reserved,
