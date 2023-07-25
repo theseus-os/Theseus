@@ -20,6 +20,12 @@ pub struct GicV3InterruptControllerConfig {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct PciEcamConfig {
+    pub base_address: PhysicalAddress,
+    pub size_bytes: usize,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum InterruptControllerConfig {
     GicV3(GicV3InterruptControllerConfig),
 }
@@ -36,6 +42,7 @@ pub struct BoardConfig {
     pub cpu_ids: [mpidr::DefinedMpidrValue; NUM_CPUS],
     pub interrupt_controller: InterruptControllerConfig,
     pub pl011_base_addresses: [PhysicalAddress; NUM_PL011_UARTS],
+    pub pci_ecam: PciEcamConfig,
 }
 
 // by default & on x86_64, the default.rs file is used

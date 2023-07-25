@@ -12,10 +12,15 @@ log = "0.4.8"
 volatile = "0.2.4"
 zerocopy = "0.5.0"
 
-port_io = { path = "../../libs/port_io" }
 memory = { path = "../memory" }
 cpu = { path = "../cpu" }
 interrupts = { path = "../interrupts" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+port_io = { path = "../../libs/port_io" }
+
+[target.'cfg(target_arch = "aarch64")'.dependencies]
+arm_boards = { path = "../arm_boards" }
 
 [lib]
 crate-type = ["rlib"]

@@ -7,7 +7,6 @@ use log::*;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 use alloc::vec::Vec;
-use port_io::Port;
 use spin::{Once, Mutex};
 use memory::{PhysicalAddress, BorrowedSliceMappedPages, Mutable, MappedPages, map_frame_range, MMIO_FLAGS};
 use bit_field::BitField;
@@ -15,6 +14,15 @@ use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
 use interrupts::InterruptNumber;
+
+#[cfg(target_arch = "x86_64")]
+use port_io::Port;
+
+#[cfg(target_arch = "aarch64")]
+use {
+    core::mem::size_of,
+    arm_boards::BOARD_CONFIG,
+};
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
@@ -65,17 +73,31 @@ const MAX_SLOTS_PER_BUS: u8 = 32;
 const MAX_FUNCTIONS_PER_SLOT: u8 = 8;
 
 /// Addresses/offsets into the PCI configuration space should clear the least-significant 2 bits.
-const PCI_CONFIG_ADDRESS_OFFSET_MASK: u8 = 0xFC; 
+const PCI_CONFIG_ADDRESS_OFFSET_MASK: u32 = !0x2;
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
 
 /// This port is used to specify the address in the PCI configuration space
 /// for the next read/write of the `PCI_CONFIG_DATA_PORT`.
+#[cfg(target_arch = "x86_64")]
 static PCI_CONFIG_ADDRESS_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_ADDRESS));
 
 /// This port is used to transfer data to or from the PCI configuration space
 /// specified by a previous write to the `PCI_CONFIG_ADDRESS_PORT`.
+#[cfg(target_arch = "x86_64")]
 static PCI_CONFIG_DATA_PORT: Mutex<Port<u32>> = Mutex::new(Port::new(CONFIG_DATA));
+
+#[cfg(target_arch = "x86_64")]
+const BASE_OFFSET: u32 = 0x8000_0000;
+
+#[cfg(target_arch = "aarch64")]
+type PciConfigSpace = BorrowedSliceMappedPages<u8, Mutable>;
+
+#[cfg(target_arch = "aarch64")]
+static PCI_CONFIG_SPACE: Mutex<Option<PciConfigSpace>> = Mutex::new(None);
+
+#[cfg(target_arch = "aarch64")]
+const BASE_OFFSET: u32 = 0;
 
 pub enum InterruptPin {
     A,
@@ -88,32 +110,33 @@ pub enum InterruptPin {
 
 /// Returns a list of all PCI buses in this system.
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
-pub fn get_pci_buses() -> &'static Vec<PciBus> {
+pub fn get_pci_buses() -> Result<&'static Vec<PciBus>, &'static str> {
     static PCI_BUSES: Once<Vec<PciBus>> = Once::new();
-    PCI_BUSES.call_once(scan_pci)
+    PCI_BUSES.try_call_once(scan_pci)
 }
 
 
 /// Returns a reference to the `PciDevice` with the given bus, slot, func identifier.
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
-pub fn get_pci_device_bsf(bus: u8, slot: u8, func: u8) -> Option<&'static PciDevice> {
-    for b in get_pci_buses() {
+pub fn get_pci_device_bsf(bus: u8, slot: u8, func: u8) -> Result<Option<&'static PciDevice>, &'static str> {
+    for b in get_pci_buses()? {
         if b.bus_number == bus {
             for d in &b.devices {
                 if d.slot == slot && d.func == func {
-                    return Some(d);
+                    return Ok(Some(d));
                 }
             }
         }
     }
-    None
+
+    Ok(None)
 }
 
 
 /// Returns an iterator that iterates over all `PciDevice`s, in no particular guaranteed order. 
 /// If the PCI bus hasn't been initialized, this initializes the PCI bus & scans it to enumerates devices.
-pub fn pci_device_iter() -> impl Iterator<Item = &'static PciDevice> {
-    get_pci_buses().iter().flat_map(|b| b.devices.iter())
+pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'static str> {
+    Ok(get_pci_buses()?.iter().flat_map(|b| b.devices.iter()))
 }
 
 
@@ -129,7 +152,20 @@ pub struct PciBus {
 
 /// Scans all PCI Buses (brute force iteration) to enumerate PCI Devices on each bus.
 /// Initializes structures containing this information. 
-fn scan_pci() -> Vec<PciBus> {
+fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
+    #[cfg(target_arch = "aarch64")] {
+        let mut config_space = PCI_CONFIG_SPACE.lock();
+        if config_space.is_none() {
+            let config = BOARD_CONFIG.pci_ecam;
+            let flags = memory::PteFlags::new().valid(true).writable(true);
+            let mapped = memory::map_frame_range(config.base_address, config.size_bytes, flags)?;
+            match mapped.into_borrowed_slice_mut(0, config.size_bytes) {
+                Ok(bsm) => config_space.insert(bsm),
+                Err((_, msg)) => return Err(msg),
+            };
+        }
+    }
+
     let mut buses: Vec<PciBus> = Vec::new();
 
     for bus in 0..MAX_PCI_BUSES {
@@ -198,7 +234,7 @@ fn scan_pci() -> Vec<PciBus> {
         }
     }
 
-    buses   
+    Ok(buses)   
 }
 
 
@@ -221,19 +257,37 @@ impl PciLocation {
     /// The least two significant bits of offset are masked, so it's 4-byte aligned addressing,
     /// which makes sense since we read PCI data (from the configuration space) in 32-bit chunks.
     fn pci_address(self, offset: u8) -> u32 {
-        ((self.bus  as u32) << 16) | 
-        ((self.slot as u32) << 11) | 
-        ((self.func as u32) <<  8) | 
-        ((offset as u32) & (PCI_CONFIG_ADDRESS_OFFSET_MASK as u32)) | 
-        0x8000_0000
+        BASE_OFFSET |
+        ((self.bus  as u32) << 16) |
+        ((self.slot as u32) << 11) |
+        ((self.func as u32) <<  8) |
+        (offset as u32)
     }
 
-    /// read 32-bit data at the specified `offset` from the PCI device specified by the given `bus`, `slot`, `func` set.
-    fn pci_read_32(&self, offset: u8) -> u32 {
-        unsafe { 
-            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
+    fn pci_read_32_addr(&self, address: u32) -> u32 {
+        #[cfg(target_arch = "x86_64")] {
+            let shift = (address & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8;
+            let aligned_address = address & PCI_CONFIG_ADDRESS_OFFSET_MASK;
+            unsafe { 
+                PCI_CONFIG_ADDRESS_PORT.lock().write(aligned_address);
+            }
+            PCI_CONFIG_DATA_PORT.lock().read() >> shift
         }
-        Self::read_data_port() >> ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8)
+
+        #[cfg(target_arch = "aarch64")] {
+            let config_space = PCI_CONFIG_SPACE.lock();
+            let config_space = config_space.deref().as_ref().unwrap();
+            let address = address as usize;
+            let slice = &config_space[address..][..size_of::<u32>()];
+            let mut value = [0; 4];
+            value.copy_from_slice(slice);
+            u32::from_ne_bytes(value)
+        }
+    }
+
+    /// Read 32-bit data at the specified `offset` from this PCI device.
+    fn pci_read_32(&self, offset: u8) -> u32 {
+        self.pci_read_32_addr(self.pci_address(offset))
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
@@ -241,54 +295,60 @@ impl PciLocation {
         self.pci_read_32(offset) as u16
     } 
 
-    /// Read 8-bit data at the specified `offset` from the PCI device.
+    /// Read 8-bit data at the specified `offset` from this PCI device.
     fn pci_read_8(&self, offset: u8) -> u8 {
         self.pci_read_32(offset) as u8
     }
 
+    fn pci_write_addr(&self, address: u32, value: u32) {
+        #[cfg(target_arch = "x86_64")] {
+            let shift = (address & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8;
+            let aligned_address = address & PCI_CONFIG_ADDRESS_OFFSET_MASK;
+            unsafe {
+                PCI_CONFIG_ADDRESS_PORT.lock().write(aligned_address); 
+                PCI_CONFIG_DATA_PORT.lock().write(value << shift);
+            }
+        }
+
+        #[cfg(target_arch = "aarch64")] {
+            let mut config_space = PCI_CONFIG_SPACE.lock();
+            let config_space = config_space.deref_mut().as_mut().unwrap();
+            let address = address as usize;
+            let slice = &mut config_space[address..][..size_of::<u32>()];
+            slice.copy_from_slice(&value.to_ne_bytes());
+        }
+    }
+
     /// Write 32-bit data to the specified `offset` for the PCI device.
     fn pci_write(&self, offset: u8, value: u32) {
-        unsafe {
-            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(offset)); 
-            Self::write_data_port((value) << ((offset & 2) * 8));
-        }
-    }
-
-    fn write_data_port(value: u32) {
-        unsafe {
-            PCI_CONFIG_DATA_PORT.lock().write(value);
-        }
-    }
-
-    fn read_data_port() -> u32 {
-        PCI_CONFIG_DATA_PORT.lock().read()
+        self.pci_write_addr(self.pci_address(offset), value);
     }
 
     /// Sets the PCI device's bit 3 in the command portion, which is apparently needed to activate DMA (??)
     pub fn pci_set_command_bus_master_bit(&self) {
-        unsafe { 
-            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(PCI_COMMAND));
-        }
-        let inval = Self::read_data_port(); 
-        trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}", self, inval);
-        Self::write_data_port(inval | (1 << 2));
+        let value = self.pci_read_32(PCI_COMMAND);
+        trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}", self, value);
+
+        self.pci_write(PCI_COMMAND, value | (1 << 2));
+
         trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value AFTER WRITE CMD: {:#x}", 
             self,
-            Self::read_data_port()
+            self.pci_read_32(PCI_COMMAND),
         );
     }
 
     /// Sets the PCI device's command bit 10 to disable legacy interrupts
     pub fn pci_set_interrupt_disable_bit(&self) {
-        unsafe { 
-            PCI_CONFIG_ADDRESS_PORT.lock().write(self.pci_address(PCI_COMMAND));
-        }
-        let command = Self::read_data_port(); 
+        let command = self.pci_read_32(PCI_COMMAND);
         trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
+
         const INTERRUPT_DISABLE: u32 = 1 << 10;
-        Self::write_data_port(command | INTERRUPT_DISABLE);
+        self.pci_write(PCI_COMMAND, command | INTERRUPT_DISABLE);
+
         trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
-            self, Self::read_data_port());
+            self,
+            self.pci_read_32(PCI_COMMAND),
+        );
     }
 
     /// Explores the PCI config space and returns address of requested capability, if present. 

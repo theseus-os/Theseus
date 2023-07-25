@@ -12,6 +12,7 @@ event_types = { path = "../event_types" }
 serial_port = { path = "../serial_port" }
 console = { path = "../console" }
 logger = { path = "../logger" }
+pci = { path = "../pci" }
 derive_more = "0.99.0"
 mpmc = "0.1.6"
 log = "0.4.8"
@@ -20,7 +21,6 @@ log = "0.4.8"
 memory = { path = "../memory" }
 e1000 = { path = "../e1000" }
 acpi = { path = "../acpi" }
-pci = { path = "../pci" }
 ps2 = { path = "../ps2" }
 keyboard = { path = "../keyboard" }
 mouse = { path = "../mouse" }

@@ -2,7 +2,7 @@
 
 use super::{
     InterruptControllerConfig::GicV3, GicV3InterruptControllerConfig,
-    BoardConfig, mpidr::DefinedMpidrValue,
+    BoardConfig, mpidr::DefinedMpidrValue, PciEcamConfig,
 };
 use memory_structs::PhysicalAddress;
 
@@ -36,4 +36,11 @@ pub static BOARD_CONFIG: BoardConfig = BoardConfig {
         ],
     }),
     pl011_base_addresses: [ PhysicalAddress::new_canonical(0x09000000) ],
+
+    // obtained via internal qemu debugging
+    // todo: will this always be correct?
+    pci_ecam: PciEcamConfig {
+        base_address: PhysicalAddress::new_canonical(0x4010000000),
+        size_bytes: 0x10000000,
+    }
 };
