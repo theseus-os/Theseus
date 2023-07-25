@@ -485,12 +485,13 @@ impl<const S: MemoryState> Drop for Frames<S> {
                     Inner::Array(_) => {
                         if list.insert(free_frames).is_ok() {
                             return;
+                        } else {
+                            error!("Failed to insert deallocated frames into the list (array). The initial static array should be created with a larger size.");
                         }
                     }
                     
-                    // For full-fledged deallocations, use the entry API to efficiently determine if
-                    // we can merge the deallocated frames with an existing contiguously-adjacent chunk
-                    // or if we need to insert a new chunk.
+                    // For full-fledged deallocations, determine if we can merge the deallocated frames 
+                    // with an existing contiguously-adjacent chunk or if we need to insert a new chunk.
                     Inner::RBTree(ref mut tree) => {
                         let mut cursor_mut = tree.lower_bound_mut(Bound::Included(free_frames.start()));
                         if let Some(next_frames_ref) = cursor_mut.get() {
