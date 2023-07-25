@@ -937,7 +937,7 @@ fn find_specific_chunk(
                             // We would like to merge it into the initial chunk with just the reference (since we have a cursor pointing to it already),
                             // but we can't get a mutable reference to the element the cursor is pointing to.
                             // So both chunks will be removed and then merged. 
-                            return allocate_from_chosen_chunk(FrameRange::new(requested_frame, requested_frame + num_frames -1), ValueRefMut::RBTree(cursor_mut), Some(next_chunk));
+                            return allocate_from_chosen_chunk(FrameRange::new(requested_frame, requested_frame + num_frames - 1), ValueRefMut::RBTree(cursor_mut), Some(next_chunk));
                         }
                     }
                 }
@@ -1030,7 +1030,8 @@ fn allocate_from_chosen_chunk(
         chosen_chunk.merge(chunk).expect("BUG: Failed to merge adjacent chunks");
     }
 
-    let SplitFrames{ before_start, start_to_end: new_allocation, after_end } = chosen_chunk.split_range(frames_to_allocate)
+    let SplitFrames { before_start, start_to_end: new_allocation, after_end } = chosen_chunk
+        .split_range(frames_to_allocate)
         .expect("BUG: Failed to split merged chunk");
 
     // TODO: Re-use the allocated wrapper if possible, rather than allocate a new one entirely.
@@ -1093,48 +1094,49 @@ fn add_reserved_region_to_lists(
     // first check the regions list for overlaps and proceed only if there are none.
     if contains_any(regions_list, &frames){
         return Err("Failed to add reserved region that overlapped with existing reserved regions.");
-    } else {
-        // Check whether the reserved region overlaps any existing regions.
-        match &mut frames_list.0 {
-            Inner::Array(ref mut arr) => {
-                for chunk in arr.iter().flatten() {
-                    if let Some(_overlap) = chunk.overlap(&frames) {
-                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                        //     frames, _overlap, chunk
-                        // );
-                        return Err("Failed to add free frames that overlapped with existing frames (array).");
-                    }
-                }
-            }
-            Inner::RBTree(ref mut tree) => {
-                let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
-                while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
-                    if chunk.start() > frames.end() {
-                        // We're iterating in ascending order over a sorted tree,
-                        // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
-                        break;
-                    }
-                    if let Some(_overlap) = chunk.overlap(&frames) {
-                        // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                        //     frames, _overlap, chunk
-                        // );
-                        return Err("Failed to add free frames that overlapped with existing frames (RBTree).");
-                    }
-                    cursor_mut.move_next();
+    }
+
+    // Check whether the reserved region overlaps any existing regions.
+    match &mut frames_list.0 {
+        Inner::Array(ref mut arr) => {
+            for chunk in arr.iter().flatten() {
+                if let Some(_overlap) = chunk.overlap(&frames) {
+                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                    //     frames, _overlap, chunk
+                    // );
+                    return Err("Failed to add free frames that overlapped with existing frames (array).");
                 }
             }
         }
-        
-        regions_list.insert(PhysicalMemoryRegion {
-                typ: MemoryRegionType::Reserved,
-                frames: frames.clone(),
-        }).map_err(|_c| "BUG: Failed to insert non-overlapping physical memory region into reserved regions list.")?;
-
-        frames_list.insert(Frames::new(
-            MemoryRegionType::Reserved,
-            frames.clone(),
-        )).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+        Inner::RBTree(ref mut tree) => {
+            let mut cursor_mut = tree.upper_bound_mut(Bound::Included(frames.start()));
+            while let Some(chunk) = cursor_mut.get().map(|w| w.deref()) {
+                if chunk.start() > frames.end() {
+                    // We're iterating in ascending order over a sorted tree,
+                    // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
+                    break;
+                }
+                if let Some(_overlap) = chunk.overlap(&frames) {
+                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                    //     frames, _overlap, chunk
+                    // );
+                    return Err("Failed to add free frames that overlapped with existing frames (RBTree).");
+                }
+                cursor_mut.move_next();
+            }
+        }
     }
+
+    regions_list.insert(PhysicalMemoryRegion {
+        typ: MemoryRegionType::Reserved,
+        frames: frames.clone(),
+    }).map_err(|_c| "BUG: Failed to insert non-overlapping physical memory region into reserved regions list.")?;
+
+    frames_list.insert(Frames::new(
+        MemoryRegionType::Reserved,
+        frames.clone(),
+    )).map_err(|_c| "BUG: Failed to insert non-overlapping frames into list.")?;
+
     Ok(frames)
 }
 
