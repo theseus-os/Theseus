@@ -1,3 +1,9 @@
+//! PCI Configuration Space Access
+//!
+//! Note: while pci currently uses port-io on x86 and mmio on aarch64,
+//! x86 may also support memory-based PCI configuration in the future;
+//! port-io is the legacy way to access the config space.
+
 #![no_std]
 #![allow(dead_code)]
 
