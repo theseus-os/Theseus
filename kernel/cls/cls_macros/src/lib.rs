@@ -42,13 +42,11 @@ impl Parse for CpuLocal {
 
 /// A macro for declaring CPU-local variables.
 ///
-/// Variables can either be an unsigned integer, or `cls::CpuLocalCell<T>`.
-/// Unsigned integers can be accessed without disabling preemption and should
-/// therefore be preferred.
+/// Variables can either be an unsigned integer, or a custom type implementing
+/// `cls::RawRepresentation`.
 ///
-/// In order to avoid circular dependencies, crates defining only integer
-/// CPU-locals can depend directly on `cls_macros`, avoiding `cls`'s dependency
-/// on `preemption`.
+/// The initialisation expression has no effect; to set the initial value,
+/// `per_cpu::PerCpuData::new` must be modified.
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     // if !args.is_empty() {
