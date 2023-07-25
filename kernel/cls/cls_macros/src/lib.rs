@@ -15,7 +15,7 @@ struct CpuLocal {
     visibility: Visibility,
     name: Ident,
     ty: Type,
-    init: Expr,
+    _init: Expr,
 }
 
 impl Parse for CpuLocal {
@@ -27,14 +27,14 @@ impl Parse for CpuLocal {
         input.parse::<Token![:]>()?;
         let ty: Type = input.parse()?;
         input.parse::<Token![=]>()?;
-        let init: Expr = input.parse()?;
+        let _init: Expr = input.parse()?;
         input.parse::<Token![;]>()?;
         Ok(CpuLocal {
             attributes,
             visibility,
             name,
             ty,
-            init,
+            _init,
         })
     }
 }
@@ -75,7 +75,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         visibility,
         name,
         ty,
-        init,
+        _init,
     } = parse_macro_input!(input as CpuLocal);
 
     let attributes = attributes.iter().map(|attribute| quote! { #attribute });
@@ -106,15 +106,11 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         #(#attributes)*
         #[thread_local]
         // #[link_section = ".cls"]
-        #visibility static #name: #struct_name = #struct_name {
-            _inner: ::core::cell::UnsafeCell::new(#init),
-        };
+        #visibility static #name: #struct_name = #struct_name;
 
         #[repr(transparent)]
         #[non_exhaustive]
-        #visibility struct #struct_name {
-            _inner: ::core::cell::UnsafeCell<#ty>,
-        }
+        #visibility struct #struct_name;
 
         #[cfg(target_arch = "x86_64")]
         impl #struct_name {
