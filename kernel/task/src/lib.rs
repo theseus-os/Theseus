@@ -998,13 +998,50 @@ mod cpu_local_task_switch {
         pub const fn new() -> Self { Self(None) }
     }
 
-    impl cls::RawRepresentation for TaskSwitchPreemptionGuard {
-        unsafe fn into_raw(self) -> u64 {
-            unsafe { core::mem::transmute(self) }
+    impl cls::Raw for TaskSwitchPreemptionGuard {
+        // We use the first bit to differentiate between None and Some, the second bit
+        // to encode whether preemption was enabled and bits three to thirty-four to
+        // encode the CPU ID.
+        //
+        // We cannot just transmute because `PreemptionGuard` contains padding bytes.
+
+        fn into_raw(self) -> u64 {
+            match self.0 {
+                Some(guard) => {
+                    let mut result = if guard.preemption_was_enabled() {
+                        0b11u64
+                    } else {
+                        0b01u64
+                    };
+
+                    let cpu_id = guard.cpu_id().value();
+                    result |= u64::from(cpu_id) << 2;
+
+                    core::mem::forget(guard);
+                    result
+                }
+                None => 0,
+            }
         }
 
         unsafe fn from_raw(raw: u64) -> Self {
-            unsafe { core::mem::transmute(raw) }
+            match raw {
+                0 => Self(None),
+                _ => {
+                    // Is the first bit set?
+                    let preemption_was_enabled = (raw >> 1 & 0x1) == 1;
+
+                    // Guaranteed to fit since it was created by `into_raw`.
+                    let cpu_id_raw = u32::try_from(raw >> 2).unwrap();
+                    // SAFETY: Created by `CpuId::value` call in `into_raw`.
+                    let cpu_id = unsafe { cpu::CpuId::from_raw(cpu_id_raw) };
+
+                    Self(Some(PreemptionGuard::from_parts(
+                        cpu_id,
+                        preemption_was_enabled,
+                    )))
+                }
+            }
         }
     }
 
@@ -1017,10 +1054,11 @@ mod cpu_local_task_switch {
         pub const fn new() -> Self { Self(None) }
     }
 
-    impl cls::RawRepresentation for DropAfterTaskSwitch {
-        unsafe fn into_raw(self) -> u64 {
+    impl cls::Raw for DropAfterTaskSwitch {
+        fn into_raw(self) -> u64 {
             self.0
                 .map(|task| Arc::into_raw(task.0))
+                // `Arc::into_raw` won't return a null pointer.
                 .unwrap_or(core::ptr::null()) as u64
         }
 

@@ -1,7 +1,7 @@
 #![feature(proc_macro_diagnostic, proc_macro_span, let_chains)]
 
 mod int;
-mod user;
+mod raw;
 
 use convert_case::{Case, Casing};
 use proc_macro::{Diagnostic, Level, Span, TokenStream};
@@ -87,7 +87,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let methods = int::methods(&ty, &offset).unwrap_or_else(|| user::methods(&ty, &offset));
+    let int_methods = int::methods(&ty, &offset).unwrap_or_else(proc_macro2::TokenStream::new);
+    let raw_methods = raw::methods(&ty, &offset);
 
     quote! {
         #(#attributes)*
@@ -104,7 +105,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         }
 
         impl #struct_name {
-            #methods
+            #int_methods
+            #raw_methods
         }
     }
     .into()

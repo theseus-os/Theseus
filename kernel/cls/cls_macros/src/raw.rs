@@ -1,26 +1,38 @@
+//! Module for user types implementing `cls::Raw`.
+
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{LitInt, Type};
 
+/// Returns the methods for CPU locals implementing `cls::Raw`.
+///
+/// Note that unsigned integers implement `cls::Raw`.
 pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
     let x64_cls_location = format!("gs:[{offset}]");
 
     quote! {
+        /// Replaces the contained value with `value`, and returns the old
+        /// contained value.
         #[cfg(target_arch = "x86_64")]
         pub fn replace(&self, value: #ty) -> #ty {
-            let mut raw = unsafe { ::cls::RawRepresentation::into_raw(value) };
+            let mut raw = unsafe { ::cls::Raw::into_raw(value) };
             unsafe {
                 ::core::arch::asm!(
                     concat!("xchg {}, ", #x64_cls_location),
                     inout(reg) raw,
                 )
             };
-            unsafe { ::cls::RawRepresentation::from_raw(raw) }
+
+            // SAFETY: [{ptr}] contained a `u64` returned by `Raw::into_raw`
+            // that has not been converted back into #ty.
+            unsafe { ::cls::Raw::from_raw(raw) }
         }
 
+        /// Replaces the contained value with `value`, and returns the old
+        /// contained value.
         #[cfg(target_arch = "aarch64")]
         pub fn replace(&self, value: #ty) -> #ty {
-            let raw_in = unsafe { ::cls::RawRepresentation::into_raw(value) };
+            let raw_in = ::cls::Raw::into_raw(value);
             let raw_out;
 
             unsafe {
@@ -50,9 +62,13 @@ pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
                     cond = out(reg) _,
                 )
             };
-            unsafe { ::cls::RawRepresentation::from_raw(raw_out) }
+
+            // SAFETY: [{ptr}] contained a `u64` returned by `Raw::into_raw`
+            // that has not been converted back into #ty.
+            unsafe { ::cls::Raw::from_raw(raw_out) }
         }
 
+        /// Sets the contained value.
         pub fn set(&self, value: #ty) {
             self.replace(value);
         }

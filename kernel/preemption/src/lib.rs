@@ -96,6 +96,19 @@ pub struct PreemptionGuard {
 impl !Send for PreemptionGuard { }
 
 impl PreemptionGuard {
+    /// Creates a preemption guard from the given values.
+    ///
+    /// # Safety
+    ///
+    /// This function must only be called to recreate a previously forgotten
+    /// preemption guard.
+    pub unsafe fn from_parts(cpu_id: CpuId, preemption_was_enabled: bool) -> Self {
+        Self {
+            cpu_id,
+            preemption_was_enabled,
+        }
+    }
+
     /// Returns whether preemption was originally enabled when this guard was created.
     ///
     /// # Return

@@ -33,6 +33,15 @@ use derive_more::*;
 pub struct CpuId(u32);
 
 impl CpuId {
+    /// Returns a `CpuId` with the corresponding `val`.
+    ///
+    /// # Safety
+    ///
+    /// The `val` must have been returned from `CpuId::value`.
+    pub unsafe fn from_raw(val: u32) -> Self {
+        Self(val)
+    }
+
     /// Returns the inner raw value of this `CpuId`.
     pub fn value(&self) -> u32 {
         self.0

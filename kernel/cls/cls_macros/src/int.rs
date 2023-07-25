@@ -1,7 +1,11 @@
+//! Module for unsigned integer types.
+
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{LitInt, Type};
 
+/// Returns the methods for unsigned integer CPU locals if `ty` is a supported
+/// type, none otherwise.
 pub(crate) fn methods(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
     let ((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
         match ty.to_token_stream().to_string().as_ref() {
