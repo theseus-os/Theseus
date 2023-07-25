@@ -702,6 +702,7 @@ impl MsixVectorEntry {
         self.msg_lower_addr.write(address | MSIX_INTERRUPT_REGION | dest_id); 
 
         // write interrupt number
+        #[allow(clippy::unnecessary_cast)]
         self.msg_data.write(int_num as u32);
 
         if false {
