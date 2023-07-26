@@ -155,7 +155,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 let ret;
                 unsafe {
                     ::core::arch::asm!(
-                        "1:",
+                        "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
                         concat!(
@@ -167,7 +167,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         // Make sure task wasn't migrated between mrs and ldxr.
                         "mrs {tp_2}, tpidr_el1",
                         "cmp {tp_1}, {tp_2}",
-                        "b.ne 1b",
+                        "b.ne 2b",
 
                         tp_1 = out(reg) _,
                         ret = out(reg) ret,
@@ -178,10 +178,10 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             }
 
             #[inline]
-            pub fn add(&self, operand: #ty) {
+            fn add(&self, operand: #ty) {
                 unsafe {
                     ::core::arch::asm!(
-                        "1:",
+                        "2:",
                         // Load value.
                         // TODO: Can we add offset and load in one instruction?
                         "mrs {tp_1}, tpidr_el1",
@@ -191,14 +191,14 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         // Make sure task wasn't migrated between msr and ldxr.
                         "mrs {tp_2}, tpidr_el1",
                         "cmp {tp_1}, {tp_2}",
-                        "b.ne 1b",
+                        "b.ne 2b",
 
                         // Compute and store value.
                         "add {value}, {value}, {operand}",
                         concat!("stxr", #aarch64_instr_width, " {cond:w}, {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
                         // Make sure task wasn't migrated between ldxr and stxr.
-                        "cbnz {cond}, 1b",
+                        "cbnz {cond}, 2b",
 
                         tp_1 = out(reg) _,
                         ptr = out(reg) _,
@@ -212,10 +212,10 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 }
             }
 
-            pub fn sub(&self, operand: #ty) {
+            fn sub(&self, operand: #ty) {
                 unsafe {
                     ::core::arch::asm!(
-                        "1:",
+                        "2:",
                         // Load value.
                         // TODO: Can we add offset and load in one instruction?
                         "mrs {tp_1}, tpidr_el1",
@@ -225,14 +225,14 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         // Make sure task wasn't migrated between msr and ldxr.
                         "mrs {tp_2}, tpidr_el1",
                         "cmp {tp_1}, {tp_2}",
-                        "b.ne 1b",
+                        "b.ne 2b",
 
                         // Compute and store value.
                         "sub {value}, {value}, {operand}",
                         concat!("stxr", #aarch64_instr_width, " {cond:w}, {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
                         // Make sure task wasn't migrated between ldxr and stxr.
-                        "cbnz {cond}, 1b",
+                        "cbnz {cond}, 2b",
 
                         tp_1 = out(reg) _,
                         ptr = out(reg) _,

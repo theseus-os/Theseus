@@ -12,7 +12,6 @@ resolver = "2"
 members = [
 	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/[!.]*/",
-	"kernel/cls/cls_macros",
 	"applications/[!.]*/",
 ]
 
