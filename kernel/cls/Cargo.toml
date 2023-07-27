@@ -7,3 +7,6 @@ edition = "2021"
 
 [dependencies]
 cls_macros = { path = "cls_macros" }
+cpu = { path = "../cpu" }
+memory = { path = "../memory" }
+sync_spin = { path = "../../libs/sync_spin" }

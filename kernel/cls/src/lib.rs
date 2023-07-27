@@ -70,6 +70,68 @@ impl Raw for u64 {
     }
 }
 
-pub fn set_base(address: *const ()) {
-    todo!("{address:0x?}");
+use alloc::vec::Vec;
+
+use sync_spin::SpinMutex;
+
+struct CpuLocalDataRegion {
+    cpu: u32,
+    _page: memory::AllocatedPages,
+    used: usize,
+}
+
+// TODO: Store size of used CLS in gs:[0].
+static CLS_SECTIONS: SpinMutex<Vec<CpuLocalDataRegion>> = SpinMutex::new(Vec::new());
+
+pub fn init() {
+    use core::arch::asm;
+
+    let page = memory::allocate_pages(1).expect("couldn't allocate page for CLS section");
+    let address = page.start_address().value();
+
+    CLS_SECTIONS.lock().push(CpuLocalDataRegion {
+        cpu: 0,
+        _page: page,
+        used: 0,
+    });
+
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        asm!(
+            "wrgsbase {}",
+            in(reg) address,
+            options(nomem, preserves_flags, nostack),
+        )
+    };
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        asm!(
+            "msr tpidr_el1, {}",
+            in(reg) address,
+            options(nomem, preserves_flags, nostack),
+        )
+    };
+
+    // TODO: Aarch64
+}
+
+pub fn allocate(len: usize) -> usize {
+    let cpu = cpu::current_cpu().value();
+
+    let mut region_ref = None;
+    let mut locked = CLS_SECTIONS.lock();
+
+    for region in locked.iter_mut() {
+        if region.cpu == cpu {
+            region_ref = Some(region);
+            break;
+        }
+    }
+
+    let region_ref = region_ref.unwrap();
+    let offset = region_ref.used;
+    assert!(region_ref.used + len <= 4096);
+    region_ref.used += len;
+
+    offset
 }
