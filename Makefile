@@ -930,10 +930,7 @@ ifeq ($(host),yes)
 	## KVM acceleration is required when using the host cpu model
 	QEMU_FLAGS += -cpu host -accel kvm
 else ifeq ($(ARCH),aarch64)
-	## highmem=on & highmem-mmio=on are currently required on aarch64 because
-	## without them, the PCI configuration space lies in "low memory" and its
-	## base address points to a bunch of zeros for some reason.
-	QEMU_FLAGS += -machine virt,gic-version=3,highmem=on,highmem-mmio=on
+	QEMU_FLAGS += -machine virt,gic-version=3
 	QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
 	QEMU_FLAGS += -usb
