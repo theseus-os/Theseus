@@ -3,10 +3,11 @@
 #![no_std]
 
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
-use irq_safety::{hold_interrupts, RwLockIrqSafe};
+use irq_safety::hold_interrupts;
 use memory::PageRange;
 use cpu::cpu_count;
 use core::hint::spin_loop;
+use sync_irq::IrqSafeRwLock;
 
 #[cfg(target_arch = "x86_64")]
 use memory_x86_64::tlb_flush_virt_addr;
@@ -19,7 +20,7 @@ static TLB_SHOOTDOWN_IPI_COUNT: AtomicU32 = AtomicU32::new(0);
 /// This lock ensures only one round of TLB shootdown IPIs can occur concurrently.
 static TLB_SHOOTDOWN_IPI_LOCK: AtomicBool = AtomicBool::new(false);
 /// The range of virtual pages to be flushed for a TLB shootdown IPI.
-static TLB_SHOOTDOWN_IPI_PAGES: RwLockIrqSafe<Option<PageRange>> = RwLockIrqSafe::new(None);
+static TLB_SHOOTDOWN_IPI_PAGES: IrqSafeRwLock<Option<PageRange>> = IrqSafeRwLock::new(None);
 
 
 /// Initializes data, functions, and structures for the TLB shootdown. 

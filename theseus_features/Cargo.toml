@@ -23,7 +23,6 @@ ls = { path = "../applications/ls", optional = true }
 mkdir = { path = "../applications/mkdir", optional = true }
 ns = { path = "../applications/ns", optional = true }
 ping = { path = "../applications/ping", optional = true }
-ping_2 = { path = "../applications/ping_2", optional = true }
 pmu_sample_start = { path = "../applications/pmu_sample_start", optional = true }
 pmu_sample_stop = { path = "../applications/pmu_sample_stop", optional = true }
 ps = { path = "../applications/ps", optional = true }
@@ -56,13 +55,13 @@ test_filerw = { path = "../applications/test_filerw", optional = true }
 test_ixgbe = { path = "../applications/test_ixgbe", optional = true }
 test_libc = { path = "../applications/test_libc", optional = true }
 test_mlx5 = { path = "../applications/test_mlx5", optional = true }
-test_mutex_sleep = { path = "../applications/test_mutex_sleep", optional = true }
 test_panic = { path = "../applications/test_panic", optional = true }
 test_priority_scheduler = { path = "../applications/test_priority_scheduler", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_scheduler = { path = "../applications/test_scheduler", optional = true }
 test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
+test_sync_block = { path = "../applications/test_sync_block", optional = true }
 test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
 test_wait_queue = { path = "../applications/test_wait_queue", optional = true }
 test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
@@ -117,7 +116,6 @@ theseus_apps = [
     "mkdir",
     "ns",
     "ping",
-    "ping_2",
     "pmu_sample_start",
     "pmu_sample_stop",
     "ps",
@@ -154,13 +152,13 @@ theseus_tests = [
     "test_ixgbe",
     "test_libc",
     "test_mlx5",
-    "test_mutex_sleep",
     "test_panic",
     "test_priority_scheduler",
     "test_restartable",
     "test_scheduler",
     "test_serial_echo",
     "test_std_fs",
+    "test_sync_block",
     "test_task_cancel",
     "test_wait_queue",
     "test_wasmtime",

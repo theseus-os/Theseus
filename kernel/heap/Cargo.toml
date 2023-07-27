@@ -7,11 +7,11 @@ version = "0.1.0"
 [dependencies]
 spin = "0.9.4"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
-
 [dependencies.log]
 version = "0.4.8"
+
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.memory]
 path = "../memory"

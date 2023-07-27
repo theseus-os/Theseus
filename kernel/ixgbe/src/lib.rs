@@ -14,7 +14,7 @@
 #[macro_use] extern crate lazy_static;
 extern crate alloc;
 extern crate spin;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate kernel_config;
 extern crate memory;
 extern crate pci; 
@@ -28,7 +28,7 @@ extern crate mpmc;
 extern crate rand;
 extern crate hpet;
 extern crate runqueue;
-extern crate network_interface_card;
+extern crate net;
 extern crate nic_initialization;
 extern crate intel_ethernet;
 extern crate nic_buffers;
@@ -52,13 +52,12 @@ use alloc::{
     sync::Arc,
     vec::Vec,
 };
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use memory::{PhysicalAddress, MappedPages, Mutable, BorrowedSliceMappedPages, BorrowedMappedPages, map_frame_range, MMIO_FLAGS};
 use pci::{PciDevice, MsixVectorTable, PciConfigSpaceAccessMechanism, PciLocation};
 use bit_field::BitField;
 use interrupts::{register_msi_interrupt, InterruptHandler};
 use hpet::get_hpet;
-use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
 use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};    
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
@@ -109,12 +108,12 @@ pub const IXGBE_NUM_TX_QUEUES_ENABLED:          u8      = 64;
 
 
 /// All the 82599 NICs found in the PCI space are initialized and then stored here.
-pub static IXGBE_NICS: Once<Vec<MutexIrqSafe<IxgbeNic>>> = Once::new();
+pub static IXGBE_NICS: Once<Vec<IrqSafeMutex<IxgbeNic>>> = Once::new();
 
 
-/// Returns a reference to the IxgbeNic wrapped in a MutexIrqSafe, if it exists and has been initialized.
+/// Returns a reference to the IxgbeNic wrapped in a IrqSafeMutex, if it exists and has been initialized.
 /// Currently we use the pci location of the device as identification since it should not change after initialization.
-pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>, &'static str> {
+pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static IrqSafeMutex<IxgbeNic>, &'static str> {
     let nics = IXGBE_NICS.get().ok_or("Ixgbe NICs weren't initialized")?;
     nics.iter()
         .find( |nic| { nic.lock().dev_id == id } )
@@ -122,7 +121,7 @@ pub fn get_ixgbe_nic(id: PciLocation) -> Result<&'static MutexIrqSafe<IxgbeNic>,
 }
 
 /// Returns a reference to the list of all initialized ixgbe NICs
-pub fn get_ixgbe_nics_list() -> Option<&'static Vec<MutexIrqSafe<IxgbeNic>>> {
+pub fn get_ixgbe_nics_list() -> Option<&'static Vec<IrqSafeMutex<IxgbeNic>>> {
     IXGBE_NICS.get()
 }
 
@@ -183,42 +182,11 @@ pub struct IxgbeNic {
     tx_registers_disabled: Vec<IxgbeTxQueueRegisters>,
 }
 
-// A trait which contains common functionalities for a NIC
-impl NetworkInterfaceCard for IxgbeNic {
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        // by default, when using the physical NIC interface, we send on queue 0.
-        let qid = 0;
-        self.tx_queues[qid].send_on_queue(transmit_buffer);
-        Ok(())
-    }
-
-    fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        // by default, when using the physical NIC interface, we receive on queue 0.
-        let qid = 0;
-        // return one frame from the queue's received frames
-        self.rx_queues[qid].received_frames.pop_front()
-    }
-
-    fn poll_receive(&mut self) -> Result<(), &'static str> {
-        // by default, when using the physical NIC interface, we receive on queue 0.
-        let qid = 0;
-        self.rx_queues[qid].poll_queue_and_store_received_packets()
-    }
-
-    fn mac_address(&self) -> [u8; 6] {
-        self.mac_spoofed.unwrap_or(self.mac_hardware)
-    }
-}
-
 impl net::NetworkDevice for IxgbeNic {
-    fn send(&mut self, buf: &[u8]) -> Result<(), net::Error> {
-        // TODO: This is just a workaround to make the new API work with the old machinery.
-        let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
-        let transmit_buffer_mut = &mut transmit_buffer;
-        transmit_buffer_mut.clone_from_slice(buf);
-        // TODO: Return specific error.
-        self.send_packet(transmit_buffer).map_err(|_| net::Error::Unknown)?;
-        Ok(())
+    fn send(&mut self, buf: TransmitBuffer) {
+        // When using the physical NIC interface, we send on queue 0 by default.
+        let queue_id = 0;
+        self.tx_queues[queue_id].send_on_queue(buf)
     }
 
     fn receive(&mut self) -> Option<ReceivedFrame> {
@@ -265,7 +233,7 @@ impl IxgbeNic {
         rx_buffer_size_kbytes: RxBufferSizeKiB,
         num_rx_descriptors: u16,
         num_tx_descriptors: u16
-    ) -> Result<MutexIrqSafe<IxgbeNic>, &'static str> {
+    ) -> Result<IrqSafeMutex<IxgbeNic>, &'static str> {
         // Series of checks to determine if starting parameters are acceptable
         if enable_virtualization && (interrupts.is_some() || enable_rss) {
             return Err("Cannot enable virtualization when interrupts or RSS are enabled");
@@ -416,7 +384,7 @@ impl IxgbeNic {
 
         info!("Link is up with speed: {} Mb/s", ixgbe_nic.link_speed() as u32);
 
-        Ok(MutexIrqSafe::new(ixgbe_nic))
+        Ok(IrqSafeMutex::new(ixgbe_nic))
     }
 
     /// Returns the device id of the PCI device.

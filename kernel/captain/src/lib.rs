@@ -87,8 +87,11 @@ pub fn init(
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
     #[cfg(target_arch = "x86_64")]
-    let _tsc_freq = tsc::get_tsc_frequency()?;
-    // info!("TSC frequency calculated: {}", _tsc_freq);
+    if let Some(period) = tsc::get_tsc_period() {
+        time::register_clock_source::<tsc::Tsc>(period);
+    } else {
+        log::warn!("Couldn't get TSC period");
+    }
 
     // now we initialize early driver stuff, like APIC/ACPI
     // arch-gate: device_manager currently detects PCI & PS2 devices,

@@ -13,11 +13,10 @@ extern crate itertools;
 extern crate getopts;
 extern crate task;
 extern crate ota_update_client;
-extern crate network_manager;
+extern crate net;
 extern crate memory;
 extern crate mod_mgmt;
 extern crate crate_swap;
-extern crate smoltcp;
 extern crate path;
 extern crate memfs;
 extern crate fs_node;
@@ -27,6 +26,7 @@ extern crate spin;
 
 use core::str::FromStr;
 use alloc::{
+    borrow::ToOwned,
     string::{String, ToString},
     vec::Vec,
     collections::BTreeSet,
@@ -34,8 +34,7 @@ use alloc::{
 };
 use spin::Once;
 use getopts::{Matches, Options};
-use network_manager::{NetworkInterfaceRef, NETWORK_INTERFACES};
-use smoltcp::wire::IpEndpoint;
+use net::{get_default_interface, IpEndpoint};
 use mod_mgmt::{
     CrateNamespace,
     NamespaceDir,
@@ -137,7 +136,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
 /// Lists the set of crates in the given update_build,
 /// or if no update build is specified, lists all available update builds by default.
 fn list(remote_endpoint: IpEndpoint, update_build: Option<&String>) -> Result<(), String> {
-    let iface = get_default_iface()?;
+    let iface = get_default_interface().ok_or_else(|| "couldn't get default interface".to_owned())?;
 
     if let Some(ub) = update_build {
         let listing = ota_update_client::download_listing(&iface, remote_endpoint, ub)
@@ -155,7 +154,7 @@ fn list(remote_endpoint: IpEndpoint, update_build: Option<&String>) -> Result<()
 
 /// Lists the contents of the diff file for the given update build.
 fn diff(remote_endpoint: IpEndpoint, update_build: &str) -> Result<(), String> {
-    let iface = get_default_iface()?;
+    let iface = get_default_interface().ok_or_else(|| "couldn't get default interface".to_owned())?;
 
     let file_str = ota_update_client::download_diff(&iface, remote_endpoint, update_build)
         .map_err(|e| e.to_string())?;
@@ -167,7 +166,7 @@ fn diff(remote_endpoint: IpEndpoint, update_build: &str) -> Result<(), String> {
 
 /// Downloads all of the new or changed crates from the `diff` file of the 
 fn download(remote_endpoint: IpEndpoint, update_build: &str, crate_list: Option<&[String]>) -> Result<(), String> {
-    let iface = get_default_iface()?;
+    let iface = get_default_interface().ok_or_else(|| "couldn't get default interface".to_owned())?;
     println!("Downloading crates...");
     let crate_list = if crate_list == Some(&[]) { None } else { crate_list };
 
@@ -301,16 +300,6 @@ fn get_my_current_namespace() -> Arc<CrateNamespace> {
                 .expect("BUG: initial kernel namespace wasn't initialized")
                 .clone()
         )
-}
-
-
-/// Returns the first network interface available in the system.
-fn get_default_iface() -> Result<NetworkInterfaceRef, String> {
-    NETWORK_INTERFACES.lock()
-        .iter()
-        .next()
-        .cloned()
-        .ok_or_else(|| "no network interfaces available".to_string())
 }
 
 

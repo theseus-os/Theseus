@@ -1,78 +1,41 @@
 #![no_std]
 
-#[macro_use] extern crate log;
-extern crate pit_clock_basic;
+use log::info;
+use time::{Instant, Period};
 
-use core::sync::atomic::{AtomicUsize, Ordering};
+pub struct Tsc;
 
+impl time::ClockSource for Tsc {
+    type ClockType = time::Monotonic;
 
-#[derive(Debug)]
-pub struct TscTicks(u128);
-
-impl TscTicks {
-    /// Converts ticks to nanoseconds. 
-    ///
-    /// Returns `None` if the TSC tick frequency is unavailable 
-    /// or if overflow occured during the conversion.
-    pub fn to_ns(&self) -> Option<u128> {
-        get_tsc_frequency()
-            .ok()
-            .and_then(|freq| self.0.checked_mul(1000000000)
-                .map(|checked_tsc| checked_tsc / freq)
-            )
-    }
-
-    /// Checked subtraction. Computes `self - other`, 
-    /// returning `None` if underflow occurred.
-    pub fn sub(&self, other: &TscTicks) -> Option<TscTicks> {
-        let checked_sub = self.0.checked_sub(other.0);
-        checked_sub.map(TscTicks)
-    }
-    
-    /// Checked addition. Computes `self + other`, 
-    /// returning `None` if overflow occurred.
-    pub fn add(&self, other: &TscTicks) -> Option<TscTicks> {
-        let checked_add = self.0.checked_add(other.0);
-        checked_add.map(TscTicks)
+    fn now() -> Instant {
+        Instant::new(tsc_value())
     }
 }
 
-impl From<TscTicks> for u128 {
-    fn from(ticks: TscTicks) -> Self {
-        ticks.0
-    }
+/// Returns the frequency of the TSC for the system, currently measured using
+/// the PIT clock for calibration.
+pub fn get_tsc_period() -> Option<Period> {
+    const PIT_WAIT_MICROSECONDS: u32 = 10_000;
+    const PIT_WAIT_FEMTOSECONDS: u64 = PIT_WAIT_MICROSECONDS as u64 * 1_000_000_000;
+
+    let start = tsc_value();
+    pit_clock_basic::pit_wait(PIT_WAIT_MICROSECONDS).ok()?;
+    let end = tsc_value();
+
+    let increments = end.checked_sub(start)?;
+    let tsc_period = Period::new(PIT_WAIT_FEMTOSECONDS / increments);
+
+    info!("TSC period calculated by PIT is: {tsc_period}");
+
+    Some(tsc_period)
 }
 
-/// Returns the current number of ticks from the TSC, i.e., `rdtscp`. 
-pub fn tsc_ticks() -> TscTicks {
-    let mut val = 0;
-    // SAFE: just reading TSC value
-    let ticks = unsafe { core::arch::x86_64::__rdtscp(&mut val) as u128 };
-    TscTicks(ticks)
-}
-
-/// Returns the frequency of the TSC for the system, 
-/// currently measured using the PIT clock for calibration.
-pub fn get_tsc_frequency() -> Result<u128, &'static str> {
-    // this is a soft state, so it's not a form of state spill
-    static TSC_FREQUENCY: AtomicUsize = AtomicUsize::new(0);
-
-    let freq = TSC_FREQUENCY.load(Ordering::SeqCst) as u128;
-    
-    if freq != 0 {
-        Ok(freq)
-    }
-    else {
-        // a freq of zero means it hasn't yet been initialized.
-        let start = tsc_ticks();
-        // wait 10000 us (10 ms)
-        pit_clock_basic::pit_wait(10000)?;
-        let end = tsc_ticks(); 
-
-        let diff = end.sub(&start).ok_or("couldn't subtract end-start TSC tick values")?;
-        let tsc_freq = u128::from(diff) * 100; // multiplied by 100 because we measured a 10ms interval
-        info!("TSC frequency calculated by PIT is: {}", tsc_freq);
-        TSC_FREQUENCY.store(tsc_freq as usize, Ordering::Release);
-        Ok(tsc_freq)
-    }
+#[doc(hidden)]
+pub fn tsc_value() -> u64 {
+    let mut _aux = 0;
+    // SAFETY: Reading the TSC value is a platform-specific intrinsic that has no
+    // side effects or dangerous behavior, and is supported on all modern x86_64
+    // hardware.
+    unsafe { core::arch::x86_64::__rdtscp(&mut _aux) }
 }

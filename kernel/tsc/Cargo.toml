@@ -3,13 +3,10 @@ authors = ["Kevin Boos <kevinaboos@gmail.com>"]
 name = "tsc"
 description = "TSC (TimeStamp Counter) support for performance counters on x86. Basically a wrapper around rdtsc."
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
+pit_clock_basic = { path = "../pit_clock_basic" }
+time = { path = "../time" }
 
-[dependencies.pit_clock_basic]
-path = "../pit_clock_basic"
-
-
-[lib]
-crate-type = ["rlib"]

@@ -12,8 +12,8 @@ path = "../nic_buffers"
 [dependencies.nic_queues]
 path = "../nic_queues"
 
-[dependencies.network_interface_card]
-path = "../network_interface_card"
+[dependencies.net]
+path = "../net"
 
 [dependencies.physical_nic]
 path = "../physical_nic"
@@ -21,8 +21,8 @@ path = "../physical_nic"
 [dependencies.intel_ethernet]
 path = "../intel_ethernet"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [lib]
 crate-type = ["rlib"]

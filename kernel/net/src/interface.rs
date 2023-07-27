@@ -1,88 +1,85 @@
-use crate::{device::DeviceWrapper, NetworkDevice, Result, Socket};
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 use core::marker::PhantomData;
-use irq_safety::MutexIrqSafe;
-use mutex_sleep::MutexSleep;
-use smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
 
-pub use smoltcp::iface::SocketSet;
-pub use wire::{IpAddress, IpCidr};
+use smoltcp::{iface, phy::DeviceCapabilities, socket::AnySocket, wire};
+pub use smoltcp::{
+    iface::SocketSet,
+    wire::{IpAddress, IpCidr},
+};
+use sync_block::Mutex;
+use sync_irq::IrqSafeMutex;
+
+use crate::{device::DeviceWrapper, NetworkDevice, Socket};
 
 /// A network interface.
 ///
 /// This is a wrapper around a network device which provides higher level
 /// abstractions such as polling sockets.
 pub struct NetworkInterface {
-    inner: MutexSleep<iface::Interface<'static>>,
-    device: &'static MutexIrqSafe<dyn crate::NetworkDevice>,
-    sockets: MutexSleep<SocketSet<'static>>,
+    pub(crate) inner: Mutex<iface::Interface>,
+    device: &'static IrqSafeMutex<dyn crate::NetworkDevice>,
+    pub(crate) sockets: Mutex<SocketSet<'static>>,
 }
 
 impl NetworkInterface {
-    pub(crate) fn new<T>(device: &'static MutexIrqSafe<T>, ip: IpCidr, gateway: IpAddress) -> Self
+    pub(crate) fn new<T>(device: &'static IrqSafeMutex<T>, ip: IpCidr, gateway: IpAddress) -> Self
     where
         T: NetworkDevice,
     {
         let hardware_addr = wire::EthernetAddress(device.lock().mac_address()).into();
 
-        let mut routes = iface::Routes::new();
-
-        match gateway {
-            IpAddress::Ipv4(addr) => routes.add_default_ipv4_route(addr),
-            IpAddress::Ipv6(addr) => routes.add_default_ipv6_route(addr),
-        }
-        .expect("btree map route storage exhausted");
-
         let mut wrapper = DeviceWrapper {
             inner: &mut *device.lock(),
         };
-        let inner = MutexSleep::new(
-            iface::InterfaceBuilder::new()
-                .random_seed(random::next_u64())
-                .hardware_addr(hardware_addr)
-                .ip_addrs(heapless::Vec::<_, 5>::from_slice(&[ip]).unwrap())
-                .routes(routes)
-                .neighbor_cache(iface::NeighborCache::new())
-                .finalize(&mut wrapper),
-        );
 
-        let sockets = MutexSleep::new(SocketSet::new(Vec::new()));
+        let mut config = iface::Config::new(hardware_addr);
+        config.random_seed = random::next_u64();
+
+        let mut interface =
+            iface::Interface::new(config, &mut wrapper, smoltcp::time::Instant::ZERO);
+        interface.update_ip_addrs(|ip_addrs| {
+            // NOTE: This won't fail as ip_addrs has a capacity of 2 (defined in smoltcp)
+            // and this is the only address we are pushing.
+            ip_addrs.push(ip).unwrap();
+        });
+        match gateway {
+            IpAddress::Ipv4(addr) => interface.routes_mut().add_default_ipv4_route(addr),
+            IpAddress::Ipv6(addr) => interface.routes_mut().add_default_ipv6_route(addr),
+        }
+        .expect("btree map route storage exhausted");
 
         Self {
-            inner,
+            inner: Mutex::new(interface),
             device,
-            sockets,
+            sockets: Mutex::new(SocketSet::new(Vec::new())),
         }
     }
 
     /// Adds a socket to the interface.
-    pub fn add_socket<T>(&self, socket: T) -> Socket<T>
+    pub fn add_socket<T>(self: Arc<Self>, socket: T) -> Socket<T>
     where
         T: AnySocket<'static>,
     {
-        let handle = self
-            .sockets
-            .lock()
-            .expect("failed to lock sockets")
-            .add(socket);
+        let handle = self.sockets.lock().add(socket);
         Socket {
             handle,
-            sockets: &self.sockets,
+            interface: self,
             phantom_data: PhantomData,
         }
     }
 
     /// Polls the sockets associated with the interface.
-    pub fn poll(&self) -> Result<()> {
-        let mut inner = self.inner.lock().expect("failed to lock inner interface");
+    ///
+    /// Returns a boolean indicating whether the readiness of any socket may
+    /// have changed.
+    pub fn poll(&self) -> bool {
+        let mut inner = self.inner.lock();
         let mut wrapper = DeviceWrapper {
             inner: &mut *self.device.lock(),
         };
-        let mut sockets = self.sockets.lock().expect("failed to lock sockets");
+        let mut sockets = self.sockets.lock();
 
-        inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut sockets)?;
-
-        Ok(())
+        inner.poll(smoltcp::time::Instant::ZERO, &mut wrapper, &mut sockets)
     }
 
     pub fn capabilities(&self) -> DeviceCapabilities {

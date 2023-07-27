@@ -15,7 +15,7 @@ use alloc::{
 use log::debug;
 use cpu::CpuId;
 use memory::VirtualAddress;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use core::panic::PanicInfo;
 
 /// The possible faults (panics and exceptions) encountered 
@@ -121,7 +121,7 @@ impl FaultEntry {
 
 
 /// The structure to hold the list of all faults so far occured in the system
-static FAULT_LIST: MutexIrqSafe<Vec<FaultEntry>> = MutexIrqSafe::new(Vec::new());
+static FAULT_LIST: IrqSafeMutex<Vec<FaultEntry>> = IrqSafeMutex::new(Vec::new());
 
 /// Clears the log of faults so far occured in the system 
 pub fn clear_fault_log() {

@@ -2,10 +2,10 @@
 
 #![no_std]
 
-use core::ops;
-use crossbeam_utils::atomic::AtomicCell;
-
 mod dummy;
+
+use core::{fmt, ops};
+use crossbeam_utils::atomic::AtomicCell;
 
 pub use core::time::Duration;
 
@@ -36,6 +36,14 @@ impl Instant {
 
     pub fn new(counter: u64) -> Self {
         Self { counter }
+    }
+
+    pub fn now() -> Self {
+        now::<Monotonic>()
+    }
+
+    pub fn elapsed(&self) -> Duration {
+        Self::now().duration_since(*self)
     }
 
     /// Returns the amount of time elapsed from another instant to this one, or
@@ -140,6 +148,12 @@ impl From<u64> for Period {
     /// Creates a new period with the specified femtoseconds.
     fn from(period: u64) -> Self {
         Self(period)
+    }
+}
+
+impl fmt::Display for Period {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} fs", self.0)
     }
 }
 

@@ -86,12 +86,12 @@ exclude = [
 	"applications/test_ixgbe",
 	"applications/test_libc",
 	"applications/test_mlx5",
-	"applications/test_mutex_sleep",
 	"applications/test_panic",
 	"applications/test_priority_scheduler",
 	"applications/test_restartable",
 	"applications/test_serial_echo",
 	"applications/test_std_fs",
+	"applications/test_sync_block",
 	"applications/test_wait_queue",
 	"applications/test_wasmtime",
 	"applications/tls_test",
@@ -104,8 +104,6 @@ exclude = [
 volatile = { git = "https://github.com/theseus-os/volatile" }
 ### use our own no_std-compatilbe getopts
 getopts = { git = "https://github.com/theseus-os/getopts" }
-### use the latest version of smoltcp from github; the one on crates.io is out of date
-smoltcp = { git = "https://github.com/m-labs/smoltcp" }
 
 ### Patch `libc` so we can use libc-specific types when using `cfg(target_os = "theseus")`.
 libc = { git = "https://github.com/theseus-os/libc", branch = "theseus" }

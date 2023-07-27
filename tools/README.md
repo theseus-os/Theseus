@@ -18,4 +18,3 @@ This directory contains tools used in Theseus's build process or for testing pur
 * `receive_udp_messages`: a test tool for receiving messages over UDP. Not really used any more. 
 * `sample_parser`: a tool for parsing the output of an execution trace of PMU samples.
 * `get_tty`: gets the next free TTY
-

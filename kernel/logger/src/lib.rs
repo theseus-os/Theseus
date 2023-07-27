@@ -16,12 +16,12 @@
 extern crate alloc;
 extern crate crossbeam_utils;
 extern crate log;
-extern crate irq_safety;
+extern crate sync_irq;
 extern crate serial_port_basic;
 
 use log::{Record, Level, Metadata, Log};
 use core::{borrow::Borrow, fmt::{self, Write}, ops::Deref};
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 use serial_port_basic::SerialPort;
 use alloc::{sync::Arc, vec::Vec};
 
@@ -41,21 +41,21 @@ pub const EARLY_LOG_BUFFER_SIZE: usize = {
 };
 
 /// The early logger used before dynamic heap allocation is available.
-static EARLY_LOGGER: MutexIrqSafe<EarlyLogger> = MutexIrqSafe::new(EarlyLogger::new());
+static EARLY_LOGGER: IrqSafeMutex<EarlyLogger> = IrqSafeMutex::new(EarlyLogger::new());
 
 /// The early log buffer.
 ///
 /// This is separate from the `EARLY_LOGGER` in order for it to be placed
 /// in `.bss` instead of `.data`, saving space in the executable.
-static EARLY_LOG_BUFFER: MutexIrqSafe<EarlyLogBuffer<EARLY_LOG_BUFFER_SIZE>> =
-    MutexIrqSafe::new(EarlyLogBuffer::new());
+static EARLY_LOG_BUFFER: IrqSafeMutex<EarlyLogBuffer<EARLY_LOG_BUFFER_SIZE>> =
+    IrqSafeMutex::new(EarlyLogBuffer::new());
 
 /// The real logger instance where log states are kept.
 ///
 /// This is accessed in the [`DummyLogger`]'s log/write methods,
 /// it is not called directly by the `log` crate.
 /// If `None`, it is uninitialized, and the [`EARLY_LOGGER`] will be used as a fallback.
-static LOGGER: MutexIrqSafe<Option<Logger>> = MutexIrqSafe::new(None);
+static LOGGER: IrqSafeMutex<Option<Logger>> = IrqSafeMutex::new(None);
 
 /// An early logger that can only write to a fixed number of [`SerialPort`]s,
 /// intended for basic use before dynamic heap allocation is available.
@@ -120,7 +120,7 @@ impl fmt::Write for EarlyLogger {
 ///
 /// This is the "backend" for the `log` crate that allows Theseus to use its `log!()` macros.
 struct Logger {
-    writers: Vec<Arc<MutexIrqSafe<dyn Write + Send>>>,
+    writers: Vec<Arc<IrqSafeMutex<dyn Write + Send>>>,
 }
 
 /// Removes all of the writers (output streams) from the early logger and returns them.
@@ -312,12 +312,12 @@ pub fn early_init(
 pub fn init<I, W>(log_level: Option<Level>, writers: impl IntoIterator<Item = I>)
 where
     W: Write + Send + 'static,
-    I: Into<Arc<MutexIrqSafe<W>>>,
+    I: Into<Arc<IrqSafeMutex<W>>>,
 {
     // Populate the fields of the real logger instance
     let logger = Logger {
         writers: writers.into_iter()
-            .map(|i| i.into() as Arc<MutexIrqSafe<dyn Write + Send>>)
+            .map(|i| i.into() as Arc<IrqSafeMutex<dyn Write + Send>>)
             .collect::<Vec<_>>(),
     };
     *LOGGER.lock() = Some(logger);

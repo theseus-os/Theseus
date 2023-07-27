@@ -1,13 +1,15 @@
 //! A set of functions to create packets for testing the NIC transmission functionality.
 
-use super::{get_ixgbe_nic, NetworkInterfaceCard, TransmitBuffer};
+use super::{get_ixgbe_nic, TransmitBuffer};
 use pci::PciLocation;
+use net::NetworkDevice;
 
 /// Sends a dhcp request packet on the ixgbe NIC.
 pub fn dhcp_request_packet(nic_id: PciLocation) -> Result<(), &'static str> {
     let transmit_buffer = create_dhcp_test_packet()?;
-    let ixgbe_nc = get_ixgbe_nic(nic_id)?;
-    ixgbe_nc.lock().send_packet(transmit_buffer)
+    let ixgbe_nic = get_ixgbe_nic(nic_id)?;
+    ixgbe_nic.lock().send(transmit_buffer);
+    Ok(())
 }
 
 /// Creates a `TransmitBuffer` containing a dhcp packet.

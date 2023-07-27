@@ -15,9 +15,9 @@ use interrupt_controller::{
 };
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
-use irq_safety::RwLockIrqSafe;
-use log::error;
+use sync_irq::IrqSafeRwLock;
 use cpu::current_cpu;
+use log::error;
 use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
@@ -48,7 +48,7 @@ const MAX_IRQ_NUM: usize = 256;
 // it's an array of function pointers which are meant to handle IRQs.
 // Synchronous Exceptions (including syscalls) are not IRQs on aarch64;
 // this crate doesn't expose any way to handle them at the moment.
-static IRQ_HANDLERS: RwLockIrqSafe<[InterruptHandler; MAX_IRQ_NUM]> = RwLockIrqSafe::new([default_irq_handler; MAX_IRQ_NUM]);
+static IRQ_HANDLERS: IrqSafeRwLock<[InterruptHandler; MAX_IRQ_NUM]> = IrqSafeRwLock::new([default_irq_handler; MAX_IRQ_NUM]);
 
 /// The Saved Program Status Register at the time of the exception.
 #[repr(transparent)]

@@ -10,22 +10,27 @@
 
 extern crate nic_buffers;
 extern crate nic_queues;
-extern crate network_interface_card;
+extern crate net;
 extern crate physical_nic;
 extern crate intel_ethernet;
 extern crate alloc;
-extern crate irq_safety;
+extern crate sync_irq;
 
 use nic_buffers::{TransmitBuffer, ReceivedFrame};
 use nic_queues::{RxQueue, TxQueue, RxQueueRegisters, TxQueueRegisters};
-use network_interface_card::{NetworkInterfaceCard};
 use intel_ethernet::descriptors::{TxDescriptor, RxDescriptor};
 use physical_nic::PhysicalNic;
 use alloc::vec::Vec;
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 
 /// A structure that contains a set of `RxQueue`s and `TxQueue`s that can be used to send and receive packets.
-pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, U: TxQueueRegisters + 'static, V: TxDescriptor + 'static> {
+pub struct VirtualNic<S, T, U, V>
+where
+    S: RxQueueRegisters + 'static,
+    T: RxDescriptor + 'static,
+    U: TxQueueRegisters + 'static,
+    V: TxDescriptor + 'static,
+{
     /// The virtual NIC id is set to the id of its first receive queue
     id: u8, 
     /// Set of `RxQueue`s assigned to a virtual NIC
@@ -39,10 +44,16 @@ pub struct VirtualNic<S: RxQueueRegisters + 'static, T: RxDescriptor + 'static, 
     /// MAC address of the NIC
     mac_address: [u8; 6],
     /// Reference to the physical NIC that Rx/Tx queues will be returned to.
-    physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>
+    physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S, T, U, V> + Send>
 }
 
-impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> VirtualNic<S,T,U,V> {
+impl<S, T, U, V> VirtualNic<S, T, U, V>
+where
+    S: RxQueueRegisters + 'static,
+    T: RxDescriptor + 'static,
+    U: TxQueueRegisters + 'static,
+    V: TxDescriptor + 'static,
+{
     /// Create a new `VirtualNIC` with the given parameters.
     /// For now we require that there is at least one Rx and one Tx queue.
     pub fn new(
@@ -51,7 +62,7 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
         tx_queues: Vec<TxQueue<U,V>>,
         default_tx_queue: usize, 
         mac_address: [u8; 6], 
-        physical_nic_ref: &'static MutexIrqSafe<dyn PhysicalNic<S,T,U,V>>
+        physical_nic_ref: &'static IrqSafeMutex<dyn PhysicalNic<S,T,U,V> + Send>
     ) -> Result<VirtualNic<S,T,U,V>, &'static str> {
 
         if rx_queues.is_empty() || tx_queues.is_empty() { 
@@ -98,20 +109,25 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     }
 }
 
-impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> NetworkInterfaceCard for VirtualNic<S,T,U,V> {
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        self.tx_queues[self.default_tx_queue].send_on_queue(transmit_buffer);
-        Ok(())
+impl<S, T, U, V> net::NetworkDevice for VirtualNic<S, T, U, V>
+where
+    S: RxQueueRegisters + Send + Sync + 'static,
+    T: RxDescriptor + Send + Sync + 'static,
+    U: TxQueueRegisters + Send + Sync + 'static,
+    V: TxDescriptor + Send + Sync + 'static,
+{
+    fn send(&mut self, buf: TransmitBuffer) {
+        self.tx_queues[self.default_tx_queue].send_on_queue(buf);
     }
 
-    fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        // return one frame from the queue's received frames
+    fn receive(&mut self) -> Option<ReceivedFrame> {
+        // poll_queue_and_store_received_packets will only return an error if it fails
+        // to create a contiguous mapping, or if the mapping created is of the wrong
+        // length, indicating a logic bug.
+        self.rx_queues[self.default_rx_queue]
+            .poll_queue_and_store_received_packets()
+            .expect("failed to poll virtual NIC queue");
         self.rx_queues[self.default_rx_queue].received_frames.pop_front()
-    }
-
-    fn poll_receive(&mut self) -> Result<(), &'static str> {
-        self.rx_queues[self.default_rx_queue].poll_queue_and_store_received_packets()?;
-        Ok(())
     }
 
     fn mac_address(&self) -> [u8; 6] {
@@ -119,7 +135,13 @@ impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor>
     }
 }
 
-impl<S: RxQueueRegisters, T: RxDescriptor, U: TxQueueRegisters, V: TxDescriptor> Drop for VirtualNic<S,T,U,V> {
+impl<S, T, U, V> Drop for VirtualNic<S, T, U, V>
+where
+    S: RxQueueRegisters + 'static,
+    T: RxDescriptor + 'static,
+    U: TxQueueRegisters + 'static,
+    V: TxDescriptor + 'static,
+{
     // Right now we assume that a `virtualNIC` is only dropped when all packets have been removed from queues.
     // TODO: check that queues are empty before returning to the NIC.
     fn drop(&mut self) {

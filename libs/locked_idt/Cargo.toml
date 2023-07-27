@@ -6,5 +6,5 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+sync_irq = { path = "../../libs/sync_irq" }
 x86_64 = "0.14.8"

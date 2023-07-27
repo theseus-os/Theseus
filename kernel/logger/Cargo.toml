@@ -7,8 +7,8 @@ version = "0.1.0"
 log = "0.4.8"
 crossbeam-utils = { version = "0.8.12", default-features = false }
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.serial_port_basic]
 path = "../serial_port_basic"

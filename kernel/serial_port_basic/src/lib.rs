@@ -31,7 +31,7 @@
 
 #![no_std]
 
-use irq_safety::MutexIrqSafe;
+use sync_irq::IrqSafeMutex;
 
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 #[cfg_attr(target_arch = "aarch64", path = "aarch64.rs")]
@@ -41,7 +41,7 @@ pub use arch::*;
 
 impl SerialPortAddress {
     /// Returns a reference to the static instance of this serial port.
-    fn to_static_port(self) -> &'static MutexIrqSafe<TriState<SerialPort>> {
+    fn to_static_port(self) -> &'static IrqSafeMutex<TriState<SerialPort>> {
         match self {
             SerialPortAddress::COM1 => &COM1_SERIAL_PORT,
             SerialPortAddress::COM2 => &COM2_SERIAL_PORT,
@@ -72,10 +72,10 @@ impl<T> TriState<T> {
 
 // Serial ports cannot be reliably probed (discovered dynamically), thus,
 // we ensure they are exposed safely as singletons through the below static instances.
-static COM1_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-static COM2_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-static COM3_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
-static COM4_SERIAL_PORT: MutexIrqSafe<TriState<SerialPort>> = MutexIrqSafe::new(TriState::Uninited);
+static COM1_SERIAL_PORT: IrqSafeMutex<TriState<SerialPort>> = IrqSafeMutex::new(TriState::Uninited);
+static COM2_SERIAL_PORT: IrqSafeMutex<TriState<SerialPort>> = IrqSafeMutex::new(TriState::Uninited);
+static COM3_SERIAL_PORT: IrqSafeMutex<TriState<SerialPort>> = IrqSafeMutex::new(TriState::Uninited);
+static COM4_SERIAL_PORT: IrqSafeMutex<TriState<SerialPort>> = IrqSafeMutex::new(TriState::Uninited);
 
 /// Takes ownership of the [`SerialPort`] specified by the given [`SerialPortAddress`].
 ///

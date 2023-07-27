@@ -19,8 +19,8 @@ version = "0.4.8"
 features = ["spin_no_std"]
 version = "1.4.0"
 
-[dependencies.irq_safety]
-git = "https://github.com/theseus-os/irq_safety"
+[dependencies.sync_irq]
+path = "../../libs/sync_irq"
 
 [dependencies.kernel_config]
 path = "../kernel_config"
@@ -33,9 +33,6 @@ path = "../pci"
 
 [dependencies.interrupts]
 path = "../interrupts"
-
-[dependencies.network_interface_card]
-path = "../network_interface_card"
 
 [dependencies.intel_ethernet]
 path = "../intel_ethernet" 
