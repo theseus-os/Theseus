@@ -44,7 +44,7 @@ impl Parse for CpuLocal {
 
 /// A macro for declaring CPU-local variables.
 ///
-/// Variables can either be an unsigned integer, or a custom type implementing
+/// Variables can either be an unsigned integer, bar u128, or a custom type implementing
 /// `cls::RawRepresentation`.
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {

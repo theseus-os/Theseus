@@ -16,8 +16,7 @@ sync_block = { path = "../sync_block" }
 sync_irq = { path = "../../libs/sync_irq" }
 
 [dependencies.smoltcp]
-# TODO: move to patch in root Cargo.toml after removing legacy net interface
-git = "https://github.com/smoltcp-rs/smoltcp"
+version = "0.10"
 default-features = false
 features = [
     "alloc",

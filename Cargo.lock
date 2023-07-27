@@ -384,7 +384,6 @@ dependencies = [
  "mod_mgmt",
  "multicore_bringup",
  "multiple_heaps",
- "network_manager",
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
@@ -894,7 +893,6 @@ dependencies = [
  "core2",
  "derive_more",
  "e1000",
- "ethernet_smoltcp_device",
  "event_types",
  "fatfs",
  "io",
@@ -908,7 +906,6 @@ dependencies = [
  "mouse",
  "mpmc",
  "net",
- "network_manager",
  "pci",
  "ps2",
  "serial_port",
@@ -982,7 +979,6 @@ dependencies = [
  "memory",
  "mpmc",
  "net",
- "network_interface_card",
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
@@ -1041,20 +1037,6 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
-]
-
-[[package]]
-name = "ethernet_smoltcp_device"
-version = "0.1.0"
-dependencies = [
- "lazy_static",
- "log",
- "memory",
- "network_interface_card",
- "network_manager",
- "nic_buffers",
- "smoltcp 0.5.0",
- "sync_irq",
 ]
 
 [[package]]
@@ -1687,7 +1669,6 @@ dependencies = [
  "memory",
  "mpmc",
  "net",
- "network_interface_card",
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
@@ -1933,12 +1914,6 @@ dependencies = [
  "sdt",
  "zerocopy",
 ]
-
-[[package]]
-name = "managed"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
 
 [[package]]
 name = "managed"
@@ -2328,27 +2303,10 @@ dependencies = [
  "rand",
  "rand_chacha",
  "random",
- "smoltcp 0.8.1",
+ "smoltcp",
  "spin 0.9.4",
  "sync_block",
  "sync_irq",
-]
-
-[[package]]
-name = "network_interface_card"
-version = "0.1.0"
-dependencies = [
- "nic_buffers",
-]
-
-[[package]]
-name = "network_manager"
-version = "0.1.0"
-dependencies = [
- "e1000",
- "log",
- "smoltcp 0.5.0",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -3457,36 +3415,16 @@ dependencies = [
 
 [[package]]
 name = "smoltcp"
-version = "0.5.0"
-source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
-dependencies = [
- "bitflags",
- "byteorder",
- "managed 0.7.1",
-]
-
-[[package]]
-name = "smoltcp"
-version = "0.8.1"
-source = "git+https://github.com/smoltcp-rs/smoltcp#19c7cba8d39dc0cea0fbd9a7ec7d7cb2ec8301c6"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d2e3a36ac8fea7b94e666dfa3871063d6e0a5c9d5d4fec9a1a6b7b6760f0229"
 dependencies = [
  "bitflags",
  "byteorder",
  "cfg-if 1.0.0",
  "defmt",
  "heapless",
- "managed 0.8.0",
-]
-
-[[package]]
-name = "smoltcp_helper"
-version = "0.1.0"
-dependencies = [
- "hpet",
- "log",
- "network_manager",
- "smoltcp 0.5.0",
- "spin 0.9.4",
+ "managed",
 ]
 
 [[package]]
@@ -3842,7 +3780,7 @@ dependencies = [
  "getopts",
  "ixgbe",
  "log",
- "network_interface_card",
+ "net",
  "spawn",
 ]
 
@@ -4344,7 +4282,7 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "network_interface_card",
+ "net",
  "nic_buffers",
  "nic_queues",
  "physical_nic",

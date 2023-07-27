@@ -1,5 +1,5 @@
-//! Manages preemption on a per-CPU core basis.
-//! 
+//! Manages preemption on a per-CPU basis.
+//!
 //! Supports enabling and disabling preemption for the purpose of 
 //! safe task state management, e.g., through preemption-safe locks.
 
@@ -8,6 +8,7 @@
 
 use cpu::CpuId;
 
+/// A reference to the preemption counter for the current CPU (in CPU-local storage).
 // NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
 #[cls::cpu_local]
 static PREEMPTION_COUNT: u8 = 0;
@@ -50,11 +51,10 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
         preemption_was_enabled: prev_val == 0,
     };
 
+    // When transitioning from preemption being enabled to disabled,
+    // (optionally) disable the local timer interrupt used for preemptive task switching.
     if DISABLE_TIMER && guard.preemption_was_enabled {
         // log::trace!(" CPU {}:   disabling local timer interrupt", cpu_id);
-        
-        // When transitioning from preemption being enabled to disabled,
-        // we must disable the local APIC timer used for preemptive task switching.
         #[cfg(target_arch = "x86_64")]
         apic::get_my_apic()
             .expect("BUG: hold_preemption() couldn't get local APIC")
@@ -134,15 +134,13 @@ impl Drop for PreemptionGuard {
             This indicates an unexpected task migration across CPUs."
         );
 
-        // Not a race condition because preemption is disabled.
         let prev_val = PREEMPTION_COUNT.fetch_sub(1);
 
+        // If the previous counter value was 1, that means the current value is 0,
+        // which means we are transitioning from preemption being disabled to enabled on this CPU.
+        // Thus, we re-enable the local timer interrupt used for preemptive task switching.
         if prev_val == 1 {
             // log::trace!("CPU {}: re-enabling local timer interrupt", cpu_id);
-
-            // If the previous counter value was 1, that means the current value is 1,
-            // which indicates we are transitioning from preemption disabled to enabled on this CPU.
-            // Thus, we re-enable the local APIC timer used for preemptive task switching.
             #[cfg(target_arch = "x86_64")]
             apic::get_my_apic()
                 .expect("BUG: PreemptionGuard::drop() couldn't get local APIC")
