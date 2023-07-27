@@ -473,7 +473,7 @@ impl<const S: MemoryState> Drop for Frames<S> {
                 if self.size_in_frames() == 0 { return; }
         
                 let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
-                let mut free_frames: FreeFrames = Frames { typ: self.typ, frames };
+                let free_frames: FreeFrames = Frames { typ: self.typ, frames };
         
                 let mut list = if free_frames.typ == MemoryRegionType::Reserved {
                     FREE_RESERVED_FRAMES_LIST.lock()
@@ -499,7 +499,7 @@ impl<const S: MemoryState> Drop for Frames<S> {
                             if *free_frames.end() + 1 == *next_frames_ref.start() {
                                 // extract the next chunk from the list
                                 let mut next_frames = cursor_mut
-                                    .replace_with(Wrapper::new_link(Frames::empty()))
+                                    .remove()
                                     .expect("BUG: couldn't remove next frames from free list in drop handler")
                                     .into_inner();
 
@@ -507,10 +507,8 @@ impl<const S: MemoryState> Drop for Frames<S> {
                                 if next_frames.merge(free_frames).is_ok() {
                                     // trace!("newly merged next chunk: {:?}", next_frames);
                                     // now return newly merged chunk into list
-                                    match cursor_mut.replace_with(Wrapper::new_link(next_frames)) { 
-                                        Ok(_) => { return; }
-                                        Err(f) => free_frames = f.into_inner(), 
-                                    }
+                                    cursor_mut.insert_before(Wrapper::new_link(next_frames));
+                                    return;
                                 } else {
                                     panic!("BUG: couldn't merge deallocated chunk into next chunk");
                                 }
@@ -523,17 +521,15 @@ impl<const S: MemoryState> Drop for Frames<S> {
                                 if let Some(_prev_frames_ref) = cursor_mut.get() {
                                     // extract the next chunk from the list
                                     let mut prev_frames = cursor_mut
-                                        .replace_with(Wrapper::new_link(Frames::empty()))
-                                        .expect("BUG: couldn't remove next frames from free list in drop handler")
+                                        .remove()
+                                        .expect("BUG: couldn't remove previous frames from free list in drop handler")
                                         .into_inner();
 
                                     if prev_frames.merge(free_frames).is_ok() {
                                         // trace!("newly merged prev chunk: {:?}", prev_frames);
                                         // now return newly merged chunk into list
-                                        match cursor_mut.replace_with(Wrapper::new_link(prev_frames)) { 
-                                            Ok(_) => { return; }
-                                            Err(f) => free_frames = f.into_inner(), 
-                                        }
+                                        cursor_mut.insert_before(Wrapper::new_link(prev_frames));
+                                        return;
                                     } else {
                                         panic!("BUG: couldn't merge deallocated chunk into prev chunk");
                                     }
