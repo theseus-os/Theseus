@@ -44,7 +44,7 @@ impl Parse for CpuLocal {
 
 /// A macro for declaring CPU-local variables.
 ///
-/// Variables can either be an unsigned integer, or a custom type implementing
+/// Variables can either be an unsigned integer, bar u128, or a custom type implementing
 /// `cls::RawRepresentation`.
 ///
 /// The initialisation expression has no effect; to set the initial value,

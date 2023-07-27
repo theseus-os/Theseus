@@ -3,17 +3,16 @@
 extern crate alloc;
 
 use alloc::{sync::Arc, vec::Vec};
+
 use smoltcp::wire::Ipv4Address;
 use spin::Mutex;
 use sync_irq::IrqSafeMutex;
 
 mod device;
-mod error;
 mod interface;
 mod socket;
 
 pub use device::{DeviceCapabilities, NetworkDevice};
-pub use error::{Error, Result};
 pub use interface::{IpAddress, IpCidr, NetworkInterface, SocketSet};
 pub use smoltcp::{
     phy,

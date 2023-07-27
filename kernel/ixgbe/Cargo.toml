@@ -58,9 +58,6 @@ path = "../acpi/hpet"
 [dependencies.runqueue]
 path = "../runqueue"
 
-[dependencies.network_interface_card]
-path = "../network_interface_card"
-
 [dependencies.nic_initialization]
 path = "../nic_initialization"
 

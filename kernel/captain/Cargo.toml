@@ -40,7 +40,6 @@ acpi = { path = "../acpi" }
 page_attribute_table = { path = "../page_attribute_table" }
 e1000 = { path = "../e1000" }
 app_io = { path = "../app_io" }
-network_manager = { path = "../network_manager" }
 ota_update_client = { path = "../ota_update_client" }
 
 ## This should be dependent upon 'cfg(simd_personality)',
