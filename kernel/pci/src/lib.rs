@@ -99,7 +99,7 @@ const BASE_OFFSET: u32 = 0x8000_0000;
 type PciConfigSpace = BorrowedSliceMappedPages<u8, Mutable>;
 
 #[cfg(target_arch = "aarch64")]
-static PCI_CONFIG_SPACE: Mutex<Option<PciConfigSpace>> = Mutex::new(None);
+static PCI_CONFIG_SPACE: Mutex<Once<PciConfigSpace>> = Mutex::new(Once::new());
 
 #[cfg(target_arch = "aarch64")]
 const BASE_OFFSET: u32 = 0;
@@ -158,18 +158,16 @@ pub struct PciBus {
 /// Scans all PCI Buses (brute force iteration) to enumerate PCI Devices on each bus.
 /// Initializes structures containing this information. 
 fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
-    #[cfg(target_arch = "aarch64")] {
-        let mut config_space = PCI_CONFIG_SPACE.lock();
-        if config_space.is_none() {
-            let config = BOARD_CONFIG.pci_ecam;
-            let flags = memory::PteFlags::new().valid(true).writable(true);
-            let mapped = memory::map_frame_range(config.base_address, config.size_bytes, flags)?;
-            match mapped.into_borrowed_slice_mut(0, config.size_bytes) {
-                Ok(bsm) => config_space.insert(bsm),
-                Err((_, msg)) => return Err(msg),
-            };
+    #[cfg(target_arch = "aarch64")]
+    PCI_CONFIG_SPACE.lock().try_call_once(|| {
+        let config = BOARD_CONFIG.pci_ecam;
+        let flags = memory::PteFlags::new().valid(true).writable(true);
+        let mapped = memory::map_frame_range(config.base_address, config.size_bytes, flags)?;
+        match mapped.into_borrowed_slice_mut(0, config.size_bytes) {
+            Ok(bsm) => Ok(bsm),
+            Err((_, msg)) => Err(msg),
         }
-    }
+    })?;
 
     let mut buses: Vec<PciBus> = Vec::new();
 
@@ -287,7 +285,8 @@ impl PciLocation {
 
         #[cfg(target_arch = "aarch64")] {
             let config_space = PCI_CONFIG_SPACE.lock();
-            let config_space = config_space.deref().as_ref().unwrap();
+            let config_space = config_space.get()
+                .expect("PCI Config Space wasn't mapped yet");
             value = unsafe {
                 config_space
                     .as_ptr()
@@ -324,7 +323,8 @@ impl PciLocation {
 
         #[cfg(target_arch = "aarch64")] {
             let mut config_space = PCI_CONFIG_SPACE.lock();
-            let config_space = config_space.deref_mut().as_mut().unwrap();
+            let config_space = config_space.get_mut()
+                .expect("PCI Config Space wasn't mapped yet");
             unsafe {
                 config_space
                     .as_mut_ptr()
