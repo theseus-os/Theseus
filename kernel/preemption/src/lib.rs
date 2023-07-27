@@ -1,5 +1,5 @@
-//! Manages preemption on a per-CPU core basis.
-//! 
+//! Manages preemption on a per-CPU basis.
+//!
 //! Supports enabling and disabling preemption for the purpose of 
 //! safe task state management, e.g., through preemption-safe locks.
 
@@ -8,6 +8,7 @@
 
 use cpu::CpuId;
 
+/// A reference to the preemption counter for the current CPU (in CPU-local storage).
 // NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
 #[cls::cpu_local(12)]
 static PREEMPTION_COUNT: u8 = 0;
