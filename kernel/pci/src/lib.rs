@@ -25,10 +25,7 @@ use interrupts::InterruptNumber;
 use port_io::Port;
 
 #[cfg(target_arch = "aarch64")]
-use {
-    core::mem::size_of,
-    arm_boards::BOARD_CONFIG,
-};
+use arm_boards::BOARD_CONFIG;
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
@@ -78,8 +75,10 @@ const MAX_SLOTS_PER_BUS: u8 = 32;
 /// There is a maximum of 32 functions (devices) on one PCI slot.
 const MAX_FUNCTIONS_PER_SLOT: u8 = 8;
 
-/// Addresses/offsets into the PCI configuration space should clear the least-significant 2 bits.
-const PCI_CONFIG_ADDRESS_OFFSET_MASK: u32 = !0x2;
+/// Addresses/offsets into the PCI configuration space should clear the
+/// least-significant 2 bits for alignment purposes.
+const PCI_CONFIG_ADDRESS_OFFSET_MASK: u8 = 0b11111100;
+
 const CONFIG_ADDRESS: u16 = 0xCF8;
 const CONFIG_DATA: u16 = 0xCFC;
 
@@ -259,41 +258,46 @@ impl PciLocation {
     pub fn function(&self) -> u8 { self.func }
 
 
-    /// Computes a PCI address from bus, slot, func, and offset. 
+    /// Computes a PCI address and value shift from bus, slot, func, and offset. 
     /// The least two significant bits of offset are masked, so it's 4-byte aligned addressing,
     /// which makes sense since we read PCI data (from the configuration space) in 32-bit chunks.
-    fn pci_address(self, offset: u8) -> u32 {
-        BASE_OFFSET |
-        ((self.bus  as u32) << 16) |
-        ((self.slot as u32) << 11) |
-        ((self.func as u32) <<  8) |
-        (offset as u32)
+    /// The shift allows selecting a byte/word from the addressed value.
+    fn pci_address_and_shift(self, offset: u8) -> (u32, u32) {
+        let shift = (offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8;
+        let address = BASE_OFFSET |
+            ((self.bus  as u32) << 16) |
+            ((self.slot as u32) << 11) |
+            ((self.func as u32) <<  8) |
+            ((offset as u32) & (PCI_CONFIG_ADDRESS_OFFSET_MASK as u32));
+
+        (address, shift as _)
     }
 
-    fn pci_read_32_addr(&self, address: u32) -> u32 {
+    /// Read 32-bit data at the specified `offset` from this PCI device.
+    fn pci_read_32(&self, offset: u8) -> u32 {
+        let (address, shift) = self.pci_address_and_shift(offset);
+        let value;
+
         #[cfg(target_arch = "x86_64")] {
-            let shift = (address & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8;
-            let aligned_address = address & PCI_CONFIG_ADDRESS_OFFSET_MASK;
             unsafe { 
-                PCI_CONFIG_ADDRESS_PORT.lock().write(aligned_address);
+                PCI_CONFIG_ADDRESS_PORT.lock().write(address);
             }
-            PCI_CONFIG_DATA_PORT.lock().read() >> shift
+            value = PCI_CONFIG_DATA_PORT.lock().read();
         }
 
         #[cfg(target_arch = "aarch64")] {
             let config_space = PCI_CONFIG_SPACE.lock();
             let config_space = config_space.deref().as_ref().unwrap();
-            let address = address as usize;
-            let slice = &config_space[address..][..size_of::<u32>()];
-            let mut value = [0; 4];
-            value.copy_from_slice(slice);
-            u32::from_ne_bytes(value)
+            value = unsafe {
+                config_space
+                    .as_ptr()
+                    .add(address as usize)
+                    .cast::<u32>()
+                    .read_volatile()
+            };
         }
-    }
 
-    /// Read 32-bit data at the specified `offset` from this PCI device.
-    fn pci_read_32(&self, offset: u8) -> u32 {
-        self.pci_read_32_addr(self.pci_address(offset))
+        value >> shift
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
@@ -306,28 +310,29 @@ impl PciLocation {
         self.pci_read_32(offset) as u8
     }
 
-    fn pci_write_addr(&self, address: u32, value: u32) {
+    /// Write 32-bit data to the specified `offset` for the PCI device.
+    fn pci_write(&self, offset: u8, value: u32) {
+        let (address, shift) = self.pci_address_and_shift(offset);
+        let shifted = value << shift;
+
         #[cfg(target_arch = "x86_64")] {
-            let shift = (address & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8;
-            let aligned_address = address & PCI_CONFIG_ADDRESS_OFFSET_MASK;
             unsafe {
-                PCI_CONFIG_ADDRESS_PORT.lock().write(aligned_address); 
-                PCI_CONFIG_DATA_PORT.lock().write(value << shift);
+                PCI_CONFIG_ADDRESS_PORT.lock().write(address); 
+                PCI_CONFIG_DATA_PORT.lock().write(shifted);
             }
         }
 
         #[cfg(target_arch = "aarch64")] {
             let mut config_space = PCI_CONFIG_SPACE.lock();
             let config_space = config_space.deref_mut().as_mut().unwrap();
-            let address = address as usize;
-            let slice = &mut config_space[address..][..size_of::<u32>()];
-            slice.copy_from_slice(&value.to_ne_bytes());
+            unsafe {
+                config_space
+                    .as_mut_ptr()
+                    .add(address as usize)
+                    .cast::<u32>()
+                    .write_volatile(shifted);
+            };
         }
-    }
-
-    /// Write 32-bit data to the specified `offset` for the PCI device.
-    fn pci_write(&self, offset: u8, value: u32) {
-        self.pci_write_addr(self.pci_address(offset), value);
     }
 
     /// Sets the PCI device's bit 3 in the command portion, which is apparently needed to activate DMA (??)
