@@ -396,26 +396,28 @@ impl FreeFrames {
     }
 
     /// Consumes this `Frames` in the `Free` state and converts them into the `Allocated` state.
-    pub fn into_allocated_frames(self) -> AllocatedFrames {    
-        let f = Frames {
+    pub fn into_allocated_frames(mut self) -> AllocatedFrames {  
+        let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+        let af = Frames {
             typ: self.typ,
-            frames: self.frames.clone(),
+            frames,
         };
         core::mem::forget(self);
-        f
+        af
     }
 }
 
 impl AllocatedFrames {
     /// Consumes this `Frames` in the `Allocated` state and converts them into the `Mapped` state.
     /// This should only be called once a `MappedPages` has been created from the `Frames`.
-    pub fn into_mapped_frames(self) -> MappedFrames {    
-        let f = Frames {
+    pub fn into_mapped_frames(mut self) -> MappedFrames {    
+        let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+        let mf = Frames {
             typ: self.typ,
-            frames: self.frames.clone(),
+            frames,
         };
         core::mem::forget(self);
-        f
+        mf
     }
 
     /// Returns an `AllocatedFrame` if this `AllocatedFrames` object contains only one frame.
@@ -433,13 +435,14 @@ impl AllocatedFrames {
 
 impl UnmappedFrames {
     /// Consumes this `Frames` in the `Unmapped` state and converts them into the `Allocated` state.
-    pub fn into_allocated_frames(self) -> AllocatedFrames {    
-        let f = Frames {
+    pub fn into_allocated_frames(mut self) -> AllocatedFrames {    
+        let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+        let af = Frames {
             typ: self.typ,
-            frames: self.frames.clone(),
+            frames
         };
         core::mem::forget(self);
-        f
+        af
     }
 }
 
@@ -469,10 +472,8 @@ impl<const S: MemoryState> Drop for Frames<S> {
             MemoryState::Free => {
                 if self.size_in_frames() == 0 { return; }
         
-                let mut free_frames: FreeFrames = Frames {
-                    typ: self.typ,
-                    frames: self.frames.clone(),
-                };
+                let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+                let mut free_frames: FreeFrames = Frames { typ: self.typ, frames };
         
                 let mut list = if free_frames.typ == MemoryRegionType::Reserved {
                     FREE_RESERVED_FRAMES_LIST.lock()
@@ -549,11 +550,13 @@ impl<const S: MemoryState> Drop for Frames<S> {
             }
             MemoryState::Allocated => { 
                 // trace!("Converting AllocatedFrames to FreeFrames. Drop handler will be called again {:?}", self.frames);
-                let _to_drop = FreeFrames::new(self.typ, self.frames.clone()); 
+                let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+                let _to_drop = FreeFrames { typ: self.typ, frames }; 
             }
             MemoryState::Mapped => panic!("We should never drop a mapped frame! It should be forgotten instead."),
             MemoryState::Unmapped => {
-                let _to_drop = AllocatedFrames { typ: self.typ, frames: self.frames.clone() };
+                let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+                let _to_drop = AllocatedFrames { typ: self.typ, frames };
             }
         }
     }
@@ -646,21 +649,22 @@ impl<const S: MemoryState> Frames<S> {
             return Err(other);
         }
 
-        if *self.start() == *other.end() + 1 {
+        let frames = if *self.start() == *other.end() + 1 {
             // `other` comes contiguously before `self`
-            self.frames = FrameRange::new(*other.start(), *self.end());
+            FrameRange::new(*other.start(), *self.end())
         } 
         else if *self.end() + 1 == *other.start() {
             // `self` comes contiguously before `other`
-            self.frames = FrameRange::new(*self.start(), *other.end());
+            FrameRange::new(*self.start(), *other.end())
         }
         else {
             // non-contiguous
             return Err(other);
-        }
+        };
 
         // ensure the now-merged Frames doesn't run its drop handler
         core::mem::forget(other); 
+        self.frames = frames;
         Ok(())
     }
 
@@ -682,22 +686,28 @@ impl<const S: MemoryState> Frames<S> {
         }
         
         let start_frame = *frames_to_extract.start();
-        let start_to_end = Frames { frames: frames_to_extract, ..self };
+        let start_to_end = frames_to_extract;
         
         let before_start = if start_frame == MIN_FRAME || start_frame == *self.start() {
             None
         } else {
-            Some(Frames { frames: FrameRange::new(*self.start(), *start_to_end.start() - 1), ..self })
+            Some(FrameRange::new(*self.start(), *start_to_end.start() - 1))
         };
 
         let after_end = if *start_to_end.end() == MAX_FRAME || *start_to_end.end() == *self.end() {
             None
         } else {
-            Some(Frames { frames: FrameRange::new(*start_to_end.end() + 1, *self.end()), ..self })
+            Some(FrameRange::new(*start_to_end.end() + 1, *self.end()))
         };
 
+        let typ = self.typ;
+        // ensure the original Frames doesn't run its drop handler and free its frames.
         core::mem::forget(self);
-        Ok(SplitFrames { before_start, start_to_end, after_end })
+        Ok(SplitFrames { 
+            before_start: before_start.map(|frames| Frames { typ, frames }),
+            start_to_end: Frames { typ, frames: start_to_end }, 
+            after_end: after_end.map(|frames| Frames { typ, frames }),
+        })
     }
 
     /// Splits this `Frames` into two separate `Frames` objects:
