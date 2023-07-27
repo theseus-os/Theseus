@@ -2635,6 +2635,7 @@ dependencies = [
 name = "per_cpu"
 version = "0.1.0"
 dependencies = [
+ "cls",
  "cpu",
  "cpu_local",
  "log",

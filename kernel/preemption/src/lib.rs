@@ -80,6 +80,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
 /// to move it across a "thread" boundary (into a different task).
 /// More specifically, it is invalid to move a `PreemptionGuard` across
 /// CPUs; this error condition is checked for when dropping it.
+#[derive(Debug, PartialEq, Eq)]
 pub struct PreemptionGuard {
     /// The ID of the CPU on which preemption was held.
     ///

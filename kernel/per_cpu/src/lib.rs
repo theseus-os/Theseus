@@ -75,11 +75,11 @@ pub struct PerCpuData {
     preemption_count: u8,
     /// A preemption guard used during task switching to ensure that one task switch
     /// cannot interrupt (preempt) another task switch already in progress.
-    task_switch_preemption_guard: TaskSwitchPreemptionGuard,
+    task_switch_preemption_guard: u64,
     /// Data that should be dropped after switching away from a task that has exited.
     /// Currently, this contains the previous task's `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
-    drop_after_task_switch: DropAfterTaskSwitch,
+    drop_after_task_switch: u64,
 }
 
 impl PerCpuData {
@@ -89,8 +89,8 @@ impl PerCpuData {
             self_ptr,
             cpu_id: CpuLocalCpuId(cpu_id),
             preemption_count: 0,
-            task_switch_preemption_guard: TaskSwitchPreemptionGuard::new(),
-            drop_after_task_switch: DropAfterTaskSwitch::new(),
+            task_switch_preemption_guard: cls::Raw::into_raw(TaskSwitchPreemptionGuard::new()),
+            drop_after_task_switch: cls::Raw::into_raw(DropAfterTaskSwitch::new()),
         }
     }
 }

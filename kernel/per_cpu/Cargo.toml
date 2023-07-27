@@ -9,6 +9,7 @@ edition = "2021"
 log = "0.4.8"
 memoffset = "0.8.0"
 
+cls = { path = "../cls" }
 cpu = { path = "../cpu" }
 cpu_local = { path = "../cpu_local" }
 no_drop = { path = "../no_drop" }

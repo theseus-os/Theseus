@@ -991,7 +991,8 @@ mod cpu_local_task_switch {
     #[cls::cpu_local(24)]
     pub(crate) static DROP_AFTER_TASK_SWITCH: DropAfterTaskSwitch = DropAfterTaskSwitch::new();
 
-    #[derive(Default)]
+    #[derive(Debug, Default)]
+    #[cfg_attr(test, derive(PartialEq, Eq))]
     pub struct TaskSwitchPreemptionGuard(pub(crate) Option<PreemptionGuard>);
 
     impl TaskSwitchPreemptionGuard {
@@ -1311,5 +1312,42 @@ fn bootstrap_task_cleanup_failure(current_task: ExitableTaskRef, kill_reason: Ki
     // If an initial bootstrap task fails, there's nothing else we can do.
     loop { 
         core::hint::spin_loop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_task_switch_preemption_guard_raw_repr() {
+        use cls::Raw;
+        use cpu::CpuId;
+        use preemption::PreemptionGuard;
+
+        use crate::TaskSwitchPreemptionGuard;
+
+        // PreemptionGuard doesn't implement clone.
+
+        macro_rules! test {
+            ($expression:expr) => {
+                let guard_1 = ::core::mem::ManuallyDrop::new($expression);
+                let guard_2 = $expression;
+                let guard_2 = ::core::mem::ManuallyDrop::new(unsafe { Raw::from_raw(Raw::into_raw(guard_2)) });
+                assert_eq!(guard_1, guard_2);
+            }
+        }
+
+        test!(TaskSwitchPreemptionGuard(None));
+        test!(TaskSwitchPreemptionGuard(Some(unsafe {
+            PreemptionGuard::from_parts(CpuId::from_raw(0), false)
+        })));
+        test!(TaskSwitchPreemptionGuard(Some(unsafe {
+            PreemptionGuard::from_parts(CpuId::from_raw(0), true)
+        })));
+        test!(TaskSwitchPreemptionGuard(Some(unsafe {
+            PreemptionGuard::from_parts(CpuId::from_raw(3), false)
+        })));
+        test!(TaskSwitchPreemptionGuard(Some(unsafe {
+            PreemptionGuard::from_parts(CpuId::from_raw(3), true)
+        })));
     }
 }
