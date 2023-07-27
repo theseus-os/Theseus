@@ -141,7 +141,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                                 " [{tp_1},#", stringify!(#offset), "]",
                             ),
 
-                            // Make sure task wasn't migrated between mrs and ldxr.
+                            // Make sure task wasn't migrated between mrs and ldr.
                             "mrs {tp_2}, tpidr_el1",
                             "cmp {tp_1}, {tp_2}",
                             "b.ne 2b",
@@ -154,6 +154,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                     ret
                 }
             }
+
             #[inline]
             pub fn fetch_add(&self, mut operand: #ty) -> #ty {
                 #[cfg(target_arch = "x86_64")]
@@ -162,7 +163,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         ::core::arch::asm!(
                             ::core::concat!("xadd ", #x64_width_modifier, #x64_cls_location, ", {}"),
                             inout(#x64_reg_class) operand,
-                            options(nostack),
+                            options(preserves_flags, nostack),
                         )
                     };
                     operand
@@ -174,7 +175,6 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         ::core::arch::asm!(
                             "2:",
                             // Load value.
-                            // TODO: Can we add offset and load in one instruction?
                             "mrs {tp_1}, tpidr_el1",
                             concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
                             concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
@@ -207,51 +207,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
             #[inline]
             pub fn fetch_sub(&self, mut operand: #ty) -> #ty {
-                #[cfg(target_arch = "x86_64")]
-                {
-                    operand = operand.overflowing_neg().0;
-                    self.fetch_add(operand)
-
-                }
-                #[cfg(target_arch = "aarch64")]
-                {
-                    let ret;
-                    unsafe {
-                        ::core::arch::asm!(
-                            "2:",
-                            // Load value.
-                            // TODO: Can we add offset and load in one instruction?
-                            "mrs {tp_1}, tpidr_el1",
-                            concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
-                            concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
-
-                            // Make sure task wasn't migrated between msr and ldxr.
-                            "mrs {tp_2}, tpidr_el1",
-                            "cmp {tp_1}, {tp_2}",
-                            "b.ne 2b",
-
-                            // Reuse tp_1 to store previous value.
-                            "mov {tp_1}, {value}",
-
-                            // Compute and store value (reuse tp_1 register).
-                            "sub {tp_1}, {value}, {operand}",
-                            concat!("stxr", #aarch64_instr_width, " {cond:w}, {tp_1", #aarch64_reg_modifier,"}, [{ptr}]"),
-
-                            // Make sure task wasn't migrated between ldxr and stxr.
-                            "cbnz {cond}, 2b",
-
-                            tp_1 = out(reg) _,
-                            ptr = out(reg) _,
-                            value = out(reg) ret,
-                            tp_2 = out(reg) _,
-                            operand = in(reg) operand,
-                            cond = out(reg) _,
-
-                            options(nostack),
-                        );
-                    }
-                    ret
-                }
+                operand = operand.overflowing_neg().0;
+                self.fetch_add(operand)
             }
         }
     }
