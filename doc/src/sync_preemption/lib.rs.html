@@ -32,7 +32,7 @@
 <a href="#32" id="32">32</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>cpu_local_preemption::{hold_preemption, PreemptionGuard};
+</span><span class="kw">use </span>preemption::{hold_preemption, PreemptionGuard};
 
 <span class="kw">pub type </span>Mutex&lt;T&gt; = sync::Mutex&lt;T, DisablePreemption&gt;;
 <span class="kw">pub type </span>MutexGuard&lt;<span class="lifetime">&#39;a</span>, T&gt; = sync::MutexGuard&lt;<span class="lifetime">&#39;a</span>, T, DisablePreemption&gt;;

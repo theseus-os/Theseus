@@ -135,13 +135,12 @@
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
-<a href="#138" id="138">138</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Contains [`PerCpuData`], the data stored on a per-CPU basis in Theseus.
 //!
 //! Each CPU has its own instance of `PerCpuData`, and each CPU&#39;s instance
 //! can only be accessed by itself.
 //!
-//! ## This `per_cpu` crate vs. the `cpu_local_preemption` crate
+//! ## This `per_cpu` crate vs. the `cpu_local` crate
 //! These two crates exist to solve a circular dependency problem:
 //! the crate that defines the per-CPU data structure (this `per_cpu` crate)
 //! must depend on all the foreign crates that define the types used for
@@ -154,17 +153,17 @@
 //!    specifically the ones that define the types needed for each field of [`PerCpuData`].
 //!    * If you want to add another piece of per-CPU data, you can do that here
 //!      by modifying the [`PerCpuData`] struct, and then updating the const definitions
-//!      of offsets and other metadata in `cpu_local_preemption::FixedCpuLocal`.
+//!      of offsets and other metadata in `cpu_local::FixedCpuLocal`.
 //!    * To actually access per-CPU data, do not use this crate,
-//!      use `cpu_local_preemption::CpuLocal` instead.
+//!      use `cpu_local::CpuLocal` instead.
 //!
-//! 2. The `cpu_local_preemption` crate is the &quot;top-level&quot; crate that is depended upon
+//! 2. The `cpu_local` crate is the &quot;top-level&quot; crate that is depended upon
 //!    by each of the crates that needs to access per-CPU data.
-//!    * `cpu_local_preemption` is a mostly standalone crate that does not depend
+//!    * `cpu_local` is a mostly standalone crate that does not depend
 //!      on any of the specific types from other Theseus crates,
 //!      which allows other Theseus crates to depend upon it.
-//!    * `cpu_local_preemption` effectively decouples the definitions
-//!    * This `per_cpu` crate also depends on `cpu_local_preemption` in order to initialize itself
+//!    * `cpu_local` effectively decouples the definitions
+//!    * This `per_cpu` crate also depends on `cpu_local` in order to initialize itself
 //!      for each CPU right after that CPU has booted.
 //!
 
@@ -173,9 +172,8 @@
 
 </span><span class="kw">use </span>core::ops::Deref;
 <span class="kw">use </span>cpu::CpuId;
-<span class="kw">use </span>cpu_local_preemption::PerCpuField;
+<span class="kw">use </span>cpu_local::PerCpuField;
 <span class="kw">use </span>task::{DropAfterTaskSwitch, TaskSwitchPreemptionGuard};
-<span class="kw">use </span>cpu_local_preemption::PreemptionCount;
 
 <span class="doccomment">/// The data stored on a per-CPU basis in Theseus.
 ///
@@ -184,18 +182,18 @@
 /// outside this struct.
 ///
 /// This struct is not directly accessible; per-CPU states are accessible
-/// by other crates using the functions in the [`cpu_local_preemption`] crate.
+/// by other crates using the functions in the [`cpu_local`] crate.
 ///
 /// ## Required traits
-/// Each field in this struct must implement [`cpu_local_preemption::PerCpuField`],
+/// Each field in this struct must implement [`cpu_local::PerCpuField`],
 /// which in turn mandates that each field have a unique type distinct from the type
 /// of every other field.
 /// Currently we achieve this with newtype wrappers
-</span><span class="attr">#[allow(dead_code)] </span><span class="comment">// These fields are accessed via `cpu_local_preemption` functions.
+</span><span class="attr">#[allow(dead_code)] </span><span class="comment">// These fields are accessed via `cpu_local` functions.
 </span><span class="attr">#[repr(C)]
 </span><span class="comment">//
 // IMPORTANT NOTE:
-// * These fields must be kept in sync with `cpu_local_preemption::PerCpuField`.
+// * These fields must be kept in sync with `cpu_local::PerCpuField`.
 // * The same applies for the `const_assertions` module at the end of this file.
 //
 </span><span class="kw">pub struct </span>PerCpuData {
@@ -211,7 +209,7 @@
     </span>cpu_id: CpuLocalCpuId,
     <span class="doccomment">/// The current preemption count of this CPU, which is used to determine
     /// whether task switching can occur or not.
-    </span>preemption_count: PreemptionCount,
+    </span>preemption_count: u8,
     <span class="doccomment">/// A preemption guard used during task switching to ensure that one task switch
     /// cannot interrupt (preempt) another task switch already in progress.
     </span>task_switch_preemption_guard: TaskSwitchPreemptionGuard,
@@ -227,7 +225,7 @@
         <span class="self">Self </span>{
             self_ptr,
             cpu_id: CpuLocalCpuId(cpu_id),
-            preemption_count: PreemptionCount::new(),
+            preemption_count: <span class="number">0</span>,
             task_switch_preemption_guard: TaskSwitchPreemptionGuard::new(),
             drop_after_task_switch: DropAfterTaskSwitch::new(),
         }
@@ -247,7 +245,7 @@
 }
 <span class="comment">// SAFETY: The `CpuLocalCpuId` type corresponds to a field in `PerCpuData`
 //         with the offset specified by `PerCpuField::CpuId`.
-</span><span class="kw">unsafe impl </span>cpu_local_preemption::CpuLocalField <span class="kw">for </span>CpuLocalCpuId {
+</span><span class="kw">unsafe impl </span>cpu_local::CpuLocalField <span class="kw">for </span>CpuLocalCpuId {
     <span class="kw">const </span>FIELD: PerCpuField = PerCpuField::CpuId;
 }
 
@@ -257,7 +255,7 @@
 /// This must be invoked from (run on) the actual CPU with the given `cpu_id`;
 /// the main bootstrap CPU cannot run this for all CPUs itself.
 </span><span class="kw">pub fn </span>init(cpu_id: cpu::CpuId) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    cpu_local_preemption::init(
+    cpu_local::init(
         cpu_id.value(),
         core::mem::size_of::&lt;PerCpuData&gt;(),
         |self_ptr| PerCpuData::new(self_ptr, cpu_id),

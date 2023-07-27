@@ -1,5 +1,5 @@
 (function() {var implementors = {
 "root":[["impl Directory for <a class=\"struct\" href=\"root/struct.RootDirectory.html\" title=\"struct root::RootDirectory\">RootDirectory</a>"]],
-"task_fs":[["impl Directory for <a class=\"struct\" href=\"task_fs/struct.TaskFs.html\" title=\"struct task_fs::TaskFs\">TaskFs</a>"],["impl Directory for <a class=\"struct\" href=\"task_fs/struct.TaskDir.html\" title=\"struct task_fs::TaskDir\">TaskDir</a>"],["impl Directory for <a class=\"struct\" href=\"task_fs/struct.MmiDir.html\" title=\"struct task_fs::MmiDir\">MmiDir</a>"]],
+"task_fs":[["impl Directory for <a class=\"struct\" href=\"task_fs/struct.MmiDir.html\" title=\"struct task_fs::MmiDir\">MmiDir</a>"],["impl Directory for <a class=\"struct\" href=\"task_fs/struct.TaskDir.html\" title=\"struct task_fs::TaskDir\">TaskDir</a>"],["impl Directory for <a class=\"struct\" href=\"task_fs/struct.TaskFs.html\" title=\"struct task_fs::TaskFs\">TaskFs</a>"]],
 "vfs_node":[["impl Directory for <a class=\"struct\" href=\"vfs_node/struct.VFSDirectory.html\" title=\"struct vfs_node::VFSDirectory\">VFSDirectory</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

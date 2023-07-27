@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["hold_preemption","preemption_enabled"],"struct":["PreemptionGuard"]};

@@ -95,7 +95,7 @@
 #![no_std]
 
 </span><span class="kw">use </span>mpmc_queue::Queue;
-<span class="kw">use </span>cpu_local_preemption::hold_preemption;
+<span class="kw">use </span>preemption::hold_preemption;
 <span class="kw">use </span>sync::DeadlockPrevention;
 <span class="kw">use </span>sync_spin::Spin;
 <span class="kw">use </span>task::{get_my_current_task, TaskRef};

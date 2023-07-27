@@ -1258,6 +1258,7 @@
 <a href="#1258" id="1258">1258</a>
 <a href="#1259" id="1259">1259</a>
 <a href="#1260" id="1260">1260</a>
+<a href="#1261" id="1261">1261</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1311,7 +1312,7 @@
 <span class="kw">use </span>environment::Environment;
 <span class="kw">use </span>memory::MmiRef;
 <span class="kw">use </span>no_drop::NoDrop;
-<span class="kw">use </span>cpu_local_preemption::PreemptionGuard;
+<span class="kw">use </span>preemption::PreemptionGuard;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>stack::Stack;
@@ -1863,7 +1864,7 @@
     ///    meaning the current task will continue running.
     </span><span class="attr">#[doc(alias(<span class="string">&quot;yield&quot;</span>))]
     </span><span class="kw">pub fn </span>schedule() -&gt; bool {
-        <span class="kw">let </span>preemption_guard = cpu_local_preemption::hold_preemption();
+        <span class="kw">let </span>preemption_guard = preemption::hold_preemption();
         <span class="comment">// If preemption was not previously enabled (before we disabled it above),
         // then we shouldn&#39;t perform a task switch here.
         </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {
@@ -2230,7 +2231,8 @@
 <span class="kw">pub use </span>cpu_local_task_switch::<span class="kw-2">*</span>;
 <span class="doccomment">/// CPU-local data related to task switching.
 </span><span class="kw">mod </span>cpu_local_task_switch {
-    <span class="kw">use </span>cpu_local_preemption::{CpuLocal, CpuLocalField, PerCpuField, PreemptionGuard};
+    <span class="kw">use </span>cpu_local::{CpuLocal, CpuLocalField, PerCpuField};
+    <span class="kw">use </span>preemption::PreemptionGuard;
 
     <span class="doccomment">/// The preemption guard that was used for safe task switching on each CPU.
     ///

@@ -1060,7 +1060,7 @@
 <span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>fs_node::FileOrDir;
-<span class="kw">use </span>cpu_local_preemption::{hold_preemption, PreemptionGuard};
+<span class="kw">use </span>preemption::{hold_preemption, PreemptionGuard};
 <span class="kw">use </span>no_drop::NoDrop;
 
 <span class="attr">#[cfg(simd_personality)]

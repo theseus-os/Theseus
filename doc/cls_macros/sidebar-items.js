@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"attr":["cpu_local"]};
