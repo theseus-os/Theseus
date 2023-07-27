@@ -112,150 +112,147 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         #[non_exhaustive]
         #visibility struct #struct_name;
 
-        #[cfg(target_arch = "x86_64")]
         impl #struct_name {
             #[inline]
             pub fn load(&self) -> #ty {
-                let ret;
-                unsafe {
-                    ::core::arch::asm!(
-                        ::core::concat!("mov {}, ", #x64_cls_location),
-                        out(#x64_reg_class) ret,
-                        options(preserves_flags, nostack),
-                    )
-                };
-                ret
-            }
+                #[cfg(target_arch = "x86_64")]
+                {
+                    let ret;
+                    unsafe {
+                        ::core::arch::asm!(
+                            ::core::concat!("mov {}, ", #x64_cls_location),
+                            out(#x64_reg_class) ret,
+                            options(nostack),
+                        )
+                    };
+                    ret
+                }
+                #[cfg(target_arch = "aarch64")]
+                {
+                    let ret;
+                    unsafe {
+                        ::core::arch::asm!(
+                            "2:",
+                            // Load value.
+                            "mrs {tp_1}, tpidr_el1",
+                            concat!(
+                                "ldr", #aarch64_instr_width,
+                                " {ret", #aarch64_reg_modifier,"},",
+                                " [{tp_1},#", stringify!(#offset), "]",
+                            ),
 
-            #[inline]
-            pub fn increment(&self) {
-                unsafe {
-                    ::core::arch::asm!(
-                        ::core::concat!("inc ", #x64_width_modifier, #x64_cls_location),
-                        options(preserves_flags, nostack),
-                    )
-                };
-            }
+                            // Make sure task wasn't migrated between mrs and ldxr.
+                            "mrs {tp_2}, tpidr_el1",
+                            "cmp {tp_1}, {tp_2}",
+                            "b.ne 2b",
 
-            #[inline]
-            pub fn decrement(&self) {
-                unsafe {
-                    ::core::arch::asm!(
-                        ::core::concat!("dec ", #x64_width_modifier, #x64_cls_location),
-                        options(preserves_flags, nostack),
-                    )
+                            tp_1 = out(reg) _,
+                            ret = out(reg) ret,
+                            tp_2 = out(reg) _,
+                        )
+                    };
+                    ret
                 }
             }
-        }
-
-        #[cfg(target_arch = "aarch64")]
-        impl #struct_name {
             #[inline]
-            pub fn load(&self) -> #ty {
-                let ret;
-                unsafe {
-                    ::core::arch::asm!(
-                        "2:",
-                        // Load value.
-                        "mrs {tp_1}, tpidr_el1",
-                        concat!(
-                            "ldr", #aarch64_instr_width,
-                            " {ret", #aarch64_reg_modifier,"},",
-                            " [{tp_1},#", stringify!(#offset), "]",
-                        ),
-
-                        // Make sure task wasn't migrated between mrs and ldxr.
-                        "mrs {tp_2}, tpidr_el1",
-                        "cmp {tp_1}, {tp_2}",
-                        "b.ne 2b",
-
-                        tp_1 = out(reg) _,
-                        ret = out(reg) ret,
-                        tp_2 = out(reg) _,
-                    )
-                };
-                ret
-            }
-
-            #[inline]
-            fn add(&self, operand: #ty) {
-                unsafe {
-                    ::core::arch::asm!(
-                        "2:",
-                        // Load value.
-                        // TODO: Can we add offset and load in one instruction?
-                        "mrs {tp_1}, tpidr_el1",
-                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
-                        concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
-
-                        // Make sure task wasn't migrated between msr and ldxr.
-                        "mrs {tp_2}, tpidr_el1",
-                        "cmp {tp_1}, {tp_2}",
-                        "b.ne 2b",
-
-                        // Compute and store value.
-                        "add {value}, {value}, {operand}",
-                        concat!("stxr", #aarch64_instr_width, " {cond:w}, {value", #aarch64_reg_modifier,"}, [{ptr}]"),
-
-                        // Make sure task wasn't migrated between ldxr and stxr.
-                        "cbnz {cond}, 2b",
-
-                        tp_1 = out(reg) _,
-                        ptr = out(reg) _,
-                        value = out(reg) _,
-                        tp_2 = out(reg) _,
-                        operand = in(reg) operand,
-                        cond = out(reg) _,
-
-                        options(nostack),
-                    );
+            pub fn fetch_add(&self, mut operand: #ty) -> #ty {
+                #[cfg(target_arch = "x86_64")]
+                {
+                    unsafe {
+                        ::core::arch::asm!(
+                            ::core::concat!("xadd ", #x64_width_modifier, #x64_cls_location, ", {}"),
+                            inout(#x64_reg_class) operand,
+                            options(nostack),
+                        )
+                    };
+                    operand
                 }
-            }
+                #[cfg(target_arch = "aarch64")]
+                {
+                    let ret;
+                    unsafe {
+                        ::core::arch::asm!(
+                            "2:",
+                            // Load value.
+                            // TODO: Can we add offset and load in one instruction?
+                            "mrs {tp_1}, tpidr_el1",
+                            concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                            concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
-            fn sub(&self, operand: #ty) {
-                unsafe {
-                    ::core::arch::asm!(
-                        "2:",
-                        // Load value.
-                        // TODO: Can we add offset and load in one instruction?
-                        "mrs {tp_1}, tpidr_el1",
-                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
-                        concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
+                            // Make sure task wasn't migrated between msr and ldxr.
+                            "mrs {tp_2}, tpidr_el1",
+                            "cmp {tp_1}, {tp_2}",
+                            "b.ne 2b",
 
-                        // Make sure task wasn't migrated between msr and ldxr.
-                        "mrs {tp_2}, tpidr_el1",
-                        "cmp {tp_1}, {tp_2}",
-                        "b.ne 2b",
+                            // Compute and store value (reuse tp_1 register).
+                            "add {tp_1}, {value}, {operand}",
+                            concat!("stxr", #aarch64_instr_width, " {cond:w}, {tp_1", #aarch64_reg_modifier,"}, [{ptr}]"),
 
-                        // Compute and store value.
-                        "sub {value}, {value}, {operand}",
-                        concat!("stxr", #aarch64_instr_width, " {cond:w}, {value", #aarch64_reg_modifier,"}, [{ptr}]"),
+                            // Make sure task wasn't migrated between ldxr and stxr.
+                            "cbnz {cond}, 2b",
 
-                        // Make sure task wasn't migrated between ldxr and stxr.
-                        "cbnz {cond}, 2b",
+                            tp_1 = out(reg) ret,
+                            ptr = out(reg) _,
+                            value = out(reg) ret,
+                            tp_2 = out(reg) _,
+                            operand = in(reg) operand,
+                            cond = out(reg) _,
 
-                        tp_1 = out(reg) _,
-                        ptr = out(reg) _,
-                        value = out(reg) _,
-                        tp_2 = out(reg) _,
-                        operand = in(reg) operand,
-                        cond = out(reg) _,
-
-                        options(nostack),
-                    );
+                            options(nostack),
+                        );
+                    }
+                    ret
                 }
             }
 
             #[inline]
-            pub fn increment(&self) {
-                self.add(1);
-            }
+            pub fn fetch_sub(&self, mut operand: #ty) -> #ty {
+                #[cfg(target_arch = "x86_64")]
+                {
+                    operand = operand.overflowing_neg().0;
+                    self.fetch_add(operand)
 
-            #[inline]
-            pub fn decrement(&self) {
-                self.sub(1);
-            }
+                }
+                #[cfg(target_arch = "aarch64")]
+                {
+                    let ret;
+                    unsafe {
+                        ::core::arch::asm!(
+                            "2:",
+                            // Load value.
+                            // TODO: Can we add offset and load in one instruction?
+                            "mrs {tp_1}, tpidr_el1",
+                            concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                            concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
+                            // Make sure task wasn't migrated between msr and ldxr.
+                            "mrs {tp_2}, tpidr_el1",
+                            "cmp {tp_1}, {tp_2}",
+                            "b.ne 2b",
+
+                            // Reuse tp_1 to store previous value.
+                            "mov {tp_1}, {value}",
+
+                            // Compute and store value (reuse tp_1 register).
+                            "sub {tp_1}, {value}, {operand}",
+                            concat!("stxr", #aarch64_instr_width, " {cond:w}, {tp_1", #aarch64_reg_modifier,"}, [{ptr}]"),
+
+                            // Make sure task wasn't migrated between ldxr and stxr.
+                            "cbnz {cond}, 2b",
+
+                            tp_1 = out(reg) _,
+                            ptr = out(reg) _,
+                            value = out(reg) ret,
+                            tp_2 = out(reg) _,
+                            operand = in(reg) operand,
+                            cond = out(reg) _,
+
+                            options(nostack),
+                        );
+                    }
+                    ret
+                }
+            }
         }
     }
     .into()
