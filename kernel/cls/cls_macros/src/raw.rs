@@ -13,62 +13,63 @@ pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
     quote! {
         /// Replaces the contained value with `value`, and returns the old
         /// contained value.
-        #[cfg(target_arch = "x86_64")]
+        #[inline]
         pub fn replace(&self, value: #ty) -> #ty {
-            let mut raw = unsafe { ::cls::Raw::into_raw(value) };
-            unsafe {
-                ::core::arch::asm!(
-                    concat!("xchg {}, ", #x64_cls_location),
-                    inout(reg) raw,
-                )
-            };
+            #[cfg(target_arch = "x86_64")]
+            {
+                let mut raw = unsafe { ::cls::Raw::into_raw(value) };
+                unsafe {
+                    ::core::arch::asm!(
+                        concat!("xchg {}, ", #x64_cls_location),
+                        inout(reg) raw,
+                    )
+                };
 
-            // SAFETY: [{ptr}] contained a `u64` returned by `Raw::into_raw`
-            // that has not been converted back into #ty.
-            unsafe { ::cls::Raw::from_raw(raw) }
-        }
+                // SAFETY: [{ptr}] contained a `u64` returned by `Raw::into_raw`
+                // that has not been converted back into #ty.
+                unsafe { ::cls::Raw::from_raw(raw) }
+            }
+            #[cfg(target_arch = "aarch64")]
+            {
+                let raw_in = ::cls::Raw::into_raw(value);
+                let raw_out;
 
-        /// Replaces the contained value with `value`, and returns the old
-        /// contained value.
-        #[cfg(target_arch = "aarch64")]
-        pub fn replace(&self, value: #ty) -> #ty {
-            let raw_in = ::cls::Raw::into_raw(value);
-            let raw_out;
+                unsafe {
+                    ::core::arch::asm!(
+                        "2:",
+                        // Load value.
+                        "mrs {tp_1}, tpidr_el1",
+                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                        "ldxr {raw_out}, [{ptr}]",
 
-            unsafe {
-                ::core::arch::asm!(
-                    "1:",
-                    // Load value.
-                    "mrs {tp_1}, tpidr_el1",
-                    concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
-                    "ldxr {raw_out}, [{ptr}]",
+                        // Make sure task wasn't migrated between msr and ldxr.
+                        "mrs {tp_2}, tpidr_el1",
+                        "cmp {tp_1}, {tp_2}",
+                        "b.ne 2b",
 
-                    // Make sure task wasn't migrated between msr and ldxr.
-                    "mrs {tp_2}, tpidr_el1",
-                    "cmp {tp_1}, {tp_2}",
-                    "b.ne 1b",
+                        // Store value.
+                        "stxr {cond:w}, {raw_in}, [{ptr}]",
 
-                    // Store value.
-                    "stxr {cond:w}, {raw_in}, [{ptr}]",
+                        // Make sure task wasn't migrated between ldxr and stxr.
+                        "cbnz {cond}, 2b",
 
-                    // Make sure task wasn't migrated between ldxr and stxr.
-                    "cbnz {cond}, 1b",
+                        tp_1 = out(reg) _,
+                        ptr = out(reg) _,
+                        raw_out = out(reg) raw_out,
+                        tp_2 = out(reg) _,
+                        raw_in = in(reg) raw_in,
+                        cond = out(reg) _,
+                    )
+                };
 
-                    tp_1 = out(reg) _,
-                    ptr = out(reg) _,
-                    raw_out = out(reg) raw_out,
-                    tp_2 = out(reg) _,
-                    raw_in = in(reg) raw_in,
-                    cond = out(reg) _,
-                )
-            };
-
-            // SAFETY: [{ptr}] contained a `u64` returned by `Raw::into_raw`
-            // that has not been converted back into #ty.
-            unsafe { ::cls::Raw::from_raw(raw_out) }
+                // SAFETY: [{ptr}] contained a `u64` returned by `Raw::into_raw`
+                // that has not been converted back into #ty.
+                unsafe { ::cls::Raw::from_raw(raw_out) }
+            }
         }
 
         /// Sets the contained value.
+        #[inline]
         pub fn set(&self, value: #ty) {
             self.replace(value);
         }

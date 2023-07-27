@@ -1,3 +1,6 @@
+//! Application for testing the preemption counter (and, indirectly, CPU-local
+//! variables).
+
 #![no_std]
 
 extern crate alloc;

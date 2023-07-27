@@ -1,6 +1,8 @@
 [package]
 name = "cpu_local"
 version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Support for accessing CPU-local storage via per-CPU variables"
 edition = "2021"
 
 [dependencies]

@@ -1,6 +1,8 @@
 [package]
 name = "cls_macros"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Macros for the `cls` crate"
 edition = "2021"
 
 [lib]

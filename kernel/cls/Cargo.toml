@@ -1,6 +1,8 @@
 [package]
 name = "cls"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Library for defining CPU-local variables"
 edition = "2021"
 
 [dependencies]
