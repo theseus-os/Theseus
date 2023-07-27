@@ -15,11 +15,12 @@ irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 context_switch = { path = "../context_switch" }
 cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
+cpu_local = { path = "../cpu_local" }
 environment = { path = "../environment" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
+preemption = { path = "../preemption" }
 stack = { path = "../stack" }
 sync_irq = { path = "../../libs/sync_irq" }
 task_struct = { path = "../task_struct" }

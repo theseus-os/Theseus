@@ -79,7 +79,7 @@ impl Blocker {
                 // disables this task, it keeps running long enough to return here and
                 // drop the lock on `woken`.
                 let result = {
-                    let guard = cpu_local_preemption::hold_preemption_no_timer_disable();
+                    let guard = preemption::hold_preemption_no_timer_disable();
                     let r = block_action();
                     drop(woken);
                     drop(guard);
@@ -123,7 +123,7 @@ where
         // is released expediently after `wake_action()` is done.
         // This is not technically required, but it prevents this waker task
         // from being scheduled out while still holding the `woken` lock.
-        let guard = cpu_local_preemption::hold_preemption_no_timer_disable();
+        let guard = preemption::hold_preemption_no_timer_disable();
         (self.wake_action)();
         drop(woken);
         drop(guard);
