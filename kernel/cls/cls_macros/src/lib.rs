@@ -122,7 +122,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         ::core::arch::asm!(
                             ::core::concat!("mov {}, ", #x64_cls_location),
                             out(#x64_reg_class) ret,
-                            options(nostack),
+                            options(preserves_flags, nostack),
                         )
                     };
                     ret
@@ -149,6 +149,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                             tp_1 = out(reg) _,
                             ret = out(reg) ret,
                             tp_2 = out(reg) _,
+
+                            options(nostack),
                         )
                     };
                     ret
@@ -163,7 +165,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                         ::core::arch::asm!(
                             ::core::concat!("xadd ", #x64_width_modifier, #x64_cls_location, ", {}"),
                             inout(#x64_reg_class) operand,
-                            options(preserves_flags, nostack),
+                            options(nostack),
                         )
                     };
                     operand
@@ -199,8 +201,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                             cond = out(reg) _,
 
                             options(nostack),
-                        );
-                    }
+                        )
+                    };
                     ret
                 }
             }
