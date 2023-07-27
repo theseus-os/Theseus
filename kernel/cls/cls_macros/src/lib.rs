@@ -1,3 +1,5 @@
+//! Exports the [`cpu_local`] macro.
+
 #![feature(proc_macro_diagnostic, proc_macro_span, let_chains)]
 
 use convert_case::{Case, Casing};
