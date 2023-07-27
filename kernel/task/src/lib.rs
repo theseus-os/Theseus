@@ -980,7 +980,7 @@ mod cpu_local_task_switch {
     /// and then retrieved from here right after the context switch ends.
     /// It is stored in a CPU-local variable because it's only related to
     /// a task switching operation on a particular CPU.
-    #[cls::cpu_local(16)]
+    #[cls::cpu_local]
     pub(crate) static TASK_SWITCH_PREEMPTION_GUARD: TaskSwitchPreemptionGuard = TaskSwitchPreemptionGuard::new();
 
     /// Data that should be dropped after switching away from a task that has exited.
@@ -988,7 +988,7 @@ mod cpu_local_task_switch {
     /// Currently, this contains the previous Task's `TaskRef` removed from its TLS area;
     /// it is stored in a CPU-local variable because it's only related to
     /// a task switching operation on a particular CPU.
-    #[cls::cpu_local(24)]
+    #[cls::cpu_local]
     pub(crate) static DROP_AFTER_TASK_SWITCH: DropAfterTaskSwitch = DropAfterTaskSwitch::new();
 
     #[derive(Debug, Default)]

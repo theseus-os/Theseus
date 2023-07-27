@@ -69,3 +69,7 @@ impl Raw for u64 {
         raw
     }
 }
+
+pub fn set_base(address: *const ()) {
+    todo!("{address:0x?}");
+}

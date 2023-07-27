@@ -10,7 +10,7 @@ use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse_macro_input, Attribute, Expr, Ident, LitInt, Token, Type, Visibility,
+    parse_macro_input, Attribute, Expr, Ident, Token, Type, Visibility,
 };
 
 struct CpuLocal {
@@ -18,7 +18,7 @@ struct CpuLocal {
     visibility: Visibility,
     name: Ident,
     ty: Type,
-    _init: Expr,
+    init: Expr,
 }
 
 impl Parse for CpuLocal {
@@ -30,14 +30,14 @@ impl Parse for CpuLocal {
         input.parse::<Token![:]>()?;
         let ty: Type = input.parse()?;
         input.parse::<Token![=]>()?;
-        let _init: Expr = input.parse()?;
+        let init: Expr = input.parse()?;
         input.parse::<Token![;]>()?;
         Ok(CpuLocal {
             attributes,
             visibility,
             name,
             ty,
-            _init,
+            init,
         })
     }
 }
@@ -46,40 +46,25 @@ impl Parse for CpuLocal {
 ///
 /// Variables can either be an unsigned integer, or a custom type implementing
 /// `cls::RawRepresentation`.
-///
-/// The initialisation expression has no effect; to set the initial value,
-/// `per_cpu::PerCpuData::new` must be modified.
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
-    // if !args.is_empty() {
-    //     Diagnostic::spanned(
-    //         Span::call_site(),
-    //         Level::Error,
-    //         "malformed `cpu_local` attribute input",
-    //     )
-    //     .help("must be of the form `#[cpu_local]`")
-    //     .emit();
-    //     return TokenStream::new();
-    // }
-
-    let offset = if let Ok(i) = syn::parse::<LitInt>(args.clone()) {
-        i
-    } else {
-        let span = args
-            .into_iter()
-            .map(|tt| tt.span())
-            .reduce(|a, b| a.join(b).unwrap())
-            .unwrap_or_else(Span::call_site);
-        Diagnostic::spanned(span, Level::Error, "invalid offset").emit();
+    if !args.is_empty() {
+        Diagnostic::spanned(
+            Span::call_site(),
+            Level::Error,
+            "malformed `cpu_local` attribute input",
+        )
+        .help("must be of the form `#[cpu_local]`")
+        .emit();
         return TokenStream::new();
-    };
+    }
 
     let CpuLocal {
         attributes,
         visibility,
         name,
         ty,
-        _init,
+        init,
     } = parse_macro_input!(input as CpuLocal);
 
     let attributes = attributes.iter().map(|attribute| quote! { #attribute });
@@ -89,20 +74,29 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let int_methods = int::methods(&ty, &offset).unwrap_or_else(proc_macro2::TokenStream::new);
-    let raw_methods = raw::methods(&ty, &offset);
+    let int_methods = int::methods(&name, &ty).unwrap_or_else(proc_macro2::TokenStream::new);
+    let raw_methods = raw::methods(&name, &ty);
 
     quote! {
         #(#attributes)*
         #[thread_local]
-        // #[link_section = ".cls"]
-        #visibility static #name: #struct_name = #struct_name;
+        #[link_section = ".cls"]
+        #visibility static #name: #struct_name = #struct_name::__new(#init);
 
         #[repr(transparent)]
         #[non_exhaustive]
-        #visibility struct #struct_name;
+        #visibility struct #struct_name {
+            inner: ::core::cell::UnsafeCell<#ty>,
+        }
 
         impl #struct_name {
+            #[doc(hidden)]
+            const fn __new(init: #ty) -> Self {
+                Self {
+                    inner: ::core::cell::UnsafeCell::new(init),
+                }
+            }
+
             #int_methods
             #raw_methods
         }

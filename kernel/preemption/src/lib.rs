@@ -9,7 +9,7 @@
 use cpu::CpuId;
 
 // NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
-#[cls::cpu_local(12)]
+#[cls::cpu_local]
 static PREEMPTION_COUNT: u8 = 0;
 
 /// Prevents preemption (preemptive task switching) from occurring

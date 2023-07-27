@@ -2,14 +2,12 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{LitInt, Type};
+use syn::{Ident, Type};
 
 /// Returns the methods for CPU locals implementing `cls::Raw`.
 ///
 /// Note that unsigned integers implement `cls::Raw`.
-pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
-    let x64_cls_location = format!("gs:[{offset}]");
-
+pub(crate) fn methods(name: &Ident, ty: &Type) -> TokenStream {
     quote! {
         /// Replaces the contained value with `value`, and returns the old
         /// contained value.
@@ -20,8 +18,10 @@ pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
                 let mut raw = unsafe { ::cls::Raw::into_raw(value) };
                 unsafe {
                     ::core::arch::asm!(
-                        concat!("xchg {}, ", #x64_cls_location),
+                        concat!("xchg {}, gs:[{}]"),
                         inout(reg) raw,
+                        sym #name,
+                        options(nostack),
                     )
                 };
 
@@ -39,7 +39,7 @@ pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
-                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                        concat!("add {ptr}, {tp_1}, {offset}"),
                         "ldxr {raw_out}, [{ptr}]",
 
                         // Make sure task wasn't migrated between msr and ldxr.
@@ -55,10 +55,12 @@ pub(crate) fn methods(ty: &Type, offset: &LitInt) -> TokenStream {
 
                         tp_1 = out(reg) _,
                         ptr = out(reg) _,
+                        offset = sym #name,
                         raw_out = out(reg) raw_out,
                         tp_2 = out(reg) _,
                         raw_in = in(reg) raw_in,
                         cond = out(reg) _,
+                        options(nostack),
                     )
                 };
 
