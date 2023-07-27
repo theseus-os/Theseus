@@ -1066,6 +1066,7 @@ mod cpu_local_task_switch {
         unsafe fn from_raw(raw: u64) -> Self {
             DropAfterTaskSwitch(match raw {
                 0 => None,
+                // SAFETY: `raw` was created by `Arc::into_raw` call in `into_raw`.
                 _ => Some(super::TaskRef(unsafe { Arc::from_raw(raw as *const _) })),
             })
         }
