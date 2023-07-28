@@ -30,7 +30,7 @@ use core::{
 use log::debug;
 use super::{
     Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
+    AllocatedPages, allocate_pages, AllocatedFrames, UnmappedFrames, PteFlags,
     InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
     get_p4, find_section_memory_bounds,
 };
@@ -223,11 +223,11 @@ pub fn get_current_p4() -> Frame {
 pub fn init(
     boot_info: &impl BootInformation,
     stack_start_virt: VirtualAddress,
-    into_alloc_frames_fn: fn(FrameRange) -> AllocatedFrames,
+    into_unmapped_frames_fn: fn(FrameRange) -> UnmappedFrames,
 ) -> Result<InitialMemoryMappings, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
-    // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
-    mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
+    // `page_table_entry::UnmappedFrameRange` back into `UnmappedFrames`.
+    mapper::INTO_UNMAPPED_FRAMES_FUNC.call_once(|| into_unmapped_frames_fn);
 
     // bootstrap a PageTable from the currently-loaded page table
     let mut page_table = PageTable::from_current()
