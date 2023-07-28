@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["UnmapResult"],"struct":["PageTableEntry","UnmappedFrames"]};
+window.SIDEBAR_ITEMS = {"enum":["UnmapResult"],"struct":["PageTableEntry","UnmappedFrameRange"]};

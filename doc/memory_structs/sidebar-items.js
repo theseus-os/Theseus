@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["CopyableFrameRange","CopyablePageRange","Frame","FrameRange","Page","PageRange","PhysicalAddress","VirtualAddress"]};
+window.SIDEBAR_ITEMS = {"enum":["MemoryState"],"struct":["CopyableFrameRange","CopyablePageRange","Frame","FrameRange","Page","PageRange","PhysicalAddress","VirtualAddress"]};

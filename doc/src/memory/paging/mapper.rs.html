@@ -1324,6 +1324,7 @@
 <a href="#1324" id="1324">1324</a>
 <a href="#1325" id="1325">1325</a>
 <a href="#1326" id="1326">1326</a>
+<a href="#1327" id="1327">1327</a>
 </pre></div><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -1344,7 +1345,7 @@
     slice,
 };
 <span class="kw">use </span>log::{error, warn, debug, trace};
-<span class="kw">use crate</span>::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
+<span class="kw">use crate</span>::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames}; 
 <span class="kw">use </span><span class="kw">crate</span>::paging::{
     get_current_p4,
     table::{P4, UPCOMING_P4, Table, Level4},
@@ -1360,23 +1361,23 @@
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">use </span>kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
-<span class="doccomment">/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
+<span class="doccomment">/// This is a private callback used to convert `UnmappedFrameRange` into `UnmappedFrames`.
 /// 
 /// This exists to break the cyclic dependency cycle between `page_table_entry` and
 /// `frame_allocator`, which depend on each other as such:
-/// * `frame_allocator` needs to `impl Into&lt;AllocatedPages&gt; for UnmappedFrames`
+/// * `frame_allocator` needs to `impl Into&lt;Frames&gt; for UnmappedFrameRange`
 ///    in order to allow unmapped exclusive frames to be safely deallocated
 /// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow
 ///   page table entry values to be set safely to a real physical frame that is owned and exists.
 /// 
 /// To get around that, the `frame_allocator::init()` function returns a callback
-/// to its function that allows converting a range of unmapped frames back into `AllocatedFrames`,
+/// to its function that allows converting a range of unmapped frames back into `UnmappedFrames`,
 /// which then allows them to be dropped and thus deallocated.
 /// 
 /// This is safe because the frame allocator can only be initialized once, and also because
 /// only this crate has access to that function callback and can thus guarantee
-/// that it is only invoked for `UnmappedFrames`.
-</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">static </span>INTO_ALLOCATED_FRAMES_FUNC: Once&lt;<span class="kw">fn</span>(FrameRange) -&gt; AllocatedFrames&gt; = Once::new();
+/// that it is only invoked for `UnmappedFrameRange`.
+</span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">static </span>INTO_UNMAPPED_FRAMES_FUNC: Once&lt;<span class="kw">fn</span>(FrameRange) -&gt; UnmappedFrames&gt; = Once::new();
 
 <span class="doccomment">/// A convenience function to translate the given virtual address into a
 /// physical address using the currently-active page table.
@@ -1936,8 +1937,8 @@
             </span>);
         }   
 
-        <span class="kw">let </span><span class="kw-2">mut </span>first_frame_range: <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt; = <span class="prelude-val">None</span>; <span class="comment">// this is what we&#39;ll return
-        </span><span class="kw">let </span><span class="kw-2">mut </span>current_frame_range: <span class="prelude-ty">Option</span>&lt;AllocatedFrames&gt; = <span class="prelude-val">None</span>;
+        <span class="kw">let </span><span class="kw-2">mut </span>first_frame_range: <span class="prelude-ty">Option</span>&lt;UnmappedFrames&gt; = <span class="prelude-val">None</span>; <span class="comment">// this is what we&#39;ll return
+        </span><span class="kw">let </span><span class="kw-2">mut </span>current_frame_range: <span class="prelude-ty">Option</span>&lt;UnmappedFrames&gt; = <span class="prelude-val">None</span>;
 
         <span class="kw">for </span>page <span class="kw">in </span><span class="self">self</span>.pages.range().clone() {            
             <span class="kw">let </span>p1 = active_table_mapper.p4_mut()
@@ -1957,8 +1958,8 @@
             // freed from the newly-unmapped P1 PTE entry above.
             </span><span class="kw">match </span>unmapped_frames {
                 UnmapResult::Exclusive(newly_unmapped_frames) =&gt; {
-                    <span class="kw">let </span>newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
-                        .ok_or(<span class="string">&quot;BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized&quot;</span>)
+                    <span class="kw">let </span>newly_unmapped_frames = INTO_UNMAPPED_FRAMES_FUNC.get()
+                        .ok_or(<span class="string">&quot;BUG: Mapper::unmap(): the `INTO_UNMAPPED_FRAMES_FUNC` callback was not initialized&quot;</span>)
                         .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))<span class="question-mark">?</span>;
 
                     <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>curr_frames) = current_frame_range.take() {
@@ -2007,7 +2008,8 @@
         }
 
         <span class="comment">// Ensure that we return at least some frame range, even if we broke out of the above loop early.
-        </span><span class="prelude-val">Ok</span>(first_frame_range.or(current_frame_range))
+        </span><span class="prelude-val">Ok</span>(first_frame_range.map(|f| f.into_allocated_frames())
+            .or(current_frame_range.map(|f| f.into_allocated_frames())))
     }
 
 

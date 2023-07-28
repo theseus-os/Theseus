@@ -230,6 +230,11 @@
 <a href="#230" id="230">230</a>
 <a href="#231" id="231">231</a>
 <a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::boxed::Box;
 <span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>intrusive_collections::{
@@ -274,6 +279,11 @@
             inner: value,
         })
     }
+
+	<span class="doccomment">/// Returns the inner value, consuming this wrapper.
+	</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>into_inner(<span class="self">self</span>) -&gt; T {
+		<span class="self">self</span>.inner
+	}
 }
 
 

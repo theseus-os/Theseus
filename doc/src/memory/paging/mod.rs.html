@@ -473,7 +473,7 @@
 <span class="kw">use </span>log::debug;
 <span class="kw">use super</span>::{
     Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
-    AllocatedPages, allocate_pages, AllocatedFrames, PteFlags,
+    AllocatedPages, allocate_pages, AllocatedFrames, UnmappedFrames, PteFlags,
     InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
     get_p4, find_section_memory_bounds,
 };
@@ -666,11 +666,11 @@
 </span><span class="kw">pub fn </span>init(
     boot_info: <span class="kw-2">&amp;</span><span class="kw">impl </span>BootInformation,
     stack_start_virt: VirtualAddress,
-    into_alloc_frames_fn: <span class="kw">fn</span>(FrameRange) -&gt; AllocatedFrames,
+    into_unmapped_frames_fn: <span class="kw">fn</span>(FrameRange) -&gt; UnmappedFrames,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;InitialMemoryMappings, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
-    // `page_table_entry::UnmappedFrames` back into `AllocatedFrames`.
-    </span>mapper::INTO_ALLOCATED_FRAMES_FUNC.call_once(|| into_alloc_frames_fn);
+    // `page_table_entry::UnmappedFrameRange` back into `UnmappedFrames`.
+    </span>mapper::INTO_UNMAPPED_FRAMES_FUNC.call_once(|| into_unmapped_frames_fn);
 
     <span class="comment">// bootstrap a PageTable from the currently-loaded page table
     </span><span class="kw">let </span><span class="kw-2">mut </span>page_table = PageTable::from_current()

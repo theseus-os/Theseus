@@ -1,3 +1,4 @@
 (function() {var implementors = {
+"memory_structs":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.ConstParamTy.html\" title=\"trait core::marker::ConstParamTy\">ConstParamTy</a> for <a class=\"enum\" href=\"memory_structs/enum.MemoryState.html\" title=\"enum memory_structs::MemoryState\">MemoryState</a>"]],
 "mlx_ethernet":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/marker/trait.ConstParamTy.html\" title=\"trait core::marker::ConstParamTy\">ConstParamTy</a> for <a class=\"enum\" href=\"mlx_ethernet/command_queue/enum.CmdState.html\" title=\"enum mlx_ethernet::command_queue::CmdState\">CmdState</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

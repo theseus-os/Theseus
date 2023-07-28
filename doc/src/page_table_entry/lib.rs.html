@@ -194,7 +194,7 @@
         // to specify whether this is a 4KiB, 2MiB, or 1GiB PTE.
         </span><span class="kw">let </span>frame_range = FrameRange::new(frame, frame);
         <span class="kw">if </span>flags.is_exclusive() {
-            UnmapResult::Exclusive(UnmappedFrames(frame_range))
+            UnmapResult::Exclusive(UnmappedFrameRange(frame_range))
         } <span class="kw">else </span>{
             UnmapResult::NonExclusive(frame_range)
         }
@@ -247,26 +247,26 @@
 <span class="doccomment">/// The frames returned from the action of unmapping a page table entry.
 /// See the `PageTableEntry::set_unmapped()` function.
 ///
-/// If exclusive, the contained `UnmappedFrames` can be used to deallocate frames.
+/// If exclusive, the contained `UnmappedFrameRange` can be used to deallocate frames.
 ///
 /// If non-exclusive, the contained `FrameRange` is provided just for debugging feedback.
 /// Note that we use `FrameRange` instead of `Frame` because a single page table entry
 /// can map many frames, e.g., using huge pages.
 </span><span class="attr">#[must_use]
 </span><span class="kw">pub enum </span>UnmapResult {
-    Exclusive(UnmappedFrames),
+    Exclusive(UnmappedFrameRange),
     NonExclusive(FrameRange)
 }
 
 <span class="doccomment">/// A range of frames that have been unmapped from a `PageTableEntry`
 /// that previously mapped that frame exclusively (i.e., &quot;owned it&quot;).
 ///
-/// These `UnmappedFrames` can be converted into `UnmappedAllocatedFrames`
+/// `UnmappedFrameRange` can be used to create an `UnmappedFrames`
 /// and then safely deallocated within the `frame_allocator`.
 ///
 /// See the `PageTableEntry::set_unmapped()` function.
-</span><span class="kw">pub struct </span>UnmappedFrames(FrameRange);
-<span class="kw">impl </span>Deref <span class="kw">for </span>UnmappedFrames {
+</span><span class="kw">pub struct </span>UnmappedFrameRange(FrameRange);
+<span class="kw">impl </span>Deref <span class="kw">for </span>UnmappedFrameRange {
     <span class="kw">type </span>Target = FrameRange;
     <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>FrameRange {
         <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0

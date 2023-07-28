@@ -9,7 +9,7 @@ and also shows their <code>PteFlags</code>.</p>
 </div></details><details class="toggle method-toggle" open><summary><section id="method.map_allocated_pages_to" class="method"><a class="srclink rightside" href="../src/memory/paging/mapper.rs.html#249-264">source</a><h4 class="code-header">pub fn <a href="#method.map_allocated_pages_to" class="fn">map_allocated_pages_to</a>&lt;F: <a class="trait" href="https://doc.rust-lang.org/nightly/core/convert/trait.Into.html" title="trait core::convert::Into">Into</a>&lt;<a class="struct" href="struct.PteFlagsArch.html" title="struct memory::PteFlagsArch">PteFlagsArch</a>&gt;&gt;(
     &amp;mut self,
     pages: <a class="struct" href="struct.AllocatedPages.html" title="struct memory::AllocatedPages">AllocatedPages</a>,
-    frames: <a class="struct" href="struct.AllocatedFrames.html" title="struct memory::AllocatedFrames">AllocatedFrames</a>,
+    frames: <a class="type" href="type.AllocatedFrames.html" title="type memory::AllocatedFrames">AllocatedFrames</a>,
     flags: F
 ) -&gt; <a class="enum" href="https://doc.rust-lang.org/nightly/core/result/enum.Result.html" title="enum core::result::Result">Result</a>&lt;<a class="struct" href="struct.MappedPages.html" title="struct memory::MappedPages">MappedPages</a>, &amp;'static <a class="primitive" href="https://doc.rust-lang.org/nightly/core/primitive.str.html">str</a>&gt;</h4></section></summary><div class="docblock"><p>Maps the given virtual <code>AllocatedPages</code> to the given physical <code>AllocatedFrames</code>.</p>
 <p>Consumes the given <code>AllocatedPages</code> and returns a <code>MappedPages</code> object which contains those <code>AllocatedPages</code>.</p>

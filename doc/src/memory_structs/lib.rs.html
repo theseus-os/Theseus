@@ -518,6 +518,29 @@
 <a href="#518" id="518">518</a>
 <a href="#519" id="519">519</a>
 <a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -527,18 +550,34 @@
 
 </span><span class="attr">#![no_std]
 #![feature(step_trait)]
+#![allow(incomplete_features)]
+#![feature(adt_const_params)]
 
 </span><span class="kw">use </span>core::{
     cmp::{min, max},
     fmt,
     iter::Step,
-    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign}
+    marker::ConstParamTy,
+    ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
 };
 <span class="kw">use </span>kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>paste::paste;
 <span class="kw">use </span>derive_more::<span class="kw-2">*</span>;
 <span class="kw">use </span>range_inclusive::{RangeInclusive, RangeInclusiveIterator};
+
+<span class="doccomment">/// The possible states that a range of exclusively-owned pages or frames can be in.
+</span><span class="attr">#[derive(PartialEq, Eq, ConstParamTy)]
+</span><span class="kw">pub enum </span>MemoryState {
+    <span class="doccomment">/// Memory is free and owned by the allocator
+    </span>Free,
+    <span class="doccomment">/// Memory is allocated and can be used for a mapping
+    </span>Allocated,
+    <span class="doccomment">/// Memory is mapped (PTE has been set)
+    </span>Mapped,
+    <span class="doccomment">/// Memory has been unmapped (PTE has been cleared)
+    </span>Unmapped
+}
 
 <span class="doccomment">/// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
@@ -989,6 +1028,13 @@
                     } <span class="kw">else </span>{
                         <span class="prelude-val">None
                     </span>}
+                }
+
+                <span class="attr">#[doc = <span class="string">&quot;Returns `true` if the `other` `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;` is fully contained within this `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;`.&quot;</span>]
+                </span><span class="kw">pub fn </span>contains_range(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="macro-nonterminal">$TypeName</span>) -&gt; bool {
+                    !other.is_empty()
+                    &amp;&amp; (other.start() &gt;= <span class="self">self</span>.start())
+                    &amp;&amp; (other.end() &lt;= <span class="self">self</span>.end())
                 }
             }
             <span class="kw">impl </span>fmt::Debug <span class="kw">for </span><span class="macro-nonterminal">$TypeName </span>{
