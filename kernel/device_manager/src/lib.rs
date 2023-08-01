@@ -11,24 +11,12 @@ use {
     mpmc::Queue,
     event_types::Event,
     memory::MemoryManagementInfo,
-    ethernet_smoltcp_device::EthernetNetworkInterface,
-    network_manager::add_to_network_interfaces,
     alloc::vec::Vec,
     io::{ByteReaderWriterWrapper, LockableIo, ReaderWriter},
     storage_manager::StorageDevice,
     memory::PhysicalAddress,
     serial_port::{SerialPortAddress, init_serial_port, take_serial_port_basic},
 };
-
-/// A randomly chosen IP address that must be outside of the DHCP range.
-/// TODO: use DHCP to acquire an IP address.
-#[cfg(target_arch = "x86_64")]
-const DEFAULT_LOCAL_IP: &str = "10.0.2.15/24"; // the default QEMU user-slirp network gives IP addresses of "10.0.2.*"
-
-/// Standard home router address.
-/// TODO: use DHCP to acquire gateway IP
-#[cfg(target_arch = "x86_64")]
-const DEFAULT_GATEWAY_IP: [u8; 4] = [10, 0, 2, 2]; // the default QEMU user-slirp networking gateway IP
 
 /// Performs early-stage initialization for simple devices needed during early boot.
 ///
@@ -140,9 +128,6 @@ pub fn init(
                 let interface = net::register_device(nic);
                 nic.lock().init_interrupts(interface)?;
 
-                let e1000_interface = EthernetNetworkInterface::new_ipv4_interface(nic, DEFAULT_LOCAL_IP, &DEFAULT_GATEWAY_IP)?;
-                add_to_network_interfaces(e1000_interface);
-                
                 continue;
             }
             if dev.vendor_id == ixgbe::INTEL_VEND && dev.device_id == ixgbe::INTEL_82599 {
@@ -188,17 +173,11 @@ pub fn init(
     // Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
     let ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
     for ixgbe_nic_ref in ixgbe_nics.iter() {
-        let ixgbe_interface = EthernetNetworkInterface::new_ipv4_interface(
-            ixgbe_nic_ref, 
-            DEFAULT_LOCAL_IP, 
-            &DEFAULT_GATEWAY_IP
-        )?;
-        add_to_network_interfaces(ixgbe_interface);
         net::register_device(ixgbe_nic_ref);
     }
 
     // Convenience notification for developers to inform them of no networking devices
-    if network_manager::NETWORK_INTERFACES.lock().is_empty() {
+    if net::get_default_interface().is_none() {
         warn!("Note: no network devices found on this system.");
     }
 

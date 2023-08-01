@@ -16,36 +16,6 @@ pub struct SystemInterruptControllerVersion(pub u8);
 pub struct SystemInterruptControllerId(pub u8);
 #[derive(Debug, Copy, Clone)]
 pub struct LocalInterruptControllerId(pub u16);
-#[derive(Debug, Copy, Clone)]
-pub struct SystemInterruptNumber(pub(crate) gic::InterruptNumber);
-#[derive(Debug, Copy, Clone)]
-pub struct LocalInterruptNumber(pub(crate) gic::InterruptNumber);
-
-impl SystemInterruptNumber {
-    /// Constructor
-    ///
-    /// On aarch64, shared-peripheral interrupt numbers must lie
-    /// between 32 & 1019 (inclusive)
-    pub const fn new(raw_num: u32) -> Self {
-        match raw_num {
-            32..=1019 => Self(raw_num),
-            _ => panic!("Invalid SystemInterruptNumber (must lie in 32..1020)"),
-        }
-    }
-}
-
-impl LocalInterruptNumber {
-    /// Constructor
-    ///
-    /// On aarch64, shared-peripheral interrupt numbers must lie
-    /// between 0 & 31 (inclusive)
-    pub const fn new(raw_num: u32) -> Self {
-        match raw_num {
-            0..=31 => Self(raw_num),
-            _ => panic!("Invalid LocalInterruptNumber (must lie in 0..32)"),
-        }
-    }
-}
 
 /// The private global Generic Interrupt Controller singleton
 pub(crate) static INTERRUPT_CONTROLLER: IrqSafeMutex<Option<ArmGic>> = IrqSafeMutex::new(None);
@@ -89,52 +59,43 @@ pub struct SystemInterruptController;
 /// On aarch64 w/ GIC, this corresponds to a Redistributor & CPU interface.
 pub struct LocalInterruptController;
 
-// 1st variant: get system controller
-// 2nd variant: get local controller
-macro_rules! get_int_ctlr {
-    ($name:ident, $func:ident, $this:expr) => {
-        let mut $name = INTERRUPT_CONTROLLER.lock();
-        let $name = $name.as_mut().expect(concat!("BUG: ", stringify!($func), "(): INTERRUPT_CONTROLLER was uninitialized"));
-    };
-    ($name:ident, $func:ident) => ( get_int_ctlr!($name, $func, ()) );
-}
-
 impl SystemInterruptControllerApi for SystemInterruptController {
     fn id(&self) -> SystemInterruptControllerId {
-        get_int_ctlr!(int_ctlr, id, self);
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: id(): INTERRUPT_CONTROLLER was uninitialized");
+
         SystemInterruptControllerId(int_ctlr.implementer().product_id)
     }
 
     fn version(&self) -> SystemInterruptControllerVersion {
-        get_int_ctlr!(int_ctlr, version, self);
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: version(): INTERRUPT_CONTROLLER was uninitialized");
+
         SystemInterruptControllerVersion(int_ctlr.implementer().version)
     }
 
     fn get_destination(
         &self,
-        interrupt_num: SystemInterruptNumber,
-    ) -> Result<(Vec<InterruptDestination>, Priority), &'static str> {
-        get_int_ctlr!(int_ctlr, get_destination, self);
+        interrupt_num: InterruptNumber,
+    ) -> Result<(Vec<CpuId>, Priority), &'static str> {
+        assert!(interrupt_num >= 32, "shared peripheral interrupts have a number >= 32");
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: get_destination(): INTERRUPT_CONTROLLER was uninitialized");
 
-        let priority = int_ctlr.get_interrupt_priority(interrupt_num.0);
-        let local_number = LocalInterruptNumber(interrupt_num.0);
-
-        let vec = match int_ctlr.get_spi_target(interrupt_num.0)?.canonicalize() {
-            SpiDestination::Specific(cpu) => [InterruptDestination {
-                cpu,
-                local_number,
-            }].to_vec(),
-            SpiDestination::AnyCpuAvailable => BOARD_CONFIG.cpu_ids.map(|mpidr| InterruptDestination {
-                cpu: mpidr.into(),
-                local_number,
-            }).to_vec(),
+        let priority = int_ctlr.get_interrupt_priority(interrupt_num as _);
+        let vec = match int_ctlr.get_spi_target(interrupt_num as _)?.canonicalize() {
+            SpiDestination::Specific(cpu) => [cpu].to_vec(),
+            SpiDestination::AnyCpuAvailable => BOARD_CONFIG.cpu_ids.map(|mpidr| mpidr.into()).to_vec(),
             SpiDestination::GICv2TargetList(list) => {
                 let mut vec = Vec::with_capacity(8);
                 for result in list.iter() {
-                    vec.push(InterruptDestination {
-                        cpu: result?,
-                        local_number,
-                    });
+                    vec.push(result?);
                 }
                 vec
             }
@@ -145,71 +106,131 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
     fn set_destination(
         &self,
-        sys_int_num: SystemInterruptNumber,
-        destination: InterruptDestination,
+        sys_int_num: InterruptNumber,
+        destination: CpuId,
         priority: Priority,
     ) -> Result<(), &'static str> {
-        get_int_ctlr!(int_ctlr, set_destination, self);
-        assert_eq!(sys_int_num.0, destination.local_number.0, "Local & System Interrupt Numbers cannot be different with GIC");
+        assert!(sys_int_num >= 32, "shared peripheral interrupts have a number >= 32");
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: set_destination(): INTERRUPT_CONTROLLER was uninitialized");
 
-        int_ctlr.set_spi_target(sys_int_num.0, SpiDestination::Specific(destination.cpu));
-        int_ctlr.set_interrupt_priority(sys_int_num.0, priority);
+        int_ctlr.set_spi_target(sys_int_num as _, SpiDestination::Specific(destination));
+        int_ctlr.set_interrupt_priority(sys_int_num as _, priority);
 
         Ok(())
     }
 }
 
 impl LocalInterruptControllerApi for LocalInterruptController {
+    fn init_secondary_cpu_interface(&self) {
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: init_secondary_cpu_interface(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.init_secondary_cpu_interface();
+    }
+
     fn id(&self) -> LocalInterruptControllerId {
-        get_int_ctlr!(int_ctlr, id);
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: id(): INTERRUPT_CONTROLLER was uninitialized");
+
         LocalInterruptControllerId(int_ctlr.get_cpu_interface_id())
     }
 
-    fn get_local_interrupt_priority(&self, num: LocalInterruptNumber) -> Priority {
-        get_int_ctlr!(int_ctlr, get_local_interrupt_priority);
-        int_ctlr.get_interrupt_priority(num.0)
+    fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority {
+        assert!(num < 32, "local interrupts have a number < 32");
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: get_local_interrupt_priority(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.get_interrupt_priority(num as _)
     }
 
-    fn set_local_interrupt_priority(&self, num: LocalInterruptNumber, priority: Priority) {
-        get_int_ctlr!(int_ctlr, set_local_interrupt_priority);
-        int_ctlr.set_interrupt_priority(num.0, priority);
+    fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority) {
+        assert!(num < 32, "local interrupts have a number < 32");
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: set_local_interrupt_priority(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.set_interrupt_priority(num as _, priority);
     }
 
-    fn is_local_interrupt_enabled(&self, num: LocalInterruptNumber) -> bool {
-        get_int_ctlr!(int_ctlr, is_local_interrupt_enabled);
-        int_ctlr.get_interrupt_state(num.0)
+    fn is_local_interrupt_enabled(&self, num: InterruptNumber) -> bool {
+        assert!(num < 32, "local interrupts have a number < 32");
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: is_local_interrupt_enabled(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.get_interrupt_state(num as _)
     }
 
-    fn enable_local_interrupt(&self, num: LocalInterruptNumber, enabled: bool) {
-        get_int_ctlr!(int_ctlr, enable_local_interrupt);
-        int_ctlr.set_interrupt_state(num.0, enabled);
+    fn enable_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
+        assert!(num < 32, "local interrupts have a number < 32");
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: enable_local_interrupt(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.set_interrupt_state(num as _, enabled);
     }
 
-    fn send_ipi(&self, destination: InterruptDestination) {
-        get_int_ctlr!(int_ctlr, send_ipi);
-        int_ctlr.send_ipi(destination.local_number.0, IpiTargetCpu::Specific(destination.cpu));
+    fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
+        use InterruptDestination::*;
+        assert!(num < 16, "IPIs have a number < 16");
+
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: send_ipi(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.send_ipi(num as _, match dest {
+            SpecificCpu(cpu) => IpiTargetCpu::Specific(cpu),
+            AllOtherCpus => IpiTargetCpu::AllOtherCpus,
+        });
     }
 
     fn get_minimum_priority(&self) -> Priority {
-        get_int_ctlr!(int_ctlr, get_minimum_priority);
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_ref()
+            .expect("BUG: get_minimum_priority(): INTERRUPT_CONTROLLER was uninitialized");
+
         int_ctlr.get_minimum_priority()
     }
 
     fn set_minimum_priority(&self, priority: Priority) {
-        get_int_ctlr!(int_ctlr, set_minimum_priority);
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: set_minimum_priority(): INTERRUPT_CONTROLLER was uninitialized");
+
         int_ctlr.set_minimum_priority(priority)
     }
 
-    fn acknowledge_interrupt(&self) -> (LocalInterruptNumber, Priority) {
-        get_int_ctlr!(int_ctlr, acknowledge_interrupt);
+    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: acknowledge_interrupt(): INTERRUPT_CONTROLLER was uninitialized");
 
         let (num, prio) = int_ctlr.acknowledge_interrupt();
-
-        (LocalInterruptNumber(num), prio)
+        (num as _, prio)
     }
 
-    fn end_of_interrupt(&self, number: LocalInterruptNumber) {
-        get_int_ctlr!(int_ctlr, end_of_interrupt);
-        int_ctlr.end_of_interrupt(number.0)
+    fn end_of_interrupt(&self, number: InterruptNumber) {
+        let mut int_ctlr = INTERRUPT_CONTROLLER.lock();
+        let int_ctlr = int_ctlr
+            .as_mut()
+            .expect("BUG: end_of_interrupt(): INTERRUPT_CONTROLLER was uninitialized");
+
+        int_ctlr.end_of_interrupt(number as _)
     }
 }

@@ -19,7 +19,7 @@ const fn redist(aff0: usize) -> PhysicalAddress {
 pub const NUM_CPUS: usize = 4;
 pub const NUM_PL011_UARTS: usize = 1;
 
-pub static BOARD_CONFIG: BoardConfig = BoardConfig {
+pub const BOARD_CONFIG: BoardConfig = BoardConfig {
     cpu_ids: [
         cpu_id(0),
         cpu_id(1),
@@ -36,6 +36,8 @@ pub static BOARD_CONFIG: BoardConfig = BoardConfig {
         ],
     }),
     pl011_base_addresses: [ PhysicalAddress::new_canonical(0x09000000) ],
+    pl011_rx_spi: 33,
+    cpu_local_timer_ppi: 30,
 
     // obtained via internal qemu debugging
     // todo: will this always be correct?

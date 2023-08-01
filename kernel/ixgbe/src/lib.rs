@@ -28,7 +28,7 @@ extern crate mpmc;
 extern crate rand;
 extern crate hpet;
 extern crate runqueue;
-extern crate network_interface_card;
+extern crate net;
 extern crate nic_initialization;
 extern crate intel_ethernet;
 extern crate nic_buffers;
@@ -58,7 +58,6 @@ use pci::{PciDevice, MsixVectorTable, PciConfigSpaceAccessMechanism, PciLocation
 use bit_field::BitField;
 use interrupts::{register_msi_interrupt, InterruptHandler};
 use hpet::get_hpet;
-use network_interface_card::NetworkInterfaceCard;
 use nic_initialization::*;
 use intel_ethernet::descriptors::{AdvancedRxDescriptor, AdvancedTxDescriptor};    
 use nic_buffers::{TransmitBuffer, ReceiveBuffer, ReceivedFrame};
@@ -183,42 +182,11 @@ pub struct IxgbeNic {
     tx_registers_disabled: Vec<IxgbeTxQueueRegisters>,
 }
 
-// A trait which contains common functionalities for a NIC
-impl NetworkInterfaceCard for IxgbeNic {
-    fn send_packet(&mut self, transmit_buffer: TransmitBuffer) -> Result<(), &'static str> {
-        // by default, when using the physical NIC interface, we send on queue 0.
-        let qid = 0;
-        self.tx_queues[qid].send_on_queue(transmit_buffer);
-        Ok(())
-    }
-
-    fn get_received_frame(&mut self) -> Option<ReceivedFrame> {
-        // by default, when using the physical NIC interface, we receive on queue 0.
-        let qid = 0;
-        // return one frame from the queue's received frames
-        self.rx_queues[qid].received_frames.pop_front()
-    }
-
-    fn poll_receive(&mut self) -> Result<(), &'static str> {
-        // by default, when using the physical NIC interface, we receive on queue 0.
-        let qid = 0;
-        self.rx_queues[qid].poll_queue_and_store_received_packets()
-    }
-
-    fn mac_address(&self) -> [u8; 6] {
-        self.mac_spoofed.unwrap_or(self.mac_hardware)
-    }
-}
-
 impl net::NetworkDevice for IxgbeNic {
-    fn send(&mut self, buf: &[u8]) -> Result<(), net::Error> {
-        // TODO: This is just a workaround to make the new API work with the old machinery.
-        let mut transmit_buffer = TransmitBuffer::new(buf.len() as u16).map_err(|_| net::Error::Exhausted)?;
-        let transmit_buffer_mut = &mut transmit_buffer;
-        transmit_buffer_mut.clone_from_slice(buf);
-        // TODO: Return specific error.
-        self.send_packet(transmit_buffer).map_err(|_| net::Error::Unknown)?;
-        Ok(())
+    fn send(&mut self, buf: TransmitBuffer) {
+        // When using the physical NIC interface, we send on queue 0 by default.
+        let queue_id = 0;
+        self.tx_queues[queue_id].send_on_queue(buf)
     }
 
     fn receive(&mut self) -> Option<ReceivedFrame> {

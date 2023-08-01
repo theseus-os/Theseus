@@ -376,6 +376,7 @@ dependencies = [
  "early_printer",
  "exceptions_full",
  "first_application",
+ "interrupt_controller",
  "interrupts",
  "irq_safety",
  "kernel_config",
@@ -385,7 +386,6 @@ dependencies = [
  "mod_mgmt",
  "multicore_bringup",
  "multiple_heaps",
- "network_manager",
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
@@ -467,6 +467,23 @@ dependencies = [
  "spawn",
  "task",
  "unified_channel",
+]
+
+[[package]]
+name = "cls"
+version = "0.1.0"
+dependencies = [
+ "cls_macros",
+]
+
+[[package]]
+name = "cls_macros"
+version = "0.1.0"
+dependencies = [
+ "convert_case 0.6.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.26",
 ]
 
 [[package]]
@@ -560,6 +577,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core2"
 version = "0.4.0"
 dependencies = [
@@ -631,17 +657,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "cpu_local_preemption"
+name = "cpu_local"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cortex-a",
- "cpu",
  "irq_safety",
- "log",
  "memory",
- "no_drop",
- "spin 0.9.4",
+ "preemption",
+ "sync_spin",
  "tock-registers",
  "x86_64",
 ]
@@ -822,7 +845,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -839,7 +862,7 @@ checksum = "7f76f9eae170d46f87b0c34cc3b29d411dbdef329e1afd85132cece3da62edd9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -867,10 +890,10 @@ version = "0.99.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cc7b9cef1e351660e5443924e4f43ab25fbbed3e9a5f052df3677deb4d6b320"
 dependencies = [
- "convert_case",
+ "convert_case 0.4.0",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -883,7 +906,6 @@ dependencies = [
  "core2",
  "derive_more",
  "e1000",
- "ethernet_smoltcp_device",
  "event_types",
  "fatfs",
  "io",
@@ -897,7 +919,6 @@ dependencies = [
  "mouse",
  "mpmc",
  "net",
- "network_manager",
  "pci",
  "ps2",
  "serial_port",
@@ -971,7 +992,6 @@ dependencies = [
  "memory",
  "mpmc",
  "net",
- "network_interface_card",
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
@@ -1030,20 +1050,6 @@ dependencies = [
  "hashbrown",
  "path",
  "root",
-]
-
-[[package]]
-name = "ethernet_smoltcp_device"
-version = "0.1.0"
-dependencies = [
- "lazy_static",
- "log",
- "memory",
- "network_interface_card",
- "network_manager",
- "nic_buffers",
- "smoltcp 0.5.0",
- "sync_irq",
 ]
 
 [[package]]
@@ -1290,7 +1296,7 @@ checksum = "bdfb8ce053d86b91919aad980c220b1fb8401a9394410e1c289ed7e66b61835d"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -1676,7 +1682,6 @@ dependencies = [
  "memory",
  "mpmc",
  "net",
- "network_interface_card",
  "nic_buffers",
  "nic_initialization",
  "nic_queues",
@@ -1925,12 +1930,6 @@ dependencies = [
 
 [[package]]
 name = "managed"
-version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdcec5e97041c7f0f1c5b7d93f12e57293c831c646f4cc7a5db59460c7ea8de6"
-
-[[package]]
-name = "managed"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ca88d725a0a943b096803bd34e73a4437208b6077654cc4ecb2947a5f91618d"
@@ -2174,7 +2173,7 @@ checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -2325,27 +2324,10 @@ dependencies = [
  "rand",
  "rand_chacha",
  "random",
- "smoltcp 0.8.1",
+ "smoltcp",
  "spin 0.9.4",
  "sync_block",
  "sync_irq",
-]
-
-[[package]]
-name = "network_interface_card"
-version = "0.1.0"
-dependencies = [
- "nic_buffers",
-]
-
-[[package]]
-name = "network_manager"
-version = "0.1.0"
-dependencies = [
- "e1000",
- "log",
- "smoltcp 0.5.0",
- "spin 0.9.4",
 ]
 
 [[package]]
@@ -2465,7 +2447,7 @@ checksum = "3b0498641e53dd6ac1a4f22547548caa6864cc4933784319cd1775271c5a46ce"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -2614,7 +2596,7 @@ name = "per_cpu"
 version = "0.1.0"
 dependencies = [
  "cpu",
- "cpu_local_preemption",
+ "cpu_local",
  "log",
  "memoffset 0.8.0",
  "no_drop",
@@ -2750,6 +2732,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5b40af805b3121feab8a3c29f04d8ad262fa8e0561883e7653e024ae4479e6de"
 
 [[package]]
+name = "preemption"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "cls",
+ "cpu",
+]
+
+[[package]]
 name = "print_fault_log"
 version = "0.1.0"
 dependencies = [
@@ -2765,7 +2756,7 @@ dependencies = [
  "proc-macro-error-attr",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
  "version_check",
 ]
 
@@ -2782,9 +2773,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.40"
+version = "1.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
+checksum = "18fb31db3f9bddb2ea821cde30a9f70117e3f119938b5ee630b7403aa6e2ead9"
 dependencies = [
  "unicode-ident",
 ]
@@ -2856,9 +2847,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.7"
+version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
+checksum = "5fe8a65d69dd0808184ebb5f836ab526bb259db23c657efa38711b1072ee47f0"
 dependencies = [
  "proc-macro2",
 ]
@@ -3179,7 +3170,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cpu",
- "cpu_local_preemption",
  "interrupts",
  "log",
  "scheduler_epoch",
@@ -3302,7 +3292,7 @@ checksum = "023e9b1467aef8a10fb88f25611870ada9800ef7e22afce356bb0d2387b6f27c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -3459,36 +3449,16 @@ dependencies = [
 
 [[package]]
 name = "smoltcp"
-version = "0.5.0"
-source = "git+https://github.com/m-labs/smoltcp#0fedb1db9aa26712830822dd61f065deaa34d611"
-dependencies = [
- "bitflags",
- "byteorder",
- "managed 0.7.1",
-]
-
-[[package]]
-name = "smoltcp"
-version = "0.8.1"
-source = "git+https://github.com/smoltcp-rs/smoltcp#19c7cba8d39dc0cea0fbd9a7ec7d7cb2ec8301c6"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d2e3a36ac8fea7b94e666dfa3871063d6e0a5c9d5d4fec9a1a6b7b6760f0229"
 dependencies = [
  "bitflags",
  "byteorder",
  "cfg-if 1.0.0",
  "defmt",
  "heapless",
- "managed 0.8.0",
-]
-
-[[package]]
-name = "smoltcp_helper"
-version = "0.1.0"
-dependencies = [
- "hpet",
- "log",
- "network_manager",
- "smoltcp 0.5.0",
- "spin 0.9.4",
+ "managed",
 ]
 
 [[package]]
@@ -3498,7 +3468,6 @@ dependencies = [
  "catch_unwind",
  "context_switch",
  "cpu",
- "cpu_local_preemption",
  "debugit",
  "early_tls",
  "fault_crate_swap",
@@ -3511,6 +3480,7 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "path",
+ "preemption",
  "runqueue",
  "scheduler",
  "spin 0.9.4",
@@ -3654,6 +3624,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "2.0.26"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "45c3457aacde3c65315de5031ec191ce46604304d2446e803d71ade03308d970"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "sync"
 version = "0.1.0"
 dependencies = [
@@ -3664,9 +3645,9 @@ dependencies = [
 name = "sync_block"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
  "log",
  "mpmc_queue",
+ "preemption",
  "scheduler",
  "sync",
  "sync_spin",
@@ -3686,7 +3667,7 @@ dependencies = [
 name = "sync_preemption"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
+ "preemption",
  "sync",
 ]
 
@@ -3705,7 +3686,7 @@ checksum = "b834f2d66f734cb897113e34aaff2f1ab4719ca946f9a7358dba8f8064148701"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
  "unicode-xid",
 ]
 
@@ -3720,7 +3701,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
- "cpu_local_preemption",
+ "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3728,6 +3709,7 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "no_drop",
+ "preemption",
  "spin 0.9.4",
  "stack",
  "static_assertions",
@@ -3832,7 +3814,7 @@ dependencies = [
  "getopts",
  "ixgbe",
  "log",
- "network_interface_card",
+ "net",
  "spawn",
 ]
 
@@ -3861,6 +3843,14 @@ dependencies = [
  "app_io",
  "log",
  "task",
+]
+
+[[package]]
+name = "test_preemption_counter"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "preemption",
 ]
 
 [[package]]
@@ -4048,6 +4038,7 @@ dependencies = [
  "test_libc",
  "test_mlx5",
  "test_panic",
+ "test_preemption_counter",
  "test_priority_scheduler",
  "test_restartable",
  "test_scheduler",
@@ -4098,7 +4089,7 @@ checksum = "9c64183aeaddf559344af98f444cd2ea6685ea0136a59c17587a2c759362e523"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -4204,6 +4195,12 @@ name = "unicode-ident"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bd2fe26506023ed7b5e1e315add59d6f584c621d037f9368fea9cfb988f368c"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "unicode-width"
@@ -4319,7 +4316,7 @@ name = "virtual_nic"
 version = "0.1.0"
 dependencies = [
  "intel_ethernet",
- "network_interface_card",
+ "net",
  "nic_buffers",
  "nic_queues",
  "physical_nic",
@@ -4400,8 +4397,8 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
  "mpmc_queue",
+ "preemption",
  "scheduler",
  "sync",
  "sync_spin",
@@ -4421,7 +4418,7 @@ dependencies = [
 name = "waker_generic"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
+ "preemption",
  "spin 0.9.4",
 ]
 
@@ -4736,6 +4733,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0af017aca1fa6181f5dd7a802456fe6f7666ecdcc18d0910431f0fc89d474e51"
 dependencies = [
  "proc-macro2",
- "syn",
+ "syn 1.0.98",
  "synstructure",
 ]

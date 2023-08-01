@@ -10,6 +10,6 @@ log = "0.4.8"
 memoffset = "0.8.0"
 
 cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
+cpu_local = { path = "../cpu_local" }
 no_drop = { path = "../no_drop" }
 task = { path = "../task" }

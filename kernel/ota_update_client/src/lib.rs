@@ -365,7 +365,7 @@ fn download_files<S: AsRef<str>>(
         // check to make sure we haven't timed out
         if start.elapsed() >= timeout {
             debug!("ota_update_client: timed out waiting to close socket, closing it manually with an abort.");
-            http_client.abort()?;
+            http_client.abort();
             break;
         }
     }

@@ -42,6 +42,17 @@ pub struct BoardConfig {
     pub cpu_ids: [mpidr::DefinedMpidrValue; NUM_CPUS],
     pub interrupt_controller: InterruptControllerConfig,
     pub pl011_base_addresses: [PhysicalAddress; NUM_PL011_UARTS],
+
+    /// The IRQ number reserved for the PL011 Single-Serial-Port Controller
+    /// which Theseus currently uses for logging and UART console.
+    pub pl011_rx_spi: u8,
+
+    /// The IRQ number reserved for CPU-local timer interrupts,
+    /// which Theseus currently uses for preemptive task switching.
+    //
+    // aarch64 manuals define the default timer IRQ number to be 30.
+    pub cpu_local_timer_ppi: u8,
+
     pub pci_ecam: PciEcamConfig,
 }
 
