@@ -42,15 +42,5 @@ path = "../../kernel/vfs_node"
 [dependencies.ota_update_client]
 path = "../../kernel/ota_update_client/"
 
-[dependencies.network_manager]
-path = "../../kernel/network_manager"
-
-[dependencies.smoltcp]
-version = "0.5.0"
-default-features = false
-features = [
-    "alloc", "ethernet",
-    # "log", "verbose", 
-    "proto-ipv4", "proto-igmp", "proto-ipv6", "proto-dhcpv4",
-    "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", 
-]
+[dependencies.net]
+path = "../../kernel/net"

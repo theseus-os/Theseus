@@ -1,0 +1,10 @@
+[package]
+name = "test_preemption_counter"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Application for testing the preemption counter"
+edition = "2021"
+
+[dependencies]
+app_io = { path = "../../kernel/app_io" }
+preemption = { path = "../../kernel/preemption" }

@@ -10,7 +10,6 @@ log = "0.4.8"
 cfg-if = "1.0.0"
 
 cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
 interrupts = { path = "../interrupts" }
 sleep = { path = "../sleep" }
 task = { path = "../task" }

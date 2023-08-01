@@ -1,0 +1,13 @@
+[package]
+name = "preemption"
+version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Handles enabling and disabling preemption for each CPU core"
+edition = "2021"
+
+[dependencies]
+cls = { path = "../cls" }
+cpu = { path = "../cpu" }
+
+[target.'cfg(target_arch = "x86_64")'.dependencies]
+apic = { path = "../apic" }

@@ -87,8 +87,11 @@ pub fn init(
     // calculate TSC period and initialize it
     // not strictly necessary, but more accurate if we do it early on before interrupts, multicore, and multitasking
     #[cfg(target_arch = "x86_64")]
-    let _tsc_freq = tsc::get_tsc_frequency()?;
-    // info!("TSC frequency calculated: {}", _tsc_freq);
+    if let Some(period) = tsc::get_tsc_period() {
+        time::register_clock_source::<tsc::Tsc>(period);
+    } else {
+        log::warn!("Couldn't get TSC period");
+    }
 
     // now we initialize early driver stuff, like APIC/ACPI
     // arch-gate: device_manager currently detects PCI & PS2 devices,
@@ -100,6 +103,9 @@ pub fn init(
     // arch-gate: the IDT & special stacks are x86_64 specific
     #[cfg(target_arch = "x86_64")]
     let idt = {
+        // does nothing at the moment on x86_64
+        interrupt_controller::init()?;
+
         let (double_fault_stack, privilege_stack) = {
             let mut kernel_mmi = kernel_mmi_ref.lock();
             (
@@ -113,6 +119,9 @@ pub fn init(
     };
 
     #[cfg(target_arch = "aarch64")] {
+        // Initialize the GIC
+        interrupt_controller::init()?;
+
         interrupts::init()?;
 
         // register BSP CpuId

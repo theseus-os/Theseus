@@ -21,7 +21,6 @@ dependencies = [
  "bit_field 0.7.0",
  "crossbeam-utils",
  "derive_more",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
@@ -29,6 +28,7 @@ dependencies = [
  "pit_clock_basic",
  "raw-cpuid",
  "spin 0.9.4",
+ "sync_irq",
  "volatile 0.2.7",
  "x86_64",
  "zerocopy",
@@ -164,6 +164,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "cls"
+version = "0.1.0"
+dependencies = [
+ "cls_macros",
+]
+
+[[package]]
+name = "cls_macros"
+version = "0.1.0"
+dependencies = [
+ "convert_case 0.6.0",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.27",
+]
+
+[[package]]
 name = "const_format"
 version = "0.2.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -223,6 +240,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "convert_case"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "core2"
 version = "0.4.0"
 dependencies = [
@@ -254,22 +280,19 @@ dependencies = [
  "arm_boards",
  "cortex-a",
  "derive_more",
- "irq_safety",
+ "sync_irq",
  "tock-registers",
 ]
 
 [[package]]
-name = "cpu_local_preemption"
+name = "cpu_local"
 version = "0.1.0"
 dependencies = [
- "apic",
  "cortex-a",
- "cpu",
  "irq_safety",
- "log",
  "memory",
- "no_drop",
- "spin 0.9.4",
+ "preemption",
+ "sync_spin",
  "tock-registers",
  "x86_64",
 ]
@@ -346,7 +369,7 @@ checksum = "7f76f9eae170d46f87b0c34cc3b29d411dbdef329e1afd85132cece3da62edd9"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -359,10 +382,10 @@ version = "0.99.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5cc7b9cef1e351660e5443924e4f43ab25fbbed3e9a5f052df3677deb4d6b320"
 dependencies = [
- "convert_case",
+ "convert_case 0.4.0",
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -439,9 +462,9 @@ dependencies = [
  "app_io",
  "cpu",
  "early_printer",
- "irq_safety",
  "log",
  "memory",
+ "sync_irq",
  "task",
 ]
 
@@ -545,11 +568,11 @@ name = "heap"
 version = "0.1.0"
 dependencies = [
  "block_allocator",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -561,9 +584,9 @@ dependencies = [
  "cpu",
  "gic",
  "ioapic",
- "irq_safety",
  "log",
  "memory",
+ "sync_irq",
 ]
 
 [[package]]
@@ -579,13 +602,13 @@ dependencies = [
  "gdt",
  "gic",
  "interrupt_controller",
- "irq_safety",
  "kernel_config",
  "locked_idt",
  "log",
  "memory",
  "pic",
  "spin 0.9.4",
+ "sync_irq",
  "time",
  "tock-registers",
  "tss",
@@ -690,15 +713,15 @@ dependencies = [
 name = "lockable"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
 name = "locked_idt"
 version = "0.1.0"
 dependencies = [
- "irq_safety",
+ "sync_irq",
  "x86_64",
 ]
 
@@ -716,9 +739,9 @@ name = "logger"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
- "irq_safety",
  "log",
  "serial_port_basic",
+ "sync_irq",
 ]
 
 [[package]]
@@ -757,7 +780,6 @@ dependencies = [
  "bitflags",
  "boot_info",
  "frame_allocator",
- "irq_safety",
  "kernel_config",
  "lazy_static",
  "log",
@@ -771,6 +793,7 @@ dependencies = [
  "pte_flags",
  "spin 0.9.4",
  "static_assertions",
+ "sync_irq",
  "x86_64",
  "xmas-elf",
  "zerocopy",
@@ -861,7 +884,7 @@ checksum = "5a7d5f7076603ebc68de2dc6a650ec331a062a13abaa346975be747bbfa4b789"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -920,7 +943,7 @@ checksum = "3b0498641e53dd6ac1a4f22547548caa6864cc4933784319cd1775271c5a46ce"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -1059,10 +1082,19 @@ name = "port_io"
 version = "0.2.1"
 
 [[package]]
+name = "preemption"
+version = "0.1.0"
+dependencies = [
+ "apic",
+ "cls",
+ "cpu",
+]
+
+[[package]]
 name = "proc-macro2"
-version = "1.0.40"
+version = "1.0.66"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd96a1e8ed2596c337f8eae5f24924ec83f5ad5ab21ea8e455d3566c69fbcaf7"
+checksum = "18fb31db3f9bddb2ea821cde30a9f70117e3f119938b5ee630b7403aa6e2ead9"
 dependencies = [
  "unicode-ident",
 ]
@@ -1087,9 +1119,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.7"
+version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aa563d17ecb180e500da1cfd2b028310ac758de548efdd203e18f283af693f37"
+checksum = "5fe8a65d69dd0808184ebb5f836ab526bb259db23c657efa38711b1072ee47f0"
 dependencies = [
  "proc-macro2",
 ]
@@ -1199,7 +1231,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cpu",
- "cpu_local_preemption",
  "interrupts",
  "log",
  "scheduler_epoch",
@@ -1289,7 +1320,7 @@ checksum = "023e9b1467aef8a10fb88f25611870ada9800ef7e22afce356bb0d2387b6f27c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
 ]
 
 [[package]]
@@ -1297,11 +1328,11 @@ name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
  "arm_boards",
- "irq_safety",
  "memory",
  "pl011",
  "port_io",
  "spin 0.9.4",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1318,8 +1349,8 @@ name = "sleep"
 version = "0.1.0"
 dependencies = [
  "crossbeam-utils",
- "irq_safety",
  "lazy_static",
+ "sync_irq",
  "task",
  "time",
 ]
@@ -1414,6 +1445,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "syn"
+version = "2.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b60f673f44a8255b9c8c657daf66a596d435f2da81a555b06dc644d080ba45e0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-ident",
+]
+
+[[package]]
 name = "sync"
 version = "0.1.0"
 dependencies = [
@@ -1424,9 +1466,9 @@ dependencies = [
 name = "sync_block"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
  "log",
  "mpmc_queue",
+ "preemption",
  "scheduler",
  "sync",
  "sync_spin",
@@ -1435,10 +1477,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync_irq"
+version = "0.1.0"
+dependencies = [
+ "irq_safety",
+ "sync",
+]
+
+[[package]]
 name = "sync_preemption"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
+ "preemption",
  "sync",
 ]
 
@@ -1457,7 +1507,7 @@ checksum = "b834f2d66f734cb897113e34aaff2f1ab4719ca946f9a7358dba8f8064148701"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 1.0.98",
  "unicode-xid",
 ]
 
@@ -1467,7 +1517,7 @@ version = "0.1.0"
 dependencies = [
  "context_switch",
  "cpu",
- "cpu_local_preemption",
+ "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -1475,9 +1525,11 @@ dependencies = [
  "memory",
  "mod_mgmt",
  "no_drop",
+ "preemption",
  "spin 0.9.4",
  "stack",
  "static_assertions",
+ "sync_irq",
  "task_struct",
  "waker_generic",
 ]
@@ -1489,13 +1541,13 @@ dependencies = [
  "cpu",
  "crossbeam-utils",
  "environment",
- "irq_safety",
  "kernel_config",
  "log",
  "memory",
  "mod_mgmt",
  "spin 0.9.4",
  "stack",
+ "sync_irq",
 ]
 
 [[package]]
@@ -1571,6 +1623,12 @@ name = "unicode-ident"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5bd2fe26506023ed7b5e1e315add59d6f584c621d037f9368fea9cfb988f368c"
+
+[[package]]
+name = "unicode-segmentation"
+version = "1.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1dd624098567895118886609431a7c3b8f516e41d30e0643f03d94592a147e36"
 
 [[package]]
 name = "unicode-xid"
@@ -1663,8 +1721,8 @@ dependencies = [
 name = "wait_queue"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
  "mpmc_queue",
+ "preemption",
  "scheduler",
  "sync",
  "sync_spin",
@@ -1675,7 +1733,7 @@ dependencies = [
 name = "waker_generic"
 version = "0.1.0"
 dependencies = [
- "cpu_local_preemption",
+ "preemption",
  "spin 0.9.4",
 ]
 
@@ -1727,7 +1785,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0af017aca1fa6181f5dd7a802456fe6f7666ecdcc18d0910431f0fc89d474e51"
 dependencies = [
  "proc-macro2",
- "syn",
+ "syn 1.0.98",
  "synstructure",
 ]
 

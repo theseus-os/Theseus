@@ -101,7 +101,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
     let tx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
 
     let socket = Socket::new(rx_buffer, tx_buffer);
-    let socket = interface.add_socket(socket);
+    let socket = interface.clone().add_socket(socket);
 
     let mut num_sent = 0;
     let mut num_received = 0;
@@ -149,9 +149,7 @@ fn _main(matches: Matches) -> Result<(), &'static str> {
 
             // Poll the socket to send the packet. Once we have a custom socket type this
             // won't be necessary.
-            interface
-                .poll()
-                .map_err(|_| "failed to poll interface after sending")?;
+            interface.poll();
             num_sent += 1;
         }
 

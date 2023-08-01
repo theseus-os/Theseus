@@ -1,21 +1,17 @@
 [package]
-authors = ["Kevin Boos <kevinaboos@gmail.com>", "Klim Tsoutsman <klim@tsoutsman.com>"]
-name = "cpu_local_preemption"
-description = "Support for accessing CPU-local variables and enabling/disabling preemption"
+name = "cpu_local"
 version = "0.1.0"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+description = "Support for accessing CPU-local storage via per-CPU variables"
 edition = "2021"
 
 [dependencies]
-log = "0.4.8"
-spin = "0.9.0"
-
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
-cpu = { path = "../cpu" }
 memory = { path = "../memory" }
-no_drop = { path = "../no_drop" }
+preemption = { path = "../preemption" }
+sync_spin = { path = "../../libs/sync_spin" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
-apic = { path = "../apic" }
 x86_64 = "0.14.8"
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
