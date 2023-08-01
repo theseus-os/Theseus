@@ -52,6 +52,16 @@
 <a href="#52" id="52">52</a>
 <a href="#53" id="53">53</a>
 <a href="#54" id="54">54</a>
+<a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Configuration and definitions for specific boards on aarch64 systems.
 //!
 //! | Board Name | Num CPUs  | Interrupt Controller | Secondary CPU Startup Method |
@@ -90,6 +100,16 @@ pub enum SecondaryCoresStartup {
     <span class="kw">pub </span>cpu_ids: [mpidr::DefinedMpidrValue; NUM_CPUS],
     <span class="kw">pub </span>interrupt_controller: InterruptControllerConfig,
     <span class="kw">pub </span>pl011_base_addresses: [PhysicalAddress; NUM_PL011_UARTS],
+
+    <span class="doccomment">/// The IRQ number reserved for the PL011 Single-Serial-Port Controller
+    /// which Theseus currently uses for logging and UART console.
+    </span><span class="kw">pub </span>pl011_rx_spi: u8,
+
+    <span class="doccomment">/// The IRQ number reserved for CPU-local timer interrupts,
+    /// which Theseus currently uses for preemptive task switching.
+    </span><span class="comment">//
+    // aarch64 manuals define the default timer IRQ number to be 30.
+    </span><span class="kw">pub </span>cpu_local_timer_ppi: u8,
 }
 
 <span class="comment">// by default &amp; on x86_64, the default.rs file is used

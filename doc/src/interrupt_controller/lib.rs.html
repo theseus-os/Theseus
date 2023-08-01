@@ -81,6 +81,17 @@
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![allow(unused_variables, unused_mut)]
 
@@ -101,22 +112,23 @@
     SystemInterruptControllerVersion,
     SystemInterruptControllerId,
     LocalInterruptControllerId,
-    SystemInterruptNumber,
-    LocalInterruptNumber,
     Priority,
     SystemInterruptController,
     LocalInterruptController,
+    init,
 };
+
+<span class="kw">pub type </span>InterruptNumber = u8;
 
 <span class="doccomment">/// The Cpu where this interrupt should be handled, as well as
 /// the local interrupt number this gets translated to.
 ///
-/// On aarch64, the system interrupt number and the local interrupt
-/// number must be the same.
+/// On aarch64, there is no `local_number` field as the system interrupt
+/// number and the local interrupt number must be the same.
 </span><span class="attr">#[derive(Debug, Copy, Clone)]
-</span><span class="kw">pub struct </span>InterruptDestination {
-    <span class="kw">pub </span>cpu: CpuId,
-    <span class="kw">pub </span>local_number: LocalInterruptNumber,
+</span><span class="kw">pub enum </span>InterruptDestination {
+    SpecificCpu(CpuId),
+    AllOtherCpus,
 }
 
 <span class="kw">pub trait </span>SystemInterruptControllerApi {
@@ -125,26 +137,36 @@
 
     <span class="kw">fn </span>get_destination(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        interrupt_num: SystemInterruptNumber,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;InterruptDestination&gt;, Priority), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
+        interrupt_num: InterruptNumber,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;CpuId&gt;, Priority), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 
     <span class="kw">fn </span>set_destination(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        sys_int_num: SystemInterruptNumber,
-        destination: InterruptDestination,
+        sys_int_num: InterruptNumber,
+        destination: CpuId,
         priority: Priority,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 }
 
 <span class="kw">pub trait </span>LocalInterruptControllerApi {
-    <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId;
-    <span class="kw">fn </span>get_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: LocalInterruptNumber) -&gt; Priority;
-    <span class="kw">fn </span>set_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: LocalInterruptNumber, priority: Priority);
-    <span class="kw">fn </span>is_local_interrupt_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, num: LocalInterruptNumber) -&gt; bool;
-    <span class="kw">fn </span>enable_local_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, num: LocalInterruptNumber, enabled: bool);
+    <span class="doccomment">/// Aarch64-specific way to initialize the secondary CPU interfaces.
+    ///
+    /// Must be called once from every secondary CPU.
+    ///
+    /// Always panics on x86_64.
+    </span><span class="kw">fn </span>init_secondary_cpu_interface(<span class="kw-2">&amp;</span><span class="self">self</span>);
 
-    <span class="doccomment">/// Sends an inter-processor interrupt to a specific CPU.
-    </span><span class="kw">fn </span>send_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, destination: InterruptDestination);
+    <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId;
+    <span class="kw">fn </span>get_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; Priority;
+    <span class="kw">fn </span>set_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, priority: Priority);
+    <span class="kw">fn </span>is_local_interrupt_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; bool;
+    <span class="kw">fn </span>enable_local_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, enabled: bool);
+
+    <span class="doccomment">/// Sends an inter-processor interrupt.
+    ///
+    /// If `dest` is Some, the interrupt is sent to a specific CPU.
+    /// If it&#39;s None, all CPUs except the sender receive the interrupt.
+    </span><span class="kw">fn </span>send_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, dest: InterruptDestination);
 
     <span class="doccomment">/// Reads the minimum priority for an interrupt to reach this CPU.
     ///
@@ -159,9 +181,9 @@
     <span class="doccomment">/// Aarch64-specific way to read the current pending interrupt number &amp; priority.
     ///
     /// Always panics on x86_64.
-    </span><span class="kw">fn </span>acknowledge_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (LocalInterruptNumber, Priority);
+    </span><span class="kw">fn </span>acknowledge_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (InterruptNumber, Priority);
 
     <span class="doccomment">/// Tell the interrupt controller that the current interrupt has been handled.
-    </span><span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: LocalInterruptNumber);
+    </span><span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: InterruptNumber);
 }
 </code></pre></div></section></main></body></html>

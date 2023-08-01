@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["init"],"struct":["LocalInterruptController","LocalInterruptControllerId","LocalInterruptNumber","Priority","SystemInterruptController","SystemInterruptControllerId","SystemInterruptControllerVersion","SystemInterruptNumber"]};
+window.SIDEBAR_ITEMS = {"fn":["init"],"struct":["LocalInterruptController","LocalInterruptControllerId","Priority","SystemInterruptController","SystemInterruptControllerId","SystemInterruptControllerVersion"]};

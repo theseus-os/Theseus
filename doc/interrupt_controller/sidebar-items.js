@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"mod":["arch"],"struct":["InterruptDestination"],"trait":["LocalInterruptControllerApi","SystemInterruptControllerApi"]};
+window.SIDEBAR_ITEMS = {"enum":["InterruptDestination"],"mod":["arch"],"trait":["LocalInterruptControllerApi","SystemInterruptControllerApi"],"type":["InterruptNumber"]};
