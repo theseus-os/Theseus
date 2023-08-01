@@ -14,7 +14,7 @@ pub struct LocalInterruptControllerId(pub u32);
 #[derive(Debug, Copy, Clone)]
 pub struct Priority;
 
-/// Initializes the interrupt controller, on aarch64
+/// Initializes the interrupt controller (not yet used on x86)
 pub fn init() -> Result<(), &'static str> { Ok(()) }
 
 /// Structure representing a top-level/system-wide interrupt controller chip,
@@ -45,8 +45,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         &self,
         interrupt_num: InterruptNumber,
     ) -> Result<(Vec<CpuId>, Priority), &'static str> {
-        // no way to read the destination for an IRQ number in IoApic
-        unimplemented!()
+        todo!("Getting interrupt destination from IOAPIC redirection tables is not yet implemented")
     }
 
     fn set_destination(
