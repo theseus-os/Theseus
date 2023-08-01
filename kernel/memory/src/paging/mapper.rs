@@ -237,17 +237,31 @@ impl Mapper {
                 }
             }
             PAGE_2MB_SIZE => {
-                for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
+                for (page, frame) in pages.range_2mb().clone().into_iter().step_by(512).zip(frames.borrow().into_iter().step_by(512)) {
                     actual_flags = actual_flags.huge(true);
+                    let higher_level_huge_flags = higher_level_flags.huge(true);
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-                    let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
+                    let p2 = p3.next_table_create(page.p3_index(), higher_level_huge_flags);
+                    trace!("P2 has value {:#X} with flags {:#b}", p2[page.p2_index()].value(), p2[page.p2_index()].flags().bits());
 
+                    // uncomment these lines if performing a standard mapping
+                    // let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
+                    // trace!("P1 has value {} with flags {}", p1[page.p1_index()].value(), p1[page.p1_index()].flags().bits());
+
+                    // comment this out if performing a standard mapping, and uncomment the following check
                     if !p2[page.p2_index()].is_unused() {
                         error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                         return Err("map_allocated_pages_to(): page was already in use");
-                    } 
+                    }
 
+                    // if !p1[page.p1_index()].is_unused() {
+                    //      error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
+                    //      return Err("map_allocated_pages_to(): page was already in use");
+                    // }
+
+                    // comment this out and uncomment the following line if performing a standard mapping
                     p2[page.p2_index()].set_entry(frame, actual_flags);
+                    // p1[page.p1_index()].set_entry(frame, actual_flags);
                 }
             }
             PAGE_1GB_SIZE => {
@@ -752,77 +766,214 @@ impl MappedPages {
         let mut first_frame_range: Option<AllocatedFrames> = None; // this is what we'll return
         let mut current_frame_range: Option<AllocatedFrames> = None;
 
-        for page in self.pages.range().clone() {            
-            let p1 = active_table_mapper.p4_mut()
-                .next_table_mut(page.p4_index())
-                .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                .ok_or("mapping code does not support huge pages")?;
-            let pte = &mut p1[page.p1_index()];
-            if pte.is_unused() {
-                return Err("unmap(): page not mapped");
-            }
-
-            let unmapped_frames = pte.set_unmapped();
-            tlb_flush_virt_addr(page.start_address());
-
-            // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
-            // freed from the newly-unmapped P1 PTE entry above.
-            match unmapped_frames {
-                UnmapResult::Exclusive(newly_unmapped_frames) => {
-                    let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
-                        .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
-                        .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
-
-                    if let Some(mut curr_frames) = current_frame_range.take() {
-                        match curr_frames.merge(newly_unmapped_frames) {
-                            Ok(()) => {
-                                // Here, the newly unmapped frames were contiguous with the current frame_range,
-                                // and we successfully merged them into a single range of AllocatedFrames.
-                                current_frame_range = Some(curr_frames);
-                            }
-                            Err(newly_unmapped_frames) => {
-                                // Here, the newly unmapped frames were **NOT** contiguous with the current_frame_range,
-                                // so we "finish" the current_frame_range (it's already been "taken") and start a new one
-                                // based on the newly unmapped frames.
-                                current_frame_range = Some(newly_unmapped_frames);
-                                
-                                // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
-                                if first_frame_range.is_none() {
-                                    first_frame_range = Some(curr_frames);
-                                } else {
-                                    // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
-                                    // otherwise there will not be any other opportunity for it to be dropped.
-                                    //
-                                    // TODO: here in the future, we could add it to the optional input list (see this function's doc comments)
-                                    //       of AllocatedFrames to return, i.e., `Option<&mut Vec<AllocatedFrames>>`.
-                                    trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", curr_frames);
-                                    // curr_frames is dropped here
+        match self.pages.page_size() {
+            PAGE_4KB_SIZE => {
+                for page in self.pages.range().clone() {
+                    let p1 = active_table_mapper.p4_mut()
+                        .next_table_mut(page.p4_index())
+                        .and_then(|p3| p3.next_table_mut(page.p3_index()))
+                        .and_then(|p2| p2.next_table_mut(page.p2_index()))
+                        .ok_or("mapping code does not support huge pages")?;
+                    let pte = &mut p1[page.p1_index()];
+                    if pte.is_unused() {
+                        return Err("unmap(): page not mapped");
+                    }
+        
+                    let unmapped_frames = pte.set_unmapped();
+                    tlb_flush_virt_addr(page.start_address());
+        
+                    // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
+                    // freed from the newly-unmapped P1 PTE entry above.
+                    match unmapped_frames {
+                        UnmapResult::Exclusive(newly_unmapped_frames) => {
+                            let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
+                                .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                                .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
+        
+                            if let Some(mut curr_frames) = current_frame_range.take() {
+                                match curr_frames.merge(newly_unmapped_frames) {
+                                    Ok(()) => {
+                                        // Here, the newly unmapped frames were contiguous with the current frame_range,
+                                        // and we successfully merged them into a single range of AllocatedFrames.
+                                        current_frame_range = Some(curr_frames);
+                                    }
+                                    Err(newly_unmapped_frames) => {
+                                        // Here, the newly unmapped frames were **NOT** contiguous with the current_frame_range,
+                                        // so we "finish" the current_frame_range (it's already been "taken") and start a new one
+                                        // based on the newly unmapped frames.
+                                        current_frame_range = Some(newly_unmapped_frames);
+                                        
+                                        // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
+                                        if first_frame_range.is_none() {
+                                            first_frame_range = Some(curr_frames);
+                                        } else {
+                                            // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
+                                            // otherwise there will not be any other opportunity for it to be dropped.
+                                            //
+                                            // TODO: here in the future, we could add it to the optional input list (see this function's doc comments)
+                                            //       of AllocatedFrames to return, i.e., `Option<&mut Vec<AllocatedFrames>>`.
+                                            trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", curr_frames);
+                                            // curr_frames is dropped here
+                                        }
+                                    }
                                 }
+                            } else {
+                                // This was the first frames we unmapped, so start a new current_frame_range.
+                                current_frame_range = Some(newly_unmapped_frames);
                             }
                         }
-                    } else {
-                        // This was the first frames we unmapped, so start a new current_frame_range.
-                        current_frame_range = Some(newly_unmapped_frames);
+                        UnmapResult::NonExclusive(_frames) => {
+                            // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
+                        }
                     }
                 }
-                UnmapResult::NonExclusive(_frames) => {
-                    // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
+            
+                #[cfg(not(bm_map))]
+                {
+                    if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
+                        func(self.pages.range().clone());
+                    }
                 }
             }
-        }
-    
-        #[cfg(not(bm_map))]
-        {
-            if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-                func(self.pages.range().clone());
+            PAGE_2MB_SIZE => {
+                for page in self.pages.range_2mb().clone().into_iter().step_by(512) {
+                    let p2 = active_table_mapper.p4_mut()
+                        .next_table_mut(page.p4_index())
+                        .and_then(|p3| p3.next_table_mut(page.p3_index()))
+                        .ok_or("mapper: error getting p2 entry while attempting to unmap 2MiB page")?;
+                    let pte = &mut p2[page.p2_index()];
+                    if pte.is_unused() {
+                        return Err("unmap(): page not mapped");
+                    }
+        
+                    let unmapped_frames = pte.set_unmapped();
+                    tlb_flush_virt_addr(page.start_address());
+        
+                    // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
+                    // freed from the newly-unmapped P1 PTE entry above.
+                    match unmapped_frames {
+                        UnmapResult::Exclusive(newly_unmapped_frames) => {
+                            let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
+                                .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                                .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
+        
+                            if let Some(mut curr_frames) = current_frame_range.take() {
+                                match curr_frames.merge(newly_unmapped_frames) {
+                                    Ok(()) => {
+                                        // Here, the newly unmapped frames were contiguous with the current frame_range,
+                                        // and we successfully merged them into a single range of AllocatedFrames.
+                                        current_frame_range = Some(curr_frames);
+                                    }
+                                    Err(newly_unmapped_frames) => {
+                                        // Here, the newly unmapped frames were **NOT** contiguous with the current_frame_range,
+                                        // so we "finish" the current_frame_range (it's already been "taken") and start a new one
+                                        // based on the newly unmapped frames.
+                                        current_frame_range = Some(newly_unmapped_frames);
+                                        
+                                        // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
+                                        if first_frame_range.is_none() {
+                                            first_frame_range = Some(curr_frames);
+                                        } else {
+                                            // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
+                                            // otherwise there will not be any other opportunity for it to be dropped.
+                                            //
+                                            // TODO: here in the future, we could add it to the optional input list (see this function's doc comments)
+                                            //       of AllocatedFrames to return, i.e., `Option<&mut Vec<AllocatedFrames>>`.
+                                            trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", curr_frames);
+                                            // curr_frames is dropped here
+                                        }
+                                    }
+                                }
+                            } else {
+                                // This was the first frames we unmapped, so start a new current_frame_range.
+                                current_frame_range = Some(newly_unmapped_frames);
+                            }
+                        }
+                        UnmapResult::NonExclusive(_frames) => {
+                            // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
+                        }
+                    }
+                }
+            
+                #[cfg(not(bm_map))]
+                {
+                    if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
+                        func(self.pages.range_2mb().as_4KiB_range());
+                    }
+                }
             }
+            PAGE_1GB_SIZE => {
+                for page in self.pages.range_1gb().clone() {
+                    let p3 = active_table_mapper.p4_mut()
+                        .next_table_mut(page.p4_index())
+                        .ok_or("mapper: error getting level 3 table when unmapping a 1GiB page")?;
+                    let pte = &mut p3[page.p3_index()];
+                    if pte.is_unused() {
+                        return Err("unmap(): page not mapped");
+                    }
+        
+                    let unmapped_frames = pte.set_unmapped();
+                    tlb_flush_virt_addr(page.start_address());
+        
+                    // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
+                    // freed from the newly-unmapped P1 PTE entry above.
+                    match unmapped_frames {
+                        UnmapResult::Exclusive(newly_unmapped_frames) => {
+                            let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
+                                .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                                .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
+        
+                            if let Some(mut curr_frames) = current_frame_range.take() {
+                                match curr_frames.merge(newly_unmapped_frames) {
+                                    Ok(()) => {
+                                        // Here, the newly unmapped frames were contiguous with the current frame_range,
+                                        // and we successfully merged them into a single range of AllocatedFrames.
+                                        current_frame_range = Some(curr_frames);
+                                    }
+                                    Err(newly_unmapped_frames) => {
+                                        // Here, the newly unmapped frames were **NOT** contiguous with the current_frame_range,
+                                        // so we "finish" the current_frame_range (it's already been "taken") and start a new one
+                                        // based on the newly unmapped frames.
+                                        current_frame_range = Some(newly_unmapped_frames);
+                                        
+                                        // If this is the first frame range we've unmapped, don't drop it -- save it as the return value.
+                                        if first_frame_range.is_none() {
+                                            first_frame_range = Some(curr_frames);
+                                        } else {
+                                            // If this is NOT the first frame range we've unmapped, then go ahead and drop it now,
+                                            // otherwise there will not be any other opportunity for it to be dropped.
+                                            //
+                                            // TODO: here in the future, we could add it to the optional input list (see this function's doc comments)
+                                            //       of AllocatedFrames to return, i.e., `Option<&mut Vec<AllocatedFrames>>`.
+                                            trace!("MappedPages::unmap(): dropping additional non-contiguous frames {:?}", curr_frames);
+                                            // curr_frames is dropped here
+                                        }
+                                    }
+                                }
+                            } else {
+                                // This was the first frames we unmapped, so start a new current_frame_range.
+                                current_frame_range = Some(newly_unmapped_frames);
+                            }
+                        }
+                        UnmapResult::NonExclusive(_frames) => {
+                            // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
+                        }
+                    }
+                }
+            
+                #[cfg(not(bm_map))]
+                {
+                    if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
+                        func(self.pages.range_1gb().as_4KiB_range());
+                    }
+                }
+            }
+            _ => {}
         }
 
         // Ensure that we return at least some frame range, even if we broke out of the above loop early.
         Ok(first_frame_range.or(current_frame_range))
     }
-
 
     /// Reinterprets this `MappedPages`'s underlying memory region as a struct of the given type `T`,
     /// i.e., overlays a struct on top of this mapped memory region. 

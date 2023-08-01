@@ -12,7 +12,7 @@ use memory::{
     VirtualAddress, PhysicalAddress, 
     Page1GiB, Page2MiB, 
     PAGE_2MB_SIZE, PAGE_1GB_SIZE, 
-    allocate_2mb_pages, allocate_1gb_pages, allocate_frames_at
+    allocate_2mb_pages, allocate_1gb_pages, allocate_frames_at, allocate_pages_at
 };
 
 pub fn main(_args: Vec<String>) -> isize {
@@ -33,35 +33,38 @@ pub fn main(_args: Vec<String>) -> isize {
         _ => println!("Page 2 not recognized as 2MiB"),
     }
 
-    let allocated_1g = allocate_1gb_pages(1)
+    let _allocated_1g = allocate_1gb_pages(1)
         .ok_or("test_huge_pages: could not allocate 1GiB page")
         .unwrap();
-    let allocated_2m = allocate_2mb_pages(1)
+    let _allocated_2m = allocate_2mb_pages(1)
         .ok_or("test_huge_pages: could not allocate 1GiB page")
         .unwrap();
     println!("Huge pages successfully allocated!");
 
+    /*
+    Examples of addresses that work
+    let aligned_2m_page = allocate_pages_at(VirtualAddress::new_canonical(0x20000000), 512)
+        .unwrap()
+        .as_allocated_2mb();
+    let aligned_2m_page = allocate_pages_at(VirtualAddress::new_canonical(0x100000000), 512)
+        .unwrap()
+        .as_allocated_2mb();
+     */
 
-    // kernel_mmi_ref.lock().page_table.map_allocated_pages(
-    //     allocated_1g,
-    //     PteFlags::new().valid(true).writable(true),
-    // ).expect("test_huge_pages: call to map_allocated_pages failed");
-    // let allocated_2m_frames = allocate_frames_at(
-    //     PhysicalAddress::new(3 * 512 * 512).unwrap(),
-    //     512).unwrap();
+    let aligned_2m_page = allocate_pages_at(VirtualAddress::new_canonical(0x1000000), 512)
+        .unwrap()
+        .as_allocated_2mb();
 
+    // frame allocator has not been modified to deal with huge frames
+    let aligned_4k_frames = allocate_frames_at(PhysicalAddress::new_canonical(0x20000000), 512).unwrap();
 
-    // kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
-    //     allocated_2m,
-    //     allocated_2m_frames,
-    //     PteFlags::new().valid(true).writable(true),
-    // ).expect("test_huge_pages: call to map_allocated_pages failed");
-
-    kernel_mmi_ref.lock().page_table.map_allocated_pages(
-        allocated_2m,
+    let mapped_pages = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
+        aligned_2m_page,
+        aligned_4k_frames,
         PteFlags::new().valid(true).writable(true),
     ).expect("test_huge_pages: call to map_allocated_pages failed");
 
+
+
     0
 }
-

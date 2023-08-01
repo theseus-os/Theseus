@@ -540,11 +540,6 @@ macro_rules! implement_page_frame_range {
                 pub fn into_1GiB_range(&self) -> $TypeName<Page1GiB> {
                     $TypeName::<Page1GiB>(RangeInclusive::new(self.start().as_1gb(), self.end().as_1gb()))
                 }
-                
-                // This does not perform any alignment. It simply changes the marker type for usage with functions that want a range of default-sized pages.
-                pub fn as_4KiB_range(&self) -> $TypeName {
-                    $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
-                }
 
                 #[doc = "Returns a new separate `" $TypeName "` that is extended to include the given [`" $chunk "`]."]
                 pub fn to_extended(&self, to_include: $chunk) -> $TypeName {
@@ -619,6 +614,11 @@ macro_rules! implement_page_frame_range {
                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
                 pub const fn new_1gb(start: $chunk<Page1GiB>, end: $chunk<Page1GiB>) -> $TypeName<Page1GiB> {
                     $TypeName::<Page1GiB>(RangeInclusive::new(start, end))
+                }
+
+                #[doc = "This does not perform any alignment. It simply changes the marker type for usage with functions that want a range of default-sized pages."]
+                pub fn as_4KiB_range(&self) -> $TypeName {
+                    $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
                 }
 
                 #[doc = "Returns the size of this range in bytes."]
