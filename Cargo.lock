@@ -3119,7 +3119,7 @@ dependencies = [
  "log",
  "single_simd_task_optimization",
  "sync_preemption",
- "task",
+ "task_struct",
 ]
 
 [[package]]
@@ -3141,7 +3141,7 @@ dependencies = [
  "log",
  "single_simd_task_optimization",
  "sync_preemption",
- "task",
+ "task_struct",
 ]
 
 [[package]]
@@ -3232,7 +3232,7 @@ dependencies = [
  "runqueue",
  "runqueue_round_robin",
  "spin 0.9.4",
- "task",
+ "task_struct",
 ]
 
 [[package]]

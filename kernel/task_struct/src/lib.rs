@@ -11,6 +11,8 @@
 
 extern crate alloc;
 
+mod exit;
+
 use core::{
     any::Any,
     fmt,
@@ -24,7 +26,7 @@ use alloc::{
     boxed::Box,
     format,
     string::String,
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 use cpu::{CpuId, OptionalCpuId};
 use crossbeam_utils::atomic::AtomicCell;
@@ -37,9 +39,14 @@ use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
 
+pub use exit::ExitableTaskRef;
+
 /// The function signature of the callback that will be invoked when a `Task`
 /// panics or otherwise fails, e.g., a machine exception occurs.
 pub type KillHandler = Box<dyn Fn(&KillReason) + Send>;
+
+/// The signature of a Task's failure cleanup function.
+pub type FailureCleanupFunction = fn(ExitableTaskRef, KillReason) -> !;
 
 /// Just like `core::panic::PanicInfo`, but with owned String types instead of &str references.
 #[derive(Debug, Default)]
@@ -163,6 +170,20 @@ pub struct RestartInfo {
 }
 
 
+/// An atomically reference counted task.
+///
+/// This type solves the circular dependency between the scheduler and task
+/// subsystems. The `TaskRef` struct has methods which interact with the
+/// scheduler subsystem (e.g. `block` and `unblock`). However, this creates a
+/// circular dependency as the scheduler subsystem nedes to store task
+/// references on the run queue. To circumvent this, the scheduler stores
+/// `RawTaskRef`s on the run queue which don't depend on the scheduler
+/// subsystem, but also doesn't expose any methods that depend on the scheduler
+/// subsystem.
+pub type RawTaskRef = Arc<Task>;
+
+pub type RawWeakTaskRef = Weak<Task>;
+
 /// The parts of a `Task` that may be modified after its creation.
 ///
 /// This includes only the parts that cannot be modified atomically.
@@ -212,7 +233,6 @@ pub struct Task {
     ///
     /// This must not be public because it permits interior mutability of key task states.
     inner: IrqSafeMutex<TaskInner>,
-
     /// The unique identifier of this Task.
     pub id: usize,
     /// The simple name of this Task.
@@ -240,17 +260,34 @@ pub struct Task {
     /// Whether this Task is an idle task, the task that runs by default when no other task is running.
     /// There exists one idle task per core, so this is `false` for most tasks.
     pub is_an_idle_task: bool,
+    /// Whether the task is on a run queue.
+    is_on_run_queue: AtomicBool,
     /// For application `Task`s, this is effectively a reference to the [`mod_mgmt::LoadedCrate`]
     /// that contains the entry function for this `Task`.
     pub app_crate: Option<Arc<AppCrateRef>>,
     /// This `Task` is linked into and runs within the context of this [`CrateNamespace`].
     pub namespace: Arc<CrateNamespace>,
+    /// The function that should be run as a last-ditch attempt to recover from this task's failure,
+    /// e.g., this can be called when unwinding itself fails. 
+    /// Typically, it will point to this Task's specific instance of `spawn::task_cleanup_failure()`,
+    /// which has generic type parameters that describe its function signature, argument type, and return type.
+    failure_cleanup_function: FailureCleanupFunction,
+    /// A mailbox for exchanging a task's exit value with another task waiting to join on it.
+    exit_value_mailbox: Mutex<Option<ExitValue>>,
+    /// Whether this Task is joinable.
+    /// * If `true`, another task holds the `JoinableTaskRef` object that was created
+    ///   by `TaskRef::create()`, which indicates that that other task is able to
+    ///   wait for this task to exit and thus be able to obtain this task's exit value.
+    /// * If `false`, the `JoinableTaskRef` was dropped, and therefore no other task
+    ///   can join this task or obtain its exit value.
+    ///
+    /// This is not public because it permits interior mutability.
+    joinable: AtomicBool,
     /// The Thread-Local Storage (TLS) area for this task.
     ///
     /// Upon each task switch, we must set the value of the TLS base register 
     /// (e.g., FsBase on x86_64) to the value of this TLS area's self pointer.
     tls_area: TlsDataImage,
-    
     #[cfg(simd_personality)]
     /// Whether this Task is SIMD enabled and what level of SIMD extensions it uses.
     pub simd: SimdExt,
@@ -306,6 +343,7 @@ impl Task {
     pub fn new(
         stack: Option<Stack>,
         states_to_inherit: InheritedStates,
+        failure_cleanup_function: FailureCleanupFunction,
     ) -> Result<Task, &'static str> {
         /// The counter of task IDs. We start at `1` such that `0` can be used 
         /// as a task ID that indicates the absence of a task, e.g., in sync primitives. 
@@ -339,8 +377,12 @@ impl Task {
             suspended: AtomicBool::new(false),
             mmi,
             is_an_idle_task: false,
+            is_on_run_queue: AtomicBool::new(false),
             app_crate,
             namespace,
+            failure_cleanup_function,
+            exit_value_mailbox: Mutex::new(None),
+            joinable: AtomicBool::new(false),
             tls_area,
 
             #[cfg(simd_personality)]
@@ -468,23 +510,6 @@ impl Task {
         self.inner.lock().restart_info.is_some()
     }
 
-    /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on error.
-    /// This will only succeed if the task is runnable or already blocked.
-    pub fn block(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable};
-
-        if self.runstate.compare_exchange(Runnable, Blocked).is_ok() {
-            Ok(Runnable)
-        } else if self.runstate.compare_exchange(Blocked, Blocked).is_ok() {
-            warn!("Blocked an already blocked task: {:?}", self);
-            Ok(Blocked)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-
     /// Blocks this `Task` if it is a newly-spawned task currently being initialized.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -500,23 +525,6 @@ impl Task {
         }
     }
 
-    /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on
-    /// error. Will only succed if the task is blocked or already runnable.
-    pub fn unblock(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable};
-
-        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
-            Ok(Blocked)
-        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
-            warn!("Unblocked an already runnable task: {:?}", self);
-            Ok(Runnable)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-    
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -580,22 +588,26 @@ impl Drop for Task {
 /// because it cannot become a spawnable/schedulable/runnable task until it is
 /// passed into `TaskRef::create()`, so that'd be completely harmless.
 #[doc(hidden)]
-pub struct ExposedTask {
-    pub task: Task,
+#[derive(Clone)]
+pub struct ExposedRawTaskRef {
+    pub task: RawTaskRef,
 }
-impl From<Task> for ExposedTask {
-    fn from(task: Task) -> Self {
+
+impl From<RawTaskRef> for ExposedRawTaskRef {
+    fn from(task: RawTaskRef) -> Self {
         Self { task }
     }
 }
-impl Deref for ExposedTask {
+
+impl Deref for ExposedRawTaskRef {
     type Target = Task;
     fn deref(&self) -> &Self::Target {
         &self.task
     }
 }
+
 // Here we simply expose accessors for all private fields of `Task`.
-impl ExposedTask {
+impl ExposedRawTaskRef {
     #[inline(always)]
     pub fn inner(&self) -> &IrqSafeMutex<TaskInner> {
         &self.inner
@@ -611,6 +623,18 @@ impl ExposedTask {
     #[inline(always)]
     pub fn runstate(&self) -> &AtomicCell<RunState> {
         &self.runstate
+    }
+    #[inline(always)]
+    pub fn is_on_run_queue(&self) -> &AtomicBool {
+        &self.is_on_run_queue
+    }
+    #[inline(always)]
+    pub fn joinable(&self) -> &AtomicBool {
+        &self.joinable
+    }
+    #[inline(always)]
+    pub fn exit_value_mailbox(&self) -> &Mutex<Option<ExitValue>> {
+        &self.exit_value_mailbox
     }
 }
 

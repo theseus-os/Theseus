@@ -10,13 +10,13 @@ use core::marker::PhantomData;
 
 use log::error;
 use runqueue_round_robin::RunQueue;
-use task::TaskRef;
+use task_struct::RawTaskRef;
 
 /// This defines the round robin scheduler policy.
 /// Returns None if there is no schedule-able task
 // TODO: Remove option?
 // TODO: Return &'static TaskRef?
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
+pub fn select_next_task(apic_id: u8) -> Option<RawTaskRef> {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {

@@ -432,8 +432,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // (in `spawn::task_cleanup_final_internal()`).
         fence(Ordering::Release);
         
-        // Idle tasks are not stored on the run queue.
-        if !self.idle {
+        // Idle and blocked tasks are not stored on the run queue.
+        if !self.idle && !self.blocked {
             if let Some(cpu) = self.pin_on_cpu {
                 runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
             } else {
