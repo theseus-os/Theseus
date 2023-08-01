@@ -376,6 +376,7 @@ dependencies = [
  "early_printer",
  "exceptions_full",
  "first_application",
+ "interrupt_controller",
  "interrupts",
  "irq_safety",
  "kernel_config",
