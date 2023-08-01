@@ -220,7 +220,7 @@ build: $(nano_core_binary)
 ## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
 ## Note: the below line with `cut` simply removes the `lib` prefix and the `.rlib` suffix from the file name.
 	@for f in $(shell find $(TARGET_DEPS_DIR)/ -name "*.rlib"); do                                          \
-		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then                                                 \
+		if [ `$(CROSS)ar -t $${f} | wc -l` != "2" ]; then                                                   \
 			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"                                  \
 				&& mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/"                       \
 				&& $(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}  \
