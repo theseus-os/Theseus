@@ -38,9 +38,13 @@ impl ExitableTaskRef {
         }
     }
 
+    /// Creates an exitable task reference from a raw task reference.
+    ///
+    /// # Safety
+    ///
+    /// This function should only be called in `init_current_task` or the unwinder.
     #[doc(hidden)]
-    pub fn obtain_for_unwinder(task: RawTaskRef) -> (Self, FailureCleanupFunction) {
-        // FIXME: Check that current task.
+    pub unsafe fn from_raw(task: RawTaskRef) -> (Self, FailureCleanupFunction) {
         let f = task.failure_cleanup_function;
         (Self { inner: task }, f)
     }

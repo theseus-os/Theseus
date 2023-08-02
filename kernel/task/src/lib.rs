@@ -813,6 +813,10 @@ fn task_switch_inner(
 ///    prepared for us to drop.
 /// 2. Obtains the preemption guard such that preemption can be re-enabled
 ///    when it is appropriate to do so.
+///
+/// # Safety
+///
+/// This must only be called after a context switch has occured.
 #[doc(hidden)]
 pub unsafe fn post_context_switch_action() -> PreemptionGuard {
     // Step 1: drop data from previously running task
@@ -998,7 +1002,7 @@ mod tls_current_task {
             } else {
                 *t_opt = Some(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
-                Ok(ExitableTaskRef::obtain_for_unwinder(taskref.into_raw()).0)
+                Ok(unsafe { ExitableTaskRef::from_raw(taskref.into_raw()).0 })
             }
             Err(_e) => {
                 log::error!("[CPU {}] BUG: init_current_task(): failed to mutably borrow CURRENT_TASK. \

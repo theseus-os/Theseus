@@ -176,6 +176,8 @@ impl Task {
     ///      for this new `Task`.
     ///      Theseus doesn't have a true parent-child relationship between tasks;
     ///      the new `Task` merely inherits select states from it.
+    /// * `failure_cleanup_function`: an error handling function that acts as a last resort
+    ///    when all else fails, e.g., if unwinding fails.
     ///
     /// # Usage Notes
     /// * This does not run the task, schedule it in, or switch to it.
