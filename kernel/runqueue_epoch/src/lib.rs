@@ -183,8 +183,7 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this RunQueue.
     fn add_task(&mut self, task: RawTaskRef) -> Result<(), &'static str> {
-        // TODO: Remove clone.
-        task.clone().expose().is_on_run_queue().store(true, Ordering::Release);
+        task.expose().is_on_run_queue().store(true, Ordering::Release);
 
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);

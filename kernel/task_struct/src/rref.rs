@@ -43,7 +43,7 @@ impl RawTaskRef {
 
     #[doc(hidden)]
     pub fn expose(&self) -> ExposedTaskRef<'_> {
-        ExposedTaskRef { inner: &self }
+        ExposedTaskRef { inner: self }
     }
 }
 

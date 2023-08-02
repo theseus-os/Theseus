@@ -1687,18 +1687,16 @@ fn print_header(tries: usize, iterations: usize) {
 	printlninfo!("========================================");
 }
 
-
-
 /// Task generated to measure time of context switching
 fn yield_task(a: u32) -> u32 {
-	let times = ITERATIONS * 1000;
+    let times = ITERATIONS * 1000;
     for _ in 0..times {
-       task::schedule();
+        task::schedule();
     }
-	a
+    a
 }
 
 /// Task generated to measure overhead of context switching
 fn overhead_task(a: u32) -> u32 {
-	a
+    a
 }
