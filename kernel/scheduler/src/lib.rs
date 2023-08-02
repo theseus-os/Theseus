@@ -27,6 +27,7 @@ cfg_if::cfg_if! {
 
 use core::ops::Deref;
 
+pub use scheduler::select_next_task;
 use task_struct::RawTaskRef;
 
 /// Changes the priority of the given task with the given priority level.
