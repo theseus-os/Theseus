@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 log = "0.4.8"
 runqueue_priority = { path = "../runqueue_priority" }
-task = { path = "../task" }
+task_struct = { path = "../task_struct" }
 time = { path = "../time" }
 
 [lib]

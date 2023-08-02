@@ -51,7 +51,7 @@ where
         drop(preemption_guard);
 
         loop {
-            scheduler::schedule();
+            task::schedule();
 
             match self.inner.push_if_fail(task.clone(), || {
                 if let Some(mutex_guard) = mutex.try_lock() {

@@ -5,11 +5,8 @@
 #![no_std]
 
 extern crate alloc;
-extern crate sync_preemption;
-extern crate atomic_linked_list;
-extern crate task;
-#[macro_use] extern crate cfg_if;
-cfg_if! {
+
+cfg_if::cfg_if! {
     if #[cfg(epoch_scheduler)] {
         extern crate runqueue_epoch as runqueue;
     } else if #[cfg(priority_scheduler)] {
@@ -19,16 +16,12 @@ cfg_if! {
     }
 }
 
-#[cfg(single_simd_task_optimization)]
-extern crate single_simd_task_optimization;
-
 use sync_preemption::PreemptionSafeRwLock;
-use task::TaskRef;
+use task_struct::RawTaskRef;
 use runqueue::RunQueue;
 
-
 /// Creates a new `RunQueue` for the given core, which is an `apic_id`.
-pub fn init(which_core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
+pub fn init(which_core: u8, idle_task: RawTaskRef) -> Result<(), &'static str> {
     RunQueue::init(which_core, idle_task)
 }
 
@@ -44,16 +37,16 @@ pub fn get_least_busy_core() -> Option<u8> {
 
 /// Chooses the "least busy" core's runqueue
 /// and adds the given `Task` reference to that core's runqueue.
-pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
+pub fn add_task_to_any_runqueue(task: RawTaskRef) -> Result<(), &'static str> {
     RunQueue::add_task_to_any_runqueue(task)
 }
 
 /// Adds the given `Task` reference to given core's runqueue.
-pub fn add_task_to_specific_runqueue(which_core: u8, task: TaskRef) -> Result<(), &'static str> {
+pub fn add_task_to_specific_runqueue(which_core: u8, task: RawTaskRef) -> Result<(), &'static str> {
     RunQueue::add_task_to_specific_runqueue(which_core, task)
 }
 
-/// Removes a `TaskRef` from all `RunQueue`s that exist on the entire system.
-pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
+/// Removes a `RawTaskRef` from all `RunQueue`s that exist on the entire system.
+pub fn remove_task_from_all(task: &RawTaskRef) -> Result<(), &'static str> {
     RunQueue::remove_task_from_all(task)
 }

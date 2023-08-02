@@ -7,7 +7,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 use log::error;
 use runqueue_priority::RunQueue;
-use task::TaskRef;
+use task_struct::RawTaskRef;
 
 pub use runqueue_priority::{
     get_priority, inherit_priority, set_priority, PriorityInheritanceGuard,
@@ -15,7 +15,7 @@ pub use runqueue_priority::{
 
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
+pub fn select_next_task(apic_id: u8) -> Option<RawTaskRef> {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {

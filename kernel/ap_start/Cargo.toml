@@ -13,7 +13,7 @@ sync_irq = { path = "../../libs/sync_irq" }
 memory = { path = "../memory" }
 stack = { path = "../stack" }
 interrupts = { path = "../interrupts" }
-scheduler = { path = "../scheduler" }
+task = { path = "../task" }
 spawn = { path = "../spawn" }
 kernel_config = { path = "../kernel_config" }
 cpu = { path = "../cpu" }

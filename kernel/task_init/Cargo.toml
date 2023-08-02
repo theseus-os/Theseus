@@ -1,0 +1,11 @@
+[package]
+name = "task_init"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+cpu = { path = "../cpu" }
+interrupts = { path = "../interrupts" }
+log = "0.4.8"
+sleep = { path = "../sleep" }
+task = { path = "../task" }

@@ -20,7 +20,7 @@ impl ExitableTaskRef {
 
             atomic::fence(Ordering::Release);
 
-            if let Some(waker) = self.inner.inner.lock().waker.take() {
+            if let Some(waker) = (***self).inner.lock().waker.take() {
                 waker.wake();
             }
 

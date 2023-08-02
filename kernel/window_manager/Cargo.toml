@@ -48,17 +48,17 @@ path = "../mod_mgmt"
 [dependencies.spawn]
 path = "../spawn"
 
+[dependencies.task]
+path = "../task"
+
 [dependencies.mouse_data]
 path = "../../libs/mouse_data"
 
 [dependencies.path]
 path = "../../kernel/path"
 
-[lib]
-crate-type = ["rlib"]
-
 [dependencies.keycodes_ascii]
 path = "../../libs/keycodes_ascii"
 
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
+[lib]
+crate-type = ["rlib"]

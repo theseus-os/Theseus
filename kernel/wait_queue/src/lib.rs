@@ -63,7 +63,7 @@ where
                 Ok(value) => return value,
                 Err(preemption_guard) => {
                     drop(preemption_guard);
-                    scheduler::schedule();
+                    task::schedule();
                 }
             }
         }

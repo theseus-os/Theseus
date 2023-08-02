@@ -46,9 +46,6 @@ path = "../../kernel/path"
 [dependencies.libterm]
 path = "../../kernel/libterm"
 
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
 [dependencies.stdio]
 path = "../../libs/stdio"
 

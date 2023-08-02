@@ -19,16 +19,16 @@ cfg_if! { if #[cfg(single_simd_task_optimization)] {
 #[macro_use] extern crate log;
 extern crate task;
 
-use task::TaskRef;
+use task_struct::RawTaskef;
 
 
 /// This function should be called when there was a new SIMD-enabled Task
 /// that was added to the list of Tasks eligible to run on the given core. 
 /// # Arguments
-/// `tasks_on_core` is an Iterator over all of the `TaskRef`s that 
+/// `tasks_on_core` is an Iterator over all of the `RawTaskef`s that 
 /// are eligible to run on the given core `which_core`.
 pub fn simd_tasks_added_to_core<'t, I>(tasks_on_core: I, _which_core: u8) 
-	where I: Iterator<Item = &'t TaskRef>
+	where I: Iterator<Item = &'t RawTaskef>
 {
 	let num_simd_tasks = &tasks_on_core
 		.filter(|taskref| taskref.simd)
@@ -62,10 +62,10 @@ pub fn simd_tasks_added_to_core<'t, I>(tasks_on_core: I, _which_core: u8)
 /// This function should be called when there was a SIMD-enabled Task
 /// removed from the list of Tasks eligible to run on the given core. 
 /// # Arguments
-/// `tasks_on_core` is an Iterator over all of the `TaskRef`s that 
+/// `tasks_on_core` is an Iterator over all of the `RawTaskef`s that 
 /// are eligible to run on the given core `which_core`.
 pub fn simd_tasks_removed_from_core<'t, I>(tasks_on_core: I, _which_core: u8) 
-	where I: Iterator<Item = &'t TaskRef>
+	where I: Iterator<Item = &'t RawTaskef>
 {
 	let num_simd_tasks = &tasks_on_core
 		.filter(|taskref| taskref.simd)

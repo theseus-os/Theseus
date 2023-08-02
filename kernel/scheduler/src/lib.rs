@@ -1,4 +1,5 @@
-//! Offers the ability to control or configure the active task scheduling policy.
+//! Offers the ability to control or configure the active task scheduling
+//! policy.
 //!
 //! ## What is and isn't in this crate?
 //! This crate also defines the timer interrupt handler used for preemptive
@@ -24,81 +25,21 @@ cfg_if::cfg_if! {
     }
 }
 
-use interrupts::{self, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
-use task::{self, TaskRef};
+use core::ops::Deref;
 
-/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
-pub use task::schedule;
-
-
-/// Initializes the scheduler on this system using the policy set at compiler time.
-///
-/// Also registers a timer interrupt handler for preemptive scheduling.
-///
-/// Currently, there is a single scheduler policy for the whole system.
-/// The policy is selected by specifying a Rust `cfg` value at build time, like so:
-/// - `make`: round-robin scheduler
-/// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
-/// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
-pub fn init() -> Result<(), &'static str> {
-    task::set_scheduler_policy(scheduler::select_next_task);
-
-    #[cfg(target_arch = "x86_64")] {
-        interrupts::register_interrupt(
-            CPU_LOCAL_TIMER_IRQ,
-            timer_tick_handler,
-        ).map_err(|_handler| {
-            log::error!("BUG: interrupt {CPU_LOCAL_TIMER_IRQ} was already registered to handler {_handler:#X}");
-            "BUG: CPU-local timer interrupt was already registered to a handler"
-        })
-    }
-
-    #[cfg(target_arch = "aarch64")] {
-        interrupts::init_timer(timer_tick_handler)?;
-        interrupts::enable_timer(true);
-        Ok(())
-    }
-}
-
-// Architecture-independent timer interrupt handler for preemptive scheduling.
-interrupt_handler!(timer_tick_handler, None, _stack_frame, {
-    #[cfg(target_arch = "aarch64")]
-    interrupts::schedule_next_timer_tick();
-
-    // tick count, only used for debugging
-    if false {
-        use core::sync::atomic::{AtomicUsize, Ordering};
-        static CPU_LOCAL_TIMER_TICKS: AtomicUsize = AtomicUsize::new(0);
-        let _ticks = CPU_LOCAL_TIMER_TICKS.fetch_add(1, Ordering::Relaxed);
-        log::info!("(CPU {}) CPU-LOCAL TIMER HANDLER! TICKS = {}", cpu::current_cpu(), _ticks);
-    }
-
-    // Inform the `sleep` crate that it should update its inner tick count
-    // in order to unblock any tasks that are done sleeping.
-    sleep::unblock_sleeping_tasks();
-
-    // We must acknowledge the interrupt before the end of this handler
-    // because we switch tasks here, which doesn't return.
-    {
-        #[cfg(target_arch = "x86_64")]
-        eoi(None); // None, because IRQ 0x22 cannot possibly be a PIC interrupt
-
-        #[cfg(target_arch = "aarch64")]
-        eoi(CPU_LOCAL_TIMER_IRQ);
-    }
-
-    schedule();
-
-    EoiBehaviour::HandlerSentEoi
-});
+use task_struct::RawTaskRef;
 
 /// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
-/// This function returns an error when a scheduler without priority is loaded. 
-pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
+/// Priority values must be between 40 (maximum priority) and 0 (minimum
+/// prriority). This function returns an error when a scheduler without priority
+/// is loaded.
+pub fn set_priority<T>(_task: &T, _priority: u8) -> Result<(), &'static str>
+where
+    T: Deref<Target = RawTaskRef>,
+{
     #[cfg(any(epoch_scheduler, priority_scheduler))]
     {
-        Ok(scheduler::set_priority(_task, _priority))
+        Ok(scheduler::set_priority(&_task, _priority))
     }
     #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
     {
@@ -108,10 +49,13 @@ pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> 
 
 /// Returns the priority of a given task.
 /// This function returns None when a scheduler without priority is loaded.
-pub fn get_priority(_task: &TaskRef) -> Option<u8> {
+pub fn get_priority<T>(_task: &T) -> Option<u8>
+where
+    T: Deref<Target = RawTaskRef>,
+{
     #[cfg(any(epoch_scheduler, priority_scheduler))]
     {
-        scheduler::get_priority(_task)
+        scheduler::get_priority(&_task)
     }
     #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
     {
@@ -119,6 +63,9 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     }
 }
 
-pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
+pub fn inherit_priority<T>(task: &T) -> scheduler::PriorityInheritanceGuard<'_>
+where
+    T: Deref<Target = RawTaskRef>,
+{
     scheduler::inherit_priority(task)
 }

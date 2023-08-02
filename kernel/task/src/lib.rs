@@ -53,8 +53,10 @@ use preemption::PreemptionGuard;
 use spin::Mutex;
 use sync_irq::IrqSafeMutex;
 use stack::Stack;
-use task_struct::{ExitableTaskRef, ExposedRawTaskRef, RawWeakTaskRef};
+use task_struct::{ExposedRawTaskRef, RawWeakTaskRef};
 use log::warn;
+
+pub use task_struct::{ExitableTaskRef, FailureCleanupFunction, RawTaskRef};
 
 
 // Re-export main types from `task_struct`.
@@ -115,8 +117,7 @@ impl fmt::Debug for TaskRef {
 impl TaskRef {
     /// Creates a new `TaskRef`, a shareable wrapper around the given `Task`.
     ///
-    /// This does *not* add this task to the system-wide task list or any runqueues,
-    /// nor does it schedule this task in.
+    /// This does *not* add this task to any runqueues.
     ///
     /// # Arguments
     /// * `task`: the new `Task` to wrap in a `TaskRef`.
@@ -129,7 +130,9 @@ impl TaskRef {
     pub fn create(task: Task) -> JoinableTaskRef {
         let taskref = TaskRef {
             inner: ExposedRawTaskRef {
-                task: Arc::new(task),
+                task: RawTaskRef {
+                    inner: Arc::new(task),
+                },
             },
         };
 
@@ -140,10 +143,22 @@ impl TaskRef {
         JoinableTaskRef { task: taskref }
     }
 
+    pub fn priority(&self) -> Option<u8> {
+        ::scheduler::get_priority(self)
+    }
+
+    pub fn set_priority(&self, priority: u8) -> Result<(), &'static str> {
+        ::scheduler::set_priority(self, priority)
+    }
+
+    pub fn into_raw(self) -> RawTaskRef {
+        self.inner.task
+    }
+
     /// Creates a new weak reference to this `Task`, similar to [`Weak`].
     pub fn downgrade(&self) -> WeakTaskRef {
         WeakTaskRef {
-            inner: Arc::downgrade(&self.inner.task)
+            inner: RawTaskRef::downgrade(&self.inner.task)
         }
     }
 
@@ -303,7 +318,7 @@ impl Hash for TaskRef {
 }
 
 impl Deref for TaskRef {
-    type Target = Task;
+    type Target = RawTaskRef;
     fn deref(&self) -> &Self::Target {
         &self.inner.task
     }
@@ -489,7 +504,7 @@ pub fn take_kill_handler() -> Option<KillHandler> {
 }
 
 
-pub use scheduler::*;
+pub use crate::scheduler::*;
 mod scheduler {
     use super::*;
 
@@ -523,7 +538,7 @@ mod scheduler {
         };
 
         let (did_switch, recovered_preemption_guard) = task_switch(
-            next_task,
+            TaskRef { inner: ExposedRawTaskRef { task: next_task }},
             cpu_id,
             preemption_guard,
         ); 
@@ -537,7 +552,7 @@ mod scheduler {
     /// The signature for the function that selects the next task for the given CPU.
     ///
     /// This is used when the [`schedule()`] function is invoked.
-    pub type SchedulerFunc = fn(u8) -> Option<TaskRef>;
+    pub type SchedulerFunc = fn(u8) -> Option<RawTaskRef>;
 
     /// The function currently registered as the system-wide scheduler policy.
     ///
@@ -699,7 +714,7 @@ pub fn task_switch(
     // and are easy to replicate in `task_wrapper()`.
     ///////////////////////////////////////////////////////////////////////////////////////////
 
-    let recovered_preemption_guard = post_context_switch_action();
+    let recovered_preemption_guard = unsafe { post_context_switch_action() };
     (true, recovered_preemption_guard)
 }
 
@@ -857,7 +872,8 @@ fn task_switch_inner(
 ///    prepared for us to drop.
 /// 2. Obtains the preemption guard such that preemption can be re-enabled
 ///    when it is appropriate to do so.
-fn post_context_switch_action() -> PreemptionGuard {
+#[doc(hidden)]
+pub unsafe fn post_context_switch_action() -> PreemptionGuard {
     // Step 1: drop data from previously running task
     {
         let prev_task_data_to_drop = DROP_AFTER_TASK_SWITCH.with_mut(|d| d.0.take());
@@ -1037,10 +1053,9 @@ mod tls_current_task {
                 log::error!("  --> attemping to dump existing task: {:?}", _existing_task);
                 Err(InitCurrentTaskError::AlreadyInited(_existing_task.id))
             } else {
-                *t_opt = Some(taskref);
+                *t_opt = Some(taskref.clone());
                 CURRENT_TASK_ID.set(current_task_id);
-                todo!();
-                // Ok(ExitableTaskRef { task: taskref })
+                Ok(ExitableTaskRef::obtain_for_unwinder(taskref.into_raw()).0)
             }
             Err(_e) => {
                 log::error!("[CPU {}] BUG: init_current_task(): failed to mutably borrow CURRENT_TASK. \

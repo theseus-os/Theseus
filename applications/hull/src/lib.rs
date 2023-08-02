@@ -259,7 +259,7 @@ impl Shell {
                         };
                 }
             }
-            scheduler::schedule();
+            task::schedule();
         }
     }
 

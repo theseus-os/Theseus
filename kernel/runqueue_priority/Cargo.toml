@@ -9,7 +9,7 @@ edition = "2021"
 atomic_linked_list = { path = "../../libs/atomic_linked_list" }
 log = "0.4.8"
 sync_preemption = { path = "../sync_preemption" }
-task = { path = "../task" }
+task_struct = { path = "../task_struct" }
 time = { path = "../time" }
 
 [lib]

@@ -10,14 +10,15 @@
 extern crate alloc;
 
 use alloc::collections::BinaryHeap;
-use atomic_linked_list::atomic_map::AtomicMap;
 use core::{
     cmp::Ordering,
     ops::{Deref, DerefMut},
 };
+
+use atomic_linked_list::atomic_map::AtomicMap;
 use log::{error, trace};
 use sync_preemption::PreemptionSafeRwLock;
-use task::TaskRef;
+use task_struct::RawTaskRef;
 use time::Instant;
 
 const DEFAULT_PRIORITY: u8 = 0;
@@ -28,7 +29,7 @@ const DEFAULT_PRIORITY: u8 = 0;
 /// dereferences to `TaskRef`.
 #[derive(Debug, Clone)]
 pub struct PriorityTaskRef {
-    pub task: TaskRef,
+    pub task: RawTaskRef,
     pub last_ran: Instant,
     priority: u8,
 }
@@ -59,15 +60,15 @@ impl Ord for PriorityTaskRef {
 }
 
 impl Deref for PriorityTaskRef {
-    type Target = TaskRef;
+    type Target = RawTaskRef;
 
-    fn deref(&self) -> &TaskRef {
+    fn deref(&self) -> &RawTaskRef {
         &self.task
     }
 }
 
 impl DerefMut for PriorityTaskRef {
-    fn deref_mut(&mut self) -> &mut TaskRef {
+    fn deref_mut(&mut self) -> &mut RawTaskRef {
         &mut self.task
     }
 }
@@ -87,7 +88,7 @@ static RUNQUEUES: AtomicMap<u8, PreemptionSafeRwLock<RunQueue>> = AtomicMap::new
 pub struct RunQueue {
     core: u8,
     queue: BinaryHeap<PriorityTaskRef>,
-    idle_task: TaskRef,
+    idle_task: RawTaskRef,
 }
 
 impl Deref for RunQueue {
@@ -106,7 +107,7 @@ impl DerefMut for RunQueue {
 
 impl RunQueue {
     /// Creates a new `RunQueue` for the given core, which is an `apic_id`
-    pub fn init(which_core: u8, idle_task: TaskRef) -> Result<(), &'static str> {
+    pub fn init(which_core: u8, idle_task: RawTaskRef) -> Result<(), &'static str> {
         #[cfg(not(loscd_eval))]
         trace!("Created runqueue (priority) for core {}", which_core);
 
@@ -159,7 +160,7 @@ impl RunQueue {
     /// Chooses the "least busy" core's runqueue (based on simple
     /// runqueue-size-based load balancing) and adds the given `Task`
     /// reference to that core's runqueue.
-    pub fn add_task_to_any_runqueue(task: TaskRef) -> Result<(), &'static str> {
+    pub fn add_task_to_any_runqueue(task: RawTaskRef) -> Result<(), &'static str> {
         let rq = RunQueue::get_least_busy_runqueue()
             .or_else(|| RUNQUEUES.iter().next().map(|r| r.1))
             .ok_or("couldn't find any runqueues to add the task to!")?;
@@ -171,7 +172,7 @@ impl RunQueue {
     /// runqueue.
     pub fn add_task_to_specific_runqueue(
         which_core: u8,
-        task: TaskRef,
+        task: RawTaskRef,
     ) -> Result<(), &'static str> {
         RunQueue::get_runqueue(which_core)
             .ok_or("Couldn't get RunQueue for the given core")?
@@ -180,7 +181,7 @@ impl RunQueue {
     }
 
     /// Adds a `TaskRef` to this runqueue with the given priority value.
-    fn add_task(&mut self, task: TaskRef, priority: u8) -> Result<(), &'static str> {
+    fn add_task(&mut self, task: RawTaskRef, priority: u8) -> Result<(), &'static str> {
         let priority_task = PriorityTaskRef {
             task,
             priority,
@@ -191,13 +192,13 @@ impl RunQueue {
     }
 
     /// The internal function that actually removes the task from the runqueue.
-    fn remove_internal(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    fn remove_internal(&mut self, task: &RawTaskRef) -> Result<(), &'static str> {
         self.queue.retain(|x| &x.task != task);
         Ok(())
     }
 
     /// Removes a `TaskRef` from this RunQueue.
-    pub fn remove_task(&mut self, task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_task(&mut self, task: &RawTaskRef) -> Result<(), &'static str> {
         self.remove_internal(task)
     }
 
@@ -205,14 +206,14 @@ impl RunQueue {
     /// system.
     ///
     /// This is a brute force approach that iterates over all runqueues.
-    pub fn remove_task_from_all(task: &TaskRef) -> Result<(), &'static str> {
+    pub fn remove_task_from_all(task: &RawTaskRef) -> Result<(), &'static str> {
         for (_core, rq) in RUNQUEUES.iter() {
             rq.write().remove_task(task)?;
         }
         Ok(())
     }
 
-    fn get_priority(&self, task: &TaskRef) -> Option<u8> {
+    fn get_priority(&self, task: &RawTaskRef) -> Option<u8> {
         for t in self.queue.iter() {
             if t.task == *task {
                 return Some(t.priority);
@@ -221,11 +222,11 @@ impl RunQueue {
         None
     }
 
-    pub fn idle_task(&self) -> &TaskRef {
+    pub fn idle_task(&self) -> &RawTaskRef {
         &self.idle_task
     }
 
-    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+    fn set_priority(&mut self, task: &RawTaskRef, priority: u8) -> bool {
         let previous_len = self.queue.len();
         self.queue.retain(|t| t.task != *task);
 
@@ -245,7 +246,7 @@ impl RunQueue {
     }
 }
 
-pub fn get_priority(task: &TaskRef) -> Option<u8> {
+pub fn get_priority(task: &RawTaskRef) -> Option<u8> {
     for (_, run_queue) in RUNQUEUES.iter() {
         if let Some(priority) = run_queue.read().get_priority(task) {
             return Some(priority);
@@ -254,7 +255,7 @@ pub fn get_priority(task: &TaskRef) -> Option<u8> {
     None
 }
 
-pub fn set_priority(task: &TaskRef, priority: u8) {
+pub fn set_priority(task: &RawTaskRef, priority: u8) {
     for (_, run_queue) in RUNQUEUES.iter() {
         if run_queue.write().set_priority(task, priority) {
             break;
@@ -264,7 +265,7 @@ pub fn set_priority(task: &TaskRef, priority: u8) {
 
 /// Lowers the task's priority to its previous value when dropped.
 pub struct PriorityInheritanceGuard<'a> {
-    inner: Option<(&'a TaskRef, u8)>,
+    inner: Option<(&'a RawTaskRef, u8)>,
 }
 
 impl<'a> Drop for PriorityInheritanceGuard<'a> {
@@ -279,20 +280,21 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
 /// current task's priority.
 ///
 /// Returns a guard which reverts the change when dropped.
-pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
-    let current_task = task::get_my_current_task().unwrap();
-
+pub fn inherit_priority<'a, 'b>(
+    current_task: &'a RawTaskRef,
+    inheriting_task: &'b RawTaskRef,
+) -> PriorityInheritanceGuard<'b> {
     let mut current_priority = None;
     let mut other_priority = None;
 
     'outer: for (core, run_queue) in RUNQUEUES.iter() {
         for epoch_task in run_queue.read().iter() {
-            if epoch_task.task == current_task {
+            if epoch_task.task == *current_task {
                 current_priority = Some(epoch_task.priority);
                 if other_priority.is_some() {
                     break 'outer;
                 }
-            } else if &epoch_task.task == task {
+            } else if &epoch_task.task == inheriting_task {
                 other_priority = Some((core, epoch_task.priority));
                 if current_priority.is_some() {
                     break 'outer;
@@ -305,7 +307,7 @@ pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
         (current_priority, other_priority) && current_priority > other_priority
     {
         // NOTE: This assumes no task migration.
-        debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task, current_priority));
+        debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(inheriting_task, current_priority));
     }
 
     PriorityInheritanceGuard {
@@ -313,7 +315,7 @@ pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
             (current_priority, other_priority)
             && current_priority > other_priority
         {
-            Some((task, other_priority))
+            Some((inheriting_task, other_priority))
         } else {
             None
         },

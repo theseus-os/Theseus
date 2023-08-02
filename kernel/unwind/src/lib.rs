@@ -920,6 +920,6 @@ fn cleanup_unwinding_context(unwinding_context_ptr: *mut UnwindingContext) -> ! 
     warn!("cleanup_unwinding_context(): invoking the task_cleanup_failure function for task {:?}", current_task);
     
     let (exitable_taskref, failure_cleanup_function) = 
-        task::ExitableTaskRef::obtain_for_unwinder(current_task);
+        task::ExitableTaskRef::obtain_for_unwinder(current_task.into_raw());
     failure_cleanup_function(exitable_taskref, cause)
 }

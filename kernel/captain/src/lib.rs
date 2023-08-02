@@ -134,7 +134,7 @@ pub fn init(
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.
-    scheduler::init()?;
+    task_init::init()?;
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), bsp_id, bsp_initial_stack)?;
     info!("Created initial bootstrap task: {:?}", bootstrap_task);
 
@@ -234,7 +234,7 @@ pub fn init(
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    task::schedule();
     loop { 
         error!("BUG: captain::init(): captain's bootstrap task was rescheduled after being dead!");
     }

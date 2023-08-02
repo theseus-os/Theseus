@@ -22,7 +22,7 @@ extern crate keycodes_ascii;
 extern crate mod_mgmt;
 extern crate mouse_data;
 extern crate path;
-extern crate scheduler; 
+extern crate task; 
 extern crate spawn;
 extern crate window_inner;
 extern crate shapes;
@@ -31,7 +31,7 @@ extern crate color;
 use alloc::collections::VecDeque;
 use alloc::string::ToString;
 use alloc::sync::{Arc, Weak};
-use alloc::vec::{Vec};
+use alloc::vec::Vec;
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 
 use mpmc::Queue;
@@ -653,7 +653,7 @@ fn window_manager_loop(
         let event_opt = key_consumer.pop()
             .or_else(||mouse_consumer.pop())
             .or_else(||{
-                scheduler::schedule();
+                task::schedule();
                 None
             });
 

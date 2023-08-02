@@ -40,7 +40,7 @@ pub struct PriorityInheritanceGuard<'a> {
     phantom: PhantomData<&'a ()>,
 }
 
-pub fn inherit_priority(_: &TaskRef) -> PriorityInheritanceGuard<'_> {
+pub fn inherit_priority(_: &RawTaskRef) -> PriorityInheritanceGuard<'_> {
     PriorityInheritanceGuard {
         phantom: PhantomData,
     }

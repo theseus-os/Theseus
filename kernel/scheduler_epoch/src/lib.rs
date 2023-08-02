@@ -14,33 +14,33 @@ extern crate alloc;
 
 use log::error;
 use runqueue_epoch::{RunQueue, MAX_PRIORITY};
-use task::TaskRef;
+use task_struct::RawTaskRef;
 
 pub use runqueue_epoch::{inherit_priority, PriorityInheritanceGuard};
 
 /// A data structure to transfer data from select_next_task_priority
 /// to select_next_task
 struct NextTaskResult {
-    taskref: Option<TaskRef>,
+    taskref: Option<RawTaskRef>,
     idle_task: bool,
 }
 
 /// Changes the priority of the given task with the given priority level.
 /// Priority values must be between 40 (maximum priority) and 0 (minimum
 /// prriority).
-pub fn set_priority(task: &TaskRef, priority: u8) {
+pub fn set_priority(task: &RawTaskRef, priority: u8) {
     let priority = core::cmp::min(priority, MAX_PRIORITY);
     runqueue_epoch::set_priority(task, priority);
 }
 
 /// Returns the priority of the given task.
-pub fn get_priority(task: &TaskRef) -> Option<u8> {
+pub fn get_priority(task: &RawTaskRef) -> Option<u8> {
     runqueue_epoch::get_priority(task)
 }
 
 /// This defines the priority scheduler policy.
 /// Returns None if there is no schedule-able task.
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
+pub fn select_next_task(apic_id: u8) -> Option<RawTaskRef> {
     let next_task = select_next_task_priority(apic_id)?;
     // If the selected task is idle task we begin a new scheduling epoch
     if next_task.idle_task {

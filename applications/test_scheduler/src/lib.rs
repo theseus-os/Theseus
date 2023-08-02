@@ -22,8 +22,8 @@ pub fn main(_args: Vec<String>) -> isize {
         .pin_on_cpu(cpu_1)
         .spawn().expect("failed to initiate task");
 
-    if let Err(e) = scheduler::set_priority(&taskref1, 30) {
-        error!("scheduler_eval(): Could not set priority to taskref1: {}", e);
+    if let Err(e) = taskref1.set_priority(30) {
+        error!("test_scheduler(): Could not set priority to taskref1: {}", e);
     }
 
     debug!("Spawned Task 1");
@@ -33,8 +33,8 @@ pub fn main(_args: Vec<String>) -> isize {
         .pin_on_cpu(cpu_1)
         .spawn().expect("failed to initiate task");
 
-    if let Err(e) = scheduler::set_priority(&taskref2, 20) {
-        error!("scheduler_eval(): Could not set priority to taskref2: {}", e);
+    if let Err(e) = taskref2.set_priority(20) {
+        error!("test_scheduler(): Could not set priority to taskref2: {}", e);
     }
 
     debug!("Spawned Task 2");
@@ -44,17 +44,17 @@ pub fn main(_args: Vec<String>) -> isize {
         .pin_on_cpu(cpu_1)
         .spawn().expect("failed to initiate task");
 
-    if let Err(e) = scheduler::set_priority(&taskref3, 10) {
-        error!("scheduler_eval(): Could not set priority to taskref3: {}", e);
+    if let Err(e) = taskref3.set_priority(10) {
+        error!("test_scheduler(): Could not set priority to taskref3: {}", e);
     }
 
     debug!("Spawned Task 3");
 
     debug!("Spawned all tasks");
 
-    let _priority1 = scheduler::get_priority(&taskref1);
-    let _priority2 = scheduler::get_priority(&taskref2);
-    let _priority3 = scheduler::get_priority(&taskref3);
+    let _priority1 = taskref1.priority();
+    let _priority2 = taskref2.priority();
+    let _priority3 = taskref3.priority();
 
     #[cfg(epoch_scheduler)]
     {
@@ -73,6 +73,6 @@ pub fn main(_args: Vec<String>) -> isize {
 fn worker(_: ()) {
     for i in 0..1000 {
        debug!("Task_ID : {} , Instance : {}", task::get_my_current_task_id(), i);
-       scheduler::schedule();
+       task::schedule();
     }
 }

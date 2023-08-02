@@ -8,8 +8,10 @@
 extern crate alloc;
 
 use alloc::collections::VecDeque;
-use atomic_linked_list::atomic_map::AtomicMap;
 use core::ops::{Deref, DerefMut};
+use core::sync::atomic::Ordering;
+
+use atomic_linked_list::atomic_map::AtomicMap;
 use log::{debug, error, trace};
 use sync_preemption::PreemptionSafeRwLock;
 use task_struct::RawTaskRef;
@@ -181,7 +183,8 @@ impl RunQueue {
 
     /// Adds a `TaskRef` to this RunQueue.
     fn add_task(&mut self, task: RawTaskRef) -> Result<(), &'static str> {
-        task.is_on_run_queue.store(true, Ordering::Release);
+        // TODO: Remove clone.
+        task.clone().expose().is_on_run_queue().store(true, Ordering::Release);
 
         #[cfg(not(loscd_eval))]
         debug!("Adding task to runqueue_priority {}, {:?}", self.core, task);
@@ -285,7 +288,7 @@ pub struct PriorityInheritanceGuard<'a> {
 impl<'a> Drop for PriorityInheritanceGuard<'a> {
     fn drop(&mut self) {
         if let Some((task, priority)) = self.inner {
-            set_priority(task, priority)
+            set_priority(task, priority);
         }
     }
 }
@@ -294,20 +297,21 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
 /// current task's priority.
 ///
 /// Returns a guard which reverts the change when dropped.
-pub fn inherit_priority(current_task: &RawTaskRef, inheriting_task: &RawTaskRef) -> PriorityInheritanceGuard<'_> {
-    let current_task = task::get_my_current_task().unwrap();
-
+pub fn inherit_priority<'a, 'b>(
+    current_task: &'a RawTaskRef,
+    inheriting_task: &'b RawTaskRef,
+) -> PriorityInheritanceGuard<'b> {
     let mut current_priority = None;
     let mut other_priority = None;
 
     'outer: for (core, run_queue) in RUNQUEUES.iter() {
         for epoch_task in run_queue.read().iter() {
-            if epoch_task.task == current_task {
+            if epoch_task.task == *current_task {
                 current_priority = Some(epoch_task.priority);
                 if other_priority.is_some() {
                     break 'outer;
                 }
-            } else if &epoch_task.task == task {
+            } else if &epoch_task.task == inheriting_task {
                 other_priority = Some((core, epoch_task.priority));
                 if current_priority.is_some() {
                     break 'outer;
@@ -320,7 +324,7 @@ pub fn inherit_priority(current_task: &RawTaskRef, inheriting_task: &RawTaskRef)
         (current_priority, other_priority) && current_priority > other_priority
     {
         // NOTE: This assumes no task migration.
-        debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task, current_priority));
+        debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(inheriting_task, current_priority));
     }
 
     PriorityInheritanceGuard {
@@ -328,7 +332,7 @@ pub fn inherit_priority(current_task: &RawTaskRef, inheriting_task: &RawTaskRef)
             (current_priority, other_priority)
             && current_priority > other_priority
         {
-            Some((task, other_priority))
+            Some((inheriting_task, other_priority))
         } else {
             None
         },

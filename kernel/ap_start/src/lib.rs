@@ -130,7 +130,7 @@ pub fn kstart_ap(
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    task::schedule();
     loop { 
         error!("BUG: ap_start::kstart_ap(): CPU {} bootstrap task was rescheduled after being dead!", cpu_id);
     }

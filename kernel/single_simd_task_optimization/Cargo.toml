@@ -10,8 +10,8 @@ cfg-if = "0.1.6"
 [dependencies.log]
 version = "0.4.8"
 
-[dependencies.task]
-path = "../task"
+[dependencies.task_struct]
+path = "../task_struct"
 
 
 [lib]

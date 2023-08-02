@@ -180,9 +180,52 @@ pub struct RestartInfo {
 /// `RawTaskRef`s on the run queue which don't depend on the scheduler
 /// subsystem, but also doesn't expose any methods that depend on the scheduler
 /// subsystem.
-pub type RawTaskRef = Arc<Task>;
+#[derive(Debug, Clone)]
+pub struct RawTaskRef {
+    pub inner: Arc<Task>,
+}
 
-pub type RawWeakTaskRef = Weak<Task>;
+impl PartialEq for RawTaskRef {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl Eq for RawTaskRef {}
+
+impl Deref for RawTaskRef {
+    type Target = Arc<Task>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl RawTaskRef {
+    pub fn downgrade(this: &Self) -> RawWeakTaskRef {
+        RawWeakTaskRef {
+            inner: Arc::downgrade(&this.inner),
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn expose(self) -> ExposedRawTaskRef {
+        ExposedRawTaskRef {
+            task: self,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RawWeakTaskRef {
+    pub inner: Weak<Task>,
+}
+
+impl RawWeakTaskRef {
+    pub fn upgrade(&self) -> Option<RawTaskRef> {
+        self.inner.upgrade().map(|inner| RawTaskRef { inner })
+    }
+}
 
 /// The parts of a `Task` that may be modified after its creation.
 ///
@@ -312,11 +355,13 @@ impl fmt::Debug for Task {
         ds.finish()
     }
 }
+
 impl fmt::Display for Task {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}{{{}}}", self.name, self.id)
     }
 }
+
 impl Hash for Task {
     fn hash<H: Hasher>(&self, h: &mut H) {
         self.id.hash(h);

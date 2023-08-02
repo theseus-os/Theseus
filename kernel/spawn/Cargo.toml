@@ -21,7 +21,6 @@ cpu = { path = "../cpu" }
 preemption = { path = "../preemption" }
 task = { path = "../task" }
 runqueue = { path = "../runqueue" }
-scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }
 context_switch = { path = "../context_switch" }
 path = { path = "../path" }

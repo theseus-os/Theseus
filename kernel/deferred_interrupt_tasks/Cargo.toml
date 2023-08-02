@@ -9,7 +9,6 @@ edition = "2021"
 log = "0.4.8"
 
 task = { path = "../task" }
-scheduler = { path = "../scheduler" }
 spawn = { path = "../spawn" }
 interrupts = { path = "../interrupts" }
 debugit = { path = "../../libs/debugit" }

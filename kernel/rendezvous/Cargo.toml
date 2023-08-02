@@ -19,9 +19,6 @@ path = "../../libs/sync_irq"
 [dependencies.task]
 path = "../task"
 
-[dependencies.scheduler]
-path = "../scheduler"
-
 [dependencies.wait_queue]
 path = "../wait_queue"
 

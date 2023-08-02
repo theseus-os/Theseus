@@ -26,7 +26,6 @@ extern crate sync_irq;
 extern crate wait_queue;
 extern crate wait_guard;
 extern crate task;
-extern crate scheduler;
 extern crate sync;
 extern crate sync_spin;
 
@@ -281,7 +280,7 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
                 return Err(e);
             }
             None => {
-                scheduler::schedule();
+                task::schedule();
             }
         }
 
@@ -301,7 +300,7 @@ impl <T: Send, P: DeadlockPrevention> Sender<T, P> {
                     _ => break,
                 }
             }
-            scheduler::schedule();
+            task::schedule();
         }
 
         // Here, we are at the rendezvous point
@@ -433,7 +432,7 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
                 return Err(e);
             }
             None => {
-                scheduler::schedule();
+                task::schedule();
             }
         }
 
@@ -452,7 +451,7 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
                     _ => break,
                 }
             }
-            scheduler::schedule();
+            task::schedule();
         }
 
 

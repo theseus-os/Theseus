@@ -101,10 +101,10 @@ dependencies = [
  "no_drop",
  "page_attribute_table",
  "per_cpu",
- "scheduler",
  "spawn",
  "stack",
  "sync_irq",
+ "task",
 ]
 
 [[package]]
@@ -390,12 +390,12 @@ dependencies = [
  "ota_update_client",
  "page_attribute_table",
  "per_cpu",
- "scheduler",
  "simd_personality",
  "spawn",
  "stack",
  "task",
  "task_fs",
+ "task_init",
  "time",
  "tlb_shootdown",
  "tsc",
@@ -820,7 +820,6 @@ dependencies = [
  "debugit",
  "interrupts",
  "log",
- "scheduler",
  "spawn",
  "task",
 ]
@@ -1524,7 +1523,6 @@ dependencies = [
  "noline",
  "path",
  "root",
- "scheduler",
  "spawn",
  "stdio",
  "sync_block",
@@ -2961,7 +2959,6 @@ version = "0.1.0"
 dependencies = [
  "debugit",
  "log",
- "scheduler",
  "spin 0.9.4",
  "sync",
  "sync_irq",
@@ -3097,7 +3094,7 @@ dependencies = [
  "runqueue_round_robin",
  "single_simd_task_optimization",
  "sync_preemption",
- "task",
+ "task_struct",
 ]
 
 [[package]]
@@ -3118,7 +3115,7 @@ dependencies = [
  "atomic_linked_list",
  "log",
  "sync_preemption",
- "task",
+ "task_struct",
  "time",
 ]
 
@@ -3174,8 +3171,7 @@ dependencies = [
  "scheduler_epoch",
  "scheduler_priority",
  "scheduler_round_robin",
- "sleep",
- "task",
+ "task_struct",
  "x86_64",
 ]
 
@@ -3187,7 +3183,7 @@ dependencies = [
  "runqueue",
  "runqueue_epoch",
  "spin 0.9.4",
- "task",
+ "task_struct",
 ]
 
 [[package]]
@@ -3208,7 +3204,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "runqueue_priority",
- "task",
+ "task_struct",
  "time",
 ]
 
@@ -3351,7 +3347,6 @@ dependencies = [
  "path",
  "root",
  "runqueue",
- "scheduler",
  "spawn",
  "spin 0.9.4",
  "stdio",
@@ -3409,7 +3404,7 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
  "log",
- "task",
+ "task_struct",
 ]
 
 [[package]]
@@ -3481,7 +3476,6 @@ dependencies = [
  "path",
  "preemption",
  "runqueue",
- "scheduler",
  "spin 0.9.4",
  "stack",
  "task",
@@ -3647,7 +3641,6 @@ dependencies = [
  "log",
  "mpmc_queue",
  "preemption",
- "scheduler",
  "sync",
  "sync_spin",
  "task",
@@ -3709,6 +3702,7 @@ dependencies = [
  "mod_mgmt",
  "no_drop",
  "preemption",
+ "scheduler",
  "spin 0.9.4",
  "stack",
  "static_assertions",
@@ -3728,6 +3722,17 @@ dependencies = [
  "path",
  "root",
  "spin 0.9.4",
+ "task",
+]
+
+[[package]]
+name = "task_init"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "interrupts",
+ "log",
+ "sleep",
  "task",
 ]
 
@@ -4683,10 +4688,10 @@ dependencies = [
  "mouse_data",
  "mpmc",
  "path",
- "scheduler",
  "shapes",
  "spawn",
  "spin 0.9.4",
+ "task",
  "window_inner",
 ]
 

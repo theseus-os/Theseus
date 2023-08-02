@@ -15,7 +15,6 @@ extern crate event_types;
 extern crate window_manager;
 extern crate path;
 extern crate root;
-extern crate scheduler;
 extern crate stdio;
 extern crate core2;
 extern crate app_io;
@@ -108,7 +107,7 @@ pub fn main(_args: Vec<String>) -> isize {
     task::with_current_task(|t| t.block())
         .expect("shell::main(): failed to get current task")
         .expect("shell:main(): failed to block the main shell task");
-    scheduler::schedule();
+    task::schedule();
 
     loop {
         warn!("BUG: blocked shell task was scheduled in unexpectedly");
@@ -422,7 +421,7 @@ impl Shell {
                     // lock. We wait for the application to finish its last time slice. It will then be
                     // removed from the run queue. We can thereafter release the lock.
                     loop {
-                        scheduler::schedule(); // yield the CPU
+                        task::schedule(); // yield the CPU
                         if !task_ref.is_running() {
                             break;
                         }
@@ -461,7 +460,7 @@ impl Shell {
                     // lock. We wait for the application to finish its last time slice. It will then be
                     // truly blocked. We can thereafter release the lock.
                     loop {
-                        scheduler::schedule(); // yield the CPU
+                        task::schedule(); // yield the CPU
                         if !task_ref.is_running() {
                             break;
                         }
@@ -1330,7 +1329,7 @@ impl Shell {
                 // update if there are inputs
                 self.terminal.lock().refresh_display()?;
             } else {
-                scheduler::schedule(); // yield the CPU if nothing to do
+                task::schedule(); // yield the CPU if nothing to do
             }
         }
     }

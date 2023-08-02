@@ -11,8 +11,7 @@ cfg-if = "1.0.0"
 
 cpu = { path = "../cpu" }
 interrupts = { path = "../interrupts" }
-sleep = { path = "../sleep" }
-task = { path = "../task" }
+task_struct = { path = "../task_struct" }
 
 scheduler_round_robin = { path = "../scheduler_round_robin" }
 scheduler_epoch = { path = "../scheduler_epoch" }

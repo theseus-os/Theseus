@@ -31,7 +31,10 @@ use spin::Mutex;
 use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
-use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
+use task::{
+    ExitValue, ExitableTaskRef, FailureCleanupFunction, JoinableTaskRef, RawTaskRef, RestartInfo,
+    RunState, Task, TaskRef,
+};
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -59,7 +62,7 @@ pub fn init(
         .spawn_restartable(None)?
         .clone();
 
-    runqueue::init(cpu_id.into_u8(), idle_task)?;
+    runqueue::init(cpu_id.into_u8(), idle_task.into_raw())?;
     runqueue::add_task_to_specific_runqueue(
         cpu_id.into_u8(),
         exitable_bootstrap_task.clone(),
@@ -129,8 +132,9 @@ pub struct BootstrapTaskRef {
     exitable_taskref: ExitableTaskRef,
 }
 impl Deref for BootstrapTaskRef {
-    type Target = TaskRef;
-    fn deref(&self) -> &TaskRef {
+    type Target = RawTaskRef;
+
+    fn deref(&self) -> &Self::Target {
         self.exitable_taskref.deref()
     }
 }
@@ -150,7 +154,7 @@ impl Drop for BootstrapTaskRef {
     fn drop(&mut self) {
         // trace!("Finishing Bootstrap Task on core {}: {:?}", self.cpu_id, self.task_ref);
         remove_current_task_from_runqueue(&self.exitable_taskref);
-        self.exitable_taskref.mark_as_exited(Box::new(()))
+        self.exitable_taskref.mark_as_exited(ExitValue::Completed(Box::new(())))
             .expect("BUG: bootstrap task was unable to mark itself as exited");
 
         // Note: we can mark this bootstrap task as exited here, but we cannot 
@@ -252,7 +256,7 @@ pub fn new_application_task_builder(
         move |new_task| {
             new_task.app_crate = Some(Arc::new(app_crate_ref));
             new_task.namespace = namespace;
-            Ok(None)
+            Ok(())
         }
     ));
     
@@ -282,8 +286,9 @@ pub struct TaskBuilder<F, A, R> {
     blocked: bool,
     idle: bool,
     post_build_function: Option<Box<
-        dyn FnOnce(&mut Task) -> Result<Option<FailureCleanupFunction>, &'static str>
+        dyn FnOnce(&mut Task) -> Result<(), &'static str>
     >>,
+    failure_cleanup_function: Option<FailureCleanupFunction>,
 
     #[cfg(simd_personality)]
     simd: SimdExt,
@@ -308,6 +313,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
             blocked: false,
             idle: false,
             post_build_function: None,
+            failure_cleanup_function: None,
 
             #[cfg(simd_personality)]
             simd: SimdExt::None,
@@ -378,8 +384,12 @@ impl<F, A, R> TaskBuilder<F, A, R>
             task::get_my_current_task()
                 .ok_or("spawn: couldn't get current task")?
                 .deref()
+                .deref()
+                .deref()
                 .into(),
+            self.failure_cleanup_function.unwrap_or(task_cleanup_failure::<F, A, R>),
         )?;
+
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
     
@@ -409,10 +419,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
 
         // If there is a post-build function, invoke it now
         // before finalizing the task and adding it to runqueues.
-        let failure_cleanup_function = match self.post_build_function {
-            Some(pb_func) => pb_func(&mut new_task)?,
-            None => None,
-        };
+        if let Some(pb_func) = self.post_build_function {
+            pb_func(&mut new_task)?
+        }
 
         // Now that it has been fully initialized, mark the task as no longer `Initing`.
         if self.blocked {
@@ -423,10 +432,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
                 .map_err(|_| "BUG: newly-spawned task was not in the Initing runstate")?;
         }
 
-        let task_ref = TaskRef::create(
-            new_task,
-            failure_cleanup_function.unwrap_or(task_cleanup_failure::<F, A, R>)
-        );
+        let task_ref = TaskRef::create(new_task);
         
         // This synchronizes with the acquire fence in this task's exit cleanup routine
         // (in `spawn::task_cleanup_final_internal()`).
@@ -435,9 +441,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Idle and blocked tasks are not stored on the run queue.
         if !self.idle && !self.blocked {
             if let Some(cpu) = self.pin_on_cpu {
-                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone().into_raw())?;
             } else {
-                runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+                runqueue::add_task_to_any_runqueue(task_ref.clone().into_raw())?;
             }
         }
 
@@ -512,9 +518,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
             move |new_task| {
                 new_task.inner_mut().restart_info = Some(restart_info);
                 setup_context_trampoline(new_task, task_wrapper_restartable::<F, A, R>)?;
-                Ok(Some(task_restartable_cleanup_failure::<F, A, R>))
+                Ok(())
             }
         ));
+        self.failure_cleanup_function = Some(task_restartable_cleanup_failure::<F, A, R>);
 
         // Code path is shared between `spawn` and `spawn_restartable` from this point
         self.spawn()
@@ -688,7 +695,7 @@ where
         // because this is the first code to run immediately after a context switch
         // switches to this task for the first time.
         // For more details, see the comments at the end of `task::task_switch()`.
-        recovered_preemption_guard = exitable_taskref.post_context_switch_action();
+        recovered_preemption_guard = unsafe { task::post_context_switch_action() };
 
         // This task's function and argument were placed at the bottom of the stack when this task was spawned.
         let task_func_arg = exitable_taskref.with_kstack(|kstack| {
@@ -800,7 +807,7 @@ fn task_cleanup_success_internal<R>(current_task: ExitableTaskRef, exit_value: R
 
     #[cfg(not(rq_eval))]
     debug!("task_cleanup_success: {:?} successfully exited with return value {:?}", current_task.name, debugit!(exit_value));
-    if current_task.mark_as_exited(Box::new(exit_value)).is_err() {
+    if current_task.mark_as_exited(ExitValue::Completed(Box::new(exit_value))).is_err() {
         error!("task_cleanup_success: {:?} task could not set exit value, because task had already exited. Is this correct?", current_task.name);
     }
 
@@ -837,7 +844,7 @@ fn task_cleanup_failure_internal(current_task: ExitableTaskRef, kill_reason: tas
 
     debug!("task_cleanup_failure: {:?} panicked with {:?}", current_task.name, kill_reason);
 
-    if current_task.mark_as_killed(kill_reason).is_err() {
+    if current_task.mark_as_exited(ExitValue::Killed(kill_reason)).is_err() {
         error!("task_cleanup_failure: {:?} task could not set kill reason, because task had already exited. Is this correct?", current_task.name);
     }
 
@@ -910,7 +917,7 @@ fn task_cleanup_final<F, A, R>(preemption_guard: PreemptionGuard, current_task: 
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    task::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { core::hint::spin_loop() }
 }
@@ -986,7 +993,7 @@ where
     // NOTE: nothing below here is guaranteed to run again!
     // ****************************************************
 
-    scheduler::schedule();
+    task::schedule();
     error!("BUG: task_cleanup_final(): task was rescheduled after being dead!");
     loop { core::hint::spin_loop() }
 }

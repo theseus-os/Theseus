@@ -8,7 +8,6 @@ edition = "2021"
 preemption = { path = "../preemption" }
 mpmc_queue = { path = "../../libs/mpmc_queue" }
 log = "0.4.8"
-scheduler = { path = "../scheduler" }
 sync = { path = "../../libs/sync" }
 task = { path = "../task" }
 sync_spin = { path = "../../libs/sync_spin" }

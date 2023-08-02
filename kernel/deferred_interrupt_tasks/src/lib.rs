@@ -172,6 +172,6 @@ fn deferred_task_entry_point<DIA, Arg, Success, Failure>(
             error!("deferred_task_entry_point: couldn't block {:?}", curr_task);
         }
 
-        scheduler::schedule();
+        task::schedule();
     }
 }

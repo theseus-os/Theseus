@@ -21,6 +21,7 @@ memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
 no_drop = { path = "../no_drop" }
 preemption = { path = "../preemption" }
+scheduler = { path = "../scheduler" }
 stack = { path = "../stack" }
 sync_irq = { path = "../../libs/sync_irq" }
 task_struct = { path = "../task_struct" }
