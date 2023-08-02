@@ -1,3 +1,5 @@
+//! Defines the task and inner task structs.
+
 use alloc::{format, string::String, sync::Arc};
 use core::{
     fmt,

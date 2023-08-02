@@ -1,3 +1,5 @@
+//! Defines an exposed task reference.
+
 use core::{ops::Deref, sync::atomic::AtomicBool};
 
 use cpu::OptionalCpuId;

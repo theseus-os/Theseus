@@ -1,3 +1,5 @@
+//! Defines a raw task reference and raw weak task reference.
+
 use alloc::sync::{Arc, Weak};
 use core::ops::Deref;
 

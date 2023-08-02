@@ -1,3 +1,5 @@
+//! Defines an exitable task reference.
+
 use core::{
     ops::Deref,
     sync::atomic::{self, Ordering},

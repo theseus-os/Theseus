@@ -1,3 +1,5 @@
+//! Defines inherited states.
+
 use alloc::sync::Arc;
 
 use environment::Environment;
