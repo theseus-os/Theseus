@@ -133,6 +133,7 @@ impl TaskRef {
                 },
             },
         };
+        taskref.inner.joinable().store(true, Ordering::Release);
 
         // Add the new TaskRef to the global task list.
         let _existing_task = TASKLIST.lock().insert(taskref.id, taskref.clone().into_raw());
@@ -483,7 +484,7 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", current_cpu());
+        // log::trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", preemption_guard.cpu_id());
         return false;
     }
 
@@ -499,7 +500,12 @@ pub fn schedule() -> bool {
         preemption_guard,
     ); 
 
-    // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
+    // log::trace!(
+    //     "AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}",
+    //     cpu_id,
+    //     get_my_current_task(),
+    //     irq_safety::interrupts_enabled()
+    // );
 
     drop(recovered_preemption_guard);
     did_switch

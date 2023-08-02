@@ -439,7 +439,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         fence(Ordering::Release);
         
         // Idle and blocked tasks are not stored on the run queue.
-        if !self.idle && !self.blocked {
+        if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
                 runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone().into_raw())?;
             } else {

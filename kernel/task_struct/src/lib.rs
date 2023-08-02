@@ -505,7 +505,7 @@ impl Task {
     /// because no other task is waiting on it to exit.
     #[doc(alias("orphan", "zombie"))]
     pub fn is_joinable(&self) -> bool {
-        self.joinable.load(Ordering::Relaxed)
+        self.joinable.load(Ordering::Acquire)
     }
 
     /// Returns the namespace that this `Task` is loaded/linked into and runs within.
@@ -526,11 +526,15 @@ impl Task {
     /// # Locking / Deadlock
     /// Obtains the lock on the system task list.
     pub fn reap_exit_value(&self) -> Option<ExitValue> {
-        if self.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
-            TASKLIST.lock().remove(&self.id);
-            self.exit_value_mailbox.lock().take()
-        } else {
-            None
+        match self.runstate.compare_exchange(RunState::Exited, RunState::Reaped) {
+            Ok(_) => {
+                TASKLIST.lock().remove(&self.id);
+                self.exit_value_mailbox.lock().take()
+            }
+            Err(state) => {
+                warn!("tried reaping task with state: {state:?}");
+                None
+            }
         }
     }
 
@@ -679,14 +683,9 @@ pub struct ExposedRawTaskRef {
     pub task: RawTaskRef,
 }
 
-impl From<RawTaskRef> for ExposedRawTaskRef {
-    fn from(task: RawTaskRef) -> Self {
-        Self { task }
-    }
-}
-
 impl Deref for ExposedRawTaskRef {
     type Target = Task;
+
     fn deref(&self) -> &Self::Target {
         &self.task
     }
@@ -698,26 +697,32 @@ impl ExposedRawTaskRef {
     pub fn inner(&self) -> &IrqSafeMutex<TaskInner> {
         &self.inner
     }
+
     #[inline(always)]
     pub fn tls_area(&self) -> &TlsDataImage {
         &self.tls_area
     }
+
     #[inline(always)]
     pub fn running_on_cpu(&self) -> &AtomicCell<OptionalCpuId> {
         &self.running_on_cpu
     }
+
     #[inline(always)]
     pub fn runstate(&self) -> &AtomicCell<RunState> {
         &self.runstate
     }
+
     #[inline(always)]
     pub fn is_on_run_queue(&self) -> &AtomicBool {
         &self.is_on_run_queue
     }
+
     #[inline(always)]
     pub fn joinable(&self) -> &AtomicBool {
         &self.joinable
     }
+
     #[inline(always)]
     pub fn exit_value_mailbox(&self) -> &Mutex<Option<ExitValue>> {
         &self.exit_value_mailbox
@@ -739,11 +744,13 @@ pub enum InheritedStates<'t> {
         app_crate: Option<Arc<AppCrateRef>>,
     }
 }
+
 impl<'t> From<&'t Task> for InheritedStates<'t> {
     fn from(task: &'t Task) -> Self {
         Self::FromTask(task)
     }
 }
+
 impl<'t> InheritedStates<'t> {
     fn into_tuple(self) -> (
         MmiRef,
