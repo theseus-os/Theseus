@@ -15,7 +15,7 @@ pub struct ExitableTaskRef {
 impl ExitableTaskRef {
     pub fn mark_as_exited(&self, exit_value: ExitValue) -> Result<(), &'static str> {
         if self.has_exited() {
-            Err("")
+            Err("BUG: task was already exited! (did not overwrite its existing exit value)")
         } else {
             *self.exit_value_mailbox.lock() = Some(exit_value);
             self.runstate.store(RunState::Exited);
@@ -27,7 +27,15 @@ impl ExitableTaskRef {
             }
 
             if !self.is_running() {
-                todo!();
+                todo!(
+                    "Unhandled scenario: internal_exit(): task {self:?} wasn't running \
+                    but its current task TLS variable needs to be cleaned up!",
+                );
+                // Note: we cannot call `deinit_current_task()` here because if this task
+                //       isn't running, then it's definitely not the current task.
+                //
+                // let _taskref_in_tls = deinit_current_task();
+                // drop(_taskref_in_tls);
             }
 
             Ok(())
