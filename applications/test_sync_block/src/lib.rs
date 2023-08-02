@@ -2,7 +2,6 @@
 
 extern crate alloc;
 
-use core::ops::Deref;
 use log::{warn, error};
 use alloc::{
     format,
@@ -67,12 +66,12 @@ fn test_contention() -> Result<(), &'static str> {
 
 
 fn sync_block_task(lock: Arc<Mutex<usize>>) -> Result<(), &'static str> {
-    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+    let curr_task = task::with_current_task(|t| format!("{:?}", t))
         .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..1000 {
-        scheduler::schedule(); // give other tasks a chance to acquire the lock
+        task::schedule(); // give other tasks a chance to acquire the lock
         warn!("{} trying to acquire lock...", curr_task);
         let mut locked = lock.lock();
         warn!("{} acquired lock!", curr_task);
@@ -125,25 +124,25 @@ fn test_lockstep() -> Result<(), &'static str> {
 
 
 fn lockstep_task((lock, remainder): (Arc<Mutex<usize>>, usize)) -> Result<(), &'static str> {
-    let curr_task = task::with_current_task(|t| format!("{}", t.deref()))
+    let curr_task = task::with_current_task(|t| format!("{:?}", t))
         .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
     for _i in 0..20 {
         loop { 
             warn!("{} top of loop, remainder {}", curr_task, remainder);
-            scheduler::schedule(); // give other tasks a chance to acquire the lock
+            task::schedule(); // give other tasks a chance to acquire the lock
             let mut locked = lock.lock();
-            scheduler::schedule();
+            task::schedule();
             if *locked % 3 == remainder {
                 warn!("Task {} Time to shine, value is {}!", curr_task, *locked);
                 *locked += 1;
                 break;
             } else {
-                scheduler::schedule();
+                task::schedule();
                 warn!("Task {} going back to sleep, value {}, remainder {}!", curr_task, *locked, remainder);
             }
-            scheduler::schedule();
+            task::schedule();
         }
     }
     warn!("{} finished loop.", curr_task);

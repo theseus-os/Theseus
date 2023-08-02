@@ -280,10 +280,10 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
 /// current task's priority.
 ///
 /// Returns a guard which reverts the change when dropped.
-pub fn inherit_priority<'a, 'b>(
-    current_task: &'a RawTaskRef,
-    inheriting_task: &'b RawTaskRef,
-) -> PriorityInheritanceGuard<'b> {
+pub fn inherit_priority<'a>(
+    current_task: &RawTaskRef,
+    inheriting_task: &'a RawTaskRef,
+) -> PriorityInheritanceGuard<'a> {
     let mut current_priority = None;
     let mut other_priority = None;
 

@@ -326,7 +326,6 @@ dependencies = [
  "pmu_x86",
  "rendezvous",
  "runqueue",
- "scheduler",
  "simple_ipc",
  "spawn",
  "task",
@@ -3193,8 +3192,8 @@ dependencies = [
  "app_io",
  "cpu",
  "getopts",
- "scheduler",
  "spawn",
+ "task",
  "time",
 ]
 
@@ -3694,7 +3693,6 @@ dependencies = [
  "context_switch",
  "cpu",
  "cpu_local",
- "crossbeam-utils",
  "environment",
  "irq_safety",
  "log",
@@ -3920,7 +3918,6 @@ version = "0.1.0"
 dependencies = [
  "cpu",
  "log",
- "scheduler",
  "spawn",
  "sync_block",
  "task",
@@ -3952,7 +3949,6 @@ dependencies = [
  "app_io",
  "cpu",
  "log",
- "scheduler",
  "spawn",
  "spin 0.9.4",
  "task",

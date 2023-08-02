@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 app_io = { path = "../../kernel/app_io" }
 getopts = "0.2"
-scheduler = { path = "../../kernel/scheduler" }
 spawn = { path = "../../kernel/spawn" }
+task = { path = "../../kernel/task" }
 time = { path = "../../kernel/time" }
 cpu = { path = "../../kernel/cpu" }

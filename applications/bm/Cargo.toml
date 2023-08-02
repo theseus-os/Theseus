@@ -44,9 +44,6 @@ path = "../../kernel/heapfile"
 [dependencies.fs_node]
 path = "../../kernel/fs_node"
 
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
 [dependencies.libtest]
 path = "../../kernel/libtest"
 

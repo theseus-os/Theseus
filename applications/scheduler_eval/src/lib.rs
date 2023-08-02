@@ -67,18 +67,6 @@ pub fn main(args: Vec<String>) -> isize {
     }
 
     for task in tasks {
-        // JoinableTaskRef::join is inlined so that we can yield if the worker hasn't
-        // exited minimising the impact our task has on the worker tasks.
-        // TODO: Call join directly once it is properly implemented.
-        // TODO: Remove dependency on scheduler.
-        while !task.has_exited() {
-            scheduler::schedule();
-        }
-
-        while task.is_running() {
-            scheduler::schedule();
-        }
-
         task.join().expect("failed to join task");
     }
     let end = now::<Monotonic>();
@@ -95,6 +83,6 @@ fn print_usage(options: getopts::Options) {
 
 fn worker(num_yields: u32) {
     for _ in 0..num_yields {
-        scheduler::schedule();
+        task::schedule();
     }
 }

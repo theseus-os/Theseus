@@ -42,7 +42,6 @@ use core::{
     task::Waker,
 };
 use cpu::CpuId;
-use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::hold_interrupts;
 use log::error;
 use environment::Environment;

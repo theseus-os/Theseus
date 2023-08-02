@@ -20,7 +20,6 @@ extern crate spawn;
 extern crate path;
 extern crate runqueue;
 extern crate heapfile;
-extern crate scheduler;
 extern crate libtest;
 extern crate memory;
 extern crate rendezvous;
@@ -1691,15 +1690,15 @@ fn print_header(tries: usize, iterations: usize) {
 
 
 /// Task generated to measure time of context switching
-fn yield_task(_a: u32) -> u32 {
-	let times = ITERATIONS*1000;
-    for _i in 0..times {
-       scheduler::schedule();
+fn yield_task(a: u32) -> u32 {
+	let times = ITERATIONS * 1000;
+    for _ in 0..times {
+       task::schedule();
     }
-    _a
+	a
 }
 
 /// Task generated to measure overhead of context switching
-fn overhead_task(_a: u32) -> u32 {
-    _a
+fn overhead_task(a: u32) -> u32 {
+	a
 }

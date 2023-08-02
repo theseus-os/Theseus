@@ -6,7 +6,6 @@ extern crate alloc;
 extern crate spin;
 extern crate task;
 extern crate spawn;
-extern crate scheduler;
 extern crate wait_condition;
 extern crate cpu;
 
@@ -67,10 +66,10 @@ fn rmain() -> Result<(), &'static str> {
         warn!("Finished spawning the 3 tasks");
 
     // give the wait task (t1) a chance to run before the notify task
-    for _ in 0..100 { scheduler::schedule(); }
+    for _ in 0..100 { task::schedule(); }
     t3.unblock().unwrap();
     
-    for _ in 0..100 { scheduler::schedule(); }
+    for _ in 0..100 { task::schedule(); }
     t2.unblock().unwrap();
 
 

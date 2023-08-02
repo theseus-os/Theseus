@@ -147,19 +147,20 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
         task::InheritedStates::FromTask(
             &*task::get_my_current_task().ok_or("Failed to get current task")?
         ),
+        |_, _| loop { core::hint::spin_loop() }, // dummy failure function
     )?;
     task.name = String::from("rq_eval_single_task_unrunnable");
     let taskref = TaskRef::create(
         task,
-        |_, _| loop { core::hint::spin_loop() }, // dummy failure function
     );
     
     let hpet = get_hpet().ok_or("couldn't get HPET timer")?;
     let start = hpet.get_counter();
     
     for _ in 0..iterations {
-        runqueue::add_task_to_specific_runqueue(cpu::current_cpu().into_u8(), taskref.clone())?;
-        runqueue::remove_task_from_all(&taskref)?;
+        runqueue::add_task_to_specific_runqueue(cpu::current_cpu().into_u8(), taskref.clone().into_raw())?;
+        // TODO: Remove clone.
+        runqueue::remove_task_from_all(&taskref.clone().into_raw())?;
     }
 
     let end = hpet.get_counter();

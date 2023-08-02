@@ -16,9 +16,6 @@ path = "../../kernel/task"
 [dependencies.cpu]
 path = "../../kernel/cpu"
 
-[dependencies.scheduler]
-path = "../../kernel/scheduler"
-
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
