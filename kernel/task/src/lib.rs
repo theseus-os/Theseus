@@ -30,7 +30,6 @@
 extern crate alloc;
 
 use alloc::{
-    collections::BTreeMap,
     format,
     sync::Arc, vec::Vec,
 };
@@ -51,9 +50,8 @@ use memory::MmiRef;
 use no_drop::NoDrop;
 use preemption::PreemptionGuard;
 use spin::Mutex;
-use sync_irq::IrqSafeMutex;
 use stack::Stack;
-use task_struct::{ExposedRawTaskRef, RawWeakTaskRef};
+use task_struct::{ExposedRawTaskRef, RawWeakTaskRef, TASKLIST};
 use log::warn;
 
 pub use task_struct::{ExitableTaskRef, FailureCleanupFunction, RawTaskRef};
@@ -68,12 +66,11 @@ pub use task_struct::{
 pub use task_struct::SimdExt;
 
 
-/// The list of all Tasks in the system.
-static TASKLIST: IrqSafeMutex<BTreeMap<usize, TaskRef>> = IrqSafeMutex::new(BTreeMap::new());
-
 /// Returns a `WeakTaskRef` (shared reference) to the `Task` specified by the given `task_id`.
 pub fn get_task(task_id: usize) -> Option<WeakTaskRef> {
-    TASKLIST.lock().get(&task_id).map(TaskRef::downgrade)
+    TASKLIST.lock().get(&task_id).map(|task| WeakTaskRef {
+        inner: RawTaskRef::downgrade(task),
+    })
 }
 
 /// Returns a list containing a snapshot of all tasks that currently exist.
@@ -83,9 +80,11 @@ pub fn get_task(task_id: usize) -> Option<WeakTaskRef> {
 /// * The existence of a task in the returned list does not mean the task will continue to exist
 ///   at any point in the future, hence the return type of `WeakTaskRef` instead of `TaskRef`.
 pub fn all_tasks() -> Vec<(usize, WeakTaskRef)> {
-    let tasklist = TASKLIST.lock();
+    let tasklist = task_struct::TASKLIST.lock();
     let mut v = Vec::with_capacity(tasklist.len());
-    v.extend(tasklist.iter().map(|(id, t)| (*id, t.downgrade())));
+    v.extend(tasklist.iter().map(|(id, task)| (*id, WeakTaskRef {
+        inner: RawTaskRef::downgrade(task),
+    })));
     v
 }
 
@@ -137,7 +136,7 @@ impl TaskRef {
         };
 
         // Add the new TaskRef to the global task list.
-        let _existing_task = TASKLIST.lock().insert(taskref.id, taskref.clone());
+        let _existing_task = TASKLIST.lock().insert(taskref.id, taskref.clone().into_raw());
         assert!(_existing_task.is_none(), "BUG: TASKLIST contained a task with the same ID");
 
         JoinableTaskRef { task: taskref }
@@ -160,22 +159,6 @@ impl TaskRef {
         WeakTaskRef {
             inner: RawTaskRef::downgrade(&self.inner.task)
         }
-    }
-
-    /// Returns `true` if this task is joinable, `false` if not.
-    /// 
-    /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
-    ///   by [`TaskRef::create()`], which indicates that that other task is able to
-    ///   wait for this task to exit and thus be able to obtain this task's exit value.
-    /// * If `false`, the [`JoinableTaskRef`] object was dropped, and therefore no other task
-    ///   can join this task or obtain its exit value.
-    /// 
-    /// When a task is not joinable, it is considered to be an orphan
-    /// and will thus be automatically reaped and cleaned up once it exits
-    /// because no other task is waiting on it to exit.
-    #[doc(alias("orphan", "zombie"))]
-    pub fn is_joinable(&self) -> bool {
-        self.inner.joinable().load(Ordering::Relaxed)
     }
 
     /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
@@ -272,27 +255,6 @@ impl TaskRef {
             }
         }
         Ok(())
-    }
-
-    /// Takes the `ExitValue` from this `Task` and returns it
-    /// if and only if this `Task` was in the `Exited` runstate.
-    ///
-    /// If this `Task` was in the `Exited` runstate, after invoking this,
-    /// this `Task`'s runstate will be set to `Reaped`
-    /// and this `Task` will be removed from the system task list.
-    ///
-    /// If this `Task` was **not** in the `Exited` runstate, 
-    /// nothing is done and `None` is returned.
-    ///
-    /// # Locking / Deadlock
-    /// Obtains the lock on the system task list.
-    fn reap_exit_value(&self) -> Option<ExitValue> {
-        if self.inner.runstate().compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
-            TASKLIST.lock().remove(&self.id);
-            self.inner.exit_value_mailbox().lock().take()
-        } else {
-            None
-        }
     }
 
     /// Sets this `Task` as this CPU's current task.
@@ -1038,13 +1000,16 @@ mod tls_current_task {
             }
             t
         } else {
-            TASKLIST.lock()
-                .get(&current_task_id)
-                .cloned()
-                .ok_or_else(|| {
-                    log::error!("Couldn't find current_task_id {} in TASKLIST", current_task_id);
-                    InitCurrentTaskError::NotInTasklist(current_task_id)
-                })?
+            TaskRef {
+                inner: TASKLIST.lock()
+                    .get(&current_task_id)
+                    .cloned()
+                    .ok_or_else(|| {
+                        log::error!("Couldn't find current_task_id {} in TASKLIST", current_task_id);
+                        InitCurrentTaskError::NotInTasklist(current_task_id)
+                    })?
+                    .expose(),
+            }
         };
 
         match CURRENT_TASK.try_borrow_mut() {

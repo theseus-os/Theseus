@@ -38,8 +38,12 @@ use kernel_config::memory::KERNEL_STACK_SIZE_IN_PAGES;
 use mod_mgmt::{AppCrateRef, CrateNamespace, TlsDataImage};
 use environment::Environment;
 use spin::Mutex;
+use alloc::collections::BTreeMap;
 
 pub use exit::ExitableTaskRef;
+
+/// The list of all Tasks in the system.
+pub static TASKLIST: IrqSafeMutex<BTreeMap<usize, RawTaskRef>> = IrqSafeMutex::new(BTreeMap::new());
 
 /// The function signature of the callback that will be invoked when a `Task`
 /// panics or otherwise fails, e.g., a machine exception occurs.
@@ -488,9 +492,46 @@ impl Task {
         self.runstate() == RunState::Runnable && !self.is_suspended()
     }
 
+    /// Returns `true` if this task is joinable, `false` if not.
+    /// 
+    /// * If `true`, another task holds the [`JoinableTaskRef`] object that was created
+    ///   by [`TaskRef::create()`], which indicates that that other task is able to
+    ///   wait for this task to exit and thus be able to obtain this task's exit value.
+    /// * If `false`, the [`JoinableTaskRef`] object was dropped, and therefore no other task
+    ///   can join this task or obtain its exit value.
+    /// 
+    /// When a task is not joinable, it is considered to be an orphan
+    /// and will thus be automatically reaped and cleaned up once it exits
+    /// because no other task is waiting on it to exit.
+    #[doc(alias("orphan", "zombie"))]
+    pub fn is_joinable(&self) -> bool {
+        self.joinable.load(Ordering::Relaxed)
+    }
+
     /// Returns the namespace that this `Task` is loaded/linked into and runs within.
     pub fn get_namespace(&self) -> &Arc<CrateNamespace> {
         &self.namespace
+    }
+
+    /// Takes the `ExitValue` from this `Task` and returns it
+    /// if and only if this `Task` was in the `Exited` runstate.
+    ///
+    /// If this `Task` was in the `Exited` runstate, after invoking this,
+    /// this `Task`'s runstate will be set to `Reaped`
+    /// and this `Task` will be removed from the system task list.
+    ///
+    /// If this `Task` was **not** in the `Exited` runstate, 
+    /// nothing is done and `None` is returned.
+    ///
+    /// # Locking / Deadlock
+    /// Obtains the lock on the system task list.
+    pub fn reap_exit_value(&self) -> Option<ExitValue> {
+        if self.runstate.compare_exchange(RunState::Exited, RunState::Reaped).is_ok() {
+            TASKLIST.lock().remove(&self.id);
+            self.exit_value_mailbox.lock().take()
+        } else {
+            None
+        }
     }
 
     /// Exposes read-only access to this `Task`'s [`Stack`] by invoking

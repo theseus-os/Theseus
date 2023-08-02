@@ -33,10 +33,9 @@ impl ExitableTaskRef {
     }
 
     pub fn reap_if_orphaned(&self) {
-        todo!();
-        // if !self.is_joinable() {
-        //     let _ = self.reap_exit_value();
-        // }
+        if !self.is_joinable() {
+            let _ = self.reap_exit_value();
+        }
     }
 
     #[doc(hidden)]
