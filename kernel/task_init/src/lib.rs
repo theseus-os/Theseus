@@ -1,3 +1,7 @@
+//! Defines the interrupt handler for the scheduler.
+//!
+//! The handler must be defined in a separate crate because it depends on `sleep`.
+
 #![feature(abi_x86_interrupt)]
 #![no_std]
 

@@ -1,6 +1,8 @@
 [package]
 name = "task_init"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Interrupt handler for the scheduler"
 edition = "2021"
 
 [dependencies]
