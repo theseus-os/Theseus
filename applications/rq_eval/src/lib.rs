@@ -159,8 +159,7 @@ fn run_single(iterations: usize) -> Result<(), &'static str> {
     
     for _ in 0..iterations {
         runqueue::add_task_to_specific_runqueue(cpu::current_cpu().into_u8(), taskref.clone().into_raw())?;
-        // TODO: Remove clone.
-        runqueue::remove_task_from_all(&taskref.clone().into_raw())?;
+        runqueue::remove_task_from_all(&**taskref)?;
     }
 
     let end = hpet.get_counter();
