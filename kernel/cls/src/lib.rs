@@ -19,3 +19,8 @@ impl Guard for preemption::PreemptionGuard {}
 mod sealed {
     pub trait Sealed {}
 }
+
+#[doc(hidden)]
+pub mod __private {
+    pub use preemption;
+}

@@ -953,9 +953,13 @@ fn task_switch_inner(
 /// 2. Obtains the preemption guard such that preemption can be re-enabled
 ///    when it is appropriate to do so.
 fn post_context_switch_action() -> PreemptionGuard {
-    let preemption_guard = unsafe { TASK_SWITCH_PREEMPTION_GUARD.take() };
-    DROP_AFTER_TASK_SWITCH.set_guarded(None, &preemption_guard);
-    preemption_guard
+    let guard_1 = preemption::hold_preemption();
+    let guard_2 = TASK_SWITCH_PREEMPTION_GUARD
+        .replace_guarded(None, &guard_1)
+        .expect("BUG: post_context_switch_action: no PreemptionGuard existed");
+    // Doesn't really matter which guard we use.
+    DROP_AFTER_TASK_SWITCH.set_guarded(None, &guard_2);
+    guard_2
 }
 
 
