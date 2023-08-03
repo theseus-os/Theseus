@@ -19,11 +19,3 @@ impl Guard for preemption::PreemptionGuard {}
 mod sealed {
     pub trait Sealed {}
 }
-
-// Re-export for the macro.
-#[doc(hidden)]
-pub mod __private {
-    pub use irq_safety::HeldInterrupts;
-    pub use preemption::PreemptionGuard;
-    pub use x86_64;
-}

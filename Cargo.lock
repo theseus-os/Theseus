@@ -476,7 +476,6 @@ dependencies = [
  "cls_macros",
  "irq_safety",
  "preemption",
- "x86_64",
 ]
 
 [[package]]

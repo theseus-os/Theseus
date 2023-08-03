@@ -9,4 +9,3 @@ edition = "2021"
 cls_macros = { path = "cls_macros" }
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 preemption = { path = "../preemption" }
-x86_64 = "*"
