@@ -62,35 +62,34 @@ impl Parse for Args {
             if name.is_ident("cls_dep") {
                 cls_dependency = input.parse::<LitBool>()?.value();
             } else if name.is_ident("stores_guard") {
-                stores_guard = Some(input.parse()?);
+                stores_guard = Some((name, input.parse::<Type>()?));
             } else {
                 Diagnostic::spanned(
                     name.span().unwrap(),
                     Level::Error,
                     format!("invalid argument `{}`", name.to_token_stream()),
                 )
-                .help("valid arguments are: `cls_dep`")
+                .help("valid arguments are: `cls_dep`, `stores_guard`")
                 .emit();
                 return Err(syn::Error::new(name.span(), ""));
             }
         }
 
-        if stores_guard.is_some() && !cls_dependency {
-            todo!();
-            // Diagnostic::spanned(
-            //     name.span().unwrap(),
-            //     Level::Error,
-            //     format!("invalid argument `{}`", name.to_token_stream()),
-            // )
-            // .help("valid arguments are: `cls_dep`")
-            // .emit();
-            // return Err(syn::Error::new(name.span(), ""));
+        if let Some((ref name, ref value)) = stores_guard && !cls_dependency {
+            let span = name.span().join(value.span()).unwrap().unwrap();
+            Diagnostic::spanned(
+                span,
+                Level::Error,
+                "`stores_guard` requires `cls_dep`",
+            )
+            .emit();
+            return Err(syn::Error::new(name.span(), ""));
         }
 
         Ok(Self {
             offset,
             cls_dependency,
-            stores_guard,
+            stores_guard: stores_guard.map(|tuple| tuple.1),
         })
     }
 }
@@ -101,13 +100,38 @@ impl Parse for Args {
 ///
 /// The initialisation expression has no effect; to set the initial value,
 /// `per_cpu::PerCpuData::new` must be modified.
+///
+/// # Arguments
+///
+/// The macro supports additional named arguments defined after the offset (e.g.
+/// `#[cpu_local(0, cls_dep = false)]`):
+/// - `cls_dep`: Whether to define methods that depend on `cls` indirectly
+///   adding a dependency on `preemption` and `irq_safety`. This is only really
+///   useful for CPU locals defined in `preemption` to avoid a circular
+///   dependency. Defaults to true.
+/// - `stores_guard`: If defined, must be set to either `HeldInterrupts` or
+///   `PreemptionGuard` and signifies that the CPU local has the type
+///   `Option<Guard>`. This option defines special methods that use the guard
+///   being switched into the CPU local, rather than an additional guard
+///   parameter, as proof that the CPU local can be safely accessed.
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     let Args {
         offset,
         cls_dependency,
         stores_guard,
-    } = parse_macro_input!(args as Args);
+    } = match syn::parse(args) {
+        Ok(args) => args,
+        Err(error) => {
+            if error.to_string() == "" {
+                // We've already emmited an error diagnostic.
+                return TokenStream::new();
+            } else {
+                Diagnostic::spanned(error.span().unwrap(), Level::Error, error.to_string()).emit();
+                return TokenStream::new();
+            }
+        }
+    };
 
     let CpuLocal {
         attributes,
@@ -124,14 +148,13 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let ptr_expr = quote! {
+    let ref_expr = quote! {
         {
-            let ptr: usize;
+            let mut ptr: usize;
             #[cfg(target_arch = "x86_64")]
             {
                 unsafe {
                     ::core::arch::asm!(
-                        // TODO: rdgsbase
                         "rdgsbase {}",
                         out(reg) ptr,
                         options(nomem, preserves_flags, nostack),
@@ -148,7 +171,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                     )
                 };
             }
-            ptr + #offset
+            ptr += #offset;
+            unsafe { &mut*(ptr as *mut #ty) }
         }
     };
 
@@ -172,10 +196,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 {}
                 implements_guard_trait::<#guard_type>();
 
+                let rref = #ref_expr;
                 let mut guard = Some(guard);
-                let ptr = #ptr_expr;
-
-                let rref = unsafe { &mut*(ptr as *mut #ty) };
                 ::core::mem::swap(rref, &mut guard);
 
                 guard
@@ -183,13 +205,11 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
             #[inline]
             pub unsafe fn take(&self) -> #guard_type {
-                let ptr = #ptr_expr;
-
+                let rref = #ref_expr;
                 let mut ret = None;
-                let rref = unsafe { &mut*(ptr as *mut #ty) };
                 ::core::mem::swap(rref, &mut ret);
 
-                ret.expect("wawawa")
+                ret.expect("took empty CPU-local guard")
             }
 
             #[inline]
@@ -204,9 +224,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             where
                 G: ::cls::Guard,
             {
-                let ptr = #ptr_expr;
-
-                let rref = unsafe { &mut*(ptr as *mut #ty) };
+                let rref = #ref_expr;
                 ::core::mem::swap(rref, &mut value);
 
                 value
