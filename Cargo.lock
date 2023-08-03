@@ -474,8 +474,11 @@ name = "cls"
 version = "0.1.0"
 dependencies = [
  "cls_macros",
+ "cortex-a",
  "irq_safety",
  "preemption",
+ "tock-registers",
+ "x86_64",
 ]
 
 [[package]]

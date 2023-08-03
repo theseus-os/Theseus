@@ -28,4 +28,12 @@ mod sealed {
 #[doc(hidden)]
 pub mod __private {
     pub use preemption;
+
+    #[cfg(target_arch = "x86_64")]
+    pub use x86_64;
+
+    #[cfg(target_arch = "aarch64")]
+    pub use tock_registers;
+    #[cfg(target_arch = "aarch64")]
+    pub use cortex_a;
 }

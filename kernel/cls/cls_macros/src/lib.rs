@@ -150,27 +150,16 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let ref_expr = quote! {
         {
-            let mut ptr: usize;
             #[cfg(target_arch = "x86_64")]
-            {
-                unsafe {
-                    ::core::arch::asm!(
-                        "rdgsbase {}",
-                        out(reg) ptr,
-                        options(nomem, preserves_flags, nostack),
-                    )
-                };
-            }
+            let mut ptr = {
+                use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
+                GS::read_base().as_u64()
+            };
             #[cfg(target_arch = "aarch64")]
-            {
-                unsafe {
-                    ::core::arch::asm!(
-                        "mrs {}, tpidr_el1",
-                        out(reg) ptr,
-                        options(nomem, preserves_flags, nostack),
-                    )
-                };
-            }
+            let mut ptr = {
+                use cls::__private::tock_registers::interfaces::Readable;
+                cls::__private::cortex_a::registers::TPIDR_EL1.get()
+            };
             ptr += #offset;
             unsafe { &mut*(ptr as *mut #ty) }
         }
