@@ -474,6 +474,9 @@ name = "cls"
 version = "0.1.0"
 dependencies = [
  "cls_macros",
+ "irq_safety",
+ "preemption",
+ "x86_64",
 ]
 
 [[package]]
@@ -2599,6 +2602,7 @@ dependencies = [
  "log",
  "memoffset 0.8.0",
  "no_drop",
+ "preemption",
  "task",
 ]
 
@@ -2735,7 +2739,7 @@ name = "preemption"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cls",
+ "cls_macros",
  "cpu",
 ]
 
@@ -3698,6 +3702,7 @@ source = "git+https://github.com/theseus-os/target-lexicon?branch=theseus#75d36c
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "cls",
  "context_switch",
  "cpu",
  "cpu_local",

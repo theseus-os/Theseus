@@ -7,3 +7,23 @@
 extern crate alloc;
 
 pub use cls_macros::cpu_local;
+
+pub trait Guard: sealed::Sealed {}
+
+impl sealed::Sealed for irq_safety::HeldInterrupts {}
+impl Guard for irq_safety::HeldInterrupts {}
+
+impl sealed::Sealed for preemption::PreemptionGuard {}
+impl Guard for preemption::PreemptionGuard {}
+
+mod sealed {
+    pub trait Sealed {}
+}
+
+// Re-export for the macro.
+#[doc(hidden)]
+pub mod __private {
+    pub use irq_safety::HeldInterrupts;
+    pub use preemption::PreemptionGuard;
+    pub use x86_64;
+}
