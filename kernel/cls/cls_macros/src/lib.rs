@@ -181,7 +181,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             #[inline]
             pub fn replace_guarded<G>(&self, mut value: #ty, guard: &G) -> #ty
             where
-                G: ::cls::Guard,
+                G: ::cls::CpuAtomicGuard,
             {
                 let rref = #ref_expr;
                 ::core::mem::swap(rref, &mut value);
@@ -191,7 +191,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             #[inline]
             pub fn set_guarded<G>(&self, mut value: #ty, guard: &G)
             where
-                G: ::cls::Guard,
+                G: ::cls::CpuAtomicGuard,
             {
                 self.replace_guarded(value, guard);
             }
@@ -204,6 +204,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 #[inline]
                 pub fn replace(&self, guard: #guard_type) -> #ty {
                     // Check that the guard type matches the type of the static.
+                    // https://github.com/rust-lang/rust/issues/20041#issuecomment-820911297
                     trait TyEq {}
                     impl<T> TyEq for (T, T) {}
                     fn ty_eq<A, B>()
@@ -215,7 +216,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                     // Check that the guard type implements cls::Guard.
                     fn implements_guard_trait<T>()
                     where
-                        T: ::cls::Guard
+                        T: ::cls::CpuAtomicGuard
                     {}
                     implements_guard_trait::<#guard_type>();
 
