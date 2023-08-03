@@ -970,7 +970,7 @@ fn post_context_switch_action() -> PreemptionGuard {
 /// It is stored in a CPU-local variable because it's only related to
 /// a task switching operation on a particular CPU.
 #[cls::cpu_local(16, stores_guard = PreemptionGuard)]
-pub(crate) static TASK_SWITCH_PREEMPTION_GUARD: Option<PreemptionGuard> = None;
+static TASK_SWITCH_PREEMPTION_GUARD: Option<PreemptionGuard> = None;
 
 /// Data that should be dropped after switching away from a task that has exited.
 ///
@@ -978,7 +978,7 @@ pub(crate) static TASK_SWITCH_PREEMPTION_GUARD: Option<PreemptionGuard> = None;
 /// it is stored in a CPU-local variable because it's only related to
 /// a task switching operation on a particular CPU.
 #[cls::cpu_local(24)]
-pub(crate) static DROP_AFTER_TASK_SWITCH: Option<TaskRef> = None;
+static DROP_AFTER_TASK_SWITCH: Option<TaskRef> = None;
 
 pub use tls_current_task::*;
 /// A private module to ensure the below TLS variables aren't modified directly.
