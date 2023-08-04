@@ -163,8 +163,8 @@ pub fn create_mapping<F: Into<PteFlagsArch>>(
 
 /// Creates an identity mapping at a random available virtual and physical address.
 ///
-/// The returned `MappedPages` is guaranteed to have the same virtual and physical addresses
-/// 
+/// The returned `MappedPages` is guaranteed to have virtual pages mapped to physical frames
+/// with the same virtual addresses as physical addresses.
 pub fn create_identity_mapping<F: Into<PteFlagsArch>>(
     num_pages: usize,
     flags: F,
@@ -216,6 +216,7 @@ pub fn create_identity_mapping<F: Into<PteFlagsArch>>(
 
     match (allocated_pages, allocated_frames) {
         (Some(ap), Ok(Some(af))) => {
+            assert!(ap.start_address().value() == af.start_address().value()); // sanity check
             kernel_mmi_ref.lock().page_table.map_allocated_pages_to(ap, af, flags)
         }
         _ => Err("Couldn't allocate frames or pages for an identity mapping"),
