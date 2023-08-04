@@ -21,7 +21,7 @@ use preemption::{hold_preemption, PreemptionGuard};
 use sync_spin::SpinMutex;
 
 #[cfg(target_arch = "x86_64")]
-use x86_64::{registers::model_specific::GsBase, VirtAddr};
+use x86_64::{registers::segmentation::{GS, Segment64}, VirtAddr};
 
 #[cfg(target_arch = "aarch64")]
 use {
@@ -200,7 +200,7 @@ impl CpuLocalDataRegion {
 
         #[cfg(target_arch = "x86_64")] {
             let gsbase_val = VirtAddr::new_truncate(self_ptr_value as u64);
-            GsBase::write(gsbase_val);
+            unsafe { GS::write_base(gsbase_val) };
         }
 
         #[cfg(target_arch = "aarch64")] {
@@ -219,6 +219,13 @@ pub fn init<P>(
     size_of_per_cpu_data: usize,
     per_cpu_data_initializer: impl FnOnce(usize) -> P
 ) -> Result<(), &'static str> {
+    // Enable FSGSBASE instructions
+    #[cfg(target_arch = "x86_64")]
+    {
+        use x86_64::registers::control::{Cr4, Cr4Flags};
+        unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
+    }
+    
     /// The global set of all per-CPU data regions.
     static CPU_LOCAL_DATA_REGIONS: SpinMutex<BTreeMap<u32, CpuLocalDataRegion>> = SpinMutex::new(BTreeMap::new());
 

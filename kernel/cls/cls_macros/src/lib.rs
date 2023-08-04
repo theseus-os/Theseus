@@ -2,6 +2,8 @@
 
 #![feature(proc_macro_diagnostic, proc_macro_span, let_chains)]
 
+mod int;
+
 use convert_case::{Case, Casing};
 use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::{quote, ToTokens};
@@ -9,7 +11,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse_macro_input,
     spanned::Spanned,
-    Attribute, Expr, Ident, LitInt, Token, Type, Visibility,
+    Attribute, Expr, Ident, LitBool, LitInt, Path, Token, Type, Visibility,
 };
 
 struct CpuLocal {
@@ -41,35 +43,94 @@ impl Parse for CpuLocal {
     }
 }
 
+struct Args {
+    offset: LitInt,
+    cls_dependency: bool,
+    stores_guard: Option<Type>,
+}
+
+impl Parse for Args {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let offset = input.parse()?;
+        let mut cls_dependency = true;
+        let mut stores_guard = None;
+
+        while input.parse::<Token![,]>().is_ok() {
+            let name = input.parse::<Path>()?;
+            input.parse::<Token![=]>()?;
+
+            if name.is_ident("cls_dep") {
+                cls_dependency = input.parse::<LitBool>()?.value();
+            } else if name.is_ident("stores_guard") {
+                stores_guard = Some((name, input.parse::<Type>()?));
+            } else {
+                Diagnostic::spanned(
+                    name.span().unwrap(),
+                    Level::Error,
+                    format!("invalid argument `{}`", name.to_token_stream()),
+                )
+                .help("valid arguments are: `cls_dep`, `stores_guard`")
+                .emit();
+                return Err(syn::Error::new(name.span(), ""));
+            }
+        }
+
+        if let Some((ref name, ref value)) = stores_guard && !cls_dependency {
+            let span = name.span().join(value.span()).unwrap().unwrap();
+            Diagnostic::spanned(
+                span,
+                Level::Error,
+                "`stores_guard` requires `cls_dep`",
+            )
+            .emit();
+            return Err(syn::Error::new(name.span(), ""));
+        }
+
+        Ok(Self {
+            offset,
+            cls_dependency,
+            stores_guard: stores_guard.map(|tuple| tuple.1),
+        })
+    }
+}
+
 /// A macro for declaring CPU-local variables.
 ///
 /// Variables must be an unsigned integer, bar `u128`.
 ///
 /// The initialisation expression has no effect; to set the initial value,
 /// `per_cpu::PerCpuData::new` must be modified.
+///
+/// # Arguments
+///
+/// The macro supports additional named arguments defined after the offset (e.g.
+/// `#[cpu_local(0, cls_dep = false)]`):
+/// - `cls_dep`: Whether to define methods that depend on `cls` indirectly
+///   adding a dependency on `preemption` and `irq_safety`. This is only really
+///   useful for CPU locals defined in `preemption` to avoid a circular
+///   dependency. Defaults to true.
+/// - `stores_guard`: If defined, must be set to either `HeldInterrupts` or
+///   `PreemptionGuard` and signifies that the CPU local has the type
+///   `Option<Guard>`. This option defines special methods that use the guard
+///   being switched into the CPU local, rather than an additional guard
+///   parameter, as proof that the CPU local can be safely accessed.
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
-    // if !args.is_empty() {
-    //     Diagnostic::spanned(
-    //         Span::call_site(),
-    //         Level::Error,
-    //         "malformed `cpu_local` attribute input",
-    //     )
-    //     .help("must be of the form `#[cpu_local]`")
-    //     .emit();
-    //     return TokenStream::new();
-    // }
-
-    let offset = if let Ok(i) = syn::parse::<LitInt>(args.clone()) {
-        i
-    } else {
-        let span = args
-            .into_iter()
-            .map(|tt| tt.span())
-            .reduce(|a, b| a.join(b).unwrap())
-            .unwrap_or_else(Span::call_site);
-        Diagnostic::spanned(span, Level::Error, "invalid offset").emit();
-        return TokenStream::new();
+    let Args {
+        offset,
+        cls_dependency,
+        stores_guard,
+    } = match syn::parse(args) {
+        Ok(args) => args,
+        Err(error) => {
+            if error.to_string() == "" {
+                // We've already emmited an error diagnostic.
+                return TokenStream::new();
+            } else {
+                Diagnostic::spanned(error.span().unwrap(), Level::Error, error.to_string()).emit();
+                return TokenStream::new();
+            }
+        }
     };
 
     let CpuLocal {
@@ -87,22 +148,104 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
-    let ((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
-        match ty.to_token_stream().to_string().as_ref() {
-            "u8" => (("byte", quote! { reg_byte }), (":w", "b")),
-            "u16" => (("word", quote! { reg }), (":w", "w")),
-            "u32" => (("dword", quote! { reg }), (":w", "")),
-            "u64" => (("qword", quote! { reg }), ("", "")),
-            _ => {
-                Diagnostic::spanned(ty.span().unwrap(), Level::Error, "invalid type")
-                    .help("CPU locals only support these types: `u8`, `u16`, `u32`, `u64`")
-                    .emit();
-                return TokenStream::new();
+    let ref_expr = quote! {
+        {
+            #[cfg(target_arch = "x86_64")]
+            let mut ptr = {
+                use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
+                GS::read_base().as_u64()
+            };
+            #[cfg(target_arch = "aarch64")]
+            let mut ptr = {
+                use cls::__private::tock_registers::interfaces::Readable;
+                cls::__private::cortex_a::registers::TPIDR_EL1.get()
+            };
+            ptr += #offset;
+            unsafe { &mut*(ptr as *mut #ty) }
+        }
+    };
+
+    let cls_dep_functions = if cls_dependency {
+        let guarded_functions = quote! {
+            #[inline]
+            pub fn replace_guarded<G>(&self, mut value: #ty, guard: &G) -> #ty
+            where
+                G: ::cls::CpuAtomicGuard,
+            {
+                let rref = #ref_expr;
+                ::core::mem::swap(rref, &mut value);
+                value
+            }
+
+            #[inline]
+            pub fn set_guarded<G>(&self, mut value: #ty, guard: &G)
+            where
+                G: ::cls::CpuAtomicGuard,
+            {
+                self.replace_guarded(value, guard);
             }
         };
 
-    let x64_width_modifier = format!("{x64_asm_width} ptr ");
-    let x64_cls_location = format!("gs:[{offset}]");
+        if let Some(guard_type) = stores_guard {
+            quote! {
+                #guarded_functions
+
+                #[inline]
+                pub fn replace(&self, guard: #guard_type) -> #ty {
+                    // Check that the guard type matches the type of the static.
+                    // https://github.com/rust-lang/rust/issues/20041#issuecomment-820911297
+                    trait TyEq {}
+                    impl<T> TyEq for (T, T) {}
+                    fn ty_eq<A, B>()
+                    where
+                        (A, B): TyEq
+                    {}
+                    ty_eq::<::core::option::Option<#guard_type>, #ty>();
+
+                    // Check that the guard type implements cls::Guard.
+                    fn implements_guard_trait<T>()
+                    where
+                        T: ::cls::CpuAtomicGuard
+                    {}
+                    implements_guard_trait::<#guard_type>();
+
+                    let rref = #ref_expr;
+                    let mut guard = Some(guard);
+                    ::core::mem::swap(rref, &mut guard);
+
+                    guard
+                }
+
+                #[inline]
+                pub fn set(&self, mut guard: #guard_type) {
+                    self.replace(guard);
+                }
+            }
+        } else {
+            quote! {
+                #guarded_functions
+
+                #[inline]
+                pub fn replace(&self, value: #ty) -> #ty {
+                    // TODO: Should this ever be `disable_interrupts` instead?
+                    let guard = ::cls::__private::preemption::hold_preemption();
+                    self.replace_guarded(value, &guard)
+                }
+
+                #[inline]
+                pub fn set(&self, value: #ty) {
+                    // TODO: Should this ever be `disable_interrupts` instead?
+                    let guard = ::cls::__private::preemption::hold_preemption();
+                    self.set_guarded(value, &guard);
+                }
+
+            }
+        }
+    } else {
+        proc_macro2::TokenStream::new()
+    };
+
+    let int_functions = int::int_functions(ty, offset);
 
     quote! {
         #(#attributes)*
@@ -115,105 +258,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         #visibility struct #struct_name;
 
         impl #struct_name {
-            #[inline]
-            pub fn load(&self) -> #ty {
-                #[cfg(target_arch = "x86_64")]
-                {
-                    let ret;
-                    unsafe {
-                        ::core::arch::asm!(
-                            ::core::concat!("mov {}, ", #x64_cls_location),
-                            out(#x64_reg_class) ret,
-                            options(preserves_flags, nostack),
-                        )
-                    };
-                    ret
-                }
-                #[cfg(target_arch = "aarch64")]
-                {
-                    let ret;
-                    unsafe {
-                        ::core::arch::asm!(
-                            "2:",
-                            // Load value.
-                            "mrs {tp_1}, tpidr_el1",
-                            concat!(
-                                "ldr", #aarch64_instr_width,
-                                " {ret", #aarch64_reg_modifier,"},",
-                                " [{tp_1},#", stringify!(#offset), "]",
-                            ),
-
-                            // Make sure task wasn't migrated between mrs and ldr.
-                            "mrs {tp_2}, tpidr_el1",
-                            "cmp {tp_1}, {tp_2}",
-                            "b.ne 2b",
-
-                            tp_1 = out(reg) _,
-                            ret = out(reg) ret,
-                            tp_2 = out(reg) _,
-
-                            options(nostack),
-                        )
-                    };
-                    ret
-                }
-            }
-
-            #[inline]
-            pub fn fetch_add(&self, mut operand: #ty) -> #ty {
-                #[cfg(target_arch = "x86_64")]
-                {
-                    unsafe {
-                        ::core::arch::asm!(
-                            ::core::concat!("xadd ", #x64_width_modifier, #x64_cls_location, ", {}"),
-                            inout(#x64_reg_class) operand,
-                            options(nostack),
-                        )
-                    };
-                    operand
-                }
-                #[cfg(target_arch = "aarch64")]
-                {
-                    let ret;
-                    unsafe {
-                        ::core::arch::asm!(
-                            "2:",
-                            // Load value.
-                            "mrs {tp_1}, tpidr_el1",
-                            concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
-                            concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
-
-                            // Make sure task wasn't migrated between msr and ldxr.
-                            "mrs {tp_2}, tpidr_el1",
-                            "cmp {tp_1}, {tp_2}",
-                            "b.ne 2b",
-
-                            // Compute and store value (reuse tp_1 register).
-                            "add {tp_1}, {value}, {operand}",
-                            concat!("stxr", #aarch64_instr_width, " {cond:w}, {tp_1", #aarch64_reg_modifier,"}, [{ptr}]"),
-
-                            // Make sure task wasn't migrated between ldxr and stxr.
-                            "cbnz {cond}, 2b",
-
-                            tp_1 = out(reg) ret,
-                            ptr = out(reg) _,
-                            value = out(reg) ret,
-                            tp_2 = out(reg) _,
-                            operand = in(reg) operand,
-                            cond = out(reg) _,
-
-                            options(nostack),
-                        )
-                    };
-                    ret
-                }
-            }
-
-            #[inline]
-            pub fn fetch_sub(&self, mut operand: #ty) -> #ty {
-                operand = operand.overflowing_neg().0;
-                self.fetch_add(operand)
-            }
+            #int_functions
+            #cls_dep_functions
         }
     }
     .into()
