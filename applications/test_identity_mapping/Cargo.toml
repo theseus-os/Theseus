@@ -1,0 +1,15 @@
+[package]
+name = "test_identity_mapping"
+version = "0.1.0"
+description = "Tests the `memory::create_identity_mapping()` function"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+log = "0.4.8"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.app_io]
+path = "../../kernel/app_io"
