@@ -20,7 +20,6 @@ use super::InterruptNumber;
 use super::Enabled;
 use super::Priority;
 use super::TargetList;
-use super::ArmGicV3;
 
 use cpu::MpidrValue;
 
@@ -122,6 +121,7 @@ pub fn set_spi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio
 ///
 /// legacy / GICv2 method
 /// int_num must be less than 16
+#[allow(dead_code)]
 pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTargetCpu) {
     if let IpiTargetCpu::Specific(cpu) = &target {
         assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
@@ -147,18 +147,18 @@ pub struct Implementer {
     pub implementer_jep106: u16,
 }
 
-impl super::ArmGic {
+impl super::ArmGicDistributor {
     pub(crate) fn distributor(&self) -> &GicRegisters {
         match self {
-            Self::V2(v2) => &v2.distributor,
-            Self::V3(v3) => &v3.distributor,
+            Self::V2 { registers } => &registers,
+            Self::V3 { v2_regs, .. } => &v2_regs,
         }
     }
 
     pub(crate) fn distributor_mut(&mut self) -> &mut GicRegisters {
         match self {
-            Self::V2(v2) => &mut v2.distributor,
-            Self::V3(v3) => &mut v3.distributor,
+            Self::V2 { registers } => registers,
+            Self::V3 { v2_regs, .. } => v2_regs,
         }
     }
 
@@ -179,7 +179,7 @@ impl super::ArmGic {
     pub fn get_spi_target(&self, int: InterruptNumber) -> Result<SpiDestination, &'static str> {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         match self {
-            Self::V2(_) | Self::V3(ArmGicV3 { affinity_routing: false, .. }) => {
+            Self::V2 { .. } | Self::V3 { affinity_routing: false, .. } => {
                 let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
 
                 for i in 0..8 {
@@ -193,8 +193,8 @@ impl super::ArmGic {
 
                 Ok(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
             },
-            Self::V3(ArmGicV3 { affinity_routing: true, dist_extended, .. }) => {
-                let reg = dist_extended.read_volatile_64(offset::P6IROUTER);
+            Self::V3 { affinity_routing: true, v3_regs, .. } => {
+                let reg = v3_regs.read_volatile_64(offset::P6IROUTER);
 
                 // bit 31: Interrupt Routing Mode
                 // value of 1 to target any available cpu
@@ -214,7 +214,7 @@ impl super::ArmGic {
     pub fn set_spi_target(&mut self, int: InterruptNumber, target: SpiDestination) {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         match self {
-            Self::V2(_) | Self::V3(ArmGicV3 { affinity_routing: false, .. }) => {
+            Self::V2 { .. } | Self::V3 { affinity_routing: false, .. } => {
                 if let SpiDestination::Specific(cpu) = &target {
                     assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
                 }
@@ -231,7 +231,7 @@ impl super::ArmGic {
 
                 self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
             },
-            Self::V3(ArmGicV3 { affinity_routing: true, dist_extended, .. }) => {
+            Self::V3 { affinity_routing: true, v3_regs, .. } => {
                 let value = match target {
                     SpiDestination::Specific(cpu) => MpidrValue::from(cpu).value(),
                     // bit 31: Interrupt Routing Mode
@@ -242,7 +242,7 @@ impl super::ArmGic {
                     },
                 };
 
-                dist_extended.write_volatile_64(offset::P6IROUTER, value);
+                v3_regs.write_volatile_64(offset::P6IROUTER, value);
             }
         }
     }

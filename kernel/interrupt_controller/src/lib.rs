@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(unused_variables, unused_mut)]
+#![feature(array_try_from_fn)]
 
 extern crate alloc;
 

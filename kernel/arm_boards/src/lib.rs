@@ -20,6 +20,8 @@ pub struct GicV3InterruptControllerConfig {
 }
 
 #[derive(Debug, Copy, Clone)]
+/// This excludes GICv2 because there's no way to send IPIs
+/// with GICv2 via the current driver API.
 pub enum InterruptControllerConfig {
     GicV3(GicV3InterruptControllerConfig),
 }
