@@ -181,15 +181,15 @@ pub fn create_identity_mapping<F: Into<PteFlagsArch>>(
     // with allocating the range of frames that matches those pages.
     let allocated_frames = frame_allocator::inspect_then_allocate_free_frames(&mut |frames| {
         if frames.size_in_frames() < num_pages {
-            log::trace!("Skipping too small {:?}", frames);
+            // log::trace!("[{num_pages} pages] Skipping too small {:?}", frames);
             return FramesIteratorRequest::Next;
         }
         let Some(start_vaddr) = VirtualAddress::new(frames.start_address().value()) else {
-            log::trace!("Skipping {:?} with invalid starting vaddr", frames);
+            // log::trace!("[{num_pages} pages] Skipping {:?} with invalid starting vaddr", frames);
             return FramesIteratorRequest::Next;
         };
         let Some(end_vaddr) = VirtualAddress::new(frames.end().start_address().value()) else {
-            log::trace!("Skipping {:?} with invalid ending vaddr", frames);
+            // log::trace!("[{num_pages} pages] Skipping {:?} with invalid ending vaddr", frames);
             return FramesIteratorRequest::Next;
         };
         let ap_result = allocate_pages_in_range(
@@ -209,7 +209,7 @@ pub fn create_identity_mapping<F: Into<PteFlagsArch>>(
                 num_frames: num_pages,
             }
         } else {
-            log::trace!("Skipping {:?}, identity pages couldn't be allocated", frames);
+            // log::trace!("[{num_pages} pages] Skipping {:?}, identity pages couldn't be allocated", frames);
             FramesIteratorRequest::Next
         }
     });

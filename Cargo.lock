@@ -3806,6 +3806,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_identity_mapping"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "memory",
+]
+
+[[package]]
 name = "test_ixgbe"
 version = "0.1.0"
 dependencies = [
@@ -4033,6 +4042,7 @@ dependencies = [
  "test_block_io",
  "test_channel",
  "test_filerw",
+ "test_identity_mapping",
  "test_ixgbe",
  "test_libc",
  "test_mlx5",
