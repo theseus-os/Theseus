@@ -161,8 +161,7 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
     #[cfg(target_arch = "aarch64")]
     PCI_CONFIG_SPACE.lock().try_call_once(|| {
         let config = BOARD_CONFIG.pci_ecam;
-        let flags = memory::PteFlags::new().valid(true).writable(true).device_memory(true);
-        let mapped = memory::map_frame_range(config.base_address, config.size_bytes, flags)?;
+        let mapped = memory::map_frame_range(config.base_address, config.size_bytes, MMIO_FLAGS)?;
         match mapped.into_borrowed_slice_mut(0, config.size_bytes) {
             Ok(bsm) => Ok(bsm),
             Err((_, msg)) => Err(msg),
