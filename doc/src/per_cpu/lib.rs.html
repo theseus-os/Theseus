@@ -135,6 +135,7 @@
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Contains [`PerCpuData`], the data stored on a per-CPU basis in Theseus.
 //!
 //! Each CPU has its own instance of `PerCpuData`, and each CPU&#39;s instance
@@ -173,7 +174,8 @@
 </span><span class="kw">use </span>core::ops::Deref;
 <span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>cpu_local::PerCpuField;
-<span class="kw">use </span>task::{DropAfterTaskSwitch, TaskSwitchPreemptionGuard};
+<span class="kw">use </span>preemption::PreemptionGuard;
+<span class="kw">use </span>task::TaskRef;
 
 <span class="doccomment">/// The data stored on a per-CPU basis in Theseus.
 ///
@@ -212,11 +214,11 @@
     </span>preemption_count: u8,
     <span class="doccomment">/// A preemption guard used during task switching to ensure that one task switch
     /// cannot interrupt (preempt) another task switch already in progress.
-    </span>task_switch_preemption_guard: TaskSwitchPreemptionGuard,
+    </span>task_switch_preemption_guard: <span class="prelude-ty">Option</span>&lt;PreemptionGuard&gt;,
     <span class="doccomment">/// Data that should be dropped after switching away from a task that has exited.
     /// Currently, this contains the previous task&#39;s `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
-    </span>drop_after_task_switch: DropAfterTaskSwitch,
+    </span>drop_after_task_switch: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
 }
 
 <span class="kw">impl </span>PerCpuData {
@@ -226,8 +228,8 @@
             self_ptr,
             cpu_id: CpuLocalCpuId(cpu_id),
             preemption_count: <span class="number">0</span>,
-            task_switch_preemption_guard: TaskSwitchPreemptionGuard::new(),
-            drop_after_task_switch: DropAfterTaskSwitch::new(),
+            task_switch_preemption_guard: <span class="prelude-val">None</span>,
+            drop_after_task_switch: <span class="prelude-val">None</span>,
         }
     }
 }

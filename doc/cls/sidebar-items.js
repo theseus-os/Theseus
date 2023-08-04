@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"attr":["cpu_local"]};
+window.SIDEBAR_ITEMS = {"attr":["cpu_local"],"trait":["CpuAtomicGuard"]};

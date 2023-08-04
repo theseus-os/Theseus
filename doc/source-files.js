@@ -17,7 +17,7 @@ var sourcesIndex = JSON.parse('{\
 "captain":["",[],["lib.rs"]],\
 "catch_unwind":["",[],["lib.rs"]],\
 "cls":["",[],["lib.rs"]],\
-"cls_macros":["",[],["lib.rs"]],\
+"cls_macros":["",[],["int.rs","lib.rs"]],\
 "color":["",[],["lib.rs"]],\
 "compositor":["",[],["lib.rs"]],\
 "console":["",[],["lib.rs"]],\

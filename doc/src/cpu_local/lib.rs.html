@@ -311,6 +311,13 @@
 <a href="#311" id="311">311</a>
 <a href="#312" id="312">312</a>
 <a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Offers types and macros to declare and access CPU-local storage (per-CPU variables).
 //!
 //! CPU-local variables cannot be used until after a given CPU has been initialized,
@@ -334,7 +341,7 @@
 <span class="kw">use </span>sync_spin::SpinMutex;
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-</span><span class="kw">use </span>x86_64::{registers::model_specific::GsBase, VirtAddr};
+</span><span class="kw">use </span>x86_64::{registers::segmentation::{GS, Segment64}, VirtAddr};
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
 </span><span class="kw">use </span>{
@@ -513,7 +520,7 @@
 
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
             <span class="kw">let </span>gsbase_val = VirtAddr::new_truncate(self_ptr_value <span class="kw">as </span>u64);
-            GsBase::write(gsbase_val);
+            <span class="kw">unsafe </span>{ GS::write_base(gsbase_val) };
         }
 
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
@@ -532,6 +539,13 @@
     size_of_per_cpu_data: usize,
     per_cpu_data_initializer: <span class="kw">impl </span>FnOnce(usize) -&gt; P
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="comment">// Enable FSGSBASE instructions
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+    </span>{
+        <span class="kw">use </span>x86_64::registers::control::{Cr4, Cr4Flags};
+        <span class="kw">unsafe </span>{ Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
+    }
+    
     <span class="doccomment">/// The global set of all per-CPU data regions.
     </span><span class="kw">static </span>CPU_LOCAL_DATA_REGIONS: SpinMutex&lt;BTreeMap&lt;u32, CpuLocalDataRegion&gt;&gt; = SpinMutex::new(BTreeMap::new());
 
