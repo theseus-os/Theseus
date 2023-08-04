@@ -467,7 +467,7 @@ impl ArmGicCpuComponents {
     /// them
     pub fn get_minimum_priority(&self) -> Priority {
         match self {
-            Self::V2 { registers, .. } => cpu_interface_gicv2::get_minimum_priority(&registers),
+            Self::V2 { registers, .. } => cpu_interface_gicv2::get_minimum_priority(registers),
             Self::V3 { .. } => cpu_interface_gicv3::get_minimum_priority(),
         }
     }

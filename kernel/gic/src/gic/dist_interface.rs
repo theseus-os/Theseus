@@ -150,8 +150,8 @@ pub struct Implementer {
 impl super::ArmGicDistributor {
     pub(crate) fn distributor(&self) -> &GicRegisters {
         match self {
-            Self::V2 { registers } => &registers,
-            Self::V3 { v2_regs, .. } => &v2_regs,
+            Self::V2 { registers } => registers,
+            Self::V3 { v2_regs, .. } => v2_regs,
         }
     }
 
