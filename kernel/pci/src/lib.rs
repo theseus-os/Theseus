@@ -250,35 +250,52 @@ pub struct PciLocation {
     func: u8,
 }
 
+struct PciAddress {
+    /// Offset to a double word in a PCI configuration space
+    dword_address: u32,
+    /// Bit offset of the bytes of interest in this dword
+    byte_shift: u32,
+}
+
 impl PciLocation {
     pub fn bus(&self) -> u8 { self.bus }
     pub fn slot(&self) -> u8 { self.slot }
     pub fn function(&self) -> u8 { self.func }
 
 
-    /// Computes a PCI address and value shift from bus, slot, func, and offset. 
-    /// The least two significant bits of offset are masked, so it's 4-byte aligned addressing,
-    /// which makes sense since we read PCI data (from the configuration space) in 32-bit chunks.
-    /// The shift allows selecting a byte/word from the addressed value.
-    fn pci_address_and_shift(self, offset: u8) -> (u32, u32) {
-        let shift = (offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8;
-        let address = BASE_OFFSET |
-            ((self.bus  as u32) << 16) |
-            ((self.slot as u32) << 11) |
-            ((self.func as u32) <<  8) |
-            ((offset as u32) & (PCI_CONFIG_ADDRESS_OFFSET_MASK as u32));
+    /// Computes a [`PciAddress`] from bus, slot, func, and offset. 
+    ///
+    /// PCI configuration space addresses must be aligned to 4 bytes (double word)
+    /// for reads and writes to succeed. The `dword_address` field of the returned
+    /// structure will be aligned to 4 bytes accordingly.
+    ///
+    /// Offsets with the two least significant bits set are still valid (they point
+    /// to words and bytes). This function computes a `byte_shift` value which should
+    /// be used to shift the double word pointed to by `dword_address`.
+    fn pci_address_and_shift(self, offset: u8) -> PciAddress {
+        let dword_offset = (offset & PCI_CONFIG_ADDRESS_OFFSET_MASK) as u32;
+        let byte_shift = ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8) as u32;
 
-        (address, shift as _)
+        let dword_address = BASE_OFFSET
+            | ((self.bus  as u32) << 16)
+            | ((self.slot as u32) << 11)
+            | ((self.func as u32) <<  8)
+            | dword_offset;
+
+        PciAddress {
+            dword_address,
+            byte_shift,
+        }
     }
 
     /// Read 32-bit data at the specified `offset` from this PCI device.
     fn pci_read_32(&self, offset: u8) -> u32 {
-        let (address, shift) = self.pci_address_and_shift(offset);
+        let address = self.pci_address_and_shift(offset);
         let value;
 
         #[cfg(target_arch = "x86_64")] {
             unsafe { 
-                PCI_CONFIG_ADDRESS_PORT.lock().write(address);
+                PCI_CONFIG_ADDRESS_PORT.lock().write(address.dword_address);
             }
             value = PCI_CONFIG_DATA_PORT.lock().read();
         }
@@ -290,13 +307,13 @@ impl PciLocation {
             value = unsafe {
                 config_space
                     .as_ptr()
-                    .add(address as usize)
+                    .add(address.dword_address as usize)
                     .cast::<u32>()
                     .read_volatile()
             };
         }
 
-        value >> shift
+        value >> address.byte_shift
     }
 
     /// Read 16-bit data at the specified `offset` from this PCI device.
@@ -311,12 +328,12 @@ impl PciLocation {
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
     fn pci_write(&self, offset: u8, value: u32) {
-        let (address, shift) = self.pci_address_and_shift(offset);
-        let shifted = value << shift;
+        let address = self.pci_address_and_shift(offset);
+        let shifted = value << address.byte_shift;
 
         #[cfg(target_arch = "x86_64")] {
             unsafe {
-                PCI_CONFIG_ADDRESS_PORT.lock().write(address); 
+                PCI_CONFIG_ADDRESS_PORT.lock().write(address.dword_address); 
                 PCI_CONFIG_DATA_PORT.lock().write(shifted);
             }
         }
@@ -328,7 +345,7 @@ impl PciLocation {
             unsafe {
                 config_space
                     .as_mut_ptr()
-                    .add(address as usize)
+                    .add(address.dword_address as usize)
                     .cast::<u32>()
                     .write_volatile(shifted);
             };

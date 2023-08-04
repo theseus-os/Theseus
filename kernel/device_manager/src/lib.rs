@@ -85,12 +85,13 @@ pub fn init(
         keyboard::init(ps2_controller.keyboard_ref(), key_producer)?;
         mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
     }
+
     // Initialize/scan the PCI bus to discover PCI devices
     for dev in pci::pci_device_iter()? {
         debug!("Found PCI device: {:#X?}", dev);
     }
 
-    // No PCI support on aarch64 at the moment
+    // No NIC support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")] {
 
     // store all the initialized ixgbe NICs here to be added to the network interface list
