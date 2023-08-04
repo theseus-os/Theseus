@@ -1,4 +1,4 @@
-use memory::{create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, MappedPages, PteFlags};
+use memory::{create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, PteFlags};
 use memory_aarch64::{read_mmu_config, asm_set_mmu_config_x2_x3};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_SIZE_IN_PAGES};
 use psci::{cpu_on, error::Error::*};
@@ -50,28 +50,30 @@ pub fn handle_ap_cores(
     ap_data.ap_data_virt_addr.write(VirtualAddress::new_canonical(&ap_data as *const _ as usize));
     ap_data.ap_stage_two_virt_addr.write(VirtualAddress::new_canonical(ap_stage_two as usize));
 
+    // -------
+    //
+    // This code identity-maps one page of writable+executable memory and
+    // copies the machine code of `ap_entry_point` to it. The fact that the
+    // mapping is identity-mapped allows the code to enable the MMU safely,
+    // as PC will be valid before and after the switch.
+
+    // map this RWX
+    let flags = PteFlags::new().valid(true).writable(true).executable(true);
+    let mut ap_startup_mapped_pages = create_identity_mapping(1, flags)?;
+    let virt_addr = ap_startup_mapped_pages.start_address();
+
+    // copy the entry point code
+    // instructions must have an alignment of four bytes; a page's alignment will always be larger.
+    let dst = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
+    let src = unsafe { (ap_entry_point as *const [u8; PAGE_SIZE]).as_ref() }.unwrap();
+    dst.copy_from_slice(src);
+
+    // -------
+
     let entry_point_phys_addr: PhysicalAddress;
     let ap_data_phys_addr: PhysicalAddress;
-    let mut ap_startup_mapped_pages: MappedPages; // must be held throughout APs being booted up
+    // then lock and translate addresses
     {
-        // This code identity-maps one page of writable+executable memory and
-        // copies the machine code of `ap_entry_point` to it. The fact that the
-        // mapping is identity-mapped allows this code to enable paging
-        // transparently without messing up with the PC register.
-
-        // map this RWX
-        let flags = PteFlags::new().valid(true).writable(true).executable(true);
-        ap_startup_mapped_pages = create_identity_mapping(1, flags)?;
-
-        let virt_addr = ap_startup_mapped_pages.start_address();
-
-        // copy the entry point code
-        // instructions must have an alignment of four bytes; a page's alignment will always be larger.
-        let dst = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
-        let src = unsafe { (ap_entry_point as *const [u8; PAGE_SIZE]).as_ref() }.unwrap();
-        dst.copy_from_slice(src);
-
-        // then lock and translate addresses
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let page_table = &mut kernel_mmi.page_table;
 
