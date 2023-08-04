@@ -316,6 +316,69 @@
 <a href="#316" id="316">316</a>
 <a href="#317" id="317">317</a>
 <a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -375,7 +438,7 @@
 <span class="kw">use </span>spin::Once;
 <span class="kw">use </span>sync_irq::IrqSafeMutex;
 <span class="kw">use </span>alloc::{sync::Arc, vec::Vec};
-<span class="kw">use </span>frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
+<span class="kw">use </span>frame_allocator::{PhysicalMemoryRegion, MemoryRegionType, FramesIteratorRequest};
 <span class="kw">use </span>no_drop::NoDrop;
 <span class="kw">pub use </span>kernel_config::memory::PAGE_SIZE;
 
@@ -476,6 +539,69 @@
     <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref().ok_or(<span class="string">&quot;create_contiguous_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or(<span class="string">&quot;memory::create_mapping(): couldn&#39;t allocate pages!&quot;</span>)<span class="question-mark">?</span>;
     kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
+}
+
+
+<span class="doccomment">/// Creates an identity mapping at a random available virtual and physical address.
+///
+/// The returned `MappedPages` is guaranteed to have virtual pages mapped to physical frames
+/// with the same virtual addresses as physical addresses.
+</span><span class="kw">pub fn </span>create_identity_mapping&lt;F: Into&lt;PteFlagsArch&gt;&gt;(
+    num_pages: usize,
+    flags: F,
+) -&gt; <span class="prelude-ty">Result</span>&lt;MappedPages, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    <span class="kw">let </span>kernel_mmi_ref = get_kernel_mmi_ref()
+        .ok_or(<span class="string">&quot;create_identity_mapping(): KERNEL_MMI was not yet initialized!&quot;</span>)<span class="question-mark">?</span>;
+
+    <span class="kw">let </span><span class="kw-2">mut </span>allocated_pages = <span class="prelude-val">None</span>;
+    <span class="comment">// We first iterate over all free general-purpose frames,
+    // as there are far fewer available frames than available pages.
+    // Once we find a suitable free chunk of frames,
+    // we then attempt to allocate the corresponding identity pages,
+    // and if that succeeds, we allow the frame allocator to proceed
+    // with allocating the range of frames that matches those pages.
+    </span><span class="kw">let </span>allocated_frames = frame_allocator::inspect_then_allocate_free_frames(<span class="kw-2">&amp;mut </span>|frames| {
+        <span class="kw">if </span>frames.size_in_frames() &lt; num_pages {
+            <span class="comment">// log::trace!(&quot;[{num_pages} pages] Skipping too small {:?}&quot;, frames);
+            </span><span class="kw">return </span>FramesIteratorRequest::Next;
+        }
+        <span class="kw">let </span><span class="prelude-val">Some</span>(start_vaddr) = VirtualAddress::new(frames.start_address().value()) <span class="kw">else </span>{
+            <span class="comment">// log::trace!(&quot;[{num_pages} pages] Skipping {:?} with invalid starting vaddr&quot;, frames);
+            </span><span class="kw">return </span>FramesIteratorRequest::Next;
+        };
+        <span class="kw">let </span><span class="prelude-val">Some</span>(end_vaddr) = VirtualAddress::new(frames.end().start_address().value()) <span class="kw">else </span>{
+            <span class="comment">// log::trace!(&quot;[{num_pages} pages] Skipping {:?} with invalid ending vaddr&quot;, frames);
+            </span><span class="kw">return </span>FramesIteratorRequest::Next;
+        };
+        <span class="kw">let </span>ap_result = allocate_pages_in_range(
+            num_pages,
+            <span class="kw-2">&amp;</span>PageRange::new(
+                Page::containing_address(start_vaddr),
+                Page::containing_address(end_vaddr),
+            )
+        );
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(ap) = ap_result {
+            <span class="kw">let </span>start_addr = PhysicalAddress::new_canonical(ap.start_address().value());
+            allocated_pages = <span class="prelude-val">Some</span>(ap);
+            <span class="comment">// Tell the `inspect_then_allocate_free_frames` function that we want to proceed
+            // with allocating the identity frames corresponding to the pages allocated above.
+            </span>FramesIteratorRequest::AllocateAt {
+                requested_frame: Frame::containing_address(start_addr),
+                num_frames: num_pages,
+            }
+        } <span class="kw">else </span>{
+            <span class="comment">// log::trace!(&quot;[{num_pages} pages] Skipping {:?}, identity pages couldn&#39;t be allocated&quot;, frames);
+            </span>FramesIteratorRequest::Next
+        }
+    });
+
+    <span class="kw">match </span>(allocated_pages, allocated_frames) {
+        (<span class="prelude-val">Some</span>(ap), <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(af))) =&gt; {
+            <span class="macro">assert!</span>(ap.start_address().value() == af.start_address().value()); <span class="comment">// sanity check
+            </span>kernel_mmi_ref.lock().page_table.map_allocated_pages_to(ap, af, flags)
+        }
+        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(<span class="string">&quot;Couldn&#39;t allocate frames or pages for an identity mapping&quot;</span>),
+    }
 }
 
 
