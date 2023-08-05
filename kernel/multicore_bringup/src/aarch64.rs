@@ -1,4 +1,4 @@
-use memory::{create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, PteFlags};
+use memory::{get_kernel_mmi_ref, create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, PteFlags};
 use memory_aarch64::{read_mmu_config, asm_set_mmu_config_x2_x3};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_SIZE_IN_PAGES};
 use psci::{cpu_on, error::Error::*};
@@ -59,8 +59,8 @@ pub fn handle_ap_cores(
     // as PC will be valid before and after the switch.
 
     // map this RWX
-    let flags = PteFlags::new().valid(true).writable(true).executable(true);
-    let mut ap_startup_mapped_pages = create_identity_mapping(1, flags)?;
+    let rwx = PteFlags::new().valid(true).writable(true).executable(true);
+    let mut ap_startup_mapped_pages = create_identity_mapping(1, rwx)?;
     let virt_addr = ap_startup_mapped_pages.start_address();
 
     {
@@ -78,6 +78,15 @@ pub fn handle_ap_cores(
 
         let dst: &mut [u8] = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
         dst.copy_from_slice(src);
+    }
+
+    // we can now remap as read-execute
+    {
+        // if we got there, it means KERNEL_MMI was initialize; we can unwrap
+        let kernel_mmi_ref = get_kernel_mmi_ref().unwrap();
+        let mut kernel_mmi_ref = kernel_mmi_ref.lock();
+        let rx = PteFlags::new().valid(true).executable(true);
+        ap_startup_mapped_pages.remap(&mut kernel_mmi_ref.page_table, rx)?;
     }
 
     // -------
