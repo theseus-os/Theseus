@@ -97,7 +97,9 @@ pub fn handle_ap_cores(
         ap_data_phys_addr = page_table.translate(ap_data.ap_data_virt_addr.read()).unwrap();
 
         // get physical address of generated entry point
-        entry_point_phys_addr = page_table.translate(virt_addr).unwrap();
+        // this is identity mapped, so we can just cast from physical to virtual
+        // entry_point_phys_addr = page_table.translate(virt_addr).unwrap();
+        entry_point_phys_addr = PhysicalAddress::new_canonical(virt_addr.value());
     }
 
     let mut ap_stack = None;
