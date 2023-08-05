@@ -20,10 +20,10 @@ kernel_config = { path = "../kernel_config" }
 psci = "0.1.1"
 memory_aarch64 = { path = "../memory_aarch64" }
 arm_boards = { path = "../arm_boards" }
+mod_mgmt = { path = "../mod_mgmt" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 pit_clock_basic = { path = "../pit_clock_basic" }
-mod_mgmt = { path = "../mod_mgmt" }
 acpi = { path = "../acpi" }
 apic = { path = "../apic" }
 madt = { path = "../acpi/madt" }

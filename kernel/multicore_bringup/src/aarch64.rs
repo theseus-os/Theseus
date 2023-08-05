@@ -8,6 +8,7 @@ use volatile::Volatile;
 use core::arch::asm;
 use cpu::{CpuId, MpidrValue, current_cpu};
 use arm_boards::BOARD_CONFIG;
+use mod_mgmt::get_initial_kernel_namespace;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
 #[cfg(target_arch = "aarch64")]
@@ -62,11 +63,22 @@ pub fn handle_ap_cores(
     let mut ap_startup_mapped_pages = create_identity_mapping(1, flags)?;
     let virt_addr = ap_startup_mapped_pages.start_address();
 
-    // copy the entry point code
-    // instructions must have an alignment of four bytes; a page's alignment will always be larger.
-    let dst = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
-    let src = unsafe { (ap_entry_point as *const [u8; PAGE_SIZE]).as_ref() }.unwrap();
-    dst.copy_from_slice(src);
+    {
+        let kernel_text_pages_ref = get_initial_kernel_namespace()
+            .ok_or("BUG: couldn't get the initial kernel CrateNamespace")
+            .and_then(|namespace| namespace.get_crate("nano_core").ok_or("BUG: couldn't get the 'nano_core' crate"))
+            .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or("BUG: nano_core crate had no text pages"))?;
+        let kernel_text_pages = kernel_text_pages_ref.0.lock();
+
+        // Second, perform the actual copy.
+        let ap_entry_point = VirtualAddress::new_canonical(ap_entry_point as usize);
+        let src = kernel_text_pages.offset_of_address(ap_entry_point)
+            .ok_or("BUG: the 'ap_entry_point' virtual address was not covered by the kernel's text pages")
+            .and_then(|offset| kernel_text_pages.as_slice(offset, PAGE_SIZE))?;
+
+        let dst: &mut [u8] = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
+        dst.copy_from_slice(src);
+    }
 
     // -------
 
