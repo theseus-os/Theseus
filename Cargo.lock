@@ -1385,7 +1385,7 @@ dependencies = [
  "cpu",
  "log",
  "memory",
- "static_assertions",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 

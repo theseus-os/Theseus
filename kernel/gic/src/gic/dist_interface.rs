@@ -13,28 +13,46 @@
 //! - Getting or setting the target of SPIs based on their numbers
 //! - Generating software interrupts (GICv2 style)
 
-use super::GicRegisters;
 use super::IpiTargetCpu;
 use super::SpiDestination;
 use super::InterruptNumber;
 use super::Enabled;
 use super::Priority;
 use super::TargetList;
+use super::read_array_volatile;
+use super::write_array_volatile;
 
+use volatile::{Volatile, ReadOnly};
+use zerocopy::FromBytes;
 use cpu::MpidrValue;
 
-mod offset {
-    use crate::{Offset32, Offset64};
-    pub(crate) const CTLR:       Offset32 = Offset32::from_byte_offset(0x000);
-    pub(crate) const IIDR:       Offset32 = Offset32::from_byte_offset(0x008);
-    pub(crate) const IGROUPR:    Offset32 = Offset32::from_byte_offset(0x080);
-    pub(crate) const ISENABLER:  Offset32 = Offset32::from_byte_offset(0x100);
-    pub(crate) const ICENABLER:  Offset32 = Offset32::from_byte_offset(0x180);
-    pub(crate) const IPRIORITYR: Offset32 = Offset32::from_byte_offset(0x400);
-    pub(crate) const ITARGETSR:  Offset32 = Offset32::from_byte_offset(0x800);
-    pub(crate) const SGIR:       Offset32 = Offset32::from_byte_offset(0xf00);
-    /// This one is on the 6th page
-    pub(crate) const P6IROUTER:  Offset64 = Offset64::from_byte_offset(0x100);
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct DistRegsP1 {                   // base offset
+    ctlr:          Volatile<u32>,         // 0x000
+    typer:         ReadOnly<u32>,         // 0x004
+    ident:         ReadOnly<u32>,         // 0x008
+    _unused0:     [u8;            0x074],
+
+    group:        [Volatile<u32>; 0x020], // 0x080
+    set_enable:   [Volatile<u32>; 0x020], // 0x100
+    clear_enable: [Volatile<u32>; 0x020], // 0x180
+
+    _unused1:     [u8;            0x200],
+
+    priority:     [Volatile<u32>; 0x100], // 0x400
+    target:       [Volatile<u32>; 0x100], // 0x800
+
+    _unused2:     [u8;            0x300],
+
+    sgir:          Volatile<u32>,         // 0xf00
+}
+
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct DistRegsP6 {     // base offset
+    _unused: [u8; 0x100],
+    route:   Volatile<u64>, // 0x100
 }
 
 // enable group 0
@@ -72,11 +90,11 @@ const SGIR_NSATT_GRP1: u32 = 1 << 15;
 /// Return value: whether or not affinity routing is
 /// currently enabled for both secure and non-secure
 /// states.
-pub fn init(registers: &mut GicRegisters) -> Enabled {
-    let mut reg = registers.read_volatile(offset::CTLR);
+pub fn init(registers: &mut DistRegsP1) -> Enabled {
+    let mut reg = registers.ctlr.read();
     reg |= CTLR_ENGRP1;
     reg |= CTLR_E1NWF;
-    registers.write_volatile(offset::CTLR, reg);
+    registers.ctlr.write(reg);
 
     // Return value: whether or not affinity routing is
     // currently enabled for both secure and non-secure
@@ -86,35 +104,35 @@ pub fn init(registers: &mut GicRegisters) -> Enabled {
 
 /// Returns whether the given SPI (shared peripheral interrupt) will be
 /// forwarded by the distributor
-pub fn is_spi_enabled(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
+pub fn is_spi_enabled(registers: &DistRegsP1, int: InterruptNumber) -> Enabled {
     // enabled?
-    registers.read_array_volatile::<32>(offset::ISENABLER, int) > 0
+    read_array_volatile::<32>(&registers.set_enable, int) > 0
     &&
     // part of group 1?
-    registers.read_array_volatile::<32>(offset::IGROUPR, int) == GROUP_1
+    read_array_volatile::<32>(&registers.group, int) == GROUP_1
 }
 
 /// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt)
-pub fn enable_spi(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
+pub fn enable_spi(registers: &mut DistRegsP1, int: InterruptNumber, enabled: Enabled) {
     let reg_base = match enabled {
-        true  => offset::ISENABLER,
-        false => offset::ICENABLER,
+        true  => &mut registers.set_enable,
+        false => &mut registers.clear_enable,
     };
-    registers.write_array_volatile::<32>(reg_base, int, 1);
+    write_array_volatile::<32>(reg_base, int, 1);
 
     // whether we're enabling or disabling,
     // set as part of group 1
-    registers.write_array_volatile::<32>(reg_base, int, GROUP_1);
+    write_array_volatile::<32>(&mut registers.group, int, GROUP_1);
 }
 
 /// Returns the priority of an SPI.
-pub fn get_spi_priority(registers: &GicRegisters, int: InterruptNumber) -> Priority {
-    u8::MAX - (registers.read_array_volatile::<4>(offset::IPRIORITYR, int) as u8)
+pub fn get_spi_priority(registers: &DistRegsP1, int: InterruptNumber) -> Priority {
+    u8::MAX - (read_array_volatile::<4>(&registers.priority, int) as u8)
 }
 
 /// Sets the priority of an SPI.
-pub fn set_spi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio: Priority) {
-    registers.write_array_volatile::<4>(offset::IPRIORITYR, int, (u8::MAX - prio) as u32);
+pub fn set_spi_priority(registers: &mut DistRegsP1, int: InterruptNumber, prio: Priority) {
+    write_array_volatile::<4>(&mut registers.priority, int, (u8::MAX - prio) as u32);
 }
 
 /// Sends an Inter-Processor-Interrupt
@@ -122,7 +140,7 @@ pub fn set_spi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio
 /// legacy / GICv2 method
 /// int_num must be less than 16
 #[allow(dead_code)]
-pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTargetCpu) {
+pub fn send_ipi_gicv2(registers: &mut DistRegsP1, int_num: u32, target: IpiTargetCpu) {
     if let IpiTargetCpu::Specific(cpu) = &target {
         assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
     }
@@ -134,7 +152,7 @@ pub fn send_ipi_gicv2(registers: &mut GicRegisters, int_num: u32, target: IpiTar
     };
 
     let value: u32 = int_num | target_list | SGIR_NSATT_GRP1;
-    registers.write_volatile(offset::SGIR, value);
+    registers.sgir.write(value);
 }
 
 /// Deserialized content of the `IIDR` distributor register
@@ -148,14 +166,14 @@ pub struct Implementer {
 }
 
 impl super::ArmGicDistributor {
-    pub(crate) fn distributor(&self) -> &GicRegisters {
+    pub(crate) fn distributor(&self) -> &DistRegsP1 {
         match self {
             Self::V2 { registers } => registers,
             Self::V3 { v2_regs, .. } => v2_regs,
         }
     }
 
-    pub(crate) fn distributor_mut(&mut self) -> &mut GicRegisters {
+    pub(crate) fn distributor_mut(&mut self) -> &mut DistRegsP1 {
         match self {
             Self::V2 { registers } => registers,
             Self::V3 { v2_regs, .. } => v2_regs,
@@ -163,7 +181,7 @@ impl super::ArmGicDistributor {
     }
 
     pub fn implementer(&self) -> Implementer {
-        let raw = self.distributor().read_volatile(offset::IIDR);
+        let raw = self.distributor().ident.read();
         Implementer {
             product_id: (raw >> 24) as _,
             version: ((raw >> 12) & 0xff) as _,
@@ -180,7 +198,7 @@ impl super::ArmGicDistributor {
         assert!(int >= 32, "interrupts number below 32 (SGIs & PPIs) don't have a target CPU");
         match self {
             Self::V2 { .. } | Self::V3 { affinity_routing: false, .. } => {
-                let flags = self.distributor().read_array_volatile::<4>(offset::ITARGETSR, int);
+                let flags = read_array_volatile::<4>(&self.distributor().target, int);
 
                 for i in 0..8 {
                     let target = 1 << i;
@@ -194,7 +212,7 @@ impl super::ArmGicDistributor {
                 Ok(SpiDestination::GICv2TargetList(TargetList(flags as u8)).canonicalize())
             },
             Self::V3 { affinity_routing: true, v3_regs, .. } => {
-                let reg = v3_regs.read_volatile_64(offset::P6IROUTER);
+                let reg = v3_regs.route.read();
 
                 // bit 31: Interrupt Routing Mode
                 // value of 1 to target any available cpu
@@ -229,7 +247,7 @@ impl super::ArmGicDistributor {
                     SpiDestination::GICv2TargetList(list) => list.0 as u32,
                 };
 
-                self.distributor_mut().write_array_volatile::<4>(offset::ITARGETSR, int, value);
+                write_array_volatile::<4>(&mut self.distributor_mut().target, int, value);
             },
             Self::V3 { affinity_routing: true, v3_regs, .. } => {
                 let value = match target {
@@ -242,7 +260,7 @@ impl super::ArmGicDistributor {
                     },
                 };
 
-                v3_regs.write_volatile_64(offset::P6IROUTER, value);
+                v3_regs.route.write(value);
             }
         }
     }
