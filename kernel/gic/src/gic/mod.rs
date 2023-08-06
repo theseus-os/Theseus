@@ -130,7 +130,6 @@ const U32BITS: usize = u32::BITS as usize;
 // items in a single u32.
 //
 // - `int` is the index
-// - `offset` tells the beginning of the array
 // - `INTS_PER_U32` = how many array slots per u32 in this array
 fn read_array_volatile<const INTS_PER_U32: usize>(slice: &[Volatile<u32>], int: InterruptNumber) -> u32 {
     let int = int as usize;
@@ -153,7 +152,6 @@ fn read_array_volatile<const INTS_PER_U32: usize>(slice: &[Volatile<u32>], int: 
 // items in a single u32.
 //
 // - `int` is the index
-// - `offset` tells the beginning of the array
 // - `INTS_PER_U32` = how many array slots per u32 in this array
 // - `value` is the value to write
 fn write_array_volatile<const INTS_PER_U32: usize>(slice: &mut [Volatile<u32>], int: InterruptNumber, value: u32) {
@@ -173,7 +171,6 @@ fn write_array_volatile<const INTS_PER_U32: usize>(slice: &mut [Volatile<u32>], 
 
 const REDIST_SGIPPI_OFFSET: usize = 0x10000;
 const DIST_P6_OFFSET: usize = 0x6000;
-
 
 pub struct ArmGicV3RedistPages {
     pub redistributor: BorrowedMappedPages<RedistRegsP1, Mutable>,
