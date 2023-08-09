@@ -43,22 +43,17 @@ pub fn handle_ap_cores(
 ) -> Result<u32, &'static str> {
     let mut online_secondary_cpus = 0;
 
-    // This ApTrampolineData & MmuConfig will be read and written-to
-    // by all detected CPU cores, via both its physical
-    // and virtual addresses.
+    // This ApTrampolineData & MmuConfig will be read and written to
+    // by all detected CPU cores, via both its physical and virtual addresses.
     let mmu_config = read_mmu_config();
     let mut ap_data: ApTrampolineData = Default::default();
     ap_data.ap_data_virt_addr.write(VirtualAddress::new_canonical(&ap_data as *const _ as usize));
     ap_data.ap_stage_two_virt_addr.write(VirtualAddress::new_canonical(ap_stage_two as usize));
 
-    // -------
-    //
-    // This code identity-maps one page of writable+executable memory and
-    // copies the machine code of `ap_entry_point` to it. The fact that the
-    // mapping is identity-mapped allows the code to enable the MMU safely,
-    // as PC will be valid before and after the switch.
-
-    // map this RWX
+    // Identity map one page of memory and copy the executable code of `ap_entry_point` into it.
+    // This ensures that when we run that `ap_entry_point` code from the identity-mapped page,
+    // it can safely enable the MMU, as the program counter will be valid
+    // (and have the same value) both before and after the MMU is enabled.
     let rwx = PteFlags::new().valid(true).writable(true).executable(true);
     let mut ap_startup_mapped_pages = create_identity_mapping(1, rwx)?;
     let virt_addr = ap_startup_mapped_pages.start_address();
@@ -70,7 +65,6 @@ pub fn handle_ap_cores(
             .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or("BUG: nano_core crate had no text pages"))?;
         let kernel_text_pages = kernel_text_pages_ref.0.lock();
 
-        // Second, perform the actual copy.
         let ap_entry_point = VirtualAddress::new_canonical(ap_entry_point as usize);
         let src = kernel_text_pages.offset_of_address(ap_entry_point)
             .ok_or("BUG: the 'ap_entry_point' virtual address was not covered by the kernel's text pages")
@@ -78,37 +72,26 @@ pub fn handle_ap_cores(
 
         let dst: &mut [u8] = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
         dst.copy_from_slice(src);
-    }
 
-    // we can now remap as read-execute
-    {
-        // if we got there, it means KERNEL_MMI was initialize; we can unwrap
-        let kernel_mmi_ref = get_kernel_mmi_ref().unwrap();
-        let mut kernel_mmi_ref = kernel_mmi_ref.lock();
+        // After copying the content into the identity page, remap it to remove write permissions.
+        let mut kernel_mmi = kernel_mmi_ref.lock();
         let rx = PteFlags::new().valid(true).executable(true);
-        ap_startup_mapped_pages.remap(&mut kernel_mmi_ref.page_table, rx)?;
+        ap_startup_mapped_pages.remap(&mut kernel_mmi.page_table, rx)?;
     }
 
-    // -------
-
-    let entry_point_phys_addr: PhysicalAddress;
-    let ap_data_phys_addr: PhysicalAddress;
-    // then lock and translate addresses
-    {
+    // We identity mapped the `ap_entry_point` above, but we need to translate
+    // the virtual address of the `ap_data` in order to obtain its physical address.
+    let entry_point_phys_addr = PhysicalAddress::new_canonical(virt_addr.value());
+    let ap_data_phys_addr = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let page_table = &mut kernel_mmi.page_table;
 
-        // get the physical address of the MmuConfig
+        // Write the physical address of the MmuConfig struct into the ApData struct.
         let mmu_config_virt_addr = VirtualAddress::new_canonical(&mmu_config as *const _ as usize);
         ap_data.ap_mmu_config.write(page_table.translate(mmu_config_virt_addr).unwrap());
 
         // get physical address of the ApTrampolineData structure
-        ap_data_phys_addr = page_table.translate(ap_data.ap_data_virt_addr.read()).unwrap();
-
-        // get physical address of generated entry point
-        // this is identity mapped, so we can just cast from physical to virtual
-        // entry_point_phys_addr = page_table.translate(virt_addr).unwrap();
-        entry_point_phys_addr = PhysicalAddress::new_canonical(virt_addr.value());
+        page_table.translate(ap_data.ap_data_virt_addr.read()).unwrap()
     }
 
     let mut ap_stack = None;
