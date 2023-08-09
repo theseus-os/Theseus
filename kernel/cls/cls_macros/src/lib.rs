@@ -247,21 +247,20 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let int_functions = int::int_functions(&ty, &offset);
 
-    let value_static_name = Ident::new(&format!("__{name}"), name.span());
-
     quote! {
-        #[doc(hidden)]
-        #[link_section = ".cls"]
-        pub static #value_static_name: #ty = #init;
-
-        // TODO: Should these attributes be expanded onto value or thread local (or both).
         #(#attributes)*
         #[thread_local]
-        #visibility static #name: #struct_name = #struct_name;
+        #[link_section = ".cls"]
+        #[used]
+        #visibility static #name: #struct_name = #struct_name {
+            __inner: #init,
+        };
 
         #[repr(transparent)]
-        #[non_exhaustive]
-        #visibility struct #struct_name;
+        #[doc(hidden)]
+        #visibility struct #struct_name {
+            __inner: #ty,
+        }
 
         impl #struct_name {
             #int_functions
