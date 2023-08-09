@@ -168,6 +168,11 @@ name = "cls"
 version = "0.1.0"
 dependencies = [
  "cls_macros",
+ "cortex-a",
+ "irq_safety",
+ "preemption",
+ "tock-registers",
+ "x86_64",
 ]
 
 [[package]]
@@ -282,19 +287,6 @@ dependencies = [
  "derive_more",
  "sync_irq",
  "tock-registers",
-]
-
-[[package]]
-name = "cpu_local"
-version = "0.1.0"
-dependencies = [
- "cortex-a",
- "irq_safety",
- "memory",
- "preemption",
- "sync_spin",
- "tock-registers",
- "x86_64",
 ]
 
 [[package]]
@@ -1086,7 +1078,7 @@ name = "preemption"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cls",
+ "cls_macros",
  "cpu",
 ]
 
@@ -1515,9 +1507,9 @@ dependencies = [
 name = "task"
 version = "0.1.0"
 dependencies = [
+ "cls",
  "context_switch",
  "cpu",
- "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",

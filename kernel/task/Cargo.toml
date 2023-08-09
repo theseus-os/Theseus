@@ -16,7 +16,6 @@ irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 context_switch = { path = "../context_switch" }
 cls = { path = "../cls" }
 cpu = { path = "../cpu" }
-cpu_local = { path = "../cpu_local" }
 environment = { path = "../environment" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
