@@ -476,8 +476,11 @@ version = "0.1.0"
 dependencies = [
  "cls_macros",
  "cortex-a",
+ "cpu",
  "irq_safety",
+ "memory",
  "preemption",
+ "sync_spin",
  "tock-registers",
  "x86_64",
 ]
