@@ -251,12 +251,12 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
     quote! {
         #[doc(hidden)]
+        #[link_section = ".cls"]
         pub static #value_static_name: #ty = #init;
 
         // TODO: Should these attributes be expanded onto value or thread local (or both).
         #(#attributes)*
         #[thread_local]
-        // #[link_section = ".cls"]
         #visibility static #name: #struct_name = #struct_name;
 
         #[repr(transparent)]

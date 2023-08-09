@@ -1,0 +1,7 @@
+[package]
+name = "set_cls_section_type"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+goblin = "*"
