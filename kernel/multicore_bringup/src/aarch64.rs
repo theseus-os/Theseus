@@ -1,4 +1,4 @@
-use memory::{get_kernel_mmi_ref, create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, PteFlags};
+use memory::{create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, PteFlags};
 use memory_aarch64::{read_mmu_config, asm_set_mmu_config_x2_x3};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_SIZE_IN_PAGES};
 use psci::{cpu_on, error::Error::*};
@@ -70,7 +70,7 @@ pub fn handle_ap_cores(
             .ok_or("BUG: the 'ap_entry_point' virtual address was not covered by the kernel's text pages")
             .and_then(|offset| kernel_text_pages.as_slice(offset, PAGE_SIZE))?;
 
-        let dst: &mut [u8] = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
+        let dst: &mut [u8] = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE)?;
         dst.copy_from_slice(src);
 
         // After copying the content into the identity page, remap it to remove write permissions.
@@ -92,7 +92,7 @@ pub fn handle_ap_cores(
 
         // get physical address of the ApTrampolineData structure
         page_table.translate(ap_data.ap_data_virt_addr.read()).unwrap()
-    }
+    };
 
     let mut ap_stack = None;
     for def_mpidr in BOARD_CONFIG.cpu_ids {
