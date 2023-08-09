@@ -227,7 +227,6 @@ impl Mapper {
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
                     let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
                     let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
-
                     if !p1[page.p1_index()].is_unused() {
                         error!("map_allocated_pages_to(): page {:#X} -> frame {:#X}, page was already in use!", page.start_address(), frame.start_address());
                         return Err("map_allocated_pages_to(): page was already in use");
@@ -242,7 +241,7 @@ impl Mapper {
                     let higher_level_huge_flags = higher_level_flags.huge(true);
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
                     let p2 = p3.next_table_create(page.p3_index(), higher_level_huge_flags);
-                    trace!("P2 has value {:#X} with flags {:#b}", p2[page.p2_index()].value(), p2[page.p2_index()].flags().bits());
+                    // trace!("P2 has value {:#X} with flags {:#b}", p2[page.p2_index()].value(), p2[page.p2_index()].flags().bits());
 
                     // uncomment these lines if performing a standard mapping
                     // let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
@@ -349,7 +348,6 @@ impl Mapper {
             PAGE_4KB_SIZE => {
                 for page in pages.range().clone() {
                     let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-        
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
                     let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
                     let p1 = p2.next_table_create(page.p2_index(), higher_level_flags);
@@ -761,7 +759,7 @@ impl MappedPages {
                 "BUG: MappedPages::unmap(): current P4 must equal original P4, \
                 cannot unmap MappedPages from a different page table than they were originally mapped to!"
             );
-        }   
+        }
 
         let mut first_frame_range: Option<AllocatedFrames> = None; // this is what we'll return
         let mut current_frame_range: Option<AllocatedFrames> = None;
@@ -774,14 +772,15 @@ impl MappedPages {
                         .and_then(|p3| p3.next_table_mut(page.p3_index()))
                         .and_then(|p2| p2.next_table_mut(page.p2_index()))
                         .ok_or("mapping code does not support huge pages")?;
+
                     let pte = &mut p1[page.p1_index()];
                     if pte.is_unused() {
                         return Err("unmap(): page not mapped");
                     }
-        
+                    
                     let unmapped_frames = pte.set_unmapped();
                     tlb_flush_virt_addr(page.start_address());
-        
+
                     // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
                     // freed from the newly-unmapped P1 PTE entry above.
                     match unmapped_frames {
@@ -845,8 +844,7 @@ impl MappedPages {
                     if pte.is_unused() {
                         return Err("unmap(): page not mapped");
                     }
-        
-                    let unmapped_frames = pte.set_unmapped();
+                    let unmapped_frames = pte.set_unmapped_2MiB();
                     tlb_flush_virt_addr(page.start_address());
         
                     // Here, create (or extend) a contiguous ranges of frames here based on the `unmapped_frames`
@@ -856,7 +854,6 @@ impl MappedPages {
                             let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
                                 .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
                                 .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
-        
                             if let Some(mut curr_frames) = current_frame_range.take() {
                                 match curr_frames.merge(newly_unmapped_frames) {
                                     Ok(()) => {
@@ -890,7 +887,7 @@ impl MappedPages {
                             }
                         }
                         UnmapResult::NonExclusive(_frames) => {
-                            // trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
+                            trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
                         }
                     }
                 }

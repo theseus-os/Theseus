@@ -56,6 +56,27 @@ impl PageTableEntry {
         // Once we support huge pages, we can use a type parameter
         // to specify whether this is a 4KiB, 2MiB, or 1GiB PTE.
         let frame_range = FrameRange::new(frame, frame);
+
+        // if is huge 
+        //  - frame_range = FrameRange start ... start + 2mb
+        if flags.is_exclusive() {
+            UnmapResult::Exclusive(UnmappedFrames(frame_range))
+        } else {
+            UnmapResult::NonExclusive(frame_range)
+        }
+    }
+
+    // Since only 4kb frames are used right now, we can't use the type parameter to get the correct size.
+    // This separate function may not be necessary in the future.
+    pub fn set_unmapped_2MiB(&mut self) -> UnmapResult {
+        let frame = self.frame_value();
+        let flags = self.flags();
+        self.zero();
+
+        let frame_range = FrameRange::new(
+            frame, 
+            Frame::containing_address(frame.start_address() + (4096 * 512)));
+
         if flags.is_exclusive() {
             UnmapResult::Exclusive(UnmappedFrames(frame_range))
         } else {

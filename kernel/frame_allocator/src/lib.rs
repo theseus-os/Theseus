@@ -463,7 +463,7 @@ impl Drop for AllocatedFrames {
         } else {
             (&FREE_GENERAL_FRAMES_LIST, MemoryRegionType::Free)
         };
-        // trace!("frame_allocator: deallocating {:?}, typ {:?}", self, typ);
+        trace!("frame_allocator: deallocating {:?}, typ {:?}", self, typ);
 
         // Simply add the newly-deallocated chunk to the free frames list.
         let mut locked_list = list.lock();
@@ -896,9 +896,9 @@ fn add_reserved_region(
                     break;
                 }
                 if let Some(_overlap) = chunk.overlap(&frames) {
-                    // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
-                    //     frames, _overlap, chunk
-                    // );
+                    trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
+                        frames, _overlap, chunk
+                    );
                     return Err("Failed to add reserved region that overlapped with existing reserved regions (RBTree).");
                 }
                 cursor_mut.move_next();

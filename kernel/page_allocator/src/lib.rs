@@ -155,6 +155,9 @@ impl PageRangeSized {
 			}
 		}
 	}
+
+	// This function changes converts a huge page range into a range of 4KiB pages.
+	// It's a little ugly.
 	pub fn range_4k(&self) -> Option<PageRangeSized> {
 		match self {
 			PageRangeSized::Normal4KiB(pr) => {
@@ -462,9 +465,10 @@ impl AllocatedPages {
         AllocatedPages { pages: PageRangeSized::Huge1GiB(self.pages.range_1gb().unwrap()) }
     }
 
-    pub fn as_allocated_2mb(&self) -> AllocatedPages {
-        AllocatedPages { pages: PageRangeSized::Huge2MiB(self.pages.range_2mb().unwrap()) }
+    pub fn as_allocated_2mb(&mut self) {
+		self.pages = PageRangeSized::Huge2MiB(self.pages.range_2mb().unwrap());
     }
+
 	/// Returns the offset of the given `VirtualAddress` within this range of pages,
 	/// i.e., `addr - self.start_address()`.
 	///
@@ -1194,10 +1198,11 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 pub fn allocate_2mb_pages(num_pages: usize) -> Option<AllocatedPages> {
 	let num_pages = num_pages * 512;
-	if let Some(ap) = allocate_pages_deferred(AllocationRequest::Any, num_pages)
+	if let Some(mut ap) = allocate_pages_deferred(AllocationRequest::Any, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok() {
-			return Some(ap.as_allocated_2mb());
+			ap.as_allocated_2mb();
+			return Some(ap);
 		}
 	None
 }
