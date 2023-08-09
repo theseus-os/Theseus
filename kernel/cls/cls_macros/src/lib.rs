@@ -19,7 +19,7 @@ struct CpuLocal {
     visibility: Visibility,
     name: Ident,
     ty: Type,
-    _init: Expr,
+    init: Expr,
 }
 
 impl Parse for CpuLocal {
@@ -31,14 +31,14 @@ impl Parse for CpuLocal {
         input.parse::<Token![:]>()?;
         let ty: Type = input.parse()?;
         input.parse::<Token![=]>()?;
-        let _init: Expr = input.parse()?;
+        let init: Expr = input.parse()?;
         input.parse::<Token![;]>()?;
         Ok(CpuLocal {
             attributes,
             visibility,
             name,
             ty,
-            _init,
+            init,
         })
     }
 }
@@ -138,7 +138,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         visibility,
         name,
         ty,
-        _init,
+        init,
     } = parse_macro_input!(input as CpuLocal);
 
     let attributes = attributes.iter().map(|attribute| quote! { #attribute });
@@ -245,9 +245,15 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         proc_macro2::TokenStream::new()
     };
 
-    let int_functions = int::int_functions(ty, offset);
+    let int_functions = int::int_functions(&ty, &offset);
+
+    let value_static_name = Ident::new(&format!("__{name}"), name.span());
 
     quote! {
+        #[doc(hidden)]
+        pub static #value_static_name: #ty = #init;
+
+        // TODO: Should these attributes be expanded onto value or thread local (or both).
         #(#attributes)*
         #[thread_local]
         // #[link_section = ".cls"]
