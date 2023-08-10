@@ -1,3 +1,8 @@
+//! Tool to prepare an ELF file with CLS sections.
+//!
+//! This involves replacing the `.cls` section's TLS flag with the CLS flag, and
+//! updating all CLS symbols to have the CLS type.
+
 use std::{
     env,
     fs::{self, File},
@@ -49,8 +54,7 @@ fn main() {
     let header = Header::from_fd(&mut file).unwrap();
 
     let sections = sections(&header, &mut file);
-    let did_update = update_cls_section(&header, &sections, &mut file);
-    if did_update {
+    if let Some(cls_section_index) = update_cls_section(&header, &sections, &mut file) {
         println!(
             "detected .cls section in {}",
             PathBuf::from(file_path)
@@ -58,7 +62,7 @@ fn main() {
                 .unwrap()
                 .to_string_lossy(),
         );
-        update_cls_symbols(&header, &sections, &mut file);
+        update_cls_symbols(&header, cls_section_index, &sections, &mut file);
     }
 }
 
@@ -82,7 +86,11 @@ fn sections(header: &Header, file: &mut File) -> Vec<SectionHeader> {
     SectionHeader::parse(&bytes, 1, header.e_shnum as usize, context).unwrap()
 }
 
-fn update_cls_section(header: &Header, sections: &[SectionHeader], file: &mut File) -> bool {
+fn update_cls_section(
+    header: &Header,
+    sections: &[SectionHeader],
+    file: &mut File,
+) -> Option<usize> {
     let section_header_string_table_index = header.e_shstrndx;
     let string_table_section = &sections[section_header_string_table_index as usize];
 
@@ -95,53 +103,57 @@ fn update_cls_section(header: &Header, sections: &[SectionHeader], file: &mut Fi
     for (i, section) in sections.iter().enumerate() {
         let name = string_table.get_unsafe(section.sh_name).unwrap();
         if name == ".cls" {
-            // The flag variable is bytes 8-16 of the section header.
-            let flag_position = header.e_shoff + i as u64 * header.e_shentsize as u64 + 8;
-            file.seek(SeekFrom::Start(flag_position)).unwrap();
-            // TODO: Le, be
-            let mut flag_bytes = [0; 8];
-            file.read_exact(&mut flag_bytes).unwrap();
-            let mut flags = u64::from_le_bytes(flag_bytes);
+            let mut flags = section.sh_flags;
 
-            // Sanity check that the TLS flag is set.
-            assert_ne!(
-                flags & SHF_TLS as u64,
-                0,
-                "TLS flag not set for .cls section"
-            );
+            if flags & CLS_SECTION_FLAG != 0 {
+                // The tool is being rerun on a file.
+                return None;
+            }
+
+            if flags & SHF_TLS as u64 == 0 {
+                panic!("TLS flag not set for .cls section");
+            }
+
             // Unset the TLS flag.
             flags &= !SHF_TLS as u64;
             // Set the CLS flag.
             flags |= CLS_SECTION_FLAG;
 
             // Overwrite the old flags.
-            file.seek(SeekFrom::Current(-8)).unwrap();
+            let flag_position = header.e_shoff + i as u64 * header.e_shentsize as u64 + 8;
+            file.seek(SeekFrom::Start(flag_position)).unwrap();
+            // TODO: Le, be
             file.write_all(&flags.to_le_bytes())
                 .expect("failed to write .cls section type to file");
 
-            return true;
+            return Some(i);
         }
     }
-    false
+    None
 }
 
-fn update_cls_symbols(header: &Header, sections: &[SectionHeader], file: &mut File) {
-    let section = sections
+fn update_cls_symbols(
+    header: &Header,
+    cls_section_index: usize,
+    sections: &[SectionHeader],
+    file: &mut File,
+) {
+    let symbol_table_section = sections
         .iter()
         .find(|section| section.sh_type == SHT_SYMTAB)
         .unwrap();
-    let section_offset = section.sh_offset;
-    let section_size = section.sh_size;
-    let entry_size = section.sh_entsize;
-    let symbol_count = if entry_size == 0 {
+    let symbol_table_offset = symbol_table_section.sh_offset;
+    let symbol_table_size = symbol_table_section.sh_size;
+    let symbol_size = symbol_table_section.sh_entsize;
+    let symbol_count = if symbol_size == 0 {
         0
     } else {
-        section_size / entry_size
+        symbol_table_size / symbol_size
     };
 
-    let mut section_bytes = vec![0; section_size as usize];
-    file.seek(SeekFrom::Start(section_offset)).unwrap();
-    file.read_exact(&mut section_bytes).unwrap();
+    let mut symbol_table_bytes = vec![0; symbol_table_size as usize];
+    file.seek(SeekFrom::Start(symbol_table_offset)).unwrap();
+    file.read_exact(&mut symbol_table_bytes).unwrap();
 
     let le = match header.e_ident[EI_DATA] {
         1 => Endian::Little,
@@ -154,17 +166,21 @@ fn update_cls_symbols(header: &Header, sections: &[SectionHeader], file: &mut Fi
         le,
     };
 
-    let symbol_table = Symtab::parse(&section_bytes, 0, symbol_count as usize, context).unwrap();
+    let symbol_table =
+        Symtab::parse(&symbol_table_bytes, 0, symbol_count as usize, context).unwrap();
 
     for (i, symbol) in symbol_table.iter().enumerate() {
-        let ty = symbol.st_info & 0xf;
-        if ty == STT_TLS {
-            let new_info = (symbol.st_info & 0xf0) | CLS_SYMBOL_TYPE;
-
-            let type_offset = section_offset + i as u64 * entry_size + 4;
-            file.seek(SeekFrom::Start(type_offset)).unwrap();
-            file.write_all(&[new_info]).unwrap();
-            println!("overwriting CLS symbol flag");
+        if symbol.st_shndx == cls_section_index {
+            let ty = symbol.st_type();
+            if ty == STT_TLS {
+                let new_info = (symbol.st_info & 0xf0) | CLS_SYMBOL_TYPE;
+                let symbol_info_offset = symbol_table_offset + i as u64 * symbol_size + 4;
+                file.seek(SeekFrom::Start(symbol_info_offset)).unwrap();
+                file.write_all(&[new_info]).unwrap();
+                println!("overwrote CLS symbol flag");
+            } else {
+                panic!("CLS symbol had unexected type: {ty:?}");
+            }
         }
     }
 }

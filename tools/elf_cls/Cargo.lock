@@ -3,6 +3,13 @@
 version = 3
 
 [[package]]
+name = "elf_cls"
+version = "0.1.0"
+dependencies = [
+ "goblin",
+]
+
+[[package]]
 name = "goblin"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -61,13 +68,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "set_cls_section_type"
-version = "0.1.0"
-dependencies = [
- "goblin",
 ]
 
 [[package]]

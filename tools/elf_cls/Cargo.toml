@@ -1,5 +1,5 @@
 [package]
-name = "set_cls_section_type"
+name = "elf_cls"
 version = "0.1.0"
 edition = "2021"
 
