@@ -10,11 +10,18 @@ use std::{
 use goblin::{
     container::{Container, Ctx, Endian},
     elf::{header::header64::Header, SectionHeader},
-    elf64::header::EI_DATA,
+    elf64::{
+        header::EI_DATA,
+        section_header::{SHF_MASKOS, SHF_TLS},
+    },
     strtab::Strtab,
 };
 
-const CLS_SECTION_TYPE: u32 = 0x60000000;
+/// The flag identifying CLS sections.
+///
+/// This must be kept in sync with `mod_mgmt`.
+const CLS_SECTION_FLAG: u64 = 0x100000;
+const _: () = assert!(CLS_SECTION_FLAG & SHF_MASKOS as u64 == CLS_SECTION_FLAG);
 
 // TODO: Cleanup and document.
 
@@ -62,18 +69,37 @@ fn main() {
         let name = string_table.get_unsafe(section.sh_name).unwrap();
         if name == ".cls" {
             println!(
-                "rewriting .cls section type in {}",
+                "setting CLS flag in {}",
                 PathBuf::from(file_path)
                     .file_name()
                     .unwrap()
                     .to_string_lossy(),
             );
-            file.seek(SeekFrom::Start(
-                header.e_shoff + i as u64 * header.e_shentsize as u64 + 4,
-            ))
-            .unwrap();
-            file.write(&CLS_SECTION_TYPE.to_le_bytes())
+
+            // The flag variable is bytes 8-16 of the section header.
+            let flag_position = header.e_shoff + i as u64 * header.e_shentsize as u64 + 8;
+            file.seek(SeekFrom::Start(flag_position)).unwrap();
+            // TODO: Le, be
+            let mut flag_bytes = [0; 8];
+            file.read_exact(&mut flag_bytes).unwrap();
+            let mut flags = u64::from_le_bytes(flag_bytes);
+
+            // Sanity check that the TLS flag is set.
+            assert_ne!(
+                flags & SHF_TLS as u64,
+                0,
+                "TLS flag not set for .cls section"
+            );
+            // Unset the TLS flag.
+            flags &= !SHF_TLS as u64;
+            // Set the CLS flag.
+            flags |= CLS_SECTION_FLAG;
+
+            // Overwrite the old flags.
+            file.seek(SeekFrom::Current(-8)).unwrap();
+            file.write(flags).to_le_bytes())
                 .expect("failed to write .cls section type to file");
+
             return;
         }
     }
