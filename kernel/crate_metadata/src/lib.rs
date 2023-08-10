@@ -508,6 +508,7 @@ impl LoadedCrate {
                 SectionType::Rodata
                 | SectionType::TlsBss
                 | SectionType::TlsData
+                | SectionType::Cls
                 | SectionType::GccExceptTable
                 | SectionType::EhFrame => new_rodata_pages_locked
                     .as_mut()
@@ -609,6 +610,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
     static BSS              : Once<StrRef> = Once::new();
     static TLS_DATA         : Once<StrRef> = Once::new();
     static TLS_BSS          : Once<StrRef> = Once::new();
+    static CLS              : Once<StrRef> = Once::new();
     static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
     static EH_FRAME         : Once<StrRef> = Once::new();
 
@@ -619,6 +621,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
         SectionType::Bss            => &BSS,
         SectionType::TlsData        => &TLS_DATA,
         SectionType::TlsBss         => &TLS_BSS,
+        SectionType::Cls            => &CLS,
         SectionType::GccExceptTable => &GCC_EXCEPT_TABLE,
         SectionType::EhFrame        => &EH_FRAME,
     };

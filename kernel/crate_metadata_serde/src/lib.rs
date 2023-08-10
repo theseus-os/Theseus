@@ -87,6 +87,7 @@ pub const DATA_SECTION_NAME             : &str = ".data";
 pub const BSS_SECTION_NAME              : &str = ".bss";
 pub const TLS_DATA_SECTION_NAME         : &str = ".tdata";
 pub const TLS_BSS_SECTION_NAME          : &str = ".tbss";
+pub const CLS_SECTION_NAME              : &str = ".cls";
 pub const GCC_EXCEPT_TABLE_SECTION_NAME : &str = ".gcc_except_table";
 pub const EH_FRAME_SECTION_NAME         : &str = ".eh_frame";
 
@@ -107,6 +108,7 @@ pub enum SectionType {
     /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
     /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
     TlsBss,
+    Cls,
     /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
@@ -137,6 +139,7 @@ impl SectionType {
             Self::Bss            => BSS_SECTION_NAME,
             Self::TlsData        => TLS_DATA_SECTION_NAME,
             Self::TlsBss         => TLS_BSS_SECTION_NAME,
+            Self::Cls            => CLS_SECTION_NAME,
             Self::GccExceptTable => GCC_EXCEPT_TABLE_SECTION_NAME,
             Self::EhFrame        => EH_FRAME_SECTION_NAME,
         }

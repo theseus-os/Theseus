@@ -44,6 +44,16 @@ const EXTRA_FILES_DIRECTORY_DELIMITER: char = '!';
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
 static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
 
+/// The flag identifying CLS sections.
+///
+/// This must be kept in sync with `update_cls_section_flags`.
+const CLS_SECTION_FLAG: u64 = 0x100000;
+
+/// The flag identifying CLS symbols.
+///
+/// This must be kept in sync with `update_cls_section_flags`.
+const CLS_SYMBOL_TYPE: Type = Type::OsSpecific(0xa);
+
 /// Returns a reference to the default kernel namespace, 
 /// which must exist because it contains the initially-loaded kernel crates. 
 /// Returns None if the default namespace hasn't yet been initialized.
@@ -1174,7 +1184,7 @@ impl CrateNamespace {
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, dp_range)| (dp.clone(), dp.lock(), dp_range.start));
 
         // The section header offset of the first read-only section, which is, in order of existence:
-        // .rodata, .eh_frame, .gcc_except_table, .tdata
+        // .rodata, .eh_frame, .gcc_except_table, .tdata, .cls
         let mut read_only_offset: Option<usize> = None;
         // The section header offset of the first read-write section, which is .data or .bss
         let mut read_write_offset:   Option<usize> = None;
@@ -1192,6 +1202,7 @@ impl CrateNamespace {
         let mut bss_shndx_and_offset:    Option<(Shndx, usize)>            = None;
         let mut tdata_shndx_and_section: Option<(Shndx, StrongSectionRef)> = None;
         let mut tbss_shndx_and_section:  Option<(Shndx, StrongSectionRef)> = None;
+        let mut cls_shndx_and_section:   Option<(Shndx, StrongSectionRef)> = None;
 
         // The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
         let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new(); 
@@ -1213,9 +1224,10 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size   = sec.size()   as usize;
             let sec_offset = sec.offset() as usize;
-            let is_write   = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec    = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls     = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write   = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec    = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls     = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls     = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
 
             let mut is_rodata = false;
             let mut is_eh_frame = false;
@@ -1238,8 +1250,8 @@ impl CrateNamespace {
                     .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
             }
 
-            // Otherwise, if writable (excluding TLS), copy the .data/.bss section into `data_pages`.
-            else if is_write && !is_tls {
+            // Otherwise, if writable (excluding TLS and CLS), copy the .data/.bss section into `data_pages`.
+            else if is_write && !is_tls && !is_cls {
                 match sec.get_type() {
                     Ok(ShType::ProgBits) => {
                         typ = SectionType::Data;
@@ -1292,6 +1304,24 @@ impl CrateNamespace {
                 // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
                 virt_addr = VirtualAddress::zero(); 
                 tls_sections.insert(shndx);
+            } else if is_cls {
+                match sec.get_type() {
+                    Ok(ShType::ProgBits) => {
+                        typ = SectionType::Cls;
+                        let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                        mapped_pages_offset = sec_offset - *read_only_start;
+
+                        (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
+                            .map(|(rp_ref, rp, _)| (rp_ref, rp))
+                            .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
+                        // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
+                        virt_addr = VirtualAddress::zero(); 
+                    }
+                    Ok(ShType::NoBits) => {
+                        todo!("bss");
+                    }
+                    _ => todo!("handle error"),
+                }
             }
 
             // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
@@ -1379,6 +1409,16 @@ impl CrateNamespace {
                     tbss_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
                 }
                 new_tls_section
+            } else if is_cls {
+                // TODO: Alignment?
+                let cls_offset = cls::allocate(new_section.size);
+                let mut section = Arc::new(new_section);
+
+                let section_ref = Arc::get_mut(&mut section).unwrap();
+                section_ref.virt_addr = VirtualAddress::new(cls_offset).unwrap();
+
+                cls_shndx_and_section = Some((shndx, Arc::clone(&section)));
+                section
             } else {
                 Arc::new(new_section)
             };
@@ -1420,6 +1460,7 @@ impl CrateNamespace {
             })?;
             let is_global = sec_binding == Binding::Global;
             let is_tls = sec_type == Type::Tls;
+            let is_cls = sec_type == CLS_SYMBOL_TYPE;
             let demangled = demangle(sec_name).to_string().as_str().into();
 
             // Declare the items we need to create a new `LoadedSection`.
@@ -1508,6 +1549,26 @@ impl CrateNamespace {
                     // as a canary value to ensure it cannot be used to index into a MappedPages.
                     mapped_pages_offset = usize::MAX;
                     virt_addr = tbss_sec.virt_addr + sec_value;
+                } else {
+                    error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
+                    return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
+                };
+                mapped_pages = rp_ref;
+            }
+
+            else if is_cls {
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                if sym_shndx == 0 {
+                    continue;
+                }
+                let rp_ref = read_only_pages_locked.as_ref()
+                    .map(|(mp_arc, ..)| mp_arc)
+                    .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
+
+                if let Some((cls_shndx, ref cls_sec)) = cls_shndx_and_section && sym_shndx == cls_shndx {
+                    typ = SectionType::Cls;
+                    mapped_pages_offset = cls_sec.mapped_pages_offset + sec_value;
+                    virt_addr = cls_sec.virt_addr + sec_value;
                 } else {
                     error!("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss: {}", symbol_entry as &dyn Entry);
                     return Err("BUG: found TLS symbol with an shndx that wasn't in .tdata or .tbss");
@@ -2950,9 +3011,10 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let addend = size.next_multiple_of(align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec  = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls   = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls   = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
             // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
             if is_exec {
                 // this includes only .text sections
@@ -2965,8 +3027,14 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
                     ro_bytes += addend;
                 }
                 // Ignore .tbss sections, which have type `NoBits`.
-            }
-            else if is_write {
+            } else if is_cls {
+                if sec.get_type() == Ok(ShType::ProgBits) {
+                    ro_bytes += addend;
+                } else {
+                    // Die a painful death.
+                    panic!();
+                }
+            } else if is_write {
                 // this includes both .bss and .data sections
                 rw_bytes += addend;
             }

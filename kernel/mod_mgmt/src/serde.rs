@@ -100,6 +100,7 @@ fn into_loaded_section(
         SectionType::Rodata
         | SectionType::TlsData
         | SectionType::TlsBss
+        | SectionType::Cls
         | SectionType::GccExceptTable
         | SectionType::EhFrame => Arc::clone(rodata_pages),
         SectionType::Data
