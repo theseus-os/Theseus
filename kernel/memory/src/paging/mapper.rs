@@ -961,9 +961,9 @@ impl MappedPages {
 
 impl Drop for MappedPages {
     fn drop(&mut self) {
-        // if self.size_in_pages() > 0 {
-        //     trace!("MappedPages::drop(): unmapped MappedPages {:?}, flags: {:?}", &*self.pages, self.flags);
-        // }
+        if self.size_in_pages() > 0 {
+            trace!("MappedPages::drop(): unmapped MappedPages {:?}, flags: {:?}", &self.pages, self.flags);
+        }
         
         let mut mapper = Mapper::from_current();
         if let Err(e) = self.unmap(&mut mapper) {

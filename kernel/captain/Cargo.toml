@@ -27,6 +27,7 @@ logger = { path = "../logger" }
 spawn = { path = "../spawn" }
 stack = { path = "../stack" }
 task = { path = "../task" }
+cls = { path = "../cls" }
 cpu = { path = "../cpu" }
 first_application = { path = "../first_application" }
 

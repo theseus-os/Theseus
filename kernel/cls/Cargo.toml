@@ -12,6 +12,7 @@ irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 memory = { path = "../memory" }
 preemption = { path = "../preemption" }
 sync_spin = { path = "../../libs/sync_spin" }
+log = "*"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"

@@ -5,6 +5,7 @@
 
 use std::{
     env,
+    ffi::OsStr,
     fs::{self, File},
     io::{Read, Seek, SeekFrom, Write},
     path::PathBuf,
@@ -44,25 +45,33 @@ const _: () = assert!(CLS_SYMBOL_TYPE <= STT_HIOS);
 // TODO: Cleanup and document.
 
 fn main() {
-    let file_path = env::args().next_back().expect("no file path provided");
+    let object_file_extension = OsStr::new("o");
+    let directory_path = env::args().next_back().expect("no directory path provided");
 
-    let mut file = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(&file_path)
-        .expect("failed to open file");
-    let header = Header::from_fd(&mut file).unwrap();
+    for entry in fs::read_dir(directory_path).unwrap() {
+        let entry = entry.unwrap();
+        let file_path = entry.path();
+        if file_path.extension() == Some(object_file_extension) {
+            if let Ok(mut file) = fs::OpenOptions::new()
+                .read(true)
+                .write(true)
+                .open(&file_path)
+            {
+                let header = Header::from_fd(&mut file).unwrap();
 
-    let sections = sections(&header, &mut file);
-    if let Some(cls_section_index) = update_cls_section(&header, &sections, &mut file) {
-        println!(
-            "detected .cls section in {}",
-            PathBuf::from(file_path)
-                .file_name()
-                .unwrap()
-                .to_string_lossy(),
-        );
-        update_cls_symbols(&header, cls_section_index, &sections, &mut file);
+                let sections = sections(&header, &mut file);
+                if let Some(cls_section_index) = update_cls_section(&header, &sections, &mut file) {
+                    println!(
+                        "detected .cls section in {}",
+                        PathBuf::from(file_path)
+                            .file_name()
+                            .unwrap()
+                            .to_string_lossy(),
+                    );
+                    update_cls_symbols(&header, cls_section_index, &sections, &mut file);
+                }
+            }
+        }
     }
 }
 

@@ -117,7 +117,9 @@ impl Drop for PreemptionGuard {
         assert!(
             self.cpu_id == cpu_id,
             "PreemptionGuard::drop(): BUG: CPU IDs did not match! \
-            This indicates an unexpected task migration across CPUs."
+            This indicates an unexpected task migration across CPUs. {} {}",
+            self.cpu_id,
+            cpu_id,
         );
 
         let prev_val = PREEMPTION_COUNT.fetch_sub(1);

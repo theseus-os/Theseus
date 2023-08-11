@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cls",
  "cpu",
  "early_tls",
  "interrupts",
@@ -367,6 +368,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "app_io",
+ "cls",
  "console",
  "cpu",
  "device_manager",
@@ -478,6 +480,7 @@ dependencies = [
  "cortex-a",
  "cpu",
  "irq_safety",
+ "log",
  "memory",
  "preemption",
  "sync_spin",

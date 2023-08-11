@@ -106,6 +106,8 @@ pub fn kstart_ap(
         cpu::register_cpu(false).unwrap();
     }
 
+    cls::init(cpu_id);
+
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // per-CPU storage, tasking, and create the idle task for this CPU.
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();

@@ -295,6 +295,11 @@ else
 $(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
 
+## Sixth, parse CPU local sections.
+## TODO: nano core binary
+	@echo -e "Parsing CPU local sections"
+	cargo r --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(OBJECT_FILES_BUILD_DIR)
+
 #############################
 ### end of "build" target ###
 #############################

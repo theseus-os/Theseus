@@ -110,6 +110,7 @@ where
         // | (4)  | .eh_frame         | part of read-only pages       |
         // | (5)  | .gcc_except_table | part/end of read-only pages   |
         // | (6)  | .tdata            | part/end of read-only pages   |
+        // | (7)  | .cls              | part/end of read-only pages   |
         // | (7)  | .tbss             | part/end of read-only pages   |
         // | (8)  | .data             | start of read-write pages     | 
         // | (9)  | .bss              | end of read-write pages       |
@@ -148,10 +149,14 @@ where
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
             }
-            // The following four sections are optional: .tdata, .tbss, .data, .bss.
+            // The following five sections are optional: .tdata, .cls, .tbss, .data, .bss.
             ".tdata" => {
                 rodata_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .tdata"
+            }
+            ".cls" => {
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .cls"
             }
             ".tbss" => {
                 // Ignore .tbss (see above) because it is a read-only section of all zeroes.

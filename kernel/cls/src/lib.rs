@@ -2,6 +2,7 @@
 //!
 //! See [`cpu_local`] for more details.
 
+#![feature(int_roundings)]
 #![no_std]
 
 extern crate alloc;
@@ -9,6 +10,8 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 pub use cls_macros::cpu_local;
+use cpu::CpuId;
+use memory::PteFlags;
 use sync_spin::SpinMutex;
 
 /// A trait abstracting over guards that ensure atomicity with respect to the
@@ -40,33 +43,49 @@ pub mod __private {
 }
 
 struct CpuLocalDataRegion {
-    cpu: u32,
-    _page: memory::AllocatedPages,
+    cpu: CpuId,
+    _mapped_page: memory::MappedPages,
     used: usize,
 }
 
 // TODO: Store size of used CLS in gs:[0].
 static CLS_SECTIONS: SpinMutex<Vec<CpuLocalDataRegion>> = SpinMutex::new(Vec::new());
 
-pub fn init() {
+pub fn init(cpu: CpuId) {
     use core::arch::asm;
+    log::info!("a");
 
     let page = memory::allocate_pages(1).expect("couldn't allocate page for CLS section");
+    log::info!("b");
     let address = page.start_address().value();
+    log::info!("c");
+    log::error!("(cpu {cpu:?}) allocated page: {page:?}");
+    let mapped_page = memory::get_kernel_mmi_ref()
+        .unwrap()
+        .lock()
+        .page_table
+        .map_allocated_pages(page, PteFlags::VALID | PteFlags::WRITABLE)
+        .unwrap();
 
     CLS_SECTIONS.lock().push(CpuLocalDataRegion {
-        cpu: 0,
-        _page: page,
+        cpu,
+        _mapped_page: mapped_page,
         used: 0,
     });
+    log::info!("d");
 
     #[cfg(target_arch = "x86_64")]
-    unsafe {
-        asm!(
-            "wrgsbase {}",
-            in(reg) address,
-            options(nomem, preserves_flags, nostack),
-        )
+    {
+        use x86_64::registers::control::{Cr4, Cr4Flags};
+        unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
+
+        unsafe {
+            asm!(
+                "wrgsbase {}",
+                in(reg) address,
+                options(nomem, preserves_flags, nostack),
+            )
+        }
     };
     #[cfg(target_arch = "aarch64")]
     unsafe {
@@ -76,12 +95,14 @@ pub fn init() {
             options(nomem, preserves_flags, nostack),
         )
     };
+    log::info!("done init");
 }
 
-pub fn allocate(len: usize) -> usize {
-    let cpu = cpu::current_cpu().value();
+pub fn allocate(len: usize, alignment: usize) -> usize {
+    log::info!("start alloc");
+    let cpu = cpu::current_cpu();
 
-    let mut region_ref = None;
+    let mut region_ref: Option<&mut CpuLocalDataRegion> = None;
     let mut locked = CLS_SECTIONS.lock();
 
     for region in locked.iter_mut() {
@@ -92,9 +113,10 @@ pub fn allocate(len: usize) -> usize {
     }
 
     let region_ref = region_ref.unwrap();
-    let offset = region_ref.used;
+    let offset = region_ref.used.next_multiple_of(alignment);
     assert!(region_ref.used + len <= 4096);
     region_ref.used += len;
 
+    log::info!("end alloc");
     offset
 }
