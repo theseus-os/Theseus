@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
-use syn::{LitInt, Type};
+use syn::{Ident, Type};
 
-pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
+pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
     let ((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
         match ty.to_token_stream().to_string().as_ref() {
             "u8" => (("byte", quote! { reg_byte }), (":w", "b")),
@@ -14,7 +14,6 @@ pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
             }
         };
     let x64_width_modifier = format!("{x64_asm_width} ptr ");
-    let x64_cls_location = format!("gs:[{offset}]");
 
     Some(quote! {
         #[inline]
@@ -24,8 +23,9 @@ pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
                 let ret;
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("mov {}, ", #x64_cls_location),
+                        ::core::concat!("mov {}, gs:[{}]"),
                         out(#x64_reg_class) ret,
+                        sym #name,
                         options(preserves_flags, nostack),
                     )
                 };
@@ -39,11 +39,12 @@ pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
-                        concat!(
-                            "ldr", #aarch64_instr_width,
-                            " {ret", #aarch64_reg_modifier,"},",
-                            " [{tp_1},#", stringify!(#offset), "]",
-                        ),
+                        // concat!(
+                        //     "ldr", #aarch64_instr_width,
+                        //     " {ret", #aarch64_reg_modifier,"},",
+                        //     " [{tp_1},#", stringify!(#offset), "]",
+                        // ),
+                        // FIXME
 
                         // Make sure task wasn't migrated between mrs and ldr.
                         "mrs {tp_2}, tpidr_el1",
@@ -67,7 +68,8 @@ pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
             {
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("xadd ", #x64_width_modifier, #x64_cls_location, ", {}"),
+                        ::core::concat!("xadd ", #x64_width_modifier, "gs:[{}], {}"),
+                        sym #name,
                         inout(#x64_reg_class) operand,
                         options(nostack),
                     )
@@ -82,7 +84,7 @@ pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
-                        concat!("add {ptr}, {tp_1}, ", stringify!(#offset)),
+                        "add {ptr}, {tp_1}, {cls}",
                         concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
                         // Make sure task wasn't migrated between msr and ldxr.
@@ -99,6 +101,7 @@ pub(crate) fn int_functions(ty: &Type, offset: &LitInt) -> Option<TokenStream> {
 
                         tp_1 = out(reg) ret,
                         ptr = out(reg) _,
+                        cls = sym #name,
                         value = out(reg) ret,
                         tp_2 = out(reg) _,
                         operand = in(reg) operand,

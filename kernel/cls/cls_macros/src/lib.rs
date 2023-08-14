@@ -8,10 +8,12 @@ use convert_case::{Case, Casing};
 use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
+    meta::ParseNestedMeta,
     parse::{Parse, ParseStream},
     parse_macro_input,
+    punctuated::Punctuated,
     spanned::Spanned,
-    Attribute, Expr, Ident, LitBool, LitInt, Path, Token, Type, Visibility,
+    Attribute, Expr, Ident, LitBool, Path, Token, Type, Visibility,
 };
 
 struct CpuLocal {
@@ -44,19 +46,16 @@ impl Parse for CpuLocal {
 }
 
 struct Args {
-    offset: LitInt,
     cls_dependency: bool,
     stores_guard: Option<Type>,
 }
 
 impl Parse for Args {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let offset = input.parse()?;
         let mut cls_dependency = true;
         let mut stores_guard = None;
 
-        while input.parse::<Token![,]>().is_ok() {
-            let name = input.parse::<Path>()?;
+        while let Ok(name) = input.parse::<Path>() {
             input.parse::<Token![=]>()?;
 
             if name.is_ident("cls_dep") {
@@ -73,6 +72,7 @@ impl Parse for Args {
                 .emit();
                 return Err(syn::Error::new(name.span(), ""));
             }
+            let _ = input.parse::<Token![,]>();
         }
 
         if let Some((ref name, ref value)) = stores_guard && !cls_dependency {
@@ -87,7 +87,6 @@ impl Parse for Args {
         }
 
         Ok(Self {
-            offset,
             cls_dependency,
             stores_guard: stores_guard.map(|tuple| tuple.1),
         })
@@ -117,7 +116,6 @@ impl Parse for Args {
 #[proc_macro_attribute]
 pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     let Args {
-        offset,
         cls_dependency,
         stores_guard,
     } = match syn::parse(args) {
@@ -160,7 +158,13 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 use cls::__private::tock_registers::interfaces::Readable;
                 cls::__private::cortex_a::registers::TPIDR_EL1.get()
             };
-            ptr += #offset;
+            unsafe {
+                ::core::arch::asm!(
+                    "add {ptr}, {cls}",
+                    ptr = inout(reg) ptr,
+                    cls = sym #name,
+                )
+            };
             unsafe { &mut*(ptr as *mut #ty) }
         }
     };
@@ -245,7 +249,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         proc_macro2::TokenStream::new()
     };
 
-    let int_functions = int::int_functions(&ty, &offset);
+    let int_functions = int::int_functions(&ty, &name);
 
     quote! {
         #(#attributes)*

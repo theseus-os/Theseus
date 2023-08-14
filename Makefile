@@ -298,7 +298,7 @@ endif
 ## Sixth, parse CPU local sections.
 ## TODO: nano core binary
 	@echo -e "Parsing CPU local sections"
-	cargo r --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(OBJECT_FILES_BUILD_DIR)
+	cargo r --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- --dir $(OBJECT_FILES_BUILD_DIR)
 
 #############################
 ### end of "build" target ###
@@ -354,6 +354,7 @@ endif
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
+	cargo r --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- --file $(nano_core_binary)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \

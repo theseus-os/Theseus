@@ -969,7 +969,7 @@ fn post_context_switch_action() -> PreemptionGuard {
 /// and then retrieved from here right after the context switch ends.
 /// It is stored in a CPU-local variable because it's only related to
 /// a task switching operation on a particular CPU.
-#[cls::cpu_local(16, stores_guard = PreemptionGuard)]
+#[cls::cpu_local(stores_guard = PreemptionGuard)]
 static TASK_SWITCH_PREEMPTION_GUARD: Option<PreemptionGuard> = None;
 
 /// Data that should be dropped after switching away from a task that has exited.
@@ -977,7 +977,7 @@ static TASK_SWITCH_PREEMPTION_GUARD: Option<PreemptionGuard> = None;
 /// Currently, this contains the previous Task's `TaskRef` removed from its TLS area;
 /// it is stored in a CPU-local variable because it's only related to
 /// a task switching operation on a particular CPU.
-#[cls::cpu_local(24)]
+#[cls::cpu_local]
 static DROP_AFTER_TASK_SWITCH: Option<TaskRef> = None;
 
 pub use tls_current_task::*;

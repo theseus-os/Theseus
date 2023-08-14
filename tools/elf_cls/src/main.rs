@@ -8,7 +8,7 @@ use std::{
     ffi::OsStr,
     fs::{self, File},
     io::{Read, Seek, SeekFrom, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use goblin::{
@@ -46,32 +46,24 @@ const _: () = assert!(CLS_SYMBOL_TYPE <= STT_HIOS);
 
 fn main() {
     let object_file_extension = OsStr::new("o");
-    let directory_path = env::args().next_back().expect("no directory path provided");
-
-    for entry in fs::read_dir(directory_path).unwrap() {
-        let entry = entry.unwrap();
-        let file_path = entry.path();
-        if file_path.extension() == Some(object_file_extension) {
-            if let Ok(mut file) = fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .open(&file_path)
-            {
-                let header = Header::from_fd(&mut file).unwrap();
-
-                let sections = sections(&header, &mut file);
-                if let Some(cls_section_index) = update_cls_section(&header, &sections, &mut file) {
-                    println!(
-                        "detected .cls section in {}",
-                        PathBuf::from(file_path)
-                            .file_name()
-                            .unwrap()
-                            .to_string_lossy(),
-                    );
-                    update_cls_symbols(&header, cls_section_index, &sections, &mut file);
+    let mut args = env::args();
+    args.next().unwrap();
+    match &args.next().unwrap()[..] {
+        "--file" => {
+            let file_path = args.next().unwrap();
+            update_file(&file_path);
+        }
+        "--dir" => {
+            let directory_path = args.next().expect("no directory path provided");
+            for entry in fs::read_dir(directory_path).unwrap() {
+                let entry = entry.unwrap();
+                let file_path = entry.path();
+                if file_path.extension() == Some(object_file_extension) {
+                    update_file(&file_path);
                 }
             }
         }
+        e => panic!("{e}"),
     }
 }
 
@@ -93,6 +85,32 @@ fn sections(header: &Header, file: &mut File) -> Vec<SectionHeader> {
     file.seek(SeekFrom::Start(header.e_shoff - 1)).unwrap();
     file.read_exact(&mut bytes).unwrap();
     SectionHeader::parse(&bytes, 1, header.e_shnum as usize, context).unwrap()
+}
+
+fn update_file<P>(file_path: P)
+where
+    P: AsRef<Path> + Copy,
+    PathBuf: From<P>,
+{
+    if let Ok(mut file) = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(file_path)
+    {
+        let header = Header::from_fd(&mut file).unwrap();
+
+        let sections = sections(&header, &mut file);
+        if let Some(cls_section_index) = update_cls_section(&header, &sections, &mut file) {
+            println!(
+                "detected .cls section in {}",
+                PathBuf::from(file_path)
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy(),
+            );
+            update_cls_symbols(&header, cls_section_index, &sections, &mut file);
+        }
+    }
 }
 
 fn update_cls_section(
@@ -186,7 +204,18 @@ fn update_cls_symbols(
                 let symbol_info_offset = symbol_table_offset + i as u64 * symbol_size + 4;
                 file.seek(SeekFrom::Start(symbol_info_offset)).unwrap();
                 file.write_all(&[new_info]).unwrap();
-                println!("overwrote CLS symbol flag");
+
+                if symbol.st_value >= 0x1000 {
+                    // TODO: Check if binary has TLS section.
+                    let new_value = symbol.st_value - 0x1000;
+                    file.seek(SeekFrom::Current(3)).unwrap();
+                    file.write_all(&new_value.to_le_bytes()).unwrap();
+                    println!("overwrote symbol flag and value");
+                } else {
+                    println!("overwrote symbol flag");
+                }
+            } else if ty == 0x10 {
+                // We are probably rerunning
             } else {
                 panic!("CLS symbol had unexected type: {ty:?}");
             }

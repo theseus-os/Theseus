@@ -56,6 +56,11 @@ SECTIONS {
 		*(.tbss .tbss.*)
 	}
 
+	.cls ALIGN(4k) : AT(ADDR(.cls) - KERNEL_OFFSET)
+	{
+		*(.cls)
+	}
+
 	.data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)
 	{
 		*(.padata)
