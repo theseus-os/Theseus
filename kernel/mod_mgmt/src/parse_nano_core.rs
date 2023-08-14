@@ -146,6 +146,7 @@ pub fn parse_nano_core(
     // Now that we've initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
     early_tls::insert(namespace.get_tls_initializer_data());
+    cls::insert(namespace.get_cls_initializer_data());
 
     Ok(NanoCoreItems {
         nano_core_crate_ref,
@@ -889,7 +890,7 @@ fn add_new_section(
             new_crate_weak_ref.clone(),
         );
         // Add this new TLS section to this namespace's TLS area image.
-        let cls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+        let cls_section_ref = namespace.cls_initializer.lock().add_existing_static_tls_section(
             tls_section,
             cls_offset,
             main_section_info.total_tls_size,

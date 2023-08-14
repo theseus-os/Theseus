@@ -106,7 +106,9 @@ pub fn kstart_ap(
         cpu::register_cpu(false).unwrap();
     }
 
-    cls::init(cpu_id);
+    // cls::init(cpu_id);
+    cls::insert(mod_mgmt::CLS_INITIALIZER.lock().get_data());
+
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // per-CPU storage, tasking, and create the idle task for this CPU.

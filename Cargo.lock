@@ -99,6 +99,7 @@ dependencies = [
  "kernel_config",
  "log",
  "memory",
+ "mod_mgmt",
  "no_drop",
  "page_attribute_table",
  "scheduler",
@@ -484,6 +485,7 @@ dependencies = [
  "memory",
  "preemption",
  "sync_spin",
+ "tls_initializer",
  "tock-registers",
  "x86_64",
 ]

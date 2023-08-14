@@ -82,6 +82,7 @@ pub fn get_namespaces_directory() -> Option<DirRef> {
 /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
 static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
 
+pub static CLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
 
 /// Create a new application `CrateNamespace` that uses the default application directory 
 /// and is structured atop the given `recursive_namespace`. 
@@ -513,6 +514,9 @@ pub struct CrateNamespace {
     /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
     tls_initializer: &'static Mutex<TlsInitializer>,
 
+    /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
+    cls_initializer: &'static Mutex<TlsInitializer>,
+
     /// A setting that toggles whether to ignore hash differences in symbols when resolving a dependency. 
     /// For example, if `true`, the symbol `my_crate::foo::h123` will be used to satisfy a dependency 
     /// on any other `my_crate::foo::*` regardless of hash value. 
@@ -539,6 +543,7 @@ impl CrateNamespace {
             dir,
             recursive_namespace,
             tls_initializer: &TLS_INITIALIZER,
+            cls_initializer: &CLS_INITIALIZER,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
@@ -565,6 +570,10 @@ impl CrateNamespace {
     /// which can be used as the initial TLS area data image for a new task.
     pub fn get_tls_initializer_data(&self) -> TlsDataImage {
         self.tls_initializer.lock().get_data()
+    }
+
+    pub fn get_cls_initializer_data(&self) -> TlsDataImage {
+        self.cls_initializer.lock().get_data()
     }
 
     #[doc(hidden)]
@@ -965,6 +974,7 @@ impl CrateNamespace {
             name: self.name.clone(),
             dir: self.dir.clone(),
             tls_initializer: &TLS_INITIALIZER,
+            cls_initializer: &CLS_INITIALIZER,
             recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
@@ -1412,14 +1422,15 @@ impl CrateNamespace {
             } else if is_cls {
                 // TODO: Alignment?
                 log::info!("cls section: {}", new_section.size);
-                let cls_offset = cls::allocate(new_section.size, 1);
-                let mut section = Arc::new(new_section);
+                todo!();
+                // let cls_offset = cls::allocate(new_section.size, 1);
+                // let mut section = Arc::new(new_section);
 
-                let section_ref = Arc::get_mut(&mut section).unwrap();
-                section_ref.virt_addr = VirtualAddress::new(cls_offset).unwrap();
+                // let section_ref = Arc::get_mut(&mut section).unwrap();
+                // section_ref.virt_addr = VirtualAddress::new(cls_offset).unwrap();
 
-                cls_shndx_and_section = Some((shndx, Arc::clone(&section)));
-                section
+                // cls_shndx_and_section = Some((shndx, Arc::clone(&section)));
+                // section
             } else {
                 Arc::new(new_section)
             };

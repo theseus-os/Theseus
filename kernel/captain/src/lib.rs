@@ -130,7 +130,8 @@ pub fn init(
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
-    cls::init(bsp_id);
+
+    // mod_mgmt::CLS_INITIALIZER.lock().set_as_current_cls_base();
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.

@@ -384,6 +384,23 @@ impl TlsDataImage {
         #[cfg(target_arch = "aarch64")]
         TPIDR_EL0.set(self.ptr as u64);
     }
+
+    pub fn set_as_current_cls_base(&self) {
+        // FIXME: Aarch64
+        #[cfg(target_arch = "x86_64")]
+        {
+            use x86_64::registers::control::{Cr4, Cr4Flags};
+            unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
+
+            unsafe {
+                core::arch::asm!(
+                    "wrgsbase {}",
+                    in(reg) self.ptr as u64,
+                    options(nomem, preserves_flags, nostack),
+                )
+            }
+        };
+    }
 }
 
 /// The status of a cached TLS area data image.

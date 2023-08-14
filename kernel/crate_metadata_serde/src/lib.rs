@@ -46,7 +46,7 @@ pub struct SerializedCrate {
     pub crate_name: String,
     /// A map containing all the sections of the crate.
     pub sections: HashMap<Shndx, SerializedSection>,
-    /// A set containing the global section of the crate.
+    /// A set containing the global sections of the crate.
     pub global_sections: BTreeSet<Shndx>,
     /// A set containing the thread-local storage (TLS) sections of the crate.
     pub tls_sections: BTreeSet<Shndx>,

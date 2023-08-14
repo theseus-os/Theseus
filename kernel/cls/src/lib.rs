@@ -44,79 +44,15 @@ pub mod __private {
 
 struct CpuLocalDataRegion {
     cpu: CpuId,
-    _mapped_page: memory::MappedPages,
-    used: usize,
+    image: TlsDataImage,
 }
 
-// TODO: Store size of used CLS in gs:[0].
-static CLS_SECTIONS: SpinMutex<Vec<CpuLocalDataRegion>> = SpinMutex::new(Vec::new());
+use tls_initializer::TlsDataImage;
 
-pub fn init(cpu: CpuId) {
-    use core::arch::asm;
-    log::info!("a");
+// TODO: Store pointer to image in gs:[0]?
+static CLS_SECTIONS: SpinMutex<Vec<TlsDataImage>> = SpinMutex::new(Vec::new());
 
-    let page = memory::allocate_pages(1).expect("couldn't allocate page for CLS section");
-    log::info!("b");
-    let address = page.start_address().value();
-    log::info!("c");
-    log::error!("(cpu {cpu:?}) allocated page: {page:?}");
-    let mapped_page = memory::get_kernel_mmi_ref()
-        .unwrap()
-        .lock()
-        .page_table
-        .map_allocated_pages(page, PteFlags::VALID | PteFlags::WRITABLE)
-        .unwrap();
-
-    CLS_SECTIONS.lock().push(CpuLocalDataRegion {
-        cpu,
-        _mapped_page: mapped_page,
-        used: 0,
-    });
-    log::info!("d");
-
-    #[cfg(target_arch = "x86_64")]
-    {
-        use x86_64::registers::control::{Cr4, Cr4Flags};
-        unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
-
-        unsafe {
-            asm!(
-                "wrgsbase {}",
-                in(reg) address,
-                options(nomem, preserves_flags, nostack),
-            )
-        }
-    };
-    #[cfg(target_arch = "aarch64")]
-    unsafe {
-        asm!(
-            "msr tpidr_el1, {}",
-            in(reg) address,
-            options(nomem, preserves_flags, nostack),
-        )
-    };
-    log::info!("done init");
-}
-
-pub fn allocate(len: usize, alignment: usize) -> usize {
-    log::info!("start alloc");
-    let cpu = cpu::current_cpu();
-
-    let mut region_ref: Option<&mut CpuLocalDataRegion> = None;
-    let mut locked = CLS_SECTIONS.lock();
-
-    for region in locked.iter_mut() {
-        if region.cpu == cpu {
-            region_ref = Some(region);
-            break;
-        }
-    }
-
-    let region_ref = region_ref.unwrap();
-    let offset = region_ref.used.next_multiple_of(alignment);
-    assert!(region_ref.used + len <= 4096);
-    region_ref.used += len;
-
-    log::info!("end alloc");
-    offset
+pub fn insert(image: TlsDataImage) {
+    image.set_as_current_cls_base();
+    CLS_SECTIONS.lock().push(image);
 }
