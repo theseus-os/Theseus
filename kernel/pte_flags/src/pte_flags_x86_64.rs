@@ -277,10 +277,11 @@ impl PteFlagsX86_64 {
     ///   * P4, P3, and P2 entries should never set `NOT_EXECUTABLE`,
     ///     only the lowest-level P1 entry should.
     /// * Clears the `EXCLUSIVE` bit.
-    ///   * Currently, we do not use the `EXCLUSIVE` bit for P4, P3, or P2 entries,
+    ///   * Generally, we do not use the `EXCLUSIVE` bit for P4, P3, or P2 entries,
     ///     because another page table frame may re-use it (create another alias to it)
-    ///     without our page table implementation knowing about it.
-    ///   * Only P1-level PTEs can map a frame exclusively.
+    ///     without our page table implementation knowing about it. However, the `EXCLUSIVE` bit
+    ///     will be set on P3 and P2 entries for huge pages (P2 for 2MiB pages, and P3 for 1GiB pages).
+    ///   * Only P1-level PTEs, and in the case of huge pages, P2 and P3-level PTEs, can map a frame exclusively.
     /// * Clears the PAT index value, as we only support PAT on P1-level PTEs.
     /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
     #[must_use]

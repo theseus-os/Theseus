@@ -14,7 +14,7 @@ mod static_array_rb_tree;
 
 use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
-use memory_structs::{VirtualAddress, Page, PageRange, Page1GiB, Page2MiB, Page4KiB, PAGE_4KB_SIZE, PAGE_2MB_SIZE};
+use memory_structs::{VirtualAddress, Page, PageRange, Page1GiB, Page2MiB, PAGE_4KB_SIZE, PAGE_2MB_SIZE};
 use spin::{Mutex, Once};
 use static_array_rb_tree::*;
 
@@ -121,6 +121,8 @@ pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'
 	Ok(())
 }
 
+/// An enum used to wrap the generic PageRange variants corresponding to different page sizes.
+/// Additional methods corresponding to PageRange methods are provided in order to destructure the enum variants.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PageRangeSized {
 	Normal4KiB(PageRange),
@@ -130,6 +132,7 @@ pub enum PageRangeSized {
 
 // These methods mostly destructure the enum in order to call internal methods
 impl PageRangeSized {
+	/// Get the size of the pages for the contained PageRange
 	pub fn page_size(&self) -> usize {
 		match self {
 			PageRangeSized::Normal4KiB(pr) => {
@@ -156,14 +159,14 @@ impl PageRangeSized {
 		}
 	}
 
-	// This function changes converts a huge page range into a range of 4KiB pages.
-	// It's a little ugly.
-	pub fn range_4k(&self) -> Option<PageRangeSized> {
+	/// Converts a huge page range into a range of 4KiB pages.
+	/// Returns None if the PageRange is already using 4KiB pages. 
+	pub fn into_range_4k(&self) -> Option<PageRangeSized> {
 		match self {
-			PageRangeSized::Normal4KiB(pr) => {
+			PageRangeSized::Normal4KiB(_) => {
 				None
 			}
-			PageRangeSized::Huge2MiB(pr) => {
+			PageRangeSized::Huge2MiB(_) => {
 				Some(PageRangeSized::Normal4KiB(
 					PageRange::new(self
 						.range_2mb()
@@ -176,7 +179,7 @@ impl PageRangeSized {
 						.end()
 						.as_4kb()))) 
 			}
-			PageRangeSized::Huge1GiB(pr) => {
+			PageRangeSized::Huge1GiB(_) => {
 				Some(PageRangeSized::Normal4KiB(PageRange::new(
 					self
 						.range_1gb()
@@ -191,26 +194,30 @@ impl PageRangeSized {
 			}
 		}
 	}
+	
+	/// range() equivalent for 2MiB page ranges
 	pub fn range_2mb(&self) -> Option<PageRange<Page2MiB>> {
 		match self {
 			PageRangeSized::Huge2MiB(pr) => {
 				Some(pr.clone())
 			}
 			PageRangeSized::Normal4KiB(pr) => {
-				Some(pr.into_2MiB_range())
+				Some(pr.into_2mb_range())
 			}
 			_ => {
 				None
 			}
 		}
 	}
+
+	/// range() equivalent for 1GiB page ranges
 	pub fn range_1gb(&self) -> Option<PageRange<Page1GiB>> {
 		match self {
 			PageRangeSized::Huge1GiB(pr) => {
 				Some(pr.clone())
 			}
 			PageRangeSized::Normal4KiB(pr) => {
-				Some(pr.into_1GiB_range())
+				Some(pr.into_1gb_range())
 			}
 			_ => {
 				None
@@ -433,39 +440,48 @@ impl AllocatedPages {
         self.pages.size_in_pages()
     }
 	
+	/// Returns the size of the pages in this page range 
 	pub fn page_size(&self) -> usize {
 		self.pages.page_size()
 	}
 
 	/// Returns the starting `Page` in this range of pages.
+	/// Note that this only for pages with the default 4KiB size.
 	pub fn start(&self) -> &Page {
 		self.pages.start()
 	}
 
 	/// Returns the ending `Page` (inclusive) in this range of pages.
+	/// Note that this only for pages with the default 4KiB size.
 	pub fn end(&self) -> &Page {
 		self.pages.end()
 	}
 
 	/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
+	/// This function is only intended for page ranges of the 4KiB pages.
 	pub fn range(&self) -> &PageRange {
 		self.pages.range().unwrap()
 	}
 	
-	// These 2 functions are range() equivalents for different page sizes
+	/// The range() equivalent for 2MiB pages. Created to avoid making the interface generic. 
 	pub fn range_2mb(&self) -> PageRange<Page2MiB> {
 		self.pages.range_2mb().ok_or("Error: attempt to get a page range of the wrong size.").unwrap()
 	}
+
+	/// The range() equivalent for 1GiB pages. Created to avoid making the interface generic. 
 	pub fn range_1gb(&self) -> PageRange<Page1GiB> {
 		self.pages.range_1gb().ok_or("Error: attempt to get a page range of the wrong size.").unwrap()
 	}
 
-	// These change the size marker of the range and convert to the appropriate enum variant, leaving the PageRange otherwise untouched.
-    pub fn as_allocated_1gb(&self) -> AllocatedPages {
-        AllocatedPages { pages: PageRangeSized::Huge1GiB(self.pages.range_1gb().unwrap()) }
+	/// Converts the indicated page size to 1GiB by changing the internal size marker type, without forcing alignment. 
+	/// This leaves the actual PageRange otherwise untouched.
+    pub fn to_1gb_allocated_pages(&mut self) {
+		self.pages = PageRangeSized::Huge1GiB(self.pages.range_1gb().unwrap());
     }
 
-    pub fn as_allocated_2mb(&mut self) {
+	/// Converts the indicated page size to 2MiB by changing the internal size marker type, without forcing alignment. 
+	/// This leaves the actual PageRange otherwise untouched.
+    pub fn to_2mb_allocated_pages(&mut self) {
 		self.pages = PageRangeSized::Huge2MiB(self.pages.range_2mb().unwrap());
     }
 
@@ -560,17 +576,14 @@ impl Drop for AllocatedPages {
 		if self.size_in_pages() == 0 { return; }
 		trace!("page_allocator: deallocating {:?}", self);
 
-		// let chunk = Chunk {
-		// 	pages: self.pages.clone(),
-		// };
-		// Convert differently-sized pages back to default size.
+		// Convert huge pages back to default size if needed.
 		let pages = match self.page_size() {
 			PAGE_4KB_SIZE => self.pages.clone(),
 			PAGE_2MB_SIZE => { 
-				self.pages.range_4k().unwrap()
+				self.pages.into_range_4k().unwrap()
 			},
 			PAGE_1GB_SIZE => { 
-				self.pages.range_4k().unwrap()
+				self.pages.into_range_4k().unwrap()
 			}
 		};
 
@@ -896,153 +909,6 @@ fn find_any_chunk(
 	Err(AllocationError::OutOfAddressSpace(num_pages, None))
 }
 
-fn find_any_aligned_chunk(
-	list: &mut StaticArrayRBTree<Chunk>,
-	aligned_size: usize,
-	num_pages: usize,
-	within_range: Option<&PageRange>,
-) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
-	let designated_low_end = DESIGNATED_PAGES_LOW_END.get()
-		.ok_or(AllocationError::NotInitialized)?;
-	let full_range = PageRange::new(*designated_low_end + 1, DESIGNATED_PAGES_HIGH_START - 1);
-	let range = within_range.unwrap_or(&full_range);
-
-	// During the first pass, we only search within the given range.
-	// If no range was given, we search from the end of the low designated region
-	// to the start of the high designated region.
-	match list.0 {
-		Inner::Array(ref mut arr) => {
-			for elem in arr.iter_mut() {
-				if let Some(chunk) = elem {
-					// Use max and min below to ensure that the range of pages we allocate from
-					// is within *both* the current chunk's bounds and the range's bounds.
-					let lowest_possible_start_page = *max(chunk.start(), range.start());
-					let highest_possible_end_page  = *min(chunk.end(), range.end());
-					if lowest_possible_start_page + num_pages <= highest_possible_end_page {
-						
-						// ADD CHECK HERE: 
-						// If page is aligned along the desired boundary, then continue.
-						
-						return adjust_chosen_chunk(
-							lowest_possible_start_page,
-							num_pages,
-							&chunk.clone(),
-							ValueRefMut::Array(elem),
-						);
-					}
-
-					// The early static array is not sorted, so we must iterate over all elements.
-				}
-			}
-		}
-		Inner::RBTree(ref mut tree) => {
-			// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
-			// ```
-			// let eligible_chunks = tree.range_mut(
-			//     Bound::Included(range.start()),
-			//     Bound::Included(range.end())
-			// );
-			// for c in eligible_chunks { ... }
-			// ```
-			//
-			// However, RBTree doesn't have a `range_mut()` method, so we use cursors for manual iteration.
-			//
-			// Because we allocate new pages by peeling them off from the beginning part of a chunk,
-			// it's MUCH faster to start the search for free pages from higher addresses moving down.
-			// This results in an O(1) allocation time in the general case, until all address ranges are already in use.
-			let mut cursor = tree.upper_bound_mut(Bound::Included(range.end()));
-			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				// Use max and min below to ensure that the range of pages we allocate from
-				// is within *both* the current chunk's bounds and the range's bounds.
-				let lowest_possible_start_page = *max(chunk.start(), range.start());
-				let highest_possible_end_page  = *min(chunk.end(), range.end());
-				if lowest_possible_start_page + num_pages <= highest_possible_end_page {
-
-					// ADD CHECK HERE:
-					// call and return result if the chunk is aligned along the desired boundary
-					return adjust_chosen_chunk(
-						lowest_possible_start_page,
-						num_pages,
-						&chunk.clone(),
-						ValueRefMut::RBTree(cursor)
-					);
-				}
-
-				if chunk.start() <= range.start() {
-					break; // move on to searching through the designated regions
-				}
-				warn!("page_allocator: unlikely scenario: had to search multiple chunks while trying to allocate {} pages in {:?}.", num_pages, range);
-				cursor.move_prev();
-			}
-		}
-	}
-
-	// If we failed to find suitable pages within the given range, return an error.
-	if let Some(range) = within_range {
-		return Err(AllocationError::OutOfAddressSpace(num_pages, Some(range.clone())));
-	}
-
-	// If we can't find any suitable chunks in the non-designated regions, then look in both designated regions.
-	warn!("PageAllocator: unlikely scenario: non-designated chunks are all allocated, \
-		  falling back to allocating {} pages from designated regions!", num_pages);
-	match list.0 {
-		Inner::Array(ref mut arr) => {
-			for elem in arr.iter_mut() {
-				if let Some(chunk) = elem {
-					if num_pages <= chunk.size_in_pages() {
-						// ADD CHECK HERE:
-						// call and return result if the chunk is aligned along the desired boundary
-						return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::Array(elem));
-					}
-				}
-			}
-		}
-		Inner::RBTree(ref mut tree) => {
-			// NOTE: if RBTree had a `range_mut()` method, we could simply do the following:
-			// ```
-			// let eligible_chunks = tree.range(
-			// 	Bound::<&Page>::Unbounded,
-			// 	Bound::Included(&DESIGNATED_PAGES_LOW_END)
-			// ).chain(tree.range(
-			// 	Bound::Included(&DESIGNATED_PAGES_HIGH_START),
-			// 	Bound::<&Page>::Unbounded
-			// ));
-			// for c in eligible_chunks { ... }
-			// ```
-			//
-			// RBTree doesn't have a `range_mut()` method, so we use cursors for two rounds of iteration.
-			// The first iterates over the lower designated region, from higher addresses to lower, down to zero.
-			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
-			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if num_pages < chunk.size_in_pages() {
-					// ADD CHECK HERE:
-					// call and return result if the chunk is aligned along the desired boundary
-					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
-				}
-				cursor.move_prev();
-			}
-
-			// The second iterates over the higher designated region, from the highest (max) address down to the designated region boundary.
-			let mut cursor = tree.upper_bound_mut::<Chunk>(Bound::Unbounded);
-			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if chunk.start() < &DESIGNATED_PAGES_HIGH_START {
-					// we already iterated over non-designated pages in the first match statement above, so we're out of memory.
-					break;
-				}
-				if num_pages < chunk.size_in_pages() {
-					// ADD CHECK HERE:
-					// call and return result if the chunk is aligned along the desired boundary
-					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
-				}
-				cursor.move_prev();
-			}
-		}
-	}
-
-	Err(AllocationError::OutOfAddressSpace(num_pages, None))
-}
-
-
 /// The final part of the main allocation routine.
 ///
 /// The given chunk is the one we've chosen to allocate from.
@@ -1111,7 +977,6 @@ pub enum AllocationRequest<'r> {
 	AtVirtualAddress(VirtualAddress),
 	/// The allocated pages can be located anywhere within the given range.
 	WithinRange(&'r PageRange),
-	AlignedTo(usize),
 }
 
 /// The core page allocation routine that allocates the given number of virtual pages,
@@ -1161,9 +1026,6 @@ pub fn allocate_pages_deferred(
 		AllocationRequest::WithinRange(range) => {
 			find_any_chunk(&mut locked_list, num_pages, Some(range))
 		}
-		AllocationRequest::AlignedTo(x) => {
-			find_any_aligned_chunk(&mut locked_list, x, num_pages, None)
-		}
 	};
 	res.map_err(From::from) // convert from AllocationError to &str
 }
@@ -1201,7 +1063,7 @@ pub fn allocate_2mb_pages(num_pages: usize) -> Option<AllocatedPages> {
 	if let Some(mut ap) = allocate_pages_deferred(AllocationRequest::Any, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok() {
-			ap.as_allocated_2mb();
+			ap.to_2mb_allocated_pages();
 			return Some(ap);
 		}
 	None
@@ -1209,10 +1071,11 @@ pub fn allocate_2mb_pages(num_pages: usize) -> Option<AllocatedPages> {
 
 pub fn allocate_1gb_pages(num_pages: usize) -> Option<AllocatedPages> {
 	let num_pages = num_pages * 512 * 512;
-	if let Some(ap) = allocate_pages_deferred(AllocationRequest::Any, num_pages)
+	if let Some(mut ap) = allocate_pages_deferred(AllocationRequest::Any, num_pages)
 		.map(|(ap, _action)| ap)
 		.ok() {
-			return Some(ap.as_allocated_1gb());
+			ap.to_1gb_allocated_pages();
+			return Some(ap);
 		}
 	None
 }

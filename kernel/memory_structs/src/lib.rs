@@ -14,7 +14,6 @@ use core::{
     iter::Step,
     ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
     marker::PhantomData,
-    any::Any,
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
@@ -22,7 +21,7 @@ use paste::paste;
 use derive_more::*;
 use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 
-pub const PAGE_4KB_SIZE: usize = (1 << 12);
+pub const PAGE_4KB_SIZE: usize = 1 << 12;
 pub const PAGE_2MB_SIZE: usize = (1 << 12) * 512;
 pub const PAGE_1GB_SIZE: usize = (1 << 12) * 512 * 512;
 
@@ -30,25 +29,26 @@ pub trait PageSize: Ord + PartialOrd + Clone {
     const SIZE: usize;
 }
 
+/// Marker struct used to indicate the default page size of 4KiB
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page4KiB;
 impl PageSize for Page4KiB {
     const SIZE: usize = PAGE_4KB_SIZE;
 }
 
+/// Marker struct used to indicate a page size of 2MiB
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page2MiB;
 impl PageSize for Page2MiB {
     const SIZE: usize = PAGE_2MB_SIZE;
 }
 
-
+/// Marker struct used to indicate a page size of 1GiB
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page1GiB;
 impl PageSize for Page1GiB {
     const SIZE: usize = PAGE_1GB_SIZE;
 }
-
 
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
@@ -285,11 +285,6 @@ macro_rules! implement_page_frame {
                 pub size: PhantomData::<P>,
             }
             impl $TypeName {
-                // #[doc = "Returns the `" $address "` at the start of this `" $TypeName "`."]
-                // pub const fn start_address(&self) -> $address {
-                //     $address::new_canonical(self.number * PAGE_SIZE)
-                // }
-
                 #[doc = "Returns the number of this `" $TypeName "`."]
                 #[inline(always)]
                 pub const fn number(&self) -> usize {
@@ -311,6 +306,7 @@ macro_rules! implement_page_frame {
                     $address::new_canonical(self.number * PAGE_SIZE)
                 }
 
+                #[doc = "Returns a `" $TypeName "` with the same number as this `" $TypeName "` but with the size marker set to indicate a size of 4kb."]
                 pub const fn as_4kb(&self) -> $TypeName {
                     $TypeName {
                         number: self.number,
@@ -318,6 +314,7 @@ macro_rules! implement_page_frame {
                     }
                 }
 
+                #[doc = "Returns a `" $TypeName "` with the same number as this `" $TypeName "` but with the size marker set to indicate a size of 1gb."]
                 pub const fn as_1gb(&self) -> $TypeName<Page1GiB> {
                     $TypeName {
                         number: self.number,
@@ -325,6 +322,7 @@ macro_rules! implement_page_frame {
                     }
                 }
 
+                #[doc = "Returns a `" $TypeName "` with the same number as this `" $TypeName "` but with the size marker set to indicate a size of 2mb."]
                 pub const fn as_2mb(&self) -> $TypeName<Page2MiB> {
                     $TypeName {
                         number: self.number,
@@ -332,14 +330,16 @@ macro_rules! implement_page_frame {
                     }
                 }
 
-                pub const fn align_to_2MiB(&self) -> $TypeName<Page2MiB> {
+                #[doc = "Returns a new `" $TypeName "` aligned to a 2mb boundary, and with the size marker changed to indicate a size of 2mb."]
+                pub const fn align_to_2mb(&self) -> $TypeName<Page2MiB> {
                     $TypeName {
                         number: self.number / PAGE_SIZE,
                         size: PhantomData::<Page2MiB>
                     }
                 }
-                
-                pub const fn align_to_1GiB(&self) -> $TypeName<Page1GiB> {
+
+                #[doc = "Returns a new `" $TypeName "` aligned to a 1GiB boundary, and with the size marker changed to indicate a size of 1GiB."]
+                pub const fn align_to_1gb(&self) -> $TypeName<Page1GiB> {
                     $TypeName {
                         number: self.number / (PAGE_SIZE * PAGE_SIZE),
                         size: PhantomData::<Page1GiB>
@@ -347,7 +347,7 @@ macro_rules! implement_page_frame {
                 }
 
                 #[doc = "Returns a 2MiB huge`" $TypeName "` containing the given `" $address "`."]
-                pub const fn containing_address_2MiB(addr: $address) -> $TypeName<Page2MiB> {
+                pub const fn containing_address_2mb(addr: $address) -> $TypeName<Page2MiB> {
                     $TypeName {
                         number: addr.value() / (PAGE_SIZE * PAGE_SIZE),
                         size: PhantomData::<Page2MiB>,
@@ -355,7 +355,7 @@ macro_rules! implement_page_frame {
                 }
 
                 #[doc = "Returns a 1GiB huge `" $TypeName "` containing the given `" $address "`."]
-                pub const fn containing_address_1GiB(addr: $address) -> $TypeName<Page1GiB> {
+                pub const fn containing_address_1gb(addr: $address) -> $TypeName<Page1GiB> {
                     $TypeName {
                         number: addr.value() / (PAGE_SIZE * PAGE_SIZE * PAGE_SIZE),
                         size: PhantomData::<Page1GiB>,
@@ -510,11 +510,6 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                // #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]
-                // pub const fn start_address(&self) -> $address {
-                //     self.0.start().start_address()
-                // }
-
                 #[doc = "Returns the number of [`" $chunk "`]s covered by this iterator.\n\n \
                     Use this instead of [`Iterator::count()`] method. \
                     This is instant, because it doesn't need to iterate over each entry, unlike normal iterators."]
@@ -524,20 +519,20 @@ macro_rules! implement_page_frame_range {
                 }
 
                 // These change the size markers and align to desired amount. 
-                pub fn align_to_2MiB_range(&self) -> $TypeName<Page2MiB> {
-                    $TypeName::<Page2MiB>(RangeInclusive::new(self.start().align_to_2MiB(), self.end().align_to_2MiB()))
+                pub fn align_to_2mb_range(&self) -> $TypeName<Page2MiB> {
+                    $TypeName::<Page2MiB>(RangeInclusive::new(self.start().align_to_2mb(), self.end().align_to_2mb()))
                 }
 
-                pub fn align_to_1GiB_range(&self) -> $TypeName<Page1GiB> {
-                    $TypeName::<Page1GiB>(RangeInclusive::new(self.start().align_to_1GiB(), self.end().align_to_1GiB()))
+                pub fn align_to_1gb_range(&self) -> $TypeName<Page1GiB> {
+                    $TypeName::<Page1GiB>(RangeInclusive::new(self.start().align_to_1gb(), self.end().align_to_1gb()))
                 }
 
                 // These into functions just convert the size marker.
-                pub fn into_2MiB_range(&self) -> $TypeName<Page2MiB> {
+                pub fn into_2mb_range(&self) -> $TypeName<Page2MiB> {
                     $TypeName::<Page2MiB>(RangeInclusive::new(self.start().as_2mb(), self.end().as_2mb()))
                 }
 
-                pub fn into_1GiB_range(&self) -> $TypeName<Page1GiB> {
+                pub fn into_1gb_range(&self) -> $TypeName<Page1GiB> {
                     $TypeName::<Page1GiB>(RangeInclusive::new(self.start().as_1gb(), self.end().as_1gb()))
                 }
 
@@ -584,11 +579,11 @@ macro_rules! implement_page_frame_range {
                 # Examples\n \
                 If the range covers addresses `0x2000` to `0x4000`, then `offset_of_address(0x3500)` would return `Some(0x1500)`."]
                 pub const fn offset_of_address(&self, addr: $address) -> Option<usize> {
-                if self.contains_address(addr) {
-                    Some(addr.value() - self.start_address().value())
-                } else {
-                    None
-                }
+                    if self.contains_address(addr) {
+                        Some(addr.value() - self.start_address().value())
+                    } else {
+                        None
+                    }
                 }
 
                 #[doc = "Returns the [`" $address "`] at the given `offset` into this `" $TypeName "`within this `" $TypeName "`, \
@@ -616,8 +611,9 @@ macro_rules! implement_page_frame_range {
                     $TypeName::<Page1GiB>(RangeInclusive::new(start, end))
                 }
 
-                #[doc = "This does not perform any alignment. It simply changes the marker type for usage with functions that want a range of default-sized pages."]
-                pub fn as_4KiB_range(&self) -> $TypeName {
+                #[doc = "Changes this `" $TypeName "` to have a size of 4KiB. This does not perform any alignment. \
+                        It simply changes the marker type for usage with functions that want a range of default-sized pages."]
+                pub fn as_4kb_range(&self) -> $TypeName {
                     $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
                 }
 

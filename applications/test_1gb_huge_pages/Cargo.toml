@@ -1,5 +1,5 @@
 [package]
-name = "test_huge_pages"
+name = "test_1gb_huge_pages"
 version = "0.1.0"
 authors = ["Noah Mogensen <mogensenn@sou.edu>"]
 
@@ -7,12 +7,6 @@ authors = ["Noah Mogensen <mogensenn@sou.edu>"]
 
 [dependencies.memory]
 path = "../../kernel/memory"
-
-[dependencies.frame_allocator]
-path = "../../kernel/frame_allocator"
-
-[dependencies.page_allocator]
-path = "../../kernel/page_allocator"
 
 [dependencies.app_io]
 path = "../../kernel/app_io"
