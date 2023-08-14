@@ -1087,6 +1087,24 @@ mod tls_current_task {
                 })?
         };
 
+        log::warn!("ptr: {:0x?}", &CURRENT_TASK as *const _);
+        let mut temp = &CURRENT_TASK as *const _;
+        let fs: u64;
+        unsafe {
+            ::core::arch::asm!(
+                "rdfsbase {}",
+                "add {}, rax",
+                out(reg) fs,
+                inout(reg) temp,
+            )
+        };
+        log::warn!("  fs: {fs:0x?}");
+        let fs0: u64;
+        unsafe {
+            ::core::arch::asm!("mov {},fs:[0x0]", out(reg) fs0)
+        };
+        log::warn!(" fs0: {fs0:0x?}");
+
         match CURRENT_TASK.try_borrow_mut() {
             Ok(mut t_opt) => if let Some(_existing_task) = t_opt.deref() {
                 log::error!("BUG: init_current_task(): CURRENT_TASK was already `Some()`");
