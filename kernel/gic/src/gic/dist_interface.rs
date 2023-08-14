@@ -83,76 +83,78 @@ const GROUP_1: u32 = 1;
 // bit 15: which interrupt group to target
 const SGIR_NSATT_GRP1: u32 = 1 << 15;
 
-/// Initializes the distributor by enabling forwarding
-/// of group 1 interrupts and allowing the GIC to pick
-/// a core that is asleep for "1 of N" interrupts.
-///
-/// Return value: whether or not affinity routing is
-/// currently enabled for both secure and non-secure
-/// states.
-pub fn init(registers: &mut DistRegsP1) -> Enabled {
-    let mut reg = registers.ctlr.read();
-    reg |= CTLR_ENGRP1;
-    reg |= CTLR_E1NWF;
-    registers.ctlr.write(reg);
+impl DistRegsP1 {
+    /// Initializes the distributor by enabling forwarding
+    /// of group 1 interrupts and allowing the GIC to pick
+    /// a core that is asleep for "1 of N" interrupts.
+    ///
+    /// Return value: whether or not affinity routing is
+    /// currently enabled for both secure and non-secure
+    /// states.
+    pub fn init(&mut self) -> Enabled {
+        let mut reg = self.ctlr.read();
+        reg |= CTLR_ENGRP1;
+        reg |= CTLR_E1NWF;
+        self.ctlr.write(reg);
 
-    // Return value: whether or not affinity routing is
-    // currently enabled for both secure and non-secure
-    // states.
-    reg & CTLR_ARE_NS > 0
-}
-
-/// Returns whether the given SPI (shared peripheral interrupt) will be
-/// forwarded by the distributor
-pub fn is_spi_enabled(registers: &DistRegsP1, int: InterruptNumber) -> Enabled {
-    // enabled?
-    read_array_volatile::<32>(&registers.set_enable, int) > 0
-    &&
-    // part of group 1?
-    read_array_volatile::<32>(&registers.group, int) == GROUP_1
-}
-
-/// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt)
-pub fn enable_spi(registers: &mut DistRegsP1, int: InterruptNumber, enabled: Enabled) {
-    let reg_base = match enabled {
-        true  => &mut registers.set_enable,
-        false => &mut registers.clear_enable,
-    };
-    write_array_volatile::<32>(reg_base, int, 1);
-
-    // whether we're enabling or disabling,
-    // set as part of group 1
-    write_array_volatile::<32>(&mut registers.group, int, GROUP_1);
-}
-
-/// Returns the priority of an SPI.
-pub fn get_spi_priority(registers: &DistRegsP1, int: InterruptNumber) -> Priority {
-    u8::MAX - (read_array_volatile::<4>(&registers.priority, int) as u8)
-}
-
-/// Sets the priority of an SPI.
-pub fn set_spi_priority(registers: &mut DistRegsP1, int: InterruptNumber, prio: Priority) {
-    write_array_volatile::<4>(&mut registers.priority, int, (u8::MAX - prio) as u32);
-}
-
-/// Sends an Inter-Processor-Interrupt
-///
-/// legacy / GICv2 method
-/// int_num must be less than 16
-#[allow(dead_code)]
-pub fn send_ipi_gicv2(registers: &mut DistRegsP1, int_num: u32, target: IpiTargetCpu) {
-    if let IpiTargetCpu::Specific(cpu) = &target {
-        assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
+        // Return value: whether or not affinity routing is
+        // currently enabled for both secure and non-secure
+        // states.
+        reg & CTLR_ARE_NS > 0
     }
 
-    let target_list = match target {
-        IpiTargetCpu::Specific(cpu) => (1 << cpu.value()) << 16,
-        IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
-        IpiTargetCpu::GICv2TargetList(list) => (list.0 as u32) << 16,
-    };
+    /// Returns whether the given SPI (shared peripheral interrupt) will be
+    /// forwarded by the distributor
+    pub fn is_spi_enabled(&self, int: InterruptNumber) -> Enabled {
+        // enabled?
+        read_array_volatile::<32>(&self.set_enable, int) > 0
+        &&
+        // part of group 1?
+        read_array_volatile::<32>(&self.group, int) == GROUP_1
+    }
 
-    let value: u32 = int_num | target_list | SGIR_NSATT_GRP1;
-    registers.sgir.write(value);
+    /// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt)
+    pub fn enable_spi(&mut self, int: InterruptNumber, enabled: Enabled) {
+        let reg_base = match enabled {
+            true  => &mut self.set_enable,
+            false => &mut self.clear_enable,
+        };
+        write_array_volatile::<32>(reg_base, int, 1);
+
+        // whether we're enabling or disabling,
+        // set as part of group 1
+        write_array_volatile::<32>(&mut self.group, int, GROUP_1);
+    }
+
+    /// Returns the priority of an SPI.
+    pub fn get_spi_priority(&self, int: InterruptNumber) -> Priority {
+        u8::MAX - (read_array_volatile::<4>(&self.priority, int) as u8)
+    }
+
+    /// Sets the priority of an SPI.
+    pub fn set_spi_priority(&mut self, int: InterruptNumber, prio: Priority) {
+        write_array_volatile::<4>(&mut self.priority, int, (u8::MAX - prio) as u32);
+    }
+
+    /// Sends an Inter-Processor-Interrupt
+    ///
+    /// legacy / GICv2 method
+    /// int_num must be less than 16
+    #[allow(dead_code)]
+    pub fn send_ipi_gicv2(&mut self, int_num: u32, target: IpiTargetCpu) {
+        if let IpiTargetCpu::Specific(cpu) = &target {
+            assert!(cpu.value() < 8, "affinity routing is disabled; cannot target a CPU with id >= 8");
+        }
+
+        let target_list = match target {
+            IpiTargetCpu::Specific(cpu) => (1 << cpu.value()) << 16,
+            IpiTargetCpu::AllOtherCpus => SGIR_TARGET_ALL_OTHER_PE,
+            IpiTargetCpu::GICv2TargetList(list) => (list.0 as u32) << 16,
+        };
+
+        let value: u32 = int_num | target_list | SGIR_NSATT_GRP1;
+        self.sgir.write(value);
+    }
 }
 
 /// Deserialized content of the `IIDR` distributor register

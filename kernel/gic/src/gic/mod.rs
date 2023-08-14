@@ -1,5 +1,3 @@
-use core::convert::AsMut;
-
 use cpu::{CpuId, MpidrValue};
 use arm_boards::{BOARD_CONFIG, NUM_CPUS};
 use memory::{
@@ -208,7 +206,7 @@ impl ArmGicDistributor {
                     .into_borrowed_mut::<DistRegsP1>(0)
                     .map_err(|(_, e)| e)?;
 
-                dist_interface::init(registers.as_mut());
+                registers.init();
 
                 Ok(Self::V2 {
                     registers,
@@ -226,7 +224,7 @@ impl ArmGicDistributor {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                let affinity_routing = dist_interface::init(v2_regs.as_mut());
+                let affinity_routing = v2_regs.init();
 
                 Ok(Self::V3 {
                     affinity_routing,
@@ -240,26 +238,26 @@ impl ArmGicDistributor {
     /// Will that interrupt be forwarded by the distributor?
     pub fn get_spi_state(&self, int: InterruptNumber) -> Enabled {
         assert!(int >= 32);
-        dist_interface::is_spi_enabled(self.distributor(), int)
+        self.distributor().is_spi_enabled(int)
     }
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
     pub fn set_spi_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         assert!(int >= 32);
-        dist_interface::enable_spi(self.distributor_mut(), int, enabled)
+        self.distributor_mut().enable_spi(int, enabled)
     }
 
     /// Returns the priority of an interrupt
     pub fn get_spi_priority(&self, int: InterruptNumber) -> Priority {
         assert!(int >= 32);
-        dist_interface::get_spi_priority(self.distributor(), int)
+        self.distributor().get_spi_priority(int)
     }
 
     /// Sets the priority of an interrupt (0-255)
     pub fn set_spi_priority(&mut self, int: InterruptNumber, enabled: Priority) {
         assert!(int >= 32);
-        dist_interface::set_spi_priority(self.distributor_mut(), int, enabled)
+        self.distributor_mut().set_spi_priority(int, enabled)
     }
 }
 
@@ -286,7 +284,7 @@ impl ArmGicCpuComponents {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                cpu_interface_gicv2::init(registers.as_mut());
+                registers.init();
 
                 Ok(Self::V2 {
                     registers,
@@ -307,7 +305,7 @@ impl ArmGicCpuComponents {
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
-                redist_interface::init(redistributor.as_mut())?;
+                redistributor.init()?;
                 cpu_interface_gicv3::init();
 
                 Ok(Self::V3 {
@@ -322,7 +320,7 @@ impl ArmGicCpuComponents {
 
     pub fn init_secondary_cpu_interface(&mut self) {
         match self {
-            Self::V2 { registers, .. } => cpu_interface_gicv2::init(registers.as_mut()),
+            Self::V2 { registers, .. } => registers.init(),
             Self::V3 { .. } => cpu_interface_gicv3::init(),
         }
     }
@@ -351,7 +349,7 @@ impl ArmGicCpuComponents {
     /// and fetches its number
     pub fn acknowledge_interrupt(&mut self) -> (InterruptNumber, Priority) {
         match self {
-            Self::V2 { registers, .. } => cpu_interface_gicv2::acknowledge_interrupt(registers),
+            Self::V2 { registers, .. } => registers.acknowledge_interrupt(),
             Self::V3 { .. } => cpu_interface_gicv3::acknowledge_interrupt(),
         }
     }
@@ -359,7 +357,7 @@ impl ArmGicCpuComponents {
     /// Performs priority drop for the specified interrupt
     pub fn end_of_interrupt(&mut self, int: InterruptNumber) {
         match self {
-            Self::V2 { registers, .. } => cpu_interface_gicv2::end_of_interrupt(registers, int),
+            Self::V2 { registers, .. } => registers.end_of_interrupt(int),
             Self::V3 { .. } => cpu_interface_gicv3::end_of_interrupt(int),
         }
     }
@@ -369,7 +367,7 @@ impl ArmGicCpuComponents {
         assert!(int < 32);
 
         if let Self::V3 { redist_regs } = self {
-            redist_interface::is_sgippi_enabled(&redist_regs.redist_sgippi, int)
+            redist_regs.redist_sgippi.is_sgippi_enabled(int)
         } else {
             // there is no redistributor and we don't have access to the distributor
             log::error!("GICv2 doesn't support enabling/disabling local interrupt");
@@ -384,7 +382,7 @@ impl ArmGicCpuComponents {
         assert!(int < 32);
 
         if let Self::V3 { redist_regs } = self {
-            redist_interface::enable_sgippi(&mut redist_regs.redist_sgippi, int, enabled);
+            redist_regs.redist_sgippi.enable_sgippi(int, enabled);
         } else {
             // there is no redistributor and we don't have access to the distributor
             log::error!("GICv2 doesn't support enabling/disabling local interrupt");
@@ -396,7 +394,7 @@ impl ArmGicCpuComponents {
         assert!(int < 32);
 
         if let Self::V3 { redist_regs } = self {
-            redist_interface::get_sgippi_priority(&redist_regs.redist_sgippi, int)
+            redist_regs.redist_sgippi.get_sgippi_priority(int)
         } else {
             // there is no redistributor and we don't have access to the distributor
             log::error!("GICv2 doesn't support setting local interrupt priority");
@@ -411,7 +409,7 @@ impl ArmGicCpuComponents {
         assert!(int < 32);
 
         if let Self::V3 { redist_regs } = self {
-            redist_interface::set_sgippi_priority(&mut redist_regs.redist_sgippi, int, enabled);
+            redist_regs.redist_sgippi.set_sgippi_priority(int, enabled);
         } else {
             // there is no redistributor and we don't have access to the distributor
             log::error!("GICv2 doesn't support setting local interrupt priority");
@@ -424,7 +422,7 @@ impl ArmGicCpuComponents {
     /// them
     pub fn get_minimum_priority(&self) -> Priority {
         match self {
-            Self::V2 { registers, .. } => cpu_interface_gicv2::get_minimum_priority(registers),
+            Self::V2 { registers, .. } => registers.get_minimum_priority(),
             Self::V3 { .. } => cpu_interface_gicv3::get_minimum_priority(),
         }
     }
@@ -435,7 +433,7 @@ impl ArmGicCpuComponents {
     /// them
     pub fn set_minimum_priority(&mut self, priority: Priority) {
         match self {
-            Self::V2 { registers, .. } => cpu_interface_gicv2::set_minimum_priority(registers, priority),
+            Self::V2 { registers, .. } => registers.set_minimum_priority(priority),
             Self::V3 { .. } => cpu_interface_gicv3::set_minimum_priority(priority),
         }
     }
@@ -446,7 +444,7 @@ impl ArmGicCpuComponents {
     /// Note #2: this is only provided for debugging purposes
     pub fn get_cpu_interface_id(&self) -> u16 {
         match self {
-            Self::V3 { redist_regs } => redist_interface::get_internal_id(&redist_regs.redistributor),
+            Self::V3 { redist_regs } => redist_regs.redistributor.get_internal_id(),
             Self::V2 { cpu_index, .. } => *cpu_index,
         }
     }
