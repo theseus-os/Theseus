@@ -1,9 +1,10 @@
 use {
     gic::{ArmGicDistributor, ArmGicCpuComponents, SpiDestination, IpiTargetCpu, Version as GicVersion},
     arm_boards::{NUM_CPUS, BOARD_CONFIG, InterruptControllerConfig},
-    core::{ops::DerefMut, array::try_from_fn},
-    memory::get_kernel_mmi_ref,
+    core::array::try_from_fn,
     sync_irq::IrqSafeMutex,
+    cpu::current_cpu,
+    spin::Once,
 };
 
 use super::*;
@@ -17,28 +18,38 @@ pub struct SystemInterruptControllerId(pub u8);
 #[derive(Debug, Copy, Clone)]
 pub struct LocalInterruptControllerId(pub u16);
 
+/// Per-CPU local interrupt controller
+static LOCAL_INT_CTRL: Once<[LocalInterruptController; NUM_CPUS]> = Once::new();
+
+/// System-wide interrupt controller
+static SYSWD_INT_CTRL: Once<SystemInterruptController> = Once::new();
+
 /// Initializes the interrupt controller, on aarch64
 pub fn init() -> Result<(), &'static str> {
     match BOARD_CONFIG.interrupt_controller {
         InterruptControllerConfig::GicV3(gicv3_cfg) => {
-            let kernel_mmi_ref = get_kernel_mmi_ref()
-                .ok_or("interrupts::aarch64::init: couldn't get kernel MMI ref")?;
-
-            let mut mmi = kernel_mmi_ref.lock();
-            let page_table = &mut mmi.deref_mut().page_table;
-
             let version = GicVersion::InitV3 {
                 dist: gicv3_cfg.distributor_base_address,
                 redist: gicv3_cfg.redistributor_base_addresses,
             };
 
-            let distrib = ArmGicDistributor::init(&version)?;
-            let cpu_ctlrs: [ArmGicCpuComponents; NUM_CPUS] = try_from_fn(|i| {
-                let cpu_id = BOARD_CONFIG.cpu_ids[i].into();
-                ArmGicCpuComponents::init(cpu_id, &version)
+            SYSWD_INT_CTRL.try_call_once(|| -> Result<_, &'static str> {
+                let distrib = ArmGicDistributor::init(&version)?;
+                let mutex = IrqSafeMutex::new(distrib);
+                Ok(SystemInterruptController(mutex))
             })?;
 
-            // TODO: store these somewhere
+            LOCAL_INT_CTRL.try_call_once(|| -> Result<_, &'static str> {
+                let cpu_ctlrs: [ArmGicCpuComponents; NUM_CPUS] = try_from_fn(|i| {
+                    let cpu_id = BOARD_CONFIG.cpu_ids[i].into();
+                    ArmGicCpuComponents::init(cpu_id, &version)
+                })?;
+
+                Ok(cpu_ctlrs.map(|ctlr| {
+                    let mutex = IrqSafeMutex::new(ctlr);
+                    LocalInterruptController(mutex)
+                }))
+            })?;
         },
     }
 
@@ -57,6 +68,10 @@ pub struct SystemInterruptController(IrqSafeMutex<ArmGicDistributor>);
 pub struct LocalInterruptController(IrqSafeMutex<ArmGicCpuComponents>);
 
 impl SystemInterruptControllerApi for SystemInterruptController {
+    fn get() -> &'static Self {
+        SYSWD_INT_CTRL.get().expect("interrupt_controller wasn't initialized")
+    }
+
     fn id(&self) -> SystemInterruptControllerId {
         let dist = self.0.lock();
         SystemInterruptControllerId(dist.implementer().product_id)
@@ -107,6 +122,19 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 }
 
 impl LocalInterruptControllerApi for LocalInterruptController {
+    fn get() -> &'static Self {
+        // While we're waiting for cpu-local-storage, this loop will work as fine as an AtomicMap
+
+        let cpu_id = current_cpu();
+        let index = BOARD_CONFIG.cpu_ids.iter().position(|mpidr| cpu_id == (*mpidr).into());
+        let index = index.expect("Invalid CpuId returned by current_cpu()");
+
+        let ctrls = LOCAL_INT_CTRL.get();
+        let ctrls = ctrls.expect("interrupt_controller wasn't initialized");
+
+        &ctrls[index]
+    }
+
     fn init_secondary_cpu_interface(&self) {
         let mut cpu = self.0.lock();
         cpu.init_secondary_cpu_interface();
