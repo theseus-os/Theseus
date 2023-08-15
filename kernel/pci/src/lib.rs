@@ -321,14 +321,16 @@ impl PciLocation {
     }
 
     /// Write 32-bit data to the specified `offset` for the PCI device.
+    ///
+    /// Note: this only supports offsets aligned to 4 bytes.
     fn pci_write(&self, offset: u8, value: u32) {
         let address = self.pci_address_and_shift(offset);
-        let shifted = value << address.byte_shift;
+        assert_eq!(address.byte_shift, 0, "PciLocation::pci_write only supports offsets aligned to 4 bytes.");
 
         #[cfg(target_arch = "x86_64")] {
             unsafe {
                 PCI_CONFIG_ADDRESS_PORT.lock().write(address.dword_address); 
-                PCI_CONFIG_DATA_PORT.lock().write(shifted);
+                PCI_CONFIG_DATA_PORT.lock().write(value);
             }
         }
 
@@ -337,7 +339,7 @@ impl PciLocation {
             let config_space = config_space.get_mut()
                 .expect("PCI Config Space wasn't mapped yet");
             let dword_index = (address.dword_address as usize) / size_of::<u32>();
-            config_space[dword_index].write(shifted);
+            config_space[dword_index].write(value);
         }
     }
 
@@ -601,7 +603,7 @@ impl PciDevice {
         // find the memory base address and size of the area for the vector table
         let mem_base = PhysicalAddress::new((self.bars[bar as usize] + offset) as usize)
             .ok_or("Invalid BAR content")?;
-        let mem_size_in_bytes = core::mem::size_of::<MsixVectorEntry>() * max_vectors;
+        let mem_size_in_bytes = size_of::<MsixVectorEntry>() * max_vectors;
 
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
 
