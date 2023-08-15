@@ -22,7 +22,7 @@ pub struct LocalInterruptControllerId(pub u16);
 static LOCAL_INT_CTRL: Once<[LocalInterruptController; NUM_CPUS]> = Once::new();
 
 /// System-wide interrupt controller
-static SYSWD_INT_CTRL: Once<SystemInterruptController> = Once::new();
+static SYSTEM_WIDE_INT_CTRL: Once<SystemInterruptController> = Once::new();
 
 /// Initializes the interrupt controller, on aarch64
 pub fn init() -> Result<(), &'static str> {
@@ -33,7 +33,7 @@ pub fn init() -> Result<(), &'static str> {
                 redist: gicv3_cfg.redistributor_base_addresses,
             };
 
-            SYSWD_INT_CTRL.try_call_once(|| -> Result<_, &'static str> {
+            SYSTEM_WIDE_INT_CTRL.try_call_once(|| -> Result<_, &'static str> {
                 let distrib = ArmGicDistributor::init(&version)?;
                 let mutex = IrqSafeMutex::new(distrib);
                 Ok(SystemInterruptController(mutex))
@@ -69,7 +69,7 @@ pub struct LocalInterruptController(IrqSafeMutex<ArmGicCpuComponents>);
 
 impl SystemInterruptControllerApi for SystemInterruptController {
     fn get() -> &'static Self {
-        SYSWD_INT_CTRL.get().expect("interrupt_controller wasn't initialized")
+        SYSTEM_WIDE_INT_CTRL.get().expect("interrupt_controller wasn't initialized")
     }
 
     fn id(&self) -> SystemInterruptControllerId {
@@ -136,68 +136,68 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 
     fn init_secondary_cpu_interface(&self) {
-        let mut cpu = self.0.lock();
-        cpu.init_secondary_cpu_interface();
+        let mut cpu_ctrl = self.0.lock();
+        cpu_ctrl.init_secondary_cpu_interface();
     }
 
     fn id(&self) -> LocalInterruptControllerId {
-        let cpu = self.0.lock();
-        LocalInterruptControllerId(cpu.get_cpu_interface_id())
+        let cpu_ctrl = self.0.lock();
+        LocalInterruptControllerId(cpu_ctrl.get_cpu_interface_id())
     }
 
     fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority {
         assert!(num < 32, "local interrupts have a number < 32");
-        let cpu = self.0.lock();
-        cpu.get_interrupt_priority(num as _)
+        let cpu_ctrl = self.0.lock();
+        cpu_ctrl.get_interrupt_priority(num as _)
     }
 
     fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority) {
         assert!(num < 32, "local interrupts have a number < 32");
-        let mut cpu = self.0.lock();
-        cpu.set_interrupt_priority(num as _, priority);
+        let mut cpu_ctrl = self.0.lock();
+        cpu_ctrl.set_interrupt_priority(num as _, priority);
     }
 
     fn is_local_interrupt_enabled(&self, num: InterruptNumber) -> bool {
         assert!(num < 32, "local interrupts have a number < 32");
-        let cpu = self.0.lock();
-        cpu.get_interrupt_state(num as _)
+        let cpu_ctrl = self.0.lock();
+        cpu_ctrl.get_interrupt_state(num as _)
     }
 
     fn enable_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
         assert!(num < 32, "local interrupts have a number < 32");
-        let mut cpu = self.0.lock();
-        cpu.set_interrupt_state(num as _, enabled);
+        let mut cpu_ctrl = self.0.lock();
+        cpu_ctrl.set_interrupt_state(num as _, enabled);
     }
 
     fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
         use InterruptDestination::*;
         assert!(num < 16, "IPIs have a number < 16");
-        let mut cpu = self.0.lock();
+        let mut cpu_ctrl = self.0.lock();
 
-        cpu.send_ipi(num as _, match dest {
+        cpu_ctrl.send_ipi(num as _, match dest {
             SpecificCpu(cpu) => IpiTargetCpu::Specific(cpu),
             AllOtherCpus => IpiTargetCpu::AllOtherCpus,
         });
     }
 
     fn get_minimum_priority(&self) -> Priority {
-        let cpu = self.0.lock();
-        cpu.get_minimum_priority()
+        let cpu_ctrl = self.0.lock();
+        cpu_ctrl.get_minimum_priority()
     }
 
     fn set_minimum_priority(&self, priority: Priority) {
-        let mut cpu = self.0.lock();
-        cpu.set_minimum_priority(priority)
+        let mut cpu_ctrl = self.0.lock();
+        cpu_ctrl.set_minimum_priority(priority)
     }
 
     fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
-        let mut cpu = self.0.lock();
-        let (num, prio) = cpu.acknowledge_interrupt();
+        let mut cpu_ctrl = self.0.lock();
+        let (num, prio) = cpu_ctrl.acknowledge_interrupt();
         (num as _, prio)
     }
 
     fn end_of_interrupt(&self, number: InterruptNumber) {
-        let mut cpu = self.0.lock();
-        cpu.end_of_interrupt(number as _)
+        let mut cpu_ctrl = self.0.lock();
+        cpu_ctrl.end_of_interrupt(number as _)
     }
 }
