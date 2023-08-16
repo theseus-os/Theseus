@@ -912,8 +912,10 @@ fn task_switch_inner(
     if curr_task_has_exited {
         // log::trace!("[CPU {}] task_switch(): deiniting current task TLS for: {:?}, next: {}", cpu_id, curr_task_tls_slot.as_deref(), next.deref());
         let prev_taskref = curr_task_tls_slot.take();
+        log::info!("about to drop");
         DROP_AFTER_TASK_SWITCH.set_guarded(prev_taskref, &preemption_guard);
     }
+    log::info!("dropped?");
 
     // Now we are done touching the current task's TLS slot, so proactively drop it now
     // to ensure that it isn't accidentally dropped later after we've switched the active TLS area.
@@ -954,11 +956,13 @@ fn task_switch_inner(
 ///    when it is appropriate to do so.
 fn post_context_switch_action() -> PreemptionGuard {
     let guard_1 = preemption::hold_preemption();
+    log::info!("helol");
     let guard_2 = TASK_SWITCH_PREEMPTION_GUARD
         .replace_guarded(None, &guard_1)
         .expect("BUG: post_context_switch_action: no PreemptionGuard existed");
     // Doesn't really matter which guard we use.
     DROP_AFTER_TASK_SWITCH.set_guarded(None, &guard_2);
+    log::info!("helol2k");
     guard_2
 }
 

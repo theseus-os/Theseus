@@ -8,6 +8,8 @@ OUTPUT_FORMAT(elf64-x86-64)
  */
 KERNEL_OFFSET = 0xFFFFFFFF80000000;
 
+TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);
+
 SECTIONS {
 
 	/*
@@ -45,20 +47,31 @@ SECTIONS {
 		*(.gcc_except_table .gcc_except_table.*)
 	}
 
+	/* .cls ALIGN(4k) + 4K - SIZEOF(.cls) : AT(ADDR(.cls) - KERNEL_OFFSET)
+	 *{
+	 *		*(.cls)
+	 *}
+	 *
+	 *.tdata ALIGN(4K) - SIZEOF(.tdata) - SIZEOF(.tbss) : AT(ADDR(.tdata) - KERNEL_OFFSET)
+	 *{
+	 *	*(.tdata .tdata.* )
+	 *}
+	 */
+
+	.cls ALIGN(4K) : AT(ADDR(.cls) - KERNEL_OFFSET)
+	{
+		*(.cls)
+	}
+
 	.tdata ALIGN(4K) : AT(ADDR(.tdata) - KERNEL_OFFSET)
 	{
-		*(.tdata .tdata.* )
+		*(.tdata .tdata.*)
 	}
 
 	/* Don't align .tbss up to a page boundary; it wastes space because .tdata and .tbss are merged. */
 	.tbss : AT(ADDR(.tbss) - KERNEL_OFFSET)
 	{
 		*(.tbss .tbss.*)
-	}
-
-	.cls ALIGN(4k) : AT(ADDR(.cls) - KERNEL_OFFSET)
-	{
-		*(.cls)
 	}
 
 	.data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)

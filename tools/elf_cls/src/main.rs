@@ -197,27 +197,19 @@ fn update_cls_symbols(
         Symtab::parse(&symbol_table_bytes, 0, symbol_count as usize, context).unwrap();
 
     for (i, symbol) in symbol_table.iter().enumerate() {
-        if symbol.st_shndx == cls_section_index {
-            let ty = symbol.st_type();
-            if ty == STT_TLS {
+        if symbol.st_type() == STT_TLS {
+            if symbol.st_shndx == cls_section_index {
                 let new_info = (symbol.st_info & 0xf0) | CLS_SYMBOL_TYPE;
                 let symbol_info_offset = symbol_table_offset + i as u64 * symbol_size + 4;
                 file.seek(SeekFrom::Start(symbol_info_offset)).unwrap();
                 file.write_all(&[new_info]).unwrap();
-
-                if symbol.st_value >= 0x1000 {
-                    // TODO: Check if binary has TLS section.
-                    let new_value = symbol.st_value - 0x1000;
-                    file.seek(SeekFrom::Current(3)).unwrap();
-                    file.write_all(&new_value.to_le_bytes()).unwrap();
-                    println!("overwrote symbol flag and value");
-                } else {
-                    println!("overwrote symbol flag");
-                }
-            } else if ty == 0x10 {
-                // We are probably rerunning
-            } else {
-                panic!("CLS symbol had unexected type: {ty:?}");
+                println!("overwrote symbol flag");
+            } else if symbol.st_value >= 0x1000 {
+                let new_value = symbol.st_value - 0x1000;
+                let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
+                file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
+                file.write_all(&new_value.to_le_bytes()).unwrap();
+                println!("overwrote symbol value for {} from {:0x?} to {:0x?}", i, symbol.st_value, new_value);
             }
         }
     }

@@ -44,6 +44,11 @@ pub fn hold_preemption_no_timer_disable() -> PreemptionGuard {
 fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
     let cpu_id = cpu::current_cpu();
 
+    let temp: u64;
+    unsafe {
+        ::core::arch::asm!("rdgsbase {}", out(reg) temp);
+    }
+    log::error!("gs: {temp:0x?}");
     let prev_val = PREEMPTION_COUNT.fetch_add(1);
 
     let guard = PreemptionGuard {

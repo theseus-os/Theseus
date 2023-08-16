@@ -18,13 +18,22 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
     Some(quote! {
         #[inline]
         pub fn load(&self) -> #ty {
+            extern "C" {
+                static TLS_SIZE: u8;
+            }
+            // SAFETY: We don't access the extern static.
+            // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+            // let tp_start = 0x1000 + unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as usize;
+            let tp_start = 0x1000 + unsafe { &TLS_SIZE } as *const u8 as usize as u64;
+
             #[cfg(target_arch = "x86_64")]
             {
                 let ret;
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("mov {}, gs:[{}]"),
+                        ::core::concat!("mov {}, gs:[{} + {}@TPOFF]"),
                         out(#x64_reg_class) ret,
+                        in(reg) tp_start,
                         sym #name,
                         options(preserves_flags, nostack),
                     )
@@ -66,9 +75,17 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
         pub fn fetch_add(&self, mut operand: #ty) -> #ty {
             #[cfg(target_arch = "x86_64")]
             {
+                extern "C" {
+                    static TLS_SIZE: ();
+                }
+                // SAFETY: We don't access the extern static.
+                // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+                let tp_start = 0x1000 + unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as usize;
+
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("xadd ", #x64_width_modifier, "gs:[{}], {}"),
+                        ::core::concat!("xadd ", #x64_width_modifier, "gs:[{} + {}@TPOFF], {}"),
+                        in(reg) tp_start,
                         sym #name,
                         inout(#x64_reg_class) operand,
                         options(nostack),
@@ -84,7 +101,8 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
-                        "add {ptr}, {tp_1}, {cls}",
+                        "add {ptr}, {tp_1}, {cls}@TPOFF",
+                        // "sub {ptr}, 0x1000",
                         concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
                         // Make sure task wasn't migrated between msr and ldxr.

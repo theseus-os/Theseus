@@ -149,29 +149,36 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     let ref_expr = quote! {
         {
             #[cfg(target_arch = "x86_64")]
-            let mut ptr = {
+            let mut ptr: u64 = {
+                extern "C" {
+                    static TLS_SIZE: u8;
+                }
+                let tls_size = unsafe { &TLS_SIZE } as *const u8 as usize as u64;
+
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
-                GS::read_base().as_u64()
+                GS::read_base().as_u64() + 0x1000 + tls_size
             };
-            #[cfg(target_arch = "aarch64")]
-            let mut ptr = {
-                use cls::__private::tock_registers::interfaces::Readable;
-                cls::__private::cortex_a::registers::TPIDR_EL1.get()
-            };
+            // log::info!("ptr before asm: {ptr:0x?}");
+            // #[cfg(target_arch = "aarch64")]
+            // let mut ptr = {
+            //     use cls::__private::tock_registers::interfaces::Readable;
+            //     cls::__private::cortex_a::registers::TPIDR_EL1.get() - 0x1000
+            // };
             unsafe {
                 ::core::arch::asm!(
-                    "add {ptr}, {cls}",
+                    "lea {ptr}, [{ptr} + {cls}@TPOFF]",
                     ptr = inout(reg) ptr,
                     cls = sym #name,
                 )
             };
+            // log::info!("ptr after asm: {ptr:0x?}");
             unsafe { &mut*(ptr as *mut #ty) }
         }
     };
 
     let cls_dep_functions = if cls_dependency {
         let guarded_functions = quote! {
-            #[inline]
+            #[inline(never)]
             pub fn replace_guarded<G>(&self, mut value: #ty, guard: &G) -> #ty
             where
                 G: ::cls::CpuAtomicGuard,
@@ -181,7 +188,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 value
             }
 
-            #[inline]
+            #[inline(never)]
             pub fn set_guarded<G>(&self, mut value: #ty, guard: &G)
             where
                 G: ::cls::CpuAtomicGuard,

@@ -70,7 +70,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
         if line.is_empty() {
             continue;
         }
-        // debug!("Looking at line: {:?}", line);
+        // println!("Looking at line: {:?}", line);
 
         if line.contains(".init") && line.contains("PROGBITS") {
             init_vaddr = parse_section(line).map(|(_, vaddr, _)| vaddr);  
@@ -179,6 +179,11 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.
             // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
             let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
+            let mut temp = false;
+            if line.contains("OS specific") {
+                temp = true;
+            }
+            let line = line.replace("<OS specific>: ", "");
             let mut parts = line
                 .splitn(8, |c: char| {
                     if c.is_whitespace() {
@@ -220,6 +225,12 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 .next()
                 .ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'")?;
 
+            if temp {
+                // println!("----------------------------");
+                // panic!("{_num:?} {sec_vaddr:0x?} {sec_size:0x?} {_typ:?} {bind:?} {_vis:?} {sec_ndx:?} {name:?}");
+                // println!("----------------------------");
+            }
+
             let global = bind == "GLOBAL" || bind == "WEAK";
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {
                 eprintln!("parse_nano_core_symbol_file(): error parsing virtual address Value at line {}: {:?}\n    line: {}", _line_num + 1, e, line);
@@ -238,7 +249,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 Ok(ndx) => ndx,
                 // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line).
                 _ => {
-                    // trace!(
+                    // println!(
                     //     "parse_nano_core_symbol_file(): skipping line {}: {}",
                     //     _line_num + 1,
                     //     line
@@ -275,7 +286,7 @@ pub struct ParsedCrateItems {
     pub global_sections: BTreeSet<Shndx>,
     pub tls_sections: BTreeSet<Shndx>,
     pub data_sections: BTreeSet<Shndx>,
-    pub cls_section: Option<Shndx>,
+    pub cls_sections: BTreeSet<Shndx>,
     /// The set of other non-section symbols too, such as constants defined in assembly code.
     pub init_symbols: BTreeMap<String, usize>,
 }
@@ -430,6 +441,9 @@ fn add_new_section(
         }
         if let SectionType::TlsData | SectionType::TlsBss = sec.ty {
             crate_items.tls_sections.insert(*section_counter);
+        }
+        if let SectionType::Cls = sec.ty {
+            crate_items.cls_sections.insert(*section_counter);
         }
         crate_items.sections.insert(*section_counter, sec);
         *section_counter += 1;

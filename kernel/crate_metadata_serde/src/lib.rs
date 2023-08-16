@@ -51,7 +51,7 @@ pub struct SerializedCrate {
     /// A set containing the thread-local storage (TLS) sections of the crate.
     pub tls_sections: BTreeSet<Shndx>,
     /// The CLS section of the crate.
-    pub cls_section: Option<Shndx>,
+    pub cls_sections: BTreeSet<Shndx>,
     /// A set containing the `.data` and `.bss` sections of the crate.
     pub data_sections: BTreeSet<Shndx>,
     /// A map of symbol names to their constant values, which contain assembler and linker

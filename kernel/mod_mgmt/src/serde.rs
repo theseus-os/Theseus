@@ -24,6 +24,13 @@ pub(crate) fn into_loaded_crate(
         .filter_map(|shndx| serialized_crate.sections.get(shndx))
         .map(|tls_sec| tls_sec.size)
         .sum();
+
+    let total_cls_size: usize = serialized_crate.cls_sections
+        .iter()
+        .filter_map(|shndx| serialized_crate.sections.get(shndx))
+        .map(|cls_sec| cls_sec.size)
+        .sum();
+
     
     // The sections need a weak reference back to the loaded_crate, and so we first create
     // the loaded_crate so we have something to reference when loading the sections.
@@ -58,6 +65,7 @@ pub(crate) fn into_loaded_crate(
                 rodata_pages,
                 data_pages,
                 total_tls_size,
+                total_cls_size,
             )?,
         );
     }
@@ -94,6 +102,7 @@ fn into_loaded_section(
     rodata_pages:       &Arc<Mutex<MappedPages>>,
     data_pages:         &Arc<Mutex<MappedPages>>,
     total_tls_size:     usize,
+    total_cls_size:     usize,
 ) -> Result<Arc<LoadedSection>, &'static str> {
     let mapped_pages = match serialized_section.ty {
         SectionType::Text => Arc::clone(text_pages),
@@ -132,6 +141,9 @@ fn into_loaded_section(
             serialized_section.virtual_address,
             total_tls_size,
         ).map_err(|_| "BUG: failed to add deserialized static TLS section to the TLS area")
+    } else if serialized_section.ty == SectionType::Cls {
+        log::info!("ADDDED CLS SECTION");
+        namespace.cls_initializer.lock().add_existing_static_tls_section(loaded_section, serialized_section.virtual_address, total_cls_size).map_err(|_| "oopsie")
     } else {
         Ok(Arc::new(loaded_section))
     }

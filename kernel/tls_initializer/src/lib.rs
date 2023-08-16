@@ -365,7 +365,7 @@ pub struct TlsDataImage {
     // The data is wrapped in an Option to avoid allocating an empty boxed slice
     // when there are no TLS data sections.
     _data: Option<Box<[u8]>>,
-    ptr:   usize,
+    pub ptr:   usize,
 }
 impl TlsDataImage {
     /// Creates an empty TLS data image with no TLS section content.
