@@ -112,7 +112,7 @@ const MAX_SLOTS_PER_BUS: u8 = 32;
 const MAX_FUNCTIONS_PER_SLOT: u8 = 8;
 
 /// Addresses/offsets into the PCI configuration space should clear the
-/// least-significant 2 bits for alignment purposes.
+/// least-significant 2 bits in order to be 4-byte aligned.
 const PCI_CONFIG_ADDRESS_OFFSET_MASK: u8 = 0b11111100;
 
 const CONFIG_ADDRESS: u16 = 0xCF8;
