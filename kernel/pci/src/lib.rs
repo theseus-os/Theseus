@@ -349,6 +349,8 @@ impl PciLocation {
     }
 
     /// Read a 4-bytes register from the PCI Configuration Space.
+    ///
+    /// Panics if the register isn't a [`FullDword`]
     fn pci_read_32(&self, register: PciRegister) -> u32 {
         let reg_width = register.1.width_in_bytes();
         let output_width = size_of::<u32>();
@@ -358,6 +360,8 @@ impl PciLocation {
     }
 
     /// Read a 2-bytes register from the PCI Configuration Space.
+    ///
+    /// Panics if the register isn't a [`Word0`] / [`Word1`]
     fn pci_read_16(&self, register: PciRegister) -> u16 {
         let reg_width = register.1.width_in_bytes();
         let output_width = size_of::<u16>();
@@ -367,6 +371,8 @@ impl PciLocation {
     }
 
     /// Read a one-byte register from the PCI Configuration Space.
+    ///
+    /// Panics if the register isn't a [`Byte0`] / [`Byte1`] / [`Byte2`] / [`Byte3`]
     fn pci_read_8(&self, register: PciRegister) -> u8 {
         let reg_width = register.1.width_in_bytes();
         let output_width = size_of::<u8>();
@@ -412,6 +418,8 @@ impl PciLocation {
     }
 
     /// Write a 4-bytes register from the PCI Configuration Space.
+    ///
+    /// Panics if the register isn't a [`FullDword`]
     fn pci_write_32(&self, register: PciRegister, value: u32) {
         let reg_width = register.1.width_in_bytes();
         let output_width = size_of::<u32>();
@@ -421,6 +429,8 @@ impl PciLocation {
     }
 
     /// Write a 2-bytes register from the PCI Configuration Space.
+    ///
+    /// Panics if the register isn't a [`Word0`] / [`Word1`]
     fn pci_write_16(&self, register: PciRegister, value: u16) {
         let reg_width = register.1.width_in_bytes();
         let output_width = size_of::<u16>();
@@ -430,6 +440,8 @@ impl PciLocation {
     }
 
     /// Write a one-byte register from the PCI Configuration Space.
+    ///
+    /// Panics if the register isn't a [`Byte0`] / [`Byte1`] / [`Byte2`] / [`Byte3`]
     fn pci_write_8(&self, register: PciRegister, value: u8) {
         let reg_width = register.1.width_in_bytes();
         let output_width = size_of::<u8>();
