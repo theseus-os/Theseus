@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
-
-cpu_local_preemption = { path = "../cpu_local_preemption" }
+preemption = { path = "../preemption" }

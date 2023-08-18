@@ -7,13 +7,15 @@
 
 #![no_std]
 #![feature(step_trait)]
+#![allow(incomplete_features)]
+#![feature(adt_const_params)]
 
 use core::{
     cmp::{min, max},
     fmt,
     iter::Step,
+    marker::{ConstParamTy, PhantomData},
     ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
-    marker::PhantomData,
 };
 use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE};
 use zerocopy::FromBytes;
@@ -50,6 +52,18 @@ impl PageSize for Page1GiB {
     const SIZE: usize = PAGE_1GB_SIZE;
 }
 
+/// The possible states that a range of exclusively-owned pages or frames can be in.
+#[derive(PartialEq, Eq, ConstParamTy)]
+pub enum MemoryState {
+    /// Memory is free and owned by the allocator
+    Free,
+    /// Memory is allocated and can be used for a mapping
+    Allocated,
+    /// Memory is mapped (PTE has been set)
+    Mapped,
+    /// Memory has been unmapped (PTE has been cleared)
+    Unmapped
+}
 
 /// A macro for defining `VirtualAddress` and `PhysicalAddress` structs
 /// and implementing their common traits, which are generally identical.
@@ -558,6 +572,13 @@ macro_rules! implement_page_frame_range {
                     } else {
                         None
                     }
+                }
+
+                #[doc = "Returns `true` if the `other` `" $TypeName "` is fully contained within this `" $TypeName "`."]
+                pub fn contains_range(&self, other: &$TypeName) -> bool {
+                    !other.is_empty()
+                    && (other.start() >= self.start())
+                    && (other.end() <= self.end())
                 }
             }
             impl<P: 'static> $TypeName<P> where P: PageSize {

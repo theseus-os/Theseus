@@ -35,7 +35,7 @@ use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRe
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
-use cpu_local_preemption::{hold_preemption, PreemptionGuard};
+use preemption::{hold_preemption, PreemptionGuard};
 use no_drop::NoDrop;
 
 #[cfg(simd_personality)]

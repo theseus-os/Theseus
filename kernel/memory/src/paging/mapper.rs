@@ -19,7 +19,7 @@ use core::{
 };
 use log::{error, warn, debug, trace};
 use memory_structs::{PAGE_4KB_SIZE, PAGE_2MB_SIZE, PAGE_1GB_SIZE};
-use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames}; 
+use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames}; 
 use crate::paging::{
     get_current_p4,
     table::{P4, UPCOMING_P4, Table, Level4},
@@ -35,23 +35,23 @@ use owned_borrowed_trait::{OwnedOrBorrowed, Owned, Borrowed};
 #[cfg(target_arch = "x86_64")]
 use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 
-/// This is a private callback used to convert `UnmappedFrames` into `AllocatedFrames`.
+/// This is a private callback used to convert `UnmappedFrameRange` into `UnmappedFrames`.
 /// 
 /// This exists to break the cyclic dependency cycle between `page_table_entry` and
 /// `frame_allocator`, which depend on each other as such:
-/// * `frame_allocator` needs to `impl Into<AllocatedPages> for UnmappedFrames`
+/// * `frame_allocator` needs to `impl Into<Frames> for UnmappedFrameRange`
 ///    in order to allow unmapped exclusive frames to be safely deallocated
 /// * `page_table_entry` needs to use the `AllocatedFrames` type in order to allow
 ///   page table entry values to be set safely to a real physical frame that is owned and exists.
 /// 
 /// To get around that, the `frame_allocator::init()` function returns a callback
-/// to its function that allows converting a range of unmapped frames back into `AllocatedFrames`,
+/// to its function that allows converting a range of unmapped frames back into `UnmappedFrames`,
 /// which then allows them to be dropped and thus deallocated.
 /// 
 /// This is safe because the frame allocator can only be initialized once, and also because
 /// only this crate has access to that function callback and can thus guarantee
-/// that it is only invoked for `UnmappedFrames`.
-pub(super) static INTO_ALLOCATED_FRAMES_FUNC: Once<fn(FrameRange) -> AllocatedFrames> = Once::new();
+/// that it is only invoked for `UnmappedFrameRange`.
+pub(super) static INTO_UNMAPPED_FRAMES_FUNC: Once<fn(FrameRange) -> UnmappedFrames> = Once::new();
 
 /// A convenience function to translate the given virtual address into a
 /// physical address using the currently-active page table.
@@ -721,8 +721,8 @@ impl MappedPages {
             );
         }
 
-        let mut first_frame_range: Option<AllocatedFrames> = None; // this is what we'll return
-        let mut current_frame_range: Option<AllocatedFrames> = None;
+        let mut first_frame_range: Option<UnmappedFrames> = None; // this is what we'll return
+        let mut current_frame_range: Option<UnmappedFrames> = None;
 
         // Select the correct unmapping behaviour based on page size.
         // The different branches mostly have the same logic, differing 
@@ -735,7 +735,6 @@ impl MappedPages {
                         .and_then(|p3| p3.next_table_mut(page.p3_index()))
                         .and_then(|p2| p2.next_table_mut(page.p2_index()))
                         .ok_or("mapping code does not support huge pages")?;
-
                     let pte = &mut p1[page.p1_index()];
                     if pte.is_unused() {
                         return Err("unmap(): page not mapped");
@@ -748,8 +747,8 @@ impl MappedPages {
                     // freed from the newly-unmapped P1 PTE entry above.
                     match unmapped_frames {
                         UnmapResult::Exclusive(newly_unmapped_frames) => {
-                            let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
-                                .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                            let newly_unmapped_frames = INTO_UNMAPPED_FRAMES_FUNC.get()
+                                .ok_or("BUG: Mapper::unmap(): the `INTO_UNMAPPED_FRAMES_FUNC` callback was not initialized")
                                 .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
         
                             if let Some(mut curr_frames) = current_frame_range.take() {
@@ -908,7 +907,8 @@ impl MappedPages {
         }
 
         // Ensure that we return at least some frame range, even if we broke out of the above loop early.
-        Ok(first_frame_range.or(current_frame_range))
+        Ok(first_frame_range.map(|f| f.into_allocated_frames())
+            .or(current_frame_range.map(|f| f.into_allocated_frames())))
     }
 
     /// Reinterprets this `MappedPages`'s underlying memory region as a struct of the given type `T`,

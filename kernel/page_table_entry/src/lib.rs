@@ -95,7 +95,7 @@ impl PageTableEntry {
             Frame::containing_address(frame.start_address() + (4096 * (512 * 512))));
 
         if flags.is_exclusive() {
-            UnmapResult::Exclusive(UnmappedFrames(frame_range))
+            UnmapResult::Exclusive(UnmappedFrameRange(frame_range))
         } else {
             UnmapResult::NonExclusive(frame_range)
         }
@@ -148,26 +148,26 @@ impl PageTableEntry {
 /// The frames returned from the action of unmapping a page table entry.
 /// See the `PageTableEntry::set_unmapped()` function.
 ///
-/// If exclusive, the contained `UnmappedFrames` can be used to deallocate frames.
+/// If exclusive, the contained `UnmappedFrameRange` can be used to deallocate frames.
 ///
 /// If non-exclusive, the contained `FrameRange` is provided just for debugging feedback.
 /// Note that we use `FrameRange` instead of `Frame` because a single page table entry
 /// can map many frames, e.g., using huge pages.
 #[must_use]
 pub enum UnmapResult {
-    Exclusive(UnmappedFrames),
+    Exclusive(UnmappedFrameRange),
     NonExclusive(FrameRange)
 }
 
 /// A range of frames that have been unmapped from a `PageTableEntry`
 /// that previously mapped that frame exclusively (i.e., "owned it").
 ///
-/// These `UnmappedFrames` can be converted into `UnmappedAllocatedFrames`
+/// `UnmappedFrameRange` can be used to create an `UnmappedFrames`
 /// and then safely deallocated within the `frame_allocator`.
 ///
 /// See the `PageTableEntry::set_unmapped()` function.
-pub struct UnmappedFrames(FrameRange);
-impl Deref for UnmappedFrames {
+pub struct UnmappedFrameRange(FrameRange);
+impl Deref for UnmappedFrameRange {
     type Target = FrameRange;
     fn deref(&self) -> &FrameRange {
         &self.0
