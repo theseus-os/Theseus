@@ -106,7 +106,6 @@ pub fn kstart_ap(
         cpu::register_cpu(false).unwrap();
     }
 
-    // cls::init(cpu_id);
     cls::insert(mod_mgmt::CLS_INITIALIZER.lock().get_data());
 
 

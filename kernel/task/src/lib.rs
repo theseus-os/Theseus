@@ -913,6 +913,7 @@ fn task_switch_inner(
         // log::trace!("[CPU {}] task_switch(): deiniting current task TLS for: {:?}, next: {}", cpu_id, curr_task_tls_slot.as_deref(), next.deref());
         let prev_taskref = curr_task_tls_slot.take();
         log::info!("about to drop");
+        log::info!("{:0x?}", Arc::as_ptr(&prev_taskref.clone().unwrap().0));
         DROP_AFTER_TASK_SWITCH.set_guarded(prev_taskref, &preemption_guard);
     }
     log::info!("dropped?");

@@ -53,8 +53,8 @@ use tls_initializer::TlsDataImage;
 static CLS_SECTIONS: SpinMutex<Vec<TlsDataImage>> = SpinMutex::new(Vec::new());
 
 pub fn insert(image: TlsDataImage) {
-    log::info!("ptr: {:0x?}", image.ptr);
     log::info!("CALLING INSERT");
+    log::info!("ptr: {:0x?}", image.ptr);
     image.set_as_current_cls_base();
     let temp: u64;
     unsafe {

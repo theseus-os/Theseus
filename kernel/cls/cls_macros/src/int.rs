@@ -2,6 +2,8 @@ use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
 use syn::{Ident, Type};
 
+use crate::cls_offset_expr;
+
 pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
     let ((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
         match ty.to_token_stream().to_string().as_ref() {
@@ -14,27 +16,20 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
             }
         };
     let x64_width_modifier = format!("{x64_asm_width} ptr ");
+    let offset_expr = cls_offset_expr(name);
 
     Some(quote! {
         #[inline]
         pub fn load(&self) -> #ty {
-            extern "C" {
-                static TLS_SIZE: u8;
-            }
-            // SAFETY: We don't access the extern static.
-            // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
-            // let tp_start = 0x1000 + unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as usize;
-            let tp_start = 0x1000 + unsafe { &TLS_SIZE } as *const u8 as usize as u64;
-
             #[cfg(target_arch = "x86_64")]
             {
+                let offset = #offset_expr;
                 let ret;
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("mov {}, gs:[{} + {}@TPOFF]"),
-                        out(#x64_reg_class) ret,
-                        in(reg) tp_start,
-                        sym #name,
+                        ::core::concat!("mov {ret}, gs:[{offset}]"),
+                        ret = out(#x64_reg_class) ret,
+                        offset = in(reg) offset,
                         options(preserves_flags, nostack),
                     )
                 };
@@ -75,19 +70,12 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
         pub fn fetch_add(&self, mut operand: #ty) -> #ty {
             #[cfg(target_arch = "x86_64")]
             {
-                extern "C" {
-                    static TLS_SIZE: ();
-                }
-                // SAFETY: We don't access the extern static.
-                // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
-                let tp_start = 0x1000 + unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as usize;
-
+                let offset = #offset_expr;
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("xadd ", #x64_width_modifier, "gs:[{} + {}@TPOFF], {}"),
-                        in(reg) tp_start,
-                        sym #name,
-                        inout(#x64_reg_class) operand,
+                        ::core::concat!("xadd ", #x64_width_modifier, "gs:[{offset}], {operand}"),
+                        offset = in(reg) offset,
+                        operand = inout(#x64_reg_class) operand,
                         options(nostack),
                     )
                 };

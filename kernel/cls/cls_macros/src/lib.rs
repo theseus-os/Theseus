@@ -146,31 +146,25 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         Span::call_site().into(),
     );
 
+    let offset_expr = cls_offset_expr(&name);
     let ref_expr = quote! {
         {
             #[cfg(target_arch = "x86_64")]
             let mut ptr: u64 = {
-                extern "C" {
-                    static TLS_SIZE: u8;
-                }
-                let tls_size = unsafe { &TLS_SIZE } as *const u8 as usize as u64;
+                let offset = #offset_expr;
 
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
-                GS::read_base().as_u64() + 0x1000 + tls_size
+                let gs = GS::read_base().as_u64();
+                let (value, overflow_occured) = gs.overflowing_add(offset);
+                assert!(overflow_occured, "overflow did not occur");
+                value
             };
-            // log::info!("ptr before asm: {ptr:0x?}");
+            log::info!("ptr before asm: {ptr:0x?}");
             // #[cfg(target_arch = "aarch64")]
             // let mut ptr = {
             //     use cls::__private::tock_registers::interfaces::Readable;
             //     cls::__private::cortex_a::registers::TPIDR_EL1.get() - 0x1000
             // };
-            unsafe {
-                ::core::arch::asm!(
-                    "lea {ptr}, [{ptr} + {cls}@TPOFF]",
-                    ptr = inout(reg) ptr,
-                    cls = sym #name,
-                )
-            };
             // log::info!("ptr after asm: {ptr:0x?}");
             unsafe { &mut*(ptr as *mut #ty) }
         }
@@ -183,7 +177,9 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             where
                 G: ::cls::CpuAtomicGuard,
             {
+                ::log::debug!("{value:?}");
                 let rref = #ref_expr;
+                ::log::debug!("ptr to CLS: {:0x?}", rref as *const _);
                 ::core::mem::swap(rref, &mut value);
                 value
             }
@@ -279,4 +275,35 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     }
     .into()
+}
+
+fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
+    quote! {
+        {
+            extern "C" {
+                static CLS_SIZE: u8;
+                static TLS_SIZE: u8;
+            }
+
+            // SAFETY: We don't access the extern static.
+            // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+            let cls_size = unsafe { ::core::ptr::addr_of!(CLS_SIZE) } as u64;
+            let tls_size = unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as u64;
+
+            // TODO: Aarch64
+            let temp: u64;
+            unsafe {
+                ::core::arch::asm!(
+                    "lea {temp}, [{cls}@TPOFF + {tls_size} + 0x1000]",
+                    temp = lateout(reg) temp,
+                    cls = sym #name,
+                    tls_size = in(reg) tls_size,
+                )
+            };
+
+            let temp = (cls_size - temp).wrapping_neg();
+            log::info!("calculated cls offset: {}", temp.wrapping_neg());
+            temp
+        }
+    }
 }
