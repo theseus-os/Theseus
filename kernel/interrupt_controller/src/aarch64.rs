@@ -19,6 +19,10 @@ pub struct SystemInterruptControllerId(pub u8);
 pub struct LocalInterruptControllerId(pub u16);
 
 /// Per-CPU local interrupt controller
+///
+/// To get the controller for a specific CPU:
+///    a. Find the position of its CpuId in `BOARD_CONFIG.cpu_ids`
+///    b. Index into this array using that position
 static LOCAL_INT_CTRL: Once<[LocalInterruptController; NUM_CPUS]> = Once::new();
 
 /// System-wide interrupt controller
@@ -123,9 +127,15 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
 impl LocalInterruptControllerApi for LocalInterruptController {
     fn get() -> &'static Self {
-        // While we're waiting for cpu-local-storage, this loop will work as fine as an AtomicMap
+        // how this function works:
+        //   a. get the current CpuId: this CpuId of the current CPU
+        //   b. iterate on all valid CpuIds, find the index of the current CpuId.
+        //      This is used as a current CPU index.
+        //   c. get the global array of interrupt controllers
+        //   d. index into this array based on the current CPU index
 
         let cpu_id = current_cpu();
+        // While we're waiting for cpu-local-storage, this loop will work as fine as an AtomicMap
         let index = BOARD_CONFIG.cpu_ids.iter().position(|mpidr| cpu_id == (*mpidr).into());
         let index = index.expect("Invalid CpuId returned by current_cpu()");
 
