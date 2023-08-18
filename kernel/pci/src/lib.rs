@@ -26,36 +26,73 @@ use port_io::Port;
 #[cfg(target_arch = "aarch64")]
 use arm_boards::BOARD_CONFIG;
 
+#[derive(Debug, Copy, Clone)]
+/// Defines a PCI register as part of a dword
+enum RegisterSpan {
+    /// Bits [0:31]
+    FullDword,
+    /// Bits [0:15]
+    Word0,
+    /// Bits [16:31]
+    Word1,
+    /// Bits [0:7]
+    Byte0,
+    /// Bits [8:15]
+    Byte1,
+    /// Bits [16:23]
+    Byte2,
+    /// Bits [24:31]
+    Byte3,
+}
+
+use RegisterSpan::*;
+
+/// (PCI Config Space Dword Index, Register Span)
+type PciRegister = (u8, RegisterSpan);
+
+/// Creates a byte register definition from a byte offset
+const fn offset_to_byte_reg_def(offset: u8) -> PciRegister {
+    let reg_index = offset >> 2;
+    let reg_span = match offset & 0b11 {
+        0 => Byte0,
+        1 => Byte1,
+        2 => Byte2,
+        3 => Byte3,
+        _ => unreachable!(),
+    };
+    (reg_index, reg_span)
+}
+
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
-const PCI_VENDOR_ID:             u8 = 0x0;
-const PCI_DEVICE_ID:             u8 = 0x2;
-const PCI_COMMAND:               u8 = 0x4;
-const PCI_STATUS:                u8 = 0x6;
-const PCI_REVISION_ID:           u8 = 0x8;
-const PCI_PROG_IF:               u8 = 0x9;
-const PCI_SUBCLASS:              u8 = 0xA;
-const PCI_CLASS:                 u8 = 0xB;
-const PCI_CACHE_LINE_SIZE:       u8 = 0xC;
-const PCI_LATENCY_TIMER:         u8 = 0xD;
-const PCI_HEADER_TYPE:           u8 = 0xE;
-const PCI_BIST:                  u8 = 0xF;
-const PCI_BAR0:                  u8 = 0x10;
-const PCI_BAR1:                  u8 = 0x14;
-const PCI_BAR2:                  u8 = 0x18;
-const PCI_BAR3:                  u8 = 0x1C;
-const PCI_BAR4:                  u8 = 0x20;
-const PCI_BAR5:                  u8 = 0x24;
-const PCI_CARDBUS_CIS:           u8 = 0x28;
-const PCI_SUBSYSTEM_VENDOR_ID:   u8 = 0x2C;
-const PCI_SUBSYSTEM_ID:          u8 = 0x2E;
-const PCI_EXPANSION_ROM_BASE:    u8 = 0x30;
-const PCI_CAPABILITIES:          u8 = 0x34;
+const PCI_VENDOR_ID:             PciRegister = (0x0, Word0);
+const PCI_DEVICE_ID:             PciRegister = (0x0, Word1);
+const PCI_COMMAND:               PciRegister = (0x1, Word0);
+const PCI_STATUS:                PciRegister = (0x1, Word1);
+const PCI_REVISION_ID:           PciRegister = (0x2, Byte0);
+const PCI_PROG_IF:               PciRegister = (0x2, Byte1);
+const PCI_SUBCLASS:              PciRegister = (0x2, Byte2);
+const PCI_CLASS:                 PciRegister = (0x2, Byte3);
+const PCI_CACHE_LINE_SIZE:       PciRegister = (0x3, Byte0);
+const PCI_LATENCY_TIMER:         PciRegister = (0x3, Byte1);
+const PCI_HEADER_TYPE:           PciRegister = (0x3, Byte2);
+const PCI_BIST:                  PciRegister = (0x3, Byte3);
+const PCI_BAR0:                  PciRegister = (0x4, FullDword);
+const PCI_BAR1:                  PciRegister = (0x5, FullDword);
+const PCI_BAR2:                  PciRegister = (0x6, FullDword);
+const PCI_BAR3:                  PciRegister = (0x7, FullDword);
+const PCI_BAR4:                  PciRegister = (0x8, FullDword);
+const PCI_BAR5:                  PciRegister = (0x9, FullDword);
+const PCI_CARDBUS_CIS:           PciRegister = (0xA, FullDword);
+const PCI_SUBSYSTEM_VENDOR_ID:   PciRegister = (0xB, Word0);
+const PCI_SUBSYSTEM_ID:          PciRegister = (0xB, Word1);
+const PCI_EXPANSION_ROM_BASE:    PciRegister = (0xC, FullDword);
+const PCI_CAPABILITIES:          PciRegister = (0xD, Byte0);
 // 0x35 through 0x3B are reserved
-const PCI_INTERRUPT_LINE:        u8 = 0x3C;
-const PCI_INTERRUPT_PIN:         u8 = 0x3D;
-const PCI_MIN_GRANT:             u8 = 0x3E;
-const PCI_MAX_LATENCY:           u8 = 0x3F;
+const PCI_INTERRUPT_LINE:        PciRegister = (0xF, Byte0);
+const PCI_INTERRUPT_PIN:         PciRegister = (0xF, Byte1);
+const PCI_MIN_GRANT:             PciRegister = (0xF, Byte2);
+const PCI_MAX_LATENCY:           PciRegister = (0xF, Byte3);
 
 #[repr(u8)]
 pub enum PciCapability {
@@ -239,6 +276,31 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
     Ok(buses)   
 }
 
+impl RegisterSpan {
+    fn to_mask_and_shift(self) -> (u32, u32) {
+        match self {
+            FullDword => (0xffff_ffff,  0),
+            Word0     => (0x0000_ffff,  0),
+            Word1     => (0xffff_0000, 16),
+            Byte0     => (0x0000_00ff,  0),
+            Byte1     => (0x0000_ff00,  8),
+            Byte2     => (0x00ff_0000, 16),
+            Byte3     => (0xff00_0000, 24),
+        }
+    }
+
+    fn width_in_bytes(self) -> usize {
+        match self {
+            FullDword => size_of::<u32>(),
+            Word0     => size_of::<u16>(),
+            Word1     => size_of::<u16>(),
+            Byte0     => size_of::<u8>(),
+            Byte1     => size_of::<u8>(),
+            Byte2     => size_of::<u8>(),
+            Byte3     => size_of::<u8>(),
+        }
+    }
+}
 
 /// The bus, slot, and function number of a given PCI device.
 /// This offers methods for reading and writing the PCI config space. 
@@ -249,88 +311,90 @@ pub struct PciLocation {
     func: u8,
 }
 
-struct PciAddress {
-    /// Offset to a double word in a PCI configuration space
-    dword_address: u32,
-    /// Bit offset of the bytes of interest in this dword
-    byte_shift: u32,
-}
-
 impl PciLocation {
     pub fn bus(&self) -> u8 { self.bus }
     pub fn slot(&self) -> u8 { self.slot }
     pub fn function(&self) -> u8 { self.func }
 
-
-    /// Computes a [`PciAddress`] from bus, slot, func, and offset. 
-    ///
-    /// PCI configuration space addresses must be aligned to 4 bytes (double word)
-    /// for reads and writes to succeed. The `dword_address` field of the returned
-    /// structure will be aligned to 4 bytes accordingly.
-    ///
-    /// Offsets with the two least significant bits set are still valid (they point
-    /// to words and bytes). This function computes a `byte_shift` value which should
-    /// be used to shift the double word pointed to by `dword_address`.
-    fn pci_address_and_shift(self, offset: u8) -> PciAddress {
-        let dword_offset = (offset & PCI_CONFIG_ADDRESS_OFFSET_MASK) as u32;
-        let byte_shift = ((offset & (!PCI_CONFIG_ADDRESS_OFFSET_MASK)) * 8) as u32;
+    /// Read a register from the PCI Configuration Space.
+    fn pci_read_raw(&self, register: PciRegister) -> u32 {
+        let (dword_offset, reg_span) = register;
+        let (mask, shift) = reg_span.to_mask_and_shift();
+        let u32_bytes = size_of::<u32>() as u32;
 
         let dword_address = BASE_OFFSET
-            | ((self.bus  as u32) << 16)
-            | ((self.slot as u32) << 11)
-            | ((self.func as u32) <<  8)
-            | dword_offset;
+            | ((self.bus     as u32) << 16)
+            | ((self.slot    as u32) << 11)
+            | ((self.func    as u32) <<  8)
+            | ((dword_offset as u32) * u32_bytes);
 
-        PciAddress {
-            dword_address,
-            byte_shift,
-        }
-    }
-
-    /// Read 32-bit data at the specified `offset` from this PCI device.
-    fn pci_read_32(&self, offset: u8) -> u32 {
-        let address = self.pci_address_and_shift(offset);
-        let value;
+        let dword_value;
 
         #[cfg(target_arch = "x86_64")] {
             unsafe { 
-                PCI_CONFIG_ADDRESS_PORT.lock().write(address.dword_address);
+                PCI_CONFIG_ADDRESS_PORT.lock().write(dword_address);
             }
-            value = PCI_CONFIG_DATA_PORT.lock().read();
+            dword_value = PCI_CONFIG_DATA_PORT.lock().read();
         }
 
         #[cfg(target_arch = "aarch64")] {
             let config_space = PCI_CONFIG_SPACE.lock();
             let config_space = config_space.get()
                 .expect("PCI Config Space wasn't mapped yet");
-            let dword_index = (address.dword_address as usize) / size_of::<u32>();
-            value = config_space[dword_index].read();
+            let dword_index = (dword_address as usize) / size_of::<u32>();
+            dword_value = config_space[dword_index].read();
         }
 
-        value >> address.byte_shift
+        (dword_value & mask) >> shift
     }
 
-    /// Read 16-bit data at the specified `offset` from this PCI device.
-    fn pci_read_16(&self, offset: u8) -> u16 {
-        self.pci_read_32(offset) as u16
-    } 
+    /// Read a 4-bytes register from the PCI Configuration Space.
+    fn pci_read_32(&self, register: PciRegister) -> u32 {
+        let reg_width = register.1.width_in_bytes();
+        let output_width = size_of::<u32>();
+        assert_eq!(reg_width, output_width, "pci_read_32: register isn't 32-bit wide");
 
-    /// Read 8-bit data at the specified `offset` from this PCI device.
-    fn pci_read_8(&self, offset: u8) -> u8 {
-        self.pci_read_32(offset) as u8
+        self.pci_read_raw(register)
     }
 
-    /// Write 32-bit data to the specified `offset` for the PCI device.
-    ///
-    /// Note: this only supports offsets aligned to 4 bytes.
-    fn pci_write(&self, offset: u8, value: u32) {
-        let address = self.pci_address_and_shift(offset);
-        assert_eq!(address.byte_shift, 0, "PciLocation::pci_write only supports offsets aligned to 4 bytes.");
+    /// Read a 2-bytes register from the PCI Configuration Space.
+    fn pci_read_16(&self, register: PciRegister) -> u16 {
+        let reg_width = register.1.width_in_bytes();
+        let output_width = size_of::<u16>();
+        assert_eq!(reg_width, output_width, "pci_read_16: register isn't 16-bit wide");
+
+        self.pci_read_raw(register) as _
+    }
+
+    /// Read a one-byte register from the PCI Configuration Space.
+    fn pci_read_8(&self, register: PciRegister) -> u8 {
+        let reg_width = register.1.width_in_bytes();
+        let output_width = size_of::<u8>();
+        assert_eq!(reg_width, output_width, "pci_read_16: register isn't 8-bit wide");
+
+        self.pci_read_raw(register) as _
+    }
+
+    /// Write to a register in the PCI Configuration Space.
+    fn pci_write_raw(&self, register: PciRegister, value: u32) {
+        let (dword_offset, reg_span) = register;
+        let (mask, shift) = reg_span.to_mask_and_shift();
+        let u32_bytes = size_of::<u32>() as u32;
+
+        let dword_address = BASE_OFFSET
+            | ((self.bus  as u32) << 16)
+            | ((self.slot as u32) << 11)
+            | ((self.func as u32) <<  8)
+            | ((dword_offset as u32) * u32_bytes);
 
         #[cfg(target_arch = "x86_64")] {
             unsafe {
-                PCI_CONFIG_ADDRESS_PORT.lock().write(address.dword_address); 
-                PCI_CONFIG_DATA_PORT.lock().write(value);
+                PCI_CONFIG_ADDRESS_PORT.lock().write(dword_address); 
+
+                let mut dword = PCI_CONFIG_DATA_PORT.lock().read();
+                dword &= !mask;
+                dword |= value << shift;
+                PCI_CONFIG_DATA_PORT.lock().write(dword);
             }
         }
 
@@ -338,50 +402,81 @@ impl PciLocation {
             let mut config_space = PCI_CONFIG_SPACE.lock();
             let config_space = config_space.get_mut()
                 .expect("PCI Config Space wasn't mapped yet");
-            let dword_index = (address.dword_address as usize) / size_of::<u32>();
-            config_space[dword_index].write(value);
+            let dword_index = (dword_address as usize) / size_of::<u32>();
+
+            let mut dword = config_space[dword_index].read();
+            dword &= !mask;
+            dword |= value << shift;
+            config_space[dword_index].write(dword);
         }
+    }
+
+    /// Write a 4-bytes register from the PCI Configuration Space.
+    fn pci_write_32(&self, register: PciRegister, value: u32) {
+        let reg_width = register.1.width_in_bytes();
+        let output_width = size_of::<u32>();
+        assert_eq!(reg_width, output_width, "pci_write_32: register isn't 32-bit wide");
+
+        self.pci_write_raw(register, value)
+    }
+
+    /// Write a 2-bytes register from the PCI Configuration Space.
+    fn pci_write_16(&self, register: PciRegister, value: u16) {
+        let reg_width = register.1.width_in_bytes();
+        let output_width = size_of::<u16>();
+        assert_eq!(reg_width, output_width, "pci_write_16: register isn't 16-bit wide");
+
+        self.pci_write_raw(register, value as _)
+    }
+
+    /// Write a one-byte register from the PCI Configuration Space.
+    fn pci_write_8(&self, register: PciRegister, value: u8) {
+        let reg_width = register.1.width_in_bytes();
+        let output_width = size_of::<u8>();
+        assert_eq!(reg_width, output_width, "pci_write_16: register isn't 8-bit wide");
+
+        self.pci_write_raw(register, value as _)
     }
 
     /// Sets the PCI device's bit 3 in the command portion, which is apparently needed to activate DMA (??)
     pub fn pci_set_command_bus_master_bit(&self) {
-        let value = self.pci_read_32(PCI_COMMAND);
+        let value = self.pci_read_16(PCI_COMMAND);
         trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value: {:#x}", self, value);
 
-        self.pci_write(PCI_COMMAND, value | (1 << 2));
+        self.pci_write_16(PCI_COMMAND, value | (1 << 2));
 
         trace!("pci_set_command_bus_master_bit: PciDevice: {}, read value AFTER WRITE CMD: {:#x}", 
             self,
-            self.pci_read_32(PCI_COMMAND),
+            self.pci_read_16(PCI_COMMAND),
         );
     }
 
     /// Sets the PCI device's command bit 10 to disable legacy interrupts
     pub fn pci_set_interrupt_disable_bit(&self) {
-        let command = self.pci_read_32(PCI_COMMAND);
+        let command = self.pci_read_16(PCI_COMMAND);
         trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
 
-        const INTERRUPT_DISABLE: u32 = 1 << 10;
-        self.pci_write(PCI_COMMAND, command | INTERRUPT_DISABLE);
+        const INTERRUPT_DISABLE: u16 = 1 << 10;
+        self.pci_write_16(PCI_COMMAND, command | INTERRUPT_DISABLE);
 
         trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
             self,
-            self.pci_read_32(PCI_COMMAND),
+            self.pci_read_16(PCI_COMMAND),
         );
     }
 
-    /// Explores the PCI config space and returns address of requested capability, if present. 
-    /// PCI capabilities are stored as a linked list in the PCI config space, 
+    /// Explores the PCI config space and returns address of requested capability, if present.
+    /// PCI capabilities are stored as a linked list in the PCI config space,
     /// with each capability storing the pointer to the next capability right after its ID.
-    /// The function returns a None value if capabilities are not valid for this device 
-    /// or if the requested capability is not present. 
+    /// The function returns a None value if capabilities are not valid for this device
+    /// or if the requested capability is not present.
     fn find_pci_capability(&self, pci_capability: PciCapability) -> Option<u8> {
         let pci_capability = pci_capability as u8;
         let status = self.pci_read_16(PCI_STATUS);
 
         // capabilities are only valid if bit 4 of status register is set
         const CAPABILITIES_VALID: u16 = 1 << 4;
-        if  status & CAPABILITIES_VALID != 0 {
+        if status & CAPABILITIES_VALID != 0 {
 
             // retrieve the capabilities pointer from the pci config space
             let capabilities = self.pci_read_8(PCI_CAPABILITIES);
@@ -393,21 +488,24 @@ impl PciLocation {
             // the last capability will have its next pointer equal to zero
             let final_capability = 0;
 
-            // iterate through the linked list of capabilities until the requested capability is found or the list reaches its end
+            // iterate through the linked list of capabilities until the requested
+            // capability is found or the list reaches its end
             while cap_addr != final_capability {
-                // the capability header is a 16 bit value which contains the current capability ID and the pointer to the next capability
-                let cap_header = self.pci_read_16(cap_addr);
+                // the capability header is a 16 bit value which contains
+                // the current capability ID and the pointer to the next capability
 
                 // the id is the lower byte of the header
-                let cap_id = (cap_header & 0xFF) as u8;
-                
+                let cap_id_reg = offset_to_byte_reg_def(cap_addr);
+                let cap_id = self.pci_read_8(cap_id_reg);
+
                 if cap_id == pci_capability {
                     debug!("Found capability: {:#X} at {:#X}", pci_capability, cap_addr);
                     return Some(cap_addr);
                 }
 
                 // find address of next capability which is the higher byte of the header
-                cap_addr = ((cap_header >> 8) & 0xFF) as u8;            
+                let next_cap_ptr_reg = offset_to_byte_reg_def(cap_addr + 1);
+                cap_addr = self.pci_read_8(next_cap_ptr_reg);
             }
         }
         None
@@ -514,15 +612,15 @@ impl PciDevice {
         // (4) Bitwise "not" (negate) that value, then add 1.
         //     The resulting value is the size of that BAR's memory region.
         // (5) Restore the original value to that BAR
-        let bar_offset = PCI_BAR0 + (bar_index as u8 * 4);
+        let bar_reg_def = (PCI_BAR0.0 + (bar_index as u8), FullDword);
         let original_value = self.bars[bar_index];
 
-        self.pci_write(bar_offset, 0xFFFF_FFFF);          // Step 1
-        let mut mem_size = self.pci_read_32(bar_offset);  // Step 2
-        mem_size.set_bits(0..4, 0);                       // Step 3
-        mem_size = !(mem_size);                           // Step 4
-        mem_size += 1;                                    // Step 4
-        self.pci_write(bar_offset, original_value);       // Step 5
+        self.pci_write_32(bar_reg_def, 0xFFFF_FFFF);       // Step 1
+        let mut mem_size = self.pci_read_32(bar_reg_def);  // Step 2
+        mem_size.set_bits(0..4, 0);                        // Step 3
+        mem_size = !(mem_size);                            // Step 4
+        mem_size += 1;                                     // Step 4
+        self.pci_write_32(bar_reg_def, original_value);    // Step 5
         mem_size
     }
 
@@ -534,34 +632,48 @@ impl PciDevice {
     /// # Arguments
     /// * `core_id`: core that interrupt will be routed to
     /// * `int_num`: interrupt number to assign to the MSI vector
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the MSI capability isn't aligned to 4 bytes
     pub fn pci_enable_msi(&self, core_id: u8, int_num: u8) -> Result<(), &'static str> {
 
         // find out if the device is msi capable
         let cap_addr = self.find_pci_capability(PciCapability::Msi).ok_or("Device not MSI capable")?;
+        assert_eq!(cap_addr & 0b11, 0, "pci_enable_msi: Invalid MSI capability address alignment");
+        let msi_reg_index = cap_addr >> 2;
 
         // offset in the capability space where the message address register is located 
-        const MESSAGE_ADDRESS_REGISTER_OFFSET: u8 = 4;
+        const MESSAGE_ADDRESS_REGISTER_OFFSET: u8 = 1 /* one dword */;
+
         // the memory region is a constant defined for Intel cpus where MSI messages are written
         // it should be written to bit 20 of the message address register
         const MEMORY_REGION: u32 = 0x0FEE << 20;
+
         // the core id tells which cpu the interrupt will be routed to 
         // it should be written to bit 12 of the message address register
         let core = (core_id as u32) << 12;
+
         // set the core the MSI will be sent to in the Message Address Register (Intel Arch SDM, vol3, 10.11)
-        self.pci_write(cap_addr + MESSAGE_ADDRESS_REGISTER_OFFSET, MEMORY_REGION| core);
+        let reg_def = (msi_reg_index + MESSAGE_ADDRESS_REGISTER_OFFSET, FullDword);
+        self.pci_write_32(reg_def, MEMORY_REGION | core);
 
         // offset in the capability space where the message data register is located 
-        const MESSAGE_DATA_REGISTER_OFFSET: u8 = 12;
-        // Set the interrupt number for the MSI in the Message Data Register
-        self.pci_write(cap_addr + MESSAGE_DATA_REGISTER_OFFSET, int_num as u32);
+        const MESSAGE_DATA_REGISTER_OFFSET: u8 = 3 /* dwords */;
 
-        // offset in the capability space where the message control register is located 
-        const MESSAGE_CONTROL_REGISTER_OFFSET: u8 = 2;
-        // to enable the MSI capability, we need to set it bit 0 of the message control register
-        const MSI_ENABLE: u32 = 1;
-        let ctrl = self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) as u32;
+        // Set the interrupt number for the MSI in the Message Data Register
+        let reg_def = (msi_reg_index + MESSAGE_DATA_REGISTER_OFFSET, FullDword);
+        self.pci_write_32(reg_def, int_num as u32);
+
+        // to enable the MSI capability, we need to set bit 0 of the message control register
+        const MSI_ENABLE: u16 = 1;
+
         // enable MSI in the Message Control Register
-        self.pci_write(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET, ctrl | MSI_ENABLE);
+        // the message control register corresponds to bits [16:31] of the first dword
+        let reg_def = (msi_reg_index, Word1);
+        let mut ctrl = self.pci_read_16(reg_def);
+        ctrl |= MSI_ENABLE;
+        self.pci_write_16(reg_def, ctrl);
 
         Ok(())  
     }
@@ -570,19 +682,21 @@ impl PciDevice {
     /// Only the enable bit is set and the remaining initialization steps of
     /// setting the interrupt number and core id should be completed in the device driver.
     pub fn pci_enable_msix(&self) -> Result<(), &'static str> {
-
         // find out if the device is msi-x capable
         let cap_addr = self.find_pci_capability(PciCapability::Msix).ok_or("Device not MSI-X capable")?;
+        assert_eq!(cap_addr & 0b11, 0, "pci_enable_msix: Invalid MSI-X capability address alignment");
+        let msix_reg_index = cap_addr >> 2;
 
-        // offset in the capability space where the message control register is located 
-        const MESSAGE_CONTROL_REGISTER_OFFSET: u8 = 2;
-        let ctrl = self.pci_read_16(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET) as u32;
+        // write to bit 15 of Message Control Register to enable MSI-X
+        const MSIX_ENABLE: u16 = 1 << 15;
 
-        // write to bit 15 of Message Control Register to enable MSI-X 
-        const MSIX_ENABLE: u32 = 1 << 15; 
-        self.pci_write(cap_addr + MESSAGE_CONTROL_REGISTER_OFFSET, ctrl | MSIX_ENABLE);
+        // the message control register corresponds to bits [16:31] of the first dword
+        let reg_def = (msix_reg_index, Word1);
+        let mut ctrl = self.pci_read_16(reg_def);
+        ctrl |= MSIX_ENABLE;
+        self.pci_write_16(reg_def, ctrl);
 
-        // let ctrl = pci_read_32(dev.bus, dev.slot, dev.func, cap_addr);
+        // let ctrl = pci_read_16(reg_def, msix_reg_index);
         // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
         Ok(())  
@@ -595,14 +709,19 @@ impl PciDevice {
     pub fn pci_mem_map_msix(&self, max_vectors: usize) -> Result<MsixVectorTable, &'static str> {
         // retreive the address in the pci config space for the msi-x capability
         let cap_addr = self.find_pci_capability(PciCapability::Msix).ok_or("Device not MSI-X capable")?;
-        // find the BAR used for msi-x
-        let vector_table_offset = 4;
-        let table_offset = self.pci_read_32(cap_addr + vector_table_offset);
+        assert_eq!(cap_addr & 0b11, 0, "pci_enable_msix: Invalid MSI-X capability address alignment");
+        let msix_reg_index = cap_addr >> 2;
+
+        // get physical address of vector table
+        let vector_table_offset = 1 /* one dword */;
+        let reg_def = (msix_reg_index + vector_table_offset, FullDword);
+        let table_offset = self.pci_read_32(reg_def);
         let bar = table_offset & 0x7;
         let offset = table_offset >> 3;
+        let addr = self.bars[bar as usize] + offset;
+
         // find the memory base address and size of the area for the vector table
-        let mem_base = PhysicalAddress::new((self.bars[bar as usize] + offset) as usize)
-            .ok_or("Invalid BAR content")?;
+        let mem_base = PhysicalAddress::new(addr as usize).ok_or("Invalid BAR content")?;
         let mem_size_in_bytes = size_of::<MsixVectorEntry>() * max_vectors;
 
         // debug!("msi-x vector table bar: {}, base_address: {:#X} and size: {} bytes", bar, mem_base, mem_size_in_bytes);
