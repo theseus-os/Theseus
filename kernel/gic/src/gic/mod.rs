@@ -236,27 +236,35 @@ impl ArmGicDistributor {
     }
 
     /// Will that interrupt be forwarded by the distributor?
+    ///
+    /// Panics: will panic if `int` is not in the SPI range (>= 32)
     pub fn get_spi_state(&self, int: InterruptNumber) -> Enabled {
-        assert!(int >= 32);
+        assert!(int >= 32, "get_spi_state: `int` must be >= 32");
         self.distributor().is_spi_enabled(int)
     }
 
     /// Enables or disables the forwarding of
     /// a particular interrupt in the distributor
+    ///
+    /// Panics: will panic if `int` is not in the SPI range (>= 32)
     pub fn set_spi_state(&mut self, int: InterruptNumber, enabled: Enabled) {
-        assert!(int >= 32);
+        assert!(int >= 32, "set_spi_state: `int` must be >= 32");
         self.distributor_mut().enable_spi(int, enabled)
     }
 
     /// Returns the priority of an interrupt
+    ///
+    /// Panics: will panic if `int` is not in the SPI range (>= 32)
     pub fn get_spi_priority(&self, int: InterruptNumber) -> Priority {
-        assert!(int >= 32);
+        assert!(int >= 32, "get_spi_priority: `int` must be >= 32");
         self.distributor().get_spi_priority(int)
     }
 
     /// Sets the priority of an interrupt (0-255)
+    ///
+    /// Panics: will panic if `int` is not in the SPI range (>= 32)
     pub fn set_spi_priority(&mut self, int: InterruptNumber, enabled: Priority) {
-        assert!(int >= 32);
+        assert!(int >= 32, "set_spi_priority: `int` must be >= 32");
         self.distributor_mut().set_spi_priority(int, enabled)
     }
 }
@@ -325,10 +333,11 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Sends an inter processor interrupt (IPI),
-    /// also called software generated interrupt (SGI).
+    /// Sends an inter processor interrupt (IPI), also called software
+    /// generated interrupt (SGI).
     ///
-    /// note: on Aarch64, IPIs must have a number below 16 on ARMv8
+    /// Panics: on Aarch64, IPIs must have a number below 16. This function
+    /// panics if `int_num` is equal to or greater than 16.
     pub fn send_ipi(&mut self, int_num: InterruptNumber, target: IpiTargetCpu) {
         assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
 
@@ -362,9 +371,11 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Will that interrupt be received by this CPU?
+    /// Will that local interrupt be received by this CPU?
+    ///
+    /// Panics: will panic if `int` is not in the local range (< 32)
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
-        assert!(int < 32);
+        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.is_sgippi_enabled(int)
@@ -378,8 +389,10 @@ impl ArmGicCpuComponents {
     }
 
     /// Enables or disables the receiving of a local interrupt in the distributor
+    ///
+    /// Panics: will panic if `int` is not in the local range (< 32)
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
-        assert!(int < 32);
+        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.enable_sgippi(int, enabled);
@@ -390,8 +403,10 @@ impl ArmGicCpuComponents {
     }
 
     /// Returns the priority of a local interrupt
+    ///
+    /// Panics: will panic if `int` is not in the local range (< 32)
     pub fn get_interrupt_priority(&self, int: InterruptNumber) -> Priority {
-        assert!(int < 32);
+        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.get_sgippi_priority(int)
@@ -405,8 +420,10 @@ impl ArmGicCpuComponents {
     }
 
     /// Sets the priority of a local interrupt (prio: 0-255)
+    ///
+    /// Panics: will panic if `int` is not in the local range (< 32)
     pub fn set_interrupt_priority(&mut self, int: InterruptNumber, enabled: Priority) {
-        assert!(int < 32);
+        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.set_sgippi_priority(int, enabled);
@@ -416,10 +433,11 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Interrupts have a priority; if their priority
-    /// is lower or equal to this one, they're queued
-    /// until this CPU or another one is ready to handle
-    /// them
+    /// Retrieves the current priority threshold for the current CPU.
+    ///
+    /// Interrupts have a priority; if their priority is lower or
+    /// equal to this threshold, they're queued until the current CPU
+    /// is ready to handle them.
     pub fn get_minimum_priority(&self) -> Priority {
         match self {
             Self::V2 { registers, .. } => registers.get_minimum_priority(),
@@ -427,10 +445,11 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Interrupts have a priority; if their priority
-    /// is lower or equal to this one, they're queued
-    /// until this CPU or another one is ready to handle
-    /// them
+    /// Sets the current priority threshold for the current CPU.
+    ///
+    /// Interrupts have a priority; if their priority is lower or
+    /// equal to this threshold, they're queued until the current CPU
+    /// is ready to handle them.
     pub fn set_minimum_priority(&mut self, priority: Priority) {
         match self {
             Self::V2 { registers, .. } => registers.set_minimum_priority(priority),

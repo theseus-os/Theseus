@@ -16,6 +16,10 @@ use zerocopy::FromBytes;
 /// to a specific CPU in the system.
 ///
 /// Methods refer to that specific CPU by "current CPU".
+///
+/// Caution: Even though the physical address for this
+/// structure is the same for each CPU, the actual backing
+/// memory is per-CPU (different for each CPU).
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct CpuRegsP1 {            // base offset
