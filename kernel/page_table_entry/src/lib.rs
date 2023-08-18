@@ -60,7 +60,7 @@ impl PageTableEntry {
         // if is huge 
         //  - frame_range = FrameRange start ... start + 2mb
         if flags.is_exclusive() {
-            UnmapResult::Exclusive(UnmappedFrames(frame_range))
+            UnmapResult::Exclusive(UnmappedFrameRange(frame_range))
         } else {
             UnmapResult::NonExclusive(frame_range)
         }
@@ -78,7 +78,7 @@ impl PageTableEntry {
             Frame::containing_address(frame.start_address() + (4096 * 512)));
 
         if flags.is_exclusive() {
-            UnmapResult::Exclusive(UnmappedFrames(frame_range))
+            UnmapResult::Exclusive(UnmappedFrameRange(frame_range))
         } else {
             UnmapResult::NonExclusive(frame_range)
         }

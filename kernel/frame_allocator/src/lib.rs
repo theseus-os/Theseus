@@ -1336,7 +1336,6 @@ where
         .map_err(From::from)
 }
 
-
 /// Converts the frame allocator from using static memory (a primitive array) to dynamically-allocated memory.
 /// 
 /// Call this function once heap allocation is available. 

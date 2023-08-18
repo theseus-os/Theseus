@@ -115,8 +115,6 @@ where
     }
 
     let rsdp_address = boot_info.rsdp();
-
-
     // init memory management: set up stack with guard page, heap, kernel text/data mappings, etc
     let (
         kernel_mmi_ref,

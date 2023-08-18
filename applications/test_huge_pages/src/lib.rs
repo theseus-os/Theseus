@@ -13,7 +13,7 @@ use memory::{
     VirtualAddress, PhysicalAddress, 
     Page1GiB, Page2MiB, 
     PAGE_2MB_SIZE, PAGE_1GB_SIZE, 
-    allocate_2mb_pages, allocate_1gb_pages, allocate_frames_at, allocate_pages_at
+    allocate_frames_at, allocate_pages_at
 };
 
 // For checking valid addresses if necessary
@@ -32,32 +32,32 @@ pub fn main(_args: Vec<String>) -> isize {
     println!("Size of page 2 is {:?}", page2m.page_size());
     
     
-    match page1g.page_size() {
-        PAGE_1GB_SIZE => println!("Page 1 recognized as 1GiB"),
-        _ => println!("Page 1 not recognized as 1GiB"),
-    }
-    match page2m.page_size() {
-        PAGE_2MB_SIZE => println!("Page 2 recognized as 2MiB"),
-        _ => println!("Page 2 not recognized as 2MiB"),
-    }
-    let _allocated_1g = allocate_1gb_pages(1)
-        .ok_or("test_huge_pages: could not allocate 1GiB page")
-        .unwrap();
-    let _allocated_2m = allocate_2mb_pages(1)
-        .ok_or("test_huge_pages: could not allocate 2MiB page")
-        .unwrap();
-    println!("Huge pages successfully allocated!");
-    // end preliminary tests
+    // match page1g.page_size() {
+    //     PAGE_1GB_SIZE => println!("Page 1 recognized as 1GiB"),
+    //     _ => println!("Page 1 not recognized as 1GiB"),
+    // }
+    // match page2m.page_size() {
+    //     PAGE_2MB_SIZE => println!("Page 2 recognized as 2MiB"),
+    //     _ => println!("Page 2 not recognized as 2MiB"),
+    // }
+    // let _allocated_1g = allocate_1gb_pages(1)
+    //     .ok_or("test_huge_pages: could not allocate 1GiB page")
+    //     .unwrap();
+    // let _allocated_2m = allocate_2mb_pages(1)
+    //     .ok_or("test_huge_pages: could not allocate 2MiB page")
+    //     .unwrap();
+    // println!("Huge pages successfully allocated!");
+    // // end preliminary tests
 
     let mut aligned_2mb_page = allocate_pages_at(
         VirtualAddress::new_canonical(0x60000000),
-        512).unwrap();
+        512).expect("Could not allocate pages. Make sure you have enough memory for the kernel (compile with make orun QEMU_MEMORY=3G).");
     aligned_2mb_page.to_2mb_allocated_pages();
 
     // frame allocator has not been modified to deal with huge frames yet
     let aligned_4k_frames = allocate_frames_at(
             PhysicalAddress::new_canonical(0x60000000), //0x1081A000
-            512).unwrap();
+            512).expect("Could not allocate frames. Make sure you have enough memory for the kernel (compile with make orun QEMU_MEMORY=3G).");
 
     let mut mapped_2mb_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
         aligned_2mb_page,

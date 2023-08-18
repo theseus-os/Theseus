@@ -21,12 +21,12 @@ pub fn main(_args: Vec<String>) -> isize {
     // Now the same for 1gb pages
     let mut aligned_1gb_page = allocate_pages_at(
         VirtualAddress::new_canonical(0x40000000), 
-        512*512).expect("test_huge_pages: failed to allocate range for 1GiB page");
+        512*512).expect("Failed to allocate range for 1GiB page. Make sure you have enough memory for the kernel (compile with make orun QEMU_MEMORY=3G).");
     aligned_1gb_page.to_1gb_allocated_pages();
 
     let aligned_4k_frames = allocate_frames_at(
         PhysicalAddress::new_canonical(0x40000000), //0x1081A000
-        512 * 512).unwrap();
+        512 * 512).expect("Failed to allocate enough frames at desired address. Make sure you have enough memory for the kernel (compile with make orun QEMU_MEMORY=3G).");
 
     let mut mapped_1gb_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
         aligned_1gb_page,

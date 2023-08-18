@@ -18,7 +18,7 @@ use core::{
     slice,
 };
 use log::{error, warn, debug, trace};
-use memory_structs::{PAGE_4KB_SIZE, PAGE_2MB_SIZE, PAGE_1GB_SIZE};
+use memory_structs::{PAGE_4KB_SIZE, PAGE_2MB_SIZE, PAGE_1GB_SIZE, MemChunkSize};
 use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames}; 
 use crate::paging::{
     get_current_p4,
@@ -224,7 +224,7 @@ impl Mapper {
         // The different branches are mostly the same. For huge pages an additional flag is set, and 
         // the frame is mapped to the page table level corresponding page size.
         match pages.page_size() {
-            PAGE_4KB_SIZE => {
+            MemChunkSize::Normal4K => {
                 // iterate over pages and frames in lockstep
                 for (page, frame) in pages.range().clone().into_iter().zip(frames.borrow().into_iter()) {
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
@@ -238,7 +238,8 @@ impl Mapper {
                     p1[page.p1_index()].set_entry(frame, actual_flags);
                 }
             }
-            PAGE_2MB_SIZE => {
+            MemChunkSize::Huge2M => {
+                // Temporarily define a custom step over the page range until correct behaviour is implemented for huge pages
                 for (page, frame) in pages.range_2mb().clone().into_iter().step_by(512).zip(frames.borrow().into_iter().step_by(512)) {
                     actual_flags = actual_flags.huge(true);
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
@@ -252,8 +253,9 @@ impl Mapper {
                     p2[page.p2_index()].set_entry(frame, actual_flags);
                 }
             }
-            PAGE_1GB_SIZE => {
-                for (page, frame) in pages.range_1gb().clone().into_iter().step_by(512*512).zip(frames.borrow().into_iter().step_by(512*512)) {
+            MemChunkSize::Huge1G => {
+                // Temporarily define a custom step over the page range until correct behaviour is implemented for huge pages
+                for (page, frame) in pages.range_1gb().clone().into_iter().step_by(512 * 512).zip(frames.borrow().into_iter().step_by(512 * 512)) {
                     actual_flags = actual_flags.huge(true);
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
 
@@ -264,9 +266,6 @@ impl Mapper {
 
                     p3[page.p3_index()].set_entry(frame, actual_flags);
                 }
-            }
-            _ => {
-                return Err("map_allocated_pages_to(): page has incorrect size");
             }
         }
 
@@ -320,7 +319,7 @@ impl Mapper {
             .exclusive(true);
 
         match pages.page_size() {
-            PAGE_4KB_SIZE => {
+            MemChunkSize::Normal4K => {
                 for page in pages.range().clone() {
                     let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
@@ -338,47 +337,11 @@ impl Mapper {
                     core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
                 }
             }
-            PAGE_2MB_SIZE => {
-                for page in pages.range_2mb().iter().step_by(512) {
-                    // This is just one frame for now, as you can only use set_entry on a single frame
-                    //let af = frame_allocator::allocate_frames(512).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-                    let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-
-                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-                    let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
-                    trace!("Attempting to map to level 2 PTE: {:?}", p2[page.p2_index()].flags());
-
-                    if !p2[page.p2_index()].is_unused() {
-                        error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
-                            page.start_address(), af.start_address()
-                        );
-                        return Err("map_allocated_pages(): page was already in use");
-                    }
-        
-                    p2[page.p2_index()].set_entry(af.as_allocated_frame(), actual_flags);
-                    core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
-                }
+            MemChunkSize::Huge2M => {
+                todo!("Mapping 2MiB huge pages to randomly-allocated huge frames is not yet supported")
             }
-            PAGE_1GB_SIZE => {
-                for page in pages.range_1gb() {
-                    //let af = frame_allocator::allocate_frames(262114).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-                    let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
-                    let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
-                    trace!("Attempting to map to PTE: {:?}", p3[page.p3_index()].flags());
-
-                    if !p3[page.p1_index()].is_unused() {
-                        error!("map_allocated_pages(): page {:#X} -> frame {:#X}, page was already in use!",
-                            page.start_address(), af.start_address()
-                        );
-                        return Err("map_allocated_pages(): page was already in use");
-                    } 
-        
-                    p3[page.p3_index()].set_entry(af.as_allocated_frame(), actual_flags);
-                    core::mem::forget(af); // we currently forget frames allocated here since we don't yet have a way to track them.
-                }
-            }
-            _ => {
-                return Err("map_allocated_pages(): page has incorrect size");
+            MemChunkSize::Huge1G => {
+                todo!("Mapping 1GiB huge pages to randomly-allocated huge frames is not yet supported")
             }
         }
 
@@ -622,43 +585,42 @@ impl MappedPages {
         }
 
         match self.pages.page_size() {
-            PAGE_4KB_SIZE => {
+            MemChunkSize::Normal4K => {
                 for page in self.pages.range().clone() {
                     let p1 = active_table_mapper.p4_mut()
                         .next_table_mut(page.p4_index())
                         .and_then(|p3| p3.next_table_mut(page.p3_index()))
                         .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                        .ok_or("remap: error getting p1 entry for 4kb page")?;
+                        .ok_or("BUG: remap() - could not get p1 entry for 4kb page")?;
 
                     p1[page.p1_index()].set_flags(new_flags);
 
                     tlb_flush_virt_addr(page.start_address());
                 }
             }
-            PAGE_2MB_SIZE => {
+            MemChunkSize::Huge2M => {
                 for page in self.pages.range_2mb().clone().into_iter().step_by(512) {
                     let p2 = active_table_mapper.p4_mut()
                         .next_table_mut(page.p4_index())
                         .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                        .ok_or("remap: error getting p2 entry for 2mb page")?;
+                        .ok_or("BUG: remap() - could not get p1 entry for 2mb page")?;
 
                     p2[page.p2_index()].set_flags(new_flags);
 
                     tlb_flush_virt_addr(page.start_address());
                 }
             }
-            PAGE_1GB_SIZE => {
+            MemChunkSize::Huge1G => {
                 for page in self.pages.range_1gb().clone().into_iter().step_by(512 * 512) {
                     let p3 = active_table_mapper.p4_mut()
                         .next_table_mut(page.p4_index())
-                        .ok_or("remap: error getting p3 entry for 1gb page")?;
+                        .ok_or("BUG: remap() - could not get p1 entry for 1gb page")?;
 
                     p3[page.p3_index()].set_flags(new_flags);
 
                     tlb_flush_virt_addr(page.start_address());
                 }
             }
-            _ => {}
         }
         if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
             func(self.pages.range().clone());
@@ -728,13 +690,13 @@ impl MappedPages {
         // The different branches mostly have the same logic, differing 
         // only in what level is unmapped and what unmapping function is used.
         match self.pages.page_size() {
-            PAGE_4KB_SIZE => {
+             MemChunkSize::Normal4K => {
                 for page in self.pages.range().clone() {
                     let p1 = active_table_mapper.p4_mut()
                         .next_table_mut(page.p4_index())
                         .and_then(|p3| p3.next_table_mut(page.p3_index()))
                         .and_then(|p2| p2.next_table_mut(page.p2_index()))
-                        .ok_or("mapping code does not support huge pages")?;
+                        .ok_or("BUG: could not get p1 entry in unmap()")?;
                     let pte = &mut p1[page.p1_index()];
                     if pte.is_unused() {
                         return Err("unmap(): page not mapped");
@@ -796,12 +758,13 @@ impl MappedPages {
                     }
                 }
             }
-            PAGE_2MB_SIZE => {
+            MemChunkSize::Huge2M => {
+                // Temporarily define a custom step over huge page ranges until correct behaiour is implemented
                 for page in self.pages.range_2mb().clone().into_iter().step_by(512) {
                     let p2 = active_table_mapper.p4_mut()
                         .next_table_mut(page.p4_index())
                         .and_then(|p3| p3.next_table_mut(page.p3_index()))
-                        .ok_or("mapper: error getting p2 entry while attempting to unmap 2MiB page")?;
+                        .ok_or("BUG: could not get p2 entry for 2mb page in unmap()")?;
                     let pte = &mut p2[page.p2_index()];
                     if pte.is_unused() {
                         return Err("unmap(): page not mapped");
@@ -811,8 +774,8 @@ impl MappedPages {
         
                     match unmapped_frames {
                         UnmapResult::Exclusive(newly_unmapped_frames) => {
-                            let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
-                                .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                            let newly_unmapped_frames = INTO_UNMAPPED_FRAMES_FUNC.get()
+                                .ok_or("BUG: Mapper::unmap(): the `INTO_UNMAPPED_FRAMES_FUNC` callback was not initialized")
                                 .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
                             if let Some(mut curr_frames) = current_frame_range.take() {
                                 match curr_frames.merge(newly_unmapped_frames) {
@@ -837,7 +800,7 @@ impl MappedPages {
                             }
                         }
                         UnmapResult::NonExclusive(_frames) => {
-                            trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
+                            //trace!("Note: FYI: page {:X?} -> frames {:X?} was just unmapped but not mapped as EXCLUSIVE.", page, _frames);
                         }
                     }
                 }
@@ -845,15 +808,16 @@ impl MappedPages {
                 #[cfg(not(bm_map))]
                 {
                     if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-                        func(self.pages.range_2mb().as_4kb_range());
+                        func(self.pages.range_2mb().as_4kb_range()); // convert to 4kb range for the TLB shootdown
                     }
                 }
             }
-            PAGE_1GB_SIZE => {
+            MemChunkSize::Huge1G => {
+                // Temporarily define a custom step over huge page ranges until correct behaiour is implemented
                 for page in self.pages.range_1gb().clone().into_iter().step_by(512*512) {
                     let p3 = active_table_mapper.p4_mut()
                         .next_table_mut(page.p4_index())
-                        .ok_or("mapper: error getting level 3 table when unmapping a 1GiB page")?;
+                        .ok_or("BUG: could not get p2 entry for 2gb page in unmap()")?;
                     let pte = &mut p3[page.p3_index()];
                     if pte.is_unused() {
                         return Err("unmap(): page not mapped");
@@ -864,8 +828,8 @@ impl MappedPages {
         
                     match unmapped_frames {
                         UnmapResult::Exclusive(newly_unmapped_frames) => {
-                            let newly_unmapped_frames = INTO_ALLOCATED_FRAMES_FUNC.get()
-                                .ok_or("BUG: Mapper::unmap(): the `INTO_ALLOCATED_FRAMES_FUNC` callback was not initialized")
+                            let newly_unmapped_frames = INTO_UNMAPPED_FRAMES_FUNC.get()
+                                .ok_or("BUG: Mapper::unmap(): the `INTO_UNMAPPED_FRAMES_FUNC` callback was not initialized")
                                 .map(|into_func| into_func(newly_unmapped_frames.deref().clone()))?;
         
                             if let Some(mut curr_frames) = current_frame_range.take() {
@@ -899,11 +863,10 @@ impl MappedPages {
                 #[cfg(not(bm_map))]
                 {
                     if let Some(func) = BROADCAST_TLB_SHOOTDOWN_FUNC.get() {
-                        func(self.pages.range_1gb().as_4kb_range());
+                        func(self.pages.range_1gb().as_4kb_range()); // convert to 4kb range for the TLB shootdown
                     }
                 }
             }
-            _ => {}
         }
 
         // Ensure that we return at least some frame range, even if we broke out of the above loop early.

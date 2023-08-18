@@ -27,29 +27,61 @@ pub const PAGE_4KB_SIZE: usize = 1 << 12;
 pub const PAGE_2MB_SIZE: usize = (1 << 12) * 512;
 pub const PAGE_1GB_SIZE: usize = (1 << 12) * 512 * 512;
 
-pub trait PageSize: Ord + PartialOrd + Clone {
-    const SIZE: usize;
+#[derive(Debug)]
+pub enum MemChunkSize {
+    Normal4K,
+    Huge2M,
+    Huge1G,
 }
 
-/// Marker struct used to indicate the default page size of 4KiB
+pub trait PageSize: Ord + PartialOrd + Clone {
+    const SIZE: MemChunkSize;
+}
+
+// pub trait PageSize: Ord + PartialOrd + Clone {
+//     const SIZE: usize;
+// }
+
+// /// Marker struct used to indicate the default page size of 4KiB
+// #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+// pub struct Page4KiB;
+// impl PageSize for Page4KiB {
+//     const SIZE: usize = PAGE_4KB_SIZE;
+// }
+
+// /// Marker struct used to indicate a page size of 2MiB
+// #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+// pub struct Page2MiB;
+// impl PageSize for Page2MiB {
+//     const SIZE: usize = PAGE_2MB_SIZE;
+// }
+
+// /// Marker struct used to indicate a page size of 1GiB
+// #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+// pub struct Page1GiB;
+// impl PageSize for Page1GiB {
+//     const SIZE: usize = PAGE_1GB_SIZE;
+// }
+
+// Marker struct used to indicate the default page size of 4KiB
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page4KiB;
 impl PageSize for Page4KiB {
-    const SIZE: usize = PAGE_4KB_SIZE;
+    const SIZE: MemChunkSize = MemChunkSize::Normal4K;
 }
 
 /// Marker struct used to indicate a page size of 2MiB
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page2MiB;
 impl PageSize for Page2MiB {
-    const SIZE: usize = PAGE_2MB_SIZE;
+    const SIZE: MemChunkSize = MemChunkSize::Huge2M;
 }
 
 /// Marker struct used to indicate a page size of 1GiB
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page1GiB;
 impl PageSize for Page1GiB {
-    const SIZE: usize = PAGE_1GB_SIZE;
+    const SIZE: MemChunkSize = MemChunkSize::Huge1G;
 }
 
 /// The possible states that a range of exclusively-owned pages or frames can be in.
@@ -376,10 +408,9 @@ macro_rules! implement_page_frame {
                     }
                 }
 
-                pub const fn page_size(&self) -> usize {
+                pub const fn page_size(&self) -> MemChunkSize {
                     P::SIZE
                 }
-
             }
 
             impl<P: 'static + PageSize> fmt::Debug for $TypeName<P> {
@@ -499,11 +530,6 @@ macro_rules! implement_page_frame_range {
             pub struct $TypeName<P: PageSize = Page4KiB>(RangeInclusive<$chunk::<P>>);
 
             impl $TypeName {
-                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
-                pub const fn new(start: $chunk, end: $chunk) -> $TypeName {
-                    $TypeName(RangeInclusive::new(start, end))
-                }
-
                 #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
                 pub const fn empty() -> $TypeName {
                     $TypeName::new($chunk { number: 11, size: PhantomData::<Page4KiB> }, $chunk { number: 0, size: PhantomData::<Page4KiB>  })
@@ -530,24 +556,6 @@ macro_rules! implement_page_frame_range {
                 pub const fn [<size_in_ $chunk:lower s>](&self) -> usize {
                     // add 1 because it's an inclusive range
                     (self.0.end().number + 1).saturating_sub(self.0.start().number)
-                }
-
-                // These change the size markers and align to desired amount. 
-                pub fn align_to_2mb_range(&self) -> $TypeName<Page2MiB> {
-                    $TypeName::<Page2MiB>(RangeInclusive::new(self.start().align_to_2mb(), self.end().align_to_2mb()))
-                }
-
-                pub fn align_to_1gb_range(&self) -> $TypeName<Page1GiB> {
-                    $TypeName::<Page1GiB>(RangeInclusive::new(self.start().align_to_1gb(), self.end().align_to_1gb()))
-                }
-
-                // These into functions just convert the size marker.
-                pub fn into_2mb_range(&self) -> $TypeName<Page2MiB> {
-                    $TypeName::<Page2MiB>(RangeInclusive::new(self.start().as_2mb(), self.end().as_2mb()))
-                }
-
-                pub fn into_1gb_range(&self) -> $TypeName<Page1GiB> {
-                    $TypeName::<Page1GiB>(RangeInclusive::new(self.start().as_1gb(), self.end().as_1gb()))
                 }
 
                 #[doc = "Returns a new separate `" $TypeName "` that is extended to include the given [`" $chunk "`]."]
@@ -580,8 +588,34 @@ macro_rules! implement_page_frame_range {
                     && (other.start() >= self.start())
                     && (other.end() <= self.end())
                 }
+
+                // NOTE: Make these fallable so that a 4k page/frame that isn't big enough is not mistakenly converted into a huge page/frame
+                #[doc = "Changes the PageSize marker of this `" $TypeName "` and aligns it to a 2mb boundary."]
+                pub fn align_to_2mb_range(&self) -> $TypeName<Page2MiB> {
+                    $TypeName::<Page2MiB>(RangeInclusive::new(self.start().align_to_2mb(), self.end().align_to_2mb()))
+                }
+
+                #[doc = "Changes the PageSize marker of this `" $TypeName "` and aligns it to a 1gb boundary."]
+                pub fn align_to_1gb_range(&self) -> $TypeName<Page1GiB> {
+                    $TypeName::<Page1GiB>(RangeInclusive::new(self.start().align_to_1gb(), self.end().align_to_1gb()))
+                }
+
+                #[doc = "Changes the PageSize marker of this `" $TypeName "` without aligning it to a 2mb boundary."]
+                pub fn into_2mb_range(&self) -> $TypeName<Page2MiB> {
+                    $TypeName::<Page2MiB>(RangeInclusive::new(self.start().as_2mb(), self.end().as_2mb()))
+                }
+
+                #[doc = "Changes the PageSize marker of this `" $TypeName "` without aligning it to a 1gb boundary."]
+                pub fn into_1gb_range(&self) -> $TypeName<Page1GiB> {
+                    $TypeName::<Page1GiB>(RangeInclusive::new(self.start().as_1gb(), self.end().as_1gb()))
+                }
             }
             impl<P: 'static> $TypeName<P> where P: PageSize {
+                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
+                pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
+                    $TypeName(RangeInclusive::new(start, end))
+                }
+
                 #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
                 pub const fn contains_address(&self, addr: $address) -> bool {
                     let c = $chunk::containing_address(addr);
@@ -622,25 +656,19 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
-                pub const fn new_2mb(start: $chunk<Page2MiB>, end: $chunk<Page2MiB>) -> $TypeName<Page2MiB> {
-                    $TypeName::<Page2MiB>(RangeInclusive::new(start, end))
-                }
-
-                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
-                pub const fn new_1gb(start: $chunk<Page1GiB>, end: $chunk<Page1GiB>) -> $TypeName<Page1GiB> {
-                    $TypeName::<Page1GiB>(RangeInclusive::new(start, end))
-                }
-
-                #[doc = "Changes this `" $TypeName "` to have a size of 4KiB. This does not perform any alignment. \
-                        It simply changes the marker type for usage with functions that want a range of default-sized pages."]
-                pub fn as_4kb_range(&self) -> $TypeName {
-                    $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
-                }
-
                 #[doc = "Returns the size of this range in bytes."]
                 pub const fn size_in_bytes(&self) -> usize {
-                    self.[<size_in_ $chunk:lower s_gen>]() * P::SIZE
+                    match P::SIZE {
+                        MemChunkSize::Normal4K => {
+                            self.[<size_in_ $chunk:lower s_gen>]() * PAGE_4KB_SIZE
+                        }
+                        MemChunkSize::Huge2M => {
+                            self.[<size_in_ $chunk:lower s_gen>]() * PAGE_2MB_SIZE
+                        }
+                        MemChunkSize::Huge1G => {
+                            self.[<size_in_ $chunk:lower s_gen>]() * PAGE_1GB_SIZE
+                        }
+                    }
                 }
 
                 #[doc = "Returns the number of [`" $chunk "`]s covered by this iterator.\n\n \
@@ -649,6 +677,12 @@ macro_rules! implement_page_frame_range {
                 pub const fn [<size_in_ $chunk:lower s_gen>](&self) -> usize {
                    // add 1 because it's an inclusive range
                    (self.0.end().number + 1).saturating_sub(self.0.start().number)
+                }
+
+                #[doc = "Changes this `" $TypeName "` to have a size of 4KiB. This does not perform any alignment. \
+                It simply changes the marker type for usage with functions that want a range of default-sized pages."]
+                pub fn as_4kb_range(&self) -> $TypeName {
+                    $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
                 }
             }
             impl<P: 'static + PageSize> fmt::Debug for $TypeName<P> {
