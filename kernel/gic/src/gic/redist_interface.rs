@@ -18,32 +18,48 @@ use super::write_array_volatile;
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 
+/// General redistributor registers
 #[derive(FromBytes)]
 #[repr(C)]
-pub struct RedistRegsP1 {        // base offset
-    ctlr:         Volatile<u32>, // 0x00
+pub struct RedistRegsP1 {                          // base offset
+    /// Redistributor Control Register
+    ctlr:         Volatile<u32>,                   // 0x00
+
+    /// Implementer Identification Register
     _unused0:     u32,
-    ident:        ReadOnly<u64>, // 0x08
+
+    /// Redistributor Type Register
+    ident:        ReadOnly<u64>,                   // 0x08
+
+    /// Error Reporting Status Register, optional
     _unused1:     u32,
-    waker:        Volatile<u32>, // 0x14
+
+    /// Redistributor Wake Register
+    waker:        Volatile<u32>,                   // 0x14
 }
 
+/// Redistributor registers for SGIs & PPIs
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct RedistRegsSgiPpi {            // base offset
     _reserved0:   [u8;            0x80],
 
+    /// Interrupt Group Register 0
     group:        [Volatile<u32>; 0x01], // 0x080
     _reserved1:   [u32;           0x1f],
 
+    /// Interrupt Set-Enable Registers
     set_enable:   [Volatile<u32>; 0x01], // 0x100
     _reserved2:   [u32;           0x1f],
 
+    /// Interrupt Clear-Enable Registers
     clear_enable: [Volatile<u32>; 0x01], // 0x180
     _reserved3:   [u32;           0x1f],
 
+    /// Interrupt Set & Clear Pending / Active Registers
     _unused0:     [u32;           0x80],
 
+    /// Interrupt Priority Registers
     priority:     [Volatile<u32>; 0x08], // 0x400
 }
 

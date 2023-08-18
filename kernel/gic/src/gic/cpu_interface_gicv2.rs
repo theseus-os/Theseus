@@ -12,14 +12,29 @@ use super::InterruptNumber;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 
+/// Registers of a CPU interface of the GIC, pertaining
+/// to a specific CPU in the system.
+///
+/// Methods refer to that specific CPU by "current CPU".
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct CpuRegsP1 {            // base offset
+    /// CPU Interface Control Register
     ctlr:         Volatile<u32>,  // 0x00
+
+    /// Interrupt Priority Mask Register
     prio_mask:    Volatile<u32>,  // 0x04
+
+    /// Binary Point Register
     _unused0:     u32,
+
+    /// Interrupt Acknowledge Register
     acknowledge:  ReadOnly<u32>,  // 0x0C
+
+    /// End of Interrupt Register
     eoi:          WriteOnly<u32>, // 0x10
+
+    /// Running Priority Register
     running_prio: ReadOnly<u32>,  // 0x14
 }
 
@@ -30,40 +45,45 @@ pub struct CpuRegsP1 {            // base offset
 const CTLR_ENGRP1: u32 = 0b10;
 
 impl CpuRegsP1 {
-    /// Enables routing of group 1 interrupts for the current CPU
+    /// Enables routing of group 1 interrupts for the current CPU.
     pub fn init(&mut self) {
         let mut reg = self.ctlr.read();
         reg |= CTLR_ENGRP1;
         self.ctlr.write(reg);
     }
 
-    /// Interrupts have a priority; if their priority
-    /// is lower or equal to this one, they're queued
-    /// until this CPU or another one is ready to handle
-    /// them
+    /// Retrieves the current priority threshold for the current CPU.
+    ///
+    /// Interrupts have a priority; if their priority is lower or
+    /// equal to this threshold, they're queued until the current CPU
+    /// is ready to handle them.
     pub fn get_minimum_priority(&self) -> Priority {
         u8::MAX - (self.prio_mask.read() as u8)
     }
 
-    /// Interrupts have a priority; if their priority
-    /// is lower or equal to this one, they're queued
-    /// until this CPU or another one is ready to handle
-    /// them
+    /// Sets the current priority threshold for the current CPU.
+    ///
+    /// Interrupts have a priority; if their priority is lower or
+    /// equal to this threshold, they're queued until the current CPU
+    /// is ready to handle them.
     pub fn set_minimum_priority(&mut self, priority: Priority) {
         self.prio_mask.write((u8::MAX - priority) as u32);
     }
 
-    /// Signals to the controller that the currently processed interrupt has
-    /// been fully handled, by zeroing the current priority level of this CPU.
+    /// Signals to the controller that the currently processed interrupt
+    /// has been fully handled, by zeroing the current priority level of
+    /// the current CPU.
+    ///
     /// This implies that the CPU is ready to process interrupts again.
     pub fn end_of_interrupt(&mut self, int: InterruptNumber) {
         self.eoi.write(int);
     }
 
-    /// Acknowledge the currently serviced interrupt
-    /// and fetches its number; this tells the GIC that
-    /// the requested interrupt is being handled by
-    /// this CPU.
+    /// Acknowledge the currently serviced interrupt and fetches its
+    /// number.
+    ///
+    /// This tells the GIC that the requested interrupt is being
+    /// handled by this CPU.
     pub fn acknowledge_interrupt(&mut self) -> (InterruptNumber, Priority) {
         // Reading the interrupt number has the side effect
         // of acknowledging the interrupt.

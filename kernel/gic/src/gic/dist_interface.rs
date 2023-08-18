@@ -26,32 +26,51 @@ use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 use cpu::MpidrValue;
 
+/// First page of distributor registers
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct DistRegsP1 {                   // base offset
+    /// Distributor Control Register
     ctlr:          Volatile<u32>,         // 0x000
+
+    /// Interrupt Controller Type Register
     typer:         ReadOnly<u32>,         // 0x004
+
+    /// Distributor Implementer Identification Register
     ident:         ReadOnly<u32>,         // 0x008
+
     _unused0:     [u8;            0x074],
 
+    /// Interrupt Group Registers
     group:        [Volatile<u32>; 0x020], // 0x080
+
+    /// Interrupt Set-Enable Registers
     set_enable:   [Volatile<u32>; 0x020], // 0x100
+
+    /// Interrupt Clear-Enable Registers
     clear_enable: [Volatile<u32>; 0x020], // 0x180
 
     _unused1:     [u8;            0x200],
 
+    /// Interrupt Priority Registers
     priority:     [Volatile<u32>; 0x100], // 0x400
+
+    /// Interrupt Processor Targets Registers
     target:       [Volatile<u32>; 0x100], // 0x800
 
     _unused2:     [u8;            0x300],
 
+    /// Software Generated Interrupt Register
     sgir:          Volatile<u32>,         // 0xf00
 }
 
+/// Sixth page of distributor registers
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct DistRegsP6 {     // base offset
     _unused: [u8; 0x100],
+
+    /// Interrupt Routing Registers
     route:   Volatile<u64>, // 0x100
 }
 
