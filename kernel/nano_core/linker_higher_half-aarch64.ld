@@ -7,9 +7,6 @@ OUTPUT_FORMAT(elf64-littleaarch64)
  */
 KERNEL_OFFSET = 0x0000FFFF80000000;
 
-CLS_SIZE = SIZEOF(.cls);
-TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);
-
 SECTIONS {
 
     /*
@@ -124,3 +121,8 @@ SECTIONS {
         *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
     }
 }
+
+/* These definitions must be placed at the end of the file so that the .cls,
+.tdata, and .tbss sections are placed in the correct order. */
+CLS_SIZE = SIZEOF(.cls);
+TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);
