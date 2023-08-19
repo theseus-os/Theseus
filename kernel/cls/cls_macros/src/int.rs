@@ -21,9 +21,9 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
     Some(quote! {
         #[inline]
         pub fn load(&self) -> #ty {
+            let offset = #offset_expr;
             #[cfg(target_arch = "x86_64")]
             {
-                let offset = #offset_expr;
                 let ret;
                 unsafe {
                     ::core::arch::asm!(
@@ -43,12 +43,11 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
-                        // concat!(
-                        //     "ldr", #aarch64_instr_width,
-                        //     " {ret", #aarch64_reg_modifier,"},",
-                        //     " [{tp_1},#", stringify!(#offset), "]",
-                        // ),
-                        // FIXME
+                        concat!(
+                            "ldr", #aarch64_instr_width,
+                            " {ret", #aarch64_reg_modifier,"},",
+                            " [{tp_1},#{offset}]",
+                        ),
 
                         // Make sure task wasn't migrated between mrs and ldr.
                         "mrs {tp_2}, tpidr_el1",
@@ -57,6 +56,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
 
                         tp_1 = out(reg) _,
                         ret = out(reg) ret,
+                        offset = in(reg) offset,
                         tp_2 = out(reg) _,
 
                         options(nostack),
@@ -68,9 +68,9 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
 
         #[inline]
         pub fn fetch_add(&self, mut operand: #ty) -> #ty {
+            let offset = #offset_expr;
             #[cfg(target_arch = "x86_64")]
             {
-                let offset = #offset_expr;
                 unsafe {
                     ::core::arch::asm!(
                         ::core::concat!("xadd ", #x64_width_modifier, "gs:[{offset}], {operand}"),
@@ -89,7 +89,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
-                        "add {ptr}, {tp_1}, {cls}@TPOFF",
+                        "add {ptr}, {tp_1}, {offset}",
                         // "sub {ptr}, 0x1000",
                         concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
@@ -107,7 +107,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
 
                         tp_1 = out(reg) ret,
                         ptr = out(reg) _,
-                        cls = sym #name,
+                        offset = in(reg) offset,
                         value = out(reg) ret,
                         tp_2 = out(reg) _,
                         operand = in(reg) operand,

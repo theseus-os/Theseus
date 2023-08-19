@@ -8,10 +8,8 @@ use convert_case::{Case, Casing};
 use proc_macro::{Diagnostic, Level, Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
-    meta::ParseNestedMeta,
     parse::{Parse, ParseStream},
     parse_macro_input,
-    punctuated::Punctuated,
     spanned::Spanned,
     Attribute, Expr, Ident, LitBool, Path, Token, Type, Visibility,
 };
@@ -149,21 +147,27 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
     let offset_expr = cls_offset_expr(&name);
     let ref_expr = quote! {
         {
+            let offset = #offset_expr;
             #[cfg(target_arch = "x86_64")]
             let mut ptr: u64 = {
-                let offset = #offset_expr;
-
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
+
                 let (value, overflow_occured) = gs.overflowing_add(offset);
                 assert!(overflow_occured, "overflow did not occur");
+
                 value
             };
-            // #[cfg(target_arch = "aarch64")]
-            // let mut ptr = {
-            //     use cls::__private::tock_registers::interfaces::Readable;
-            //     cls::__private::cortex_a::registers::TPIDR_EL1.get() - 0x1000
-            // };
+            #[cfg(target_arch = "aarch64")]
+            let mut ptr = {
+                use cls::__private::tock_registers::interfaces::Readable;
+                let tpidr_el1 = cls::__private::cortex_a::registers::TPIDR_EL1.get();
+
+                let (value, overflow_occured) = tpidr_el1.overflowing_add(offset);
+                assert!(overflow_occured, "overflow did not occur");
+
+                value
+            };
             // log::info!("ptr after asm: {ptr:0x?}");
             unsafe { &mut*(ptr as *mut #ty) }
         }
@@ -286,25 +290,31 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                 static TLS_SIZE: u8;
             }
 
-            // SAFETY: We don't access the extern static.
             // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+            // SAFETY: We don't access the extern static.
             let cls_size = unsafe { ::core::ptr::addr_of!(CLS_SIZE) } as u64;
+            // SAFETY: We don't access the extern static.
             let tls_size = unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as u64;
 
-            // TODO: Aarch64
-            let temp: u64;
-            unsafe {
-                ::core::arch::asm!(
-                    "lea {temp}, [{cls}@TPOFF + {tls_size} + 0x1000]",
-                    temp = lateout(reg) temp,
-                    cls = sym #name,
-                    tls_size = in(reg) tls_size,
-                )
-            };
-
-            let temp = (cls_size - temp).wrapping_neg();
-            // log::info!("calculated cls offset: {}", temp.wrapping_neg());
-            temp
+            #[cfg(target_arch = "x86_64")]
+            {
+                let temp: u64;
+                unsafe {
+                    ::core::arch::asm!(
+                        "lea {temp}, [{cls}@TPOFF + {tls_size} + 0x1000]",
+                        temp = lateout(reg) temp,
+                        cls = sym #name,
+                        tls_size = in(reg) tls_size,
+                    )
+                };
+                let offset = (cls_size - temp).wrapping_neg();
+                offset
+            }
+            #[cfg(target_arch = "aarch64")]
+            {
+                todo!();
+                0u64
+            }
         }
     }
 }

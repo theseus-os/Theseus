@@ -398,7 +398,8 @@ impl TlsDataImage {
         };
         #[cfg(target_arch = "aarch64")]
         {
-            todo!();
+            use cortex_a::registers::TPIDR_EL1;
+            TPIDR_EL1.set(self.ptr as u64);
         }
     }
 }
