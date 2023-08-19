@@ -19,8 +19,8 @@ static PREEMPTION_COUNT: u8 = 0;
 /// If this results in a transition from preemption being enabled to being disabled
 /// on this CPU, the local timer interrupt used for preemptive task switches
 /// will also be disabled until preemption is re-enabled.
-pub fn hold_preemption() -> Option<PreemptionGuard> {
-    Some(hold_preemption_internal::<true>())
+pub fn hold_preemption() -> PreemptionGuard {
+    hold_preemption_internal::<true>()
 }
 
 /// Prevents preemption (preemptive task switching) from occurring

@@ -387,20 +387,19 @@ impl TlsDataImage {
     }
 
     pub fn set_as_current_cls_base(&self) {
-        // FIXME: Aarch64
         #[cfg(target_arch = "x86_64")]
         {
-            use x86_64::registers::control::{Cr4, Cr4Flags};
+            use x86_64::registers::{
+                control::{Cr4, Cr4Flags},
+                segmentation::{Segment64, GS},
+            };
             unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
-
-            unsafe {
-                core::arch::asm!(
-                    "wrgsbase {}",
-                    in(reg) self.ptr as u64,
-                    options(nomem, preserves_flags, nostack),
-                )
-            }
+            unsafe { GS::write_base(VirtAddr::new(self.ptr as u64)) };
         };
+        #[cfg(target_arch = "aarch64")]
+        {
+            todo!();
+        }
     }
 }
 

@@ -159,7 +159,6 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 assert!(overflow_occured, "overflow did not occur");
                 value
             };
-            // log::info!("ptr before asm: {ptr:0x?}");
             // #[cfg(target_arch = "aarch64")]
             // let mut ptr = {
             //     use cls::__private::tock_registers::interfaces::Readable;
@@ -172,19 +171,17 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
     let cls_dep_functions = if cls_dependency {
         let guarded_functions = quote! {
-            #[inline(never)]
+            #[inline]
             pub fn replace_guarded<G>(&self, mut value: #ty, guard: &G) -> #ty
             where
                 G: ::cls::CpuAtomicGuard,
             {
-                // ::log::debug!("{value:?}");
                 let rref = #ref_expr;
-                // ::log::debug!("ptr to CLS: {:0x?}", rref as *const _);
                 ::core::mem::swap(rref, &mut value);
                 value
             }
 
-            #[inline(never)]
+            #[inline]
             pub fn set_guarded<G>(&self, mut value: #ty, guard: &G)
             where
                 G: ::cls::CpuAtomicGuard,

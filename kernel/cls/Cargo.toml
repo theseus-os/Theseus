@@ -13,7 +13,6 @@ memory = { path = "../memory" }
 preemption = { path = "../preemption" }
 sync_spin = { path = "../../libs/sync_spin" }
 tls_initializer = { path = "../tls_initializer" }
-log = "*"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"
