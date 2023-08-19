@@ -63,36 +63,85 @@ const fn offset_to_byte_reg_def(offset: u8) -> PciRegister {
     (reg_index, reg_span)
 }
 
+/// Creates a word register definition from a byte offset
+const fn offset_to_word_reg_def(offset: u8) -> PciRegister {
+    let reg_index = offset >> 2;
+    let reg_span = match offset & 0b11 {
+        0 => Word0,
+        1 => panic!("PCI: invalid word offset"),
+        2 => Word1,
+        3 => panic!("PCI: invalid word offset"),
+        _ => unreachable!(),
+    };
+    (reg_index, reg_span)
+}
+
+/// Creates a dword register definition from a byte offset
+const fn offset_to_dword_reg_def(offset: u8) -> PciRegister {
+    let reg_index = offset >> 2;
+    let reg_span = match offset & 0b11 {
+        0 => FullDword,
+        1 => panic!("PCI: invalid dword offset"),
+        2 => panic!("PCI: invalid dword offset"),
+        3 => panic!("PCI: invalid dword offset"),
+        _ => unreachable!(),
+    };
+    (reg_index, reg_span)
+}
+
+macro_rules! pci_register {
+    ($name:ident, $offset:expr, 1) => {
+        const $name: PciRegister = offset_to_byte_reg_def($offset);
+    };
+    ($name:ident, $offset:expr, 2) => {
+        const $name: PciRegister = offset_to_word_reg_def($offset);
+    };
+    ($name:ident, $offset:expr, 4) => {
+        const $name: PciRegister = offset_to_dword_reg_def($offset);
+    };
+}
+
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
-const PCI_VENDOR_ID:             PciRegister = (0x0, Word0);
-const PCI_DEVICE_ID:             PciRegister = (0x0, Word1);
-const PCI_COMMAND:               PciRegister = (0x1, Word0);
-const PCI_STATUS:                PciRegister = (0x1, Word1);
-const PCI_REVISION_ID:           PciRegister = (0x2, Byte0);
-const PCI_PROG_IF:               PciRegister = (0x2, Byte1);
-const PCI_SUBCLASS:              PciRegister = (0x2, Byte2);
-const PCI_CLASS:                 PciRegister = (0x2, Byte3);
-const PCI_CACHE_LINE_SIZE:       PciRegister = (0x3, Byte0);
-const PCI_LATENCY_TIMER:         PciRegister = (0x3, Byte1);
-const PCI_HEADER_TYPE:           PciRegister = (0x3, Byte2);
-const PCI_BIST:                  PciRegister = (0x3, Byte3);
-const PCI_BAR0:                  PciRegister = (0x4, FullDword);
-const PCI_BAR1:                  PciRegister = (0x5, FullDword);
-const PCI_BAR2:                  PciRegister = (0x6, FullDword);
-const PCI_BAR3:                  PciRegister = (0x7, FullDword);
-const PCI_BAR4:                  PciRegister = (0x8, FullDword);
-const PCI_BAR5:                  PciRegister = (0x9, FullDword);
-const PCI_CARDBUS_CIS:           PciRegister = (0xA, FullDword);
-const PCI_SUBSYSTEM_VENDOR_ID:   PciRegister = (0xB, Word0);
-const PCI_SUBSYSTEM_ID:          PciRegister = (0xB, Word1);
-const PCI_EXPANSION_ROM_BASE:    PciRegister = (0xC, FullDword);
-const PCI_CAPABILITIES:          PciRegister = (0xD, Byte0);
+
+pci_register!(PCI_VENDOR_ID,           0x00, 2);
+pci_register!(PCI_DEVICE_ID,           0x02, 2);
+
+pci_register!(PCI_COMMAND,             0x04, 2);
+pci_register!(PCI_STATUS,              0x06, 2);
+
+pci_register!(PCI_REVISION_ID,         0x08, 1);
+pci_register!(PCI_PROG_IF,             0x09, 1);
+pci_register!(PCI_SUBCLASS,            0x0A, 1);
+pci_register!(PCI_CLASS,               0x0B, 1);
+
+pci_register!(PCI_CACHE_LINE_SIZE,     0x0C, 1);
+pci_register!(PCI_LATENCY_TIMER,       0x0D, 1);
+pci_register!(PCI_HEADER_TYPE,         0x0E, 1);
+pci_register!(PCI_BIST,                0x0F, 1);
+
+pci_register!(PCI_BAR0,                0x10, 4);
+pci_register!(PCI_BAR1,                0x14, 4);
+pci_register!(PCI_BAR2,                0x18, 4);
+pci_register!(PCI_BAR3,                0x1C, 4);
+pci_register!(PCI_BAR4,                0x20, 4);
+pci_register!(PCI_BAR5,                0x24, 4);
+
+pci_register!(PCI_CARDBUS_CIS,         0x28, 4);
+
+pci_register!(PCI_SUBSYSTEM_VENDOR_ID, 0x2C, 2);
+pci_register!(PCI_SUBSYSTEM_ID,        0x2E, 2);
+
+pci_register!(PCI_EXPANSION_ROM_BASE,  0x30, 4);
+
+pci_register!(PCI_CAPABILITIES,        0x34, 1);
+
 // 0x35 through 0x3B are reserved
-const PCI_INTERRUPT_LINE:        PciRegister = (0xF, Byte0);
-const PCI_INTERRUPT_PIN:         PciRegister = (0xF, Byte1);
-const PCI_MIN_GRANT:             PciRegister = (0xF, Byte2);
-const PCI_MAX_LATENCY:           PciRegister = (0xF, Byte3);
+
+pci_register!(PCI_INTERRUPT_LINE,      0x3C, 1);
+pci_register!(PCI_INTERRUPT_PIN,       0x3D, 1);
+pci_register!(PCI_MIN_GRANT,           0x3E, 1);
+pci_register!(PCI_MAX_LATENCY,         0x3F, 1);
 
 #[repr(u8)]
 pub enum PciCapability {
