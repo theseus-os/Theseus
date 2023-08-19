@@ -938,9 +938,12 @@ fn task_switch_inner(
         drop(_held_interrupts);
     }
 
+    // loop {}
+    log::info!("A");
     // Move the preemption guard into CPU-local storage such that we can retrieve it
     // after the actual context switch operation has completed.
     TASK_SWITCH_PREEMPTION_GUARD.set(preemption_guard);
+    log::info!("B");
 
     #[cfg(not(simd_personality))]
     return Ok((prev_task_saved_sp, next_task_saved_sp));

@@ -159,7 +159,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 assert!(overflow_occured, "overflow did not occur");
                 value
             };
-            log::info!("ptr before asm: {ptr:0x?}");
+            // log::info!("ptr before asm: {ptr:0x?}");
             // #[cfg(target_arch = "aarch64")]
             // let mut ptr = {
             //     use cls::__private::tock_registers::interfaces::Readable;
@@ -177,9 +177,9 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             where
                 G: ::cls::CpuAtomicGuard,
             {
-                ::log::debug!("{value:?}");
+                // ::log::debug!("{value:?}");
                 let rref = #ref_expr;
-                ::log::debug!("ptr to CLS: {:0x?}", rref as *const _);
+                // ::log::debug!("ptr to CLS: {:0x?}", rref as *const _);
                 ::core::mem::swap(rref, &mut value);
                 value
             }
@@ -216,9 +216,13 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                     {}
                     implements_guard_trait::<#guard_type>();
 
+                    // ::log::debug!("guard: {guard:?}");
                     let rref = #ref_expr;
+                    // ::log::debug!("ptr to CLS guard: {:0x?}", rref as *const _);
+                    // ::log::debug!("bytes at CLS guard: {:0x?}", unsafe { core::slice::from_raw_parts(rref as *const _ as *const u8, 8) });
                     let mut guard = Some(guard);
                     ::core::mem::swap(rref, &mut guard);
+                    // log::info!("replaced guard: {guard:?}");
 
                     guard
                 }
@@ -302,7 +306,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
             };
 
             let temp = (cls_size - temp).wrapping_neg();
-            log::info!("calculated cls offset: {}", temp.wrapping_neg());
+            // log::info!("calculated cls offset: {}", temp.wrapping_neg());
             temp
         }
     }

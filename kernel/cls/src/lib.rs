@@ -55,6 +55,7 @@ static CLS_SECTIONS: SpinMutex<Vec<TlsDataImage>> = SpinMutex::new(Vec::new());
 pub fn insert(image: TlsDataImage) {
     log::info!("CALLING INSERT");
     log::info!("ptr: {:0x?}", image.ptr);
+    log::info!("data: {:0x?}", image._data);
     image.set_as_current_cls_base();
     let temp: u64;
     unsafe {

@@ -266,7 +266,7 @@ impl TlsInitializer {
                 new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
 
                 // Insert the section data into the new data vec.
-                if sec.typ == SectionType::TlsData {
+                if (sec.typ == SectionType::TlsData) | (sec.typ == SectionType::Cls) {
                     let sec_mp = sec.mapped_pages.lock();
                     let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size).unwrap();
                     new_data.extend_from_slice(sec_data);
@@ -364,7 +364,8 @@ impl TlsInitializer {
 pub struct TlsDataImage {
     // The data is wrapped in an Option to avoid allocating an empty boxed slice
     // when there are no TLS data sections.
-    _data: Option<Box<[u8]>>,
+    // TODO: I don't think an empty boxed slice allocates.
+    pub _data: Option<Box<[u8]>>,
     pub ptr:   usize,
 }
 impl TlsDataImage {
