@@ -914,6 +914,7 @@ impl fmt::Debug for LoadedSection {
         // Add the rest of the typical fields
         dbg.field("vaddr", &self.virt_addr)
             .field("size", &self.size)
+            .field("mapped_pages_offset", &self.mapped_pages_offset)
             .finish_non_exhaustive()
     }
 }

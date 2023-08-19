@@ -92,7 +92,6 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
                         "add {ptr}, {tp_1}, {offset}",
-                        // "sub {ptr}, 0x1000",
                         concat!("ldxr", #aarch64_instr_width, " {value", #aarch64_reg_modifier,"}, [{ptr}]"),
 
                         // Make sure task wasn't migrated between msr and ldxr.

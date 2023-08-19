@@ -156,6 +156,10 @@ impl TlsInitializer {
         #[cfg(target_arch = "aarch64")]
         let offset = max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */) + offset;
 
+        log::info!("adding existing static tls section: {tls_section:#0x?}");
+        log::info!("offset: {offset:0x?}");
+        log::info!("total size: {total_static_tls_size:0x?}");
+
         let range = offset .. (offset + tls_section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
@@ -266,6 +270,7 @@ impl TlsInitializer {
                 new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
 
                 // Insert the section data into the new data vec.
+                log::info!("adding sec: {sec:?}");
                 if (sec.typ == SectionType::TlsData) | (sec.typ == SectionType::Cls) {
                     let sec_mp = sec.mapped_pages.lock();
                     let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size).unwrap();

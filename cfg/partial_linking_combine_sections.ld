@@ -34,6 +34,11 @@ SECTIONS {
 		*(.gcc_except_table .gcc_except_table.*)
 	}
 
+	.cls :
+	{
+		*(.cls .cls.*)
+	}
+
 	.tdata :
 	{
 		*(.tdata .tdata.*)

@@ -349,10 +349,11 @@ where
         // | (3)  | .rodata           | start of read-only pages      |
         // | (4)  | .eh_frame         | part of read-only pages       |
         // | (5)  | .gcc_except_table | part/end of read-only pages   |
-        // | (6)  | .tdata            | part/end of read-only pages   |
-        // | (7)  | .tbss             | part/end of read-only pages   |
-        // | (8)  | .data             | start of read-write pages     |
-        // | (9)  | .bss              | end of read-write pages       |
+        // | (6)  | .cls              | part/end of read-only pages   |
+        // | (7)  | .tdata            | part/end of read-only pages   |
+        // | (8)  | .tbss             | part/end of read-only pages   |
+        // | (9)  | .data             | start of read-write pages     |
+        // | (10) | .bss              | end of read-write pages       |
         // |------|-------------------|-------------------------------|
         //
         // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
@@ -386,7 +387,11 @@ where
                 rodata_flags = Some(flags);
                 "nano_core .gcc_except_table"
             }
-            // The following four sections are optional: .tdata, .tbss, .data, .bss.
+            // The following four sections are optional: .cls, .tdata, .tbss, .data, .bss.
+            ".cls" => {
+                rodata_end = Some((end_virt_addr, end_phys_addr));
+                "nano_core .cls"
+            }
             ".tdata" => {
                 rodata_end = Some((end_virt_addr, end_phys_addr));
                 "nano_core .tdata"
@@ -459,6 +464,8 @@ where
         end: data_end,
         flags: data_flags,
     };
+    log::info!("rodata: {rodata:0x?}");
+    log::info!("rodata len: {:0x?}", rodata.end.0 - rodata.start.0);
 
     let aggregated_sections_memory_bounds = AggregatedSectionMemoryBounds {
         init,

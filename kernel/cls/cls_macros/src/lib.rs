@@ -312,18 +312,16 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
             }
             #[cfg(target_arch = "aarch64")]
             {
-                let mut temp_1: u64;
-                let mut temp_2 = 0x1000 + tls_size;
+                let mut temp = 0x1000 + tls_size;
                 unsafe {
                     ::core::arch::asm!(
-                        "ldr {temp_1}, ={cls}@TPOFF",
-                        "add {temp_1}, {temp_1}, {temp_2}",
-                        temp_1 = out(reg) temp_1,
+                        "add {temp}, {temp}, #:tprel_hi12:{cls}, lsl #12",
+                        "add {temp}, {temp}, #:tprel_lo12_nc:{cls}",
+                        temp = inout(reg) temp,
                         cls = sym #name,
-                        temp_2 = in(reg) temp_2,
                     )
                 };
-                let offset = (cls_size - temp_1).wrapping_neg();
+                let offset = (cls_size - temp).wrapping_neg();
                 offset
             }
         }
