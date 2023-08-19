@@ -43,10 +43,11 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         "2:",
                         // Load value.
                         "mrs {tp_1}, tpidr_el1",
+                        "add {ptr}, {tp_1}, {offset}",
                         concat!(
                             "ldr", #aarch64_instr_width,
                             " {ret", #aarch64_reg_modifier,"},",
-                            " [{tp_1},#{offset}]",
+                            " [{ptr}]",
                         ),
 
                         // Make sure task wasn't migrated between mrs and ldr.
@@ -55,8 +56,9 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         "b.ne 2b",
 
                         tp_1 = out(reg) _,
-                        ret = out(reg) ret,
+                        ptr = out(reg) _,
                         offset = in(reg) offset,
+                        ret = out(reg) ret,
                         tp_2 = out(reg) _,
 
                         options(nostack),

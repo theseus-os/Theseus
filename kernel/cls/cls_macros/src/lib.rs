@@ -149,7 +149,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
         {
             let offset = #offset_expr;
             #[cfg(target_arch = "x86_64")]
-            let mut ptr: u64 = {
+            let mut ptr = {
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
 
@@ -312,8 +312,19 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
             }
             #[cfg(target_arch = "aarch64")]
             {
-                todo!();
-                0u64
+                let mut temp_1: u64;
+                let mut temp_2 = 0x1000 + tls_size;
+                unsafe {
+                    ::core::arch::asm!(
+                        "ldr {temp_1}, ={cls}@TPOFF",
+                        "add {temp_1}, {temp_1}, {temp_2}",
+                        temp_1 = out(reg) temp_1,
+                        cls = sym #name,
+                        temp_2 = in(reg) temp_2,
+                    )
+                };
+                let offset = (cls_size - temp_1).wrapping_neg();
+                offset
             }
         }
     }

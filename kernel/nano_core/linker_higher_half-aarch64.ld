@@ -7,6 +7,9 @@ OUTPUT_FORMAT(elf64-littleaarch64)
  */
 KERNEL_OFFSET = 0x0000FFFF80000000;
 
+CLS_SIZE = SIZEOF(.cls);
+TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);
+
 SECTIONS {
 
     /*
@@ -53,6 +56,11 @@ SECTIONS {
     {
         *(.gcc_except_table .gcc_except_table.*)
     }
+
+	.cls ALIGN(4K) : AT(ADDR(.cls) - KERNEL_OFFSET)
+	{
+		*(.cls)
+	}
 
     .tdata ALIGN(4K) : AT(ADDR(.tdata) - KERNEL_OFFSET)
     {
