@@ -758,7 +758,6 @@ impl<const S: MemoryState> Deref for Frames<S> {
         &self.frames
     }
 }
-
 impl<const S: MemoryState> Ord for Frames<S> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.frames.start().cmp(other.frames.start())
@@ -1335,6 +1334,7 @@ where
         .map(|(af, _)| Some(af))
         .map_err(From::from)
 }
+
 
 /// Converts the frame allocator from using static memory (a primitive array) to dynamically-allocated memory.
 /// 

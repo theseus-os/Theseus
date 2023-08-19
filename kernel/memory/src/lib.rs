@@ -33,8 +33,6 @@ pub use page_allocator::{
     allocate_pages_in_range,
     allocate_pages_by_bytes_in_range,
     dump_page_allocator_state,
-//    allocate_1gb_pages,
-//    allocate_2mb_pages,
 };
 pub use frame_allocator::{
     AllocatedFrames,
