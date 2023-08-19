@@ -168,7 +168,6 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 
                 value
             };
-            // log::info!("ptr after asm: {ptr:0x?}");
             unsafe { &mut*(ptr as *mut #ty) }
         }
     };

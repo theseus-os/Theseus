@@ -42,17 +42,48 @@ pub mod __private {
     pub use x86_64;
 }
 
-struct CpuLocalDataRegion {
-    cpu: CpuId,
-    image: TlsDataImage,
+use tls_initializer::{ClsDataImage, ClsInitializer};
+
+static CLS_INITIALIZER: SpinMutex<ClsInitializer> = SpinMutex::new(ClsInitializer::new());
+static CLS_SECTIONS: SpinMutex<Vec<(CpuId, ClsDataImage)>> = SpinMutex::new(Vec::new());
+
+/// Adds a CLS section with a pre-determined offset to the global CLS
+/// initializer.
+///
+/// The CLS register will not be updated until either [`reload`] or
+/// [`reload_current_core`] is called.
+pub fn add_static_section() {
+    todo!();
 }
 
-use tls_initializer::TlsDataImage;
+/// Adds a dynamic CLS section to the global CLS initializer.
+///
+/// The CLS register will not be updated until either [`reload`] or
+/// [`reload_current_core`] is called.
+pub fn add_dynamic_section() {
+    todo!();
+}
 
-// TODO: Store pointer to image in gs:[0]?
-static CLS_SECTIONS: SpinMutex<Vec<TlsDataImage>> = SpinMutex::new(Vec::new());
+/// Generates a new data image for the current core and sets the CLS register
+/// accordingly.
+pub fn reload_current_core() {
+    let current_cpu = cpu::current_cpu();
 
-pub fn insert(image: TlsDataImage) {
-    image.set_as_current_cls_base();
-    CLS_SECTIONS.lock().push(image);
+    let mut data = CLS_INITIALIZER.lock().get_data();
+    // SAFETY: TODO
+    unsafe { data.set_as_current_cls() };
+
+    let mut sections = CLS_SECTIONS.lock();
+    for (cpu, image) in sections.iter_mut() {
+        if *cpu == current_cpu {
+            core::mem::swap(image, &mut data);
+            return;
+        }
+    }
+    sections.push((current_cpu, data));
+}
+
+pub fn reload() {
+    let _initializer = CLS_INITIALIZER.lock();
+    // FIXME: Reload CLS register on all cores.
 }
