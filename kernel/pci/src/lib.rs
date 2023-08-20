@@ -347,13 +347,13 @@ impl PciLocation {
     fn pci_read_raw(&self, register: PciRegister) -> u32 {
         let PciRegister { index, span } = register;
         let (mask, shift) = span.get_mask_and_bitshift();
-        let u32_bytes = size_of::<u32>() as u32;
+        const U32_BYTES: u32 = size_of::<u32>() as u32;
 
         let dword_address = BASE_OFFSET
             | ((self.bus    as u32) << 16)
             | ((self.slot   as u32) << 11)
             | ((self.func   as u32) <<  8)
-            | ((index as u32) * u32_bytes);
+            | ((index as u32) * U32_BYTES);
 
         let dword_value;
 
@@ -408,25 +408,42 @@ impl PciLocation {
         self.pci_read_raw(register) as _
     }
 
-    /// Write to a register in the PCI Configuration Space.
+    /// Writes (part of) the given `value` to the given `register` in the PCI Configuration Space.
+    ///
+    /// If the width of the given `register` is less than 4 bytes, this function will first
+    /// read the initial value from the `register` to ensure we don't ovewrite other
+    /// unrelated parts of the `u32` value.
     fn pci_write_raw(&self, register: PciRegister, value: u32) {
         let PciRegister { index, span } = register;
-        let (mask, shift) = span.get_mask_and_bitshift();
-        let u32_bytes = size_of::<u32>() as u32;
-
+        const U32_BYTES: u32 = size_of::<u32>() as u32;
         let dword_address = BASE_OFFSET
             | ((self.bus  as u32) << 16)
             | ((self.slot as u32) << 11)
             | ((self.func as u32) <<  8)
-            | ((index as u32) * u32_bytes);
+            | ((index as u32) * U32_BYTES);
+
+        /// A macro that handles the required bitmasking/shifting to calculate the
+        /// final value that should actually be written to this `register`.
+        macro_rules! calc_value {
+            ($read_initial_value:expr) => {
+                if matches!(span, FullDword) {
+                    value
+                } else {
+                    let mut dword = $read_initial_value;
+                    let (mask, shift) = span.get_mask_and_bitshift();
+                    dword &= !mask;
+                    dword |= value << shift;
+                    dword
+                }
+            }
+        }
 
         #[cfg(target_arch = "x86_64")] {
             unsafe {
-                PCI_CONFIG_ADDRESS_PORT.lock().write(dword_address); 
-
-                let mut dword = PCI_CONFIG_DATA_PORT.lock().read();
-                dword &= !mask;
-                dword |= value << shift;
+                PCI_CONFIG_ADDRESS_PORT.lock().write(dword_address);
+            }
+            let dword = calc_value!(PCI_CONFIG_DATA_PORT.lock().read());
+            unsafe {
                 PCI_CONFIG_DATA_PORT.lock().write(dword);
             }
         }
@@ -437,9 +454,7 @@ impl PciLocation {
                 .expect("PCI Config Space wasn't mapped yet");
             let dword_index = (dword_address as usize) / size_of::<u32>();
 
-            let mut dword = config_space[dword_index].read();
-            dword &= !mask;
-            dword |= value << shift;
+            let dword = calc_value!(config_space[dword_index].read());
             config_space[dword_index].write(dword);
         }
     }
