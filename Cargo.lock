@@ -2567,9 +2567,9 @@ checksum = "be5e13c266502aadf83426d87d81a0f5d1ef45b8027f5a471c360abfe4bfae92"
 
 [[package]]
 name = "paste"
-version = "1.0.5"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "path"
@@ -2587,6 +2587,7 @@ dependencies = [
 name = "pci"
 version = "0.1.0"
 dependencies = [
+ "arm_boards",
  "bit_field 0.7.0",
  "cpu",
  "interrupts",

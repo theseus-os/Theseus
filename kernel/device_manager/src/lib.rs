@@ -3,11 +3,11 @@
 
 extern crate alloc;
 
-use log::info;
+use log::{info, debug};
 
 #[cfg(target_arch = "x86_64")]
 use {
-    log::{error, debug, warn},
+    log::{error, warn},
     mpmc::Queue,
     event_types::Event,
     memory::MemoryManagementInfo,
@@ -86,19 +86,20 @@ pub fn init(
         mouse::init(ps2_controller.mouse_ref(), mouse_producer)?;
     }
 
-    // No PCI support on aarch64 at the moment
-    #[cfg(target_arch = "x86_64")] {
     // Initialize/scan the PCI bus to discover PCI devices
-    for dev in pci::pci_device_iter() {
-        debug!("Found pci device: {:X?}", dev);
+    for dev in pci::pci_device_iter()? {
+        debug!("Found PCI device: {:X?}", dev);
     }
+
+    // No NIC support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")] {
 
     // store all the initialized ixgbe NICs here to be added to the network interface list
     let mut ixgbe_devs = Vec::new();
 
     // Iterate over all PCI devices and initialize the drivers for the devices we support.
 
-    for dev in pci::pci_device_iter() {
+    for dev in pci::pci_device_iter()? {
         // Currently we skip Bridge devices, since we have no use for them yet. 
         if dev.class == 0x06 {
             continue;
