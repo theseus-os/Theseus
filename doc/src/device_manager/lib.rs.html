@@ -290,16 +290,17 @@
 <a href="#290" id="290">290</a>
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(trait_alias))]
 
 </span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>log::info;
+<span class="kw">use </span>log::{info, debug};
 
 <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
 </span><span class="kw">use </span>{
-    log::{error, debug, warn},
+    log::{error, warn},
     mpmc::Queue,
     event_types::Event,
     memory::MemoryManagementInfo,
@@ -378,19 +379,20 @@
         mouse::init(ps2_controller.mouse_ref(), mouse_producer)<span class="question-mark">?</span>;
     }
 
-    <span class="comment">// No PCI support on aarch64 at the moment
-    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
     <span class="comment">// Initialize/scan the PCI bus to discover PCI devices
-    </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {
-        <span class="macro">debug!</span>(<span class="string">&quot;Found pci device: {:X?}&quot;</span>, dev);
+    </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter()<span class="question-mark">? </span>{
+        <span class="macro">debug!</span>(<span class="string">&quot;Found PCI device: {:X?}&quot;</span>, dev);
     }
+
+    <span class="comment">// No NIC support on aarch64 at the moment
+    </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
 
     <span class="comment">// store all the initialized ixgbe NICs here to be added to the network interface list
     </span><span class="kw">let </span><span class="kw-2">mut </span>ixgbe_devs = Vec::new();
 
     <span class="comment">// Iterate over all PCI devices and initialize the drivers for the devices we support.
 
-    </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter() {
+    </span><span class="kw">for </span>dev <span class="kw">in </span>pci::pci_device_iter()<span class="question-mark">? </span>{
         <span class="comment">// Currently we skip Bridge devices, since we have no use for them yet. 
         </span><span class="kw">if </span>dev.class == <span class="number">0x06 </span>{
             <span class="kw">continue</span>;
