@@ -27,7 +27,10 @@ use port_io::Port;
 use arm_boards::BOARD_CONFIG;
 
 #[derive(Debug, Copy, Clone)]
-/// Defines a PCI register as part of a dword
+/// The span of bytes within a 4-byte chunk that a PCI register occupies.
+///
+/// The PCI configuration space is represented as an array of 4-byte chunks.
+/// This struct defines where in a given 4-byte chunk a PCI register exists.
 enum RegisterSpan {
     /// Bits [0:31]
     FullDword,
@@ -44,100 +47,75 @@ enum RegisterSpan {
     /// Bits [24:31]
     Byte3,
 }
-
 use RegisterSpan::*;
 
-/// (PCI Config Space Dword Index, Register Span)
-type PciRegister = (u8, RegisterSpan);
-
-/// Creates a byte register definition from a byte offset
-const fn offset_to_byte_reg_def(offset: u8) -> PciRegister {
-    let reg_index = offset >> 2;
-    let reg_span = match offset & 0b11 {
-        0 => Byte0,
-        1 => Byte1,
-        2 => Byte2,
-        3 => Byte3,
-        _ => unreachable!(),
-    };
-    (reg_index, reg_span)
+/// A definition of a PCI configuration space register.
+#[derive(Clone, Copy, Debug)]
+struct PciRegister {
+    /// The location of this register in the PCI configuration space,
+    /// given as an index into the space as an array of `u32`s (4-byte chunks).
+    index: u8,
+    /// The location of this register within the 4-byte chunk.
+    span: RegisterSpan,
+}
+impl PciRegister {
+    const fn from_offset(raw_offset: u8, size_in_bytes: u8) -> Self {
+        let index = raw_offset >> 2;
+        match (size_in_bytes, raw_offset & 0b11) {
+            (1, 0) => PciRegister { index, span: Byte0 },
+            (1, 1) => PciRegister { index, span: Byte1 },
+            (1, 2) => PciRegister { index, span: Byte2 },
+            (1, 3) => PciRegister { index, span: Byte3 },
+            (2, 0) => PciRegister { index, span: Word0 },
+            (2, 2) => PciRegister { index, span: Word1 },
+            (4, 0) => PciRegister { index, span: FullDword },
+            // Throw a const panic (compile error) for invalid values.
+            _ => panic!("Invalid PciRegister specification"),
+        }
+    }
 }
 
-/// Creates a word register definition from a byte offset
-const fn offset_to_word_reg_def(offset: u8) -> PciRegister {
-    let reg_index = offset >> 2;
-    let reg_span = match offset & 0b11 {
-        0 => Word0,
-        1 => panic!("PCI: invalid word offset"),
-        2 => Word1,
-        3 => panic!("PCI: invalid word offset"),
-        _ => unreachable!(),
-    };
-    (reg_index, reg_span)
-}
-
-/// Creates a dword register definition from a byte offset
-const fn offset_to_dword_reg_def(offset: u8) -> PciRegister {
-    let reg_index = offset >> 2;
-    let reg_span = match offset & 0b11 {
-        0 => FullDword,
-        1 => panic!("PCI: invalid dword offset"),
-        2 => panic!("PCI: invalid dword offset"),
-        3 => panic!("PCI: invalid dword offset"),
-        _ => unreachable!(),
-    };
-    (reg_index, reg_span)
-}
-
+/// A macro for easily defining PCI registers using offsets from the PCI spec.
+///
+/// The last argument only accepts register sizes of 1, 2, and 4 bytes.
 macro_rules! pci_register {
     ($name:ident, $offset:expr, 1) => {
-        const $name: PciRegister = offset_to_byte_reg_def($offset);
+        const $name: PciRegister = PciRegister::from_offset($offset, 1);
     };
     ($name:ident, $offset:expr, 2) => {
-        const $name: PciRegister = offset_to_word_reg_def($offset);
+        const $name: PciRegister = PciRegister::from_offset($offset, 2);
     };
     ($name:ident, $offset:expr, 4) => {
-        const $name: PciRegister = offset_to_dword_reg_def($offset);
+        const $name: PciRegister = PciRegister::from_offset($offset, 4);
     };
 }
 
 // The below constants define the PCI configuration space. 
 // More info here: <http://wiki.osdev.org/PCI#PCI_Device_Structure>
-
 pci_register!(PCI_VENDOR_ID,           0x00, 2);
 pci_register!(PCI_DEVICE_ID,           0x02, 2);
-
 pci_register!(PCI_COMMAND,             0x04, 2);
 pci_register!(PCI_STATUS,              0x06, 2);
-
 pci_register!(PCI_REVISION_ID,         0x08, 1);
 pci_register!(PCI_PROG_IF,             0x09, 1);
 pci_register!(PCI_SUBCLASS,            0x0A, 1);
 pci_register!(PCI_CLASS,               0x0B, 1);
-
 pci_register!(PCI_CACHE_LINE_SIZE,     0x0C, 1);
 pci_register!(PCI_LATENCY_TIMER,       0x0D, 1);
 pci_register!(PCI_HEADER_TYPE,         0x0E, 1);
 pci_register!(PCI_BIST,                0x0F, 1);
-
 pci_register!(PCI_BAR0,                0x10, 4);
 pci_register!(PCI_BAR1,                0x14, 4);
 pci_register!(PCI_BAR2,                0x18, 4);
 pci_register!(PCI_BAR3,                0x1C, 4);
 pci_register!(PCI_BAR4,                0x20, 4);
 pci_register!(PCI_BAR5,                0x24, 4);
-
 pci_register!(PCI_CARDBUS_CIS,         0x28, 4);
-
 pci_register!(PCI_SUBSYSTEM_VENDOR_ID, 0x2C, 2);
 pci_register!(PCI_SUBSYSTEM_ID,        0x2E, 2);
-
 pci_register!(PCI_EXPANSION_ROM_BASE,  0x30, 4);
-
 pci_register!(PCI_CAPABILITIES,        0x34, 1);
-
 // 0x35 through 0x3B are reserved
-
 pci_register!(PCI_INTERRUPT_LINE,      0x3C, 1);
 pci_register!(PCI_INTERRUPT_PIN,       0x3D, 1);
 pci_register!(PCI_MIN_GRANT,           0x3E, 1);
@@ -326,7 +304,7 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
 }
 
 impl RegisterSpan {
-    fn to_mask_and_shift(self) -> (u32, u32) {
+    const fn to_mask_and_shift(self) -> (u32, u32) {
         match self {
             FullDword => (0xffff_ffff,  0),
             Word0     => (0x0000_ffff,  0),
@@ -338,7 +316,7 @@ impl RegisterSpan {
         }
     }
 
-    fn width_in_bytes(self) -> usize {
+    const fn width_in_bytes(self) -> usize {
         match self {
             FullDword => size_of::<u32>(),
             Word0     => size_of::<u16>(),
@@ -365,17 +343,17 @@ impl PciLocation {
     pub fn slot(&self) -> u8 { self.slot }
     pub fn function(&self) -> u8 { self.func }
 
-    /// Read a register from the PCI Configuration Space.
+    /// Read the value of the given `register` in the PCI Configuration Space.
     fn pci_read_raw(&self, register: PciRegister) -> u32 {
-        let (dword_offset, reg_span) = register;
-        let (mask, shift) = reg_span.to_mask_and_shift();
+        let PciRegister { index, span } = register;
+        let (mask, shift) = span.to_mask_and_shift();
         let u32_bytes = size_of::<u32>() as u32;
 
         let dword_address = BASE_OFFSET
-            | ((self.bus     as u32) << 16)
-            | ((self.slot    as u32) << 11)
-            | ((self.func    as u32) <<  8)
-            | ((dword_offset as u32) * u32_bytes);
+            | ((self.bus    as u32) << 16)
+            | ((self.slot   as u32) << 11)
+            | ((self.func   as u32) <<  8)
+            | ((index as u32) * u32_bytes);
 
         let dword_value;
 
@@ -401,7 +379,7 @@ impl PciLocation {
     ///
     /// Panics if the register isn't a [`FullDword`]
     fn pci_read_32(&self, register: PciRegister) -> u32 {
-        let reg_width = register.1.width_in_bytes();
+        let reg_width = register.span.width_in_bytes();
         let output_width = size_of::<u32>();
         assert_eq!(reg_width, output_width, "pci_read_32: register isn't 32-bit wide");
 
@@ -412,7 +390,7 @@ impl PciLocation {
     ///
     /// Panics if the register isn't a [`Word0`] / [`Word1`]
     fn pci_read_16(&self, register: PciRegister) -> u16 {
-        let reg_width = register.1.width_in_bytes();
+        let reg_width = register.span.width_in_bytes();
         let output_width = size_of::<u16>();
         assert_eq!(reg_width, output_width, "pci_read_16: register isn't 16-bit wide");
 
@@ -423,7 +401,7 @@ impl PciLocation {
     ///
     /// Panics if the register isn't a [`Byte0`] / [`Byte1`] / [`Byte2`] / [`Byte3`]
     fn pci_read_8(&self, register: PciRegister) -> u8 {
-        let reg_width = register.1.width_in_bytes();
+        let reg_width = register.span.width_in_bytes();
         let output_width = size_of::<u8>();
         assert_eq!(reg_width, output_width, "pci_read_16: register isn't 8-bit wide");
 
@@ -432,15 +410,15 @@ impl PciLocation {
 
     /// Write to a register in the PCI Configuration Space.
     fn pci_write_raw(&self, register: PciRegister, value: u32) {
-        let (dword_offset, reg_span) = register;
-        let (mask, shift) = reg_span.to_mask_and_shift();
+        let PciRegister { index, span } = register;
+        let (mask, shift) = span.to_mask_and_shift();
         let u32_bytes = size_of::<u32>() as u32;
 
         let dword_address = BASE_OFFSET
             | ((self.bus  as u32) << 16)
             | ((self.slot as u32) << 11)
             | ((self.func as u32) <<  8)
-            | ((dword_offset as u32) * u32_bytes);
+            | ((index as u32) * u32_bytes);
 
         #[cfg(target_arch = "x86_64")] {
             unsafe {
@@ -470,7 +448,7 @@ impl PciLocation {
     ///
     /// Panics if the register isn't a [`FullDword`]
     fn pci_write_32(&self, register: PciRegister, value: u32) {
-        let reg_width = register.1.width_in_bytes();
+        let reg_width = register.span.width_in_bytes();
         let output_width = size_of::<u32>();
         assert_eq!(reg_width, output_width, "pci_write_32: register isn't 32-bit wide");
 
@@ -481,7 +459,7 @@ impl PciLocation {
     ///
     /// Panics if the register isn't a [`Word0`] / [`Word1`]
     fn pci_write_16(&self, register: PciRegister, value: u16) {
-        let reg_width = register.1.width_in_bytes();
+        let reg_width = register.span.width_in_bytes();
         let output_width = size_of::<u16>();
         assert_eq!(reg_width, output_width, "pci_write_16: register isn't 16-bit wide");
 
@@ -492,7 +470,7 @@ impl PciLocation {
     ///
     /// Panics if the register isn't a [`Byte0`] / [`Byte1`] / [`Byte2`] / [`Byte3`]
     fn pci_write_8(&self, register: PciRegister, value: u8) {
-        let reg_width = register.1.width_in_bytes();
+        let reg_width = register.span.width_in_bytes();
         let output_width = size_of::<u8>();
         assert_eq!(reg_width, output_width, "pci_write_16: register isn't 8-bit wide");
 
@@ -556,7 +534,7 @@ impl PciLocation {
                 // the current capability ID and the pointer to the next capability
 
                 // the id is the lower byte of the header
-                let cap_id_reg = offset_to_byte_reg_def(cap_addr);
+                let cap_id_reg = PciRegister::from_offset(cap_addr, 1);
                 let cap_id = self.pci_read_8(cap_id_reg);
 
                 if cap_id == pci_capability {
@@ -565,7 +543,7 @@ impl PciLocation {
                 }
 
                 // find address of next capability which is the higher byte of the header
-                let next_cap_ptr_reg = offset_to_byte_reg_def(cap_addr + 1);
+                let next_cap_ptr_reg = PciRegister::from_offset(cap_addr + 1, 1);
                 cap_addr = self.pci_read_8(next_cap_ptr_reg);
             }
         }
@@ -673,7 +651,10 @@ impl PciDevice {
         // (4) Bitwise "not" (negate) that value, then add 1.
         //     The resulting value is the size of that BAR's memory region.
         // (5) Restore the original value to that BAR
-        let bar_reg_def = (PCI_BAR0.0 + (bar_index as u8), FullDword);
+        let bar_reg_def = PciRegister {
+            index: PCI_BAR0.index + (bar_index as u8),
+            span: FullDword,
+        };
         let original_value = self.bars[bar_index];
 
         self.pci_write_32(bar_reg_def, 0xFFFF_FFFF);       // Step 1
@@ -716,25 +697,31 @@ impl PciDevice {
         let core = (core_id as u32) << 12;
 
         // set the core the MSI will be sent to in the Message Address Register (Intel Arch SDM, vol3, 10.11)
-        let reg_def = (msi_reg_index + MESSAGE_ADDRESS_REGISTER_OFFSET, FullDword);
-        self.pci_write_32(reg_def, MEMORY_REGION | core);
+        let msg_addr_reg = PciRegister {
+            index: msi_reg_index + MESSAGE_ADDRESS_REGISTER_OFFSET,
+            span: FullDword,
+        };
+        self.pci_write_32(msg_addr_reg, MEMORY_REGION | core);
 
         // offset in the capability space where the message data register is located 
         const MESSAGE_DATA_REGISTER_OFFSET: u8 = 3 /* dwords */;
 
         // Set the interrupt number for the MSI in the Message Data Register
-        let reg_def = (msi_reg_index + MESSAGE_DATA_REGISTER_OFFSET, FullDword);
-        self.pci_write_32(reg_def, int_num as u32);
+        let msg_data_reg = PciRegister {
+            index: msi_reg_index + MESSAGE_DATA_REGISTER_OFFSET,
+            span: FullDword,
+        };
+        self.pci_write_32(msg_data_reg, int_num as u32);
 
         // to enable the MSI capability, we need to set bit 0 of the message control register
         const MSI_ENABLE: u16 = 1;
 
         // enable MSI in the Message Control Register
         // the message control register corresponds to bits [16:31] of the first dword
-        let reg_def = (msi_reg_index, Word1);
-        let mut ctrl = self.pci_read_16(reg_def);
+        let msg_ctrl_reg = PciRegister { index: msi_reg_index, span: Word1 };
+        let mut ctrl = self.pci_read_16(msg_ctrl_reg);
         ctrl |= MSI_ENABLE;
-        self.pci_write_16(reg_def, ctrl);
+        self.pci_write_16(msg_ctrl_reg, ctrl);
 
         Ok(())  
     }
@@ -752,12 +739,12 @@ impl PciDevice {
         const MSIX_ENABLE: u16 = 1 << 15;
 
         // the message control register corresponds to bits [16:31] of the first dword
-        let reg_def = (msix_reg_index, Word1);
-        let mut ctrl = self.pci_read_16(reg_def);
+        let msg_ctrl_reg = PciRegister { index: msix_reg_index, span: Word1 };
+        let mut ctrl = self.pci_read_16(msg_ctrl_reg);
         ctrl |= MSIX_ENABLE;
-        self.pci_write_16(reg_def, ctrl);
+        self.pci_write_16(msg_ctrl_reg, ctrl);
 
-        // let ctrl = pci_read_16(reg_def, msix_reg_index);
+        // let ctrl = pci_read_16(msg_ctrl_reg, msix_reg_index);
         // debug!("MSIX HEADER AFTER ENABLE: {:#X}", ctrl);
 
         Ok(())  
@@ -774,9 +761,12 @@ impl PciDevice {
         let msix_reg_index = cap_addr >> 2;
 
         // get physical address of vector table
-        let vector_table_offset = 1 /* one dword */;
-        let reg_def = (msix_reg_index + vector_table_offset, FullDword);
-        let table_offset = self.pci_read_32(reg_def);
+        const VECTOR_TABLE_OFFSET: u8 = 1;
+        let vector_table_reg = PciRegister {
+            index: msix_reg_index + VECTOR_TABLE_OFFSET,
+            span: FullDword,
+        };
+        let table_offset = self.pci_read_32(vector_table_reg);
         let bar = table_offset & 0x7;
         let offset = table_offset >> 3;
         let addr = self.bars[bar as usize] + offset;
