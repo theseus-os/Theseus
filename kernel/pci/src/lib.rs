@@ -304,7 +304,7 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
 }
 
 impl RegisterSpan {
-    const fn to_mask_and_shift(self) -> (u32, u32) {
+    const fn get_mask_and_bitshift(self) -> (u32, u8) {
         match self {
             FullDword => (0xffff_ffff,  0),
             Word0     => (0x0000_ffff,  0),
@@ -346,7 +346,7 @@ impl PciLocation {
     /// Read the value of the given `register` in the PCI Configuration Space.
     fn pci_read_raw(&self, register: PciRegister) -> u32 {
         let PciRegister { index, span } = register;
-        let (mask, shift) = span.to_mask_and_shift();
+        let (mask, shift) = span.get_mask_and_bitshift();
         let u32_bytes = size_of::<u32>() as u32;
 
         let dword_address = BASE_OFFSET
@@ -411,7 +411,7 @@ impl PciLocation {
     /// Write to a register in the PCI Configuration Space.
     fn pci_write_raw(&self, register: PciRegister, value: u32) {
         let PciRegister { index, span } = register;
-        let (mask, shift) = span.to_mask_and_shift();
+        let (mask, shift) = span.get_mask_and_bitshift();
         let u32_bytes = size_of::<u32>() as u32;
 
         let dword_address = BASE_OFFSET
