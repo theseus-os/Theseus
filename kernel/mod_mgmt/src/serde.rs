@@ -135,7 +135,7 @@ fn into_loaded_section(
 
     if serialized_section.ty.is_tls() {
         log::info!("adding tls");
-        namespace.tls_initializer.lock().add_existing_static_tls_section(
+        namespace.tls_initializer.lock().add_existing_static_section(
             loaded_section,
             // TLS sections encode their TLS offset in the virtual address field,
             // which is necessary to properly calculate relocation entries that depend upon them.
@@ -144,7 +144,7 @@ fn into_loaded_section(
         ).map_err(|_| "BUG: failed to add deserialized static TLS section to the TLS area")
     } else if serialized_section.ty == SectionType::Cls && serialized_section.name != "_TLS_MODULE_BASE_" {
         log::info!("adding cls");
-        namespace.cls_initializer.lock().add_existing_static_tls_section(loaded_section, serialized_section.virtual_address, total_cls_size).map_err(|e| panic!("{:?}", e))
+        cls_allocator::add_static_section(loaded_section, serialized_section.virtual_address, total_cls_size).map_err(|e| panic!("{:?}", e))
     } else {
         Ok(Arc::new(loaded_section))
     }

@@ -82,8 +82,6 @@ pub fn get_namespaces_directory() -> Option<DirRef> {
 /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
 static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::new());
 
-pub static CLS_INITIALIZER: Mutex<ClsInitializer> = Mutex::new(ClsInitializer::new());
-
 /// Create a new application `CrateNamespace` that uses the default application directory 
 /// and is structured atop the given `recursive_namespace`. 
 /// If no `recursive_namespace` is provided, the default initial kernel namespace will be used. 
@@ -540,7 +538,6 @@ impl CrateNamespace {
             dir,
             recursive_namespace,
             tls_initializer: &TLS_INITIALIZER,
-            cls_initializer: &CLS_INITIALIZER,
             crate_tree: Mutex::new(Trie::new()),
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
@@ -967,7 +964,6 @@ impl CrateNamespace {
             name: self.name.clone(),
             dir: self.dir.clone(),
             tls_initializer: &TLS_INITIALIZER,
-            cls_initializer: &CLS_INITIALIZER,
             recursive_namespace: self.recursive_namespace.clone(),
             crate_tree: Mutex::new(self.crate_tree.lock().clone()),
             symbol_map: Mutex::new(self.symbol_map.lock().clone()),
@@ -1402,7 +1398,7 @@ impl CrateNamespace {
                 // This will also update the section's virtual address field to hold that offset value,
                 // which is used for relocation entries that ask for a section's offset from the TLS base.
                 let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                    .add_new_dynamic_tls_section(new_section, sec.align() as usize)
+                    .add_new_dynamic_section(new_section, sec.align() as usize)
                     .map_err(|_| "Failed to add new dynamic TLS section")?;
 
                 // trace!("Updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
@@ -1927,7 +1923,7 @@ impl CrateNamespace {
                     // This will also update the section's virtual address field to hold that offset value,
                     // which is used for relocation entries that ask for a section's offset from the TLS base.
                     let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                        .add_new_dynamic_tls_section(new_tls_section, sec_align)
+                        .add_new_dynamic_section(new_tls_section, sec_align)
                         .map_err(|_| "Failed to add new TLS section")?;
 
                     // trace!("\t --> updated new TLS section: {:?}", new_tls_section);

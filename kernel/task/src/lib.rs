@@ -275,7 +275,8 @@ impl TaskRef {
     /// Currently, this simply updates the current CPU's TLS base register
     /// to point to this task's TLS data image.
     fn set_as_current_task(&self) {
-        self.0.task.tls_area().set_as_current_tls_base();
+        // SAFETY: ???
+        unsafe { self.0.task.tls_area().set_as_current_tls() };
     }
 }
 

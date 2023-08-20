@@ -63,6 +63,7 @@ pub fn kstart_ap(
     // The early TLS image has already been initialized by the bootstrap CPU,
     // so all we need to do here is to reload it on this CPU.
     early_tls::reload();
+    cls_allocator::reload_current_core();
 
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = take_ap_stack(cpu_id.value()).unwrap_or_else(
@@ -105,9 +106,6 @@ pub fn kstart_ap(
         // This is the equivalent of `LocalApic::init` on aarch64
         cpu::register_cpu(false).unwrap();
     }
-
-    cls::insert(mod_mgmt::CLS_INITIALIZER.lock().get_data());
-
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // per-CPU storage, tasking, and create the idle task for this CPU.

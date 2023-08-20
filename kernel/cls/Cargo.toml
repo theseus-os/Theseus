@@ -7,12 +7,8 @@ edition = "2021"
 
 [dependencies]
 cls_macros = { path = "cls_macros" }
-cpu = { path = "../cpu" }
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
-memory = { path = "../memory" }
 preemption = { path = "../preemption" }
-sync_spin = { path = "../../libs/sync_spin" }
-tls_initializer = { path = "../tls_initializer" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"

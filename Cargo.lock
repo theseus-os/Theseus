@@ -91,7 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
- "cls",
+ "cls_allocator",
  "cpu",
  "early_tls",
  "interrupts",
@@ -478,13 +478,21 @@ version = "0.1.0"
 dependencies = [
  "cls_macros",
  "cortex-a",
- "cpu",
  "irq_safety",
- "memory",
  "preemption",
+ "tock-registers",
+ "x86_64",
+]
+
+[[package]]
+name = "cls_allocator"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "crate_metadata",
+ "log",
  "sync_spin",
  "tls_initializer",
- "tock-registers",
  "x86_64",
 ]
 
@@ -2118,7 +2126,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bootloader_modules",
- "cls",
+ "cls_allocator",
  "const_format",
  "cow_arc",
  "cpio_reader",
