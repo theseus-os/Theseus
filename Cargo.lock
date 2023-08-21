@@ -369,6 +369,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "app_io",
+ "cls_allocator",
  "console",
  "cpu",
  "device_manager",

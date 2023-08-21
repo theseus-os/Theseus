@@ -152,11 +152,11 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             let mut ptr = {
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
-                log::error!("gs: {gs:0x?}");
+                // log::error!("gs: {gs:0x?}");
 
                 let (value, overflow_occured) = gs.overflowing_add(offset);
                 assert!(overflow_occured, "overflow did not occur");
-                log::error!("value: {value:0x?}");
+                // log::error!("value: {value:0x?}");
 
                 value
             };

@@ -63,7 +63,6 @@ pub fn kstart_ap(
     // The early TLS image has already been initialized by the bootstrap CPU,
     // so all we need to do here is to reload it on this CPU.
     early_tls::reload();
-    cls_allocator::reload_current_core();
 
     // get the stack that was allocated for us (this AP) by the BSP.
     let this_ap_stack = take_ap_stack(cpu_id.value()).unwrap_or_else(
@@ -98,6 +97,7 @@ pub fn kstart_ap(
             nmi_flags,
         ).unwrap();
     }
+    cls_allocator::reload_current_core();
 
     #[cfg(target_arch = "aarch64")] {
         interrupts::init_ap();

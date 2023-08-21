@@ -146,7 +146,6 @@ pub fn parse_nano_core(
     // Now that we've initialized the nano_core, i.e., set up its sections,
     // we can obtain a new TLS data image and initialize the TLS register to point to it.
     early_tls::insert(namespace.get_tls_initializer_data());
-    cls_allocator::reload_current_core();
 
     Ok(NanoCoreItems {
         nano_core_crate_ref,
