@@ -117,7 +117,8 @@ pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'
 			pages: PageRange::new(
 				Page::containing_address(VirtualAddress::new_canonical(KERNEL_HEAP_START)),
 				// This is the page right below the beginning of the 510th entry of the top-level P4 page table.
-				Page::containing_address(VirtualAddress::new_canonical(RECURSIVE_P4_START - 1))),
+				Page::containing_address(VirtualAddress::new_canonical(RECURSIVE_P4_START - 1)),
+			)
 		}),
 		// Here, we skip the addresses covered by the `RECURSIVE_P4_INDEX`.
 
@@ -608,10 +609,9 @@ impl Drop for AllocatedPages {
 		let chunk = Chunk {
 			pages: pages,
 		};
-
 		let mut list = FREE_PAGE_LIST.lock();
 		
-		// If we don't return from this functio, we failed to insert 
+		// If we don't return from this function, we failed to insert
 		match &mut list.0 {
 			// For early allocations, just add the deallocated chunk to the free pages list.
 			Inner::Array(_) => {
@@ -627,7 +627,7 @@ impl Drop for AllocatedPages {
 				let mut cursor_mut = tree.lower_bound_mut(Bound::Included(chunk.start()));
 				if let Some(next_chunk) = cursor_mut.get() {
 					if *chunk.end() + 1 == *next_chunk.start() {
-						trace!("Prepending {:?} onto beg of next {:?}", chunk, next_chunk.deref());
+						// trace!("Prepending {:?} onto beg of next {:?}", chunk, next_chunk.deref());
 						if cursor_mut.replace_with(Wrapper::new_link(Chunk {
 							pages: PageRange::new(*chunk.start(), *next_chunk.end()),
 						})).is_ok() {
@@ -637,7 +637,7 @@ impl Drop for AllocatedPages {
 				}
 				if let Some(prev_chunk) = cursor_mut.peek_prev().get() {
 					if *prev_chunk.end() + 1 == *chunk.start() {
-						trace!("Appending {:?} onto end of prev {:?}", chunk, prev_chunk.deref());
+						//trace!("Appending {:?} onto end of prev {:?}", chunk, prev_chunk.deref());
 						let new_page_range = PageRange::new(*prev_chunk.start(), *chunk.end());
 						cursor_mut.move_prev();
 						if cursor_mut.replace_with(Wrapper::new_link(Chunk {
@@ -927,6 +927,7 @@ fn find_any_chunk(
 	Err(AllocationError::OutOfAddressSpace(num_pages, None))
 }
 
+
 /// The final part of the main allocation routine.
 ///
 /// The given chunk is the one we've chosen to allocate from.
@@ -1076,6 +1077,7 @@ pub fn allocate_pages(num_pages: usize) -> Option<AllocatedPages> {
 		.ok()
 }
 
+
 /// Allocates pages with no constraints on the starting virtual address,
 /// with a size given by the number of bytes.
 ///
@@ -1105,6 +1107,7 @@ pub fn allocate_pages_at(vaddr: VirtualAddress, num_pages: usize) -> Result<Allo
 	allocate_pages_deferred(AllocationRequest::AtVirtualAddress(vaddr), num_pages)
 		.map(|(ap, _action)| ap)
 }
+
 
 /// Allocates the given number of pages with the constraint that
 /// they must be within the given inclusive `range` of pages.
@@ -1146,4 +1149,3 @@ pub fn dump_page_allocator_state() {
 	}
 	debug!("---------------------------------------------------");
 }
-

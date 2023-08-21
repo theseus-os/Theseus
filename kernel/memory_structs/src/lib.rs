@@ -23,10 +23,12 @@ use paste::paste;
 use derive_more::*;
 use range_inclusive::{RangeInclusive, RangeInclusiveIterator};
 
+/// Numeric constants associated with different page types.
 pub const PAGE_4KB_SIZE: usize = 1 << 12;
 pub const PAGE_2MB_SIZE: usize = (1 << 12) * 512;
 pub const PAGE_1GB_SIZE: usize = (1 << 12) * 512 * 512;
 
+/// Enum used to indicate the size of a page or frame.
 #[derive(Debug)]
 pub enum MemChunkSize {
     Normal4K,
@@ -34,50 +36,26 @@ pub enum MemChunkSize {
     Huge1G,
 }
 
+/// Trait used to group the size marker structs that paging-related types are parameterized with.
 pub trait PageSize: Ord + PartialOrd + Clone {
     const SIZE: MemChunkSize;
 }
 
-// pub trait PageSize: Ord + PartialOrd + Clone {
-//     const SIZE: usize;
-// }
-
-// /// Marker struct used to indicate the default page size of 4KiB
-// #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-// pub struct Page4KiB;
-// impl PageSize for Page4KiB {
-//     const SIZE: usize = PAGE_4KB_SIZE;
-// }
-
-// /// Marker struct used to indicate a page size of 2MiB
-// #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-// pub struct Page2MiB;
-// impl PageSize for Page2MiB {
-//     const SIZE: usize = PAGE_2MB_SIZE;
-// }
-
-// /// Marker struct used to indicate a page size of 1GiB
-// #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
-// pub struct Page1GiB;
-// impl PageSize for Page1GiB {
-//     const SIZE: usize = PAGE_1GB_SIZE;
-// }
-
-// Marker struct used to indicate the default page size of 4KiB
+/// Marker struct used to indicate the default page size of 4KiB.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page4KiB;
 impl PageSize for Page4KiB {
     const SIZE: MemChunkSize = MemChunkSize::Normal4K;
 }
 
-/// Marker struct used to indicate a page size of 2MiB
+/// Marker struct used to indicate a page size of 2MiB.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page2MiB;
 impl PageSize for Page2MiB {
     const SIZE: MemChunkSize = MemChunkSize::Huge2M;
 }
 
-/// Marker struct used to indicate a page size of 1GiB
+/// Marker struct used to indicate a page size of 1GiB.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Page1GiB;
 impl PageSize for Page1GiB {
@@ -345,7 +323,6 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-
             impl<P> $TypeName<P> where P: PageSize + 'static {
                 #[doc = "Returns the `" $address "` at the start of this `" $TypeName "`."]
                 pub const fn start_address(&self) -> $address {
@@ -412,7 +389,6 @@ macro_rules! implement_page_frame {
                     P::SIZE
                 }
             }
-
             impl<P: 'static + PageSize> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                     write!(f, concat!(stringify!($TypeName), "(", $prefix, "{:#X})"), self.start_address())
@@ -732,4 +708,3 @@ macro_rules! implement_page_frame_range {
 
 implement_page_frame_range!(PageRange, "virtual", virt, Page, VirtualAddress);
 implement_page_frame_range!(FrameRange, "physical", phys, Frame, PhysicalAddress);
-

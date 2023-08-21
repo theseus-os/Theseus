@@ -345,7 +345,6 @@ impl Mapper {
             }
         }
 
-
         Ok(MappedPages {
             page_table_p4: self.target_p4,
             pages,
