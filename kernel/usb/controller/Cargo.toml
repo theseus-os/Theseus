@@ -1,0 +1,16 @@
+[package]
+authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
+name = "usb_controller"
+description = "USB controller support"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+log = "0.4.8"
+zerocopy = "0.5.0"
+volatile = "0.2.7"
+bilge = "0.2.0"
+
+memory = { path = "../../memory" }
+sleep = { path = "../../sleep" }
+pci = { path = "../../pci" }

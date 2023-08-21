@@ -3,11 +3,10 @@
 
 extern crate alloc;
 
-use log::{info, debug};
+use log::*;
 
 #[cfg(target_arch = "x86_64")]
 use {
-    log::{error, warn},
     mpmc::Queue,
     event_types::Event,
     memory::MemoryManagementInfo,
@@ -91,10 +90,11 @@ pub fn init(
         debug!("Found PCI device: {:X?}", dev);
     }
 
-    // No NIC support on aarch64 at the moment
-    #[cfg(target_arch = "x86_64")] {
+    // usb_controller::init();
 
     // store all the initialized ixgbe NICs here to be added to the network interface list
+    // No NIC support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")]
     let mut ixgbe_devs = Vec::new();
 
     // Iterate over all PCI devices and initialize the drivers for the devices we support.
@@ -106,6 +106,8 @@ pub fn init(
         }
 
         // If this is a storage device, initialize it as such.
+        // No storage device support on aarch64 at the moment
+        #[cfg(target_arch = "x86_64")]
         match storage_manager::init_device(dev) {
             // Successfully initialized this storage device.
             Ok(Some(_storage_controller)) => continue,
@@ -120,8 +122,23 @@ pub fn init(
             }
         }
 
+        if dev.class == 0x0C {
+            // Serial Bus Controller
+            if dev.subclass == 0x03 {
+                use usb_controller::Standard;
+                // USB controller
+                if dev.prog_if == 0x20 {
+                    // EHCI
+                    usb_controller::init(Standard::Ehci(dev))?;
+                    continue;
+                }
+            }
+        }
+
         // If this is a network device, initialize it as such.
         // Look for networking controllers, specifically ethernet cards
+        // No NIC support on aarch64 at the moment
+        #[cfg(target_arch = "x86_64")]
         if dev.class == 0x02 && dev.subclass == 0x00 {
             if dev.vendor_id == e1000::INTEL_VEND && dev.device_id == e1000::E1000_DEV {
                 info!("e1000 PCI device found at: {:?}", dev.location);
@@ -172,18 +189,25 @@ pub fn init(
     }
 
     // Once all the NICs have been initialized, we can store them and add them to the list of network interfaces.
-    let ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
-    for ixgbe_nic_ref in ixgbe_nics.iter() {
-        net::register_device(ixgbe_nic_ref);
+    // No NIC support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")] {
+        let ixgbe_nics = ixgbe::IXGBE_NICS.call_once(|| ixgbe_devs);
+        for ixgbe_nic_ref in ixgbe_nics.iter() {
+            net::register_device(ixgbe_nic_ref);
+        }
     }
 
     // Convenience notification for developers to inform them of no networking devices
+    // No NIC support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")]
     if net::get_default_interface().is_none() {
         warn!("Note: no network devices found on this system.");
     }
 
     // Discover filesystems from each storage device on the storage controllers initialized above
     // and mount each filesystem to the root directory by default.
+    // No storage device support on aarch64 at the moment
+    #[cfg(target_arch = "x86_64")]
     if false {
         for storage_device in storage_manager::storage_devices() {
             let disk = fatfs_adapter::FatFsAdapter::new(
@@ -217,7 +241,6 @@ pub fn init(
                 }
             }
         }
-    }
     }
 
     Ok(())
