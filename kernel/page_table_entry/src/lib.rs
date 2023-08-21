@@ -53,12 +53,10 @@ impl PageTableEntry {
         self.zero();
 
         // Since we don't support huge pages, this PTE can only cover one 4KiB frame.
-        // Once we support huge pages, we can use a type parameter
+        // Once we fully support huge pages, we can use a type parameter
         // to specify whether this is a 4KiB, 2MiB, or 1GiB PTE.
         let frame_range = FrameRange::new(frame, frame);
 
-        // if is huge 
-        //  - frame_range = FrameRange start ... start + 2mb
         if flags.is_exclusive() {
             UnmapResult::Exclusive(UnmappedFrameRange(frame_range))
         } else {

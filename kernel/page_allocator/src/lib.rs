@@ -1,13 +1,13 @@
 //! Provides an allocator for virtual memory pages.
-//! The minimum unit of allocation is a single page.
-//!
+//! The minimum unit of allocation is a single page. 
+//! 
 //! This also supports early allocation of pages (up to 32 separate chunks)
-//! before heap allocation is available, and does so behind the scenes using the same single interface.
-//!
+//! before heap allocation is available, and does so behind the scenes using the same single interface. 
+//! 
 //! Once heap allocation is available, it uses a dynamically-allocated list of page chunks to track allocations.
-//!
-//! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html),
-//! but there are several convenience functions that offer simpler interfaces for general usage.
+//! 
+//! The core allocation function is [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html), 
+//! but there are several convenience functions that offer simpler interfaces for general usage. 
 //!
 //! # Notes
 //! This allocator only makes one attempt to merge deallocated pages into existing
@@ -45,7 +45,7 @@ use static_array_rb_tree::*;
 /// This lower part of the address range that's designated covers from 0x0 to this address.
 static DESIGNATED_PAGES_LOW_END: Once<Page> = Once::new();
 
-/// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`.
+/// Defines the upper part of the address space that's designated, similar to `DESIGNATED_PAGES_LOW_END`. 
 /// Any virtual addresses **greater than or equal to** this address is considered "designated".
 /// This higher part of the address range covers from:
 /// the beginning of the recursive P4 entry used for modifying upcoming page tables
@@ -67,10 +67,10 @@ static FREE_PAGE_LIST: Mutex<StaticArrayRBTree<Chunk>> = Mutex::new(StaticArrayR
 /// Initialize the page allocator.
 ///
 /// # Arguments
-/// * `end_vaddr_of_low_designated_region`: the `VirtualAddress` that marks the end of the
+/// * `end_vaddr_of_low_designated_region`: the `VirtualAddress` that marks the end of the 
 ///   lower designated region, which should be the ending address of the initial kernel image
 ///   (a lower-half identity address).
-///
+/// 
 /// The page allocator considers two regions as "designated" regions. It will only allocate pages
 /// within these designated regions if the specifically-requested address falls within them.
 /// 1. The lower designated region is for identity-mapped bootloader content
@@ -370,7 +370,7 @@ impl PageRangeSized {
 /// since it ignores their actual range of pages.
 #[derive(Debug, Clone, Eq)]
 struct Chunk {
-	/// The Pages covered by this chunk, an inclusive range.
+	/// The Pages covered by this chunk, an inclusive range. 
 	pages: PageRange,
 }
 impl Chunk {
@@ -380,7 +380,7 @@ impl Chunk {
 		}
 	}
 
-	/// Returns a new `Chunk` with an empty range of pages.
+	/// Returns a new `Chunk` with an empty range of pages. 
 	fn empty() -> Chunk {
 		Chunk {
 			pages: PageRange::empty(),
@@ -415,13 +415,13 @@ impl Borrow<Page> for &'_ Chunk {
 }
 
 
-/// Represents a range of allocated `VirtualAddress`es, specified in `Page`s.
-///
+/// Represents a range of allocated `VirtualAddress`es, specified in `Page`s. 
+/// 
 /// These pages are not initially mapped to any physical memory frames, you must do that separately
-/// in order to actually use their memory; see the `MappedPages` type for more.
-///
+/// in order to actually use their memory; see the `MappedPages` type for more. 
+/// 
 /// This object represents ownership of the allocated virtual pages;
-/// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop.
+/// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. 
 pub struct AllocatedPages {
 	pages: PageRangeSized,
 }
@@ -436,8 +436,8 @@ impl fmt::Debug for AllocatedPages {
 }
 
 impl AllocatedPages {
-	/// Returns an empty AllocatedPages object that performs no page allocation.
-    /// Can be used as a placeholder, but will not permit any real usage.
+	/// Returns an empty AllocatedPages object that performs no page allocation. 
+    /// Can be used as a placeholder, but will not permit any real usage. 
     pub const fn empty() -> AllocatedPages {
         AllocatedPages {
 			pages: PageRangeSized::Normal4KiB(PageRange::empty())
