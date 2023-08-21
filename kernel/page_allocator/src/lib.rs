@@ -543,7 +543,7 @@ impl AllocatedPages {
 		}
 		self.pages = PageRangeSized::Normal4KiB(PageRange::new(*self.start(), *ap.end()));
 		// ensure the now-merged AllocatedPages doesn't run its drop handler and free its pages.
-		core::mem::forget(ap);
+		core::mem::forget(ap); 
 		Ok(())
 	}
 
@@ -599,10 +599,18 @@ impl Drop for AllocatedPages {
 		let pages = match self.page_size() {
 			MemChunkSize::Normal4K => self.pages.range().unwrap().clone(),
 			MemChunkSize::Huge2M => { 
-				self.pages.into_range_4k().unwrap().range().unwrap().clone() // NOTE: this is truly hideous :(
+				self.pages.into_range_4k()
+                    .unwrap()
+                    .range()
+                    .unwrap()
+                    .clone() 
 			},
 			MemChunkSize::Huge1G => { 
-				self.pages.into_range_4k().unwrap().range().unwrap().clone()
+				self.pages.into_range_4k()
+                    .unwrap()
+                    .range()
+                    .unwrap()
+                    .clone()
 			}
 		};
 

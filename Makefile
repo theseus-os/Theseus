@@ -882,7 +882,7 @@ ifeq ($(graphic), no)
 endif
 
 ## Set the amount of system memory (RAM) provided to the QEMU guest OS
-QEMU_MEMORY ?= 3G
+QEMU_MEMORY ?= 512M
 QEMU_FLAGS += -m $(QEMU_MEMORY) 
 
 ## Enable multicore CPUs, i.e., SMP (Symmetric Multi-Processor)

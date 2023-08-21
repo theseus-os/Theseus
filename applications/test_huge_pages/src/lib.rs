@@ -16,11 +16,12 @@ use memory::{
     allocate_frames_at, allocate_pages_at
 };
 
-// For checking valid addresses if necessary
+// For checking valid test addresses, if necessary
 // use frame_allocator::dump_frame_allocator_state;
 // use page_allocator::dump_page_allocator_state;
 
 pub fn main(_args: Vec<String>) -> isize {
+    println!("NOTE: Before running, make sure you Theseus has been run with enough memory (make orun QEMU_MEMORY=3G).");
     let kernel_mmi_ref = memory::get_kernel_mmi_ref()
         .ok_or("KERNEL_MMI was not yet initialized!")
         .unwrap();
@@ -56,7 +57,7 @@ pub fn main(_args: Vec<String>) -> isize {
 
     // frame allocator has not been modified to deal with huge frames yet
     let aligned_4k_frames = allocate_frames_at(
-            PhysicalAddress::new_canonical(0x60000000), //0x1081A000
+            PhysicalAddress::new_canonical(0x60000000),
             512).expect("Could not allocate frames. Make sure you have enough memory for the kernel (compile with make orun QEMU_MEMORY=3G).");
 
     let mut mapped_2mb_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
@@ -89,7 +90,7 @@ pub fn main(_args: Vec<String>) -> isize {
     
     // Dump entries to see if dropping has unmapped everything properly
     drop(mapped_2mb_page);
-    kernel_mmi_ref.lock().page_table.dump_pte(VirtualAddress::new_canonical(0x20000000));      
+    kernel_mmi_ref.lock().page_table.dump_pte(VirtualAddress::new_canonical(0x20000000));
 
     0
 }
