@@ -12,4 +12,5 @@ memoffset = "0.8.0"
 cpu = { path = "../cpu" }
 cpu_local = { path = "../cpu_local" }
 no_drop = { path = "../no_drop" }
+preemption = { path = "../preemption" }
 task = { path = "../task" }

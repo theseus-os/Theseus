@@ -36,7 +36,8 @@
 use core::ops::Deref;
 use cpu::CpuId;
 use cpu_local::PerCpuField;
-use task::{DropAfterTaskSwitch, TaskSwitchPreemptionGuard};
+use preemption::PreemptionGuard;
+use task::TaskRef;
 
 /// The data stored on a per-CPU basis in Theseus.
 ///
@@ -75,11 +76,11 @@ pub struct PerCpuData {
     preemption_count: u8,
     /// A preemption guard used during task switching to ensure that one task switch
     /// cannot interrupt (preempt) another task switch already in progress.
-    task_switch_preemption_guard: TaskSwitchPreemptionGuard,
+    task_switch_preemption_guard: Option<PreemptionGuard>,
     /// Data that should be dropped after switching away from a task that has exited.
     /// Currently, this contains the previous task's `TaskRef` that was removed
     /// from its TLS area during the last task switch away from it.
-    drop_after_task_switch: DropAfterTaskSwitch,
+    drop_after_task_switch: Option<TaskRef>,
 }
 
 impl PerCpuData {
@@ -89,8 +90,8 @@ impl PerCpuData {
             self_ptr,
             cpu_id: CpuLocalCpuId(cpu_id),
             preemption_count: 0,
-            task_switch_preemption_guard: TaskSwitchPreemptionGuard::new(),
-            drop_after_task_switch: DropAfterTaskSwitch::new(),
+            task_switch_preemption_guard: None,
+            drop_after_task_switch: None,
         }
     }
 }

@@ -13,6 +13,7 @@ log = "0.4.8"
 memory = { path = "../memory" }
 stack = { path = "../stack" }
 cpu = { path = "../cpu" }
+mod_mgmt = { path = "../mod_mgmt" }
 ap_start = { path = "../ap_start" }
 kernel_config = { path = "../kernel_config" }
 
@@ -23,7 +24,6 @@ arm_boards = { path = "../arm_boards" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 pit_clock_basic = { path = "../pit_clock_basic" }
-mod_mgmt = { path = "../mod_mgmt" }
 acpi = { path = "../acpi" }
 apic = { path = "../apic" }
 madt = { path = "../acpi/madt" }

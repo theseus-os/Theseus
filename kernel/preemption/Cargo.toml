@@ -6,7 +6,7 @@ description = "Handles enabling and disabling preemption for each CPU core"
 edition = "2021"
 
 [dependencies]
-cls = { path = "../cls" }
+cls_macros = { path = "../cls/cls_macros" }
 cpu = { path = "../cpu" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
