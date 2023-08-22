@@ -216,10 +216,6 @@ where
         #[cfg(target_arch = "aarch64")]
         let offset = max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */) + offset;
 
-        log::info!("adding existing static tls section: {tls_section:#0x?}");
-        log::info!("offset: {offset:0x?}");
-        log::info!("total size: {total_static_tls_size:0x?}");
-
         let range = offset .. (offset + tls_section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
@@ -398,7 +394,7 @@ where
             dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
             LocalStorageDataImage {
                 ptr: tls_self_ptr_value,
-                _data: data_copy,
+                data: data_copy,
                 _phantom: PhantomData,
             }
         }
@@ -407,7 +403,7 @@ where
             let cloned = self.data_cache.clone();
             LocalStorageDataImage {
                 ptr: cloned.as_ptr() as u64,
-                _data: cloned,
+                data: cloned,
                 _phantom: PhantomData,
             }
         }
@@ -431,7 +427,7 @@ pub struct LocalStorageDataImage<T>
 where
     T: LocalStorage,
 {
-    _data: Vec<u8>,
+    data: Vec<u8>,
     ptr: u64,
     _phantom: PhantomData<T>,
 }
@@ -443,10 +439,17 @@ where
     /// Creates an empty data image.
     pub const fn new() -> Self {
         Self {
-            _data: Vec::new(),
+            data: Vec::new(),
             ptr: 0,
             _phantom: PhantomData,
         }
+    }
+
+    pub fn inherit(&mut self, other: &Self) {
+        let other_len = other.data.len();
+        assert!(other_len <= self.data.len());
+        // FIXME: What if TLS symbols are not allocated sequentially?
+        self.data[..other_len].clone_from_slice(&other.data);
     }
 }
 
@@ -480,8 +483,6 @@ impl LocalStorageDataImage<Tls> {
     pub unsafe fn set_as_current_tls(&self) {
         // SAFETY: We guarantee that the length of `data` never changes and hence that it is never
         // reallocated. The caller guarantees that `self` and by extension `data` is never dropped.
-        // NOTE: Same as above.
-        log::error!("setting fs to: {:0x?}", self.ptr);
         unsafe { Tls::set_as_current_base(self.ptr) };
     }
 }

@@ -1088,7 +1088,6 @@ mod tls_current_task {
                 })?
         };
 
-        log::info!("current task ptr: {:0x?}", &CURRENT_TASK as *const _);
         match CURRENT_TASK.try_borrow_mut() {
             Ok(mut t_opt) => if let Some(_existing_task) = t_opt.deref() {
                 log::error!("BUG: init_current_task(): CURRENT_TASK was already `Some()`");

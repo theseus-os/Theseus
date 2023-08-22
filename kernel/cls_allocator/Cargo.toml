@@ -6,6 +6,6 @@ edition = "2021"
 [dependencies]
 cpu = { path = "../cpu" }
 crate_metadata = { path = "../crate_metadata" }
+preemption = { path = "../preemption" }
 sync_spin = { path = "../../libs/sync_spin" }
 tls_initializer = { path = "../tls_initializer" }
-log = "*"

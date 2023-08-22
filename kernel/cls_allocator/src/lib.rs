@@ -10,7 +10,7 @@ use sync_spin::SpinMutex;
 use tls_initializer::{ClsDataImage, ClsInitializer, LocalStorageInitializerError};
 
 static CLS_INITIALIZER: SpinMutex<ClsInitializer> = SpinMutex::new(ClsInitializer::new());
-static CLS_SECTIONS: SpinMutex<Vec<(u32, ClsDataImage)>> = SpinMutex::new(Vec::new());
+static CLS_SECTIONS: SpinMutex<Vec<(CpuId, ClsDataImage)>> = SpinMutex::new(Vec::new());
 
 /// Adds a CLS section with a pre-determined offset to the global CLS
 /// initializer.
@@ -38,25 +38,31 @@ pub fn add_dynamic_section() {
 /// Generates a new data image for the current core and sets the CLS register
 /// accordingly.
 pub fn reload_current_core() {
-    let current_cpu = cpu::current_cpu().value();
-    log::error!("reloading current core: {current_cpu:?}");
+    let current_cpu = cpu::current_cpu();
 
     let mut data = CLS_INITIALIZER.lock().get_data();
-    // SAFETY: TODO
-    log::info!("setting CLS");
-    unsafe { data.set_as_current_cls() };
-    log::info!("set CLS");
 
     let mut sections = CLS_SECTIONS.lock();
-    log::error!("before: {sections:#0x?}");
     for (cpu, image) in sections.iter_mut() {
         if *cpu == current_cpu {
+            // We disable preemption so that we can safely access `image` and `data` without it
+            // being changed under our noses.
+            let _guard = preemption::hold_preemption();
+
+            data.inherit(image);
+            // SAFETY: We only drop `data` after another image has been set as the current
+            // CPU local storage.
+            unsafe { data.set_as_current_cls() };
+
             core::mem::swap(image, &mut data);
             return;
         }
     }
+
+    // SAFETY: We only drop `data` after another image has been set as the current CPU local
+    // storage.
+    unsafe { data.set_as_current_cls() };
     sections.push((current_cpu, data));
-    log::error!("after: {sections:#0x?}");
 }
 
 pub fn reload() {
