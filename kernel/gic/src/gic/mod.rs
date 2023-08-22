@@ -1,11 +1,14 @@
-use cpu::{CpuId, MpidrValue};
 use arm_boards::{BOARD_CONFIG, NUM_CPUS};
+use cpu::{CpuId, MpidrValue};
+use volatile::Volatile;
+use spin::Once;
+
 use memory::{
-    BorrowedMappedPages, Mutable, PhysicalAddress,
-    MMIO_FLAGS, map_frame_range, PAGE_SIZE,
+    BorrowedMappedPages, Mutable, PhysicalAddress, MappedPages,
+    AllocatedFrames, get_kernel_mmi_ref, allocate_frames_at,
+    allocate_pages, map_frame_range, PAGE_SIZE, MMIO_FLAGS,
 };
 
-use volatile::Volatile;
 
 mod cpu_interface_gicv3;
 mod cpu_interface_gicv2;
@@ -279,6 +282,35 @@ pub enum ArmGicCpuComponents {
     },
 }
 
+/// Map the physical frames containing the GICv2 CPU Interface's MMIO registers into the given `page_table`.
+fn map_gicv2_cpu_iface(cpu_iface: PhysicalAddress) -> Result<MappedPages, &'static str> {
+    static CPU_IFACE_FRAME: Once<AllocatedFrames> = Once::new();
+
+    let frame = if let Some(cpu_iface) = CPU_IFACE_FRAME.get() {
+        cpu_iface
+    } else {
+        let cpu_iface = allocate_frames_at(cpu_iface, 1)?;
+        CPU_IFACE_FRAME.call_once(|| cpu_iface)
+    };
+
+    let new_page = allocate_pages(1).ok_or("out of virtual address space!")?;
+    let mmi = get_kernel_mmi_ref().ok_or("map_gicv2_cpu_iface(): uninitialized KERNEL_MMI")?;
+    let mut mmi = mmi.lock();
+
+    // The CPU Interface frame is the same actual physical address across all CPU cores,
+    // but they're actually completely independent pieces of hardware that share one address.
+    // Therefore, there's no way to represent that to the Rust language or
+    // MappedPages/AllocatedFrames types, so we must use unsafe code, at least for now.
+    unsafe {
+        memory::Mapper::map_to_non_exclusive(
+            &mut mmi.page_table,
+            new_page,
+            frame,
+            MMIO_FLAGS,
+        )
+    }
+}
+
 impl ArmGicCpuComponents {
     pub fn init(cpu_id: CpuId, version: &Version) -> Result<Self, &'static str> {
         let cpu_index = BOARD_CONFIG.cpu_ids.iter()
@@ -288,7 +320,7 @@ impl ArmGicCpuComponents {
         match version {
             Version::InitV2 { cpu, .. } => {
                 let mut registers: BorrowedMappedPages<CpuRegsP1, Mutable> = {
-                    let mapped = map_frame_range(*cpu, PAGE_SIZE, MMIO_FLAGS)?;
+                    let mapped = map_gicv2_cpu_iface(*cpu)?;
                     mapped.into_borrowed_mut(0).map_err(|(_, e)| e)?
                 };
 
