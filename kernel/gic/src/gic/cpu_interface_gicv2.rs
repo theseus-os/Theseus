@@ -12,14 +12,13 @@ use super::InterruptNumber;
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
 
-/// Registers of a CPU interface of the GIC, pertaining
-/// to a specific CPU in the system.
+/// The GICv2 MMIO registers for interfacing with a specific CPU.
 ///
-/// Methods refer to that specific CPU by "current CPU".
+/// Methods herein apply to the "current" CPU only, i.e., the CPU
+/// on which the code that accesses these registers is currently running.
 ///
-/// Caution: Even though the physical address for this
-/// structure is the same for each CPU, the actual backing
-/// memory is per-CPU (different for each CPU).
+/// Note: the physical address for this structure is the same for all CPUs,
+/// but the actual backing memory refers to physically separate registers.
 #[derive(FromBytes)]
 #[repr(C)]
 pub struct CpuRegsP1 {            // base offset
