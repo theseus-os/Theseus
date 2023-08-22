@@ -26,23 +26,62 @@ pub fn init(pci_device: Standard<&PciDevice>) -> Result<(), &'static str> {
     }
 }
 
+/*
+
+#[derive(Debug, Default, FromBytes)]
+pub struct Allocator<const N: usize, T: FromBytes> {
+    slots: [T; N],
+    occupied: [bool; N],
+}
+
+impl<const N: usize, T: FromBytes> Allocator<N, T> {
+    pub fn init(&mut self) {
+        self.occupied.fill(false);
+    }
+
+    pub fn alloc(&mut self, value: T) -> Result<(usize, u32), &'static str> {
+        for i in 0..N {
+            if !self.occupied[i] {
+                self.occupied[i] = true;
+                let mut_ref = &mut self.slots[i];
+                *mut_ref = value;
+                let addr = mut_ref as *const Request as usize;
+
+                return Ok((i, addr as u32))
+            }
+        }
+
+        Err("Allocator: Out of slots")
+    }
+
+    pub fn get(&self, index: usize) -> Option<&T> {
+        self.slots.get(index)
+    }
+
+    pub fn get_mut(&self, index: usize) -> Option<&mut T> {
+        self.slots.get_mut(index)
+    }
+}
+
+*/
+
 #[derive(Debug, Default, FromBytes)]
 #[repr(C)]
 pub struct DeviceDescriptor {
-    pub len: Volatile<u8>,
-    pub device_type: Volatile<u8>,
-    pub usb_version: Volatile<u16>,
-    pub class: Volatile<u8>,
-    pub sub_class: Volatile<u8>,
-    pub protocol: Volatile<u8>,
-    pub max_packet_size: Volatile<u8>,
-    pub vendor_id: Volatile<u16>,
-    pub product_id: Volatile<u16>,
-    pub device_version: Volatile<u16>,
-    pub vendor_str: Volatile<u8>,
-    pub product_str: Volatile<u8>,
-    pub serial_str: Volatile<u8>,
-    pub conf_count: Volatile<u8>,
+    pub len: u8,
+    pub device_type: u8,
+    pub usb_version: u16,
+    pub class: u8,
+    pub sub_class: u8,
+    pub protocol: u8,
+    pub max_packet_size: u8,
+    pub vendor_id: u16,
+    pub product_id: u16,
+    pub device_version: u16,
+    pub vendor_str: u8,
+    pub product_str: u8,
+    pub serial_str: u8,
+    pub conf_count: u8,
 }
 
 #[bitsize(64)]
