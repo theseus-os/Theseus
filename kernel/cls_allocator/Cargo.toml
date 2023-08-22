@@ -9,4 +9,3 @@ crate_metadata = { path = "../crate_metadata" }
 sync_spin = { path = "../../libs/sync_spin" }
 tls_initializer = { path = "../tls_initializer" }
 log = "*"
-x86_64 = "*"

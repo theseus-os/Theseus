@@ -494,7 +494,6 @@ dependencies = [
  "log",
  "sync_spin",
  "tls_initializer",
- "x86_64",
 ]
 
 [[package]]
@@ -2725,7 +2724,6 @@ dependencies = [
  "apic",
  "cls_macros",
  "cpu",
- "log",
 ]
 
 [[package]]

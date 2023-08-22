@@ -481,9 +481,8 @@ impl LocalStorageDataImage<Tls> {
         // SAFETY: We guarantee that the length of `data` never changes and hence that it is never
         // reallocated. The caller guarantees that `self` and by extension `data` is never dropped.
         // NOTE: Same as above.
-        // log::error!("setting fs to: {ptr:0x?}");
+        log::error!("setting fs to: {:0x?}", self.ptr);
         unsafe { Tls::set_as_current_base(self.ptr) };
-        // log::error!("fs should be: {ptr:0x?}");
     }
 }
 

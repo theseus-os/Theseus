@@ -152,7 +152,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             let mut ptr = {
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
-                // log::error!("gs: {gs:0x?}");
+                log::error!("offset: {offset:?}");
+                log::error!("gs: {gs:0x?}");
 
                 let (value, overflow_occured) = gs.overflowing_add(offset);
                 assert!(overflow_occured, "overflow did not occur");
@@ -165,6 +166,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 use cls::__private::tock_registers::interfaces::Readable;
                 let tpidr_el1 = cls::__private::cortex_a::registers::TPIDR_EL1.get();
 
+                log::error!("offset: {offset:?}");
+                log::error!("gs: {tpidr_el1:0x?}");
                 let (value, overflow_occured) = tpidr_el1.overflowing_add(offset);
                 assert!(overflow_occured, "overflow did not occur");
 
@@ -322,7 +325,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                         cls = sym #name,
                     )
                 };
-                let offset = (cls_size - temp).wrapping_neg();
+                let offset = (cls_size - temp).wrapping_neg() + ::core::cmp::max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
                 offset
             }
         }

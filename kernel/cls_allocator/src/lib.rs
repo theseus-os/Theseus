@@ -41,12 +41,6 @@ pub fn reload_current_core() {
     let current_cpu = cpu::current_cpu().value();
     log::error!("reloading current core: {current_cpu:?}");
 
-    fn rdmsr(msr: u32) -> u64 {
-        unsafe { x86_64::registers::model_specific::Msr::new(msr).read() }
-    }
-    let rdmsr_cpuid = rdmsr(0xc0000103);
-    log::error!("rdmsr cpuid: {rdmsr_cpuid}");
-
     let mut data = CLS_INITIALIZER.lock().get_data();
     // SAFETY: TODO
     log::info!("setting CLS");
