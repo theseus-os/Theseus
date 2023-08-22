@@ -152,12 +152,9 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             let mut ptr = {
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
-                log::error!("offset: {offset:?}");
-                log::error!("gs: {gs:0x?}");
 
                 let (value, overflow_occured) = gs.overflowing_add(offset);
                 assert!(overflow_occured, "overflow did not occur");
-                // log::error!("value: {value:0x?}");
 
                 value
             };
@@ -166,9 +163,6 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 use cls::__private::tock_registers::interfaces::Readable;
                 let tpidr_el1 = cls::__private::cortex_a::registers::TPIDR_EL1.get();
 
-                log::error!("{}", core::any::type_name::<Self>());
-                log::error!("offset: {offset:0x?}");
-                log::error!("gs: {tpidr_el1:0x?}");
                 tpidr_el1 + offset
             };
             unsafe { &mut*(ptr as *mut #ty) }
@@ -219,13 +213,9 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                     {}
                     implements_guard_trait::<#guard_type>();
 
-                    // ::log::debug!("guard: {guard:?}");
                     let rref = #ref_expr;
-                    // ::log::debug!("ptr to CLS guard: {:0x?}", rref as *const _);
-                    // ::log::debug!("bytes at CLS guard: {:0x?}", unsafe { core::slice::from_raw_parts(rref as *const _ as *const u8, 8) });
                     let mut guard = Some(guard);
                     ::core::mem::swap(rref, &mut guard);
-                    // log::info!("replaced guard: {guard:?}");
 
                     guard
                 }
@@ -314,19 +304,33 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
             }
             #[cfg(target_arch = "aarch64")]
             {
-                let mut temp = 0;
+                let mut offset = 0;
                 unsafe {
+                    // This will compile into something like
+                    // ```armasm
+                    // add {offset}, 0, #1, lsl #12
+                    // add {offset}, {offset}, #0x10
+                    // sub {offset}, {offset}, #1, lsl #12
+                    // ```
+                    // `#1, lsl #12` is `1 << 12 = 0x1000` which is the size of a single page.
+                    //
+                    // The first add instruction loads the upper 12 bits of the offset into
+                    // `{offset}`, and the second add instruction loads the lower 12 bits. Then,
+                    // since all CLS offsets on AArch64 are a page size larger than they are
+                    // supposed to be, we subtract a page size. Realistically, we could just omit
+                    // loading the upper 12 bits of the offset and the `sub` insntruction under the
+                    // assumption that the CLS section will never be larger than a page. But that
+                    // would lead to very cryptic bugs if we were to ever breach that limit and an
+                    // extra `sub` instruction per CLS access isn't significant.
                     ::core::arch::asm!(
-                        // Could also disable this add.
-                        "add {temp}, {temp}, #:tprel_hi12:{cls}, lsl #12",
-                        "add {temp}, {temp}, #:tprel_lo12_nc:{cls}",
-                        "sub {temp}, {temp}, #1, lsl #12",
-                        temp = inout(reg) temp,
+                        "add {offset}, {offset}, #:tprel_hi12:{cls}, lsl #12",
+                        "add {offset}, {offset}, #:tprel_lo12_nc:{cls}",
+                        "sub {offset}, {offset}, #1, lsl #12",
+                        offset = inout(reg) offset,
                         cls = sym #name,
                     )
                 };
-                // let offset = (cls_size - temp).wrapping_neg() + ::core::cmp::max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
-                temp
+                offset
             }
         }
     }
