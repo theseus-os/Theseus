@@ -54,11 +54,6 @@ SECTIONS {
         *(.gcc_except_table .gcc_except_table.*)
     }
 
-	.cls ALIGN(4K) : AT(ADDR(.cls) - KERNEL_OFFSET)
-	{
-		*(.cls)
-	}
-
     .tdata ALIGN(4K) : AT(ADDR(.tdata) - KERNEL_OFFSET)
     {
         *(.tdata .tdata.* )
@@ -69,6 +64,11 @@ SECTIONS {
     {
         *(.tbss .tbss.*)
     }
+
+	.cls ALIGN(4K) : AT(ADDR(.cls) - KERNEL_OFFSET)
+	{
+		*(.cls)
+	}
 
     .data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)
     {

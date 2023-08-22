@@ -166,12 +166,10 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 use cls::__private::tock_registers::interfaces::Readable;
                 let tpidr_el1 = cls::__private::cortex_a::registers::TPIDR_EL1.get();
 
-                log::error!("offset: {offset:?}");
+                log::error!("{}", core::any::type_name::<Self>());
+                log::error!("offset: {offset:0x?}");
                 log::error!("gs: {tpidr_el1:0x?}");
-                let (value, overflow_occured) = tpidr_el1.overflowing_add(offset);
-                assert!(overflow_occured, "overflow did not occur");
-
-                value
+                tpidr_el1 + offset
             };
             unsafe { &mut*(ptr as *mut #ty) }
         }
@@ -316,17 +314,19 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
             }
             #[cfg(target_arch = "aarch64")]
             {
-                let mut temp = 0x1000 + tls_size;
+                let mut temp = 0;
                 unsafe {
                     ::core::arch::asm!(
+                        // Could also disable this add.
                         "add {temp}, {temp}, #:tprel_hi12:{cls}, lsl #12",
                         "add {temp}, {temp}, #:tprel_lo12_nc:{cls}",
+                        "sub {temp}, {temp}, #1, lsl #12",
                         temp = inout(reg) temp,
                         cls = sym #name,
                     )
                 };
-                let offset = (cls_size - temp).wrapping_neg() + ::core::cmp::max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
-                offset
+                // let offset = (cls_size - temp).wrapping_neg() + ::core::cmp::max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
+                temp
             }
         }
     }

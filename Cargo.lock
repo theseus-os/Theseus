@@ -1483,6 +1483,7 @@ name = "hello"
 version = "0.1.0"
 dependencies = [
  "log",
+ "test_preemption_counter",
 ]
 
 [[package]]

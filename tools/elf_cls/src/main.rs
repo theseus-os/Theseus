@@ -48,10 +48,15 @@ fn main() {
     let object_file_extension = OsStr::new("o");
     let mut args = env::args();
     args.next().unwrap();
+    let is_x64 = match &args.next().unwrap()[..] {
+        "x86_64" => true,
+        "aarch64" => false,
+        arch => panic!("invalid architecture: {arch}"),
+    };
     match &args.next().unwrap()[..] {
         "--file" => {
             let file_path = args.next().unwrap();
-            update_file(&file_path);
+            update_file(&file_path, is_x64);
         }
         "--dir" => {
             let directory_path = args.next().expect("no directory path provided");
@@ -59,7 +64,7 @@ fn main() {
                 let entry = entry.unwrap();
                 let file_path = entry.path();
                 if file_path.extension() == Some(object_file_extension) {
-                    update_file(&file_path);
+                    update_file(&file_path, is_x64);
                 }
             }
         }
@@ -87,7 +92,7 @@ fn sections(header: &Header, file: &mut File) -> Vec<SectionHeader> {
     SectionHeader::parse(&bytes, 1, header.e_shnum as usize, context).unwrap()
 }
 
-fn update_file<P>(file_path: P)
+fn update_file<P>(file_path: P, is_x64: bool)
 where
     P: AsRef<Path> + Copy,
     PathBuf: From<P>,
@@ -108,7 +113,7 @@ where
                     .unwrap()
                     .to_string_lossy(),
             );
-            update_cls_symbols(&header, cls_section_index, &sections, &mut file);
+            update_cls_symbols(&header, cls_section_index, &sections, &mut file, is_x64);
         }
     }
 }
@@ -164,6 +169,7 @@ fn update_cls_symbols(
     cls_section_index: usize,
     sections: &[SectionHeader],
     file: &mut File,
+    is_x64: bool,
 ) {
     let symbol_table_section = sections
         .iter()
@@ -203,13 +209,29 @@ fn update_cls_symbols(
                 let symbol_info_offset = symbol_table_offset + i as u64 * symbol_size + 4;
                 file.seek(SeekFrom::Start(symbol_info_offset)).unwrap();
                 file.write_all(&[new_info]).unwrap();
-                println!("overwrote symbol flag");
-            } else if symbol.st_value >= 0x1000 {
+
+                if !is_x64 && symbol.st_value >= 0x1000 {
+                    let new_value = symbol.st_value - 0x1000;
+                    let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
+                    file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
+                    file.write_all(&new_value.to_le_bytes()).unwrap();
+                    println!(
+                        "overwrote symbol value for {} from {:0x?} to {:0x?}",
+                        i, symbol.st_value, new_value
+                    );
+                } else {
+                    println!("overwrote symbol flag");
+                }
+            // On x64, the TLS symbols have the wrong value.
+            } else if is_x64 && symbol.st_value >= 0x1000 {
                 let new_value = symbol.st_value - 0x1000;
                 let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
                 file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
                 file.write_all(&new_value.to_le_bytes()).unwrap();
-                println!("overwrote symbol value for {} from {:0x?} to {:0x?}", i, symbol.st_value, new_value);
+                println!(
+                    "overwrote symbol value for {} from {:0x?} to {:0x?}",
+                    i, symbol.st_value, new_value
+                );
             }
         }
     }
