@@ -238,34 +238,34 @@ impl ArmGicDistributor {
         }
     }
 
-    /// Will that interrupt be forwarded by the distributor?
+    /// Returns whether the given interrupt is forwarded by the distributor.
     ///
-    /// Panics: will panic if `int` is not in the SPI range (>= 32)
+    /// Panics if `int` is not in the SPI range (>= 32).
     pub fn get_spi_state(&self, int: InterruptNumber) -> Enabled {
         assert!(int >= 32, "get_spi_state: `int` must be >= 32");
         self.distributor().is_spi_enabled(int)
     }
 
-    /// Enables or disables the forwarding of
-    /// a particular interrupt in the distributor
+    /// Enables or disables the forwarding of the given interrupt
+    /// by the distributor.
     ///
-    /// Panics: will panic if `int` is not in the SPI range (>= 32)
+    /// Panics if `int` is not in the SPI range (>= 32).
     pub fn set_spi_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         assert!(int >= 32, "set_spi_state: `int` must be >= 32");
         self.distributor_mut().enable_spi(int, enabled)
     }
 
-    /// Returns the priority of an interrupt
+    /// Returns the priority of the given interrupt.
     ///
-    /// Panics: will panic if `int` is not in the SPI range (>= 32)
+    /// Panics if `int` is not in the SPI range (>= 32).
     pub fn get_spi_priority(&self, int: InterruptNumber) -> Priority {
         assert!(int >= 32, "get_spi_priority: `int` must be >= 32");
         self.distributor().get_spi_priority(int)
     }
 
-    /// Sets the priority of an interrupt (0-255)
+    /// Sets the priority of the given interrupt.
     ///
-    /// Panics: will panic if `int` is not in the SPI range (>= 32)
+    /// Panics if `int` is not in the SPI range (>= 32).
     pub fn set_spi_priority(&mut self, int: InterruptNumber, enabled: Priority) {
         assert!(int >= 32, "set_spi_priority: `int` must be >= 32");
         self.distributor_mut().set_spi_priority(int, enabled)
@@ -365,19 +365,21 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Sends an inter processor interrupt (IPI), also called software
-    /// generated interrupt (SGI).
+    /// Sends an Inter-Processor Interrupt (IPI) with the given interrupt number
+    /// to the given target CPU(s).
     ///
-    /// Panics: on Aarch64, IPIs must have a number below 16. This function
-    /// panics if `int_num` is equal to or greater than 16.
-    pub fn send_ipi(&mut self, int_num: InterruptNumber, target: IpiTargetCpu) {
-        assert!(int_num < 16, "IPIs must have a number below 16 on ARMv8");
+    /// This is also referred to as a Software-Generated Interrupt (SGI).
+    ///
+    /// Panics if `int` is greater than or equal to 16;
+    /// on aarch64, IPIs much be sent to an interrupt number less than 16.
+    pub fn send_ipi(&mut self, int: InterruptNumber, target: IpiTargetCpu) {
+        assert!(int < 16, "IPIs must have a number below 16 on ARMv8");
 
         if let Self::V3 { .. } = self {
-            cpu_interface_gicv3::send_ipi(int_num, target)
+            cpu_interface_gicv3::send_ipi(int, target)
         } else {
             // we don't have access to the distributor... code would be:
-            // dist_interface::send_ipi_gicv2(&mut dist_regs, int_num, target)
+            // dist_interface::send_ipi_gicv2(&mut dist_regs, int, target)
             // workaround: caller could check is this must be done in the dist
             // and then get the SystemInterruptController and call a dedicated
             // method on it, like `sys_ctlr.send_ipi_gicv2()`
@@ -386,8 +388,12 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Acknowledge the currently serviced interrupt
-    /// and fetches its number
+    /// Acknowledge the currently-serviced interrupt.
+    ///
+    /// This tells the GIC that the current interrupt is in the midst of
+    /// being handled by this CPU.
+    ///
+    /// Returns a tuple of the interrupt's number and priority.
     pub fn acknowledge_interrupt(&mut self) -> (InterruptNumber, Priority) {
         match self {
             Self::V2 { registers, .. } => registers.acknowledge_interrupt(),
@@ -395,7 +401,11 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Performs priority drop for the specified interrupt
+    /// Signals to the controller that the currently processed interrupt
+    /// has been fully handled, by zeroing the current priority level of
+    /// the current CPU.
+    ///
+    /// This implies that the CPU is ready to process interrupts again.
     pub fn end_of_interrupt(&mut self, int: InterruptNumber) {
         match self {
             Self::V2 { registers, .. } => registers.end_of_interrupt(int),
@@ -403,9 +413,10 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Will that local interrupt be received by this CPU?
+    /// Returns whether the given local interrupt will be received by the current CPU.
     ///
-    /// Panics: will panic if `int` is not in the local range (< 32)
+    /// Panics if `int` is greater than or equal to 32, which is beyond the range
+    /// of local interrupt numbers.
     pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
         assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
@@ -420,9 +431,10 @@ impl ArmGicCpuComponents {
         }
     }
 
-    /// Enables or disables the receiving of a local interrupt in the distributor
+    /// Enables or disables the receiving of a local interrupt in the distributor.
     ///
-    /// Panics: will panic if `int` is not in the local range (< 32)
+    /// Panics if `int` is greater than or equal to 32, which is beyond the range
+    /// of local interrupt numbers.
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
         assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
@@ -436,7 +448,8 @@ impl ArmGicCpuComponents {
 
     /// Returns the priority of a local interrupt
     ///
-    /// Panics: will panic if `int` is not in the local range (< 32)
+    /// Panics if `int` is greater than or equal to 32, which is beyond the range
+    /// of local interrupt numbers.
     pub fn get_interrupt_priority(&self, int: InterruptNumber) -> Priority {
         assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
@@ -453,7 +466,8 @@ impl ArmGicCpuComponents {
 
     /// Sets the priority of a local interrupt (prio: 0-255)
     ///
-    /// Panics: will panic if `int` is not in the local range (< 32)
+    /// Panics if `int` is greater than or equal to 32, which is beyond the range
+    /// of local interrupt numbers.
     pub fn set_interrupt_priority(&mut self, int: InterruptNumber, enabled: Priority) {
         assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
@@ -491,8 +505,9 @@ impl ArmGicCpuComponents {
 
     /// Returns the internal ID of the redistributor (GICv3)
     ///
-    /// Note #1: as a compatibility feature, on GICv2, the CPU index is returned.
-    /// Note #2: this is only provided for debugging purposes
+    /// ## Notes
+    /// * As a compatibility feature, on GICv2, the CPU index is returned.
+    /// * This is only provided for debugging purposes.
     pub fn get_cpu_interface_id(&self) -> u16 {
         match self {
             Self::V3 { redist_regs } => redist_regs.redistributor.get_internal_id(),
