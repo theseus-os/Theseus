@@ -436,7 +436,7 @@ impl ArmGicCpuComponents {
     /// Panics if `int` is greater than or equal to 32, which is beyond the range
     /// of local interrupt numbers.
     pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
-        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
+        assert!(int < 32, "set_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.enable_sgippi(int, enabled);
@@ -451,7 +451,7 @@ impl ArmGicCpuComponents {
     /// Panics if `int` is greater than or equal to 32, which is beyond the range
     /// of local interrupt numbers.
     pub fn get_interrupt_priority(&self, int: InterruptNumber) -> Priority {
-        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
+        assert!(int < 32, "get_interrupt_priority: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.get_sgippi_priority(int)
@@ -469,7 +469,7 @@ impl ArmGicCpuComponents {
     /// Panics if `int` is greater than or equal to 32, which is beyond the range
     /// of local interrupt numbers.
     pub fn set_interrupt_priority(&mut self, int: InterruptNumber, enabled: Priority) {
-        assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
+        assert!(int < 32, "set_interrupt_priority: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
             redist_regs.redist_sgippi.set_sgippi_priority(int, enabled);
