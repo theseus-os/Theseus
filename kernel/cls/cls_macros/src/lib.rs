@@ -277,19 +277,19 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
     quote! {
         {
-            extern "C" {
-                static CLS_SIZE: u8;
-                static TLS_SIZE: u8;
-            }
-
-            // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
-            // SAFETY: We don't access the extern static.
-            let cls_size = unsafe { ::core::ptr::addr_of!(CLS_SIZE) } as u64;
-            // SAFETY: We don't access the extern static.
-            let tls_size = unsafe { ::core::ptr::addr_of!(TLS_SIZE) } as u64;
-
             #[cfg(target_arch = "x86_64")]
             {
+                extern "C" {
+                    static __THESEUS_CLS_SIZE: u8;
+                    static __THESEUS_TLS_SIZE: u8;
+                }
+
+                // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+                // SAFETY: We don't access the extern static.
+                let cls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_CLS_SIZE) } as u64;
+                // SAFETY: We don't access the extern static.
+                let tls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_TLS_SIZE) } as u64;
+
                 let temp: u64;
                 unsafe {
                     ::core::arch::asm!(

@@ -179,10 +179,6 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.
             // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
             let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
-            let mut temp = false;
-            if line.contains("OS specific") {
-                temp = true;
-            }
             let line = line.replace("<OS specific>: ", "");
             let mut parts = line
                 .splitn(8, |c: char| {
@@ -224,12 +220,6 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             let name = parts
                 .next()
                 .ok_or("parse_nano_core_symbol_file(): couldn't get column 7 'Name'")?;
-
-            if temp {
-                // println!("----------------------------");
-                // panic!("{_num:?} {sec_vaddr:0x?} {sec_size:0x?} {_typ:?} {bind:?} {_vis:?} {sec_ndx:?} {name:?}");
-                // println!("----------------------------");
-            }
 
             let global = bind == "GLOBAL" || bind == "WEAK";
             let sec_vaddr = usize::from_str_radix(sec_vaddr, 16).map_err(|e| {

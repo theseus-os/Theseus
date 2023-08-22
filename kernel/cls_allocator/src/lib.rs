@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
+use alloc::{sync::Arc, vec::Vec};
 
 use cpu::CpuId;
 use crate_metadata::{LoadedSection, StrongSectionRef};
@@ -31,8 +31,13 @@ pub fn add_static_section(
 ///
 /// The CLS register will not be updated until either [`reload`] or
 /// [`reload_current_core`] is called.
-pub fn add_dynamic_section() {
-    todo!();
+pub fn add_dynamic_section(
+    section: LoadedSection,
+    alignment: usize,
+) -> Result<(usize, Arc<LoadedSection>), LocalStorageInitializerError> {
+    CLS_INITIALIZER
+        .lock()
+        .add_new_dynamic_section(section, alignment)
 }
 
 /// Generates a new data image for the current core and sets the CLS register
@@ -45,8 +50,8 @@ pub fn reload_current_core() {
     let mut sections = CLS_SECTIONS.lock();
     for (cpu, image) in sections.iter_mut() {
         if *cpu == current_cpu {
-            // We disable preemption so that we can safely access `image` and `data` without it
-            // being changed under our noses.
+            // We disable preemption so that we can safely access `image` and `data` without
+            // it being changed under our noses.
             let _guard = preemption::hold_preemption();
 
             data.inherit(image);
@@ -59,8 +64,8 @@ pub fn reload_current_core() {
         }
     }
 
-    // SAFETY: We only drop `data` after another image has been set as the current CPU local
-    // storage.
+    // SAFETY: We only drop `data` after another image has been set as the current
+    // CPU local storage.
     unsafe { data.set_as_current_cls() };
     sections.push((current_cpu, data));
 }

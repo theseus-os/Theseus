@@ -1411,15 +1411,10 @@ impl CrateNamespace {
             } else if is_cls {
                 // TODO: Alignment?
                 log::info!("cls section: {}", new_section.size);
-                todo!();
-                // let cls_offset = cls::allocate(new_section.size, 1);
-                // let mut section = Arc::new(new_section);
-
-                // let section_ref = Arc::get_mut(&mut section).unwrap();
-                // section_ref.virt_addr = VirtualAddress::new(cls_offset).unwrap();
-
-                // cls_shndx_and_section = Some((shndx, Arc::clone(&section)));
-                // section
+                let (_, new_cls_section) = cls_allocator::add_dynamic_section(new_section, sec.align() as usize)
+                    .map_err(|_| "Failed to add new dynamic CLS section")?;
+                cls_shndx_and_section = Some((shndx, Arc::clone(&new_cls_section)));
+                new_cls_section
             } else {
                 Arc::new(new_section)
             };
@@ -1559,11 +1554,8 @@ impl CrateNamespace {
             }
 
             else if is_cls {
-                log::error!("CLS SYMbOL: {sec_name} with offset {sec_value}");
+                log::error!("CLS SYMBOL: {sec_name} with offset {sec_value}");
                 let sym_shndx = symbol_entry.shndx() as Shndx;
-                if sym_shndx == 0 {
-                    continue;
-                }
                 let rp_ref = read_only_pages_locked.as_ref()
                     .map(|(mp_arc, ..)| mp_arc)
                     .ok_or("BUG: found TLS symbol but no rodata_pages were allocated")?;
