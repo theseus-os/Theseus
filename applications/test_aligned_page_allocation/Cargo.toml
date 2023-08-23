@@ -1,0 +1,15 @@
+[package]
+name = "test_aligned_page_allocation"
+version = "0.1.0"
+description = "Tests the `AllocationRequest::AlignedTo` variant, which is needed for huge pages"
+authors = ["Kevin Boos <kevinaboos@gmail.com>"]
+edition = "2021"
+
+[dependencies]
+log = "0.4.8"
+
+[dependencies.memory]
+path = "../../kernel/memory"
+
+[dependencies.app_io]
+path = "../../kernel/app_io"

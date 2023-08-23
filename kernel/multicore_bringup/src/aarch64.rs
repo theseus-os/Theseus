@@ -1,4 +1,4 @@
-use memory::{MmiRef, VirtualAddress, PhysicalAddress, MappedPages, PteFlags};
+use memory::{create_identity_mapping, MmiRef, VirtualAddress, PhysicalAddress, PteFlags};
 use memory_aarch64::{read_mmu_config, asm_set_mmu_config_x2_x3};
 use kernel_config::memory::{PAGE_SIZE, KERNEL_STACK_SIZE_IN_PAGES};
 use psci::{cpu_on, error::Error::*};
@@ -8,6 +8,7 @@ use volatile::Volatile;
 use core::arch::asm;
 use cpu::{CpuId, MpidrValue, current_cpu};
 use arm_boards::BOARD_CONFIG;
+use mod_mgmt::get_initial_kernel_namespace;
 
 /// The data items used when an AP core is booting up in ap_entry_point & ap_stage_two.
 #[cfg(target_arch = "aarch64")]
@@ -42,79 +43,56 @@ pub fn handle_ap_cores(
 ) -> Result<u32, &'static str> {
     let mut online_secondary_cpus = 0;
 
-    // This ApTrampolineData & MmuConfig will be read and written-to
-    // by all detected CPU cores, via both its physical
-    // and virtual addresses.
+    // This ApTrampolineData & MmuConfig will be read and written to
+    // by all detected CPU cores, via both its physical and virtual addresses.
     let mmu_config = read_mmu_config();
     let mut ap_data: ApTrampolineData = Default::default();
     ap_data.ap_data_virt_addr.write(VirtualAddress::new_canonical(&ap_data as *const _ as usize));
     ap_data.ap_stage_two_virt_addr.write(VirtualAddress::new_canonical(ap_stage_two as usize));
 
-    let entry_point_phys_addr: PhysicalAddress;
-    let ap_data_phys_addr: PhysicalAddress;
-    let mut ap_startup_mapped_pages: MappedPages; // must be held throughout APs being booted up
+    // Identity map one page of memory and copy the executable code of `ap_entry_point` into it.
+    // This ensures that when we run that `ap_entry_point` code from the identity-mapped page,
+    // it can safely enable the MMU, as the program counter will be valid
+    // (and have the same value) both before and after the MMU is enabled.
+    let rwx = PteFlags::new().valid(true).writable(true).executable(true);
+    let mut ap_startup_mapped_pages = create_identity_mapping(1, rwx)?;
+    let virt_addr = ap_startup_mapped_pages.start_address();
+
     {
+        let kernel_text_pages_ref = get_initial_kernel_namespace()
+            .ok_or("BUG: couldn't get the initial kernel CrateNamespace")
+            .and_then(|namespace| namespace.get_crate("nano_core").ok_or("BUG: couldn't get the 'nano_core' crate"))
+            .and_then(|nano_core_crate| nano_core_crate.lock_as_ref().text_pages.clone().ok_or("BUG: nano_core crate had no text pages"))?;
+        let kernel_text_pages = kernel_text_pages_ref.0.lock();
+
+        let ap_entry_point = VirtualAddress::new_canonical(ap_entry_point as usize);
+        let src = kernel_text_pages.offset_of_address(ap_entry_point)
+            .ok_or("BUG: the 'ap_entry_point' virtual address was not covered by the kernel's text pages")
+            .and_then(|offset| kernel_text_pages.as_slice(offset, PAGE_SIZE))?;
+
+        let dst: &mut [u8] = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE)?;
+        dst.copy_from_slice(src);
+
+        // After copying the content into the identity page, remap it to remove write permissions.
+        let mut kernel_mmi = kernel_mmi_ref.lock();
+        let rx = PteFlags::new().valid(true).executable(true);
+        ap_startup_mapped_pages.remap(&mut kernel_mmi.page_table, rx)?;
+    }
+
+    // We identity mapped the `ap_entry_point` above, but we need to translate
+    // the virtual address of the `ap_data` in order to obtain its physical address.
+    let entry_point_phys_addr = PhysicalAddress::new_canonical(virt_addr.value());
+    let ap_data_phys_addr = {
         let mut kernel_mmi = kernel_mmi_ref.lock();
         let page_table = &mut kernel_mmi.page_table;
 
-        // get the physical address of the MmuConfig
+        // Write the physical address of the MmuConfig struct into the ApData struct.
         let mmu_config_virt_addr = VirtualAddress::new_canonical(&mmu_config as *const _ as usize);
         ap_data.ap_mmu_config.write(page_table.translate(mmu_config_virt_addr).unwrap());
 
         // get physical address of the ApTrampolineData structure
-        ap_data_phys_addr = page_table.translate(ap_data.ap_data_virt_addr.read()).unwrap();
-
-        // This block identity-maps one page of writable+executable memory and
-        // copies the machine code of `ap_entry_point` to it. The fact that the
-        // mapping is identity-mapped allows this code to enable paging
-        // transparently without messing up with the PC register.
-        //
-        // However, there is currently no way in Theseus to dynamically find a
-        // memory range that is identity mappable, so the address is hardcoded.
-        //
-        // Another solution was implemented instead, which is why this one is
-        // soft-commented. The CPU has instruction caches, so when paging gets
-        // enabled, it can still execute some instructions located near PC without
-        // using the page directory. This allows us to branch to a physical address,
-        // enable paging, and then branch to a virtual address (even though at the
-        // time of the second branch, PC has an invalid address) where the
-        // initialization can continue.
-        // Note: caches must not be flushed before this second branch.
-        //
-        // It would still be preferable to use the first solution, as it doesn't
-        // rely on a cache trick.
-        if false {
-            const ID_MAPPED_ENTRY_POINT: usize = 0x5001_0000;
-
-            entry_point_phys_addr = PhysicalAddress::new_canonical(ID_MAPPED_ENTRY_POINT);
-
-            // When the AArch64 core will enter startup code, it will do so with MMU disabled,
-            // which means these frames MUST be identity mapped.
-            let ap_startup_frames = memory::allocate_frames_by_bytes_at(entry_point_phys_addr, PAGE_SIZE)
-                .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup frames")?;
-            let ap_startup_pages  = memory::allocate_pages_at(VirtualAddress::new_canonical(ID_MAPPED_ENTRY_POINT), ap_startup_frames.size_in_frames())
-                .map_err(|_e| "handle_ap_cores(): failed to allocate AP startup pages")?;
-
-            // map this RWX
-            let flags = PteFlags::new().valid(true).writable(true).executable(true);
-            ap_startup_mapped_pages = page_table.map_allocated_pages_to(
-                ap_startup_pages,
-                ap_startup_frames,
-                flags,
-            )?;
-
-            // copy the entry point code
-            // instructions must have an alignment of four bytes; a page's alignment will always be larger.
-            let dst = ap_startup_mapped_pages.as_slice_mut(0, PAGE_SIZE).unwrap();
-            let src = unsafe { (ap_entry_point as *const [u8; PAGE_SIZE]).as_ref() }.unwrap();
-            dst.copy_from_slice(src);
-
-        } else {
-            // get the physical address of ap_entry_point
-            let entry_point_virt_addr = VirtualAddress::new_canonical(ap_entry_point as usize);
-            entry_point_phys_addr = page_table.translate(entry_point_virt_addr).unwrap();
-        }
-    }
+        page_table.translate(ap_data.ap_data_virt_addr.read()).unwrap()
+    };
 
     let mut ap_stack = None;
     for def_mpidr in BOARD_CONFIG.cpu_ids {

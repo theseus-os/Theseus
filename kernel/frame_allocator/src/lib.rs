@@ -1213,7 +1213,7 @@ pub fn allocate_frames_deferred(
         if !contains_any(&GENERAL_REGIONS.lock(), &requested_frames) {
             let _new_reserved_frames = add_reserved_region_to_lists(&mut RESERVED_REGIONS.lock(), &mut free_reserved_frames_list, requested_frames)?;
             find_specific_chunk(&mut free_reserved_frames_list, start_frame, num_frames)
-        } 
+        }
         else {
             Err(AllocationError::AddressNotFree(start_frame, num_frames))
         }
@@ -1279,6 +1279,60 @@ pub fn allocate_frames_by_bytes_at(paddr: PhysicalAddress, num_bytes: usize) -> 
 pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<AllocatedFrames, &'static str> {
     allocate_frames_deferred(Some(paddr), num_frames)
         .map(|(af, _action)| af)
+}
+
+
+/// An enum that must be returned by the function passed into [`iter_free_frames()`]
+/// in order to define the post-iteration behavior.
+pub enum FramesIteratorRequest {
+    /// Keep iterating to the next chunk of frames.
+    Next,
+    /// Stop iterating, and do not allocate anything.
+    Stop,
+    /// Stop iterating, and then attempt to allocate the specified frames.
+    AllocateAt {
+        requested_frame: Frame,
+        num_frames: usize,
+    }
+}
+
+/// Iterates over all free frames and invokes the given `func` on each one
+/// in order to determine what to do with those frames.
+///
+/// See [`FramesIteratorRequest`] for more detail.
+pub fn inspect_then_allocate_free_frames<F>(
+    func: &mut F,
+) -> Result<Option<AllocatedFrames>, &'static str>
+where
+    F: FnMut(&FreeFrames) -> FramesIteratorRequest
+{
+    let alloc_result;
+    // This scope ensures we drop the lock on the free frames list
+    // before doing any deferred allocation actions.
+    {
+        let mut general_free_list = FREE_GENERAL_FRAMES_LIST.lock();
+        let mut frame_alloc_request = None;
+        for frames in general_free_list.iter() {
+            match func(frames) {
+                FramesIteratorRequest::Next => continue,
+                FramesIteratorRequest::Stop => break,
+                FramesIteratorRequest::AllocateAt { requested_frame, num_frames } => {
+                    frame_alloc_request = Some((requested_frame, num_frames));
+                    break;
+                } 
+            }
+        }
+
+        if let Some((requested_frame, num_frames)) = frame_alloc_request {
+            alloc_result = find_specific_chunk(&mut general_free_list, requested_frame, num_frames);
+        } else {
+            return Ok(None);
+        }
+    }
+
+    alloc_result
+        .map(|(af, _)| Some(af))
+        .map_err(From::from)
 }
 
 
