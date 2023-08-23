@@ -1385,7 +1385,8 @@ dependencies = [
  "cpu",
  "log",
  "memory",
- "static_assertions",
+ "spin 0.9.4",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1581,6 +1582,7 @@ dependencies = [
  "ioapic",
  "log",
  "memory",
+ "spin 0.9.4",
  "sync_irq",
 ]
 
