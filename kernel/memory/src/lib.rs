@@ -26,6 +26,8 @@ pub use memory_structs::*;
 pub use page_allocator::{
     AllocatedPages,
     AllocationRequest,
+    allocate_pages_deferred,
+    allocate_pages_by_bytes_deferred,
     allocate_pages,
     allocate_pages_at,
     allocate_pages_by_bytes,
@@ -37,6 +39,8 @@ pub use page_allocator::{
 pub use frame_allocator::{
     AllocatedFrames,
     UnmappedFrames,
+    allocate_frames_deferred,
+    allocate_frames_by_bytes_deferred,
     allocate_frames,
     allocate_frames_at,
     allocate_frames_by_bytes,

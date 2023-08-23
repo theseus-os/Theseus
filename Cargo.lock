@@ -3759,6 +3759,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_aligned_page_allocation"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "memory",
+]
+
+[[package]]
 name = "test_async"
 version = "0.1.0"
 dependencies = [
@@ -4048,6 +4057,7 @@ dependencies = [
  "seconds_counter",
  "shell",
  "swap",
+ "test_aligned_page_allocation",
  "test_async",
  "test_backtrace",
  "test_block_io",
