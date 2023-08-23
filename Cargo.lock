@@ -491,6 +491,7 @@ version = "0.1.0"
 dependencies = [
  "cpu",
  "crate_metadata",
+ "log",
  "preemption",
  "sync_spin",
  "tls_initializer",
@@ -2724,6 +2725,7 @@ dependencies = [
  "apic",
  "cls_macros",
  "cpu",
+ "log",
 ]
 
 [[package]]

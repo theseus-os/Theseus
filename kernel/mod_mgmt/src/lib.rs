@@ -1155,6 +1155,10 @@ impl CrateNamespace {
             new_crate_mut.data_sections   = data_sections;
         }
 
+        // TODO: Should be reload().
+        cls_allocator::reload_current_core();
+
+
         Ok((new_crate, elf_file))
     }
 
@@ -1597,7 +1601,6 @@ impl CrateNamespace {
 
             last_shndx += 1;
         } // end of iterating over all symbol table entries
-
 
         // // Quick test to ensure that all .data and .bss sections are fully covered 
         // // by overlapping OBJECT symbols.
@@ -2139,6 +2142,7 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(), &'static str> {
+        let verbose_log = true;
         let mut new_crate = new_crate_ref.lock_as_mut()
             .ok_or("BUG: perform_relocations(): couldn't get exclusive mutable access to new_crate")?;
         if verbose_log { debug!("=========== moving on to the relocations for crate {} =========", new_crate.crate_name); }
@@ -2207,10 +2211,10 @@ impl CrateNamespace {
                         let source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() as usize)
                             .and_then(|s| s.get_name(elf_file));
                         trace!("             relevant section [{}]: {:?}, value: {:#X}", source_sec_shndx, source_sec_header_name, source_sec_value);
-                        // trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
-                        //     source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
-                        //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
-                        //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
+                        trace!("             Entry name {} {:?} vis {:?} bind {:?} type {:?} shndx {} value {} size {}", 
+                            source_sec_entry.name(), source_sec_entry.get_name(&elf_file), 
+                            source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
+                            source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                     }
 
                     let mut source_and_target_in_same_crate = false;
@@ -2233,6 +2237,29 @@ impl CrateNamespace {
                                 } else {
                                     source_sec_name
                                 };
+
+                                if source_sec_name == "__THESEUS_CLS_SIZE" {
+                                    let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                    write_relocation(
+                                        relocation_entry,
+                                        target_sec_slice,
+                                        target_sec.mapped_pages_offset,
+                                        VirtualAddress::new(usize::MAX).unwrap(),
+                                        verbose_log,
+                                    )?;
+                                    continue;
+                                } else if source_sec_name == "__THESEUS_TLS_SIZE" {
+                                    let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                    write_relocation(
+                                        relocation_entry,
+                                        target_sec_slice,
+                                        target_sec.mapped_pages_offset,
+                                        VirtualAddress::new(usize::MAX).unwrap(),
+                                        verbose_log,
+                                    )?;
+                                    continue;
+                                }
+                                
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
