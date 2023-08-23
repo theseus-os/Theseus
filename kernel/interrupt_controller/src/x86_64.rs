@@ -31,6 +31,10 @@ pub struct SystemInterruptController {
 pub struct LocalInterruptController;
 
 impl SystemInterruptControllerApi for SystemInterruptController {
+    fn get() -> &'static Self {
+        unimplemented!()
+    }
+
     fn id(&self) -> SystemInterruptControllerId {
         let mut int_ctlr = get_ioapic(self.id).expect("BUG: id(): get_ioapic() returned None");
         SystemInterruptControllerId(int_ctlr.id())
@@ -65,6 +69,10 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 
 
 impl LocalInterruptControllerApi for LocalInterruptController {
+    fn get() -> &'static Self {
+        unimplemented!()
+    }
+
     fn init_secondary_cpu_interface(&self) {
         panic!("This must not be used on x86_64")
     }

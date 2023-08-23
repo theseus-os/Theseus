@@ -1384,7 +1384,8 @@ dependencies = [
  "cpu",
  "log",
  "memory",
- "static_assertions",
+ "spin 0.9.4",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1580,6 +1581,7 @@ dependencies = [
  "ioapic",
  "log",
  "memory",
+ "spin 0.9.4",
  "sync_irq",
 ]
 
@@ -2572,9 +2574,9 @@ checksum = "be5e13c266502aadf83426d87d81a0f5d1ef45b8027f5a471c360abfe4bfae92"
 
 [[package]]
 name = "paste"
-version = "1.0.5"
+version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbf547ad0c65e31259204bd90935776d1c693cec2f4ff7abb7a1bbbd40dfe58"
+checksum = "de3145af08024dea9fa9914f381a17b8fc6034dfb00f3a84013f7ff43f29ed4c"
 
 [[package]]
 name = "path"
@@ -2592,6 +2594,7 @@ dependencies = [
 name = "pci"
 version = "0.1.0"
 dependencies = [
+ "arm_boards",
  "bit_field 0.7.0",
  "cpu",
  "interrupts",
@@ -3751,6 +3754,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_aligned_page_allocation"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "memory",
+]
+
+[[package]]
 name = "test_async"
 version = "0.1.0"
 dependencies = [
@@ -4040,6 +4052,7 @@ dependencies = [
  "seconds_counter",
  "shell",
  "swap",
+ "test_aligned_page_allocation",
  "test_async",
  "test_backtrace",
  "test_block_io",

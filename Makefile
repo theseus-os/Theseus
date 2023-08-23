@@ -939,6 +939,9 @@ else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -machine virt,gic-version=3
 	QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
+	QEMU_FLAGS += -usb
+	QEMU_FLAGS += -device usb-ehci,id=ehci
+	QEMU_FLAGS += -device usb-kbd
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif

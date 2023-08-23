@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(unused_variables, unused_mut)]
+#![feature(array_try_from_fn)]
 
 extern crate alloc;
 
@@ -38,6 +39,8 @@ pub enum InterruptDestination {
 }
 
 pub trait SystemInterruptControllerApi {
+    fn get() -> &'static Self;
+
     fn id(&self) -> SystemInterruptControllerId;
     fn version(&self) -> SystemInterruptControllerVersion;
 
@@ -55,6 +58,8 @@ pub trait SystemInterruptControllerApi {
 }
 
 pub trait LocalInterruptControllerApi {
+    fn get() -> &'static Self;
+
     /// Aarch64-specific way to initialize the secondary CPU interfaces.
     ///
     /// Must be called once from every secondary CPU.

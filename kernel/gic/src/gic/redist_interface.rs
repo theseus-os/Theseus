@@ -9,20 +9,58 @@
 //! - Enabling or disabling the forwarding of PPIs & SGIs based on their numbers
 //! - Getting or setting the priority of PPIs & SGIs based on their numbers
 
-use super::GicRegisters;
 use super::InterruptNumber;
 use super::Enabled;
 use super::Priority;
+use super::read_array_volatile;
+use super::write_array_volatile;
 
-mod offset {
-    use crate::{Offset32, Offset64};
-    pub(crate) const CTLR:              Offset32 = Offset32::from_byte_offset(0x00);
-    pub(crate) const TYPER:             Offset64 = Offset64::from_byte_offset(0x08);
-    pub(crate) const WAKER:             Offset32 = Offset32::from_byte_offset(0x14);
-    pub(crate) const IGROUPR:           Offset32 = Offset32::from_byte_offset(0x80);
-    pub(crate) const SGIPPI_ISENABLER:  Offset32 = Offset32::from_byte_offset(0x100);
-    pub(crate) const SGIPPI_ICENABLER:  Offset32 = Offset32::from_byte_offset(0x180);
-    pub(crate) const SGIPPI_IPRIORITYR: Offset32 = Offset32::from_byte_offset(0x400);
+use volatile::{Volatile, ReadOnly};
+use zerocopy::FromBytes;
+
+/// General redistributor registers
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct RedistRegsP1 {                          // base offset
+    /// Redistributor Control Register
+    ctlr:         Volatile<u32>,                   // 0x00
+
+    /// Implementer Identification Register
+    _unused0:     u32,
+
+    /// Redistributor Type Register
+    ident:        ReadOnly<u64>,                   // 0x08
+
+    /// Error Reporting Status Register, optional
+    _unused1:     u32,
+
+    /// Redistributor Wake Register
+    waker:        Volatile<u32>,                   // 0x14
+}
+
+/// Redistributor registers for SGIs & PPIs
+#[derive(FromBytes)]
+#[repr(C)]
+pub struct RedistRegsSgiPpi {            // base offset
+    _reserved0:   [u8;            0x80],
+
+    /// Interrupt Group Register 0
+    group:        [Volatile<u32>; 0x01], // 0x080
+    _reserved1:   [u32;           0x1f],
+
+    /// Interrupt Set-Enable Registers
+    set_enable:   [Volatile<u32>; 0x01], // 0x100
+    _reserved2:   [u32;           0x1f],
+
+    /// Interrupt Clear-Enable Registers
+    clear_enable: [Volatile<u32>; 0x01], // 0x180
+    _reserved3:   [u32;           0x1f],
+
+    /// Interrupt Set & Clear Pending / Active Registers
+    _unused0:     [u32;           0x80],
+
+    /// Interrupt Priority Registers
+    priority:     [Volatile<u32>; 0x08], // 0x400
 }
 
 const WAKER_PROCESSOR_SLEEP: u32 = 1 << 1;
@@ -57,86 +95,90 @@ const GROUP_1: u32 = 1;
 /// developers (or directly submit a PR).
 const TIMEOUT_ITERATIONS: usize = 0xffff;
 
-/// Initializes the redistributor by waking it up and waiting for it to awaken.
-///
-/// Returns an error if a timeout occurs while waiting.
-pub fn init(registers: &mut GicRegisters) -> Result<(), &'static str> {
-    let mut reg = registers.read_volatile(offset::WAKER);
+impl RedistRegsP1 {
+    /// Initializes the redistributor by waking it up and waiting for it to awaken.
+    ///
+    /// Returns an error if a timeout occurs while waiting.
+    pub fn init(&mut self) -> Result<(), &'static str> {
+        let mut reg = self.waker.read();
 
-    // Wake the redistributor
-    reg &= !WAKER_PROCESSOR_SLEEP;
-    registers.write_volatile(offset::WAKER, reg);
+        // Wake the redistributor
+        reg &= !WAKER_PROCESSOR_SLEEP;
+        self.waker.write(reg);
 
-    // Then, wait for the children to wake up, timing out if it never happens.
-    let children_asleep = || {
-        registers.read_volatile(offset::WAKER) & WAKER_CHLIDREN_ASLEEP > 0
-    };
-    let mut counter = 0;
-    while children_asleep() {
-        counter += 1;
-        if counter >= TIMEOUT_ITERATIONS {
-            break;
+        // Then, wait for the children to wake up, timing out if it never happens.
+        let children_asleep = || {
+            self.waker.read() & WAKER_CHLIDREN_ASLEEP > 0
+        };
+        let mut counter = 0;
+        while children_asleep() {
+            counter += 1;
+            if counter >= TIMEOUT_ITERATIONS {
+                break;
+            }
         }
+
+        if counter >= TIMEOUT_ITERATIONS {
+            return Err("BUG: gic driver: The redistributor didn't wake up in time.");
+        }
+
+        if self.ident.read() & TYPER_DPGS != 0 {
+            // DPGS bits are supported in GICR_CTLR
+            let mut reg = self.ctlr.read();
+
+            // Enable PE selection for non-secure group 1 SPIs
+            reg &= !CTLR_DPG1NS;
+
+            // Disable PE selection for group 0 & secure group 1 SPIs
+            reg |= CTLR_DPG0;
+            reg |= CTLR_DPG1S;
+
+            self.ctlr.write(reg);
+        }
+
+        Ok(())
     }
 
-    if counter >= TIMEOUT_ITERATIONS {
-        return Err("BUG: gic driver: The redistributor didn't wake up in time.");
+    /// Returns the internal ID of the redistributor
+    ///
+    /// Note: this is only provided for debugging purposes
+    pub fn get_internal_id(&self) -> u16 {
+        (self.ident.read() >> 8) as _
+    }
+}
+
+impl RedistRegsSgiPpi {
+    /// Returns whether the given SGI (software generated interrupts) or
+    /// PPI (private peripheral interrupts) will be forwarded by the redistributor
+    pub fn is_sgippi_enabled(&self, int: InterruptNumber) -> Enabled {
+        read_array_volatile::<32>(&self.set_enable, int) > 0
+        &&
+        // part of group 1?
+        read_array_volatile::<32>(&self.group, int) == GROUP_1
     }
 
-    if registers.read_volatile_64(offset::TYPER) & TYPER_DPGS != 0 {
-        // DPGS bits are supported in GICR_CTLR
-        let mut reg = registers.read_volatile(offset::CTLR);
+    /// Enables or disables the forwarding of a particular
+    /// SGI (software generated interrupts) or PPI (private
+    /// peripheral interrupts)
+    pub fn enable_sgippi(&mut self, int: InterruptNumber, enabled: Enabled) {
+        let reg = match enabled {
+            true => &mut self.set_enable,
+            false => &mut self.clear_enable,
+        };
+        write_array_volatile::<32>(reg, int, 1);
 
-        // Enable PE selection for non-secure group 1 SPIs
-        reg &= !CTLR_DPG1NS;
-
-        // Disable PE selection for group 0 & secure group 1 SPIs
-        reg |= CTLR_DPG0;
-        reg |= CTLR_DPG1S;
-
-        registers.write_volatile(offset::CTLR, reg);
+        // whether we're enabling or disabling,
+        // set as part of group 1
+        write_array_volatile::<32>(&mut self.group, int, GROUP_1);
     }
 
-    Ok(())
-}
+    /// Returns the priority of an SGI/PPI.
+    pub fn get_sgippi_priority(&self, int: InterruptNumber) -> Priority {
+        u8::MAX - (read_array_volatile::<4>(&self.priority, int) as u8)
+    }
 
-/// Returns whether the given SGI (software generated interrupts) or
-/// PPI (private peripheral interrupts) will be forwarded by the redistributor
-pub fn is_sgippi_enabled(registers: &GicRegisters, int: InterruptNumber) -> Enabled {
-    registers.read_array_volatile::<32>(offset::SGIPPI_ISENABLER, int) > 0
-    &&
-    // part of group 1?
-    registers.read_array_volatile::<32>(offset::IGROUPR, int) == GROUP_1
-}
-
-/// Enables or disables the forwarding of a particular
-/// SGI (software generated interrupts) or PPI (private
-/// peripheral interrupts)
-pub fn enable_sgippi(registers: &mut GicRegisters, int: InterruptNumber, enabled: Enabled) {
-    let reg = match enabled {
-        true => offset::SGIPPI_ISENABLER,
-        false => offset::SGIPPI_ICENABLER,
-    };
-    registers.write_array_volatile::<32>(reg, int, 1);
-
-    // whether we're enabling or disabling,
-    // set as part of group 1
-    registers.write_array_volatile::<32>(offset::IGROUPR, int, GROUP_1);
-}
-
-/// Returns the priority of an SGI/PPI.
-pub fn get_sgippi_priority(registers: &GicRegisters, int: InterruptNumber) -> Priority {
-    u8::MAX - (registers.read_array_volatile::<4>(offset::SGIPPI_IPRIORITYR, int) as u8)
-}
-
-/// Sets the priority of an SGI/PPI.
-pub fn set_sgippi_priority(registers: &mut GicRegisters, int: InterruptNumber, prio: Priority) {
-    registers.write_array_volatile::<4>(offset::SGIPPI_IPRIORITYR, int, (u8::MAX - prio) as u32);
-}
-
-/// Returns the internal ID of the redistributor
-///
-/// Note: this is only provided for debugging purposes
-pub fn get_internal_id(registers: &GicRegisters) -> u16 {
-    (registers.read_volatile_64(offset::TYPER) >> 8) as _
+    /// Sets the priority of an SGI/PPI.
+    pub fn set_sgippi_priority(&mut self, int: InterruptNumber, prio: Priority) {
+        write_array_volatile::<4>(&mut self.priority, int, (u8::MAX - prio) as u32);
+    }
 }

@@ -140,7 +140,7 @@ pub fn init_ap() {
     set_vbar_el1();
 
     // Enable the CPU-local timer
-    let int_ctrl = LocalInterruptController;
+    let int_ctrl = LocalInterruptController::get();
     int_ctrl.init_secondary_cpu_interface();
     int_ctrl.set_minimum_priority(0);
 
@@ -160,7 +160,7 @@ pub fn init() -> Result<(), &'static str> {
 
     set_vbar_el1();
 
-    let int_ctrl = LocalInterruptController;
+    let int_ctrl = LocalInterruptController::get();
     int_ctrl.set_minimum_priority(0);
 
     Ok(())
@@ -178,7 +178,7 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 
     // Route the IRQ to this core (implicit as IRQ < 32) & Enable the interrupt.
     {
-        let int_ctrl = LocalInterruptController;
+        let int_ctrl = LocalInterruptController::get();
 
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
@@ -198,7 +198,7 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
     }
 
     {
-        let int_ctrl = LocalInterruptController;
+        let int_ctrl = LocalInterruptController::get();
 
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(local_num, true);
@@ -209,7 +209,7 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
 
 /// Enables the PL011 "RX" SPI and routes it to the current CPU.
 pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
-    let int_ctrl = SystemInterruptController;
+    let int_ctrl = SystemInterruptController::get();
     int_ctrl.set_destination(PL011_RX_SPI, current_cpu(), u8::MAX)
 }
 
@@ -295,14 +295,14 @@ pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) ->
 /// Broadcast an Inter-Processor Interrupt to all other
 /// cores in the system
 pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
-    let int_ctrl = LocalInterruptController;
+    let int_ctrl = LocalInterruptController::get();
     int_ctrl.send_ipi(irq_num, InterruptDestination::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: InterruptNumber) {
-    let int_ctrl = LocalInterruptController;
+    let int_ctrl = LocalInterruptController::get();
     int_ctrl.end_of_interrupt(irq_num);
 }
 
@@ -417,7 +417,7 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 #[no_mangle]
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
-        let int_ctrl = LocalInterruptController;
+        let int_ctrl = LocalInterruptController::get();
         int_ctrl.acknowledge_interrupt()
     };
 

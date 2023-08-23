@@ -20,6 +20,14 @@ pub struct GicV3InterruptControllerConfig {
 }
 
 #[derive(Debug, Copy, Clone)]
+pub struct PciEcamConfig {
+    pub base_address: PhysicalAddress,
+    pub size_bytes: usize,
+}
+
+/// This excludes GICv2 because there's no way to send IPIs
+/// with GICv2 via the current driver API.
+#[derive(Debug, Copy, Clone)]
 pub enum InterruptControllerConfig {
     GicV3(GicV3InterruptControllerConfig),
 }
@@ -46,6 +54,8 @@ pub struct BoardConfig {
     //
     // aarch64 manuals define the default timer IRQ number to be 30.
     pub cpu_local_timer_ppi: u8,
+
+    pub pci_ecam: PciEcamConfig,
 }
 
 // by default & on x86_64, the default.rs file is used

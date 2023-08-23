@@ -38,7 +38,7 @@ use static_array_rb_tree::*;
 
 
 /// Certain regions are pre-designated for special usage, specifically the kernel's initial identity mapping.
-/// They will be allocated from if an address within them is specifically requested;
+/// They will be allocated from if an address within them is specifically 
 /// otherwise, they will only be allocated from as a "last resort" if all other non-designated address ranges are exhausted.
 ///
 /// Any virtual addresses **less than or equal** to this address are considered "designated".
@@ -536,10 +536,15 @@ fn find_specific_chunk(
 /// If no range is specified, this function first attempts to find a suitable chunk
 /// that is **not** within the designated regions,
 /// and only allocates from the designated regions as a backup option.
+///
+/// If an alignment is specified (in terms of number of 4KiB pages), then the starting page
+/// in the allocated range must be aligned to that number of pages.
+/// If no specific alignment is needed, the default aligment of 1 page should be used.
 fn find_any_chunk(
 	list: &mut StaticArrayRBTree<Chunk>,
 	num_pages: usize,
 	within_range: Option<&PageRange>,
+	alignment_4k_pages: usize,
 ) -> Result<(AllocatedPages, DeferredAllocAction<'static>), AllocationError> {
 	let designated_low_end = DESIGNATED_PAGES_LOW_END.get()
 		.ok_or(AllocationError::NotInitialized)?;
@@ -555,7 +560,8 @@ fn find_any_chunk(
 				if let Some(chunk) = elem {
 					// Use max and min below to ensure that the range of pages we allocate from
 					// is within *both* the current chunk's bounds and the range's bounds.
-					let lowest_possible_start_page = *max(chunk.start(), range.start());
+					let lowest_possible_start_page = max(chunk.start(), range.start())
+						.align_up(alignment_4k_pages);
 					let highest_possible_end_page  = *min(chunk.end(), range.end());
 					if lowest_possible_start_page + num_pages <= highest_possible_end_page {
 						return adjust_chosen_chunk(
@@ -589,7 +595,8 @@ fn find_any_chunk(
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
 				// Use max and min below to ensure that the range of pages we allocate from
 				// is within *both* the current chunk's bounds and the range's bounds.
-				let lowest_possible_start_page = *max(chunk.start(), range.start());
+				let lowest_possible_start_page = max(chunk.start(), range.start())
+					.align_up(alignment_4k_pages);
 				let highest_possible_end_page  = *min(chunk.end(), range.end());
 				if lowest_possible_start_page + num_pages <= highest_possible_end_page {
 					return adjust_chosen_chunk(
@@ -621,8 +628,14 @@ fn find_any_chunk(
 		Inner::Array(ref mut arr) => {
 			for elem in arr.iter_mut() {
 				if let Some(chunk) = elem {
-					if num_pages <= chunk.size_in_pages() {
-						return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::Array(elem));
+					let lowest_possible_start_page = chunk.start().align_up(alignment_4k_pages);
+					if lowest_possible_start_page + num_pages <= *chunk.end() {
+						return adjust_chosen_chunk(
+							lowest_possible_start_page,
+							num_pages,
+							&chunk.clone(),
+							ValueRefMut::Array(elem),
+						);
 					}
 				}
 			}
@@ -644,8 +657,14 @@ fn find_any_chunk(
 			// The first iterates over the lower designated region, from higher addresses to lower, down to zero.
 			let mut cursor = tree.upper_bound_mut(Bound::Included(designated_low_end));
 			while let Some(chunk) = cursor.get().map(|w| w.deref()) {
-				if num_pages < chunk.size_in_pages() {
-					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
+				let lowest_possible_start_page = chunk.start().align_up(alignment_4k_pages);
+				if lowest_possible_start_page + num_pages <= *chunk.end() {
+					return adjust_chosen_chunk(
+						lowest_possible_start_page,
+						num_pages,
+						&chunk.clone(),
+						ValueRefMut::RBTree(cursor),
+					);
 				}
 				cursor.move_prev();
 			}
@@ -657,8 +676,14 @@ fn find_any_chunk(
 					// we already iterated over non-designated pages in the first match statement above, so we're out of memory. 
 					break; 
 				}
-				if num_pages < chunk.size_in_pages() {
-					return adjust_chosen_chunk(*chunk.start(), num_pages, &chunk.clone(), ValueRefMut::RBTree(cursor));
+				let lowest_possible_start_page = chunk.start().align_up(alignment_4k_pages);
+				if lowest_possible_start_page + num_pages <= *chunk.end() {
+					return adjust_chosen_chunk(
+						lowest_possible_start_page,
+						num_pages,
+						&chunk.clone(),
+						ValueRefMut::RBTree(cursor),
+					);
 				}
 				cursor.move_prev();
 			}
@@ -729,15 +754,23 @@ fn adjust_chosen_chunk(
 }
 
 
-/// Possible options when requested pages from the page allocator.
+/// Possible options when requesting pages from the page allocator.
 pub enum AllocationRequest<'r> {
-	/// The allocated pages can be located at any virtual address.
-	Any,
 	/// The allocated pages must start exactly at the given `VirtualAddress`.
 	AtVirtualAddress(VirtualAddress),
+	/// The allocated pages may be located at any virtual address,
+	/// but the starting page must be aligned to a multiple of `alignment_4k_pages`.
+	/// An alignment of `1` page is equivalent to specifying no alignment requirement.
+	///
+	/// Note: alignment is specified in number of 4KiB pages, not number of bytes.
+	AlignedTo { alignment_4k_pages: usize },
 	/// The allocated pages can be located anywhere within the given range.
 	WithinRange(&'r PageRange),
+	/// The allocated pages can be located at any virtual address
+	/// and have no special alignment requirements beyond a single page.
+	Any,
 }
+
 
 /// The core page allocation routine that allocates the given number of virtual pages,
 /// optionally at the requested starting `VirtualAddress`.
@@ -745,7 +778,7 @@ pub enum AllocationRequest<'r> {
 /// This simply reserves a range of virtual addresses, it does not allocate 
 /// actual physical memory frames nor do any memory mapping. 
 /// Thus, the returned `AllocatedPages` aren't directly usable until they are mapped to physical frames. 
-/// 
+///
 /// Allocation is based on a red-black tree and is thus `O(log(n))`.
 /// Fragmentation isn't cleaned up until we're out of address space, but that's not really a big deal.
 /// 
@@ -780,11 +813,14 @@ pub fn allocate_pages_deferred(
 		AllocationRequest::AtVirtualAddress(vaddr) => {
 			find_specific_chunk(&mut locked_list, Page::containing_address(vaddr), num_pages)
 		}
-		AllocationRequest::Any => {
-			find_any_chunk(&mut locked_list, num_pages, None)
+		AllocationRequest::AlignedTo { alignment_4k_pages } => {
+			find_any_chunk(&mut locked_list, num_pages, None, alignment_4k_pages)
 		}
 		AllocationRequest::WithinRange(range) => {
-			find_any_chunk(&mut locked_list, num_pages, Some(range))
+			find_any_chunk(&mut locked_list, num_pages, Some(range), 1)
+		}
+		AllocationRequest::Any => {
+			find_any_chunk(&mut locked_list, num_pages, None, 1)
 		}
 	};
 	res.map_err(From::from) // convert from AllocationError to &str
