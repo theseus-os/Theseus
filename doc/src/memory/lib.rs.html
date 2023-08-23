@@ -379,6 +379,10 @@
 <a href="#379" id="379">379</a>
 <a href="#380" id="380">380</a>
 <a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate implements the main memory management subsystem for Theseus.
 //!
 //! The primary type of interest is [`MappedPages`], which offers a robust
@@ -407,6 +411,8 @@
 <span class="kw">pub use </span>page_allocator::{
     AllocatedPages,
     AllocationRequest,
+    allocate_pages_deferred,
+    allocate_pages_by_bytes_deferred,
     allocate_pages,
     allocate_pages_at,
     allocate_pages_by_bytes,
@@ -418,6 +424,8 @@
 <span class="kw">pub use </span>frame_allocator::{
     AllocatedFrames,
     UnmappedFrames,
+    allocate_frames_deferred,
+    allocate_frames_by_bytes_deferred,
     allocate_frames,
     allocate_frames_at,
     allocate_frames_by_bytes,

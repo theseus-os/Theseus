@@ -541,6 +541,16 @@
 <a href="#541" id="541">541</a>
 <a href="#542" id="542">542</a>
 <a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate contains basic types used for memory management.
 //!
 //! The types of interest are divided into three categories:
@@ -550,6 +560,7 @@
 
 </span><span class="attr">#![no_std]
 #![feature(step_trait)]
+#![feature(int_roundings)]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
 
@@ -828,6 +839,15 @@
                 </span><span class="kw">pub const fn </span>containing_address(addr: <span class="macro-nonterminal">$address</span>) -&gt; <span class="macro-nonterminal">$TypeName </span>{
                     <span class="macro-nonterminal">$TypeName </span>{
                         number: addr.value() / PAGE_SIZE,
+                    }
+                }
+
+                <span class="attr">#[doc = <span class="string">&quot;Returns a new `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;` that is aligned up from this \
+                    `&quot; </span><span class="macro-nonterminal">$TypeName </span><span class="string">&quot;` to the nearest multiple of `alignment_4k_pages`.&quot;</span>]
+                #[doc(alias = <span class="string">&quot;next_multiple_of&quot;</span>)]
+                </span><span class="kw">pub const fn </span>align_up(<span class="kw-2">&amp;</span><span class="self">self</span>, alignment_4k_pages: usize) -&gt; <span class="macro-nonterminal">$TypeName </span>{
+                    <span class="macro-nonterminal">$TypeName </span>{
+                        number: <span class="self">self</span>.number.next_multiple_of(alignment_4k_pages)
                     }
                 }
             }
