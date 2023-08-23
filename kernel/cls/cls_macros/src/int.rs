@@ -73,7 +73,6 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
             let offset = #offset_expr;
             #[cfg(target_arch = "x86_64")]
             {
-                log::error!("offset: {offset:0x?}");
                 unsafe {
                     ::core::arch::asm!(
                         ::core::concat!("xadd ", #x64_width_modifier, "gs:[{offset}], {operand}"),

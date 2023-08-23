@@ -153,8 +153,8 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
 
-                let (value, overflow_occured) = gs.overflowing_add(offset);
-                assert!(overflow_occured, "overflow did not occur");
+                // If we were statically linked on x64, `offset` will be negative.
+                let (value, _) = gs.overflowing_add(offset);
 
                 value
             };
@@ -277,17 +277,6 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
 fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
     quote! {
         {
-            extern "C" {
-                static __THESEUS_CLS_SIZE: u8;
-                static __THESEUS_TLS_SIZE: u8;
-            }
-
-            // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
-            // SAFETY: We don't access the extern static.
-            let cls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_CLS_SIZE) } as u64;
-            // SAFETY: We don't access the extern static.
-            let tls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_TLS_SIZE) } as u64;
-
             // There are two ways in which a crate can be linked:
             // - Statically, meaning it is linked at compile-time by an external linker.
             // - Dynamically, meaning it is linked at runtime by `mod_mgmt`.
@@ -303,6 +292,17 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
 
             #[cfg(target_arch = "x86_64")]
             {
+                extern "C" {
+                    static __THESEUS_CLS_SIZE: u8;
+                    static __THESEUS_TLS_SIZE: u8;
+                }
+
+                // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+                // SAFETY: We don't access the extern static.
+                let cls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_CLS_SIZE) } as u64;
+                // SAFETY: We don't access the extern static.
+                let tls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_TLS_SIZE) } as u64;
+
                 // On x64, `mod_mgmt` will set `__THESEUS_CLS_SIZE` and `__THESEUS_TLS_SIZE` to
                 // `usize::MAX` so we can differentiate between static and dynamic linking.
 
@@ -387,33 +387,51 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                     // When running in loadable mode, `nano_core` will have a `.cls` section but no
                     // `.tls` section. In this case, `{cls}@TPOFF` is correctly given as the offset
                     // from the end of the `.cls` section.
-                    let cls_start_to_tls_start: u64 = if tls_size == 0 {
-                        0
+                    if tls_size == 0 {
+                        let offset: u64;
+                        unsafe {
+                            ::core::arch::asm!(
+                                "lea {offset}, [{cls}@TPOFF]",
+                                offset = out(reg) offset,
+                                cls = sym #name,
+                            )
+                        };
+                        offset
                     } else {
-                        // TODO: Use `next_multiple_of` when stabilised.
-                        let remainder = cls_size % 0x1000;
-                        if remainder == 0 {
-                            cls_size
-                        } else {
-                            cls_size + 0x1000 - remainder
-                        }
-                    };
+                        let cls_start_to_tls_start = {
+                            // TODO: Use `next_multiple_of` when stabilised.
+                            let remainder = cls_size % 0x1000;
+                            if remainder == 0 {
+                                cls_size
+                            } else {
+                                cls_size + 0x1000 - remainder
+                            }
+                        };
 
-                    unsafe {
-                        ::core::arch::asm!(
-                            "lea {from_cls_start}, [{cls}@TPOFF + {tls_size} + {cls_start_to_tls_start}]",
-                            from_cls_start = lateout(reg) from_cls_start,
-                            cls = sym #name,
-                            tls_size = in(reg) tls_size,
-                            cls_start_to_tls_start = in(reg) cls_start_to_tls_start,
-                        )
-                    };
-                    let offset = (cls_size - from_cls_start).wrapping_neg();
-                    offset
+                        unsafe {
+                            ::core::arch::asm!(
+                                "lea {from_cls_start}, [{cls}@TPOFF + {tls_size} + {cls_start_to_tls_start}]",
+                                from_cls_start = lateout(reg) from_cls_start,
+                                cls = sym #name,
+                                tls_size = in(reg) tls_size,
+                                cls_start_to_tls_start = in(reg) cls_start_to_tls_start,
+                            )
+                        };
+                        let offset = (cls_size - from_cls_start).wrapping_neg();
+                        offset
+                    }
                 }
             }
             #[cfg(target_arch = "aarch64")]
             {
+                extern "C" {
+                    static __THESEUS_TLS_SIZE: u8;
+                }
+
+                // TODO: Open an issue in rust repo? We aren't actually doing anything unsafe.
+                // SAFETY: We don't access the extern static.
+                let tls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_TLS_SIZE) } as u64;
+
                 // Unlike x64, AArch64 doesn't have different branches for statically linked, and
                 // dynamically linked variables. This is because on AArch64, there are no negative
                 // offset shenanigans; a TLS data image looks like
@@ -441,15 +459,15 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                 // `tls_size.next_multiple_of(0x1000)`, or 0 if there is not TLS section. So, when
                 // loading CLS symbols on AArch64, `mod_mgmt` simply sets `__THESEUS_TLS_SIZE` to 0.
 
-                let cls_start_to_tls_start: u64 = if tls_size == 0 {
+                let tls_start_to_cls_start: u64 = if tls_size == 0 {
                     0
                 } else {
                     // TODO: Use `next_multiple_of` when stabilised.
-                    let remainder = cls_size % 0x1000;
+                    let remainder = tls_size % 0x1000;
                     if remainder == 0 {
-                        cls_size
+                        tls_size
                     } else {
-                        cls_size + 0x1000 - remainder
+                        tls_size + 0x1000 - remainder
                     }
                 };
 
@@ -474,10 +492,10 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                     ::core::arch::asm!(
                         "add {offset}, {offset}, #:tprel_hi12:{cls}, lsl #12",
                         "add {offset}, {offset}, #:tprel_lo12_nc:{cls}",
-                        "sub {offset}, {offset}, {cls_start_to_tls_start}",
+                        "sub {offset}, {offset}, {tls_start_to_cls_start}",
                         offset = inout(reg) offset,
                         cls = sym #name,
-                        cls_start_to_tls_start = in(reg) cls_start_to_tls_start,
+                        tls_start_to_cls_start = in(reg) tls_start_to_cls_start,
                     )
                 };
                 offset

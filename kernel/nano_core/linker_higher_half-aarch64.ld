@@ -121,3 +121,7 @@ SECTIONS {
         *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
     }
 }
+
+/* This definition must be placed at the end of the file so that the .cls,
+.tdata, and .tbss sections are placed in the correct order. */
+__THESEUS_TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);

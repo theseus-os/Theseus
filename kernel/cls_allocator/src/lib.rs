@@ -53,14 +53,14 @@ pub fn reload_current_core() {
     let mut sections = CLS_SECTIONS.lock();
     for (cpu, image) in sections.iter_mut() {
         if *cpu == current_cpu {
-            // We disable preemption so that we can safely access `image` and `data` without
-            // it being changed under our noses.
-            let _guard = preemption::hold_preemption();
-
             log::info!("old image: {:0x?}", image);
             log::info!("new image: {:0x?}", data);
             data.inherit(image);
             log::info!("nww image: {:0x?}", data);
+            // We disable preemption so that we can safely access `image` and `data` without
+            // it being changed under our noses.
+            // let _guard = preemption::hold_preemption();
+
             // SAFETY: We only drop `data` after another image has been set as the current
             // CPU local storage.
             unsafe { data.set_as_current_cls() };
@@ -70,6 +70,7 @@ pub fn reload_current_core() {
         }
     }
     log::info!("three");
+    log::info!("new image: {:0x?}", data);
 
     // SAFETY: We only drop `data` after another image has been set as the current
     // CPU local storage.
