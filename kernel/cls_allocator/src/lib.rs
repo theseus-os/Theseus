@@ -43,23 +43,18 @@ pub fn add_dynamic_section(
 /// Generates a new data image for the current core and sets the CLS register
 /// accordingly.
 pub fn reload_current_core() {
-    log::info!("one");
     let current_cpu = cpu::current_cpu();
 
-    log::info!("twop");
     let mut data = CLS_INITIALIZER.lock().get_data();
 
-    log::info!("three");
     let mut sections = CLS_SECTIONS.lock();
     for (cpu, image) in sections.iter_mut() {
         if *cpu == current_cpu {
-            log::info!("old image: {:0x?}", image);
-            log::info!("new image: {:0x?}", data);
+            // We disable interrupts so that we can safely access `image` and `data` without
+            // them being changed under our nose.
+            let _guard = irq_safety::disable_interrupts();
+
             data.inherit(image);
-            log::info!("nww image: {:0x?}", data);
-            // We disable preemption so that we can safely access `image` and `data` without
-            // it being changed under our noses.
-            // let _guard = preemption::hold_preemption();
 
             // SAFETY: We only drop `data` after another image has been set as the current
             // CPU local storage.
@@ -69,8 +64,6 @@ pub fn reload_current_core() {
             return;
         }
     }
-    log::info!("three");
-    log::info!("new image: {:0x?}", data);
 
     // SAFETY: We only drop `data` after another image has been set as the current
     // CPU local storage.

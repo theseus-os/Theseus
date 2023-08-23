@@ -445,11 +445,45 @@ where
         }
     }
 
+    /// Inherits the data from another data image.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the other image has a longer length, or (on x64) if the other
+    /// image has a differently sized static area.
     pub fn inherit(&mut self, other: &Self) {
-        let other_len = other.data.len();
-        assert!(other_len <= self.data.len());
-        // FIXME: What if TLS symbols are not allocated sequentially?
-        self.data[..other_len].clone_from_slice(&other.data);
+        #[cfg(target_arch = "aarch64")]
+        {
+            let other_len = other.data.len();
+            assert!(other_len <= self.data.len());
+            self.data[..other_len].clone_from_slice(&other.data[..]);
+        }
+        #[cfg(target_arch = "x86_64")]
+        {
+            if !other.data.is_empty() {
+                // ```
+                //                ptr
+                //                 V
+                //        +--------+----------+---------+
+                // other: | static | self ptr | dynamic |
+                //        +--------+----------+---------+
+                //        +--------+----------+-------------+
+                //  self: | static | self ptr |   dynamic   |
+                //        +--------+----------+-------------+
+                //                 ^
+                //                ptr
+                // ```
+                let self_static_len = self.ptr as usize - self.data.as_ptr() as usize;
+                let other_static_len = other.ptr as usize - other.data.as_ptr() as usize;
+
+                assert_eq!(self_static_len, other_static_len);
+                assert!(other.data.len() <= self.data.len());
+
+                self.data[..self_static_len].clone_from_slice(&other.data[..self_static_len]);
+                self.data[(self_static_len + TLS_SELF_POINTER_SIZE)..other.data.len()]
+                    .clone_from_slice(&other.data[(self_static_len + TLS_SELF_POINTER_SIZE)..]);
+            }
+        }
     }
 }
 

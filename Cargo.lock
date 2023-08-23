@@ -491,8 +491,7 @@ version = "0.1.0"
 dependencies = [
  "cpu",
  "crate_metadata",
- "log",
- "preemption",
+ "irq_safety",
  "sync_spin",
  "tls_initializer",
 ]
