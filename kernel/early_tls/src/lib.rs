@@ -5,7 +5,7 @@
 
 #![no_std]
 
-use tls_initializer::TlsDataImage;
+use local_storage_initializer::TlsDataImage;
 use spin::Mutex;
 
 static EARLY_TLS_IMAGE: Mutex<TlsDataImage> = Mutex::new(TlsDataImage::new());

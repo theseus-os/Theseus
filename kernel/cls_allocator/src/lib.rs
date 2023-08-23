@@ -6,8 +6,8 @@ use alloc::{sync::Arc, vec::Vec};
 
 use cpu::CpuId;
 use crate_metadata::{LoadedSection, StrongSectionRef};
+use local_storage_initializer::{ClsDataImage, ClsInitializer, LocalStorageInitializerError};
 use sync_spin::SpinMutex;
-use tls_initializer::{ClsDataImage, ClsInitializer, LocalStorageInitializerError};
 
 static CLS_INITIALIZER: SpinMutex<ClsInitializer> = SpinMutex::new(ClsInitializer::new());
 static CLS_SECTIONS: SpinMutex<Vec<(CpuId, ClsDataImage)>> = SpinMutex::new(Vec::new());

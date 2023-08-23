@@ -608,7 +608,7 @@ mod scheduler {
         // If preemption was not previously enabled (before we disabled it above),
         // then we shouldn't perform a task switch here.
         if !preemption_guard.preemption_was_enabled() {
-            // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", current_cpu());
+            log::trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
             return false;
         }
 

@@ -25,7 +25,7 @@ use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
 
-pub use tls_initializer::{TlsInitializer, TlsDataImage};
+pub use local_storage_initializer::{TlsInitializer, TlsDataImage};
 pub use crate_name_utils::*;
 pub use crate_metadata::*;
 
@@ -1524,7 +1524,6 @@ impl CrateNamespace {
 
             // Handle a "TLS" symbol, which exists in .tdata or .tbss
             else if is_tls {
-                log::error!("TLS");
                 let sym_shndx = symbol_entry.shndx() as Shndx;
                 // A TLS symbol with an shndx of 0 is a reference to a foreign dependency,
                 // so we skip it just like we do for `NoType` symbols at the top of this loop.

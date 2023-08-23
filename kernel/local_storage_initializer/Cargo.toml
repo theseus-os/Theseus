@@ -1,7 +1,7 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "tls_initializer"
-description = "Generates data images for Thread-Local Storage (TLS) areas"
+name = "local_storage_initializer"
+description = "Generates data images for TLS and CLS areas"
 version = "0.1.0"
 edition = "2021"
 

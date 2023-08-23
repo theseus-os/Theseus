@@ -654,11 +654,15 @@ fn window_manager_loop(
             .or_else(||mouse_consumer.pop())
             .or_else(||{
                 scheduler::schedule();
+                // log::info!("no-event: {}", Arc::strong_count(&key_consumer.state));
                 None
             });
 
+        // log::info!("CHECKING");
+
         if let Some(event) = event_opt {
             // Currently, the window manager only cares about keyboard or mouse events
+            log::error!("event");
             match event {
                 Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;

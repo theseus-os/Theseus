@@ -492,8 +492,8 @@ dependencies = [
  "cpu",
  "crate_metadata",
  "irq_safety",
+ "local_storage_initializer",
  "sync_spin",
- "tls_initializer",
 ]
 
 [[package]]
@@ -1029,8 +1029,8 @@ dependencies = [
 name = "early_tls"
 version = "0.1.0"
 dependencies = [
+ "local_storage_initializer",
  "spin 0.9.4",
- "tls_initializer",
 ]
 
 [[package]]
@@ -1850,6 +1850,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "local_storage_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "log",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.4",
+ "tock-registers",
+ "x86_64",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2138,6 +2152,7 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
+ "local_storage_initializer",
  "log",
  "lz4_flex",
  "memfs",
@@ -2149,7 +2164,6 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "tls_initializer",
  "vfs_node",
  "xmas-elf",
 ]
@@ -3337,6 +3351,7 @@ dependencies = [
  "libterm",
  "log",
  "path",
+ "preemption",
  "root",
  "runqueue",
  "scheduler",
@@ -4114,20 +4129,6 @@ dependencies = [
  "memory_aarch64",
  "memory_x86_64",
  "sync_irq",
-]
-
-[[package]]
-name = "tls_initializer"
-version = "0.1.0"
-dependencies = [
- "cortex-a",
- "crate_metadata",
- "log",
- "memory_structs",
- "rangemap",
- "spin 0.9.4",
- "tock-registers",
- "x86_64",
 ]
 
 [[package]]
