@@ -70,6 +70,8 @@
 <a href="#70" id="70">70</a>
 <a href="#71" id="71">71</a>
 <a href="#72" id="72">72</a>
+<a href="#73" id="73">73</a>
+<a href="#74" id="74">74</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Configuration and definitions for specific boards on aarch64 systems.
 //!
 //! | Board Name | Num CPUs  | Interrupt Controller | Secondary CPU Startup Method |
@@ -97,7 +99,9 @@
     <span class="kw">pub </span>size_bytes: usize,
 }
 
-<span class="attr">#[derive(Debug, Copy, Clone)]
+<span class="doccomment">/// This excludes GICv2 because there&#39;s no way to send IPIs
+/// with GICv2 via the current driver API.
+</span><span class="attr">#[derive(Debug, Copy, Clone)]
 </span><span class="kw">pub enum </span>InterruptControllerConfig {
     GicV3(GicV3InterruptControllerConfig),
 }

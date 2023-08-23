@@ -92,8 +92,14 @@
 <a href="#92" id="92">92</a>
 <a href="#93" id="93">93</a>
 <a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![allow(unused_variables, unused_mut)]
+#![feature(array_try_from_fn)]
 
 </span><span class="kw">extern crate </span>alloc;
 
@@ -132,6 +138,8 @@
 }
 
 <span class="kw">pub trait </span>SystemInterruptControllerApi {
+    <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self</span>;
+
     <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerId;
     <span class="kw">fn </span>version(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerVersion;
 
@@ -149,6 +157,8 @@
 }
 
 <span class="kw">pub trait </span>LocalInterruptControllerApi {
+    <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self</span>;
+
     <span class="doccomment">/// Aarch64-specific way to initialize the secondary CPU interfaces.
     ///
     /// Must be called once from every secondary CPU.
