@@ -1,7 +1,17 @@
 //! Tool to prepare an ELF file with CLS sections.
 //!
-//! This involves replacing the `.cls` section's TLS flag with the CLS flag, and
-//! updating all CLS symbols to have the CLS type.
+//! This involves replacing the `.cls` section's TLS flag with the CLS flag,
+//! updating all CLS symbols to have the CLS type, and updating various symbol
+//! values.
+//!
+//! Can be invoked on a single file
+//! ```
+//! elf_cls <arch> --file <path>
+//! ```
+//! or a directory of object files
+//! ```
+//! elf_cls <arch> --dir <path>
+//! ```
 #![feature(int_roundings)]
 
 use std::{
@@ -45,6 +55,7 @@ const _: () = assert!(CLS_SYMBOL_TYPE <= STT_HIOS);
 
 fn main() {
     let object_file_extension = OsStr::new("o");
+
     let mut args = env::args();
     args.next().unwrap();
     let is_x64 = match &args.next().unwrap()[..] {
@@ -67,20 +78,14 @@ fn main() {
                 }
             }
         }
-        e => panic!("{e}"),
+        option => panic!("invalid option: {option}"),
     }
 }
 
 fn sections(header: &Header, file: &mut File) -> Vec<SectionHeader> {
-    let le = match header.e_ident[EI_DATA] {
-        1 => Endian::Little,
-        2 => Endian::Big,
-        _ => panic!(),
-    };
-
     let context = Ctx {
         container: Container::Big,
-        le,
+        le: Endian::Little,
     };
 
     // `SectionHeader::parse` will instantly return if the offset is 0, so we trick
@@ -107,15 +112,14 @@ where
         if let Some((cls_section_index, cls_section_size, tls_section_size)) =
             update_cls_section(&header, &sections, &mut file)
         {
-            println!(
-                "detected .cls section in {}",
-                PathBuf::from(file_path)
-                    .file_name()
-                    .unwrap()
-                    .to_string_lossy(),
-            );
+            // println!(
+            //     "detected .cls section in {}",
+            //     PathBuf::from(file_path)
+            //         .file_name()
+            //         .unwrap()
+            //         .to_string_lossy(),
+            // );
             update_cls_symbols(
-                &header,
                 cls_section_index,
                 cls_section_size,
                 tls_section_size,
@@ -127,7 +131,8 @@ where
     }
 }
 
-/// Update the CLS section flag returning the section index and size.
+/// Update the CLS section flag returning the CLS section index, CLS section
+/// size, and TLS section size.
 fn update_cls_section(
     header: &Header,
     sections: &[SectionHeader],
@@ -167,8 +172,7 @@ fn update_cls_section(
             // Overwrite the old flags.
             let flag_position = header.e_shoff + i as u64 * header.e_shentsize as u64 + 8;
             file.seek(SeekFrom::Start(flag_position)).unwrap();
-            file.write_all(&flags.to_le_bytes())
-                .expect("failed to write .cls section type to file");
+            file.write_all(&flags.to_le_bytes()).unwrap();
 
             cls_info = Some((i, section.sh_size));
         } else {
@@ -183,7 +187,6 @@ fn update_cls_section(
 }
 
 fn update_cls_symbols(
-    header: &Header,
     cls_section_index: usize,
     cls_size: u64,
     tls_size: u64,
@@ -208,15 +211,9 @@ fn update_cls_symbols(
     file.seek(SeekFrom::Start(symbol_table_offset)).unwrap();
     file.read_exact(&mut symbol_table_bytes).unwrap();
 
-    let le = match header.e_ident[EI_DATA] {
-        1 => Endian::Little,
-        2 => Endian::Big,
-        _ => panic!(),
-    };
-
     let context = Ctx {
         container: Container::Big,
-        le,
+        le: Endian::Little,
     };
 
     let symbol_table =
@@ -258,12 +255,9 @@ fn update_cls_symbols(
                     let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
                     file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
                     file.write_all(&new_value.to_le_bytes()).unwrap();
-                    println!(
-                        "overwrote symbol value for {} from {:0x?} to {:0x?}",
-                        i, symbol.st_value, new_value
-                    );
+                    // println!("overwrote CLS symbol value and flag");
                 } else {
-                    println!("overwrote symbol flag");
+                    // println!("overwrote CLS symbol flag");
                 }
             // On x64, the TLS symbols have the wrong value. The linker thinks
             // the data image looks like
@@ -282,10 +276,7 @@ fn update_cls_symbols(
                 let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
                 file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
                 file.write_all(&new_value.to_le_bytes()).unwrap();
-                println!(
-                    "overwrote symbol value for {} from {:0x?} to {:0x?}",
-                    i, symbol.st_value, new_value
-                );
+                // println!("overwrote TLS symbol value");
             }
         }
     }
