@@ -375,7 +375,6 @@ extern "x86-interrupt" fn stack_segment_fault_handler(stack_frame: InterruptStac
 
 /// exception 0x0D
 extern "x86-interrupt" fn general_protection_fault_handler(stack_frame: InterruptStackFrame, error_code: u64) {
-    // loop {}
     println_both!("\nEXCEPTION: GENERAL PROTECTION FAULT\n{:#X?}\nError code: {:#b}", stack_frame, error_code);
     kill_and_halt(0xD, &stack_frame, Some(error_code.into()), true)
 }
