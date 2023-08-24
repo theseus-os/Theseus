@@ -136,7 +136,6 @@ fn into_loaded_section(
     );
 
     if serialized_section.ty.is_tls() {
-        log::info!("adding tls");
         namespace.tls_initializer.lock().add_existing_static_section(
             loaded_section,
             // TLS sections encode their TLS offset in the virtual address field,
@@ -144,8 +143,8 @@ fn into_loaded_section(
             serialized_section.virtual_address,
             total_tls_size,
         ).map_err(|_| "BUG: failed to add deserialized static TLS section to the TLS area")
-    } else if serialized_section.ty == SectionType::Cls && serialized_section.name != "_TLS_MODULE_BASE_" {
-        log::info!("adding cls");
+        // On AArch64, the linker includes a _TLS_MODULE_BASE_ zero sized symbol that we don't want to add.
+    } else if serialized_section.ty == SectionType::Cls && serialized_section.size > 0 {
         cls_allocator::add_static_section(loaded_section, serialized_section.virtual_address, total_cls_size).map_err(|e| panic!("{:?}", e))
     } else {
         Ok(Arc::new(loaded_section))
