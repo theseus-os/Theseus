@@ -72,7 +72,6 @@ pub fn reload_current_core() {
 }
 
 pub fn reload() {
-    let _initializer = CLS_INITIALIZER.lock();
     todo!("cls_allocator::reload");
     // FIXME: Reload CLS register on all cores.
 }
