@@ -3078,10 +3078,6 @@
 <a href="#3078" id="3078">3078</a>
 <a href="#3079" id="3079">3079</a>
 <a href="#3080" id="3080">3080</a>
-<a href="#3081" id="3081">3081</a>
-<a href="#3082" id="3082">3082</a>
-<a href="#3083" id="3083">3083</a>
-<a href="#3084" id="3084">3084</a>
 </pre></div><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(int_roundings)]
@@ -3092,8 +3088,8 @@
 
 <span class="kw">use </span>core::{fmt, ops::{Deref, Range}};
 <span class="kw">use </span>alloc::{
-    collections::{BTreeMap, btree_map, BTreeSet}, 
-    string::{String, ToString}, 
+    collections::{BTreeMap, btree_map, BTreeSet},
+    string::{String, ToString},
     sync::{Arc, Weak}, vec::Vec
 };
 <span class="kw">use </span>spin::{Mutex, Once};
@@ -3143,15 +3139,15 @@
 <span class="doccomment">/// The thread-local storage (TLS) area &quot;image&quot; that is used as the initial data for each `Task`.
 /// When spawning a new task, the new task will create its own local TLS area
 /// with this `TlsInitializer` as the initial data values.
-/// 
+///
 /// # Implementation Notes/Shortcomings
 /// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.
 /// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.
-/// 
+///
 /// However, this is quite complex because each namespace must be aware of the TLS sections
 /// in BOTH its underlying recursive namespace AND its (multiple) &quot;parent&quot; namespace(s)
 /// that recursively depend on it, since no two TLS sections can conflict (have the same offset).
-/// 
+///
 /// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
 /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
 </span><span class="kw">static </span>TLS_INITIALIZER: Mutex&lt;TlsInitializer&gt; = Mutex::new(TlsInitializer::empty());
@@ -3160,10 +3156,10 @@
 <span class="doccomment">/// Create a new application `CrateNamespace` that uses the default application directory 
 /// and is structured atop the given `recursive_namespace`. 
 /// If no `recursive_namespace` is provided, the default initial kernel namespace will be used. 
-/// 
+///
 /// # Return
 /// The returned `CrateNamespace` will itself be empty, having no crates and no symbols in its map.
-/// 
+///
 </span><span class="kw">pub fn </span>create_application_namespace(recursive_namespace: <span class="prelude-ty">Option</span>&lt;Arc&lt;CrateNamespace&gt;&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Arc&lt;CrateNamespace&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     <span class="comment">// (1) use the initial kernel CrateNamespace as the new app namespace&#39;s recursive namespace if none was provided.
     </span><span class="kw">let </span>recursive_namespace = recursive_namespace
@@ -3203,10 +3199,10 @@
 /// and placing them into namespace-specific directories according to their name prefix, e.g., &quot;k#&quot;, &quot;ksse#&quot;.
 /// This function does not create any namespaces, it just populates the files and directories
 /// such that namespaces can be created based on those files.
-/// 
+///
 /// If a file does not have an expected crate prefix according to [`CrateType::from_module_name()`],
 /// then it is treated as part of &quot;extra_files&quot;; see [`parse_extra_file()`] for more.
-/// 
+///
 /// Returns a tuple of: 
 /// * the top-level root &quot;namespaces&quot; directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
@@ -3316,14 +3312,14 @@
 }
 
 <span class="doccomment">/// Adds the given extra file to the directory of extra files
-/// 
+///
 /// See the top-level Makefile target &quot;extra_files&quot; for an explanation of how these work.
 /// Basically, they are arbitrary files that are included by the bootloader as modules
 /// (files that exist as areas of pre-loaded memory).
-/// 
+///
 /// Their file paths are encoded by flattening directory hierarchies into a the file name,
 /// using `&#39;!&#39;` (exclamation marks) to replace the directory delimiter `&#39;/&#39;`.
-/// 
+///
 /// Thus, for example, a file named `&quot;foo!bar!me!test.txt&quot;` will be placed at the path
 /// `/extra_files/foo/bar/me/test.txt`.
 </span><span class="kw">fn </span>parse_extra_file(
@@ -3332,9 +3328,8 @@
     extra_file_mp: MappedPages,
     extra_files_dir: DirRef
 ) -&gt; <span class="prelude-ty">Result</span>&lt;FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-
     <span class="kw">let </span><span class="kw-2">mut </span>file_name = extra_file_name;
-    
+
     <span class="kw">let </span><span class="kw-2">mut </span>parent_dir = extra_files_dir;
     <span class="kw">let </span><span class="kw-2">mut </span>iter = extra_file_name.split(EXTRA_FILES_DIRECTORY_DELIMITER).peekable();
     <span class="kw">while let </span><span class="prelude-val">Some</span>(path_component) = iter.next() {
@@ -3362,7 +3357,7 @@
 
 
 
-<span class="doccomment">/// A &quot;symbol map&quot; from a fully-qualified demangled symbol String  
+<span class="doccomment">/// A &quot;symbol map&quot; from a fully-qualified demangled symbol String
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
 </span><span class="kw">pub type </span>SymbolMap = Trie&lt;StrRef, WeakSectionRef&gt;;
@@ -3370,9 +3365,9 @@
 
 <span class="doccomment">/// A wrapper around a `Directory` reference that offers special convenience functions
 /// for getting and inserting crate object files into a directory.  
-/// 
+///
 /// Auto-derefs into a `DirRef`.
-</span><span class="attr">#[derive(Clone)] 
+</span><span class="attr">#[derive(Clone)]
 </span><span class="kw">pub struct </span>NamespaceDir(DirRef);
 
 <span class="kw">impl </span>Deref <span class="kw">for </span>NamespaceDir {
@@ -3396,10 +3391,10 @@
     <span class="doccomment">/// Creates a new `NamespaceDir` that wraps the given `DirRef`.
     </span><span class="kw">pub fn </span>new(dir: DirRef) -&gt; NamespaceDir {
         NamespaceDir(dir)
-    }    
+    }
 
     <span class="doccomment">/// Finds the single file in this directory whose name starts with the given `prefix`.
-    /// 
+    ///
     /// # Return
     /// If a single file matches, then that file is returned. 
     /// Otherwise, if no files or multiple files match, then `None` is returned.
@@ -3431,11 +3426,11 @@
     }
 
     <span class="doccomment">/// Gets the given object file based on its crate name prefix. 
-    /// 
+    ///
     /// # Arguments
     /// * `crate_object_file_name`: the name of the object file to be returned, 
     ///    with or without a preceding `CrateType` prefix.
-    /// 
+    ///
     /// # Examples 
     /// * The name &quot;k#keyboard-36be916209949cef.o&quot; will look for and return the file &quot;keyboard-36be916209949cef.o&quot;.
     /// * The name &quot;keyboard-36be916209949cef.o&quot; will look for and return the file &quot;keyboard-36be916209949cef.o&quot;.
@@ -3446,12 +3441,12 @@
     }
 
     <span class="doccomment">/// Insert the given crate object file based on its crate type prefix. 
-    /// 
+    ///
     /// # Arguments
     /// * `crate_object_file_name`: the name of the object file to be inserted, 
     ///    with a preceding `CrateType` prefix.
     /// * `content`: the bytes that will be written into the file.
-    /// 
+    ///
     /// # Examples 
     /// * The file &quot;k#keyboard-36be916209949cef.o&quot; will be written to &quot;./keyboard-36be916209949cef.o&quot;. 
     /// * The file &quot;a#ps.o&quot; will be placed into &quot;./ps.o&quot;. 
@@ -3465,7 +3460,7 @@
 
 
 <span class="doccomment">/// A type that can be converted into a crate object file.
-/// 
+///
 /// We use an enum rather than implement `TryInto` because we need additional information
 /// to resolve a `Prefix`, namely the `CrateNamespace` in which to search for the prefix.
 </span><span class="kw">pub enum </span>IntoCrateObjectFile {
@@ -3494,9 +3489,9 @@
 
 
 <span class="doccomment">/// An application crate that has been loaded into a `CrateNamespace`.
-/// 
+///
 /// This type auto-derefs into the application&#39;s `StrongCrateRef`.
-/// 
+///
 /// When dropped, the application crate will be removed 
 /// from the `CrateNamespace` into which it was originally loaded.
 </span><span class="kw">pub struct </span>AppCrateRef {
@@ -3539,11 +3534,11 @@
 /// that have all been loaded and linked against each other, 
 /// completely separate and in isolation from any other crate namespace 
 /// (although a given crate may be shared across multiple namespaces).
-/// 
+///
 /// Each `CrateNamespace` can be treated as a separate OS personality, 
 /// but are significantly more efficient than library OS-style personalities. 
 /// A `CrateNamespace` is also useful to create a process (task group) abstraction.
-/// 
+///
 /// `CrateNamespace`s can also optionally be recursive. 
 /// For example, a namespace that holds just application crates and symbols 
 /// can recursively rely upon (link against) the crates and symbols in a lower-level namespace
@@ -3583,7 +3578,7 @@
     /// that is spawned and runs within this `CrateNamespace`.
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
-    /// 
+    ///
     /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
     </span>tls_initializer: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mutex&lt;TlsInitializer&gt;,
 
@@ -3593,7 +3588,7 @@
     /// Fuzzy matching should only be successful if there is just a single matching symbol; 
     /// if there are multiple matches (e.g., `my_crate::foo::h456` and `my_crate::foo::h789` both exist),
     /// then the dependency should fail to be resolved.
-    /// 
+    ///
     /// This is a potentially dangerous setting because it overrides the compiler-chosen dependency links.
     /// Thus, it is false by default, and should only be enabled with expert knowledge, 
     /// ideally only temporarily in order to manually load a given crate.
@@ -3617,7 +3612,7 @@
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: <span class="bool-val">false</span>,
         }
-    } 
+    }
 
     <span class="doccomment">/// Returns the name of this `CrateNamespace`, which is just used for debugging purposes. 
     </span><span class="kw">pub fn </span>name(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>str {
@@ -3677,7 +3672,7 @@
 
     <span class="doccomment">/// Iterates over all crates in this namespace and calls the given function `f` on each crate.
     /// If `recursive` is true, crates in recursive namespaces are included in the iteration as well.
-    /// 
+    ///
     /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate.
     /// The function `f` must return a boolean value that indicates whether to continue iterating; 
     /// if `true`, the iteration will continue, if `false`, the iteration will stop. 
@@ -3703,7 +3698,7 @@
     <span class="doccomment">/// Acquires the lock on this `CrateNamespace`&#39;s crate list and returns the crate 
     /// that matches the given `crate_name`, if it exists in this namespace.
     /// If it does not exist in this namespace, then the recursive namespace is searched as well.
-    /// 
+    ///
     /// # Important note about Return value
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
@@ -3722,7 +3717,7 @@
     /// This function is similar to the [`get_crate`](#method.get_crate) method,
     /// but it also returns the `CrateNamespace` in which the crate was found.
     /// It is an associated function rather than a method so it can operate on `Arc&lt;CrateNamespace&gt;`s.
-    /// 
+    ///
     /// # Important note about Return value
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
@@ -3738,18 +3733,18 @@
     }
 
     <span class="doccomment">/// Finds the `LoadedCrate`s whose names start with the given `crate_name_prefix`.
-    /// 
+    ///
     /// # Return
     /// Returns a list of matching crates, in the form of a tuple containing the crate&#39;s name, 
     /// a shallow-cloned reference to the crate, and a reference to the namespace in which the matching crate was found.
     /// If you want to add the returned crate to another namespace, 
     /// you MUST fully `clone()` the returned crate reference in order to mark that crate as shared across namespaces. 
-    /// 
+    ///
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with &quot;`-`&quot;.
     /// This may provide results more in line with the caller&#39;s expectations; see the last example below about a trailing &quot;`-`&quot;. 
     /// This works because the delimiter between a crate name and its trailing hash value is &quot;`-`&quot;.
-    /// 
+    ///
     /// # Example
     /// * This `CrateNamespace` contains the crates `my_crate-843a613894da0c24` and 
     ///   `my_crate_new-933a635894ce0f12`. 
@@ -3757,7 +3752,7 @@
     </span><span class="kw">pub fn </span>get_crates_starting_with&lt;<span class="lifetime">&#39;n</span>&gt;(
         namespace: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;,
         crate_name_prefix: <span class="kw-2">&amp;</span>str
-    ) -&gt; Vec&lt;(StrRef, StrongCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; { 
+    ) -&gt; Vec&lt;(StrRef, StrongCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; {
         <span class="comment">// First, we make a list of matching crates in this namespace. 
         </span><span class="kw">let </span>crates = namespace.crate_tree.lock();
         <span class="kw">let </span><span class="kw-2">mut </span>crates_in_this_namespace = crates.iter_prefix(crate_name_prefix.as_bytes())
@@ -3771,24 +3766,24 @@
 
         <span class="comment">// Third, we combine the lists into one list that spans all namespaces.
         </span>crates_in_this_namespace.append(<span class="kw-2">&amp;mut </span>crates_in_recursive_namespace);
-        crates_in_this_namespace        
+        crates_in_this_namespace
     }
 
     <span class="doccomment">/// Finds the `LoadedCrate` whose name starts with the given `crate_name_prefix`,
     /// *if and only if* there is a single matching crate in this namespace or any of its recursive namespaces.
     /// This is a convenience wrapper around the [`get_crates_starting_with()`](#method.get_crates_starting_with) method. 
-    /// 
+    ///
     /// # Return
     /// Returns a tuple containing the crate&#39;s name, a shallow-cloned reference to the crate, 
     /// and a reference to the namespace in which the matching crate was found.
     /// If you want to add the returned crate to another namespace, 
     /// you MUST fully `clone()` the returned crate reference in order to mark that crate as shared across namespaces. 
-    /// 
+    ///
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with &quot;`-`&quot;.
     /// This may provide results more in line with the caller&#39;s expectations; see the last example below about a trailing &quot;`-`&quot;. 
     /// This works because the delimiter between a crate name and its trailing hash value is &quot;`-`&quot;.
-    /// 
+    ///
     /// # Example
     /// * This `CrateNamespace` contains the crates `my_crate-843a613894da0c24` and 
     ///   `my_crate_new-933a635894ce0f12`. 
@@ -3798,20 +3793,20 @@
     </span><span class="kw">pub fn </span>get_crate_starting_with&lt;<span class="lifetime">&#39;n</span>&gt;(
         namespace: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;,
         crate_name_prefix: <span class="kw-2">&amp;</span>str
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(StrRef, StrongCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; { 
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(StrRef, StrongCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>crates_iter = <span class="self">Self</span>::get_crates_starting_with(namespace, crate_name_prefix).into_iter();
         crates_iter.next().filter(|<span class="kw">_</span>| crates_iter.next().is_none()) <span class="comment">// ensure single element
     </span>}
 
     <span class="doccomment">/// Like [`get_crates_starting_with()`](#method.get_crates_starting_with),
     /// but for crate *object file*s instead of loaded crates. 
-    /// 
+    ///
     /// Returns a list of matching object files and the namespace in which they were found,
     /// inclusive of recursive namespaces.
     </span><span class="kw">pub fn </span>get_crate_object_files_starting_with&lt;<span class="lifetime">&#39;n</span>&gt;(
         namespace: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;,
         file_name_prefix: <span class="kw-2">&amp;</span>str
-    ) -&gt; Vec&lt;(FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; { 
+    ) -&gt; Vec&lt;(FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; {
         <span class="comment">// First, we make a list of matching files in this namespace. 
         </span><span class="kw">let </span><span class="kw-2">mut </span>files = namespace.dir
             .get_files_starting_with(file_name_prefix)
@@ -3826,18 +3821,18 @@
 
         <span class="comment">// Third, we combine the lists into one list that spans all namespaces.
         </span>files.append(<span class="kw-2">&amp;mut </span>files_in_recursive_namespace);
-        files        
+        files
     }
 
     <span class="doccomment">/// Like [`get_crate_starting_with()`](#method.get_crate_starting_with),
     /// but for crate *object file*s instead of loaded crates. 
-    /// 
+    ///
     /// Returns the matching object file and the namespace in which it was found,
     /// if and only if there was a single match (inclusive of recursive namespaces).
     </span><span class="kw">pub fn </span>get_crate_object_file_starting_with&lt;<span class="lifetime">&#39;n</span>&gt;(
         namespace: <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;,
         file_name_prefix: <span class="kw-2">&amp;</span>str
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; { 
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(FileRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;n </span>Arc&lt;CrateNamespace&gt;)&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>files_iter = <span class="self">Self</span>::get_crate_object_files_starting_with(namespace, file_name_prefix).into_iter();
         files_iter.next().filter(|<span class="kw">_</span>| files_iter.next().is_none()) <span class="comment">// ensure single element
     </span>}
@@ -3846,13 +3841,13 @@
     <span class="doccomment">/// Same as `get_crate_object_files_starting_with()`,
     /// but is a method instead of an associated function,
     /// and also returns `&amp;CrateNamespace` instead of `&amp;Arc&lt;CrateNamespace&gt;`.
-    /// 
+    ///
     /// This is only necessary because I can&#39;t figure out how to make a generic function
     /// that accepts and returns either `&amp;CrateNamespace` or `&amp;Arc&lt;CrateNamespace&gt;`.
     </span><span class="kw">pub fn </span>method_get_crate_object_files_starting_with(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         file_name_prefix: <span class="kw-2">&amp;</span>str
-    ) -&gt; Vec&lt;(FileRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; { 
+    ) -&gt; Vec&lt;(FileRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; {
         <span class="comment">// First, we make a list of matching files in this namespace. 
         </span><span class="kw">let </span><span class="kw-2">mut </span>files = <span class="self">self</span>.dir
             .get_files_starting_with(file_name_prefix)
@@ -3867,37 +3862,37 @@
 
         <span class="comment">// Third, we combine the lists into one list that spans all namespaces.
         </span>files.append(<span class="kw-2">&amp;mut </span>files_in_recursive_namespace);
-        files        
+        files
     }
 
     <span class="doccomment">/// Same as `get_crate_object_file_starting_with()`,
     /// but is a method instead of an associated function,
     /// and also returns `&amp;CrateNamespace` instead of `&amp;Arc&lt;CrateNamespace&gt;`.
-    /// 
+    ///
     /// This is only necessary because I can&#39;t figure out how to make a generic function
     /// that accepts and returns either `&amp;CrateNamespace` or `&amp;Arc&lt;CrateNamespace&gt;`.
     </span><span class="kw">pub fn </span>method_get_crate_object_file_starting_with(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         file_name_prefix: <span class="kw-2">&amp;</span>str
-    ) -&gt; <span class="prelude-ty">Option</span>&lt;(FileRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; { 
+    ) -&gt; <span class="prelude-ty">Option</span>&lt;(FileRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>files_iter = <span class="self">self</span>.method_get_crate_object_files_starting_with(file_name_prefix).into_iter();
         files_iter.next().filter(|<span class="kw">_</span>| files_iter.next().is_none()) <span class="comment">// ensure single element
     </span>}
 
     <span class="doccomment">/// Loads the specified application crate into this `CrateNamespace`, allowing it to be run.
-    /// 
+    ///
     /// The new application crate&#39;s public symbols are added to this `CrateNamespace`&#39;s symbol map,
     /// allowing other crates in this namespace to depend upon it.
-    /// 
+    ///
     /// Application crates are added to the CrateNamespace just like kernel crates,
     /// so to load an application crate multiple times to spawn multiple instances of it,
     /// you can create a new top-level namespace to hold that application crate.
-    /// 
+    ///
     /// Returns a Result containing the newly-loaded application crate itself.
     </span><span class="kw">pub fn </span>load_crate_as_application(
         namespace: <span class="kw-2">&amp;</span>Arc&lt;CrateNamespace&gt;,
-        crate_object_file: <span class="kw-2">&amp;</span>FileRef, 
-        kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef, 
+        crate_object_file: <span class="kw-2">&amp;</span>FileRef,
+        kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
         verbose_log: bool
     ) -&gt; <span class="prelude-ty">Result</span>&lt;AppCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="macro">debug!</span>(<span class="string">&quot;load_crate_as_application(): trying to load application crate at {:?}&quot;</span>, crate_object_file.lock().get_absolute_path());
@@ -3920,7 +3915,7 @@
     <span class="doccomment">/// Loads the specified crate into memory, allowing it to be invoked.  
     /// Returns a Result containing the number of symbols that were added to the symbol map
     /// as a result of loading this crate.
-    /// 
+    ///
     /// # Arguments
     /// * `crate_object_file`: the crate object file that will be loaded into this `CrateNamespace`.
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
@@ -3932,21 +3927,20 @@
     </span><span class="kw">pub fn </span>load_crate(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         crate_object_file: <span class="kw-2">&amp;</span>FileRef,
-        temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;, 
-        kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef, 
+        temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;,
+        kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
         verbose_log: bool
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(StrongCrateRef, usize), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">debug!</span>(<span class="string">&quot;load_crate: trying to load crate at {:?}&quot;</span>, crate_object_file.lock().get_absolute_path());
         <span class="kw">let </span>new_crate_ref = <span class="self">self</span>.load_crate_internal(crate_object_file, temp_backup_namespace, kernel_mmi_ref, verbose_log)<span class="question-mark">?</span>;
-        
+
         <span class="kw">let </span>(new_crate_name, _num_sections, new_syms) = {
             <span class="kw">let </span>new_crate = new_crate_ref.lock_as_ref();
             <span class="kw">let </span>new_syms = <span class="self">self</span>.add_symbols(new_crate.sections.values(), verbose_log);
             (new_crate.crate_name.clone(), new_crate.sections.len(), new_syms)
         };
-            
+
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">info!</span>(<span class="string">&quot;loaded new crate {:?}, num sections: {}, added {} new symbols.&quot;</span>, new_crate_name, _num_sections, new_syms);
         <span class="self">self</span>.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone_shallow());
@@ -3959,8 +3953,8 @@
     /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#fn.load_crate_as_application).
     </span><span class="kw">fn </span>load_crate_internal(<span class="kw-2">&amp;</span><span class="self">self</span>,
         crate_object_file: <span class="kw-2">&amp;</span>FileRef,
-        temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;, 
-        kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef, 
+        temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;,
+        kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
         verbose_log: bool
     ) -&gt; <span class="prelude-ty">Result</span>&lt;StrongCrateRef, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>cf = crate_object_file.lock();
@@ -3969,13 +3963,13 @@
         <span class="prelude-val">Ok</span>(new_crate_ref)
     }
 
-    
+
     <span class="doccomment">/// This function first loads all of the given crates&#39; sections and adds them to the symbol map,
     /// and only after *all* crates are loaded does it move on to linking/relocation calculations. 
-    /// 
+    ///
     /// This allows multiple object files with circular dependencies on one another
     /// to be loaded all at once, as if they were a single entity.
-    /// 
+    ///
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
     /// this function will load both crate `A` and `B` before trying to resolve their dependencies individually. 
@@ -3985,7 +3979,7 @@
         temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;,
         kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
         verbose_log: bool,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; 
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
         <span class="kw">where </span>I: Iterator&lt;Item = <span class="kw-2">&amp;</span><span class="lifetime">&#39;f </span>FileRef&gt;
     {
         <span class="comment">// First, lock all of the crate object files.
@@ -3995,13 +3989,13 @@
         }
 
         <span class="comment">// Second, do all of the section parsing and loading, and add all public symbols to the symbol map.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>partially_loaded_crates: Vec&lt;(StrongCrateRef, ElfFile)&gt; = Vec::with_capacity(locked_crate_files.len()); 
-        <span class="kw">for </span>locked_crate_file <span class="kw">in </span><span class="kw-2">&amp;</span>locked_crate_files {            
+        </span><span class="kw">let </span><span class="kw-2">mut </span>partially_loaded_crates: Vec&lt;(StrongCrateRef, ElfFile)&gt; = Vec::with_capacity(locked_crate_files.len());
+        <span class="kw">for </span>locked_crate_file <span class="kw">in </span><span class="kw-2">&amp;</span>locked_crate_files {
             <span class="kw">let </span>(new_crate_ref, elf_file) = <span class="self">self</span>.load_crate_sections(locked_crate_file.deref(), kernel_mmi_ref, verbose_log)<span class="question-mark">?</span>;
             <span class="kw">let </span>_new_syms = <span class="self">self</span>.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             partially_loaded_crates.push((new_crate_ref, elf_file));
         }
-        
+
         <span class="comment">// Finally, we do all of the relocations.
         </span><span class="kw">for </span>(new_crate_ref, elf_file) <span class="kw">in </span>partially_loaded_crates {
             <span class="self">self</span>.perform_relocations(<span class="kw-2">&amp;</span>elf_file, <span class="kw-2">&amp;</span>new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)<span class="question-mark">?</span>;
@@ -4016,11 +4010,11 @@
     <span class="doccomment">/// Duplicates this `CrateNamespace` into a new `CrateNamespace`, 
     /// but uses a copy-on-write/clone-on-write semantic that creates 
     /// a special shared reference to each crate that indicates it is shared across multiple namespaces.
-    /// 
+    ///
     /// In other words, crates in the new namespace returned by this fucntions 
     /// are fully shared with crates in *this* namespace, 
     /// until either namespace attempts to modify a shared crate in the future.
-    /// 
+    ///
     /// When modifying crates in the new namespace, e.g., swapping crates, 
     /// any crates in the new namespace that are still shared with the old namespace
     /// must be deeply copied into a new crate that is exclusively owned,
@@ -4033,7 +4027,7 @@
     /// that now depend on `A2` instead of `A`. 
     /// The existing versions of `B` and `C` would still depend on `A`, 
     /// but they would no longer be part of the new namespace. 
-    /// 
+    ///
     </span><span class="kw">pub fn </span>clone_on_write(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; CrateNamespace {
         CrateNamespace {
             name: <span class="self">self</span>.name.clone(),
@@ -4056,7 +4050,6 @@
         new_section: <span class="kw-2">&amp;</span>StrongSectionRef,
         kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-
         <span class="kw">for </span>weak_dep <span class="kw">in </span><span class="kw-2">&amp;</span>old_section.inner.read().sections_dependent_on_me {
             <span class="kw">let </span>target_sec = weak_dep.section.upgrade().ok_or(<span class="string">&quot;couldn&#39;t upgrade WeakDependent.section&quot;</span>)<span class="question-mark">?</span>;
             <span class="kw">let </span>relocation_entry = weak_dep.relocation;
@@ -4085,7 +4078,7 @@
                     target_sec_mapped_pages.remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, target_sec_initial_flags)<span class="question-mark">?</span>;
                 };
             }
-            
+
             <span class="comment">// Tell the new source_sec that the existing target_sec depends on it.
             // Note that we don&#39;t need to do this if we&#39;re re-swapping in a cached crate,
             // because that crate&#39;s sections&#39; dependents are already properly set up from when it was first swapped in.
@@ -4120,13 +4113,13 @@
     <span class="doccomment">/// The primary internal routine for parsing and loading all sections in a crate object file.
     /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**,
     /// since its sections are totally incomplete and non-executable.
-    /// 
+    ///
     /// However, it does add all of the newly-loaded crate sections to the symbol map (yes, even before relocation/linking),
     /// since we can use them to resolve missing symbols for relocations.
-    /// 
+    ///
     /// Parses each section in the given `crate_file` object file and copies its contents to each section.
     /// Returns a tuple of a reference to the new `LoadedCrate` and the crate&#39;s ELF file (to avoid having to re-parse it).
-    /// 
+    ///
     /// # Arguments
     /// * `crate_file`: the object file for the crate that will be loaded into this `CrateNamespace`.
     /// * `kernel_mmi_ref`: the kernel&#39;s MMI struct, for memory mapping use.
@@ -4137,7 +4130,6 @@
         kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
         _verbose_log: bool
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(StrongCrateRef, ElfFile&lt;<span class="lifetime">&#39;f</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        
         <span class="kw">let </span>mapped_pages  = crate_file.as_mapping()<span class="question-mark">?</span>;
         <span class="kw">let </span>size_in_bytes = crate_file.len();
         <span class="kw">let </span>abs_path      = Path::new(crate_file.get_absolute_path());
@@ -4154,7 +4146,7 @@
         <span class="comment">// It&#39;s probably better to pass in the actual crate file reference so we can use it here,
         // but since we don&#39;t currently do that, we just get another reference to the crate object file via its Path.
         </span><span class="kw">let </span>crate_object_file = <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>abs_path) {
-            <span class="prelude-val">Some</span>(FileOrDir::File(f)) =&gt; f, 
+            <span class="prelude-val">Some</span>(FileOrDir::File(f)) =&gt; f,
             <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;BUG: load_crate_sections(): couldn&#39;t get crate object file path&quot;</span>),
         };
 
@@ -4188,7 +4180,7 @@
         </span><span class="kw">let </span>new_crate = CowArc::new(LoadedCrate {
             crate_name,
             debug_symbols_file:      Arc::downgrade(<span class="kw-2">&amp;</span>crate_object_file),
-            object_file:             crate_object_file, 
+            object_file:             crate_object_file,
             sections:                HashMap::new(),
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
@@ -4200,7 +4192,7 @@
         });
         <span class="kw">let </span>new_crate_weak_ref = CowArc::downgrade(<span class="kw-2">&amp;</span>new_crate);
 
-        <span class="kw">let </span>load_sections_fn = <span class="kw">if </span>sections_are_merged { 
+        <span class="kw">let </span>load_sections_fn = <span class="kw">if </span>sections_are_merged {
             <span class="self">Self</span>::load_crate_with_merged_sections
         } <span class="kw">else </span>{
             <span class="self">Self</span>::load_crate_with_separate_sections
@@ -4236,10 +4228,10 @@
 
     <span class="doccomment">/// An internal routine to load and populate the sections of a crate&#39;s object file
     /// if those sections have already been merged.
-    /// 
+    ///
     /// This is the &quot;new, acclerated&quot; way to load sections, and is used by `load_crate_sections()`
     /// for object files that **have** been modified by Theseus&#39;s special partial relinking script.
-    /// 
+    ///
     /// This works by iterating over all symbols in the object file 
     /// and creating section entries for each one of those symbols only.
     /// The actual section data can be loaded quickly because they have been merged into top-level sections,
@@ -4252,7 +4244,7 @@
         rodata_pages: <span class="prelude-ty">Option</span>&lt;(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;)&gt;,
         data_pages:   <span class="prelude-ty">Option</span>&lt;(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;)&gt;,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;SectionMetadata, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        
+
         <span class="kw">let </span><span class="kw-2">mut </span>text_pages_locked       = text_pages  .as_ref().map(|(tp, tp_range)| (tp.clone(), tp.lock(), tp_range.start));
         <span class="kw">let </span><span class="kw-2">mut </span>read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, rp_range)| (rp.clone(), rp.lock(), rp_range.start));
         <span class="kw">let </span><span class="kw-2">mut </span>read_write_pages_locked = data_pages  .as_ref().map(|(dp, dp_range)| (dp.clone(), dp.lock(), dp_range.start));
@@ -4262,7 +4254,7 @@
         </span><span class="kw">let </span><span class="kw-2">mut </span>read_only_offset: <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
         <span class="comment">// The section header offset of the first read-write section, which is .data or .bss
         </span><span class="kw">let </span><span class="kw-2">mut </span>read_write_offset:   <span class="prelude-ty">Option</span>&lt;usize&gt; = <span class="prelude-val">None</span>;
- 
+
         <span class="comment">// We need to track various section `shndx`s to differentiate between 
         // the different types of &quot;OBJECT&quot; symbols and &quot;TLS&quot; symbols.
         //
@@ -4278,7 +4270,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>tbss_shndx_and_section:  <span class="prelude-ty">Option</span>&lt;(Shndx, StrongSectionRef)&gt; = <span class="prelude-val">None</span>;
 
         <span class="comment">// The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
-        </span><span class="kw">let </span><span class="kw-2">mut </span>loaded_sections: HashMap&lt;usize, StrongSectionRef&gt; = HashMap::new(); 
+        </span><span class="kw">let </span><span class="kw-2">mut </span>loaded_sections: HashMap&lt;usize, StrongSectionRef&gt; = HashMap::new();
         <span class="kw">let </span><span class="kw-2">mut </span>data_sections:   BTreeSet&lt;usize&gt; = BTreeSet::new();
         <span class="kw">let </span><span class="kw-2">mut </span>tls_sections:    BTreeSet&lt;usize&gt; = BTreeSet::new();
         <span class="kw">let </span><span class="kw-2">mut </span>last_shndx = <span class="number">0</span>;
@@ -4291,7 +4283,7 @@
             <span class="kw">let </span>sec_flags = sec.flags();
             <span class="comment">// Skip non-allocated sections, because they don&#39;t appear in the loaded object file.
             </span><span class="kw">if </span>sec_flags &amp; SHF_ALLOC == <span class="number">0 </span>{
-                <span class="kw">continue</span>; 
+                <span class="kw">continue</span>;
             }
 
             <span class="comment">// get the relevant section info, i.e., size, alignment, and data contents
@@ -4374,7 +4366,7 @@
                     .map(|(rp_ref, rp, <span class="kw">_</span>)| (rp_ref, rp))
                     .ok_or(<span class="string">&quot;BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated&quot;</span>)<span class="question-mark">?</span>;
                 <span class="comment">// Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
-                </span>virt_addr = VirtualAddress::zero(); 
+                </span>virt_addr = VirtualAddress::zero();
                 tls_sections.insert(shndx);
             }
 
@@ -4537,9 +4529,9 @@
                     typ = SectionType::Rodata;
                     mapped_pages = rp_ref;
                     <span class="comment">// no additional offset below, because .rodata is always the first read-only section.
-                    </span>mapped_pages_offset = sec_value; 
+                    </span>mapped_pages_offset = sec_value;
                     virt_addr = rp_start_vaddr + mapped_pages_offset;
-                } 
+                }
                 <span class="comment">// Handle .data/.bss symbol
                 </span><span class="kw">else </span>{
                     data_sections.insert(last_shndx);
@@ -4622,7 +4614,7 @@
             <span class="kw">if </span>is_global {
                 global_sections.insert(last_shndx);
             }
-        
+
             last_shndx += <span class="number">1</span>;
         } <span class="comment">// end of iterating over all symbol table entries
 
@@ -4665,7 +4657,7 @@
         //     }
         // }
 
-        </span><span class="prelude-val">Ok</span>(SectionMetadata { 
+        </span><span class="prelude-val">Ok</span>(SectionMetadata {
             loaded_sections,
             global_sections,
             tls_sections,
@@ -4676,10 +4668,10 @@
 
     <span class="doccomment">/// An internal routine to load and populate the sections of a crate&#39;s object file
     /// if those sections have not been merged.
-    /// 
+    ///
     /// This is the &quot;legacy&quot; way to load sections, and is used by `load_crate_sections()`
     /// for object files that have **not** been modified by Theseus&#39;s special partial relinking script.
-    /// 
+    ///
     /// This works by iterating over all section headers in the object file
     /// and extracting the symbol names from each section name, which is quite slow. 
     </span><span class="kw">fn </span>load_crate_with_separate_sections(
@@ -4689,8 +4681,8 @@
         text_pages:   <span class="prelude-ty">Option</span>&lt;(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;)&gt;,
         rodata_pages: <span class="prelude-ty">Option</span>&lt;(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;)&gt;,
         data_pages:   <span class="prelude-ty">Option</span>&lt;(Arc&lt;Mutex&lt;MappedPages&gt;&gt;, Range&lt;VirtualAddress&gt;)&gt;,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;SectionMetadata, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; { 
-        
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;SectionMetadata, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+
         <span class="comment">// Check the symbol table to get the set of sections that are global (publicly visible).
         </span><span class="kw">let </span>global_sections: BTreeSet&lt;Shndx&gt; = {
             <span class="comment">// For us to properly load the ELF file, it must NOT have been fully stripped,
@@ -4703,7 +4695,7 @@
                 <span class="comment">// Include all symbols with &quot;GLOBAL&quot; binding, regardless of visibility.  
                 </span><span class="kw">if </span>entry.get_binding() == <span class="prelude-val">Ok</span>(xmas_elf::symbol_table::Binding::Global) {
                     <span class="kw">match </span>entry.get_type() {
-                        <span class="prelude-val">Ok</span>(xmas_elf::symbol_table::Type::Func 
+                        <span class="prelude-val">Ok</span>(xmas_elf::symbol_table::Type::Func
                             | xmas_elf::symbol_table::Type::Object
                             | xmas_elf::symbol_table::Type::Tls) =&gt; {
                             globals.insert(entry.shndx() <span class="kw">as </span>Shndx);
@@ -4712,7 +4704,7 @@
                     }
                 }
             }
-            globals 
+            globals
         };
 
         <span class="comment">// Since .text sections come at the beginning of the object file,
@@ -4739,7 +4731,7 @@
         // we copy them into their respective pages individually on a per-section basis, 
         // keeping track of the offset into each of their MappedPages as we go.
         </span><span class="kw">let </span>(<span class="kw-2">mut </span>rodata_offset, <span class="kw-2">mut </span>data_offset) = (<span class="number">0 </span>, <span class="number">0</span>);
-                    
+
         <span class="kw">const </span>TEXT_PREFIX:             <span class="kw-2">&amp;</span>str = <span class="string">&quot;.text.&quot;</span>;
         <span class="kw">const </span>UNLIKELY_PREFIX:         <span class="kw-2">&amp;</span>str = <span class="string">&quot;unlikely.&quot;</span>; <span class="comment">// the full section prefix is &quot;.text.unlikely.&quot;
         </span><span class="kw">const </span>RODATA_PREFIX:           <span class="kw-2">&amp;</span>str = <span class="string">&quot;.rodata.&quot;</span>;
@@ -4753,12 +4745,12 @@
 
         <span class="doccomment">/// A convenient macro to obtain the rest of the symbol name after its prefix,
         /// i.e., the characters after &#39;.text&#39;, &#39;.rodata&#39;, &#39;.data&#39;, etc.
-        /// 
+        ///
         /// * If the name isn&#39;t long enough, the macro prints and returns an error str.
         /// * If the name isn&#39;t long enough but is an empty section (e.g., just &quot;.text&quot;, &quot;.rodata&quot;, etc)
         ///   this macro `continue`s to the next iteration of the loop.
         /// * The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &amp;str.
-        /// 
+        ///
         /// Note: I&#39;d prefer this to be a const function that accepts the prefix as a const &amp;&#39;static str,
         ///       but Rust does not support concat!()-ing const generic parameters yet.
         </span><span class="macro">macro_rules! </span>try_get_symbol_name_after_prefix {
@@ -4786,7 +4778,7 @@
         }
 
         <span class="comment">// this maps section header index (shndx) to LoadedSection
-        </span><span class="kw">let </span><span class="kw-2">mut </span>loaded_sections: HashMap&lt;Shndx, StrongSectionRef&gt; = HashMap::new(); 
+        </span><span class="kw">let </span><span class="kw-2">mut </span>loaded_sections: HashMap&lt;Shndx, StrongSectionRef&gt; = HashMap::new();
         <span class="comment">// the set of Shndxes for .data and .bss sections
         </span><span class="kw">let </span><span class="kw-2">mut </span>data_sections: BTreeSet&lt;Shndx&gt; = BTreeSet::new();
         <span class="comment">// the set of Shndxes for TLS sections (.tdata, .tbss)
@@ -4802,7 +4794,7 @@
             <span class="kw">let </span>sec_flags = sec.flags();
             <span class="comment">// Skip non-allocated sections, because they don&#39;t appear in the loaded object file.
             </span><span class="kw">if </span>sec_flags &amp; SHF_ALLOC == <span class="number">0 </span>{
-                <span class="kw">continue</span>; 
+                <span class="kw">continue</span>;
             }
 
             <span class="comment">// Even if we&#39;re using the next section&#39;s data (for a zero-sized section, as handled below),
@@ -4875,7 +4867,7 @@
                     <span class="kw">let </span>dest_vaddr = tp_range.start + text_offset;
 
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             SectionType::Text,
                             demangled,
@@ -4937,7 +4929,7 @@
                         new_crate.clone(),
                     );
                     <span class="comment">// trace!(&quot;Loaded new TLS section: {:?}&quot;, new_tls_section);
-                    
+
                     // Add the new TLS section to this namespace&#39;s initial TLS area,
                     // which will reserve/obtain a new offset into that TLS area which holds this section&#39;s data.
                     // This will also update the section&#39;s virtual address field to hold that offset value,
@@ -4975,7 +4967,7 @@
                         // })
                 </span>};
                 <span class="kw">let </span>demangled = demangle(name).to_string().as_str().into();
-                
+
                 <span class="kw">if let </span><span class="prelude-val">Some</span>((<span class="kw-2">ref </span>dp_ref, <span class="kw-2">ref mut </span>dp)) = read_write_pages_locked {
                     <span class="comment">// here: we&#39;re ready to copy the data/bss section to the proper address
                     </span><span class="kw">let </span>dest_vaddr = dp.address_at_offset(data_offset)
@@ -4989,7 +4981,7 @@
                             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .data section&quot;</span>);
                         }
                     }
-                    
+
                     loaded_sections.insert(
                         shndx,
                         Arc::new(LoadedSection::new(
@@ -5030,9 +5022,9 @@
                             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;couldn&#39;t get section data in .rodata section&quot;</span>);
                         }
                     }
-                    
+
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             SectionType::Rodata,
                             demangled,
@@ -5077,7 +5069,7 @@
 
                     <span class="kw">let </span>typ = SectionType::GccExceptTable;
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             typ,
                             section_name_str_ref(<span class="kw-2">&amp;</span>typ),
@@ -5116,7 +5108,7 @@
 
                     <span class="kw">let </span>typ = SectionType::EhFrame;
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             typ,
                             section_name_str_ref(<span class="kw-2">&amp;</span>typ),
@@ -5147,7 +5139,7 @@
             }
         }
 
-        <span class="prelude-val">Ok</span>(SectionMetadata { 
+        <span class="prelude-val">Ok</span>(SectionMetadata {
             loaded_sections,
             global_sections,
             tls_sections,
@@ -5155,7 +5147,7 @@
         })
     }
 
-        
+
     <span class="doccomment">/// The second stage of parsing and loading a new kernel crate, 
     /// filling in the missing relocation information in the already-loaded sections. 
     /// It also remaps the `new_crate`&#39;s MappedPages according to each of their section permissions.
@@ -5176,9 +5168,9 @@
         // Iterate over every non-zero relocation section in the file
         </span><span class="kw">for </span>sec <span class="kw">in </span>elf_file.section_iter().filter(|sec| sec.get_type() == <span class="prelude-val">Ok</span>(ShType::Rela) &amp;&amp; sec.size() != <span class="number">0</span>) {
             <span class="kw">use </span>xmas_elf::sections::SectionData::Rela64;
-            <span class="kw">if </span>verbose_log { 
+            <span class="kw">if </span>verbose_log {
                 <span class="macro">trace!</span>(<span class="string">&quot;Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}&quot;</span>, 
-                sec.get_name(elf_file), sec.get_type(), sec.info()); 
+                sec.get_name(elf_file), sec.get_type(), sec.info());
             }
 
             <span class="comment">// Debug sections are handled separately
@@ -5193,23 +5185,23 @@
                 <span class="kw">_ </span>=&gt; {
                     <span class="macro">error!</span>(<span class="string">&quot;Found Rela section that wasn&#39;t able to be parsed as Rela64: {:?}&quot;</span>, sec);
                     <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Found Rela section that wasn&#39;t able to be parsed as Rela64&quot;</span>);
-                } 
+                }
             };
 
             <span class="comment">// The target section is where we write the relocation data to.
             // The source section is where we get the data from. 
             // There is one target section per rela section (`rela_array`), and one source section per rela_entry in this rela section.
             // The &quot;info&quot; field in the Rela section specifies which section is the target of the relocation.
-                
+
             // Get the target section (that we already loaded) for this rela_array Rela section.
             </span><span class="kw">let </span>target_sec_shndx = sec.info() <span class="kw">as </span>usize;
             <span class="kw">let </span>target_sec = new_crate.sections.get(<span class="kw-2">&amp;</span>target_sec_shndx).ok_or_else(|| {
                 <span class="macro">error!</span>(<span class="string">&quot;ELF file error: target section was not loaded for Rela section {:?}!&quot;</span>, sec.get_name(elf_file));
                 <span class="string">&quot;target section was not loaded for Rela section&quot;
-            </span>})<span class="question-mark">?</span>; 
+            </span>})<span class="question-mark">?</span>;
 
             <span class="kw">let </span><span class="kw-2">mut </span>target_sec_data_was_modified = <span class="bool-val">false</span>;
-            
+
             <span class="kw">let </span><span class="kw-2">mut </span>target_sec_dependencies: Vec&lt;StrongDependency&gt; = Vec::new();
             <span class="attr">#[cfg(internal_deps)]
             </span><span class="kw">let </span><span class="kw-2">mut </span>target_sec_internal_dependencies: Vec&lt;InternalDependency&gt; = Vec::new();
@@ -5222,16 +5214,16 @@
 
                 <span class="comment">// iterate through each relocation entry in the relocation array for the target_sec
                 </span><span class="kw">for </span>rela_entry <span class="kw">in </span>rela_array {
-                    <span class="kw">if </span>verbose_log { 
+                    <span class="kw">if </span>verbose_log {
                         <span class="macro">trace!</span>(<span class="string">&quot;      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}&quot;</span>, 
                             rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                     }
 
                     <span class="kw">use </span>xmas_elf::symbol_table::Entry;
                     <span class="kw">let </span>source_sec_entry = <span class="kw-2">&amp;</span>symtab[rela_entry.get_symbol_table_index() <span class="kw">as </span>usize];
-                    <span class="kw">let </span>source_sec_shndx = source_sec_entry.shndx() <span class="kw">as </span>usize; 
+                    <span class="kw">let </span>source_sec_shndx = source_sec_entry.shndx() <span class="kw">as </span>usize;
                     <span class="kw">let </span>source_sec_value = source_sec_entry.value() <span class="kw">as </span>usize;
-                    <span class="kw">if </span>verbose_log { 
+                    <span class="kw">if </span>verbose_log {
                         <span class="kw">let </span>source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() <span class="kw">as </span>usize)
                             .and_then(|s| s.get_name(elf_file));
                         <span class="macro">trace!</span>(<span class="string">&quot;             relevant section [{}]: {:?}, value: {:#X}&quot;</span>, source_sec_shndx, source_sec_header_name, source_sec_value);
@@ -5240,7 +5232,7 @@
                         //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
                         //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                     </span>}
-                    
+
                     <span class="kw">let </span><span class="kw-2">mut </span>source_and_target_in_same_crate = <span class="bool-val">false</span>;
 
                     <span class="comment">// We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
@@ -5303,13 +5295,13 @@
                             relocation: relocation_entry,
                         };
                         source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
-                        
+
                         <span class="comment">// tell the target_sec that it has a strong dependency on the source_sec
                         </span><span class="kw">let </span>strong_dep = StrongDependency {
                             section: Arc::clone(<span class="kw-2">&amp;</span>source_sec),
                             relocation: relocation_entry,
                         };
-                        target_sec_dependencies.push(strong_dep);          
+                        target_sec_dependencies.push(strong_dep);
                     }
                 }
             }
@@ -5317,7 +5309,7 @@
             <span class="comment">// If the target section of the relocation was a TLS section, 
             // that TLS section&#39;s initializer data has now changed.
             // Thus, we need to invalidate the TLS initializer area&#39;s cached data.
-            </span><span class="kw">if </span>target_sec_data_was_modified &amp;&amp; 
+            </span><span class="kw">if </span>target_sec_data_was_modified &amp;&amp;
                 (target_sec.typ == SectionType::TlsData || target_sec.typ == SectionType::TlsBss)
             {
                 <span class="comment">// debug!(&quot;Invalidating TlsInitializer due to relocation written to section {:?}&quot;, &amp;*target_sec);
@@ -5337,7 +5329,7 @@
 
         // We need to remap each section&#39;s mapped pages with the proper permission bits, 
         // since we initially mapped them all as writable.
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tp) = new_crate.text_pages { 
+        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tp) = new_crate.text_pages {
             tp.<span class="number">0</span>.lock().remap(<span class="kw-2">&amp;mut </span>kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)<span class="question-mark">?</span>;
         }
         <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>rp) = new_crate.rodata_pages {
@@ -5349,13 +5341,13 @@
         // By default, we can safely remove the metadata for all private (non-global) .rodata sections
         // that do not have any strong dependencies (its `sections_i_depend_on` list is empty).
         // If you want all sections to be kept, e.g., for debugging, you can set the below cfg option.
-        </span><span class="attr">#[cfg(not(keep_private_rodata))] 
+        </span><span class="attr">#[cfg(not(keep_private_rodata))]
         </span>{
             new_crate.sections.retain(|_shndx, sec| {
-                <span class="kw">let </span>should_remove = !sec.global 
+                <span class="kw">let </span>should_remove = !sec.global
                     &amp;&amp; sec.typ == SectionType::Rodata
                     &amp;&amp; sec.inner.read().sections_i_depend_on.is_empty();
-                
+
                 <span class="comment">// For an element to be removed, this closure should return `false`.
                 </span>!should_remove
             });
@@ -5364,7 +5356,7 @@
         <span class="prelude-val">Ok</span>(())
     }
 
-    
+
     <span class="doccomment">/// Adds the given symbol to this namespace&#39;s symbol map.
     /// If the symbol already exists in the symbol map, this replaces the existing symbol with the new one, warning if they differ in size.
     /// Returns true if the symbol was added, and false if it already existed and thus was merely replaced.
@@ -5381,7 +5373,7 @@
                         <span class="comment">// debug!(&quot;       add_symbol(): replacing section: old: {:?}, new: {:?}&quot;, old_sec, new_section);
                         </span><span class="kw">if </span>new_section.size != old_sec.size {
                             <span class="macro">warn!</span>(<span class="string">&quot;Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}&quot;</span>, old_sec.size, old_sec.name, new_section.size, new_section.name);
-                        } 
+                        }
                         <span class="kw">else </span>{
                             <span class="macro">warn!</span>(<span class="string">&quot;Replacing new symbol already present: old {:?}, new: {:?}&quot;</span>, old_sec.name, new_section.name);
                         }
@@ -5391,7 +5383,7 @@
                 <span class="bool-val">false
             </span>}
             qp_trie::Entry::Vacant(new_entry) =&gt; {
-                <span class="kw">if </span>log_replacements { 
+                <span class="kw">if </span>log_replacements {
                     <span class="macro">debug!</span>(<span class="string">&quot;         add_symbol(): Adding brand new symbol: new: {:?}&quot;</span>, new_section);
                 }
                 new_entry.insert(Arc::downgrade(new_section));
@@ -5401,12 +5393,12 @@
     }
 
     <span class="doccomment">/// Adds only *global* symbols in the given `sections` iterator to this namespace&#39;s symbol map,
-    /// 
+    ///
     /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
-    /// 
+    ///
     /// Returns the number of *new* unique symbols added.
     </span><span class="kw">pub fn </span>add_symbols&lt;<span class="lifetime">&#39;a</span>, I&gt;(
-        <span class="kw-2">&amp;</span><span class="self">self</span>, 
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         sections: I,
         _log_replacements: bool,
     ) -&gt; usize
@@ -5418,12 +5410,12 @@
 
     <span class="doccomment">/// Adds symbols in the given `sections` iterator to this namespace&#39;s symbol map,
     /// but only sections that are *global* AND for which the given `filter_func` returns true. 
-    /// 
+    ///
     /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
-    /// 
+    ///
     /// Returns the number of *new* unique symbols added.
     </span><span class="kw">fn </span>add_symbols_filtered&lt;<span class="lifetime">&#39;a</span>, I, F&gt;(
-        <span class="kw-2">&amp;</span><span class="self">self</span>, 
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
         sections: I,
         filter_func: F,
         log_replacements: bool,
@@ -5445,34 +5437,34 @@
                 }
             }
         }
-        
+
         count
     }
 
-    
+
     <span class="doccomment">/// Finds the crate that contains the given `VirtualAddress` in its loaded code.
-    /// 
+    ///
     /// By default, only executable sections (`.text`) are searched, since typically the only use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
-    /// 
+    ///
     /// # Usage
     /// This is mostly useful for printing symbol names for a stack trace (backtrace).
     /// It is also similar in functionality to the tool `addr2line`, 
     /// but gives the section itself rather than the line of code.
-    /// 
+    ///
     /// # Locking
     /// This can obtain the lock on every crate and every section, 
     /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
     /// It does *not* need to obtain locks on the underlying `MappedPages` regions.
-    /// 
+    ///
     /// # Note
     /// This is a slow procedure because, in the worst case,
     /// it will iterate through **every** loaded crate in this namespace (and its recursive namespace).
     </span><span class="kw">pub fn </span>get_crate_containing_address(
-        <span class="kw-2">&amp;</span><span class="self">self</span>, 
-        virt_addr: VirtualAddress, 
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        virt_addr: VirtualAddress,
         search_all_section_types: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;StrongCrateRef&gt; {
 
@@ -5480,7 +5472,7 @@
         </span><span class="kw">let </span>crate_contains_vaddr = |crate_ref: <span class="kw-2">&amp;</span>StrongCrateRef| {
             <span class="kw">let </span>krate = crate_ref.lock_as_ref();
             <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tp) = krate.text_pages {
-                <span class="kw">if </span>tp.<span class="number">1</span>.contains(<span class="kw-2">&amp;</span>virt_addr) { 
+                <span class="kw">if </span>tp.<span class="number">1</span>.contains(<span class="kw-2">&amp;</span>virt_addr) {
                     <span class="kw">return </span><span class="bool-val">true</span>;
                 }
             }
@@ -5498,7 +5490,7 @@
             }
             <span class="bool-val">false
         </span>};
-        
+
         <span class="kw">let </span><span class="kw-2">mut </span>found_crate = <span class="prelude-val">None</span>;
 
         <span class="comment">// Here, we didn&#39;t find the symbol when searching from the starting crate, 
@@ -5518,29 +5510,29 @@
 
 
     <span class="doccomment">/// Finds the section that contains the given `VirtualAddress` in its loaded code.
-    /// 
+    ///
     /// By default, only executable sections (`.text`) are searched, since the typical use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
-    /// 
+    ///
     /// # Usage
     /// This is mostly useful for printing symbol names for a stack trace (backtrace).
     /// It is also similar in functionality to the tool `addr2line`, 
     /// but gives the section itself rather than the line of code.
-    /// 
+    ///
     /// # Locking
     /// This can obtain the lock on every crate in this namespace and its recursive namespaces, 
     /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
-    /// 
+    ///
     /// # Note
     /// This is a slow procedure because, in the worst case,
     /// it will iterate through **every** section in **every** loaded crate 
     /// in this namespace (and its recursive namespace),
     /// not just the publicly-visible (global) sections. 
     </span><span class="kw">pub fn </span>get_section_containing_address(
-        <span class="kw-2">&amp;</span><span class="self">self</span>, 
-        virt_addr: VirtualAddress, 
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        virt_addr: VirtualAddress,
         search_all_section_types: bool,
     ) -&gt; <span class="prelude-ty">Option</span>&lt;(StrongSectionRef, usize)&gt; {
 
@@ -5559,7 +5551,7 @@
         </span><span class="kw">for </span>sec <span class="kw">in </span>crate_locked.sections.values() {
             <span class="comment">// .text sections are always included, other sections are included if requested.
             </span><span class="kw">let </span>eligible_section = sec.typ == SectionType::Text || search_all_section_types;
-            
+
             <span class="comment">// If the section&#39;s address bounds contain the address, then we&#39;ve found it.
             // Only a single section can contain the address, so it&#39;s safe to stop once we&#39;ve found a match.
             </span><span class="kw">if </span>eligible_section
@@ -5568,7 +5560,7 @@
             {
                 <span class="kw">let </span>offset = virt_addr.value() - sec.virt_addr.value();
                 merged_section_and_offset = <span class="prelude-val">Some</span>((sec.clone(), offset));
-                
+
                 <span class="kw">if </span>sec.name.as_str() == sec.typ.name() {
                     <span class="comment">// If this section is a merged section, it will have the standard name
                     // for its section type, e.g., &quot;.text&quot;, &quot;.data&quot;, &quot;.rodata&quot;, etc.
@@ -5611,23 +5603,23 @@
     /// similar to the simpler function `get_symbol()`, but takes the additional step of trying to 
     /// automatically find and/or load the crate containing that symbol 
     /// (and does so recursively for any of its crate dependencies).
-    /// 
+    ///
     /// (1) First, it recursively searches this namespace&#39;s and its recursive namespaces&#39; symbol maps, 
     ///     and returns the symbol if already loaded.
-    /// 
+    ///
     /// (2) Second, if the symbol is missing from this namespace, it looks in the `temp_backup_namespace`. 
     ///     If we find it there, then we add that symbol and its containing crate as a shared crate in this namespace.
-    /// 
+    ///
     /// (3) Third, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
     ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
-    /// 
+    ///
     /// (4) Fourth, if the missing symbol isn&#39;t in the backup namespace either, 
     ///     try to load its containing crate from the object file. 
     ///     This can only be done for symbols that have a leading crate name, such as &quot;my_crate::foo&quot;;
     ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it,
     ///     and that symbol&#39;s containing crate should be manually loaded before invoking this. 
-    /// 
-    /// 
+    ///
+    ///
     /// # Arguments
     /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., &quot;my_crate::MyStruct::foo::h843a9ea794da0c24&quot;.
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be temporarily searched (just during this call)
@@ -5635,9 +5627,9 @@
     ///   If `temp_backup_namespace` is `None`, then only this namespace (and its recursive namespaces) will be searched.
     /// * `kernel_mmi_ref`: a reference to the kernel&#39;s `MemoryManagementInfo`, which must not be locked.
     </span><span class="kw">pub fn </span>get_symbol_or_load(
-        <span class="kw-2">&amp;</span><span class="self">self</span>, 
-        demangled_full_symbol: <span class="kw-2">&amp;</span>str, 
-        temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;, 
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        demangled_full_symbol: <span class="kw-2">&amp;</span>str,
+        temp_backup_namespace: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>CrateNamespace&gt;,
         kernel_mmi_ref: <span class="kw-2">&amp;</span>MmiRef,
         verbose_log: bool
     ) -&gt; WeakSectionRef {
@@ -5681,7 +5673,7 @@
 
 
     <span class="doccomment">/// Looks for the given `demangled_full_symbol` in the `temp_backup_namespace` and returns a reference to the matching section. 
-    /// 
+    ///
     /// This is the second and third attempts to find a symbol within [`get_symbol_or_load()`](#method.get_symbol_or_load).
     </span><span class="kw">fn </span>get_symbol_from_backup_namespace(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -5720,7 +5712,7 @@
         </span>})<span class="question-mark">?</span>;
 
         <span class="comment">// Here, we found the matching section in the temp_backup_namespace.
-        </span><span class="kw">let </span>parent_crate_ref = { 
+        </span><span class="kw">let </span>parent_crate_ref = {
             sec.parent_crate.upgrade().or_else(|| {
                 <span class="macro">error!</span>(<span class="string">&quot;BUG: Found symbol \&quot;{}\&quot; in backup namespace, but unexpectedly couldn&#39;t get its parent crate!&quot;</span>, demangled_full_symbol);
                 <span class="prelude-val">None
@@ -5736,7 +5728,7 @@
             </span><span class="self">self</span>.add_symbols(<span class="prelude-val">Some</span>(sec.clone()).iter(), verbose_log);
             parent_crate.crate_name.clone()
         };
-        
+
         <span class="attr">#[cfg(not(loscd_eval))]
         </span><span class="macro">info!</span>(<span class="string">&quot;Symbol {:?} not initially found, using {}symbol {} from crate {:?} in backup namespace {:?} in new namespace {:?}&quot;</span>,
             demangled_full_symbol, 
@@ -5755,24 +5747,24 @@
 
 
     <span class="doccomment">/// Attempts to find and load the crate that may contain the given `demangled_full_symbol`. 
-    /// 
+    ///
     /// If successful, the new crate is loaded into this `CrateNamespace` and the symbol&#39;s section is returned.
     /// If this namespace does not contain any matching crates, its recursive namespaces are searched as well.
-    /// 
+    ///
     /// This approach only works for mangled symbols that contain a crate name, such as &quot;my_crate::foo&quot;. 
     /// If &quot;foo()&quot; was marked no_mangle, then we don&#39;t know which crate to load because there is no &quot;my_crate::&quot; prefix before it.
-    /// 
+    ///
     /// Note: while attempting to find the missing `demangled_full_symbol`, this function may end up
     /// loading *multiple* crates into this `CrateNamespace` or its recursive namespaces, due to two reasons:
     /// 1. The `demangled_full_symbol` may have multiple crate prefixes within it.
     ///    * For example, `&lt;page_allocator::AllocatedPages as core::ops::drop::Drop&gt;::drop::h55e0a4c312ccdd63`
     ///      contains two possible crate prefixes: `page_allocator` and `core`.
     /// 2. There may be multiple versions of a single crate.
-    /// 
+    ///
     /// Possible crates are iteratively loaded and searched until the missing symbol is found.
     /// Currently, crates that were loaded but did *not* contain the missing symbol are *not* unloaded,
     /// but you could manually unload them later with no adverse effects to reclaim memory.
-    /// 
+    ///
     /// This is the final attempt to find a symbol within [`CrateNamespace::get_symbol_or_load()`].
     </span><span class="kw">fn </span>load_crate_for_missing_symbol(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
@@ -5784,7 +5776,7 @@
         <span class="comment">// Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
         </span><span class="kw">for </span>potential_crate_name <span class="kw">in </span>get_containing_crate_name(demangled_full_symbol) {
             <span class="kw">let </span>potential_crate_name = <span class="macro">format!</span>(<span class="string">&quot;{potential_crate_name}-&quot;</span>);
- 
+
             <span class="comment">// Try to find and load the missing crate object file from this namespace&#39;s directory or its recursive namespace&#39;s directory,
             // (or from the backup namespace&#39;s directory set).
             // The object files from the recursive namespace(s) are appended after the files in the initial namespace,
@@ -5817,7 +5809,7 @@
                         <span class="comment">// We *could* return an error here, but we might as well continue on to trying to load other crates.
                     </span>}
                 }
-            } 
+            }
         }
 
         <span class="macro">warn!</span>(<span class="string">&quot;Couldn&#39;t find/load crate(s) that may contain the missing symbol {:?}&quot;</span>, demangled_full_symbol);
@@ -5828,16 +5820,16 @@
     <span class="doccomment">/// Returns a copied list of the corresponding `LoadedSection`s 
     /// with names that start with the given `symbol_prefix`.
     /// This will also search the recursive namespace&#39;s symbol map. 
-    /// 
+    ///
     /// This method causes allocation because it creates a copy
     /// of the matching entries in the symbol map.
-    /// 
+    ///
     /// # Example
     /// The symbol map contains `my_crate::foo::h843a613894da0c24` and 
     /// `my_crate::foo::h933a635894ce0f12`. 
     /// Calling `find_symbols_starting_with(&quot;my_crate::foo&quot;)` will return 
     /// a vector containing both sections, which can then be iterated through.
-    </span><span class="kw">pub fn </span>find_symbols_starting_with(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;(String, WeakSectionRef)&gt; { 
+    </span><span class="kw">pub fn </span>find_symbols_starting_with(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;(String, WeakSectionRef)&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>syms: Vec&lt;(String, WeakSectionRef)&gt; = <span class="self">self</span>.symbol_map.lock()
             .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
@@ -5853,7 +5845,7 @@
 
     <span class="doccomment">/// Similar to `find_symbols_starting_with`, but also includes a reference to the exact `CrateNamespace`
     /// where the matching symbol was found.
-    </span><span class="kw">pub fn </span>find_symbols_starting_with_and_namespace(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;(String, WeakSectionRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; { 
+    </span><span class="kw">pub fn </span>find_symbols_starting_with_and_namespace(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; Vec&lt;(String, WeakSectionRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>syms: Vec&lt;(String, WeakSectionRef, <span class="kw-2">&amp;</span>CrateNamespace)&gt; = <span class="self">self</span>.symbol_map.lock()
             .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone(), <span class="self">self</span>))
@@ -5870,12 +5862,12 @@
     <span class="doccomment">/// Returns a weak reference to the `LoadedSection` whose name beings with the given `symbol_prefix`,
     /// *if and only if* the symbol map only contains a single possible matching symbol.
     /// This will also search the recursive namespace&#39;s symbol map. 
-    /// 
+    ///
     /// # Important Usage Note
     /// To avoid greedily matching more symbols than expected, you may wish to end the `symbol_prefix` with &quot;`::`&quot;.
     /// This may provide results more in line with the caller&#39;s expectations; see the last example below about a trailing &quot;`::`&quot;. 
     /// This works because the delimiter between a symbol and its trailing hash value is &quot;`::`&quot;.
-    /// 
+    ///
     /// # Example
     /// * The symbol map contains `my_crate::foo::h843a613894da0c24` 
     ///   and no other symbols that start with `my_crate::foo`. 
@@ -5892,21 +5884,21 @@
     ///   because it will match both `foo` and `foo_new`. 
     ///   To match only `foo`, call this function as `get_symbol_starting_with(&quot;my_crate::foo::&quot;)`
     ///   (note the trailing &quot;`::`&quot;).
-    </span><span class="kw">pub fn </span>get_symbol_starting_with(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; WeakSectionRef { 
+    </span><span class="kw">pub fn </span>get_symbol_starting_with(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; WeakSectionRef {
         <span class="self">self</span>.get_symbol_starting_with_internal(symbol_prefix)
             .unwrap_or_default()
     }
 
     <span class="doccomment">/// This is an internal version of method: [`get_symbol_starting_with()`](#method.get_symbol_starting_with) 
     /// that returns an Option to allow easier recursive use.
-    </span><span class="kw">fn </span>get_symbol_starting_with_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;WeakSectionRef&gt; { 
+    </span><span class="kw">fn </span>get_symbol_starting_with_internal(<span class="kw-2">&amp;</span><span class="self">self</span>, symbol_prefix: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;WeakSectionRef&gt; {
         <span class="comment">// First, we see if there&#39;s a single matching symbol in this namespace. 
         </span><span class="kw">let </span>map = <span class="self">self</span>.symbol_map.lock();
         <span class="kw">let </span><span class="kw-2">mut </span>iter = map.iter_prefix(symbol_prefix.as_bytes()).map(|tuple| tuple.<span class="number">1</span>);
         <span class="kw">let </span>symbol_in_this_namespace = iter.next()
             .filter(|<span class="kw">_</span>| iter.next().is_none()) <span class="comment">// ensure single element
             </span>.cloned();
-        
+
         <span class="comment">// Second, we see if there&#39;s a single matching symbol in the recursive namespace.
         </span><span class="kw">let </span>symbol_in_recursive_namespace = <span class="self">self</span>.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_symbol_starting_with_internal(symbol_prefix));
 
@@ -5914,7 +5906,7 @@
         </span>symbol_in_this_namespace.xor(symbol_in_recursive_namespace)
     }
 
-    
+
     <span class="doccomment">/// Simple debugging function that returns the entire symbol map as a String.
     /// This includes only symbols from this namespace, and excludes symbols from recursive namespaces.
     </span><span class="kw">pub fn </span>dump_symbol_map(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
@@ -6074,7 +6066,7 @@
             allocate_pages_by_bytes(size_in_bytes)
                 .ok_or(<span class="string">&quot;Couldn&#39;t allocate pages for new section&quot;</span>)<span class="question-mark">?
         </span>};
-    
+
         kernel_mmi_ref.lock().page_table.map_allocated_pages(
             allocated_pages,
             flags.valid(<span class="bool-val">true</span>).writable(<span class="bool-val">true</span>)
@@ -6143,7 +6135,7 @@
 
 
 <span class="doccomment">/// Returns a reference to the symbol table in the given `ElfFile`.
-</span><span class="kw">pub fn </span>find_symbol_table&lt;<span class="lifetime">&#39;e</span>&gt;(elf_file: <span class="kw-2">&amp;</span><span class="lifetime">&#39;e </span>ElfFile) 
+</span><span class="kw">pub fn </span>find_symbol_table&lt;<span class="lifetime">&#39;e</span>&gt;(elf_file: <span class="kw-2">&amp;</span><span class="lifetime">&#39;e </span>ElfFile)
     -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;e </span>[xmas_elf::symbol_table::Entry64], <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;
     {
     <span class="kw">use </span>xmas_elf::sections::SectionData::SymbolTable64;
