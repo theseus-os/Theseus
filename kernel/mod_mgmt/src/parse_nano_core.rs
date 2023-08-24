@@ -902,23 +902,23 @@ fn add_new_section(
         let cls_offset = sec_vaddr;
         let cls_sec_data_vaddr = main_section_info.cls_info.unwrap().1 + cls_offset; 
 
-        let tls_section = LoadedSection::new(
+        let cls_section = LoadedSection::new(
             SectionType::Cls,
             sec_name,
             Arc::clone(rodata_pages),
-            // TLS sections are lumped into the ".rodata" MappedPages with the read-only data sections.
-            rodata_pages_locked.offset_of_address(cls_sec_data_vaddr).ok_or("nano_core TLS .tdata section wasn't covered by the .rodata mapped pages!")?,
-            VirtualAddress::new(cls_offset).ok_or("new TLS .tdata section had invalid virtual address (TLS offset)")?,
+            // CLS sections are lumped into the ".rodata" MappedPages with the read-only data sections.
+            rodata_pages_locked.offset_of_address(cls_sec_data_vaddr).ok_or("nano_core CLS .cls section wasn't covered by the .rodata mapped pages!")?,
+            VirtualAddress::new(cls_offset).ok_or("new TLS .cls section had invalid virtual address (CLS offset)")?,
             sec_size,
             global,
             new_crate_weak_ref.clone(),
         );
         // Add this new TLS section to this namespace's TLS area image.
         let cls_section_ref = cls_allocator::add_static_section(
-            tls_section,
+            cls_section,
             cls_offset,
             main_section_info.total_cls_size,
-        ).map_err(|_| "BUG: failed to add static TLS section to the TLS area")?;
+        ).map_err(|_| "BUG: failed to add static CLS section to the CLS area")?;
         Some(cls_section_ref)
     } else {
         crate_items.init_symbols.insert(String::from(sec_name.as_str()), sec_vaddr);
