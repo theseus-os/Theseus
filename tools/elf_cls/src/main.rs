@@ -31,7 +31,6 @@ use goblin::{
         SectionHeader,
     },
     elf64::{
-        header::EI_DATA,
         section_header::{SHF_MASKOS, SHF_TLS},
         sym::STT_TLS,
     },
