@@ -444,7 +444,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                 // ```
                 //
                 // Unlike x64, the `.cls` section is located after `.tls` in a binary and so the
-                // linker thinks the data image looks something like
+                // linker thinks the data image looks like
                 // ```
                 // fs
                 // V

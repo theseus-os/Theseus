@@ -2,6 +2,7 @@
 //!
 //! This involves replacing the `.cls` section's TLS flag with the CLS flag, and
 //! updating all CLS symbols to have the CLS type.
+#![feature(int_roundings)]
 
 use std::{
     env,
@@ -41,8 +42,6 @@ const CLS_SYMBOL_TYPE: u8 = 0xa;
 
 const _: () = assert!(CLS_SYMBOL_TYPE >= STT_LOOS);
 const _: () = assert!(CLS_SYMBOL_TYPE <= STT_HIOS);
-
-// TODO: Cleanup and document.
 
 fn main() {
     let object_file_extension = OsStr::new("o");
@@ -105,7 +104,9 @@ where
         let header = Header::from_fd(&mut file).unwrap();
 
         let sections = sections(&header, &mut file);
-        if let Some(cls_section_index) = update_cls_section(&header, &sections, &mut file) {
+        if let Some((cls_section_index, cls_section_size, tls_section_size)) =
+            update_cls_section(&header, &sections, &mut file)
+        {
             println!(
                 "detected .cls section in {}",
                 PathBuf::from(file_path)
@@ -113,16 +114,25 @@ where
                     .unwrap()
                     .to_string_lossy(),
             );
-            update_cls_symbols(&header, cls_section_index, &sections, &mut file, is_x64);
+            update_cls_symbols(
+                &header,
+                cls_section_index,
+                cls_section_size,
+                tls_section_size,
+                &sections,
+                &mut file,
+                is_x64,
+            );
         }
     }
 }
 
+/// Update the CLS section flag returning the section index and size.
 fn update_cls_section(
     header: &Header,
     sections: &[SectionHeader],
     file: &mut File,
-) -> Option<usize> {
+) -> Option<(usize, u64, u64)> {
     let section_header_string_table_index = header.e_shstrndx;
     let string_table_section = &sections[section_header_string_table_index as usize];
 
@@ -131,6 +141,9 @@ fn update_cls_section(
         .unwrap();
     file.read_exact(&mut string_table_bytes).unwrap();
     let string_table = Strtab::new(&string_table_bytes, 0);
+
+    let mut cls_info = None;
+    let mut tls_size = 0;
 
     for (i, section) in sections.iter().enumerate() {
         let name = string_table.get_unsafe(section.sh_name).unwrap();
@@ -154,19 +167,26 @@ fn update_cls_section(
             // Overwrite the old flags.
             let flag_position = header.e_shoff + i as u64 * header.e_shentsize as u64 + 8;
             file.seek(SeekFrom::Start(flag_position)).unwrap();
-            // TODO: Le, be
             file.write_all(&flags.to_le_bytes())
                 .expect("failed to write .cls section type to file");
 
-            return Some(i);
+            cls_info = Some((i, section.sh_size));
+        } else {
+            let is_tls = section.sh_flags & SHF_TLS as u64 == SHF_TLS as u64;
+            if is_tls {
+                tls_size += section.sh_size;
+            }
         }
     }
-    None
+
+    cls_info.map(|(cls_index, cls_size)| (cls_index, cls_size, tls_size))
 }
 
 fn update_cls_symbols(
     header: &Header,
     cls_section_index: usize,
+    cls_size: u64,
+    tls_size: u64,
     sections: &[SectionHeader],
     file: &mut File,
     is_x64: bool,
@@ -202,6 +222,17 @@ fn update_cls_symbols(
     let symbol_table =
         Symtab::parse(&symbol_table_bytes, 0, symbol_count as usize, context).unwrap();
 
+    // CLS size cannot be zero, otherwise this function wouldn't have been called.
+    let cls_rounded_size = cls_size.next_multiple_of(0x1000);
+    let tls_rounded_size = if tls_size == 0 {
+        0
+    } else {
+        tls_size.next_multiple_of(0x1000)
+    };
+
+    // The value of a CLS/TLS symbol is the offset into the CLS/TLS section.
+    // Negative offsets are for relocations, **not** symbol values.
+
     for (i, symbol) in symbol_table.iter().enumerate() {
         if symbol.st_type() == STT_TLS {
             if symbol.st_shndx == cls_section_index {
@@ -210,8 +241,20 @@ fn update_cls_symbols(
                 file.seek(SeekFrom::Start(symbol_info_offset)).unwrap();
                 file.write_all(&[new_info]).unwrap();
 
-                if !is_x64 && symbol.st_value >= 0x1000 {
-                    let new_value = symbol.st_value - 0x1000;
+                // On AArch64, the CLS symbols have the wrong value. The linker thinks the data
+                // image looks like
+                // ```
+                // +-----------------------+-----+-----------------------+------------------------+
+                // | statically linked TLS | 000 | statically linked CLS | dynamically linked TLS |
+                // +-----------------------+-----+-----------------------+------------------------+
+                // ```
+                // where `000` are padding bytes to align the start of the statically linked CLS
+                // to a page boundary.
+                //
+                // So we subtract the size of the TLS section + padding bytes from all CLS
+                // variables.
+                if !is_x64 && symbol.st_value >= tls_rounded_size {
+                    let new_value = symbol.st_value - tls_rounded_size;
                     let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
                     file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
                     file.write_all(&new_value.to_le_bytes()).unwrap();
@@ -222,9 +265,20 @@ fn update_cls_symbols(
                 } else {
                     println!("overwrote symbol flag");
                 }
-            // On x64, the TLS symbols have the wrong value.
-            } else if is_x64 && symbol.st_value >= 0x1000 {
-                let new_value = symbol.st_value - 0x1000;
+            // On x64, the TLS symbols have the wrong value. The linker thinks
+            // the data image looks like
+            // ```
+            // +-----------------------+-----+-----------------------+
+            // | statically linked cls | 000 | statically linked TLS |
+            // +-----------------------+-----+-----------------------+
+            // ```
+            // where `000` are padding bytes to align the start of the
+            // statically linked TLS to a page boundary.
+            //
+            // So we subtract the size of the CLS section + padding bytes from
+            // all TLS variables.
+            } else if is_x64 && symbol.st_value >= cls_rounded_size {
+                let new_value = symbol.st_value - cls_rounded_size;
                 let symbol_value_offset = symbol_table_offset + i as u64 * symbol_size + 8;
                 file.seek(SeekFrom::Start(symbol_value_offset)).unwrap();
                 file.write_all(&new_value.to_le_bytes()).unwrap();
