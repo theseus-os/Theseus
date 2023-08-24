@@ -187,6 +187,11 @@ impl SerialPort {
         }
     }
 
+    /// Clears an interrupt in the serial port controller
+    pub fn acknowledge_interrupt(&mut self, _event: SerialPortInterruptEvent) {
+        // no-op on x86_64
+    }
+
     /// Write the given string to the serial port, blocking until data can be transmitted.
     ///
     /// # Special characters
