@@ -662,7 +662,6 @@ fn window_manager_loop(
 
         if let Some(event) = event_opt {
             // Currently, the window manager only cares about keyboard or mouse events
-            log::error!("event");
             match event {
                 Event::KeyboardEvent(ref input_event) => {
                     let key_input = input_event.key_event;

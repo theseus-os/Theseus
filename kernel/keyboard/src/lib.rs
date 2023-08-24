@@ -69,7 +69,6 @@ pub fn init(keyboard: PS2Keyboard<'static>, keyboard_queue_producer: Queue<Event
 
 /// The interrupt handler for a PS/2-connected keyboard, registered at IRQ 0x21.
 extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame) {
-    log::info!("KEYBOARD EVENT");
     // Some of the scancodes are "extended", which means they generate two different interrupts,
     // the first handling the E0 byte, the second handling their second byte.
     static EXTENDED_SCANCODE: AtomicBool = AtomicBool::new(false);

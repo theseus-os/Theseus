@@ -188,6 +188,7 @@ fn parse_nano_core_symbol_file_or_binary(
         data_pages:          Some((data_pages.clone(),   mp_range(data_pages))),
         global_sections:     BTreeSet::new(),
         tls_sections:        BTreeSet::new(),
+        cls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
         reexported_symbols:  BTreeSet::new(),
     });

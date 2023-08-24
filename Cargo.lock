@@ -493,6 +493,7 @@ dependencies = [
  "crate_metadata",
  "irq_safety",
  "local_storage_initializer",
+ "log",
  "sync_spin",
 ]
 

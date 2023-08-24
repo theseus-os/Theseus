@@ -52,7 +52,7 @@ pub fn reload_current_core() {
         if *cpu == current_cpu {
             // We disable interrupts so that we can safely access `image` and `data` without
             // them being changed under our nose.
-            let _guard = irq_safety::disable_interrupts();
+            let _guard = irq_safety::hold_interrupts();
 
             data.inherit(image);
 

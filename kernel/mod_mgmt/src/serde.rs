@@ -44,6 +44,7 @@ pub(crate) fn into_loaded_crate(
         data_pages:          Some((Arc::clone(data_pages), mp_range(data_pages))),
         global_sections:     serialized_crate.global_sections,
         tls_sections:        serialized_crate.tls_sections,
+        cls_sections:        serialized_crate.cls_sections,
         data_sections:       serialized_crate.data_sections,
         reexported_symbols:  BTreeSet::new(),
     });

@@ -1120,6 +1120,7 @@ impl CrateNamespace {
             data_pages:              data_pages.clone(),
             global_sections:         BTreeSet::new(),
             tls_sections:            BTreeSet::new(),
+            cls_sections:            BTreeSet::new(),
             data_sections:           BTreeSet::new(),
             reexported_symbols:      BTreeSet::new(),
         });
@@ -1135,6 +1136,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
          } = load_sections_fn(
             self,
@@ -1152,6 +1154,7 @@ impl CrateNamespace {
             new_crate_mut.sections        = loaded_sections;
             new_crate_mut.global_sections = global_sections;
             new_crate_mut.tls_sections    = tls_sections;
+            new_crate_mut.cls_sections    = cls_sections;
             new_crate_mut.data_sections   = data_sections;
         }
 
@@ -1211,6 +1214,7 @@ impl CrateNamespace {
         let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new();
         let mut data_sections:   BTreeSet<usize> = BTreeSet::new();
         let mut tls_sections:    BTreeSet<usize> = BTreeSet::new();
+        let mut cls_sections:    BTreeSet<usize> = BTreeSet::new();
         let mut last_shndx = 0;
 
         // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
@@ -1319,11 +1323,12 @@ impl CrateNamespace {
                             .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
                         // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
                         virt_addr = VirtualAddress::zero();
+                        cls_sections.insert(shndx);
                     }
-                    Ok(ShType::NoBits) => {
-                        todo!("bss");
-                    }
-                    _ => todo!("handle error"),
+                    ty => {
+                        error!("CLS section had incorrect type: {ty:?}");
+                        return Err("CLS section had incorrect type");
+                    },
                 }
             }
 
@@ -1643,6 +1648,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
         })
     }
@@ -1719,6 +1725,7 @@ impl CrateNamespace {
         const RODATA_PREFIX:           &str = ".rodata.";
         const DATA_PREFIX:             &str = ".data.";
         const BSS_PREFIX:              &str = ".bss.";
+        const CLS_PREFIX:              &str = ".cls.";
         const TLS_DATA_PREFIX:         &str = ".tdata.";
         const TLS_BSS_PREFIX:          &str = ".tbss.";
         // const RELRO_PREFIX:            &str = "rel.ro.";
@@ -1765,11 +1772,11 @@ impl CrateNamespace {
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
         // the set of Shndxes for TLS sections (.tdata, .tbss)
         let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
+        // the set of Shndxes for CLS sections (.cls)
+        let mut cls_sections: BTreeSet<Shndx> = BTreeSet::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
-
-
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
         for (shndx, sec) in elf_file.section_iter().enumerate() {
@@ -1819,9 +1826,10 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
-            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write  = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec   = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls    = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls    = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
 
 
             // First, check for executable sections, which can only be .text sections.
@@ -1923,6 +1931,53 @@ impl CrateNamespace {
                     // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
+
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling TLS section");
+                }
+            }
+
+            else if is_cls {
+                // check if this TLS section is .bss or .data
+                if sec.get_type() != Ok(ShType::ProgBits) {
+                    return Err("CLS section had wrong type");
+                }
+
+                let name = try_get_symbol_name_after_prefix!(sec_name, CLS_PREFIX);
+                let demangled = demangle(name).to_string().as_str().into();
+
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    let (mapped_pages_offset, sec_typ) = {
+                        // Here: copy the TLS .tdata section's contents to the proper address in the read-only pages.
+                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for CLS .cls section [{}] {}: {:?}", shndx, sec_name, _other);
+                                return Err("couldn't get section data in CLS .cls section");
+                            }
+                        };
+                        // As with all other normal sections, use the current offset for these read-only pages.
+                        (rodata_offset, SectionType::Cls)
+                    };
+
+                    let new_cls_section = LoadedSection::new(
+                        sec_typ,
+                        demangled,
+                        Arc::clone(rp_ref),
+                        mapped_pages_offset,
+                        VirtualAddress::zero(), // will be replaced in `add_dynamic_cls_section()` below
+                        sec_size,
+                        global_sections.contains(&shndx),
+                        new_crate.clone(),
+                    );
+                    let (_, new_cls_section) = cls_allocator::add_dynamic_section(new_cls_section, sec_align)
+                        .map_err(|_| "Failed to add new CLS section")?;
+
+                    loaded_sections.insert(shndx, new_cls_section);
+                    cls_sections.insert(shndx);
 
                     rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
@@ -2125,6 +2180,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
         })
     }
@@ -2952,6 +3008,7 @@ struct SectionMetadata {
     loaded_sections: HashMap<usize, Arc<LoadedSection>>,
     global_sections: BTreeSet<usize>,
     tls_sections:    BTreeSet<usize>,
+    cls_sections:    BTreeSet<usize>,
     data_sections:   BTreeSet<usize>,
 }
 

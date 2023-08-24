@@ -9,3 +9,4 @@ crate_metadata = { path = "../crate_metadata" }
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 local_storage_initializer = { path = "../local_storage_initializer" }
 sync_spin = { path = "../../libs/sync_spin" }
+log = "*"

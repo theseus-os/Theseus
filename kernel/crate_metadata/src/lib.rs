@@ -248,6 +248,8 @@ pub struct LoadedCrate {
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
     pub tls_sections: BTreeSet<Shndx>,
+    /// The set of CPU-local storage (CLS) symbols in this crate.
+    pub cls_sections: BTreeSet<Shndx>,
     /// The set of `.data` and `.bss` sections in this crate.
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
