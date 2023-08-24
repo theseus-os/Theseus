@@ -257,7 +257,6 @@ fn parse_extra_file(
     extra_file_mp: MappedPages,
     extra_files_dir: DirRef
 ) -> Result<FileRef, &'static str> {
-
     let mut file_name = extra_file_name;
 
     let mut parent_dir = extra_files_dir;
@@ -861,7 +860,6 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(StrongCrateRef, usize), &'static str> {
-
         #[cfg(not(loscd_eval))]
         debug!("load_crate: trying to load crate at {:?}", crate_object_file.lock().get_absolute_path());
         let new_crate_ref = self.load_crate_internal(crate_object_file, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
@@ -981,7 +979,6 @@ impl CrateNamespace {
         new_section: &StrongSectionRef,
         kernel_mmi_ref: &MmiRef
     ) -> Result<(), &'static str> {
-
         for weak_dep in &old_section.inner.read().sections_dependent_on_me {
             let target_sec = weak_dep.section.upgrade().ok_or("couldn't upgrade WeakDependent.section")?;
             let relocation_entry = weak_dep.relocation;
@@ -1062,7 +1059,6 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
-
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.len();
         let abs_path      = Path::new(crate_file.get_absolute_path());
