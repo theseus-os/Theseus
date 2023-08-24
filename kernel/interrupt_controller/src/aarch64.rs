@@ -112,14 +112,18 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: CpuId,
+        destination: Option<CpuId>,
         priority: Priority,
     ) -> Result<(), &'static str> {
         assert!(sys_int_num >= 32, "shared peripheral interrupts have a number >= 32");
         let mut dist = self.0.lock();
 
-        dist.set_spi_target(sys_int_num as _, SpiDestination::Specific(destination));
-        dist.set_spi_priority(sys_int_num as _, priority);
+        if let Some(destination) = destination {
+            dist.set_spi_target(sys_int_num as _, SpiDestination::Specific(destination));
+            dist.set_spi_priority(sys_int_num as _, priority);
+        }
+
+        dist.set_spi_state(sys_int_num as _, destination.is_some());
 
         Ok(())
     }

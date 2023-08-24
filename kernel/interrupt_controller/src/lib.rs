@@ -52,7 +52,7 @@ pub trait SystemInterruptControllerApi {
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: CpuId,
+        destination: Option<CpuId>,
         priority: Priority,
     ) -> Result<(), &'static str>;
 }
