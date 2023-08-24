@@ -97,7 +97,6 @@ pub fn kstart_ap(
             nmi_flags,
         ).unwrap();
     }
-    cls_allocator::reload_current_core();
 
     #[cfg(target_arch = "aarch64")] {
         interrupts::init_ap();
@@ -109,6 +108,7 @@ pub fn kstart_ap(
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // per-CPU storage, tasking, and create the idle task for this CPU.
+    cls_allocator::reload_current_core();
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
 
     // The PAT must be initialized explicitly on every CPU,
