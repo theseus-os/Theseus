@@ -424,6 +424,7 @@ fn parse_nano_core_symbol_file(
         // third, parse each symbol table entry
         for (_line_num, line) in file_iterator {
             if line.is_empty() { continue; }
+            // CLS symbols have an OS specific symbol type which messes with the parser.
             let line = line.replace("<OS specific>: ", "");
             
             // we need the following items from a symbol table entry:

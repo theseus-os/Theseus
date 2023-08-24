@@ -70,7 +70,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
         if line.is_empty() {
             continue;
         }
-        // println!("Looking at line: {:?}", line);
+        // debug!("Looking at line: {:?}", line);
 
         if line.contains(".init") && line.contains("PROGBITS") {
             init_vaddr = parse_section(line).map(|(_, vaddr, _)| vaddr);  
@@ -179,6 +179,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
             // after we've split the first 7 columns by whitespace. So we write a custom closure to group multiple whitespaces together.
             // We use "splitn(8, ..)" because it stops at the 8th column (column index 7) and gets the rest of the line in a single iteration.
             let mut prev_whitespace = true; // by default, we start assuming that the previous element was whitespace.
+            // CLS symbols have an OS specific symbol type which messes with the parser.
             let line = line.replace("<OS specific>: ", "");
             let mut parts = line
                 .splitn(8, |c: char| {
@@ -239,7 +240,7 @@ pub fn parse_nano_core_symbol_file(symbol_str: String) -> Result<ParsedCrateItem
                 Ok(ndx) => ndx,
                 // Otherwise, if ndx is not a number (e.g., "ABS"), then we just skip that entry (go onto the next line).
                 _ => {
-                    // println!(
+                    // trace!(
                     //     "parse_nano_core_symbol_file(): skipping line {}: {}",
                     //     _line_num + 1,
                     //     line
