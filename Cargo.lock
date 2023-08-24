@@ -2741,7 +2741,6 @@ dependencies = [
  "apic",
  "cls_macros",
  "cpu",
- "log",
 ]
 
 [[package]]

@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 cls_macros = { path = "../cls/cls_macros" }
 cpu = { path = "../cpu" }
-log = "*"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 apic = { path = "../apic" }

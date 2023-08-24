@@ -275,7 +275,7 @@ impl TaskRef {
     /// Currently, this simply updates the current CPU's TLS base register
     /// to point to this task's TLS data image.
     fn set_as_current_task(&self) {
-        // SAFETY: ???
+        // SAFETY: We don't drop the TLS area until the task is finished.
         unsafe { self.0.task.tls_area().set_as_current_tls() };
     }
 }
@@ -608,7 +608,7 @@ mod scheduler {
         // If preemption was not previously enabled (before we disabled it above),
         // then we shouldn't perform a task switch here.
         if !preemption_guard.preemption_was_enabled() {
-            // log::trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
+            // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
             return false;
         }
 

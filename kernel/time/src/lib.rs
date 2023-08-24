@@ -4,10 +4,10 @@
 
 mod dummy;
 
-pub use core::time::Duration;
 use core::{fmt, ops};
-
 use crossbeam_utils::atomic::AtomicCell;
+
+pub use core::time::Duration;
 
 const FEMTOS_TO_NANOS: u128 = 1_000_000;
 
