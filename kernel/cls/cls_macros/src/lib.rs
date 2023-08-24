@@ -316,6 +316,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                             "lea {offset}, [{cls}@TPOFF]",
                             offset = out(reg) offset,
                             cls = sym #name,
+                            options(nomem, preserves_flags, nostack),
                         )
                     };
                     offset
@@ -394,6 +395,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                                 "lea {offset}, [{cls}@TPOFF]",
                                 offset = out(reg) offset,
                                 cls = sym #name,
+                                options(nomem, preserves_flags, nostack),
                             )
                         };
                         offset
@@ -415,6 +417,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                                 cls = sym #name,
                                 tls_size = in(reg) tls_size,
                                 cls_start_to_tls_start = in(reg) cls_start_to_tls_start,
+                                options(nomem, preserves_flags, nostack),
                             )
                         };
                         let offset = (cls_size - from_cls_start).wrapping_neg();
@@ -496,6 +499,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                         offset = inout(reg) offset,
                         cls = sym #name,
                         tls_start_to_cls_start = in(reg) tls_start_to_cls_start,
+                        options(nomem, preserves_flags, nostack),
                     )
                 };
                 offset

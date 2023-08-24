@@ -30,7 +30,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         ::core::concat!("mov {ret}, gs:[{offset}]"),
                         ret = out(#x64_reg_class) ret,
                         offset = in(reg) offset,
-                        options(preserves_flags, nostack),
+                        options(readonly, preserves_flags, nostack),
                     )
                 };
                 ret
@@ -61,7 +61,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                         ret = out(reg) ret,
                         tp_2 = out(reg) _,
 
-                        options(nostack),
+                        options(readonly, nostack),
                     )
                 };
                 ret
