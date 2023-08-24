@@ -82,17 +82,13 @@ where
     _phantom: PhantomData<T>,
 } 
 
-pub trait LocalStorage {
-    unsafe fn set_as_current_base(ptr: u64);
-}
+pub trait LocalStorage: private::Sealed {}
 
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct Cls {}
 
-impl private::Sealed for Cls {}
-
-impl LocalStorage for Cls {
+impl Sealed for Cls {
     unsafe fn set_as_current_base(ptr: u64) {
         #[cfg(target_arch = "x86_64")]
         {
@@ -101,34 +97,41 @@ impl LocalStorage for Cls {
                 segmentation::{Segment64, GS},
             };
             unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
-            unsafe { GS::write_base(VirtAddr::new(ptr as u64)) };
+            unsafe { GS::write_base(VirtAddr::new(ptr)) };
         };
         #[cfg(target_arch = "aarch64")]
         {
             use cortex_a::registers::TPIDR_EL1;
-            TPIDR_EL1.set(ptr as u64);
+            TPIDR_EL1.set(ptr);
         }
     }
 }
+
+impl LocalStorage for Cls {}
 
 #[non_exhaustive]
 #[derive(Debug)]
 pub struct Tls {}
 
-impl private::Sealed for Tls {}
-
-impl LocalStorage for Tls {
+impl Sealed for Tls {
     unsafe fn set_as_current_base(ptr: u64) {
         #[cfg(target_arch = "x86_64")]
-        FsBase::write(VirtAddr::new(ptr as u64));
+        FsBase::write(VirtAddr::new(ptr));
 
         #[cfg(target_arch = "aarch64")]
-        TPIDR_EL0.set(ptr as u64);
+        TPIDR_EL0.set(ptr);
     }
 }
 
+impl LocalStorage for Tls {}
+
+use private::Sealed;
 mod private {
-    pub trait Sealed {}
+    pub trait Sealed {
+        /// Moves `ptr` into the associated register.
+        #[allow(clippy::missing_safety_doc)]
+        unsafe fn set_as_current_base(ptr: u64);
+    }
 }
 
 /// On x86_64, a TLS self pointer exists at the 0th index/offset into each TLS data image,

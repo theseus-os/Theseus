@@ -95,6 +95,7 @@ pub(crate) fn into_loaded_crate(
 
 
 /// Convert the given [`SerializedSection`] into a [`LoadedSection`].
+#[allow(clippy::too_many_arguments)]
 fn into_loaded_section(
     serialized_section: SerializedSection,
     parent_crate:       WeakCrateRef,
