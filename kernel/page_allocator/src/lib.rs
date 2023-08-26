@@ -219,7 +219,7 @@ impl PageRangeSized {
 				Some(pr.clone())
 			}
 			PageRangeSized::Normal4KiB(pr) => {
-				Some(pr.into_2mb_range())
+				pr.into_2mb_range()
 			}
 			_ => {
 				None
@@ -234,7 +234,7 @@ impl PageRangeSized {
 				Some(pr.clone())
 			}
 			PageRangeSized::Normal4KiB(pr) => {
-				Some(pr.into_1gb_range())
+				pr.into_1gb_range()
 			}
 			_ => {
 				None
@@ -322,10 +322,10 @@ impl PageRangeSized {
 				pr.size_in_pages()
 			}
 			PageRangeSized::Huge2MiB(pr) => {
-				pr.size_in_pages_gen()
+				pr.size_in_pages()
 			}
 			PageRangeSized::Huge1GiB(pr) => {
-				pr.size_in_pages_gen()
+				pr.size_in_pages()
 			}
 		}
 	}
