@@ -35,37 +35,42 @@ pub fn init() {
     unsafe { asm!("msr ICC_IGRPEN1_EL1, {}", in(reg) IGRPEN_ENABLED) };
 }
 
-/// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're queued
-/// until this CPU or another one is ready to handle
-/// them
+/// Retrieves the current priority threshold for the current CPU.
+///
+/// Interrupts have a priority; if their priority is lower or
+/// equal to this threshold, they're queued until the current CPU
+/// is ready to handle them.
 pub fn get_minimum_priority() -> Priority {
     let mut reg_value: u64;
     unsafe { asm!("mrs {}, ICC_PMR_EL1", out(reg) reg_value) };
     u8::MAX - (reg_value as u8)
 }
 
-/// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're queued
-/// until this CPU or another one is ready to handle
-/// them
+/// Sets the current priority threshold for the current CPU.
+///
+/// Interrupts have a priority; if their priority is lower or
+/// equal to this threshold, they're queued until the current CPU
+/// is ready to handle them.
 pub fn set_minimum_priority(priority: Priority) {
     let reg_value = (u8::MAX - priority) as u64;
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
-/// Signals to the controller that the currently processed interrupt has
-/// been fully handled, by zeroing the current priority level of this CPU.
+/// Signals to the controller that the currently processed interrupt
+/// has been fully handled, by zeroing the current priority level of
+/// the current CPU.
+///
 /// This implies that the CPU is ready to process interrupts again.
 pub fn end_of_interrupt(int: InterruptNumber) {
     let reg_value = int as u64;
     unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
 }
 
-/// Acknowledge the currently serviced interrupt
-/// and fetches its number; this tells the GIC that
-/// the requested interrupt is being handled by
-/// this CPU.
+/// Acknowledge the currently serviced interrupt and fetches its
+/// number.
+///
+/// This tells the GIC that the requested interrupt is being
+/// handled by this CPU.
 pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
     let int_num: u64;
     let priority: u64;
@@ -82,6 +87,7 @@ pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
     (int_num as InterruptNumber, priority as u8)
 }
 
+/// Generates an interrupt in CPU interfaces of the system
 pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
     let mut value = match target {
         IpiTargetCpu::Specific(cpu) => {

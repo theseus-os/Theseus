@@ -7,6 +7,7 @@
 
 #![no_std]
 #![feature(step_trait)]
+#![feature(int_roundings)]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
 
@@ -374,6 +375,15 @@ macro_rules! implement_page_frame {
 
                 pub const fn page_size(&self) -> MemChunkSize {
                     P::SIZE
+                }
+              
+                #[doc = "Returns a new `" $TypeName "` that is aligned up from this \
+                    `" $TypeName "` to the nearest multiple of `alignment_4k_pages`."]
+                #[doc(alias = "next_multiple_of")]
+                pub const fn align_up(&self, alignment_4k_pages: usize) -> $TypeName {
+                    $TypeName {
+                        number: self.number.next_multiple_of(alignment_4k_pages)
+                    }
                 }
             }
             impl<P: 'static + PageSize> fmt::Debug for $TypeName<P> {
