@@ -101,7 +101,7 @@ impl<L: HierarchicalLevel> Table<L> {
     fn next_table_address(&self, index: usize) -> Option<VirtualAddress> {
         let pte_flags = self[index].flags();
 
-        if pte_flags.is_valid() && !is_huge(&pte_flags)  {
+        if pte_flags.is_valid() && !is_huge(&pte_flags) {
             let table_address = self as *const _ as usize;
             let next_table_vaddr: usize = (table_address << 9) | (index << PAGE_SHIFT);
             Some(VirtualAddress::new_canonical(next_table_vaddr))
