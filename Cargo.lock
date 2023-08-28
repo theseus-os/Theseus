@@ -3758,6 +3758,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_1gb_huge_pages"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "memory",
+]
+
+[[package]]
 name = "test_async"
 version = "0.1.0"
 dependencies = [
@@ -3813,6 +3821,16 @@ dependencies = [
  "memfs",
  "memory",
  "root",
+]
+
+[[package]]
+name = "test_huge_pages"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "frame_allocator",
+ "memory",
+ "page_allocator",
 ]
 
 [[package]]

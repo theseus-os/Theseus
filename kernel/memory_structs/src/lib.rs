@@ -471,7 +471,6 @@ macro_rules! implement_page_frame {
                 }
             }
             #[doc = "Implementing `Step` allows `" $TypeName "` to be used in an [`Iterator`]."]
-           // impl<P: PageSize> Step for $TypeName<P> {
             impl Step for $TypeName {
                 #[inline]
                 fn steps_between(start: &$TypeName, end: &$TypeName) -> Option<usize> {
@@ -479,7 +478,7 @@ macro_rules! implement_page_frame {
                 }
                 #[inline]
                 fn forward_checked(start: $TypeName, count: usize) -> Option<$TypeName> {
-                    Step::forward_checked(start.number, count).map(|n| $TypeName { number: n, size: PhantomData /* PhantomData::<Page4KiB> */ })
+                    Step::forward_checked(start.number, count).map(|n| $TypeName { number: n, size: PhantomData })
                 }
                 #[inline]
                 fn backward_checked(start: $TypeName, count: usize) -> Option<$TypeName> {
@@ -501,7 +500,7 @@ macro_rules! implement_page_frame {
                 }
                 #[inline]
                 fn forward_checked(start: $TypeName<Page2MiB>, count: usize) -> Option<$TypeName<Page2MiB>> {
-                    Step::forward_checked(start.number, count + 512).map(|n| $TypeName { number: n, size: PhantomData /* PhantomData::<Page4KiB> */ })
+                    Step::forward_checked(start.number, count + 512).map(|n| $TypeName { number: n, size: PhantomData })
                 }
                 #[inline]
                 fn backward_checked(start: $TypeName<Page2MiB>, count: usize) -> Option<$TypeName<Page2MiB>> {
@@ -523,23 +522,23 @@ macro_rules! implement_page_frame {
                 }
                 #[inline]
                 fn forward_checked(start: $TypeName<Page1GiB>, count: usize) -> Option<$TypeName<Page1GiB>> {
-                    Step::forward_checked(start.number, count + (512 * 512)).map(|n| $TypeName { number: n, size: PhantomData /* PhantomData::<Page4KiB> */ })
+                    Step::forward_checked(start.number, count + (512 * 512)).map(|n| $TypeName { number: n, size: PhantomData })
                 }
                 #[inline]
                 fn backward_checked(start: $TypeName<Page1GiB>, count: usize) -> Option<$TypeName<Page1GiB>> {
                     Step::backward_checked(start.number, count + (512 * 512)).map(|n| $TypeName { number: n, size: PhantomData })
                 }
             }
-            impl From<$TypeName> for $TypeName<Page2MiB> {
-                fn from(p: $TypeName) -> Self {
+            impl From<&$TypeName> for $TypeName<Page2MiB> {
+                fn from(p: &$TypeName) -> Self {
                     $TypeName {
                         number: p.number,
                         size: PhantomData::<Page2MiB>,
                     }
                 }
             }
-            impl From<$TypeName> for $TypeName<Page1GiB> {
-                fn from(p: $TypeName) -> Self {
+            impl From<&$TypeName> for $TypeName<Page1GiB> {
+                fn from(p: &$TypeName) -> Self {
                     $TypeName {
                         number: p.number,
                         size: PhantomData::<Page1GiB>,
@@ -717,20 +716,11 @@ macro_rules! implement_page_frame_range {
 
                 #[doc = "Returns the size of this range in bytes."]
                 pub const fn size_in_bytes(&self) -> usize {
-                    match P::SIZE {
-                        MemChunkSize::Normal4K => {
-                            self.[<size_in_ $chunk:lower s_gen>]() * PAGE_4KB_SIZE
-                        }
-                        MemChunkSize::Huge2M => {
-                            self.[<size_in_ $chunk:lower s_gen>]() * PAGE_4KB_SIZE // PAGE_2MB_SIZE
-                        }
-                        MemChunkSize::Huge1G => {
-                            self.[<size_in_ $chunk:lower s_gen>]() * PAGE_4KB_SIZE // PAGE_1GB_SIZE
-                        }
-                    }
+                    self.[<size_in_ $chunk:lower s_gen>]() * PAGE_4KB_SIZE
                 }
 
-                #[doc = "Needed for functions in the impl block generic over chunk size P, as the compiler cannot recognize which methods to call."]
+                #[doc = "Returns the number of 4KiB chunks in this range. \
+                    Needed for functions in the impl block generic over chunk size P, as the compiler cannot recognize which methods to call."]
                 const fn [<size_in_ $chunk:lower s_gen>](&self) -> usize {
                    // add 1 because it's an inclusive range
                    (self.0.end().number + 1).saturating_sub(self.0.start().number)
@@ -819,7 +809,7 @@ macro_rules! implement_page_frame_range {
                 type Error = &'static str;
                 fn try_from(p: $TypeName) -> Result<Self, &'static str> {
                     if (p.[<size_in_ $chunk:lower s>]() - 1) % 512 == 0 {
-                        return Ok(Self::new(p.start().as_2mb(), p.end().as_2mb()));
+                        return Ok(Self::new($chunk::<Page2MiB>::from(p.start()), $chunk::<Page2MiB>::from(p.end())));
                     } else {
                         return Err("Could not convert 4KiB page range into 2MiB page range.");
                     }
@@ -828,8 +818,8 @@ macro_rules! implement_page_frame_range {
             impl TryFrom<$TypeName> for $TypeName<Page1GiB> {
                 type Error = &'static str;
                 fn try_from(p: $TypeName) -> Result<Self, &'static str> {
-                    if (p.[<size_in_ $chunk:lower s>]() - 1) % 512 == 0 {
-                        return Ok(Self::new(p.start().as_1gb(), p.end().as_1gb()));
+                    if (p.[<size_in_ $chunk:lower s>]() - 1) % (512 * 512) == 0 {
+                        return Ok(Self::new($chunk::<Page1GiB>::from(p.start()), $chunk::<Page1GiB>::from(p.end())));
                     } else {
                         return Err("Could not convert 4KiB page range into 1GiB page range.");
                     }
