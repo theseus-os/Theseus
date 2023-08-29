@@ -7,7 +7,6 @@
 
 #![no_std]
 #![feature(step_trait)]
-#![feature(int_roundings)]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
 
@@ -40,9 +39,31 @@ pub enum MemChunkSize {
     Huge1G,
 }
 
+impl MemChunkSize {
+    /// Return the number of 4kb chunks that this chunk contains
+    pub const fn contained_4k_pages(&self) -> usize {
+        match *self {
+            Self::Normal4K => 1,
+            Self::Huge2M => 512,
+            Self::Huge1G => 512 * 512
+        }
+    }
+
+    /// Return the size of an individual chunk of this size
+    pub const fn size_in_bytes(&self) -> usize {
+        match *self {
+            Self::Normal4K => PAGE_SIZE,
+            Self::Huge2M => PAGE_SIZE * 512,
+            Self::Huge1G => PAGE_SIZE * 512 * 512
+        }
+    }
+}
+
 /// Trait used to group the size marker structs that paging-related types are parameterized with.
 pub trait PageSize: Ord + PartialOrd + Clone {
     const SIZE: MemChunkSize;
+    const CONTAINED_4K: usize;
+    const SIZE_IN_BYTES: usize;
 }
 
 /// Marker struct used to indicate the default page size of 4KiB.
@@ -50,6 +71,8 @@ pub trait PageSize: Ord + PartialOrd + Clone {
 pub struct Page4KiB;
 impl PageSize for Page4KiB {
     const SIZE: MemChunkSize = MemChunkSize::Normal4K;
+    const CONTAINED_4K: usize = 1;
+    const SIZE_IN_BYTES: usize = PAGE_SIZE;
 }
 
 /// Marker struct used to indicate a page size of 2MiB.
@@ -57,6 +80,8 @@ impl PageSize for Page4KiB {
 pub struct Page2MiB;
 impl PageSize for Page2MiB {
     const SIZE: MemChunkSize = MemChunkSize::Huge2M;
+    const CONTAINED_4K: usize = 512;
+    const SIZE_IN_BYTES: usize = PAGE_SIZE * 512;
 }
 
 /// Marker struct used to indicate a page size of 1GiB.
@@ -64,6 +89,8 @@ impl PageSize for Page2MiB {
 pub struct Page1GiB;
 impl PageSize for Page1GiB {
     const SIZE: MemChunkSize = MemChunkSize::Huge1G;
+    const CONTAINED_4K: usize = 512 * 512;
+    const SIZE_IN_BYTES: usize = PAGE_SIZE * 512 * 512;
 }
 
 /// The possible states that a range of exclusively-owned pages or frames can be in.
@@ -341,26 +368,10 @@ macro_rules! implement_page_frame {
                     }
                 }
 
-                #[doc = "Returns a `" $TypeName "` with the same number as this `" $TypeName "` but with the size marker set to indicate a size of 1gb."]
-                pub const fn as_1gb(&self) -> $TypeName<Page1GiB> {
-                    $TypeName {
-                        number: self.number,
-                        size: PhantomData::<Page1GiB>
-                    }
-                }
-
-                #[doc = "Returns a `" $TypeName "` with the same number as this `" $TypeName "` but with the size marker set to indicate a size of 2mb."]
-                pub const fn as_2mb(&self) -> $TypeName<Page2MiB> {
-                    $TypeName {
-                        number: self.number,
-                        size: PhantomData::<Page2MiB>
-                    }
-                }
-
                 #[doc = "Returns a 2MiB huge`" $TypeName "` containing the given `" $address "`."]
                 pub const fn containing_address_2mb(addr: $address) -> $TypeName<Page2MiB> {
                     $TypeName {
-                        number: addr.value() / PAGE_SIZE,
+                        number: addr.value() / (PAGE_SIZE * MemChunkSize::Huge2M.contained_4k_pages()) * MemChunkSize::Huge2M.contained_4k_pages(),
                         size: PhantomData::<Page2MiB>,
                     }
                 }
@@ -368,22 +379,14 @@ macro_rules! implement_page_frame {
                 #[doc = "Returns a 1GiB huge `" $TypeName "` containing the given `" $address "`."]
                 pub const fn containing_address_1gb(addr: $address) -> $TypeName<Page1GiB> {
                     $TypeName {
-                        number: addr.value() / PAGE_SIZE,
+                        number: addr.value() / (PAGE_SIZE * MemChunkSize::Huge1G.contained_4k_pages()) * MemChunkSize::Huge1G.contained_4k_pages(),
                         size: PhantomData::<Page1GiB>,
                     }
                 }
 
+                #[doc = "Returns the size of this `" $TypeName "`."]
                 pub const fn page_size(&self) -> MemChunkSize {
                     P::SIZE
-                }
-              
-                #[doc = "Returns a new `" $TypeName "` that is aligned up from this \
-                    `" $TypeName "` to the nearest multiple of `alignment_4k_pages`."]
-                #[doc(alias = "next_multiple_of")]
-                pub const fn align_up(&self, alignment_4k_pages: usize) -> $TypeName {
-                    $TypeName {
-                        number: self.number.next_multiple_of(alignment_4k_pages)
-                    }
                 }
             }
             impl<P: 'static + PageSize> fmt::Debug for $TypeName<P> {
@@ -391,83 +394,29 @@ macro_rules! implement_page_frame {
                     write!(f, concat!(stringify!($TypeName), "(", $prefix, "{:#X})"), self.start_address())
                 }
             }
-            impl Add<usize> for $TypeName {
-                type Output = $TypeName;
-                fn add(self, rhs: usize) -> $TypeName {
+            impl<P: PageSize> Add<usize> for $TypeName<P> {
+                type Output = $TypeName<P>;
+                fn add(self, rhs: usize) -> $TypeName<P> {
                     // cannot exceed max page number (which is also max frame number)
                     $TypeName {
-                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs * P::SIZE.contained_4k_pages())),
                         size: self.size,
                     }
                 }
             }
-            impl Add<usize> for $TypeName<Page2MiB> {
-                type Output = $TypeName<Page2MiB>;
-                fn add(self, rhs: usize) -> $TypeName<Page2MiB> {
-                    // cannot exceed max page number (which is also max frame number)
-                    $TypeName {
-                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs + 512)),
-                        size: self.size,
-                    }
-                }
-            }
-            impl Add<usize> for $TypeName<Page1GiB> {
-                type Output = $TypeName<Page1GiB>;
-                fn add(self, rhs: usize) -> $TypeName<Page1GiB> {
-                    // cannot exceed max page number (which is also max frame number)
-                    $TypeName {
-                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs + (512 * 512))),
-                        size: self.size,
-                    }
-                }
-            }
-            impl AddAssign<usize> for $TypeName {
+            impl<P: PageSize> AddAssign<usize> for $TypeName<P> {
                 fn add_assign(&mut self, rhs: usize) {
                     *self = $TypeName {
-                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs)),
+                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs * P::SIZE.contained_4k_pages())),
                         size: self.size,
                     };
                 }
             }
-            impl AddAssign<usize> for $TypeName<Page2MiB> {
-                fn add_assign(&mut self, rhs: usize) {
-                    *self = $TypeName {
-                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs + 512)),
-                        size: self.size,
-                    };
-                }
-            }
-            impl AddAssign<usize> for $TypeName<Page1GiB> {
-                fn add_assign(&mut self, rhs: usize) {
-                    *self = $TypeName {
-                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs + (512 * 512))),
-                        size: self.size,
-                    };
-                }
-            }
-            impl Sub<usize> for $TypeName {
-                type Output = $TypeName;
-                fn sub(self, rhs: usize) -> $TypeName {
+            impl<P: PageSize> Sub<usize> for $TypeName<P> {
+                type Output = $TypeName<P>;
+                fn sub(self, rhs: usize) -> $TypeName<P> {
                     $TypeName {
-                        number: self.number.saturating_sub(rhs),
-                        size: self.size,
-                    }
-                }
-            }
-            impl Sub<usize> for $TypeName<Page2MiB> {
-                type Output = $TypeName<Page2MiB>;
-                fn sub(self, rhs: usize) -> $TypeName<Page2MiB> {
-                    $TypeName {
-                        number: self.number.saturating_sub(rhs * 512),
-                        size: self.size,
-                    }
-                }
-            }
-            impl Sub<usize> for $TypeName<Page1GiB> {
-                type Output = $TypeName<Page1GiB>;
-                fn sub(self, rhs: usize) -> $TypeName<Page1GiB> {
-                    $TypeName {
-                        number: self.number.saturating_sub(rhs * (512 * 512)),
+                        number: self.number.saturating_sub(rhs * P::SIZE.contained_4k_pages()),
                         size: self.size,
                     }
                 }
@@ -480,78 +429,50 @@ macro_rules! implement_page_frame {
                     };
                 }
             }
-            #[doc = "Implementing `Step` allows `" $TypeName "` to be used in an [`Iterator`]."]
-            impl Step for $TypeName {
+            impl<P: PageSize> Step for $TypeName<P> {
                 #[inline]
-                fn steps_between(start: &$TypeName, end: &$TypeName) -> Option<usize> {
-                    Step::steps_between(&start.number, &end.number)
-                }
-                #[inline]
-                fn forward_checked(start: $TypeName, count: usize) -> Option<$TypeName> {
-                    Step::forward_checked(start.number, count).map(|n| $TypeName { number: n, size: PhantomData })
-                }
-                #[inline]
-                fn backward_checked(start: $TypeName, count: usize) -> Option<$TypeName> {
-                    Step::backward_checked(start.number, count).map(|n| $TypeName { number: n, size: PhantomData })
-                }
-            }
-            #[doc = "Implement `Step` for 2MiB `" $TypeName "`s ensures proper iteration behaviour."]
-            impl Step for $TypeName<Page2MiB> {
-                #[inline]
-                fn steps_between(start: &$TypeName<Page2MiB>, end: &$TypeName<Page2MiB>) -> Option<usize> {
+                fn steps_between(start: &$TypeName<P>, end: &$TypeName<P>) -> Option<usize> {
                     match Step::steps_between(&start.number, &end.number) {
                         None => {
                             None
                         }
                         Some(n) => {
-                            Some(n / 512)
+                            Some(n / P::SIZE.contained_4k_pages())
                         }
                     }
                 }
                 #[inline]
-                fn forward_checked(start: $TypeName<Page2MiB>, count: usize) -> Option<$TypeName<Page2MiB>> {
-                    Step::forward_checked(start.number, count + 512).map(|n| $TypeName { number: n, size: PhantomData })
+                fn forward_checked(start: $TypeName<P>, count: usize) -> Option<$TypeName<P>> {
+                    Step::forward_checked(start.number, count +  P::SIZE.contained_4k_pages()).map(|n| $TypeName { number: n, size: PhantomData })
                 }
                 #[inline]
-                fn backward_checked(start: $TypeName<Page2MiB>, count: usize) -> Option<$TypeName<Page2MiB>> {
-                    Step::backward_checked(start.number, count + 512).map(|n| $TypeName { number: n, size: PhantomData })
+                fn backward_checked(start: $TypeName<P>, count: usize) -> Option<$TypeName<P>> {
+                    Step::backward_checked(start.number, count +  P::SIZE.contained_4k_pages()).map(|n| $TypeName { number: n, size: PhantomData })
                 }
             }
-            #[doc = "Implement `Step` for 1GiB `" $TypeName "`s ensures proper iteration behaviour."]
-            impl Step for $TypeName<Page1GiB> {
-                #[inline]
-                fn steps_between(start: &$TypeName<Page1GiB>, end: &$TypeName<Page1GiB>) -> Option<usize> {
-                    match Step::steps_between(&start.number, &end.number) {
-                        None => {
-                            None
-                        }
-                        Some(n) => {
-                            Some(n / (512 * 512))
-                        }
-                    }
-                }
-                #[inline]
-                fn forward_checked(start: $TypeName<Page1GiB>, count: usize) -> Option<$TypeName<Page1GiB>> {
-                    Step::forward_checked(start.number, count + (512 * 512)).map(|n| $TypeName { number: n, size: PhantomData })
-                }
-                #[inline]
-                fn backward_checked(start: $TypeName<Page1GiB>, count: usize) -> Option<$TypeName<Page1GiB>> {
-                    Step::backward_checked(start.number, count + (512 * 512)).map(|n| $TypeName { number: n, size: PhantomData })
-                }
-            }
-            impl From<&$TypeName> for $TypeName<Page2MiB> {
-                fn from(p: &$TypeName) -> Self {
-                    $TypeName {
-                        number: p.number,
-                        size: PhantomData::<Page2MiB>,
+            impl TryFrom<&$TypeName> for $TypeName<Page2MiB> {
+                type Error = &'static str;
+                fn try_from(p: &$TypeName) -> Result<Self, &'static str>  {
+                    if p.number % MemChunkSize::Huge2M.contained_4k_pages() == 0 {
+                        return Ok ($TypeName {
+                            number: p.number,
+                            size: PhantomData::<Page2MiB>,
+                        });
+                    } else {
+                        return Err("Could not convert 4KiB to 2MiB page.");
                     }
                 }
             }
-            impl From<&$TypeName> for $TypeName<Page1GiB> {
-                fn from(p: &$TypeName) -> Self {
-                    $TypeName {
-                        number: p.number,
-                        size: PhantomData::<Page1GiB>,
+            impl TryFrom<&$TypeName> for $TypeName<Page1GiB> {
+                type Error = &'static str;
+                fn try_from(p: &$TypeName) -> Result<Self, &'static str>  {
+                     if p.number % MemChunkSize::Huge1G.contained_4k_pages() == 0 {
+                        return Ok ($TypeName {
+                            number: p.number,
+                            size: PhantomData::<Page1GiB>,
+                        });
+                    } else {
+                        return Err("Could not convert 4KiB to 1GiB page.");
                     }
                 }
             }
@@ -658,24 +579,6 @@ macro_rules! implement_page_frame_range {
                     !other.is_empty()
                     && (other.start() >= self.start())
                     && (other.end() <= self.end())
-                }
-
-                #[doc = "Changes the PageSize marker of this `" $TypeName "`. Returns None if the the page is not aligned on a 2MiB boundary."]
-                pub fn into_2mb_range(&self) -> Option<$TypeName<Page2MiB>> {
-                    if (self.[<size_in_ $chunk:lower s>]() - 1) % 512 == 0 {
-                        return Some($TypeName::<Page2MiB>(RangeInclusive::new(self.start().as_2mb(), self.end().as_2mb())));
-                    } else {
-                        return None;
-                    }
-                }
-
-                #[doc = "Changes the PageSize marker of this `" $TypeName "`. Returns None if the the page is not aligned on a 2MiB boundary."]
-                pub fn into_1gb_range(&self) -> Option<$TypeName<Page1GiB>> {
-                    if (self.[<size_in_ $chunk:lower s>]() - 1) % (512 * 512) == 0 {
-                        return Some($TypeName::<Page1GiB>(RangeInclusive::new(self.start().as_1gb(), self.end().as_1gb())));
-                    } else {
-                        return None;
-                    }
                 }
             }
             impl<P: 'static> $TypeName<P> where P: PageSize {
@@ -819,7 +722,10 @@ macro_rules! implement_page_frame_range {
                 type Error = &'static str;
                 fn try_from(p: $TypeName) -> Result<Self, &'static str> {
                     if (p.[<size_in_ $chunk:lower s>]() - 1) % 512 == 0 {
-                        return Ok(Self::new($chunk::<Page2MiB>::from(p.start()), $chunk::<Page2MiB>::from(p.end())));
+                        return Ok(Self::new(
+                            $chunk::<Page2MiB>::try_from(p.start())?,
+                            $chunk::<Page2MiB>::try_from(p.end())?
+                        ));
                     } else {
                         return Err("Could not convert 4KiB page range into 2MiB page range.");
                     }
@@ -829,7 +735,10 @@ macro_rules! implement_page_frame_range {
                 type Error = &'static str;
                 fn try_from(p: $TypeName) -> Result<Self, &'static str> {
                     if (p.[<size_in_ $chunk:lower s>]() - 1) % (512 * 512) == 0 {
-                        return Ok(Self::new($chunk::<Page1GiB>::from(p.start()), $chunk::<Page1GiB>::from(p.end())));
+                        return Ok(Self::new(
+                            $chunk::<Page1GiB>::try_from(p.start())?,
+                            $chunk::<Page1GiB>::try_from(p.end())?
+                        ));
                     } else {
                         return Err("Could not convert 4KiB page range into 1GiB page range.");
                     }

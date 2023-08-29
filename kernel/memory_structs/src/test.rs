@@ -2,8 +2,6 @@
 
 extern crate std;
 
-use self::std::dbg;
-
 use super::*;
 
 #[test]
@@ -41,6 +39,7 @@ fn huge_2mb_range_iteration2() {
         Page::<Page2MiB>::containing_address_2mb(VirtualAddress::new(0x200000).unwrap()),
         Page::<Page2MiB>::containing_address_2mb(VirtualAddress::new(0x800000).unwrap()));
     let mut num_iters = 0;
+    // assert_eq!(r.start().number, 0x200000);
     for _ in r {
         num_iters += 1;
     }
@@ -90,7 +89,8 @@ fn huge_1gb_from_4kb() {
         Page::containing_address(VirtualAddress::new(0x80000000).unwrap()));
 
 
-    let new1gb = r.into_1gb_range().unwrap();
+    // let new1gb = r.into_1gb_range().unwrap();
+    let new1gb = PageRange::<Page1GiB>::try_from(r).unwrap();
 
     assert!(matches!(new1gb.start().page_size(), MemChunkSize::Huge1G));
     
@@ -98,8 +98,9 @@ fn huge_1gb_from_4kb() {
         Page::containing_address(VirtualAddress::new(0x40000000).unwrap()),
         Page::containing_address(VirtualAddress::new(0x42000000).unwrap()));
 
-    let new1gb = r.into_1gb_range();
-    assert_eq!(new1gb, None);
+    //let new1gb = r.into_1gb_range();
+    let new1gb = PageRange::<Page1GiB>::try_from(r);
+    assert!(new1gb.is_err());
 }
 
 #[test]
@@ -108,15 +109,16 @@ fn huge_2gb_from_4kb() {
         Page::containing_address(VirtualAddress::new(0x200000).unwrap()),
         Page::containing_address(VirtualAddress::new(0x800000).unwrap()));
 
-    let new2mb = r.into_2mb_range().unwrap();
+    let new2mb = PageRange::<Page2MiB>::try_from(r).unwrap(); // r.into_2mb_range().unwrap();
     assert!(matches!(new2mb.start().page_size(), MemChunkSize::Huge2M));
 
     let r = PageRange::new(
         Page::containing_address(VirtualAddress::new(0x30000).unwrap()),
         Page::containing_address(VirtualAddress::new(0x40000).unwrap()));
 
-    let new2mb = r.into_2mb_range();
-    assert_eq!(new2mb, None);
+    // let new2mb = r.into_2mb_range();
+    let new2mb = PageRange::<Page2MiB>::try_from(r);
+    assert!(new2mb.is_err());
 }
 
 #[test]
