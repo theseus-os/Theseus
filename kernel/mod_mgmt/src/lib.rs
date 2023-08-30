@@ -1155,7 +1155,7 @@ impl CrateNamespace {
         }
 
         // TODO: Should be reload().
-        cls_allocator::reload_current_core();
+        cls_allocator::reload_current_cpu();
 
         Ok((new_crate, elf_file))
     }

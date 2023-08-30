@@ -16,7 +16,7 @@ static CLS_SECTIONS: SpinMutex<Vec<(CpuId, ClsDataImage)>> = SpinMutex::new(Vec:
 /// initializer.
 ///
 /// The CLS register will not be updated until either [`reload`] or
-/// [`reload_current_core`] is called.
+/// [`reload_current_cpu`] is called.
 pub fn add_static_section(
     section: LoadedSection,
     offset: usize,
@@ -30,7 +30,7 @@ pub fn add_static_section(
 /// Adds a dynamic CLS section to the global CLS initializer.
 ///
 /// The CLS register will not be updated until either [`reload`] or
-/// [`reload_current_core`] is called.
+/// [`reload_current_cpu`] is called.
 pub fn add_dynamic_section(
     section: LoadedSection,
     alignment: usize,
@@ -40,9 +40,9 @@ pub fn add_dynamic_section(
         .add_new_dynamic_section(section, alignment)
 }
 
-/// Generates a new data image for the current core and sets the CLS register
+/// Generates a new data image for the current CPU and sets the CLS register
 /// accordingly.
-pub fn reload_current_core() {
+pub fn reload_current_cpu() {
     let current_cpu = cpu::current_cpu();
 
     let mut data = CLS_INITIALIZER.lock().get_data();
@@ -73,5 +73,5 @@ pub fn reload_current_core() {
 
 pub fn reload() {
     todo!("cls_allocator::reload");
-    // FIXME: Reload CLS register on all cores.
+    // FIXME: Reload CLS register on all CPUs.
 }
