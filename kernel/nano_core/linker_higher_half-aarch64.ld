@@ -125,3 +125,4 @@ SECTIONS {
 /* This definition must be placed at the end of the file so that the .cls,
 section is placed in the correct order. */
 __THESEUS_TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);
+/* We don't need the CLS size on AArch64. */
