@@ -751,7 +751,7 @@ struct MainSectionInfo {
     data_shndx:      Shndx,
     bss_shndx:       Shndx,
     tls_data_info:   Option<(Shndx, VirtualAddress)>,
-    cls_info:       Option<(Shndx, VirtualAddress)>,
+    cls_info:        Option<(Shndx, VirtualAddress)>,
     tls_bss_info:    Option<(Shndx, VirtualAddress)>,
     total_tls_size:  usize,
     total_cls_size:  usize,
