@@ -455,17 +455,8 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                 // `tls_size.next_multiple_of(0x1000)`, or 0 if there is not TLS section. So, when
                 // loading CLS symbols on AArch64, `mod_mgmt` simply sets `__THESEUS_TLS_SIZE` to 0.
 
-                let tls_start_to_cls_start: u64 = if tls_size == 0 {
-                    0
-                } else {
-                    // TODO: Use `next_multiple_of` when stabilised.
-                    let remainder = tls_size % 0x1000;
-                    if remainder == 0 {
-                        tls_size
-                    } else {
-                        tls_size + 0x1000 - remainder
-                    }
-                };
+                // TODO: Use `next_multiple_of(0x1000)` when stabilised.
+                let tls_start_to_cls_start = (tls_size + 0xfff) & !0xfff;
 
                 let mut offset = 0;
                 unsafe {
