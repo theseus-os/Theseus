@@ -1,7 +1,7 @@
 //! Logic for generating thread-local storage (TLS) and CPU-local storage (CLS) images.
 //!
 //! The two key types are:
-//! 1. [`LocalStorageInitialiser`]: a "factory" that maintains a list of loaded sections
+//! 1. [`LocalStorageInitializer`]: a "factory" that maintains a list of loaded sections
 //!    in order to correctly generate new local storage data images.
 //! 2. [`LocalStorageDataImage`]: a generated local storage data image that can be set
 //!    as the current data image.
