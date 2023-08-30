@@ -110,6 +110,8 @@ pub enum SectionType {
     /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
     /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
     TlsBss,
+    /// A `.cls` section is a read-only section that holds the initial data "image" for a CPU-local
+    /// (CLS) area.
     Cls,
     /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
