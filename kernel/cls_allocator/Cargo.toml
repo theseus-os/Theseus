@@ -1,6 +1,8 @@
 [package]
 name = "cls_allocator"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Allocator for CPU-local storage"
 edition = "2021"
 
 [dependencies]
