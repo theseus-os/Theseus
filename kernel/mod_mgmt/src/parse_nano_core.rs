@@ -913,7 +913,7 @@ fn add_new_section(
             global,
             new_crate_weak_ref.clone(),
         );
-        // Add this new TLS section to this namespace's TLS area image.
+        // Add this new CLS section to this namespace's CLS area image.
         let cls_section_ref = cls_allocator::add_static_section(
             cls_section,
             cls_offset,
