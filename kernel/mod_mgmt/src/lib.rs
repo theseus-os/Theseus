@@ -2276,15 +2276,23 @@ impl CrateNamespace {
 
                                 // See `cls_macros` for more details.
                                 if source_sec_name == "__THESEUS_CLS_SIZE" {
-                                    let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
-                                    write_relocation(
-                                        relocation_entry,
-                                        target_sec_slice,
-                                        target_sec.mapped_pages_offset,
-                                        VirtualAddress::new(usize::MAX).unwrap(),
-                                        verbose_log,
-                                    )?;
-                                    continue;
+                                    #[cfg(target_arch = "aarch64")]
+                                    {
+                                        return Err("encountered `__THESEUS_CLS_SIZE` relocation on AArch64");
+                                    }
+                                    #[cfg(target_arch = "x86_64")]
+                                    {
+                                        let cls_size = VirtualAddress::new(usize::MAX).unwrap();
+                                        let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                        write_relocation(
+                                            relocation_entry,
+                                            target_sec_slice,
+                                            target_sec.mapped_pages_offset,
+                                            cls_size,
+                                            verbose_log,
+                                        )?;
+                                        continue;
+                                    }
                                 } else if source_sec_name == "__THESEUS_TLS_SIZE" {
                                     #[cfg(target_arch = "x86_64")]
                                     let tls_size = VirtualAddress::new(usize::MAX).unwrap();
