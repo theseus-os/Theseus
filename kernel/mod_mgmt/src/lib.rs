@@ -24,6 +24,7 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
+use crate_metadata_serde::{CLS_SECTION_FLAG, CLS_SYMBOL_TYPE};
 
 pub use local_storage_initializer::{TlsInitializer, TlsDataImage};
 pub use crate_name_utils::*;
@@ -43,16 +44,6 @@ const EXTRA_FILES_DIRECTORY_DELIMITER: char = '!';
 
 /// The initial `CrateNamespace` that all kernel crates are added to by default.
 static INITIAL_KERNEL_NAMESPACE: Once<Arc<CrateNamespace>> = Once::new();
-
-/// The flag identifying CLS sections.
-///
-/// This must be kept in sync with `update_cls_section_flags`.
-const CLS_SECTION_FLAG: u64 = 0x100000;
-
-/// The flag identifying CLS symbols.
-///
-/// This must be kept in sync with `update_cls_section_flags`.
-const CLS_SYMBOL_TYPE: Type = Type::OsSpecific(0xa);
 
 /// Returns a reference to the default kernel namespace, 
 /// which must exist because it contains the initially-loaded kernel crates. 
@@ -1458,7 +1449,7 @@ impl CrateNamespace {
             })?;
             let is_global = sec_binding == Binding::Global;
             let is_tls = sec_type == Type::Tls;
-            let is_cls = sec_type == CLS_SYMBOL_TYPE;
+            let is_cls = sec_type == Type::OsSpecific(CLS_SYMBOL_TYPE);
             let demangled = demangle(sec_name).to_string().as_str().into();
 
             // Declare the items we need to create a new `LoadedSection`.

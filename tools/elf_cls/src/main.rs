@@ -22,6 +22,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate_metadata_serde::{CLS_SECTION_FLAG, CLS_SYMBOL_TYPE};
 use goblin::{
     container::{Container, Ctx, Endian},
     elf::{
@@ -37,20 +38,13 @@ use goblin::{
     strtab::Strtab,
 };
 
-/// The flag identifying CLS sections.
-///
-/// This must be kept in sync with `mod_mgmt`.
-const CLS_SECTION_FLAG: u64 = 0x100000;
-
-const _: () = assert!(CLS_SECTION_FLAG & SHF_MASKOS as u64 == CLS_SECTION_FLAG);
-
-/// The flag identifying CLS symbols.
-///
-/// This must be kept in sync with `mod_mgmt`.
-const CLS_SYMBOL_TYPE: u8 = 0xa;
-
+// Sanity check that the values we use are in the range reserved for custom OS shenanigans.
+//
+// These checks are here rather than in `crate_metadata_serde` to avoid an otherwise unnecessary
+// dependency on `goblin`.
 const _: () = assert!(CLS_SYMBOL_TYPE >= STT_LOOS);
 const _: () = assert!(CLS_SYMBOL_TYPE <= STT_HIOS);
+const _: () = assert!(CLS_SECTION_FLAG & SHF_MASKOS as u64 == CLS_SECTION_FLAG);
 
 fn main() {
     let object_file_extension = OsStr::new("o");

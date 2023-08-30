@@ -37,6 +37,12 @@ use alloc::{
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
+/// The flag identifying CLS sections.
+pub const CLS_SECTION_FLAG: u64 = 0x100000;
+
+/// The type identifying CLS symbols.
+pub const CLS_SYMBOL_TYPE: u8 = 0xa;
+
 /// A (de)serializable representation of a loaded crate that is `serde`-compatible.
 ///
 /// See `LoadedCrate` for more detail on the fields of this struct.

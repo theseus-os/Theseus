@@ -12,5 +12,5 @@ features = ["nightly", "serde"]
 [dependencies.serde]
 version = "1.0.137"
 default-features = false
-features = ["derive"]
+features = ["alloc", "derive"]
 
