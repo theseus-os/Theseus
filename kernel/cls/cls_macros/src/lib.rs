@@ -400,15 +400,8 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                         };
                         offset
                     } else {
-                        let cls_start_to_tls_start = {
-                            // TODO: Use `next_multiple_of` when stabilised.
-                            let remainder = cls_size % 0x1000;
-                            if remainder == 0 {
-                                cls_size
-                            } else {
-                                cls_size + 0x1000 - remainder
-                            }
-                        };
+                        // TODO: Use `next_multiple_of(0x1000)` when stabilised.
+                        let cls_start_to_tls_start = (cls_size + 0xfff) & !0xfff;
 
                         unsafe {
                             ::core::arch::asm!(
