@@ -10,7 +10,7 @@ use local_storage_initializer::{ClsDataImage, ClsInitializer, LocalStorageInitia
 use sync_spin::SpinMutex;
 
 static CLS_INITIALIZER: SpinMutex<ClsInitializer> = SpinMutex::new(ClsInitializer::new());
-static CLS_SECTIONS: SpinMutex<Vec<(CpuId, ClsDataImage)>> = SpinMutex::new(Vec::new());
+static CLS_REGIONS: SpinMutex<Vec<(CpuId, ClsDataImage)>> = SpinMutex::new(Vec::new());
 
 /// Adds a CLS section with a pre-determined offset to the global CLS
 /// initializer.
@@ -47,7 +47,7 @@ pub fn reload_current_cpu() {
 
     let mut data = CLS_INITIALIZER.lock().get_data();
 
-    let mut sections = CLS_SECTIONS.lock();
+    let mut sections = CLS_REGIONS.lock();
     for (cpu, image) in sections.iter_mut() {
         if *cpu == current_cpu {
             // We disable interrupts so that we can safely access `image` and `data` without
