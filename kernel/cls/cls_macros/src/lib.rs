@@ -153,7 +153,7 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                 use cls::__private::x86_64::registers::segmentation::{GS, Segment64};
                 let gs = GS::read_base().as_u64();
 
-                // If we were statically linked on x64, `offset` will be negative.
+                // If this CLS section was statically linked, its `offset` will be negative on x86_64 only.
                 let (value, _) = gs.overflowing_add(offset);
 
                 value
