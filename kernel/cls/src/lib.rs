@@ -22,7 +22,7 @@
 //!
 //! ### Static linking
 //!
-//! On x64, a TLS data image looks like
+//! On x86_64, a TLS data image looks like
 //!
 //! ```text
 //!                        fs
@@ -85,16 +85,16 @@
 //!
 //! ### Dynamic linking
 //!
-//! When a crate is dynamically linked on x64, `mod_mgmt` will set `__THESEUS_CLS_SIZE`
+//! When a crate is dynamically linked on x86_64, `mod_mgmt` will set `__THESEUS_CLS_SIZE`
 //! and `__THESEUS_TLS_SIZE` to `usize::MAX`. Prior to calculating the offset, the CLS
 //! access code will check if the variables are set to their sentinel values and if so,
 //! it will simply use the provided offset since `mod_mgmt` would have computed it
 //! correctly, unlike the external linker.
 //!
-//! ## Aarch64
+//! ## aarch64
 //!
-//! Unlike x64, AArch64 doesn't have different branches for statically linked, and
-//! dynamically linked variables. This is because on AArch64, there are no negative
+//! Unlike x86_64, aarch64 doesn't have different branches for statically linked, and
+//! dynamically linked variables. This is because on aarch64, there are no negative
 //! offset shenanigans. A TLS data image looks like
 //! ```
 //! fs
@@ -104,7 +104,7 @@
 //! +-----------------------+------------------------+
 //! ```
 //!
-//! Unlike x64, the `.cls` section is located after `.tls` in a binary and so the
+//! Unlike x86_64, the `.cls` section is located after `.tls` in a binary and so the
 //! linker thinks the data image looks like
 //! ```
 //! fs
@@ -118,7 +118,7 @@
 //!
 //! Hence, CLS symbols have an offset that is incorrect by
 //! `tls_size.next_multiple_of(0x1000)`, or 0 if there is not TLS section. So, when
-//! loading CLS symbols on AArch64, `mod_mgmt` simply sets `__THESEUS_TLS_SIZE` to 0.
+//! loading CLS symbols on aarch64, `mod_mgmt` simply sets `__THESEUS_TLS_SIZE` to 0.
 
 #![no_std]
 
@@ -143,11 +143,11 @@ mod sealed {
 
 #[doc(hidden)]
 pub mod __private {
-    #[cfg(target_arch = "aarch64")]
-    pub use cortex_a;
     pub use preemption;
+    
     #[cfg(target_arch = "aarch64")]
-    pub use tock_registers;
+    pub use {cortex_a, tock_registers};
+
     #[cfg(target_arch = "x86_64")]
     pub use x86_64;
 }

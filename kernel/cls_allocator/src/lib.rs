@@ -47,8 +47,8 @@ pub fn reload_current_cpu() {
 
     let mut data = CLS_INITIALIZER.lock().get_data();
 
-    let mut sections = CLS_REGIONS.lock();
-    for (cpu, image) in sections.iter_mut() {
+    let mut regions = CLS_REGIONS.lock();
+    for (cpu, image) in regions.iter_mut() {
         if *cpu == current_cpu {
             // We disable interrupts so that we can safely access `image` and `data` without
             // them being changed under our nose.
@@ -68,7 +68,7 @@ pub fn reload_current_cpu() {
     // SAFETY: We only drop `data` after another image has been set as the current
     // CPU local storage.
     unsafe { data.set_as_current_cls() };
-    sections.push((current_cpu, data));
+    regions.push((current_cpu, data));
 }
 
 pub fn reload() {

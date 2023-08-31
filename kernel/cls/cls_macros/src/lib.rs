@@ -292,13 +292,11 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                 // SAFETY: We don't access the extern static.
                 let tls_size = unsafe { ::core::ptr::addr_of!(__THESEUS_TLS_SIZE) } as u64;
 
-                // On x64, `mod_mgmt` will set `__THESEUS_CLS_SIZE` and `__THESEUS_TLS_SIZE` to
-                // `usize::MAX` so we can differentiate between static and dynamic linking.
-
+                // On x86_64, `mod_mgmt` will set `__THESEUS_CLS_SIZE` and `__THESEUS_TLS_SIZE` to
+                // `usize::MAX` in order to indicate dynamic loading/linking is being used.
                 if cls_size == u64::MAX && tls_size == u64::MAX {
-                    // The CLS variable was dynamically loaded by `mod_mgmt` and hence `{cls}@TPOFF`
-                    // will be correct.
-
+                    // The offset is always correct when dynamically linked (since we set it in `mod_mgmt`),
+                    // so there is no need to modify the offset here, we can just use it directly.
                     let offset: u64;
                     unsafe {
                         ::core::arch::asm!(
@@ -309,13 +307,15 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                         )
                     };
                     offset
-                } else {
-                    // The CLS variable was statically linked.
-
-                    let from_cls_start: u64;
-
-                    // When running in loadable mode, `nano_core` will have a `.cls` section but no
-                    // `.tls` section. In this case, `{cls}@TPOFF` is correctly given as the offset
+                }
+                
+                // Otherwise, if the CLS section/symbol was statically linked,
+                // we need to adjust the offset to account for the section's 4K page alignment
+                // and the size of the preceding static TLS sections.
+                // See the crate-level docs of `cls` for a detailed explanation of this.
+                else {
+                    // If the statically-linked base kernel image has no TLS sections,
+                    // the `{cls}@TPOFF` expression alone correctly gives us the offset
                     // from the end of the `.cls` section.
                     if tls_size == 0 {
                         let offset: u64;
@@ -334,6 +334,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                         // TODO: Use `next_multiple_of(0x1000)` when stabilised.
                         let cls_start_to_tls_start = (cls_size + ALIGNMENT - 1) & !(ALIGNMENT - 1);
 
+                        let from_cls_start: u64;
                         unsafe {
                             ::core::arch::asm!(
                                 "lea {from_cls_start}, [{cls}@TPOFF + {tls_size} + {cls_start_to_tls_start}]",
@@ -376,7 +377,7 @@ fn cls_offset_expr(name: &Ident) -> proc_macro2::TokenStream {
                     //
                     // The first add instruction loads the upper 12 bits of the offset into
                     // `{offset}`, and the second add instruction loads the lower 12 bits. Then,
-                    // since all CLS offsets on AArch64 are a page size larger than they are
+                    // since all CLS offsets on aarch64 are a page size larger than they are
                     // supposed to be, we subtract a page size. Realistically, we could just omit
                     // loading the upper 12 bits of the offset and the `sub` insntruction under the
                     // assumption that the CLS section will never be larger than a page. But that

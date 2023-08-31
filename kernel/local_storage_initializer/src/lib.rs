@@ -446,7 +446,7 @@ where
     ///
     /// # Panics
     ///
-    /// Panics if the other image has a longer length, or (on x64) if the other
+    /// Panics if the other image has a longer length, or (on x86_64) if the other
     /// image has a differently sized static area.
     pub fn inherit(&mut self, other: &Self) {
         #[cfg(target_arch = "aarch64")]

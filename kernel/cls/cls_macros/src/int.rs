@@ -5,7 +5,7 @@ use syn::{Ident, Type};
 use crate::cls_offset_expr;
 
 pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
-    let ((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
+    let ((x86_64_asm_width, x86_64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
         match ty.to_token_stream().to_string().as_ref() {
             "u8" => (("byte", quote! { reg_byte }), (":w", "b")),
             "u16" => (("word", quote! { reg }), (":w", "w")),
@@ -15,7 +15,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                 return None;
             }
         };
-    let x64_width_modifier = format!("{x64_asm_width} ptr ");
+    let x86_64_width_modifier = format!("{x86_64_asm_width} ptr ");
     let offset_expr = cls_offset_expr(name);
 
     Some(quote! {
@@ -28,7 +28,7 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
                 unsafe {
                     ::core::arch::asm!(
                         ::core::concat!("mov {ret}, gs:[{offset}]"),
-                        ret = out(#x64_reg_class) ret,
+                        ret = out(#x86_64_reg_class) ret,
                         offset = in(reg) offset,
                         options(readonly, preserves_flags, nostack),
                     )
@@ -75,9 +75,9 @@ pub(crate) fn int_functions(ty: &Type, name: &Ident) -> Option<TokenStream> {
             {
                 unsafe {
                     ::core::arch::asm!(
-                        ::core::concat!("xadd ", #x64_width_modifier, "gs:[{offset}], {operand}"),
+                        ::core::concat!("xadd ", #x86_64_width_modifier, "gs:[{offset}], {operand}"),
                         offset = in(reg) offset,
-                        operand = inout(#x64_reg_class) operand,
+                        operand = inout(#x86_64_reg_class) operand,
                         options(nostack),
                     )
                 };
