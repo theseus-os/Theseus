@@ -30,7 +30,7 @@ fn huge_2mb_range_iteration1() {
     for _ in r {
         num_iters += 1;
     }
-    assert_eq!(num_iters, 1);
+    assert_eq!(num_iters, 2);
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn huge_2mb_range_iteration2() {
     for _ in r {
         num_iters += 1;
     }
-    assert_eq!(num_iters, 3);
+    assert_eq!(num_iters, 4);
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn huge_2mb_range_iteration3() {
     for _ in r {
         num_iters += 1;
     }
-    assert_eq!(num_iters, 7);
+    assert_eq!(num_iters, 8);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn huge_1gb_range_iteration() {
     for _ in r {
         num_iters += 1;
     }
-    assert_eq!(num_iters, 1);
+    assert_eq!(num_iters, 2);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn huge_1gb_range_iteration2() {
     for _ in r {
         num_iters += 1;
     }
-    assert_eq!(num_iters, 3);
+    assert_eq!(num_iters, 4);
 }
 
 #[test]
@@ -148,14 +148,18 @@ fn try_from_conversions() {
     let r = PageRange::new(
         Page::containing_address(VirtualAddress::new(0x200000).unwrap()),
         Page::containing_address(VirtualAddress::new(0x800000).unwrap()));
-
+    assert_eq!(r.size_in_pages(), 1537);
+    
     let new2mb = PageRange::<Page2MiB>::try_from(r).unwrap();
     assert!(matches!(new2mb.start().page_size(), MemChunkSize::Huge2M));
+    assert_eq!(new2mb.size_in_pages(), 3);
     
     let r = PageRange::new(
         Page::containing_address(VirtualAddress::new(0x40000000).unwrap()),
         Page::containing_address(VirtualAddress::new(0x80000000).unwrap()));
+    assert_eq!(r.size_in_pages(), 262145);
 
     let new1gb = PageRange::<Page1GiB>::try_from(r).unwrap();
     assert!(matches!(new1gb.start().page_size(), MemChunkSize::Huge1G));
+    assert_eq!(new1gb.size_in_pages(), 1);
 }
