@@ -10,7 +10,7 @@ Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) t
 For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](https://theseus-os.github.io/Theseus/book/misc/papers_presentations.html), which describe Theseus's design and implementation. 
 
 Theseus is under active development, and although it is not yet mature, we envision that Theseus will be useful in high-end embedded systems or edge datacenter environments. 
-We are continually working to improve the OS, including its fault recovery abilities for higher system availability without redundancy, as well as easier and more arbitrary live evolution and runtime flexbility.
+We are continually working to improve the OS, including its fault recovery abilities for higher system availability without redundancy, as well as easier and more arbitrary live evolution and runtime flexibility.
 
 
 # Quick start
@@ -121,7 +121,7 @@ Note: building and running Theseus within a Docker container may be slower than 
     ``` 
     * After docker installs, enable your user account to run docker without root privileges:   
       `sudo groupadd docker; sudo usermod -aG docker $USER`    
-      Then, **log out and log back in** (or restart your computer) for the user/group changes to take effet.
+      Then, **log out and log back in** (or restart your computer) for the user/group changes to take effect.
  
  3. Build the docker image:     
     ```
@@ -226,7 +226,7 @@ make view-book  ## for the Theseus book
 
 ## Booting on Real Hardware
 We have tested Theseus on a variety of real machines, including Intel NUC devices, various Thinkpad laptops, and Supermicro servers. 
-Currently, the only limiting factor is that the device support booting via USB or PXE using traditional BIOS rather than UEFI; support for UEFI is a work-in-progress. 
+Currently, the only limiting factor is that the device supports booting via USB or PXE using traditional BIOS rather than UEFI; support for UEFI is a work-in-progress. 
 
 To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
 On WSL or other host environments where `/dev` device nodes don't exist, you can simply run `make iso` and burn the `.iso` file in the `build/` directory to a USB, e.g., using [Rufus](https://rufus.ie/) on Windows.
