@@ -24,8 +24,9 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
+use crate_metadata_serde::{CLS_SECTION_FLAG, CLS_SYMBOL_TYPE};
 
-pub use tls_initializer::{TlsInitializer, TlsDataImage};
+pub use local_storage_initializer::{TlsInitializer, TlsDataImage};
 pub use crate_name_utils::*;
 pub use crate_metadata::*;
 
@@ -70,8 +71,7 @@ pub fn get_namespaces_directory() -> Option<DirRef> {
 ///
 /// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
 /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
-static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
-
+static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::new());
 
 /// Create a new application `CrateNamespace` that uses the default application directory 
 /// and is structured atop the given `recursive_namespace`. 
@@ -1107,6 +1107,7 @@ impl CrateNamespace {
             data_pages:              data_pages.clone(),
             global_sections:         BTreeSet::new(),
             tls_sections:            BTreeSet::new(),
+            cls_sections:            BTreeSet::new(),
             data_sections:           BTreeSet::new(),
             reexported_symbols:      BTreeSet::new(),
         });
@@ -1122,6 +1123,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
          } = load_sections_fn(
             self,
@@ -1139,8 +1141,12 @@ impl CrateNamespace {
             new_crate_mut.sections        = loaded_sections;
             new_crate_mut.global_sections = global_sections;
             new_crate_mut.tls_sections    = tls_sections;
+            new_crate_mut.cls_sections    = cls_sections;
             new_crate_mut.data_sections   = data_sections;
         }
+
+        // TODO: Should be reload().
+        cls_allocator::reload_current_cpu();
 
         Ok((new_crate, elf_file))
     }
@@ -1170,7 +1176,7 @@ impl CrateNamespace {
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, dp_range)| (dp.clone(), dp.lock(), dp_range.start));
 
         // The section header offset of the first read-only section, which is, in order of existence:
-        // .rodata, .eh_frame, .gcc_except_table, .tdata
+        // .rodata, .eh_frame, .gcc_except_table, .tdata, .cls
         let mut read_only_offset: Option<usize> = None;
         // The section header offset of the first read-write section, which is .data or .bss
         let mut read_write_offset:   Option<usize> = None;
@@ -1188,11 +1194,13 @@ impl CrateNamespace {
         let mut bss_shndx_and_offset:    Option<(Shndx, usize)>            = None;
         let mut tdata_shndx_and_section: Option<(Shndx, StrongSectionRef)> = None;
         let mut tbss_shndx_and_section:  Option<(Shndx, StrongSectionRef)> = None;
+        let mut cls_shndx_and_section:   Option<(Shndx, StrongSectionRef)> = None;
 
         // The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
         let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new();
         let mut data_sections:   BTreeSet<usize> = BTreeSet::new();
         let mut tls_sections:    BTreeSet<usize> = BTreeSet::new();
+        let mut cls_sections:    BTreeSet<usize> = BTreeSet::new();
         let mut last_shndx = 0;
 
         // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
@@ -1209,9 +1217,10 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size   = sec.size()   as usize;
             let sec_offset = sec.offset() as usize;
-            let is_write   = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec    = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls     = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write   = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec    = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls     = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls     = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
 
             let mut is_rodata = false;
             let mut is_eh_frame = false;
@@ -1234,8 +1243,8 @@ impl CrateNamespace {
                     .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
             }
 
-            // Otherwise, if writable (excluding TLS), copy the .data/.bss section into `data_pages`.
-            else if is_write && !is_tls {
+            // Otherwise, if writable (excluding TLS and CLS), copy the .data/.bss section into `data_pages`.
+            else if is_write && !is_tls && !is_cls {
                 match sec.get_type() {
                     Ok(ShType::ProgBits) => {
                         typ = SectionType::Data;
@@ -1285,9 +1294,28 @@ impl CrateNamespace {
                 (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
                     .map(|(rp_ref, rp, _)| (rp_ref, rp))
                     .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
-                // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
+                // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_section()` below.
                 virt_addr = VirtualAddress::zero();
                 tls_sections.insert(shndx);
+            } else if is_cls {
+                match sec.get_type() {
+                    Ok(ShType::ProgBits) => {
+                        typ = SectionType::Cls;
+                        let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                        mapped_pages_offset = sec_offset - *read_only_start;
+
+                        (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
+                            .map(|(rp_ref, rp, _)| (rp_ref, rp))
+                            .ok_or("BUG: ELF file contained a .cls section, but no rodata_pages were allocated")?;
+                        // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_section()` below.
+                        virt_addr = VirtualAddress::zero();
+                        cls_sections.insert(shndx);
+                    }
+                    ty => {
+                        error!("CLS section had incorrect type: {ty:?}");
+                        return Err("CLS section had incorrect type");
+                    },
+                }
             }
 
             // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
@@ -1365,7 +1393,7 @@ impl CrateNamespace {
                 // This will also update the section's virtual address field to hold that offset value,
                 // which is used for relocation entries that ask for a section's offset from the TLS base.
                 let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                    .add_new_dynamic_tls_section(new_section, sec.align() as usize)
+                    .add_new_dynamic_section(new_section, sec.align() as usize)
                     .map_err(|_| "Failed to add new dynamic TLS section")?;
 
                 // trace!("Updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
@@ -1375,6 +1403,11 @@ impl CrateNamespace {
                     tbss_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
                 }
                 new_tls_section
+            } else if is_cls {
+                let (_, new_cls_section) = cls_allocator::add_dynamic_section(new_section, sec.align() as usize)
+                    .map_err(|_| "Failed to add new dynamic CLS section")?;
+                cls_shndx_and_section = Some((shndx, Arc::clone(&new_cls_section)));
+                new_cls_section
             } else {
                 Arc::new(new_section)
             };
@@ -1416,6 +1449,7 @@ impl CrateNamespace {
             })?;
             let is_global = sec_binding == Binding::Global;
             let is_tls = sec_type == Type::Tls;
+            let is_cls = sec_type == Type::OsSpecific(CLS_SYMBOL_TYPE);
             let demangled = demangle(sec_name).to_string().as_str().into();
 
             // Declare the items we need to create a new `LoadedSection`.
@@ -1511,6 +1545,23 @@ impl CrateNamespace {
                 mapped_pages = rp_ref;
             }
 
+            else if is_cls {
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                let rp_ref = read_only_pages_locked.as_ref()
+                    .map(|(mp_arc, ..)| mp_arc)
+                    .ok_or("BUG: found CLS symbol but no rodata_pages were allocated")?;
+
+                if let Some((cls_shndx, ref cls_sec)) = cls_shndx_and_section && sym_shndx == cls_shndx {
+                    typ = SectionType::Cls;
+                    mapped_pages_offset = cls_sec.mapped_pages_offset + sec_value;
+                    virt_addr = cls_sec.virt_addr + sec_value;
+                } else {
+                    error!("BUG: found CLS symbol with an shndx that wasn't in .cls: {}", symbol_entry as &dyn Entry);
+                    return Err("BUG: found CLS symbol with an shndx that wasn't in .cls");
+                };
+                mapped_pages = rp_ref;
+            }
+
             else {
                 error!("Found unexpected symbol type: {}", symbol_entry as &dyn Entry);
                 return Err("Found unexpected symbol type");
@@ -1537,7 +1588,6 @@ impl CrateNamespace {
 
             last_shndx += 1;
         } // end of iterating over all symbol table entries
-
 
         // // Quick test to ensure that all .data and .bss sections are fully covered 
         // // by overlapping OBJECT symbols.
@@ -1581,6 +1631,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
         })
     }
@@ -1657,6 +1708,7 @@ impl CrateNamespace {
         const RODATA_PREFIX:           &str = ".rodata.";
         const DATA_PREFIX:             &str = ".data.";
         const BSS_PREFIX:              &str = ".bss.";
+        const CLS_PREFIX:              &str = ".cls.";
         const TLS_DATA_PREFIX:         &str = ".tdata.";
         const TLS_BSS_PREFIX:          &str = ".tbss.";
         // const RELRO_PREFIX:            &str = "rel.ro.";
@@ -1703,11 +1755,11 @@ impl CrateNamespace {
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
         // the set of Shndxes for TLS sections (.tdata, .tbss)
         let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
+        // the set of Shndxes for CLS sections (.cls)
+        let mut cls_sections: BTreeSet<Shndx> = BTreeSet::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
-
-
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
         for (shndx, sec) in elf_file.section_iter().enumerate() {
@@ -1757,9 +1809,10 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
-            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write  = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec   = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls    = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls    = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
 
 
             // First, check for executable sections, which can only be .text sections.
@@ -1843,7 +1896,7 @@ impl CrateNamespace {
                         demangled,
                         Arc::clone(rp_ref),
                         mapped_pages_offset,
-                        VirtualAddress::zero(), // will be replaced in `add_new_dynamic_tls_section()` below
+                        VirtualAddress::zero(), // will be replaced in `add_new_dynamic_section()` below
                         sec_size,
                         global_sections.contains(&shndx),
                         new_crate.clone(),
@@ -1855,12 +1908,58 @@ impl CrateNamespace {
                     // This will also update the section's virtual address field to hold that offset value,
                     // which is used for relocation entries that ask for a section's offset from the TLS base.
                     let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                        .add_new_dynamic_tls_section(new_tls_section, sec_align)
+                        .add_new_dynamic_section(new_tls_section, sec_align)
                         .map_err(|_| "Failed to add new TLS section")?;
 
                     // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
+
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling TLS section");
+                }
+            }
+
+            else if is_cls {
+                if sec.get_type() != Ok(ShType::ProgBits) {
+                    return Err("CLS section had wrong type");
+                }
+
+                let name = try_get_symbol_name_after_prefix!(sec_name, CLS_PREFIX);
+                let demangled = demangle(name).to_string().as_str().into();
+
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    let (mapped_pages_offset, sec_typ) = {
+                        // Here: copy the TLS .tdata section's contents to the proper address in the read-only pages.
+                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for CLS .cls section [{}] {}: {:?}", shndx, sec_name, _other);
+                                return Err("couldn't get section data in CLS .cls section");
+                            }
+                        };
+                        // As with all other normal sections, use the current offset for these read-only pages.
+                        (rodata_offset, SectionType::Cls)
+                    };
+
+                    let new_cls_section = LoadedSection::new(
+                        sec_typ,
+                        demangled,
+                        Arc::clone(rp_ref),
+                        mapped_pages_offset,
+                        VirtualAddress::zero(), // will be replaced in `add_dynamic_section()` below
+                        sec_size,
+                        global_sections.contains(&shndx),
+                        new_crate.clone(),
+                    );
+                    let (_, new_cls_section) = cls_allocator::add_dynamic_section(new_cls_section, sec_align)
+                        .map_err(|_| "Failed to add new CLS section")?;
+
+                    loaded_sections.insert(shndx, new_cls_section);
+                    cls_sections.insert(shndx);
 
                     rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
@@ -2063,6 +2162,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
         })
     }
@@ -2173,6 +2273,43 @@ impl CrateNamespace {
                                 } else {
                                     source_sec_name
                                 };
+
+                                // See `cls_macros` for more details.
+                                if source_sec_name == "__THESEUS_CLS_SIZE" {
+                                    #[cfg(target_arch = "aarch64")]
+                                    {
+                                        return Err("encountered `__THESEUS_CLS_SIZE` relocation on AArch64");
+                                    }
+                                    #[cfg(target_arch = "x86_64")]
+                                    {
+                                        let cls_size = VirtualAddress::new(usize::MAX).unwrap();
+                                        let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                        write_relocation(
+                                            relocation_entry,
+                                            target_sec_slice,
+                                            target_sec.mapped_pages_offset,
+                                            cls_size,
+                                            verbose_log,
+                                        )?;
+                                        continue;
+                                    }
+                                } else if source_sec_name == "__THESEUS_TLS_SIZE" {
+                                    #[cfg(target_arch = "x86_64")]
+                                    let tls_size = VirtualAddress::new(usize::MAX).unwrap();
+                                    #[cfg(target_arch = "aarch64")]
+                                    let tls_size = VirtualAddress::zero();
+
+                                    let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                    write_relocation(
+                                        relocation_entry,
+                                        target_sec_slice,
+                                        target_sec.mapped_pages_offset,
+                                        tls_size,
+                                        verbose_log,
+                                    )?;
+                                    continue;
+                                }
+                                
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
@@ -2860,6 +2997,7 @@ struct SectionMetadata {
     loaded_sections: HashMap<usize, Arc<LoadedSection>>,
     global_sections: BTreeSet<usize>,
     tls_sections:    BTreeSet<usize>,
+    cls_sections:    BTreeSet<usize>,
     data_sections:   BTreeSet<usize>,
 }
 
@@ -2946,9 +3084,10 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let addend = size.next_multiple_of(align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec  = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls   = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls   = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
             // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
             if is_exec {
                 // this includes only .text sections
@@ -2961,8 +3100,13 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
                     ro_bytes += addend;
                 }
                 // Ignore .tbss sections, which have type `NoBits`.
-            }
-            else if is_write {
+            } else if is_cls {
+                if sec.get_type() == Ok(ShType::ProgBits) {
+                    ro_bytes += addend;
+                } else {
+                    return Err("CLS section had unexpected type");
+                }
+            } else if is_write {
                 // this includes both .bss and .data sections
                 rw_bytes += addend;
             }

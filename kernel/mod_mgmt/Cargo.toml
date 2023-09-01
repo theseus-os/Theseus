@@ -18,6 +18,7 @@ hashbrown = { version = "0.11.2", features = ["nightly"] }
 log = { version = "0.4.8" }
 
 cow_arc = { path = "../../libs/cow_arc" }
+cls_allocator = { path = "../cls_allocator" }
 kernel_config = { path = "../kernel_config" }
 crate_name_utils = { path = "../crate_name_utils" }
 crate_metadata = { path = "../crate_metadata" }
@@ -29,7 +30,7 @@ fs_node = { path = "../fs_node" }
 no_drop = { path = "../no_drop" }
 early_tls = { path = "../early_tls" }
 vfs_node = { path = "../vfs_node" }
-tls_initializer = { path = "../tls_initializer" }
+local_storage_initializer = { path = "../local_storage_initializer" }
 path = { path = "../path" }
 memfs = { path = "../memfs" }
 

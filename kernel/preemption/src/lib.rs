@@ -10,7 +10,7 @@ use cpu::CpuId;
 
 /// A reference to the preemption counter for the current CPU (in CPU-local storage).
 // NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
-#[cls_macros::cpu_local(12, cls_dep = false)]
+#[cls_macros::cpu_local(cls_dep = false)]
 static PREEMPTION_COUNT: u8 = 0;
 
 /// Prevents preemption (preemptive task switching) from occurring
@@ -80,6 +80,7 @@ fn hold_preemption_internal<const DISABLE_TIMER: bool>() -> PreemptionGuard {
 /// to move it across a "thread" boundary (into a different task).
 /// More specifically, it is invalid to move a `PreemptionGuard` across
 /// CPUs; this error condition is checked for when dropping it.
+#[derive(Debug)]
 pub struct PreemptionGuard {
     /// The ID of the CPU on which preemption was held.
     ///
@@ -117,7 +118,9 @@ impl Drop for PreemptionGuard {
         assert!(
             self.cpu_id == cpu_id,
             "PreemptionGuard::drop(): BUG: CPU IDs did not match! \
-            This indicates an unexpected task migration across CPUs."
+            Task unexpectedly migrated from CPU {} to CPU {}.",
+            self.cpu_id,
+            cpu_id,
         );
 
         let prev_val = PREEMPTION_COUNT.fetch_sub(1);

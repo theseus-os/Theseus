@@ -1,0 +1,13 @@
+[package]
+name = "cls_allocator"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Allocator for CPU-local storage"
+edition = "2021"
+
+[dependencies]
+cpu = { path = "../cpu" }
+crate_metadata = { path = "../crate_metadata" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+local_storage_initializer = { path = "../local_storage_initializer" }
+sync_spin = { path = "../../libs/sync_spin" }

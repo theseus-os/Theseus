@@ -15,6 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         sections: crate_items.sections,
         global_sections: crate_items.global_sections,
         tls_sections: crate_items.tls_sections,
+        cls_sections: crate_items.cls_sections,
         data_sections: crate_items.data_sections,
         init_symbols: crate_items.init_symbols,
     };

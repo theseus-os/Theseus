@@ -101,10 +101,10 @@ pub fn cleanup_bootstrap_tasks(num_tasks: u32) -> Result<(), &'static str> {
             }
             info!("Cleaned up all {} bootstrap tasks.", total_tasks);
             *BOOTSTRAP_TASKS.lock() = Vec::new(); // replace the Vec to drop it
-            // Now that all bootstrap tasks are finished executing and have been cleaned up,
-            // we can safely deallocate the early TLS data image because it is guaranteed
-            // to no longer be in use on any CPU.
-            early_tls::drop();
+            // SAFETY: Now that all bootstrap tasks are finished executing and have been cleaned up,
+            // we can safely deallocate the early TLS data image because it is guaranteed to no
+            // longer be in use on any CPU.
+            unsafe { early_tls::drop() };
         },
         num_tasks,
     )

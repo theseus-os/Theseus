@@ -1,22 +1,23 @@
-//! Logic for generating Thread-Local Storage (TLS) data image for TLS areas.
+//! Logic for generating thread-local storage (TLS) and CPU-local storage (CLS) images.
 //!
 //! The two key types are:
-//! 1. [`TlsInitializer`]: a "factory" that maintains a list of loaded TLS sections
-//!    in order to correctly generate new TLS data images.
-//! 2. [`TlsDataImage`]: a generated TLS data image that can be used as the TLS area
-//!    for a single task.
+//! 1. [`LocalStorageInitializer`]: a "factory" that maintains a list of loaded sections
+//!    in order to correctly generate new local storage data images.
+//! 2. [`LocalStorageDataImage`]: a generated local storage data image that can be set
+//!    as the current data image.
 //!
 //! TODO FIXME: currently we are unsure of the `virt_addr_value`s calculated 
 //!             for TLS sections on aarch64. The placement of those sections in the
 //!             TLS data image is correct, but relocations against them may not be.
+//! TODO: We don't really need a TLS self pointer for CLS.
 
 #![no_std]
 #![feature(int_roundings)]
 
 extern crate alloc;
 
-use alloc::{sync::Arc, vec::Vec, boxed::Box};
-use core::{cmp::max, ops::Deref};
+use alloc::{sync::Arc, vec::Vec};
+use core::{cmp::max, ops::Deref, marker::PhantomData};
 use crate_metadata::{LoadedSection, SectionType, StrongSectionRef};
 use memory_structs::VirtualAddress;
 use rangemap::RangeMap;
@@ -33,18 +34,23 @@ use {
     tock_registers::interfaces::Writeable,
 };
 
-/// A "factory" that creates Thread-Local Storage (TLS) data images,
-/// which are used to initialize a new `Task`'s TLS area.
+pub type TlsInitializer = LocalStorageInitializer<Tls>;
+pub type ClsInitializer = LocalStorageInitializer<Cls>;
+
+/// A "factory" that creates local storage data images.
 #[derive(Debug, Clone)]
-pub struct TlsInitializer {
+pub struct LocalStorageInitializer<T>
+where
+    T: LocalStorage,
+{
     /// The cached data image (with blank space for the TLS self pointer).
-    /// This is used to avoid unnecessarily re-generating the TLS data image
-    /// every time a new task is spawned if no TLS data sections have been added.
+    /// This is used to avoid unnecessarily re-generating the local storage data image
+    /// every time a new task is spawned if no data sections have been added.
     data_cache: Vec<u8>,
     /// The status of the above `data_cache`: whether it is ready to be used
     /// immediately or needs to be regenerated.
     cache_status: CacheStatus,
-    /// The set of TLS data sections that are defined at link time
+    /// The set of CLS/TLS data sections that are defined at link time
     /// and come from the statically-linked base kernel image (the nano_core).
     ///
     /// On x86_64, the ELF TLS ABI specifies that static TLS sections exist at **negative** offsets
@@ -56,24 +62,77 @@ pub struct TlsInitializer {
     /// On aarch64, the ELF TLS ABI specifies only positive offsets,
     /// and there is no TLS self pointer.
     static_section_offsets:  RangeMap<usize, StrongSectionRefWrapper>,
-    /// The ending offset (an exclusive range end bound) of the last TLS section
+    /// The ending offset (an exclusive range end bound) of the last CLS/TLS section
     /// in the above set of `static_section_offsets`.
     /// This is the offset where the TLS self pointer exists.
     end_of_static_sections: usize,
-    /// The set of TLS data sections that come from dynamically-loaded crate object files.
+    /// The set of CLS/TLS data sections that come from dynamically-loaded crate object files.
     /// We can control and arbitrarily assign their offsets, and thus,
     /// we place all of these sections **after** the static sections
-    /// in the generated TLS data image.
+    /// in the generated CLS/TLS data image.
     ///
     /// * On x86_64, these are placed right after the TLS self pointer,
-    ///   which itself is right after the static TLS sections.
-    /// * On aarch64, these are placed directly after the static TLS sections,
+    ///   which itself is right after the static CLS/TLS sections.
+    /// * On aarch64, these are placed directly after the static CLS/TLS sections,
     ///   as there is no TLS self pointer.
     dynamic_section_offsets: RangeMap<usize, StrongSectionRefWrapper>,
-    /// The ending offset (an exclusive range end bound) of the last TLS section
+    /// The ending offset (an exclusive range end bound) of the last CLS/TLS section
     /// in the above set of `dynamic_section_offsets`.
     end_of_dynamic_sections: usize,
+    _phantom: PhantomData<T>,
 } 
+
+pub trait LocalStorage: private::Sealed {}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct Cls {}
+
+impl Sealed for Cls {
+    unsafe fn set_as_current_base(ptr: u64) {
+        #[cfg(target_arch = "x86_64")]
+        {
+            use x86_64::registers::{
+                control::{Cr4, Cr4Flags},
+                segmentation::{Segment64, GS},
+            };
+            unsafe { Cr4::update(|flags| flags.insert(Cr4Flags::FSGSBASE)) };
+            unsafe { GS::write_base(VirtAddr::new(ptr)) };
+        };
+        #[cfg(target_arch = "aarch64")]
+        {
+            use cortex_a::registers::TPIDR_EL1;
+            TPIDR_EL1.set(ptr);
+        }
+    }
+}
+
+impl LocalStorage for Cls {}
+
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct Tls {}
+
+impl Sealed for Tls {
+    unsafe fn set_as_current_base(ptr: u64) {
+        #[cfg(target_arch = "x86_64")]
+        FsBase::write(VirtAddr::new(ptr));
+
+        #[cfg(target_arch = "aarch64")]
+        TPIDR_EL0.set(ptr);
+    }
+}
+
+impl LocalStorage for Tls {}
+
+use private::Sealed;
+mod private {
+    pub trait Sealed {
+        /// Moves `ptr` into the associated register.
+        #[allow(clippy::missing_safety_doc)]
+        unsafe fn set_as_current_base(ptr: u64);
+    }
+}
 
 /// On x86_64, a TLS self pointer exists at the 0th index/offset into each TLS data image,
 /// which is just a pointer to itself.
@@ -84,24 +143,27 @@ const TLS_SELF_POINTER_SIZE: usize = size_of::<usize>();
 #[cfg(target_arch = "aarch64")]
 const TLS_SELF_POINTER_SIZE: usize = 0;
 
-/// Errors that may occur when adding TLS sections to a `TlsInitializer`.
+/// Errors that may occur when adding sections to a `LocalStorageInitializer`.
 #[derive(Debug)]
-pub enum TlsInitializerError {
-    /// Inserting a TLS section at the included offset
+pub enum LocalStorageInitializerError {
+    /// Inserting a CLS/TLS section at the included offset
     /// would erroneously overlap with an existing section. 
     /// This indicates a link-time bug or a bug in the symbol parsing code
-    /// that invokes the [`TlsInitializer::add_existing_static_tls_section()`].
+    /// that invokes the [`LocalStorageInitializer::add_existing_static_tls_section()`].
     OverlapWithExistingSection(usize),
-    /// The included virtual address calculated for a TLS section was invalid.
+    /// The included virtual address calculated for a CLS/TLS section was invalid.
     InvalidVirtualAddress(usize),
-    /// There was insufficient space to insert a TLS section into the TLS data image.
+    /// There was insufficient space to insert a CLS/TLS section into the data image.
     NoRemainingSpace,
 }
 
-impl TlsInitializer {
-    /// Creates an empty TLS initializer with no TLS data sections.
-    pub const fn empty() -> TlsInitializer {
-        TlsInitializer {
+impl<T> LocalStorageInitializer<T>
+where
+    T: LocalStorage,
+{
+    /// Creates an empty local storage initializer with no data sections.
+    pub const fn new() -> Self {
+        LocalStorageInitializer {
             // The data image will be generated lazily on the next request to use it.
             data_cache: Vec::new(),
             cache_status: CacheStatus::Invalidated,
@@ -109,11 +171,12 @@ impl TlsInitializer {
             end_of_static_sections: 0,
             dynamic_section_offsets: RangeMap::new(),
             end_of_dynamic_sections: 0,
+            _phantom: PhantomData,
         }
     }
 
     
-    /// Add a TLS section that has pre-determined offset, e.g.,
+    /// Add a CLS/TLS section that has pre-determined offset, e.g.,
     /// one that was specified in the statically-linked base kernel image.
     ///
     /// This function modifies the `tls_section`'s starting virtual address field
@@ -132,11 +195,11 @@ impl TlsInitializer {
     ///     (from the beginning of all sections).
     ///
     /// ## Arguments
-    /// * `tls_section`: the TLS section present in base kernel image.
+    /// * `section`: the section present in base kernel image.
     /// * `offset`: the offset of this section as determined by the linker.
     ///    This corresponds to the "value" of this section's symbol in the ELF file.
-    /// * `total_static_tls_size`: the total size of all statically-known TLS sections,
-    ///    including both TLS BSS (`.tbss`) and TLS data (`.tdata`) sections.
+    /// * `total_static_size`: the total size of all statically-known CLS/TLS sections,
+    ///    including both TLS BSS (`.tbss`) and TLS data (`.tdata`) sections for TLS.
     ///
     /// ## Return
     /// * A reference to the newly added and properly modified section, if successful.
@@ -145,42 +208,42 @@ impl TlsInitializer {
     ///   An error occurring here would indicate a link-time bug 
     ///   or a bug in the symbol parsing code that invokes this function.
     #[cfg_attr(target_arch = "aarch64", allow(unused_variables))]
-    pub fn add_existing_static_tls_section(
+    pub fn add_existing_static_section(
         &mut self,
-        mut tls_section: LoadedSection,
+        mut section: LoadedSection,
         offset: usize,
-        total_static_tls_size: usize,
-    ) -> Result<StrongSectionRef, TlsInitializerError> {
+        total_static_size: usize,
+    ) -> Result<StrongSectionRef, LocalStorageInitializerError> {
         #[cfg(target_arch = "aarch64")]
         let original_offset = offset;
         #[cfg(target_arch = "aarch64")]
         let offset = max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */) + offset;
 
-        let range = offset .. (offset + tls_section.size);
+        let range = offset .. (offset + section.size);
         if self.static_section_offsets.contains_key(&range.start) || 
             self.static_section_offsets.contains_key(&(range.end - 1))
         {
-            return Err(TlsInitializerError::OverlapWithExistingSection(offset));
+            return Err(LocalStorageInitializerError::OverlapWithExistingSection(offset));
         }
 
         // Calculate the new value of this section's virtual address based on its offset.
         #[cfg(target_arch = "x86_64")]
-        let virt_addr_value = (total_static_tls_size - offset).wrapping_neg();
+        let virt_addr_value = (total_static_size - offset).wrapping_neg();
 
         #[cfg(target_arch = "aarch64")]
         let virt_addr_value = original_offset;
 
-        tls_section.virt_addr = VirtualAddress::new(virt_addr_value)
-            .ok_or(TlsInitializerError::InvalidVirtualAddress(virt_addr_value))?;
+        section.virt_addr = VirtualAddress::new(virt_addr_value)
+            .ok_or(LocalStorageInitializerError::InvalidVirtualAddress(virt_addr_value))?;
         self.end_of_static_sections = max(self.end_of_static_sections, range.end);
-        let section_ref = Arc::new(tls_section);
+        let section_ref = Arc::new(section);
         self.static_section_offsets.insert(range, StrongSectionRefWrapper(section_ref.clone()));
         self.cache_status = CacheStatus::Invalidated;
         Ok(section_ref)
     }
 
-    /// Inserts the given `section` into this TLS area at the next index
-    /// (i.e., offset into the TLS area) where the section will fit.
+    /// Inserts the given `section` into this CLS/TLS area at the next index
+    /// (i.e., offset into the CLS/TLS area) where the section will fit.
     ///
     /// This also modifies the virtual address field of the given `section`
     /// to hold the proper value based on that offset, which is necessary
@@ -188,15 +251,15 @@ impl TlsInitializer {
     ///
     /// Returns a tuple of:
     /// 1. The index at which the new section was inserted, 
-    ///    which is the offset from the beginning of the TLS area where the section data starts.
+    ///    which is the offset from the beginning of the CLS/TLS area where the section data starts.
     /// 2. The modified section as a `StrongSectionRef`.
     ///
     /// Returns an Error if there is no remaining space that can fit the section.
-    pub fn add_new_dynamic_tls_section(
+    pub fn add_new_dynamic_section(
         &mut self,
         mut section: LoadedSection,
         alignment: usize,
-    ) -> Result<(usize, StrongSectionRef), TlsInitializerError> {
+    ) -> Result<(usize, StrongSectionRef), LocalStorageInitializerError> {
         let mut start_index = None;
         // First, we find the next "gap" big enough to fit the new TLS section.
         // On x86_64, we skip the first `TLS_SELF_POINTER_SIZE` bytes, reserved for the TLS self pointer.
@@ -215,7 +278,7 @@ impl TlsInitializer {
             }
         }
 
-        let start = start_index.ok_or(TlsInitializerError::NoRemainingSpace)?;
+        let start = start_index.ok_or(LocalStorageInitializerError::NoRemainingSpace)?;
 
         // Calculate this section's virtual address based the range we reserved for it.
         #[cfg(target_arch = "x86_64")]
@@ -225,7 +288,7 @@ impl TlsInitializer {
         let virt_addr_value = start + self.end_of_static_sections - max(16, 8 /* TODO FIXME: pass in the TLS segment's alignment */);
 
         section.virt_addr = VirtualAddress::new(virt_addr_value)
-            .ok_or(TlsInitializerError::InvalidVirtualAddress(virt_addr_value))?;
+            .ok_or(LocalStorageInitializerError::InvalidVirtualAddress(virt_addr_value))?;
         let range = start .. (start + section.size);
         let section_ref = Arc::new(section);
         self.end_of_dynamic_sections = max(self.end_of_dynamic_sections, range.end);
@@ -235,23 +298,23 @@ impl TlsInitializer {
         Ok((start, section_ref))
     }
 
-    /// Invalidates the cached data image in this `TlsInitializer` area.
+    /// Invalidates the cached data image in this `LocalStorageInitializer` area.
     /// 
-    /// This is useful for when a TLS section's data has been modified,
+    /// This is useful for when a CLS/TLS section's data has been modified,
     /// e.g., while performing relocations, 
     /// and thus the data image needs to be re-created by re-reading the section data.
     pub fn invalidate(&mut self) {
         self.cache_status = CacheStatus::Invalidated;
     }
 
-    /// Returns a new copy of the TLS data image.
+    /// Returns a new copy of the data image.
     ///
-    /// This function lazily generates the TLS image data on demand, if needed.
-    pub fn get_data(&mut self) -> TlsDataImage {
+    /// This function lazily generates the image data on demand, if needed.
+    pub fn get_data(&mut self) -> LocalStorageDataImage<T> {
         let total_section_size = self.end_of_static_sections + self.end_of_dynamic_sections;
         let required_capacity = if total_section_size > 0 { total_section_size + TLS_SELF_POINTER_SIZE } else { 0 };
         if required_capacity == 0 {
-            return TlsDataImage { _data: None, ptr: 0 };
+            return LocalStorageDataImage::new();
         }
 
         // An internal function that iterates over all TLS sections and copies their data into the new data image.
@@ -266,7 +329,8 @@ impl TlsInitializer {
                 new_data.extend(core::iter::repeat(0).take(num_padding_bytes));
 
                 // Insert the section data into the new data vec.
-                if sec.typ == SectionType::TlsData {
+                log::info!("adding sec: {sec:?}");
+                if (sec.typ == SectionType::TlsData) | (sec.typ == SectionType::Cls) {
                     let sec_mp = sec.mapped_pages.lock();
                     let sec_data: &[u8] = sec_mp.as_slice(sec.mapped_pages_offset, sec.size).unwrap();
                     new_data.extend_from_slice(sec_data);
@@ -279,7 +343,7 @@ impl TlsInitializer {
         }
 
         if self.cache_status == CacheStatus::Invalidated {
-            // log::debug!("TlsInitializer was invalidated, re-generating data.\n{:#X?}", self);
+            // log::debug!("LocalStorageInitializer was invalidated, re-generating data.\n{:#X?}", self);
 
             // On some architectures, such as x86_64, the ABI convention REQUIRES that
             // the TLS area data starts with a pointer to itself (the TLS self pointer).
@@ -318,7 +382,7 @@ impl TlsInitializer {
 
         // Here, the `data_cache` is guaranteed to be fresh and ready to use.
         #[cfg(target_arch = "x86_64")] {
-            let mut data_copy: Box<[u8]> = self.data_cache.as_slice().into();
+            let mut data_copy = self.data_cache.clone();
             // Every time we create a new copy of the TLS data image, we have to re-calculate
             // and re-assign the TLS self pointer value (located after the static TLS section data),
             // because the virtual address of that new TLS data image copy will be unique.
@@ -329,64 +393,132 @@ impl TlsInitializer {
             ) else {
                 panic!("BUG: offset of TLS self pointer was out of bounds in the TLS data image:\n{:02X?}", data_copy);
             };
-            let tls_self_ptr_value = dest_slice.as_ptr() as usize;
+            let tls_self_ptr_value = dest_slice.as_ptr() as u64;
             dest_slice.copy_from_slice(&tls_self_ptr_value.to_ne_bytes());
-            TlsDataImage {
-                _data: Some(data_copy),
-                ptr:   tls_self_ptr_value,
+            LocalStorageDataImage {
+                ptr: tls_self_ptr_value,
+                data: data_copy,
+                _phantom: PhantomData,
             }
         }
 
         #[cfg(target_arch = "aarch64")] {
-            let data_copy: Box<[u8]> = self.data_cache.as_slice().into();
-            let ptr = data_copy.as_ptr() as usize;
-            TlsDataImage {
-                _data: Some(data_copy),
-                ptr,
+            let cloned = self.data_cache.clone();
+            LocalStorageDataImage {
+                ptr: cloned.as_ptr() as u64,
+                data: cloned,
+                _phantom: PhantomData,
             }
         }
     }
 }
 
-/// An initialized TLS area data image ready to be used by a new task.
+/// An initialized data image ready to be used by a CPU/new task.
 /// 
-/// The data is opaque, but one can obtain a pointer to the TLS area.
-/// 
-/// The enclosed opaque data is stored as a boxed slice (`Box<[u8]>`)
-/// instead of a vector (`Vec<u8>`) because it is instantiated once upon task creation
-/// and should never be expanded or shrunk.
+/// The data is opaque, but one can obtain a pointer to the CLS/TLS area.
 /// 
 /// The data is "immutable" with respect to Theseus task management functions
-/// at the language level.
-/// However, the data within this TLS area will be modified directly by code
-/// that executes "in" this task, e.g., instructions that access the current TLS area.
+/// at the language level. However, it will be modified by CLS/TLS accesses.
 #[derive(Debug)]
-pub struct TlsDataImage {
-    // The data is wrapped in an Option to avoid allocating an empty boxed slice
-    // when there are no TLS data sections.
-    _data: Option<Box<[u8]>>,
-    ptr:   usize,
+pub struct LocalStorageDataImage<T>
+where
+    T: LocalStorage,
+{
+    data: Vec<u8>,
+    ptr: u64,
+    _phantom: PhantomData<T>,
 }
-impl TlsDataImage {
-    /// Creates an empty TLS data image with no TLS section content.
-    pub const fn empty() -> TlsDataImage {
-        Self { _data: None, ptr: 0 }
+
+impl<T> LocalStorageDataImage<T>
+where
+    T: LocalStorage,
+{
+    /// Creates an empty data image.
+    pub const fn new() -> Self {
+        Self {
+            data: Vec::new(),
+            ptr: 0,
+            _phantom: PhantomData,
+        }
     }
 
-    /// Sets the current CPU's TLS register to point to this TLS data image.
+    /// Inherits the data from another data image.
     ///
-    /// * On x86_64, this writes to the `FsBase` MSR.
-    /// * On ARMv8, this writes to `TPIDR_EL0`.
-    pub fn set_as_current_tls_base(&self) {
-        #[cfg(target_arch = "x86_64")]
-        FsBase::write(VirtAddr::new_truncate(self.ptr as u64));
-
+    /// # Panics
+    ///
+    /// Panics if the other image has a longer length, or (on x86_64) if the other
+    /// image has a differently sized static area.
+    pub fn inherit(&mut self, other: &Self) {
         #[cfg(target_arch = "aarch64")]
-        TPIDR_EL0.set(self.ptr as u64);
+        {
+            let other_len = other.data.len();
+            assert!(other_len <= self.data.len());
+            self.data[..other_len].clone_from_slice(&other.data[..]);
+        }
+        #[cfg(target_arch = "x86_64")]
+        {
+            if !other.data.is_empty() {
+                // ```
+                //                ptr
+                //                 V
+                //        +--------+----------+---------+
+                // other: | static | self ptr | dynamic |
+                //        +--------+----------+---------+
+                //        +--------+----------+-------------+
+                //  self: | static | self ptr |   dynamic   |
+                //        +--------+----------+-------------+
+                //                 ^
+                //                ptr
+                // ```
+                let self_static_len = self.ptr as usize - self.data.as_ptr() as usize;
+                let other_static_len = other.ptr as usize - other.data.as_ptr() as usize;
+
+                assert_eq!(self_static_len, other_static_len);
+                assert!(other.data.len() <= self.data.len());
+
+                self.data[..self_static_len].clone_from_slice(&other.data[..self_static_len]);
+                self.data[(self_static_len + TLS_SELF_POINTER_SIZE)..other.data.len()]
+                    .clone_from_slice(&other.data[(self_static_len + TLS_SELF_POINTER_SIZE)..]);
+            }
+        }
     }
 }
 
-/// The status of a cached TLS area data image.
+pub type ClsDataImage = LocalStorageDataImage<Cls>;
+
+pub type TlsDataImage = LocalStorageDataImage<Tls>;
+
+impl LocalStorageDataImage<Cls> {
+    /// Sets the data image.
+    ///
+    /// # Safety
+    ///
+    /// The data image must not be dropped until another data image replaces it.
+    pub unsafe fn set_as_current_cls(&self) {
+        // SAFETY: We guarantee that the length of `data` never changes and hence that it is never
+        // reallocated. The caller guarantees that `self` and by extension `data` is never dropped.
+        // NOTE: This is technically undefined behaviour because we cast the `*const ptr` into a
+        // `*mut ptr` in the code generated by `cls_macros`. Obviously, it goes through a system
+        // register that Rust cannot possible reason about so it's probably fine?
+        unsafe { Cls::set_as_current_base(self.ptr) };
+    }
+}
+
+impl LocalStorageDataImage<Tls> {
+    /// Sets the data image.
+    ///
+    /// # Safety
+    ///
+    /// The data image must not be dropped until another data image replaces it, or until
+    /// thread-local storage will never be accessed from the current thread again.
+    pub unsafe fn set_as_current_tls(&self) {
+        // SAFETY: We guarantee that the length of `data` never changes and hence that it is never
+        // reallocated. The caller guarantees that `self` and by extension `data` is never dropped.
+        unsafe { Tls::set_as_current_base(self.ptr) };
+    }
+}
+
+/// The status of a cached data image.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum CacheStatus {
     /// The cached data image is up to date and can be used immediately.
@@ -399,15 +531,18 @@ enum CacheStatus {
 /// so we can use it in a `RangeMap`.
 #[derive(Debug, Clone)]
 struct StrongSectionRefWrapper(StrongSectionRef);
+
 impl Deref for StrongSectionRefWrapper {
     type Target = StrongSectionRef;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
+
 impl PartialEq for StrongSectionRefWrapper {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }
 }
-impl Eq for StrongSectionRefWrapper { }
+
+impl Eq for StrongSectionRefWrapper {}
