@@ -188,6 +188,16 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
             {
                 self.replace_guarded(value, guard);
             }
+
+            #[inline]
+            pub fn update_guarded<F, R, G>(&self, f: F, guard: &G) -> R
+            where
+                F: ::core::ops::FnOnce(&mut #ty) -> R,
+                G: ::cls::CpuAtomicGuard,
+            {
+                let rref = #ref_expr;
+                f(rref)
+            }
         };
 
         if let Some(guard_type) = stores_guard {
@@ -243,6 +253,15 @@ pub fn cpu_local(args: TokenStream, input: TokenStream) -> TokenStream {
                     self.set_guarded(value, &guard);
                 }
 
+                #[inline]
+                pub fn update<F, R>(&self, f: F) -> R
+                where
+                    F: ::core::ops::FnOnce(&mut #ty) -> R,
+                {
+                    // TODO: Should this ever be `disable_interrupts` instead?
+                    let guard = ::cls::__private::preemption::hold_preemption();
+                    self.update_guarded(f, &guard)
+                }
             }
         }
     } else {
