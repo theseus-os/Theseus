@@ -183,7 +183,7 @@ To build and run Theseus on aarch64, first install the required dependencies:
 
 Then, build Theseus and run it in QEMU:
 ```bash
-make ARCH=aarch64 FEATURES="" run
+make ARCH=aarch64 run
 ```
 
 Doing a "full" build of all Theseus crates isn't yet supported on aarch64,
@@ -277,7 +277,7 @@ We don't yet have a patched version of GDB for aarch64 targets, but we can use t
 
 2. Build Theseus for aarch64 and run it in QEMU:
     ```sh
-    make ARCH=aarch64 FEATURES="" run ## or use `run_pause`
+    make ARCH=aarch64 run ## or use `run_pause`
     ```
 3. In another terminal window, run the following to start GDB and attach it to the running QEMU instance:
     ```sh
