@@ -226,7 +226,6 @@ make view-book  ## for the Theseus book
 
 ## Booting on Real Hardware
 We have tested Theseus on a variety of real machines, including Intel NUC devices, various Thinkpad laptops, and Supermicro servers. 
-Currently, the only limiting factor is that the device supports booting via USB or PXE using traditional BIOS rather than UEFI; support for UEFI is a work-in-progress. 
 
 To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
 On WSL or other host environments where `/dev` device nodes don't exist, you can simply run `make iso` and burn the `.iso` file in the `build/` directory to a USB, e.g., using [Rufus](https://rufus.ie/) on Windows.
