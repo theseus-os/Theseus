@@ -43,6 +43,11 @@ EXECUTABLE_PREFIX   ?= e\#
 ## However, one can override which crates are built by setting `FEATURES`.
 FEATURES ?= --workspace
 
+## Currently, we cannot build all crates in the workspace on aarch64, just the minimum subset.
+ifeq ($(ARCH),aarch64)
+	FEATURES =
+endif
+
 ## Build modes: debug is development mode, release is with full optimizations.
 ## We build using release mode by default, because running in debug mode is quite slow.
 ## You can set these on the command line like so: "make run BUILD_MODE=release"
