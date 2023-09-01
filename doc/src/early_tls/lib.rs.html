@@ -30,6 +30,19 @@
 <a href="#30" id="30">30</a>
 <a href="#31" id="31">31</a>
 <a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
+<a href="#36" id="36">36</a>
+<a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
+<a href="#39" id="39">39</a>
+<a href="#40" id="40">40</a>
+<a href="#41" id="41">41</a>
+<a href="#42" id="42">42</a>
+<a href="#43" id="43">43</a>
+<a href="#44" id="44">44</a>
+<a href="#45" id="45">45</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Handles initialization of TLS data images during early OS initialization.
 //!
 //! This is only useful before the tasking subsystem is initialized, i.e.,
@@ -37,29 +50,42 @@
 
 </span><span class="attr">#![no_std]
 
-</span><span class="kw">use </span>tls_initializer::TlsDataImage;
+</span><span class="kw">use </span>local_storage_initializer::TlsDataImage;
 <span class="kw">use </span>spin::Mutex;
 
-<span class="kw">static </span>EARLY_TLS_IMAGE: Mutex&lt;TlsDataImage&gt; = Mutex::new(TlsDataImage::empty());
+<span class="kw">static </span>EARLY_TLS_IMAGE: Mutex&lt;TlsDataImage&gt; = Mutex::new(TlsDataImage::new());
 
 <span class="doccomment">/// Insert the current early TLS image with the given `new_tls_image`,
 /// and loads the new image on this CPU.
 ///
 /// If an early TLS image already exists, it is removed and dropped.
 </span><span class="kw">pub fn </span>insert(new_tls_image: TlsDataImage) {
-    new_tls_image.set_as_current_tls_base();
+    <span class="comment">// SAFETY: `new_tls_image` is only dropped if:
+    // - `insert` is called again, in which case the next image will replace it
+    //   before it is dropped.
+    // - `drop` is called in which case the caller guarantees that the task
+    //   subsystem has been initialized i.e. the early image has been replaced.
+    </span><span class="kw">unsafe </span>{ new_tls_image.set_as_current_tls() };
     <span class="kw-2">*</span>EARLY_TLS_IMAGE.lock() = new_tls_image;
 }
 
 <span class="doccomment">/// Loads the existing (previously-initialized) early TLS image on this CPU.
 </span><span class="kw">pub fn </span>reload() {
-    EARLY_TLS_IMAGE.lock().set_as_current_tls_base();
+    <span class="comment">// SAFETY: The early TLS image is only dropped if:
+    // - `insert` is called, in which case the next image will replace it before it
+    //   is dropped.
+    // - `drop` is called in which case the caller guarantees that the task
+    //   subsystem has been initialized i.e. the early image has been replaced.
+    </span><span class="kw">unsafe </span>{ EARLY_TLS_IMAGE.lock().set_as_current_tls() };
 }
 
 <span class="doccomment">/// Clears the early TLS image
 ///
-/// This should only be invoked after the task subsystem is initialized on all CPUs.
-</span><span class="kw">pub fn </span>drop() {
-    <span class="kw-2">*</span>EARLY_TLS_IMAGE.lock() = TlsDataImage::empty();
+/// # Safety
+///
+/// This must only be called after the task subsystem is initialized on all
+/// CPUs.
+</span><span class="kw">pub unsafe fn </span>drop() {
+    <span class="kw-2">*</span>EARLY_TLS_IMAGE.lock() = TlsDataImage::new();
 }
 </code></pre></div></section></main></body></html>

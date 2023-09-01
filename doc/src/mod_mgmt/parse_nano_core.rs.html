@@ -876,6 +876,69 @@
 <a href="#876" id="876">876</a>
 <a href="#877" id="877">877</a>
 <a href="#878" id="878">878</a>
+<a href="#879" id="879">879</a>
+<a href="#880" id="880">880</a>
+<a href="#881" id="881">881</a>
+<a href="#882" id="882">882</a>
+<a href="#883" id="883">883</a>
+<a href="#884" id="884">884</a>
+<a href="#885" id="885">885</a>
+<a href="#886" id="886">886</a>
+<a href="#887" id="887">887</a>
+<a href="#888" id="888">888</a>
+<a href="#889" id="889">889</a>
+<a href="#890" id="890">890</a>
+<a href="#891" id="891">891</a>
+<a href="#892" id="892">892</a>
+<a href="#893" id="893">893</a>
+<a href="#894" id="894">894</a>
+<a href="#895" id="895">895</a>
+<a href="#896" id="896">896</a>
+<a href="#897" id="897">897</a>
+<a href="#898" id="898">898</a>
+<a href="#899" id="899">899</a>
+<a href="#900" id="900">900</a>
+<a href="#901" id="901">901</a>
+<a href="#902" id="902">902</a>
+<a href="#903" id="903">903</a>
+<a href="#904" id="904">904</a>
+<a href="#905" id="905">905</a>
+<a href="#906" id="906">906</a>
+<a href="#907" id="907">907</a>
+<a href="#908" id="908">908</a>
+<a href="#909" id="909">909</a>
+<a href="#910" id="910">910</a>
+<a href="#911" id="911">911</a>
+<a href="#912" id="912">912</a>
+<a href="#913" id="913">913</a>
+<a href="#914" id="914">914</a>
+<a href="#915" id="915">915</a>
+<a href="#916" id="916">916</a>
+<a href="#917" id="917">917</a>
+<a href="#918" id="918">918</a>
+<a href="#919" id="919">919</a>
+<a href="#920" id="920">920</a>
+<a href="#921" id="921">921</a>
+<a href="#922" id="922">922</a>
+<a href="#923" id="923">923</a>
+<a href="#924" id="924">924</a>
+<a href="#925" id="925">925</a>
+<a href="#926" id="926">926</a>
+<a href="#927" id="927">927</a>
+<a href="#928" id="928">928</a>
+<a href="#929" id="929">929</a>
+<a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
+<a href="#934" id="934">934</a>
+<a href="#935" id="935">935</a>
+<a href="#936" id="936">936</a>
+<a href="#937" id="937">937</a>
+<a href="#938" id="938">938</a>
+<a href="#939" id="939">939</a>
+<a href="#940" id="940">940</a>
+<a href="#941" id="941">941</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Routines for parsing the `nano_core`, the fully-linked, already-loaded base kernel image,
 //! in other words, the code that is currently executing.
 //! As such, it performs no loading, but rather just creates metadata that represents
@@ -884,7 +947,7 @@
 </span><span class="attr">#![allow(clippy::type_complexity)]
 
 </span><span class="kw">use </span>alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
-<span class="kw">use crate</span>::{CrateNamespace, mp_range};
+<span class="kw">use crate</span>::{CrateNamespace, mp_range, CLS_SECTION_FLAG};
 <span class="kw">use </span>fs_node::FileRef;
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>rustc_demangle::demangle;
@@ -1066,6 +1129,7 @@
         data_pages:          <span class="prelude-val">Some</span>((data_pages.clone(),   mp_range(data_pages))),
         global_sections:     BTreeSet::new(),
         tls_sections:        BTreeSet::new(),
+        cls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
         reexported_symbols:  BTreeSet::new(),
     });
@@ -1130,7 +1194,9 @@
     <span class="kw">let </span><span class="kw-2">mut </span>bss_shndx:      <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>tls_data_info:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>tls_bss_info:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>cls_info:       <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>total_tls_size: usize = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>total_cls_size: usize = <span class="number">0</span>;
 
     <span class="doccomment">/// An internal function that parses a section header&#39;s index (e.g., &quot;[7]&quot;) out of the given str.
     /// Returns a tuple of the parsed `Shndx` and the rest of the unparsed str after the shndx.
@@ -1204,6 +1270,15 @@
                     })
                 );
         }
+        <span class="kw">else if </span>line.contains(<span class="string">&quot;.cls&quot;</span>) &amp;&amp; line.contains(<span class="string">&quot;PROGBITS&quot;</span>) {
+            cls_info = parse_section_ndx(line)
+                .and_then(|(shndx, rest_of_line)| parse_section_vaddr_size(rest_of_line)
+                    .map(|(vaddr, size)| {
+                        total_cls_size += size;
+                        (shndx, vaddr)
+                    })
+                );
+        }
         <span class="kw">else if </span>line.contains(<span class="string">&quot;.data &quot;</span>) &amp;&amp; line.contains(<span class="string">&quot;PROGBITS&quot;</span>) {
             data_shndx = parse_section_ndx(line).map(|(shndx, <span class="kw">_</span>)| shndx);
         }
@@ -1259,8 +1334,15 @@
     <span class="kw">let </span>data_shndx    = data_shndx  .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .data section index&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>bss_shndx     = bss_shndx   .ok_or(<span class="string">&quot;parse_nano_core_symbol_file(): couldn&#39;t find .bss section index&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>main_sec_info = MainSectionInfo {
-        text_shndx, rodata_shndx, data_shndx, bss_shndx,
-        tls_data_info, tls_bss_info, total_tls_size,
+        text_shndx,
+        rodata_shndx,
+        data_shndx,
+        bss_shndx,
+        tls_data_info,
+        tls_bss_info,
+        cls_info,
+        total_tls_size,
+        total_cls_size,
     };
 
     <span class="comment">// second, skip ahead to the start of the symbol table: a line which contains &quot;.symtab&quot; but does NOT contain &quot;SYMTAB&quot;
@@ -1283,6 +1365,8 @@
         <span class="comment">// third, parse each symbol table entry
         </span><span class="kw">for </span>(_line_num, line) <span class="kw">in </span>file_iterator {
             <span class="kw">if </span>line.is_empty() { <span class="kw">continue</span>; }
+            <span class="comment">// CLS symbols have an OS specific symbol type which messes with the parser.
+            </span><span class="kw">let </span>line = line.replace(<span class="string">&quot;&lt;OS specific&gt;: &quot;</span>, <span class="string">&quot;&quot;</span>);
             
             <span class="comment">// we need the following items from a symbol table entry:
             // * Value (address),      column 1
@@ -1401,7 +1485,9 @@
     <span class="kw">let </span><span class="kw-2">mut </span>bss_shndx:      <span class="prelude-ty">Option</span>&lt;Shndx&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>tls_data_info:  <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>tls_bss_info:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>cls_info:       <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt; = <span class="prelude-val">None</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>total_tls_size: usize = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>total_cls_size: usize = <span class="number">0</span>;
 
     <span class="comment">// We will fill in these crate items while parsing the symbol file.
     </span><span class="kw">let </span><span class="kw-2">mut </span>crate_items = ParsedCrateItems::empty();
@@ -1454,8 +1540,17 @@
                 }
                 <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec.address() <span class="kw">as </span>usize)
                     .ok_or(<span class="string">&quot;the nano_core .tbss section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
-                    tls_bss_info = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
-                    total_tls_size += sec_size;
+                tls_bss_info = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
+                total_tls_size += sec_size;
+            }
+            <span class="prelude-val">Ok</span>(<span class="string">&quot;.cls&quot;</span>) =&gt; {
+                <span class="kw">if </span>sec.flags() &amp; (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | CLS_SECTION_FLAG) != (SHF_ALLOC | SHF_WRITE | CLS_SECTION_FLAG) {
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;.cls section had wrong flags!&quot;</span>);
+                }
+                <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec.address() <span class="kw">as </span>usize)
+                    .ok_or(<span class="string">&quot;the nano_core .cls section had an invalid virtual address&quot;</span>)<span class="question-mark">?</span>;
+                cls_info = <span class="prelude-val">Some</span>((shndx, sec_vaddr));
+                total_cls_size += sec_size;
             }
             <span class="prelude-val">Ok</span>(<span class="string">&quot;.gcc_except_table&quot;</span>) =&gt; {
                 <span class="kw">let </span>sec_vaddr = VirtualAddress::new(sec.address() <span class="kw">as </span>usize)
@@ -1510,8 +1605,15 @@
     <span class="kw">let </span>data_shndx    = data_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .data section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>bss_shndx     = bss_shndx.ok_or(<span class="string">&quot;couldn&#39;t find .bss section in nano_core ELF&quot;</span>)<span class="question-mark">?</span>;
     <span class="kw">let </span>main_sec_info = MainSectionInfo {
-        text_shndx, rodata_shndx, data_shndx, bss_shndx,
-        tls_data_info, tls_bss_info, total_tls_size,
+        text_shndx,
+        rodata_shndx,
+        data_shndx,
+        bss_shndx,
+        tls_data_info,
+        tls_bss_info,
+        cls_info,
+        total_tls_size,
+        total_cls_size,
     };
     
     {
@@ -1590,8 +1692,10 @@
     data_shndx:      Shndx,
     bss_shndx:       Shndx,
     tls_data_info:   <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
+    cls_info:        <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
     tls_bss_info:    <span class="prelude-ty">Option</span>&lt;(Shndx, VirtualAddress)&gt;,
     total_tls_size:  usize,
+    total_cls_size:  usize,
 }
 
 <span class="doccomment">/// A convenience function that separates out the logic 
@@ -1697,7 +1801,7 @@
             new_crate_weak_ref.clone(),
         );
         <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.
-        </span><span class="kw">let </span>tls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+        </span><span class="kw">let </span>tls_section_ref = namespace.tls_initializer.lock().add_existing_static_section(
             tls_section,
             tls_offset,
             main_section_info.total_tls_size,
@@ -1728,14 +1832,36 @@
             new_crate_weak_ref.clone(),
         );
         <span class="comment">// Add this new TLS section to this namespace&#39;s TLS area image.
-        </span><span class="kw">let </span>tls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+        </span><span class="kw">let </span>tls_section_ref = namespace.tls_initializer.lock().add_existing_static_section(
             tls_section,
             tls_offset,
             main_section_info.total_tls_size,
         ).map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: failed to add static TLS section to the TLS area initializer&quot;</span>)<span class="question-mark">?</span>;
         <span class="prelude-val">Some</span>(tls_section_ref)
     }
-    <span class="kw">else </span>{
+    <span class="kw">else if </span>main_section_info.cls_info.map_or(<span class="bool-val">false</span>, |(shndx, <span class="kw">_</span>)| sec_ndx == shndx) {
+        <span class="kw">let </span>cls_offset = sec_vaddr;
+        <span class="kw">let </span>cls_sec_data_vaddr = main_section_info.cls_info.unwrap().<span class="number">1 </span>+ cls_offset; 
+
+        <span class="kw">let </span>cls_section = LoadedSection::new(
+            SectionType::Cls,
+            sec_name,
+            Arc::clone(rodata_pages),
+            <span class="comment">// CLS sections are lumped into the &quot;.rodata&quot; MappedPages with the read-only data sections.
+            </span>rodata_pages_locked.offset_of_address(cls_sec_data_vaddr).ok_or(<span class="string">&quot;nano_core CLS .cls section wasn&#39;t covered by the .rodata mapped pages!&quot;</span>)<span class="question-mark">?</span>,
+            VirtualAddress::new(cls_offset).ok_or(<span class="string">&quot;new TLS .cls section had invalid virtual address (CLS offset)&quot;</span>)<span class="question-mark">?</span>,
+            sec_size,
+            global,
+            new_crate_weak_ref.clone(),
+        );
+        <span class="comment">// Add this new CLS section to this namespace&#39;s CLS area image.
+        </span><span class="kw">let </span>cls_section_ref = cls_allocator::add_static_section(
+            cls_section,
+            cls_offset,
+            main_section_info.total_cls_size,
+        ).map_err(|<span class="kw">_</span>| <span class="string">&quot;BUG: failed to add static CLS section to the CLS area&quot;</span>)<span class="question-mark">?</span>;
+        <span class="prelude-val">Some</span>(cls_section_ref)
+    } <span class="kw">else </span>{
         crate_items.init_symbols.insert(String::from(sec_name.as_str()), sec_vaddr);
         <span class="prelude-val">None
     </span>};

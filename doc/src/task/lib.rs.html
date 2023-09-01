@@ -1221,6 +1221,7 @@
 <a href="#1221" id="1221">1221</a>
 <a href="#1222" id="1222">1222</a>
 <a href="#1223" id="1223">1223</a>
+<a href="#1224" id="1224">1224</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Key types and functions for multitasking that build on the basic [`Task`].
 //!
 //! The main types of interest are:
@@ -1498,7 +1499,8 @@
     /// Currently, this simply updates the current CPU&#39;s TLS base register
     /// to point to this task&#39;s TLS data image.
     </span><span class="kw">fn </span>set_as_current_task(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="self">self</span>.<span class="number">0</span>.task.tls_area().set_as_current_tls_base();
+        <span class="comment">// SAFETY: We don&#39;t drop the TLS area until the task is finished.
+        </span><span class="kw">unsafe </span>{ <span class="self">self</span>.<span class="number">0</span>.task.tls_area().set_as_current_tls() };
     }
 }
 
@@ -1830,7 +1832,7 @@
         <span class="comment">// If preemption was not previously enabled (before we disabled it above),
         // then we shouldn&#39;t perform a task switch here.
         </span><span class="kw">if </span>!preemption_guard.preemption_was_enabled() {
-            <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, current_cpu());
+            <span class="comment">// trace!(&quot;Note: preemption was disabled on CPU {}, skipping scheduler.&quot;, cpu::current_cpu());
             </span><span class="kw">return </span><span class="bool-val">false</span>;
         }
 
@@ -2192,7 +2194,7 @@
 /// and then retrieved from here right after the context switch ends.
 /// It is stored in a CPU-local variable because it&#39;s only related to
 /// a task switching operation on a particular CPU.
-</span><span class="attr">#[cls::cpu_local(<span class="number">16</span>, stores_guard = PreemptionGuard)]
+</span><span class="attr">#[cls::cpu_local(stores_guard = PreemptionGuard)]
 </span><span class="kw">static </span>TASK_SWITCH_PREEMPTION_GUARD: <span class="prelude-ty">Option</span>&lt;PreemptionGuard&gt; = <span class="prelude-val">None</span>;
 
 <span class="doccomment">/// Data that should be dropped after switching away from a task that has exited.
@@ -2200,7 +2202,7 @@
 /// Currently, this contains the previous Task&#39;s `TaskRef` removed from its TLS area;
 /// it is stored in a CPU-local variable because it&#39;s only related to
 /// a task switching operation on a particular CPU.
-</span><span class="attr">#[cls::cpu_local(<span class="number">24</span>)]
+</span><span class="attr">#[cls::cpu_local]
 </span><span class="kw">static </span>DROP_AFTER_TASK_SWITCH: <span class="prelude-ty">Option</span>&lt;TaskRef&gt; = <span class="prelude-val">None</span>;
 
 <span class="kw">pub use </span>tls_current_task::<span class="kw-2">*</span>;

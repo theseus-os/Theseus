@@ -152,6 +152,19 @@
 <a href="#152" id="152">152</a>
 <a href="#153" id="153">153</a>
 <a href="#154" id="154">154</a>
+<a href="#155" id="155">155</a>
+<a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
+<a href="#163" id="163">163</a>
+<a href="#164" id="164">164</a>
+<a href="#165" id="165">165</a>
+<a href="#166" id="166">166</a>
+<a href="#167" id="167">167</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Standalone crate containing (de)serializable types for crate and section metadata.
 //! 
 //! The primary reason this exists is because `LoadedCrate` and `LoadedSection`
@@ -191,6 +204,12 @@
 <span class="kw">use </span>hashbrown::HashMap;
 <span class="kw">use </span>serde::{Deserialize, Serialize};
 
+<span class="doccomment">/// The flag identifying CLS sections.
+</span><span class="kw">pub const </span>CLS_SECTION_FLAG: u64 = <span class="number">0x100000</span>;
+
+<span class="doccomment">/// The type identifying CLS symbols.
+</span><span class="kw">pub const </span>CLS_SYMBOL_TYPE: u8 = <span class="number">0xa</span>;
+
 <span class="doccomment">/// A (de)serializable representation of a loaded crate that is `serde`-compatible.
 ///
 /// See `LoadedCrate` for more detail on the fields of this struct.
@@ -200,10 +219,12 @@
     </span><span class="kw">pub </span>crate_name: String,
     <span class="doccomment">/// A map containing all the sections of the crate.
     </span><span class="kw">pub </span>sections: HashMap&lt;Shndx, SerializedSection&gt;,
-    <span class="doccomment">/// A set containing the global sectinos of the crate.
+    <span class="doccomment">/// A set containing the global sections of the crate.
     </span><span class="kw">pub </span>global_sections: BTreeSet&lt;Shndx&gt;,
     <span class="doccomment">/// A set containing the thread-local storage (TLS) sections of the crate.
     </span><span class="kw">pub </span>tls_sections: BTreeSet&lt;Shndx&gt;,
+    <span class="doccomment">/// The CLS section of the crate.
+    </span><span class="kw">pub </span>cls_sections: BTreeSet&lt;Shndx&gt;,
     <span class="doccomment">/// A set containing the `.data` and `.bss` sections of the crate.
     </span><span class="kw">pub </span>data_sections: BTreeSet&lt;Shndx&gt;,
     <span class="doccomment">/// A map of symbol names to their constant values, which contain assembler and linker
@@ -241,6 +262,7 @@
 <span class="kw">pub const </span>BSS_SECTION_NAME              : <span class="kw-2">&amp;</span>str = <span class="string">&quot;.bss&quot;</span>;
 <span class="kw">pub const </span>TLS_DATA_SECTION_NAME         : <span class="kw-2">&amp;</span>str = <span class="string">&quot;.tdata&quot;</span>;
 <span class="kw">pub const </span>TLS_BSS_SECTION_NAME          : <span class="kw-2">&amp;</span>str = <span class="string">&quot;.tbss&quot;</span>;
+<span class="kw">pub const </span>CLS_SECTION_NAME              : <span class="kw-2">&amp;</span>str = <span class="string">&quot;.cls&quot;</span>;
 <span class="kw">pub const </span>GCC_EXCEPT_TABLE_SECTION_NAME : <span class="kw-2">&amp;</span>str = <span class="string">&quot;.gcc_except_table&quot;</span>;
 <span class="kw">pub const </span>EH_FRAME_SECTION_NAME         : <span class="kw-2">&amp;</span>str = <span class="string">&quot;.eh_frame&quot;</span>;
 
@@ -261,6 +283,9 @@
     <span class="doccomment">/// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
     /// This is is effectively an empty placeholder: the all-zero data section doesn&#39;t actually exist in memory.
     </span>TlsBss,
+    <span class="doccomment">/// A `.cls` section is a read-only section that holds the initial data &quot;image&quot; for a CPU-local
+    /// (CLS) area.
+    </span>Cls,
     <span class="doccomment">/// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
@@ -291,6 +316,7 @@
             <span class="self">Self</span>::Bss            =&gt; BSS_SECTION_NAME,
             <span class="self">Self</span>::TlsData        =&gt; TLS_DATA_SECTION_NAME,
             <span class="self">Self</span>::TlsBss         =&gt; TLS_BSS_SECTION_NAME,
+            <span class="self">Self</span>::Cls            =&gt; CLS_SECTION_NAME,
             <span class="self">Self</span>::GccExceptTable =&gt; GCC_EXCEPT_TABLE_SECTION_NAME,
             <span class="self">Self</span>::EhFrame        =&gt; EH_FRAME_SECTION_NAME,
         }

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["LocalStorageInitializerError"],"struct":["Cls","LocalStorageDataImage","LocalStorageInitializer","Tls"],"trait":["LocalStorage"],"type":["ClsDataImage","ClsInitializer","TlsDataImage","TlsInitializer"]};

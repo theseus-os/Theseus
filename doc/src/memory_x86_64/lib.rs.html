@@ -288,6 +288,11 @@
 <a href="#288" id="288">288</a>
 <a href="#289" id="289">289</a>
 <a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on x86_64.
 //!
 //! The `memory` crate uses this crate to obtain the multiboot2-provided memory layout
@@ -399,12 +404,13 @@
         // | (3)  | .rodata           | start of read-only pages      |
         // | (4)  | .eh_frame         | part of read-only pages       |
         // | (5)  | .gcc_except_table | part/end of read-only pages   |
-        // | (6)  | .tdata            | part/end of read-only pages   |
-        // | (7)  | .tbss             | part/end of read-only pages   |
-        // | (8)  | .data             | start of read-write pages     | 
-        // | (9)  | .bss              | end of read-write pages       |
-        // | (10) | .page_table       | separate .data-like section   |
-        // | (11) | .stack            | separate .data-like section   |
+        // | (6)  | .cls              | part/end of read-only pages   |
+        // | (7)  | .tdata            | part/end of read-only pages   |
+        // | (8)  | .tbss             | part/end of read-only pages   |
+        // | (9)  | .data             | start of read-write pages     | 
+        // | (10) | .bss              | end of read-write pages       |
+        // | (11) | .page_table       | separate .data-like section   |
+        // | (12) | .stack            | separate .data-like section   |
         // |------|-------------------|-------------------------------|
         //
         // Note that we combine the TLS data sections (.tdata and .tbss) into the read-only pages,
@@ -438,8 +444,12 @@
                 rodata_flags = <span class="prelude-val">Some</span>(flags);
                 <span class="string">&quot;nano_core .gcc_except_table&quot;
             </span>}
-            <span class="comment">// The following four sections are optional: .tdata, .tbss, .data, .bss.
-            </span><span class="string">&quot;.tdata&quot; </span>=&gt; {
+            <span class="comment">// The following five sections are optional: .cls, .tdata, .tbss, .data, .bss.
+            </span><span class="string">&quot;.cls&quot; </span>=&gt; {
+                rodata_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
+                <span class="string">&quot;nano_core .cls&quot;
+            </span>}
+            <span class="string">&quot;.tdata&quot; </span>=&gt; {
                 rodata_end = <span class="prelude-val">Some</span>((end_virt_addr, end_phys_addr));
                 <span class="string">&quot;nano_core .tdata&quot;
             </span>}

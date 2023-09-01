@@ -17,6 +17,7 @@ var sourcesIndex = JSON.parse('{\
 "captain":["",[],["lib.rs"]],\
 "catch_unwind":["",[],["lib.rs"]],\
 "cls":["",[],["lib.rs"]],\
+"cls_allocator":["",[],["lib.rs"]],\
 "cls_macros":["",[],["int.rs","lib.rs"]],\
 "color":["",[],["lib.rs"]],\
 "compositor":["",[],["lib.rs"]],\
@@ -27,7 +28,6 @@ var sourcesIndex = JSON.parse('{\
 "context_switch_sse":["",[],["lib.rs"]],\
 "cow_arc":["",[],["lib.rs"]],\
 "cpu":["",[],["lib.rs","x86_64.rs"]],\
-"cpu_local":["",[],["lib.rs"]],\
 "crate_metadata":["",[],["lib.rs"]],\
 "crate_metadata_serde":["",[],["lib.rs"]],\
 "crate_name_utils":["",[],["lib.rs"]],\
@@ -79,6 +79,7 @@ var sourcesIndex = JSON.parse('{\
 "keyboard":["",[],["lib.rs"]],\
 "keycodes_ascii":["",[],["lib.rs"]],\
 "libterm":["",[],["cursor.rs","lib.rs"]],\
+"local_storage_initializer":["",[],["lib.rs"]],\
 "lockable":["",[],["lib.rs"]],\
 "locked_idt":["",[],["lib.rs"]],\
 "logger":["",[],["lib.rs"]],\
@@ -111,7 +112,6 @@ var sourcesIndex = JSON.parse('{\
 "panic_wrapper":["",[],["lib.rs"]],\
 "path":["",[],["lib.rs"]],\
 "pci":["",[],["lib.rs"]],\
-"per_cpu":["",[],["lib.rs"]],\
 "percent_encoding":["",[],["lib.rs"]],\
 "physical_nic":["",[],["lib.rs"]],\
 "pic":["",[],["lib.rs"]],\
@@ -170,7 +170,6 @@ var sourcesIndex = JSON.parse('{\
 "thread_local_macro":["",[],["lib.rs"]],\
 "time":["",[],["dummy.rs","lib.rs"]],\
 "tlb_shootdown":["",[],["lib.rs"]],\
-"tls_initializer":["",[],["lib.rs"]],\
 "tsc":["",[],["lib.rs"]],\
 "tss":["",[],["lib.rs"]],\
 "tty":["",[],["channel.rs","discipline.rs","lib.rs"]],\

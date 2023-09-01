@@ -118,12 +118,24 @@
 <a href="#118" id="118">118</a>
 <a href="#119" id="119">119</a>
 <a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>proc_macro2::TokenStream;
 <span class="kw">use </span>quote::{quote, ToTokens};
-<span class="kw">use </span>syn::{LitInt, Type};
+<span class="kw">use </span>syn::{Ident, Type};
 
-<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>int_functions(ty: Type, offset: LitInt) -&gt; <span class="prelude-ty">Option</span>&lt;TokenStream&gt; {
-    <span class="kw">let </span>((x64_asm_width, x64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
+<span class="kw">use </span><span class="kw">crate</span>::cls_offset_expr;
+
+<span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>int_functions(ty: <span class="kw-2">&amp;</span>Type, name: <span class="kw-2">&amp;</span>Ident) -&gt; <span class="prelude-ty">Option</span>&lt;TokenStream&gt; {
+    <span class="kw">let </span>((x86_64_asm_width, x86_64_reg_class), (aarch64_reg_modifier, aarch64_instr_width)) =
         <span class="kw">match </span>ty.to_token_stream().to_string().as_ref() {
             <span class="string">&quot;u8&quot; </span>=&gt; ((<span class="string">&quot;byte&quot;</span>, <span class="macro">quote! </span>{ reg_byte }), (<span class="string">&quot;:w&quot;</span>, <span class="string">&quot;b&quot;</span>)),
             <span class="string">&quot;u16&quot; </span>=&gt; ((<span class="string">&quot;word&quot;</span>, <span class="macro">quote! </span>{ reg }), (<span class="string">&quot;:w&quot;</span>, <span class="string">&quot;w&quot;</span>)),
@@ -133,20 +145,22 @@
                 <span class="kw">return </span><span class="prelude-val">None</span>;
             }
         };
-    <span class="kw">let </span>x64_width_modifier = <span class="macro">format!</span>(<span class="string">&quot;{x64_asm_width} ptr &quot;</span>);
-    <span class="kw">let </span>x64_cls_location = <span class="macro">format!</span>(<span class="string">&quot;gs:[{offset}]&quot;</span>);
+    <span class="kw">let </span>x86_64_width_modifier = <span class="macro">format!</span>(<span class="string">&quot;{x86_64_asm_width} ptr &quot;</span>);
+    <span class="kw">let </span>offset_expr = cls_offset_expr(name);
 
     <span class="prelude-val">Some</span>(<span class="macro">quote! </span>{
         <span class="attr">#[inline]
         </span><span class="kw">pub fn </span>load(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; #ty {
+            <span class="kw">let </span>offset = #offset_expr;
             <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
             </span>{
                 <span class="kw">let </span>ret;
                 <span class="kw">unsafe </span>{
                     <span class="macro">::core::arch::asm!</span>(
-                        <span class="macro">::core::concat!</span>(<span class="string">&quot;mov {}, &quot;</span>, #x64_cls_location),
-                        out(#x64_reg_class) ret,
-                        options(preserves_flags, nostack),
+                        <span class="macro">::core::concat!</span>(<span class="string">&quot;mov {ret}, gs:[{offset}]&quot;</span>),
+                        ret = out(#x86_64_reg_class) ret,
+                        offset = <span class="kw">in</span>(reg) offset,
+                        options(readonly, preserves_flags, nostack),
                     )
                 };
                 ret
@@ -159,10 +173,11 @@
                         <span class="string">&quot;2:&quot;</span>,
                         <span class="comment">// Load value.
                         </span><span class="string">&quot;mrs {tp_1}, tpidr_el1&quot;</span>,
+                        <span class="string">&quot;add {ptr}, {tp_1}, {offset}&quot;</span>,
                         <span class="macro">concat!</span>(
                             <span class="string">&quot;ldr&quot;</span>, #aarch64_instr_width,
                             <span class="string">&quot; {ret&quot;</span>, #aarch64_reg_modifier,<span class="string">&quot;},&quot;</span>,
-                            <span class="string">&quot; [{tp_1},#&quot;</span>, <span class="macro">stringify!</span>(#offset), <span class="string">&quot;]&quot;</span>,
+                            <span class="string">&quot; [{ptr}]&quot;</span>,
                         ),
 
                         <span class="comment">// Make sure task wasn&#39;t migrated between mrs and ldr.
@@ -171,10 +186,12 @@
                         <span class="string">&quot;b.ne 2b&quot;</span>,
 
                         tp_1 = out(reg) <span class="kw">_</span>,
+                        ptr = out(reg) <span class="kw">_</span>,
+                        offset = <span class="kw">in</span>(reg) offset,
                         ret = out(reg) ret,
                         tp_2 = out(reg) <span class="kw">_</span>,
 
-                        options(nostack),
+                        options(readonly, nostack),
                     )
                 };
                 ret
@@ -183,12 +200,14 @@
 
         <span class="attr">#[inline]
         </span><span class="kw">pub fn </span>fetch_add(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="kw-2">mut </span>operand: #ty) -&gt; #ty {
+            <span class="kw">let </span>offset = #offset_expr;
             <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
             </span>{
                 <span class="kw">unsafe </span>{
                     <span class="macro">::core::arch::asm!</span>(
-                        <span class="macro">::core::concat!</span>(<span class="string">&quot;xadd &quot;</span>, #x64_width_modifier, #x64_cls_location, <span class="string">&quot;, {}&quot;</span>),
-                        inout(#x64_reg_class) operand,
+                        <span class="macro">::core::concat!</span>(<span class="string">&quot;xadd &quot;</span>, #x86_64_width_modifier, <span class="string">&quot;gs:[{offset}], {operand}&quot;</span>),
+                        offset = <span class="kw">in</span>(reg) offset,
+                        operand = inout(#x86_64_reg_class) operand,
                         options(nostack),
                     )
                 };
@@ -202,7 +221,7 @@
                         <span class="string">&quot;2:&quot;</span>,
                         <span class="comment">// Load value.
                         </span><span class="string">&quot;mrs {tp_1}, tpidr_el1&quot;</span>,
-                        <span class="macro">concat!</span>(<span class="string">&quot;add {ptr}, {tp_1}, &quot;</span>, <span class="macro">stringify!</span>(#offset)),
+                        <span class="string">&quot;add {ptr}, {tp_1}, {offset}&quot;</span>,
                         <span class="macro">concat!</span>(<span class="string">&quot;ldxr&quot;</span>, #aarch64_instr_width, <span class="string">&quot; {value&quot;</span>, #aarch64_reg_modifier,<span class="string">&quot;}, [{ptr}]&quot;</span>),
 
                         <span class="comment">// Make sure task wasn&#39;t migrated between msr and ldxr.
@@ -219,6 +238,7 @@
 
                         tp_1 = out(reg) ret,
                         ptr = out(reg) <span class="kw">_</span>,
+                        offset = <span class="kw">in</span>(reg) offset,
                         value = out(reg) ret,
                         tp_2 = out(reg) <span class="kw">_</span>,
                         operand = <span class="kw">in</span>(reg) operand,

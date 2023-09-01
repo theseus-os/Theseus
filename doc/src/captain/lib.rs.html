@@ -371,7 +371,7 @@
     
     <span class="comment">// get BSP&#39;s CPU ID
     </span><span class="kw">let </span>bsp_id = cpu::bootstrap_cpu().ok_or(<span class="string">&quot;captain::init(): couldn&#39;t get ID of bootstrap CPU!&quot;</span>)<span class="question-mark">?</span>;
-    per_cpu::init(bsp_id)<span class="question-mark">?</span>;
+    cls_allocator::reload_current_cpu();
 
     <span class="comment">// Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.

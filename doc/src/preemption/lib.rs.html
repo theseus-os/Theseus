@@ -147,6 +147,9 @@
 <a href="#147" id="147">147</a>
 <a href="#148" id="148">148</a>
 <a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Manages preemption on a per-CPU basis.
 //!
 //! Supports enabling and disabling preemption for the purpose of 
@@ -159,7 +162,7 @@
 
 <span class="doccomment">/// A reference to the preemption counter for the current CPU (in CPU-local storage).
 </span><span class="comment">// NOTE: This offset must be kept in sync with `cpu_local::PerCpuField`.
-</span><span class="attr">#[cls_macros::cpu_local(<span class="number">12</span>, cls_dep = <span class="bool-val">false</span>)]
+</span><span class="attr">#[cls_macros::cpu_local(cls_dep = <span class="bool-val">false</span>)]
 </span><span class="kw">static </span>PREEMPTION_COUNT: u8 = <span class="number">0</span>;
 
 <span class="doccomment">/// Prevents preemption (preemptive task switching) from occurring
@@ -229,6 +232,7 @@
 /// to move it across a &quot;thread&quot; boundary (into a different task).
 /// More specifically, it is invalid to move a `PreemptionGuard` across
 /// CPUs; this error condition is checked for when dropping it.
+</span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>PreemptionGuard {
     <span class="doccomment">/// The ID of the CPU on which preemption was held.
     ///
@@ -266,8 +270,10 @@
         <span class="macro">assert!</span>(
             <span class="self">self</span>.cpu_id == cpu_id,
             <span class="string">&quot;PreemptionGuard::drop(): BUG: CPU IDs did not match! \
-            This indicates an unexpected task migration across CPUs.&quot;
-        </span>);
+            Task unexpectedly migrated from CPU {} to CPU {}.&quot;</span>,
+            <span class="self">self</span>.cpu_id,
+            cpu_id,
+        );
 
         <span class="kw">let </span>prev_val = PREEMPTION_COUNT.fetch_sub(<span class="number">1</span>);
 

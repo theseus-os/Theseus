@@ -264,7 +264,141 @@
 <a href="#264" id="264">264</a>
 <a href="#265" id="265">265</a>
 <a href="#266" id="266">266</a>
-</pre></div><pre class="rust"><code><span class="doccomment">//! Exports the [`cpu_local`] macro.
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
+<a href="#287" id="287">287</a>
+<a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
+<a href="#292" id="292">292</a>
+<a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
+<a href="#314" id="314">314</a>
+<a href="#315" id="315">315</a>
+<a href="#316" id="316">316</a>
+<a href="#317" id="317">317</a>
+<a href="#318" id="318">318</a>
+<a href="#319" id="319">319</a>
+<a href="#320" id="320">320</a>
+<a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
+<a href="#324" id="324">324</a>
+<a href="#325" id="325">325</a>
+<a href="#326" id="326">326</a>
+<a href="#327" id="327">327</a>
+<a href="#328" id="328">328</a>
+<a href="#329" id="329">329</a>
+<a href="#330" id="330">330</a>
+<a href="#331" id="331">331</a>
+<a href="#332" id="332">332</a>
+<a href="#333" id="333">333</a>
+<a href="#334" id="334">334</a>
+<a href="#335" id="335">335</a>
+<a href="#336" id="336">336</a>
+<a href="#337" id="337">337</a>
+<a href="#338" id="338">338</a>
+<a href="#339" id="339">339</a>
+<a href="#340" id="340">340</a>
+<a href="#341" id="341">341</a>
+<a href="#342" id="342">342</a>
+<a href="#343" id="343">343</a>
+<a href="#344" id="344">344</a>
+<a href="#345" id="345">345</a>
+<a href="#346" id="346">346</a>
+<a href="#347" id="347">347</a>
+<a href="#348" id="348">348</a>
+<a href="#349" id="349">349</a>
+<a href="#350" id="350">350</a>
+<a href="#351" id="351">351</a>
+<a href="#352" id="352">352</a>
+<a href="#353" id="353">353</a>
+<a href="#354" id="354">354</a>
+<a href="#355" id="355">355</a>
+<a href="#356" id="356">356</a>
+<a href="#357" id="357">357</a>
+<a href="#358" id="358">358</a>
+<a href="#359" id="359">359</a>
+<a href="#360" id="360">360</a>
+<a href="#361" id="361">361</a>
+<a href="#362" id="362">362</a>
+<a href="#363" id="363">363</a>
+<a href="#364" id="364">364</a>
+<a href="#365" id="365">365</a>
+<a href="#366" id="366">366</a>
+<a href="#367" id="367">367</a>
+<a href="#368" id="368">368</a>
+<a href="#369" id="369">369</a>
+<a href="#370" id="370">370</a>
+<a href="#371" id="371">371</a>
+<a href="#372" id="372">372</a>
+<a href="#373" id="373">373</a>
+<a href="#374" id="374">374</a>
+<a href="#375" id="375">375</a>
+<a href="#376" id="376">376</a>
+<a href="#377" id="377">377</a>
+<a href="#378" id="378">378</a>
+<a href="#379" id="379">379</a>
+<a href="#380" id="380">380</a>
+<a href="#381" id="381">381</a>
+<a href="#382" id="382">382</a>
+<a href="#383" id="383">383</a>
+<a href="#384" id="384">384</a>
+<a href="#385" id="385">385</a>
+<a href="#386" id="386">386</a>
+<a href="#387" id="387">387</a>
+<a href="#388" id="388">388</a>
+<a href="#389" id="389">389</a>
+<a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! Exports the [`macro@cpu_local`] macro.
 
 </span><span class="attr">#![feature(proc_macro_diagnostic, proc_macro_span, let_chains)]
 
@@ -277,7 +411,7 @@
     parse::{Parse, ParseStream},
     parse_macro_input,
     spanned::Spanned,
-    Attribute, Expr, Ident, LitBool, LitInt, Path, Token, Type, Visibility,
+    Attribute, Expr, Ident, LitBool, Path, Token, Type, Visibility,
 };
 
 <span class="kw">struct </span>CpuLocal {
@@ -285,7 +419,7 @@
     visibility: Visibility,
     name: Ident,
     ty: Type,
-    _init: Expr,
+    init: Expr,
 }
 
 <span class="kw">impl </span>Parse <span class="kw">for </span>CpuLocal {
@@ -297,32 +431,29 @@
         input.parse::&lt;<span class="macro">Token!</span>[:]&gt;()<span class="question-mark">?</span>;
         <span class="kw">let </span>ty: Type = input.parse()<span class="question-mark">?</span>;
         input.parse::&lt;<span class="macro">Token!</span>[=]&gt;()<span class="question-mark">?</span>;
-        <span class="kw">let </span>_init: Expr = input.parse()<span class="question-mark">?</span>;
+        <span class="kw">let </span>init: Expr = input.parse()<span class="question-mark">?</span>;
         input.parse::&lt;<span class="macro">Token!</span>[;]&gt;()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(CpuLocal {
             attributes,
             visibility,
             name,
             ty,
-            _init,
+            init,
         })
     }
 }
 
 <span class="kw">struct </span>Args {
-    offset: LitInt,
     cls_dependency: bool,
     stores_guard: <span class="prelude-ty">Option</span>&lt;Type&gt;,
 }
 
 <span class="kw">impl </span>Parse <span class="kw">for </span>Args {
     <span class="kw">fn </span>parse(input: ParseStream) -&gt; syn::Result&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">let </span>offset = input.parse()<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>cls_dependency = <span class="bool-val">true</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>stores_guard = <span class="prelude-val">None</span>;
 
-        <span class="kw">while </span>input.parse::&lt;<span class="macro">Token!</span>[,]&gt;().is_ok() {
-            <span class="kw">let </span>name = input.parse::&lt;Path&gt;()<span class="question-mark">?</span>;
+        <span class="kw">while let </span><span class="prelude-val">Ok</span>(name) = input.parse::&lt;Path&gt;() {
             input.parse::&lt;<span class="macro">Token!</span>[=]&gt;()<span class="question-mark">?</span>;
 
             <span class="kw">if </span>name.is_ident(<span class="string">&quot;cls_dep&quot;</span>) {
@@ -339,6 +470,7 @@
                 .emit();
                 <span class="kw">return </span><span class="prelude-val">Err</span>(syn::Error::new(name.span(), <span class="string">&quot;&quot;</span>));
             }
+            <span class="kw">let _ </span>= input.parse::&lt;<span class="macro">Token!</span>[,]&gt;();
         }
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>((<span class="kw-2">ref </span>name, <span class="kw-2">ref </span>value)) = stores_guard &amp;&amp; !cls_dependency {
@@ -353,7 +485,6 @@
         }
 
         <span class="prelude-val">Ok</span>(<span class="self">Self </span>{
-            offset,
             cls_dependency,
             stores_guard: stores_guard.map(|tuple| tuple.<span class="number">1</span>),
         })
@@ -383,7 +514,6 @@
 </span><span class="attr">#[proc_macro_attribute]
 </span><span class="kw">pub fn </span>cpu_local(args: TokenStream, input: TokenStream) -&gt; TokenStream {
     <span class="kw">let </span>Args {
-        offset,
         cls_dependency,
         stores_guard,
     } = <span class="kw">match </span>syn::parse(args) {
@@ -404,7 +534,7 @@
         visibility,
         name,
         ty,
-        _init,
+        init,
     } = <span class="macro">parse_macro_input!</span>(input <span class="kw">as </span>CpuLocal);
 
     <span class="kw">let </span>attributes = attributes.iter().map(|attribute| <span class="macro">quote! </span>{ #attribute });
@@ -414,19 +544,27 @@
         Span::call_site().into(),
     );
 
+    <span class="kw">let </span>offset_expr = cls_offset_expr(<span class="kw-2">&amp;</span>name);
     <span class="kw">let </span>ref_expr = <span class="macro">quote! </span>{
         {
+            <span class="kw">let </span>offset = #offset_expr;
             <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
             </span><span class="kw">let </span><span class="kw-2">mut </span>ptr = {
                 <span class="kw">use </span>cls::__private::x86_64::registers::segmentation::{GS, Segment64};
-                GS::read_base().as_u64()
+                <span class="kw">let </span>gs = GS::read_base().as_u64();
+
+                <span class="comment">// If this CLS section was statically linked, its `offset` will be negative on x86_64 only.
+                </span><span class="kw">let </span>(value, <span class="kw">_</span>) = gs.overflowing_add(offset);
+
+                value
             };
             <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
             </span><span class="kw">let </span><span class="kw-2">mut </span>ptr = {
                 <span class="kw">use </span>cls::__private::tock_registers::interfaces::Readable;
-                cls::__private::cortex_a::registers::TPIDR_EL1.get()
+                <span class="kw">let </span>tpidr_el1 = cls::__private::cortex_a::registers::TPIDR_EL1.get();
+
+                tpidr_el1 + offset
             };
-            ptr += #offset;
             <span class="kw">unsafe </span>{ <span class="kw-2">&amp;mut*</span>(ptr <span class="kw">as </span><span class="kw-2">*mut </span>#ty) }
         }
     };
@@ -511,17 +649,22 @@
         proc_macro2::TokenStream::new()
     };
 
-    <span class="kw">let </span>int_functions = int::int_functions(ty, offset);
+    <span class="kw">let </span>int_functions = int::int_functions(<span class="kw-2">&amp;</span>ty, <span class="kw-2">&amp;</span>name);
 
     <span class="macro">quote! </span>{
         #(#attributes)*
         <span class="attr">#[thread_local]
-        </span><span class="comment">// #[link_section = &quot;.cls&quot;]
-        </span>#visibility <span class="kw">static </span>#name: #struct_name = #struct_name;
+        #[link_section = <span class="string">&quot;.cls&quot;</span>]
+        #[used]
+        </span>#visibility <span class="kw">static </span>#name: #struct_name = #struct_name {
+            __inner: #init,
+        };
 
         <span class="attr">#[repr(transparent)]
-        #[non_exhaustive]
-        </span>#visibility <span class="kw">struct </span>#struct_name;
+        #[doc(hidden)]
+        </span>#visibility <span class="kw">struct </span>#struct_name {
+            __inner: #ty,
+        }
 
         <span class="kw">impl </span>#struct_name {
             #int_functions
@@ -529,5 +672,130 @@
         }
     }
     .into()
+}
+
+<span class="kw">fn </span>cls_offset_expr(name: <span class="kw-2">&amp;</span>Ident) -&gt; proc_macro2::TokenStream {
+    <span class="macro">quote! </span>{
+        {
+            <span class="comment">// See the crate-level docs in `cls` for an explanation of the implementation.
+
+            </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
+            </span>{
+                <span class="kw">extern </span><span class="string">&quot;C&quot; </span>{
+                    <span class="kw">static </span>__THESEUS_CLS_SIZE: u8;
+                    <span class="kw">static </span>__THESEUS_TLS_SIZE: u8;
+                }
+
+                <span class="comment">// TODO: Open an issue in rust repo? We aren&#39;t actually doing anything unsafe.
+                // SAFETY: We don&#39;t access the extern static.
+                </span><span class="kw">let </span>cls_size = <span class="kw">unsafe </span>{ <span class="macro">::core::ptr::addr_of!</span>(__THESEUS_CLS_SIZE) } <span class="kw">as </span>u64;
+                <span class="comment">// SAFETY: We don&#39;t access the extern static.
+                </span><span class="kw">let </span>tls_size = <span class="kw">unsafe </span>{ <span class="macro">::core::ptr::addr_of!</span>(__THESEUS_TLS_SIZE) } <span class="kw">as </span>u64;
+
+                <span class="comment">// On x86_64, `mod_mgmt` will set `__THESEUS_CLS_SIZE` and `__THESEUS_TLS_SIZE` to
+                // `usize::MAX` in order to indicate dynamic loading/linking is being used.
+                </span><span class="kw">if </span>cls_size == u64::MAX &amp;&amp; tls_size == u64::MAX {
+                    <span class="comment">// The offset is always correct when dynamically linked (since we set it in `mod_mgmt`),
+                    // so there is no need to modify the offset here, we can just use it directly.
+                    </span><span class="kw">let </span>offset: u64;
+                    <span class="kw">unsafe </span>{
+                        <span class="macro">::core::arch::asm!</span>(
+                            <span class="string">&quot;lea {offset}, [{cls}@TPOFF]&quot;</span>,
+                            offset = out(reg) offset,
+                            cls = sym #name,
+                            options(nomem, preserves_flags, nostack),
+                        )
+                    };
+                    offset
+                }
+                
+                <span class="comment">// Otherwise, if the CLS section/symbol was statically linked,
+                // we need to adjust the offset to account for the section&#39;s 4K page alignment
+                // and the size of the preceding static TLS sections.
+                // See the crate-level docs of `cls` for a detailed explanation of this.
+                </span><span class="kw">else </span>{
+                    <span class="comment">// If the statically-linked base kernel image has no TLS sections,
+                    // the `{cls}@TPOFF` expression alone correctly gives us the offset
+                    // from the end of the `.cls` section.
+                    </span><span class="kw">if </span>tls_size == <span class="number">0 </span>{
+                        <span class="kw">let </span>offset: u64;
+                        <span class="kw">unsafe </span>{
+                            <span class="macro">::core::arch::asm!</span>(
+                                <span class="string">&quot;lea {offset}, [{cls}@TPOFF]&quot;</span>,
+                                offset = out(reg) offset,
+                                cls = sym #name,
+                                options(nomem, preserves_flags, nostack),
+                            )
+                        };
+                        offset
+                    } <span class="kw">else </span>{
+                        <span class="comment">// The linker script aligns sections to page boundaries.
+                        </span><span class="kw">const </span>ALIGNMENT: u64 = <span class="number">1 </span>&lt;&lt; <span class="number">12</span>;
+                        <span class="comment">// TODO: Use `next_multiple_of(0x1000)` when stabilised.
+                        </span><span class="kw">let </span>cls_start_to_tls_start = (cls_size + ALIGNMENT - <span class="number">1</span>) &amp; !(ALIGNMENT - <span class="number">1</span>);
+
+                        <span class="kw">let </span>from_cls_start: u64;
+                        <span class="kw">unsafe </span>{
+                            <span class="macro">::core::arch::asm!</span>(
+                                <span class="string">&quot;lea {from_cls_start}, [{cls}@TPOFF + {tls_size} + {cls_start_to_tls_start}]&quot;</span>,
+                                from_cls_start = lateout(reg) from_cls_start,
+                                cls = sym #name,
+                                tls_size = <span class="kw">in</span>(reg) tls_size,
+                                cls_start_to_tls_start = <span class="kw">in</span>(reg) cls_start_to_tls_start,
+                                options(nomem, preserves_flags, nostack),
+                            )
+                        };
+                        <span class="kw">let </span>offset = (cls_size - from_cls_start).wrapping_neg();
+                        offset
+                    }
+                }
+            }
+            <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+            </span>{
+                <span class="kw">extern </span><span class="string">&quot;C&quot; </span>{
+                    <span class="kw">static </span>__THESEUS_TLS_SIZE: u8;
+                }
+
+                <span class="comment">// TODO: Open an issue in rust repo? We aren&#39;t actually doing anything unsafe.
+                // SAFETY: We don&#39;t access the extern static.
+                </span><span class="kw">let </span>tls_size = <span class="kw">unsafe </span>{ <span class="macro">::core::ptr::addr_of!</span>(__THESEUS_TLS_SIZE) } <span class="kw">as </span>u64;
+
+                <span class="comment">// The linker script aligns sections to page boundaries.
+                </span><span class="kw">const </span>ALIGNMENT: u64 = <span class="number">1 </span>&lt;&lt; <span class="number">12</span>;
+                <span class="comment">// TODO: Use `next_multiple_of(0x1000)` when stabilised.
+                </span><span class="kw">let </span>tls_start_to_cls_start = (tls_size + ALIGNMENT - <span class="number">1</span>) &amp; !(ALIGNMENT - <span class="number">1</span>);
+
+                <span class="kw">let </span><span class="kw-2">mut </span>offset = <span class="number">0</span>;
+                <span class="kw">unsafe </span>{
+                    <span class="comment">// This will compile into something like
+                    // ```armasm
+                    // add {offset}, 0, #1, lsl #12
+                    // add {offset}, {offset}, #0x10
+                    // sub {offset}, {offset}, #1, lsl #12
+                    // ```
+                    // `#1, lsl #12` is `1 &lt;&lt; 12 = 0x1000` which is the size of a single page.
+                    //
+                    // The first add instruction loads the upper 12 bits of the offset into
+                    // `{offset}`, and the second add instruction loads the lower 12 bits. Then,
+                    // since all CLS offsets on aarch64 are a page size larger than they are
+                    // supposed to be, we subtract a page size. Realistically, we could just omit
+                    // loading the upper 12 bits of the offset and the `sub` insntruction under the
+                    // assumption that the CLS section will never be larger than a page. But that
+                    // would lead to very cryptic bugs if we were to ever breach that limit and an
+                    // extra `sub` instruction per CLS access isn&#39;t significant.
+                    </span><span class="macro">::core::arch::asm!</span>(
+                        <span class="string">&quot;add {offset}, {offset}, #:tprel_hi12:{cls}, lsl #12&quot;</span>,
+                        <span class="string">&quot;add {offset}, {offset}, #:tprel_lo12_nc:{cls}&quot;</span>,
+                        <span class="string">&quot;sub {offset}, {offset}, {tls_start_to_cls_start}&quot;</span>,
+                        offset = inout(reg) offset,
+                        cls = sym #name,
+                        tls_start_to_cls_start = <span class="kw">in</span>(reg) tls_start_to_cls_start,
+                        options(nomem, preserves_flags, nostack),
+                    )
+                };
+                offset
+            }
+        }
+    }
 }
 </code></pre></div></section></main></body></html>

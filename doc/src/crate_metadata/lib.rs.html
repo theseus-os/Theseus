@@ -1422,6 +1422,12 @@
 <a href="#1422" id="1422">1422</a>
 <a href="#1423" id="1423">1423</a>
 <a href="#1424" id="1424">1424</a>
+<a href="#1425" id="1425">1425</a>
+<a href="#1426" id="1426">1426</a>
+<a href="#1427" id="1427">1427</a>
+<a href="#1428" id="1428">1428</a>
+<a href="#1429" id="1429">1429</a>
+<a href="#1430" id="1430">1430</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Defines types that contain metadata about crates loaded in Theseus and their dependencies.
 //! 
 //! ## Representing dependencies between sections
@@ -1672,6 +1678,8 @@
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
     </span><span class="kw">pub </span>tls_sections: BTreeSet&lt;Shndx&gt;,
+    <span class="doccomment">/// The set of CPU-local storage (CLS) symbols in this crate.
+    </span><span class="kw">pub </span>cls_sections: BTreeSet&lt;Shndx&gt;,
     <span class="doccomment">/// The set of `.data` and `.bss` sections in this crate.
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
@@ -1932,6 +1940,7 @@
                 SectionType::Rodata
                 | SectionType::TlsBss
                 | SectionType::TlsData
+                | SectionType::Cls
                 | SectionType::GccExceptTable
                 | SectionType::EhFrame =&gt; new_rodata_pages_locked
                     .as_mut()
@@ -2033,6 +2042,7 @@
     <span class="kw">static </span>BSS              : Once&lt;StrRef&gt; = Once::new();
     <span class="kw">static </span>TLS_DATA         : Once&lt;StrRef&gt; = Once::new();
     <span class="kw">static </span>TLS_BSS          : Once&lt;StrRef&gt; = Once::new();
+    <span class="kw">static </span>CLS              : Once&lt;StrRef&gt; = Once::new();
     <span class="kw">static </span>GCC_EXCEPT_TABLE : Once&lt;StrRef&gt; = Once::new();
     <span class="kw">static </span>EH_FRAME         : Once&lt;StrRef&gt; = Once::new();
 
@@ -2043,6 +2053,7 @@
         SectionType::Bss            =&gt; <span class="kw-2">&amp;</span>BSS,
         SectionType::TlsData        =&gt; <span class="kw-2">&amp;</span>TLS_DATA,
         SectionType::TlsBss         =&gt; <span class="kw-2">&amp;</span>TLS_BSS,
+        SectionType::Cls            =&gt; <span class="kw-2">&amp;</span>CLS,
         SectionType::GccExceptTable =&gt; <span class="kw-2">&amp;</span>GCC_EXCEPT_TABLE,
         SectionType::EhFrame        =&gt; <span class="kw-2">&amp;</span>EH_FRAME,
     };
@@ -2335,6 +2346,7 @@
         <span class="comment">// Add the rest of the typical fields
         </span>dbg.field(<span class="string">&quot;vaddr&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.virt_addr)
             .field(<span class="string">&quot;size&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.size)
+            .field(<span class="string">&quot;mapped_pages_offset&quot;</span>, <span class="kw-2">&amp;</span><span class="self">self</span>.mapped_pages_offset)
             .finish_non_exhaustive()
     }
 }
