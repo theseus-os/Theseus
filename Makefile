@@ -67,11 +67,15 @@ LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
-	CROSS = x86_64-elf-
+	CROSS = $(ARCH)-elf-
 	## macOS uses a different unmounting utility
 	UNMOUNT = diskutil unmount
 	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
 else
+	## Handle building for aarch64 on x86_64 Linux/WSL
+	ifeq ($(ARCH),aarch64)
+		CROSS = aarch64-linux-gnu-
+	endif
 	## Just use normal umount on Linux/WSL
 	UNMOUNT = umount
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
@@ -297,7 +301,7 @@ endif
 
 ## Sixth, fix up CPU local sections.
 	@echo -e "Parsing CPU local sections"
-	@cargo r --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --dir $(OBJECT_FILES_BUILD_DIR)
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --dir $(OBJECT_FILES_BUILD_DIR)
 
 #############################
 ### end of "build" target ###
@@ -354,7 +358,7 @@ endif
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
 ## Fix up CLS sections.
-	cargo r --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --file $(nano_core_binary)
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --file $(nano_core_binary)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
