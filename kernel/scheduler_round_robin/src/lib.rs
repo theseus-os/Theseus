@@ -16,7 +16,7 @@ use task::TaskRef;
 /// Returns None if there is no schedule-able task
 // TODO: Remove option?
 // TODO: Return &'static TaskRef?
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
+pub fn select_next_task() -> Option<TaskRef> {
     let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
         Some(rq) => rq.write(),
         _ => {
@@ -36,12 +36,28 @@ pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
     }
 }
 
-pub struct PriorityInheritanceGuard<'a> {
-    phantom: PhantomData<&'a ()>,
+struct RoundRobinScheduler {
+    idle_task: TaskRef,
+    queue: VecDeque<RoundRobinTaskRef>,
 }
 
-pub fn inherit_priority(_: &TaskRef) -> PriorityInheritanceGuard<'_> {
-    PriorityInheritanceGuard {
-        phantom: PhantomData,
+impl task::scheduler_2::Scheduler for RoundRobinScheduler {
+    fn next(&mut self) -> TaskRef {
+        if let Some((task_index, _)) = self
+            .queue
+            .iter()
+            .enumerate()
+            .find(|(_, task)| task.is_runnable())
+        {
+            let task = self.queue.swap_remove_front(task_index);
+            self.queue.push_back(task.clone());
+            task
+        } else {
+            self.idle_task.clone()
+        }
+    }
+
+    fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler_2::PriorityScheduler> {
+        None
     }
 }

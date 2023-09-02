@@ -26,6 +26,7 @@
 #![no_std]
 #![feature(negative_impls)]
 #![feature(thread_local)]
+#![feature(const_mut_refs)]
 
 extern crate alloc;
 
@@ -584,7 +585,7 @@ pub fn take_kill_handler() -> Option<KillHandler> {
         .flatten()
 }
 
-
+pub mod scheduler_2;
 pub use scheduler::*;
 mod scheduler {
     use super::*;
