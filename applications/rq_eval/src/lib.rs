@@ -19,7 +19,6 @@ extern crate alloc;
 extern crate task;
 extern crate cpu;
 extern crate spawn;
-extern crate runqueue;
 extern crate getopts;
 extern crate hpet;
 extern crate libtest;

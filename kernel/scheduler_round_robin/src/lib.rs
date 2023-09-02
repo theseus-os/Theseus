@@ -6,39 +6,23 @@
 
 extern crate alloc;
 
-use core::marker::PhantomData;
+use alloc::collections::VecDeque;
 
-use log::error;
-use runqueue_round_robin::RunQueue;
 use task::TaskRef;
 
-/// This defines the round robin scheduler policy.
-/// Returns None if there is no schedule-able task
-// TODO: Remove option?
-// TODO: Return &'static TaskRef?
-pub fn select_next_task() -> Option<TaskRef> {
-    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            error!("BUG: select_next_task_round_robin(): couldn't get runqueue for core {apic_id}",);
-            return None;
-        }
-    };
-
-    if let Some((task_index, _)) = runqueue_locked
-        .iter()
-        .enumerate()
-        .find(|(_, task)| task.is_runnable())
-    {
-        runqueue_locked.move_to_end(task_index)
-    } else {
-        Some(runqueue_locked.idle_task().clone())
-    }
+pub struct RoundRobinScheduler {
+    idle_task: TaskRef,
+    // TODO: Use regular Vec.
+    queue: VecDeque<TaskRef>,
 }
 
-struct RoundRobinScheduler {
-    idle_task: TaskRef,
-    queue: VecDeque<RoundRobinTaskRef>,
+impl RoundRobinScheduler {
+    pub const fn new(idle_task: TaskRef) -> Self {
+        Self {
+            idle_task,
+            queue: VecDeque::new(),
+        }
+    }
 }
 
 impl task::scheduler_2::Scheduler for RoundRobinScheduler {
@@ -49,11 +33,36 @@ impl task::scheduler_2::Scheduler for RoundRobinScheduler {
             .enumerate()
             .find(|(_, task)| task.is_runnable())
         {
-            let task = self.queue.swap_remove_front(task_index);
+            let task = self.queue.swap_remove_front(task_index).unwrap();
             self.queue.push_back(task.clone());
             task
         } else {
             self.idle_task.clone()
+        }
+    }
+
+    fn busyness(&self) -> usize {
+        self.queue.len()
+    }
+
+    fn push(&mut self, task: TaskRef) {
+        self.queue.push_back(task);
+    }
+
+    fn remove(&mut self, task: &TaskRef) -> bool {
+        let mut task_index = None;
+        for (i, t) in self.queue.iter().enumerate() {
+            if t == task {
+                task_index = Some(i);
+                break;
+            }
+        }
+
+        if let Some(task_index) = task_index {
+            self.queue.remove(task_index);
+            true
+        } else {
+            false
         }
     }
 

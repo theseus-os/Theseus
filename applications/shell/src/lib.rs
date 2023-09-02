@@ -10,7 +10,6 @@ extern crate spin;
 extern crate dfqueue;
 extern crate spawn;
 extern crate task;
-extern crate runqueue;
 extern crate event_types; 
 extern crate window_manager;
 extern crate path;
@@ -409,9 +408,7 @@ impl Shell {
                     if task_ref.has_exited() { continue; }
                     match task_ref.kill(KillReason::Requested) {
                         Ok(_) => {
-                            if let Err(e) = runqueue::remove_task_from_all(task_ref) {
-                                error!("Killed task but could not remove it from runqueue: {}", e);
-                            }
+                            task::scheduler_2::remove_task(task_ref);
                         }
                         Err(e) => error!("Could not kill task, error: {}", e),
                     }

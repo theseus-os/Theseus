@@ -18,7 +18,6 @@ extern crate apic;
 extern crate cpu;
 extern crate spawn;
 extern crate path;
-extern crate runqueue;
 extern crate heapfile;
 extern crate scheduler;
 extern crate libtest;

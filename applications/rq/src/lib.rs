@@ -5,7 +5,6 @@ extern crate alloc;
 extern crate apic;
 extern crate getopts;
 extern crate task;
-extern crate runqueue;
 
 use getopts::Options;
 use alloc::{

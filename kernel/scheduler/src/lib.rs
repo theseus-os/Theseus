@@ -41,8 +41,6 @@ pub use task::schedule;
 /// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
 /// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
 pub fn init() -> Result<(), &'static str> {
-    task::set_scheduler_policy(scheduler::select_next_task);
-
     #[cfg(target_arch = "x86_64")] {
         interrupts::register_interrupt(
             CPU_LOCAL_TIMER_IRQ,
@@ -119,6 +117,7 @@ pub fn get_priority(_task: &TaskRef) -> Option<u8> {
     }
 }
 
-pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
-    scheduler::inherit_priority(task)
-}
+// pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
+//     todo!();
+//     // scheduler::inherit_priority(task)
+// }

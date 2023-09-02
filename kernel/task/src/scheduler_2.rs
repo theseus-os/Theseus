@@ -22,7 +22,7 @@ static SCHEDULER: Option<&'static ConcurrentScheduler> = None;
 
 type ConcurrentScheduler = Mutex<Box<dyn Scheduler>>;
 
-pub fn set_policy<T>(scheduler: T)
+pub fn set_policy<T>(cpu_id: CpuId, scheduler: T)
 where
     T: Scheduler,
 {
@@ -37,15 +37,13 @@ where
 
     let mut locked = SCHEDULERS.lock();
     SCHEDULER.update(|current_scheduler| {
-        let current_cpu = cpu::current_cpu();
-
         if let Some(old_scheduler) = current_scheduler {
             // TODO: Drain tasks from old scheduler and place into new scheduler.
             error!("replacing existing scheduler: this is not currently supported");
 
             let mut old_scheduler_index = None;
             for (i, (cpu, scheduler)) in locked.iter().enumerate() {
-                if *cpu == current_cpu {
+                if *cpu == cpu_id {
                     if ptr::eq(old_scheduler, scheduler) {
                         old_scheduler_index = Some(i);
                         break;
@@ -66,17 +64,58 @@ where
             }
         }
 
-        locked.push((current_cpu, scheduler_ref));
+        locked.push((cpu_id, scheduler_ref));
         *current_scheduler = Some(scheduler_ref);
     });
 }
 
-fn next_task() -> Option<TaskRef> {
+pub(crate) fn next_task() -> TaskRef {
     SCHEDULER.update(|scheduler| scheduler.unwrap().lock().as_mut().next())
 }
 
+pub fn add_task(task: TaskRef) {
+    let locked = SCHEDULERS.lock();
+
+    let max_busyness = usize::MAX;
+    let mut least_busy_index = None;
+
+    for (i, (_, scheduler)) in locked.iter().enumerate() {
+        if scheduler.lock().busyness() < max_busyness {
+            least_busy_index = Some(i);
+        }
+    }
+
+    // TODO
+    locked[least_busy_index.unwrap()].1.lock().push(task);
+}
+
+pub fn add_task_to(task: TaskRef, cpu_id: CpuId) {
+    for (cpu, scheduler) in SCHEDULERS.lock().iter() {
+        if *cpu == cpu_id {
+            scheduler.lock().push(task);
+            return;
+        }
+    }
+}
+
+pub fn remove_task(task: &TaskRef) -> bool {
+    // TODO: T
+    for (_, scheduler) in SCHEDULERS.lock().iter() {
+        if scheduler.lock().remove(task) {
+            return true;
+        }
+    }
+    false
+}
+
 pub trait Scheduler: Send + Sync + 'static {
-    fn next(&mut self) -> Option<TaskRef>;
+    fn next(&mut self) -> TaskRef;
+
+    fn push(&mut self, task: TaskRef);
+
+    fn busyness(&self) -> usize;
+
+    fn remove(&mut self, task: &TaskRef) -> bool;
 
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
 }

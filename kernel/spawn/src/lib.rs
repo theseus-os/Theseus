@@ -59,11 +59,8 @@ pub fn init(
         .spawn_restartable(None)?
         .clone();
 
-    runqueue::init(cpu_id.into_u8(), idle_task)?;
-    runqueue::add_task_to_specific_runqueue(
-        cpu_id.into_u8(),
-        exitable_bootstrap_task.clone(),
-    )?;
+    task::scheduler_2::set_policy(cpu_id, scheduler_round_robin::RoundRobinScheduler::new(idle_task));
+    task::scheduler_2::add_task_to(exitable_bootstrap_task.clone(), cpu_id);
 
     Ok(BootstrapTaskRef {
         cpu_id,
@@ -435,9 +432,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Idle tasks are not stored on the run queue.
         if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
-                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+                task::scheduler_2::add_task_to(task_ref.clone(), cpu);
             } else {
-                runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+                task::scheduler_2::add_task(task_ref.clone());
             }
         }
 
@@ -993,21 +990,7 @@ where
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
-    // Special behavior when evaluating runqueues
-    #[cfg(rq_eval)] {
-        runqueue::remove_task_from_all(current_task).unwrap();
-    }
-
-    // In the regular case, we do not perform task migration between cores,
-    // so we can use the heuristic that the task is only on the current core's runqueue.
-    #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
-            .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
-        {
-            error!("BUG: couldn't remove exited task from runqueue: {}", e);
-        }
-    }
+    task::scheduler_2::remove_task(current_task);
 }
 
 /// A basic idle task that does nothing but loop endlessly.

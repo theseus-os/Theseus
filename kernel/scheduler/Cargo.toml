@@ -15,8 +15,8 @@ sleep = { path = "../sleep" }
 task = { path = "../task" }
 
 scheduler_round_robin = { path = "../scheduler_round_robin" }
-scheduler_epoch = { path = "../scheduler_epoch" }
-scheduler_priority = { path = "../scheduler_priority" }
+# scheduler_epoch = { path = "../scheduler_epoch" }
+# scheduler_priority = { path = "../scheduler_priority" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 x86_64 = "0.14.8"

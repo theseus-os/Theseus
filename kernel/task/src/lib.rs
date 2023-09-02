@@ -615,9 +615,7 @@ mod scheduler {
 
         let cpu_id = preemption_guard.cpu_id();
 
-        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
-            return false; // keep running the same current task
-        };
+        let next_task = scheduler_2::next_task();
 
         let (did_switch, recovered_preemption_guard) = task_switch(
             next_task,

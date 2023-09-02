@@ -33,8 +33,8 @@ path = "../../kernel/spawn"
 [dependencies.path]
 path = "../../kernel/path"
 
-[dependencies.runqueue]
-path = "../../kernel/runqueue"
+# [dependencies.runqueue]
+# path = "../../kernel/runqueue"
 
 [dependencies.heapfile]
 path = "../../kernel/heapfile"

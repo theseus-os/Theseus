@@ -6,7 +6,6 @@ extern crate memory;
 extern crate apic;
 extern crate cpu;
 extern crate hpet;
-extern crate runqueue;
 extern crate pmu_x86;
 extern crate libm;
 #[macro_use] extern crate log;
