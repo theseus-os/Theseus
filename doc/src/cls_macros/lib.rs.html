@@ -398,6 +398,25 @@
 <a href="#398" id="398">398</a>
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
+<a href="#402" id="402">402</a>
+<a href="#403" id="403">403</a>
+<a href="#404" id="404">404</a>
+<a href="#405" id="405">405</a>
+<a href="#406" id="406">406</a>
+<a href="#407" id="407">407</a>
+<a href="#408" id="408">408</a>
+<a href="#409" id="409">409</a>
+<a href="#410" id="410">410</a>
+<a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
+<a href="#415" id="415">415</a>
+<a href="#416" id="416">416</a>
+<a href="#417" id="417">417</a>
+<a href="#418" id="418">418</a>
+<a href="#419" id="419">419</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Exports the [`macro@cpu_local`] macro.
 
 </span><span class="attr">#![feature(proc_macro_diagnostic, proc_macro_span, let_chains)]
@@ -588,6 +607,16 @@
             {
                 <span class="self">self</span>.replace_guarded(value, guard);
             }
+
+            <span class="attr">#[inline]
+            </span><span class="kw">pub fn </span>update_guarded&lt;F, R, G&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, f: F, guard: <span class="kw-2">&amp;</span>G) -&gt; R
+            <span class="kw">where
+                </span>F: ::core::ops::FnOnce(<span class="kw-2">&amp;mut </span>#ty) -&gt; R,
+                G: ::cls::CpuAtomicGuard,
+            {
+                <span class="kw">let </span>rref = #ref_expr;
+                f(rref)
+            }
         };
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(guard_type) = stores_guard {
@@ -643,6 +672,15 @@
                     <span class="self">self</span>.set_guarded(value, <span class="kw-2">&amp;</span>guard);
                 }
 
+                <span class="attr">#[inline]
+                </span><span class="kw">pub fn </span>update&lt;F, R&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, f: F) -&gt; R
+                <span class="kw">where
+                    </span>F: ::core::ops::FnOnce(<span class="kw-2">&amp;mut </span>#ty) -&gt; R,
+                {
+                    <span class="comment">// TODO: Should this ever be `disable_interrupts` instead?
+                    </span><span class="kw">let </span>guard = ::cls::__private::preemption::hold_preemption();
+                    <span class="self">self</span>.update_guarded(f, <span class="kw-2">&amp;</span>guard)
+                }
             }
         }
     } <span class="kw">else </span>{
