@@ -575,16 +575,10 @@ macro_rules! implement_page_frame_range {
                     (self.0.end().number + 1).saturating_sub(self.0.start().number) / P::NUM_4K_PAGES
                 }
 
-                #[doc = "Returns the number of 4KiB chunks in this range. \
-                    Needed for functions in the impl block generic over chunk size P, as the compiler cannot recognize which methods to call."]
-                const fn [<size_in_ $chunk:lower s_gen>](&self) -> usize {
-                   // add 1 because it's an inclusive range
-                   (self.0.end().number + 1).saturating_sub(self.0.start().number)
-                }
-
                 #[doc = "Returns the size of this range in bytes."]
                 pub const fn size_in_bytes(&self) -> usize {
-                    self.[<size_in_ $chunk:lower s_gen>]() * PAGE_SIZE
+                    // self.[<size_in_ $chunk:lower s_gen>]() * PAGE_SIZE
+                    self.[<size_in_ $chunk:lower s>]() * PAGE_SIZE
                 }
 
                 #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
