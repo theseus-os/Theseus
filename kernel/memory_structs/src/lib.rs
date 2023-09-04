@@ -341,7 +341,7 @@ macro_rules! implement_page_frame {
                 pub const fn containing_address_2mb(addr: $address) -> $TypeName<Page2MiB> {
                     $TypeName {
                         number: addr.value() / (PAGE_SIZE * Page2MiB::NUM_4K_PAGES) * Page2MiB::NUM_4K_PAGES,
-                        size: PhantomData::<Page2MiB>,
+                        size: PhantomData,
                     }
                 }
             }
@@ -350,7 +350,7 @@ macro_rules! implement_page_frame {
                 pub const fn containing_address_1gb(addr: $address) -> $TypeName<Page1GiB> {
                     $TypeName {
                         number: addr.value() / (PAGE_SIZE * Page1GiB::NUM_4K_PAGES) * Page1GiB::NUM_4K_PAGES,
-                        size: PhantomData::<Page1GiB>,
+                        size: PhantomData,
                     }
                 }
             }
@@ -370,7 +370,7 @@ macro_rules! implement_page_frame {
                 pub const fn as_4kb(&self) -> $TypeName {
                     $TypeName {
                         number: self.number,
-                        size: PhantomData::<Page4KiB>
+                        size: PhantomData
                     }
                 }
 
@@ -433,7 +433,7 @@ macro_rules! implement_page_frame {
                     if p.number %  Page2MiB::NUM_4K_PAGES == 0 {
                         return Ok ($TypeName {
                             number: p.number,
-                            size: PhantomData::<Page2MiB>,
+                            size: PhantomData,
                         });
                     } else {
                         return Err("Could not convert 4KiB to 2MiB page.");
@@ -446,7 +446,7 @@ macro_rules! implement_page_frame {
                      if p.number % Page1GiB::NUM_4K_PAGES == 0 {
                         return Ok ($TypeName {
                             number: p.number,
-                            size: PhantomData::<Page1GiB>,
+                            size: PhantomData,
                         });
                     } else {
                         return Err("Could not convert 4KiB to 1GiB page.");
@@ -459,7 +459,7 @@ macro_rules! implement_page_frame {
                      if p.number % Page1GiB::NUM_4K_PAGES == 0 { 
                         return Ok ($TypeName {
                             number: p.number,
-                            size: PhantomData::<Page1GiB>,
+                            size: PhantomData,
                         });
                     } else {
                         return Err("Could not convert 2MiB to 1GiB page.");
@@ -470,7 +470,7 @@ macro_rules! implement_page_frame {
                 fn from(p: $TypeName<Page1GiB>) -> Self { 
                     Self {                             
                         number: p.number,
-                        size: PhantomData::<Page2MiB>
+                        size: PhantomData
                     }
                 }
             }
@@ -478,7 +478,7 @@ macro_rules! implement_page_frame {
                 fn from(p: $TypeName<Page1GiB>) -> Self { 
                     Self {                             
                         number: p.number,
-                        size: PhantomData::<Page4KiB>
+                        size: PhantomData
                     }
                 }
             }
@@ -486,7 +486,7 @@ macro_rules! implement_page_frame {
                 fn from(p: $TypeName<Page2MiB>) -> Self { 
                     Self {                             
                         number: p.number,
-                        size: PhantomData::<Page4KiB>
+                        size: PhantomData
                     }
                 }
             }
