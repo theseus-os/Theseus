@@ -3078,17 +3078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "runqueue_priority"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "sync_preemption",
- "task",
- "time",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3126,7 +3115,6 @@ dependencies = [
  "cpu",
  "interrupts",
  "log",
- "scheduler_round_robin",
  "sleep",
  "task",
  "x86_64",

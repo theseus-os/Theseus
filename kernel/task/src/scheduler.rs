@@ -53,7 +53,7 @@ pub fn schedule() -> bool {
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
 
-    // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
+    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, super::get_my_current_task(), irq_safety::interrupts_enabled());
 
     drop(recovered_preemption_guard);
     did_switch
