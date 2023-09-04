@@ -408,7 +408,7 @@ impl Shell {
                     if task_ref.has_exited() { continue; }
                     match task_ref.kill(KillReason::Requested) {
                         Ok(_) => {
-                            task::scheduler_2::remove_task(task_ref);
+                            task::scheduler::remove_task(task_ref);
                         }
                         Err(e) => error!("Could not kill task, error: {}", e),
                     }

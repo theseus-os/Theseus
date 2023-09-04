@@ -12,7 +12,6 @@ use task::TaskRef;
 
 pub struct RoundRobinScheduler {
     idle_task: TaskRef,
-    // TODO: Use regular Vec.
     queue: VecDeque<TaskRef>,
 }
 
@@ -25,7 +24,7 @@ impl RoundRobinScheduler {
     }
 }
 
-impl task::scheduler_2::Scheduler for RoundRobinScheduler {
+impl task::scheduler::Scheduler for RoundRobinScheduler {
     fn next(&mut self) -> TaskRef {
         if let Some((task_index, _)) = self
             .queue
@@ -45,7 +44,7 @@ impl task::scheduler_2::Scheduler for RoundRobinScheduler {
         self.queue.len()
     }
 
-    fn push(&mut self, task: TaskRef) {
+    fn add(&mut self, task: TaskRef) {
         self.queue.push_back(task);
     }
 
@@ -66,7 +65,7 @@ impl task::scheduler_2::Scheduler for RoundRobinScheduler {
         }
     }
 
-    fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler_2::PriorityScheduler> {
+    fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler::PriorityScheduler> {
         None
     }
 }

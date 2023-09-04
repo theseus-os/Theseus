@@ -59,8 +59,8 @@ pub fn init(
         .spawn_restartable(None)?
         .clone();
 
-    task::scheduler_2::set_policy(cpu_id, scheduler_round_robin::RoundRobinScheduler::new(idle_task));
-    task::scheduler_2::add_task_to(exitable_bootstrap_task.clone(), cpu_id);
+    task::scheduler::set_policy(cpu_id, scheduler_round_robin::RoundRobinScheduler::new(idle_task));
+    task::scheduler::add_task_to(exitable_bootstrap_task.clone(), cpu_id);
 
     Ok(BootstrapTaskRef {
         cpu_id,
@@ -432,9 +432,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Idle tasks are not stored on the run queue.
         if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
-                task::scheduler_2::add_task_to(task_ref.clone(), cpu);
+                task::scheduler::add_task_to(task_ref.clone(), cpu);
             } else {
-                task::scheduler_2::add_task(task_ref.clone());
+                task::scheduler::add_task(task_ref.clone());
             }
         }
 
@@ -873,7 +873,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill
 #[inline(always)]
 fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
     // First, remove the task from its runqueue(s).
-    remove_current_task_from_runqueue(current_task);
+    task::scheduler::remove_task_from_current(current_task);
 
     // Second, run TLS object destructors, which will drop any TLS objects
     // that were lazily initialized during this execution of this task.
@@ -990,7 +990,7 @@ where
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
-    task::scheduler_2::remove_task(current_task);
+    task::scheduler::remove_task(current_task);
 }
 
 /// A basic idle task that does nothing but loop endlessly.
