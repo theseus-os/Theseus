@@ -6,7 +6,7 @@
 
 extern crate alloc;
 
-use alloc::collections::VecDeque;
+use alloc::{boxed::Box, collections::VecDeque};
 
 use task::TaskRef;
 
@@ -67,5 +67,9 @@ impl task::scheduler::Scheduler for RoundRobinScheduler {
 
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler::PriorityScheduler> {
         None
+    }
+
+    fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_> {
+        Box::new(self.queue.drain(..))
     }
 }

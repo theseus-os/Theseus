@@ -25,9 +25,6 @@ path = "../tlb_shootdown"
 [dependencies.task]
 path = "../task"
 
-# [dependencies.runqueue]
-# path = "../runqueue"
-
 [dependencies.fault_log]
 path = "../fault_log"
 

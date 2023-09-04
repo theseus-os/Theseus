@@ -1,8 +1,7 @@
-use alloc::{boxed::Box, vec::Vec};
+use alloc::{boxed::Box, sync::Arc, vec::Vec};
 use core::ptr;
 
 use cpu::CpuId;
-use log::error;
 use spin::Mutex;
 
 use crate::TaskRef;
@@ -11,14 +10,14 @@ use crate::TaskRef;
 ///
 /// This is primarily used for spawning tasks, either to find the least busy CPU
 /// or spawn a task pinned to a particular CPU.
-static SCHEDULERS: Mutex<Vec<(CpuId, &'static ConcurrentScheduler)>> = Mutex::new(Vec::new());
+static SCHEDULERS: Mutex<Vec<(CpuId, Arc<ConcurrentScheduler>)>> = Mutex::new(Vec::new());
 
 /// A reference to the current CPUs scheduler.
 ///
 /// This isn't strictly necessary, but it greatly improves performance, as it
 /// avoids having to lock the system-wide list of schedulers.
 #[cls::cpu_local]
-static SCHEDULER: Option<&'static ConcurrentScheduler> = None;
+static SCHEDULER: Option<Arc<ConcurrentScheduler>> = None;
 
 type ConcurrentScheduler = Mutex<Box<dyn Scheduler>>;
 
@@ -41,15 +40,18 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.",
+        // cpu::current_cpu());
         return false;
     }
 
     let cpu_id = preemption_guard.cpu_id();
 
-    let next_task = next_task();
+    let next_task =
+        SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().as_mut().next());
 
-    let (did_switch, recovered_preemption_guard) = super::task_switch(next_task, cpu_id, preemption_guard);
+    let (did_switch, recovered_preemption_guard) =
+        super::task_switch(next_task, cpu_id, preemption_guard);
 
     // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
 
@@ -64,19 +66,11 @@ where
 {
     let boxed: Box<dyn Scheduler> = Box::new(scheduler);
     let mutex = Mutex::new(boxed);
-
-    let scheduler_ref = {
-        let ptr = Box::into_raw(Box::new(mutex));
-        // SAFETY: We just converted the box into a raw pointer.
-        unsafe { &*ptr }
-    };
+    let scheduler = Arc::new(mutex);
 
     let mut locked = SCHEDULERS.lock();
     SCHEDULER.update(|current_scheduler| {
         if let Some(old_scheduler) = current_scheduler {
-            // FIXME: Drain tasks from old scheduler and place into new scheduler.
-            error!("replacing existing scheduler: this is not currently supported");
-
             let mut old_scheduler_index = None;
             for (i, (cpu, scheduler)) in locked.iter().enumerate() {
                 if *cpu == cpu_id {
@@ -91,22 +85,20 @@ where
 
             if let Some(old_scheduler_index) = old_scheduler_index {
                 locked.swap_remove(old_scheduler_index);
-                // SAFETY: We just dropped the only other reference.
-                let boxed = unsafe { Box::from_raw(old_scheduler) };
-                drop(boxed);
             } else {
                 // TODO: Log error.
                 panic!();
             }
+
+            let mut new_scheduler = scheduler.lock();
+            for task in old_scheduler.lock().drain() {
+                new_scheduler.add(task);
+            }
         }
 
-        locked.push((cpu_id, scheduler_ref));
-        *current_scheduler = Some(scheduler_ref);
+        locked.push((cpu_id, scheduler.clone()));
+        *current_scheduler = Some(scheduler);
     });
-}
-
-pub(crate) fn next_task() -> TaskRef {
-    SCHEDULER.update(|scheduler| scheduler.unwrap().lock().as_mut().next())
 }
 
 pub fn add_task(task: TaskRef) {
@@ -135,7 +127,7 @@ pub fn add_task_to(task: TaskRef, cpu_id: CpuId) {
 }
 
 pub fn add_task_to_current(task: TaskRef) {
-    SCHEDULER.update(|scheduler| scheduler.unwrap().lock().add(task))
+    SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().add(task))
 }
 
 pub fn remove_task(task: &TaskRef) -> bool {
@@ -157,25 +149,33 @@ pub fn remove_task_from(task: &TaskRef, cpu_id: CpuId) -> bool {
 }
 
 pub fn remove_task_from_current(task: &TaskRef) -> bool {
-    SCHEDULER.update(|scheduler| scheduler.unwrap().lock().remove(task))
+    SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().remove(task))
 }
 
 pub trait Scheduler: Send + Sync + 'static {
+    /// Returns the next task to run.
     fn next(&mut self) -> TaskRef;
 
+    /// Adds a task to the run queue.
     fn add(&mut self, task: TaskRef);
 
+    /// Returns a measure of how busy the scheduler is.
     fn busyness(&self) -> usize;
 
+    /// Removes a task from the run queue.
     fn remove(&mut self, task: &TaskRef) -> bool;
 
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
+
+    fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_>;
 }
 
 pub trait PriorityScheduler {
-    fn set_priority(&mut self, task: &TaskRef);
+    /// Sets the priority of the given task.
+    fn set_priority(&mut self, task: &TaskRef, priority: usize);
 
-    fn get_priority(&mut self, task: &TaskRef);
+    /// Gets the priority of the given task.
+    fn get_priority(&mut self, task: &TaskRef) -> Option<usize>;
 
     fn inherit_priority(&mut self, task: &TaskRef);
 }
