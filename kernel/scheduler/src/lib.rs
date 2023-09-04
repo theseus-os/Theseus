@@ -14,18 +14,7 @@
 #![no_std]
 #![cfg_attr(target_arch = "x86_64", feature(abi_x86_interrupt))]
 
-cfg_if::cfg_if! {
-    if #[cfg(epoch_scheduler)] {
-        extern crate scheduler_epoch as scheduler;
-    } else if #[cfg(priority_scheduler)] {
-        extern crate scheduler_priority as scheduler;
-    } else {
-        extern crate scheduler_round_robin as scheduler;
-    }
-}
-
 use interrupts::{self, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
-use task::{self, TaskRef};
 
 /// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
 pub use task::schedule;
@@ -89,35 +78,3 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 
     EoiBehaviour::HandlerSentEoi
 });
-
-/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
-/// This function returns an error when a scheduler without priority is loaded. 
-pub fn set_priority(_task: &TaskRef, _priority: u8) -> Result<(), &'static str> {
-    #[cfg(any(epoch_scheduler, priority_scheduler))]
-    {
-        Ok(scheduler::set_priority(_task, _priority))
-    }
-    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    {
-        Err("called set priority on scheduler that doesn't support set priority")
-    }
-}
-
-/// Returns the priority of a given task.
-/// This function returns None when a scheduler without priority is loaded.
-pub fn get_priority(_task: &TaskRef) -> Option<u8> {
-    #[cfg(any(epoch_scheduler, priority_scheduler))]
-    {
-        scheduler::get_priority(_task)
-    }
-    #[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    {
-        None
-    }
-}
-
-// pub fn inherit_priority(task: &TaskRef) -> scheduler::PriorityInheritanceGuard<'_> {
-//     todo!();
-//     // scheduler::inherit_priority(task)
-// }

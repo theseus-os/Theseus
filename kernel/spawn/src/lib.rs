@@ -59,7 +59,17 @@ pub fn init(
         .spawn_restartable(None)?
         .clone();
 
-    task::scheduler::set_policy(cpu_id, scheduler_round_robin::RoundRobinScheduler::new(idle_task));
+    let scheduler;
+    cfg_if::cfg_if! {
+        if #[cfg(epoch_scheduler)] {
+            scheduler = scheduler_epoch::Scheduler::new(idle_task);
+        } else if #[cfg(priority_scheduler)] {
+            scheduler = scheduler_priority::Scheduler::new(idle_task);
+        } else {
+            scheduler = scheduler_round_robin::Scheduler::new(idle_task);
+        }
+    }
+    task::scheduler::set_policy(cpu_id, scheduler);
     task::scheduler::add_task_to(exitable_bootstrap_task.clone(), cpu_id);
 
     Ok(BootstrapTaskRef {

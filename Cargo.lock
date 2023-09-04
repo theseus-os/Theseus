@@ -3078,17 +3078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "runqueue_epoch"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
-]
-
-[[package]]
 name = "runqueue_priority"
 version = "0.1.0"
 dependencies = [
@@ -3423,6 +3412,7 @@ name = "spawn"
 version = "0.1.0"
 dependencies = [
  "catch_unwind",
+ "cfg-if 1.0.0",
  "context_switch",
  "cpu",
  "debugit",
@@ -3439,6 +3429,8 @@ dependencies = [
  "path",
  "preemption",
  "scheduler",
+ "scheduler_epoch",
+ "scheduler_priority",
  "scheduler_round_robin",
  "spin 0.9.4",
  "stack",

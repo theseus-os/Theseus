@@ -10,12 +10,12 @@ use alloc::{boxed::Box, collections::VecDeque};
 
 use task::TaskRef;
 
-pub struct RoundRobinScheduler {
+pub struct Scheduler {
     idle_task: TaskRef,
     queue: VecDeque<TaskRef>,
 }
 
-impl RoundRobinScheduler {
+impl Scheduler {
     pub const fn new(idle_task: TaskRef) -> Self {
         Self {
             idle_task,
@@ -24,7 +24,7 @@ impl RoundRobinScheduler {
     }
 }
 
-impl task::scheduler::Scheduler for RoundRobinScheduler {
+impl task::scheduler::Scheduler for Scheduler {
     fn next(&mut self) -> TaskRef {
         if let Some((task_index, _)) = self
             .queue
