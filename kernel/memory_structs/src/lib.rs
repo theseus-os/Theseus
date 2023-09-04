@@ -577,7 +577,6 @@ macro_rules! implement_page_frame_range {
 
                 #[doc = "Returns the size of this range in bytes."]
                 pub const fn size_in_bytes(&self) -> usize {
-                    // self.[<size_in_ $chunk:lower s_gen>]() * PAGE_SIZE
                     self.[<size_in_ $chunk:lower s>]() * PAGE_SIZE
                 }
 
