@@ -8,5 +8,5 @@ edition = "2021"
 [dependencies]
 spin = "0.9.4"
 
-tls_initializer = { path = "../tls_initializer" }
+local_storage_initializer = { path = "../local_storage_initializer" }
 

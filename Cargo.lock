@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cls_allocator",
  "cpu",
  "early_tls",
  "interrupts",
@@ -100,7 +101,6 @@ dependencies = [
  "memory",
  "no_drop",
  "page_attribute_table",
- "per_cpu",
  "scheduler",
  "spawn",
  "stack",
@@ -368,6 +368,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "app_io",
+ "cls_allocator",
  "console",
  "cpu",
  "device_manager",
@@ -389,7 +390,6 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
- "per_cpu",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -482,6 +482,17 @@ dependencies = [
  "preemption",
  "tock-registers",
  "x86_64",
+]
+
+[[package]]
+name = "cls_allocator"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "crate_metadata",
+ "irq_safety",
+ "local_storage_initializer",
+ "sync_spin",
 ]
 
 [[package]]
@@ -662,19 +673,6 @@ dependencies = [
  "derive_more",
  "sync_irq",
  "tock-registers",
-]
-
-[[package]]
-name = "cpu_local"
-version = "0.1.0"
-dependencies = [
- "cortex-a",
- "irq_safety",
- "memory",
- "preemption",
- "sync_spin",
- "tock-registers",
- "x86_64",
 ]
 
 [[package]]
@@ -1030,8 +1028,8 @@ dependencies = [
 name = "early_tls"
 version = "0.1.0"
 dependencies = [
+ "local_storage_initializer",
  "spin 0.9.4",
- "tls_initializer",
 ]
 
 [[package]]
@@ -1853,6 +1851,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "local_storage_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "log",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.4",
+ "tock-registers",
+ "x86_64",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1976,15 +1988,6 @@ name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
-name = "memoffset"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
 dependencies = [
  "autocfg",
 ]
@@ -2138,6 +2141,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bootloader_modules",
+ "cls_allocator",
  "const_format",
  "cow_arc",
  "cpio_reader",
@@ -2149,6 +2153,7 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
+ "local_storage_initializer",
  "log",
  "lz4_flex",
  "memfs",
@@ -2160,7 +2165,6 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "tls_initializer",
  "vfs_node",
  "xmas-elf",
 ]
@@ -2599,19 +2603,6 @@ dependencies = [
  "spin 0.9.4",
  "volatile 0.2.7",
  "zerocopy",
-]
-
-[[package]]
-name = "per_cpu"
-version = "0.1.0"
-dependencies = [
- "cpu",
- "cpu_local",
- "log",
- "memoffset 0.8.0",
- "no_drop",
- "preemption",
- "task",
 ]
 
 [[package]]
@@ -3713,7 +3704,6 @@ dependencies = [
  "cls",
  "context_switch",
  "cpu",
- "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -4149,20 +4139,6 @@ dependencies = [
  "memory_aarch64",
  "memory_x86_64",
  "sync_irq",
-]
-
-[[package]]
-name = "tls_initializer"
-version = "0.1.0"
-dependencies = [
- "cortex-a",
- "crate_metadata",
- "log",
- "memory_structs",
- "rangemap",
- "spin 0.9.4",
- "tock-registers",
- "x86_64",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@ set -e
 #### Check if `brew` is installed
 command -v brew >/dev/null 2>&1 || { echo >&2 "Missing homebrew (\`brew\`). Install it from http://brew.sh/."; exit 1; }
 
-brew install make wget coreutils findutils nasm pkgconfig x86_64-elf-gcc x86_64-elf-binutils xorriso
+brew install make wget coreutils findutils nasm pkgconfig x86_64-elf-gcc x86_64-elf-binutils aarch64-elf-gcc aarch64-elf-binutils xorriso
 ### Install dependencies needed to cross-compile grub for macOS
 brew install autoconf automake libtool pkg-config
 

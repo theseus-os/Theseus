@@ -108,7 +108,7 @@ pub fn kstart_ap(
 
     // Now that the Local APIC has been initialized for this CPU, we can initialize the
     // per-CPU storage, tasking, and create the idle task for this CPU.
-    per_cpu::init(cpu_id).unwrap();
+    cls_allocator::reload_current_cpu();
     let bootstrap_task = spawn::init(kernel_mmi_ref.clone(), cpu_id, this_ap_stack).unwrap();
 
     // The PAT must be initialized explicitly on every CPU,
