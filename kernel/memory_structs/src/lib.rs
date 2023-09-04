@@ -35,7 +35,10 @@ pub enum MemChunkSize {
     Huge1G,
 }
 
-/// Trait used to group the size marker structs that paging-related types are parameterized with.
+/// Trait used to represent the size of a page or frame, i.e., for normal or huge pages.
+///
+/// This is used to parameterize `Page`- and `Frame`-related types with a page size,
+/// in order to define normal and huge pages in a generic manner.
 pub trait PageSize: Ord + PartialOrd + Clone {
     const SIZE: MemChunkSize;
     const NUM_4K_PAGES: usize;
@@ -381,7 +384,7 @@ macro_rules! implement_page_frame {
                     write!(f, concat!(stringify!($TypeName), "(", $prefix, "{:#X})"), self.start_address())
                 }
             }
-            impl<P: PageSize> Add<usize> for $TypeName<P> {
+            impl<P: PageSize + 'static> Add<usize> for $TypeName<P> {
                 type Output = $TypeName<P>;
                 fn add(self, rhs: usize) -> $TypeName<P> {
                     // cannot exceed max page number (which is also max frame number)
@@ -391,7 +394,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + Copy> AddAssign<usize> for $TypeName<P> {
+            impl<P: PageSize + Copy + 'static> AddAssign<usize> for $TypeName<P> {
                 fn add_assign(&mut self, rhs: usize) {
                     *self = (*self).add(rhs * P::NUM_4K_PAGES)
                 }
@@ -532,7 +535,6 @@ macro_rules! implement_page_frame_range {
             #[derive(Clone, PartialEq, Eq)]
             pub struct $TypeName<P: PageSize = Page4KiB>(RangeInclusive<$chunk::<P>>);
 
-            //impl<P: 'static + Copy> $TypeName<P> where P: PageSize {
             impl $TypeName {
                 #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
                 pub const fn empty() -> $TypeName {
@@ -554,13 +556,70 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
-            impl<P: 'static + Copy> $TypeName<P> where P: PageSize {
+            impl<P: PageSize + 'static + Copy> $TypeName<P> {
+                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
+                pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
+                    $TypeName(RangeInclusive::new(start, end))
+                }
+
+                #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]
+                pub const fn start_address(&self) -> $address {
+                    self.0.start().start_address()
+                }
+
                 #[doc = "Returns the number of [`" $chunk "`]s covered by this iterator.\n\n \
                     Use this instead of [`Iterator::count()`] method. \
                     This is instant, because it doesn't need to iterate over each entry, unlike normal iterators."]
                 pub const fn [<size_in_ $chunk:lower s>](&self) -> usize {
                     // add 1 because it's an inclusive range
                     (self.0.end().number + 1).saturating_sub(self.0.start().number) / P::NUM_4K_PAGES
+                }
+
+                #[doc = "Returns the number of 4KiB chunks in this range. \
+                    Needed for functions in the impl block generic over chunk size P, as the compiler cannot recognize which methods to call."]
+                const fn [<size_in_ $chunk:lower s_gen>](&self) -> usize {
+                   // add 1 because it's an inclusive range
+                   (self.0.end().number + 1).saturating_sub(self.0.start().number)
+                }
+
+                #[doc = "Returns the size of this range in bytes."]
+                pub const fn size_in_bytes(&self) -> usize {
+                    self.[<size_in_ $chunk:lower s_gen>]() * PAGE_SIZE
+                }
+
+                #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
+                pub const fn contains_address(&self, addr: $address) -> bool {
+                    let c = <$chunk>::containing_address(addr);
+                    self.0.start().number <= c.number
+                        && c.number <= self.0.end().number
+                }
+
+                #[doc = "Returns the offset of the given [`" $address "`] within this `" $TypeName "`, \
+                    i.e., `addr - self.start_address()`.\n\n \
+                    If the given `addr` is not covered by this range of [`" $chunk "`]s, this returns `None`.\n\n \
+                    # Examples\n \
+                    If the range covers addresses `0x2000` to `0x4000`, then `offset_of_address(0x3500)` would return `Some(0x1500)`."]
+                pub const fn offset_of_address(&self, addr: $address) -> Option<usize> {
+                    if self.contains_address(addr) {
+                        Some(addr.value() - self.start_address().value())
+                    } else {
+                        None
+                    }
+                }
+
+                #[doc = "Returns the [`" $address "`] at the given `offset` into this `" $TypeName "`within this `" $TypeName "`, \
+                    i.e., `self.start_address() + offset`.\n\n \
+                    If the given `offset` is not within this range of [`" $chunk "`]s, this returns `None`.\n\n \
+                    # Examples\n \
+                    If the range covers addresses `0x2000` through `0x3FFF`, then `address_at_offset(0x1500)` would return `Some(0x3500)`, \
+                    and `address_at_offset(0x2000)` would return `None`."]
+                pub const fn address_at_offset(&self, offset: usize) -> Option<$address> {
+                    if offset < self.size_in_bytes() {
+                        Some($address::new_canonical(self.start_address().value() + offset))
+                    }
+                    else {
+                        None
+                    }
                 }
 
                 #[doc = "Returns a new separate `" $TypeName "` that is extended to include the given [`" $chunk "`]."]
@@ -593,65 +652,6 @@ macro_rules! implement_page_frame_range {
                     && (other.start() >= self.start())
                     && (other.end() <= self.end())
                 }
-            }
-            impl<P: PageSize + 'static> $TypeName<P> {
-                #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
-                pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
-                    $TypeName(RangeInclusive::new(start, end))
-                }
-
-                #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
-                pub const fn contains_address(&self, addr: $address) -> bool {
-                    let c = <$chunk>::containing_address(addr);
-                    self.0.start().number <= c.number
-                        && c.number <= self.0.end().number
-                }
-
-                #[doc = "Returns the [`" $address "`] of the starting [`" $chunk "`] in this `" $TypeName "`."]
-                pub const fn start_address(&self) -> $address {
-                    self.0.start().start_address()
-                }
-
-                #[doc = "Returns the offset of the given [`" $address "`] within this `" $TypeName "`, \
-                    i.e., `addr - self.start_address()`.\n\n \
-                    If the given `addr` is not covered by this range of [`" $chunk "`]s, this returns `None`.\n\n \
-                    # Examples\n \
-                    If the range covers addresses `0x2000` to `0x4000`, then `offset_of_address(0x3500)` would return `Some(0x1500)`."]
-                pub const fn offset_of_address(&self, addr: $address) -> Option<usize> {
-                    if self.contains_address(addr) {
-                        Some(addr.value() - self.start_address().value())
-                    } else {
-                        None
-                    }
-                }
-
-                #[doc = "Returns the [`" $address "`] at the given `offset` into this `" $TypeName "`within this `" $TypeName "`, \
-                    i.e., `self.start_address() + offset`.\n\n \
-                    If the given `offset` is not within this range of [`" $chunk "`]s, this returns `None`.\n\n \
-                    # Examples\n \
-                    If the range covers addresses `0x2000` through `0x3FFF`, then `address_at_offset(0x1500)` would return `Some(0x3500)`, \
-                    and `address_at_offset(0x2000)` would return `None`."]
-                pub const fn address_at_offset(&self, offset: usize) -> Option<$address> {
-                    if offset < self.size_in_bytes() {
-                        Some($address::new_canonical(self.start_address().value() + offset))
-                    }
-                    else {
-                        None
-                    }
-                }
-
-                #[doc = "Returns the size of this range in bytes."]
-                pub const fn size_in_bytes(&self) -> usize {
-                    self.[<size_in_ $chunk:lower s_gen>]() * PAGE_SIZE
-                }
-
-                #[doc = "Returns the number of 4KiB chunks in this range. \
-                    Needed for functions in the impl block generic over chunk size P, as the compiler cannot recognize which methods to call."]
-                const fn [<size_in_ $chunk:lower s_gen>](&self) -> usize {
-                   // add 1 because it's an inclusive range
-                   (self.0.end().number + 1).saturating_sub(self.0.start().number)
-                }
-                
 
                 #[doc = "Changes this `" $TypeName "` to have a size of 4KiB. This does not perform any alignment. \
                 It simply changes the marker type for usage with functions that want a range of default-sized pages."]
@@ -659,12 +659,12 @@ macro_rules! implement_page_frame_range {
                     $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
                 }
             }
-            impl<P: 'static + PageSize> fmt::Debug for $TypeName<P> {
+            impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                     write!(f, "{:?}", self.0)
                 }
             }
-            impl<P: PageSize> Deref for $TypeName<P> {
+            impl<P: PageSize + 'static> Deref for $TypeName<P> {
                 type Target = RangeInclusive<$chunk<P>>;
                 fn deref(&self) -> &RangeInclusive<$chunk<P>> {
                     &self.0
@@ -675,7 +675,7 @@ macro_rules! implement_page_frame_range {
                     &mut self.0
                 }
             }
-            impl<P: PageSize> IntoIterator for $TypeName<P> {
+            impl<P: PageSize + 'static> IntoIterator for $TypeName<P> {
                 type Item = $chunk<P>;
                 type IntoIter = RangeInclusiveIterator<$chunk<P>>;
                 fn into_iter(self) -> Self::IntoIter {
@@ -684,28 +684,12 @@ macro_rules! implement_page_frame_range {
             }
 
             
-            // #[doc = "A `" $TypeName "` that implements `Copy`"]
-            // #[derive(Clone, Copy)]
-            // pub struct [<Copyable $TypeName>] {
-            //     start: $chunk,
-            //     end: $chunk,
-            // }
             #[doc = "A `" $TypeName "` that implements `Copy`"]
             #[derive(Clone, Copy)]
             pub struct [<Copyable $TypeName>]<P: PageSize = Page4KiB> {
                 start: $chunk<P>,
                 end: $chunk<P>,
             }
-            // impl From<$TypeName> for [<Copyable $TypeName>] {
-            //     fn from(r: $TypeName) -> Self {
-            //         Self { start: *r.start(), end: *r.end() }
-            //     }
-            // }
-            // impl From<[<Copyable $TypeName>]> for $TypeName {
-            //     fn from(cr: [<Copyable $TypeName>]) -> Self {
-            //         Self::new(cr.start, cr.end)
-            //     }
-            // }
             impl<P: PageSize + Copy + 'static> From<$TypeName<P>> for [<Copyable $TypeName>]<P> {
                 fn from(r: $TypeName<P>) -> Self {
                     Self { start: *r.start(), end: *r.end() }
