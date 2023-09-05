@@ -3,6 +3,7 @@ use core::ptr;
 
 use cpu::CpuId;
 use spin::Mutex;
+use sync_preemption::PreemptionSafeMutex;
 
 use crate::TaskRef;
 
@@ -19,7 +20,7 @@ static SCHEDULERS: Mutex<Vec<(CpuId, Arc<ConcurrentScheduler>)>> = Mutex::new(Ve
 #[cls::cpu_local]
 static SCHEDULER: Option<Arc<ConcurrentScheduler>> = None;
 
-type ConcurrentScheduler = Mutex<Box<dyn Scheduler>>;
+type ConcurrentScheduler = PreemptionSafeMutex<Box<dyn Scheduler>>;
 
 /// Yields the current CPU by selecting a new `Task` to run next,
 /// and then switches to that new `Task`.
@@ -53,7 +54,9 @@ pub fn schedule() -> bool {
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
 
-    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, super::get_my_current_task(), irq_safety::interrupts_enabled());
+    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts
+    // are {}", cpu_id, super::get_my_current_task(),
+    // irq_safety::interrupts_enabled());
 
     drop(recovered_preemption_guard);
     did_switch
@@ -65,7 +68,7 @@ where
     T: Scheduler,
 {
     let boxed: Box<dyn Scheduler> = Box::new(scheduler);
-    let mutex = Mutex::new(boxed);
+    let mutex = PreemptionSafeMutex::new(boxed);
     let scheduler = Arc::new(mutex);
 
     let mut locked = SCHEDULERS.lock();
@@ -187,14 +190,40 @@ pub struct PriorityInheritanceGuard<'a> {
 
 impl<'a> Drop for PriorityInheritanceGuard<'a> {
     fn drop(&mut self) {
-        // if let Some((task, priority)) = self.inner {
-        //     set_priority(task, priority)
-        // }
+        if let Some((task, priority)) = self.inner {
+            set_priority(task, priority);
+        }
     }
 }
 
-// /// Modifies the given task's priority to be the maximum of its priority and the
-// /// current task's priority.
+pub fn get_priority(task: &TaskRef) -> Option<u8> {
+    for (_, scheduler) in SCHEDULERS.lock().iter() {
+        if let Some(priority) = scheduler
+            .lock()
+            .as_priority_scheduler()
+            .and_then(|priority_scheduler| priority_scheduler.get_priority(task))
+        {
+            return Some(priority);
+        }
+    }
+    None
+}
+
+pub fn set_priority(task: &TaskRef, priority: u8) -> bool {
+    for (_, scheduler) in SCHEDULERS.lock().iter() {
+        if let Some(true) = scheduler
+            .lock()
+            .as_priority_scheduler()
+            .map(|priority_scheduler| priority_scheduler.set_priority(task, priority))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+// /// Modifies the given task's priority to be the maximum of its priority and
+// the /// current task's priority.
 // ///
 // /// Returns a guard which reverts the change when dropped.
 // pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
@@ -220,11 +249,11 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
 //     }
 
 //     if let (Some(current_priority), Some((core, other_priority))) =
-//         (current_priority, other_priority) && current_priority > other_priority
-//     {
+//         (current_priority, other_priority) && current_priority >
+// other_priority     {
 //         // NOTE: This assumes no task migration.
-//         debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task, current_priority));
-//     }
+//         debug_assert!(RUNQUEUES.get(core).unwrap().write().set_priority(task,
+// current_priority));     }
 
 //     PriorityInheritanceGuard {
 //         inner: if let (Some(current_priority), Some((_, other_priority))) =

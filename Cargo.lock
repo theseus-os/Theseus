@@ -3651,6 +3651,7 @@ dependencies = [
  "stack",
  "static_assertions",
  "sync_irq",
+ "sync_preemption",
  "task_struct",
  "waker_generic",
 ]
