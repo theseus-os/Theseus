@@ -69,7 +69,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 
     // interrupts must be disabled here, because this IPI sequence must be fully synchronous with other cores,
     // and we wouldn't want this core to be interrupted while coordinating IPI responses across multiple cores.
-    let _held_ints = hold_interrupts();
+    let _held_ints = hold_interrupts("tlb_shootdown");
 
     // acquire lock
     // TODO: add timeout!!

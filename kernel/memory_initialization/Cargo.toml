@@ -17,4 +17,4 @@ kernel_config = { path = "../kernel_config" }
 bootloader_modules = { path = "../bootloader_modules" }
 heap = { path = "../heap" }
 
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+irq_safety = { path = "../../../irq_safety" }

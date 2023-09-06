@@ -11,7 +11,7 @@ spin = "0.9.4"
 static_assertions = "1.1.0"
 crossbeam-utils = { version = "0.8.2", default-features = false }
 
-irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+irq_safety = { path = "../../../irq_safety" }
 
 context_switch = { path = "../context_switch" }
 cls = { path = "../cls" }
