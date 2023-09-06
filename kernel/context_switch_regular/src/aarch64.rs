@@ -19,6 +19,9 @@ pub struct ContextRegular {
     // x30 stores the return address
     // it's used by the `ret` instruction
     x30_link_register: usize,
+
+    // only NZCV & DAIF bits are saved and restored
+    pstate: usize,
 }
 
 impl ContextRegular {
@@ -36,6 +39,9 @@ impl ContextRegular {
             // x30 stores the return address
             // it's used by the `ret` instruction
             x30_link_register: start_address,
+
+            // interrupts are initially unmasked/enabled
+            pstate: 0,
         }
     }
 
@@ -88,6 +94,12 @@ macro_rules! save_registers_regular {
             stp x25, x26, [sp, #8 * 2 * 3]
             stp x27, x28, [sp, #8 * 2 * 4]
             stp x29, x30, [sp, #8 * 2 * 5]
+
+            // Push an OR of DAIF and NZCV flags of PSTATE
+            mrs x29, DAIF
+            mrs x30, NZCV
+            orr x29, x29, x30
+            str x29, [sp, #8 * 2 * 6]
         "#
     );
 }
@@ -119,13 +131,19 @@ macro_rules! restore_registers_regular {
     () => (
         // Restore the next task's general purpose registers.
         r#"
+            // Pop DAIF and NZCV flags of PSTATE
+            // These MSRs discard irrelevant bits; no AND is required.
+            ldr x29, [sp, #8 * 2 * 6]
+            msr DAIF, x29
+            msr NZCV, x29
+
             // Pop registers from the stack, two at a time.
-            ldp x19, x20, [sp, #8 * 2 * 0]
-            ldp x21, x22, [sp, #8 * 2 * 1]
-            ldp x23, x24, [sp, #8 * 2 * 2]
-            ldp x25, x26, [sp, #8 * 2 * 3]
-            ldp x27, x28, [sp, #8 * 2 * 4]
             ldp x29, x30, [sp, #8 * 2 * 5]
+            ldp x27, x28, [sp, #8 * 2 * 4]
+            ldp x25, x26, [sp, #8 * 2 * 3]
+            ldp x23, x24, [sp, #8 * 2 * 2]
+            ldp x21, x22, [sp, #8 * 2 * 1]
+            ldp x19, x20, [sp, #8 * 2 * 0]
 
             // Move the stack pointer back up.
             add sp,  sp,  #8 * 2 * 6
