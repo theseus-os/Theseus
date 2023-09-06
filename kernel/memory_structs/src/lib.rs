@@ -366,14 +366,6 @@ macro_rules! implement_page_frame {
                     $address::new_canonical(self.number * PAGE_SIZE)
                 }
 
-                #[doc = "Returns a `" $TypeName "` with the same number as this `" $TypeName "` but with the size marker set to indicate a size of 4kb."]
-                pub const fn as_4kb(&self) -> $TypeName {
-                    $TypeName {
-                        number: self.number,
-                        size: PhantomData
-                    }
-                }
-
                 #[doc = "Returns the size of this `" $TypeName "`."]
                 pub const fn page_size(&self) -> MemChunkSize {
                     P::SIZE
@@ -399,21 +391,21 @@ macro_rules! implement_page_frame {
                     *self = (*self).add(rhs * P::NUM_4K_PAGES)
                 }
             }
-            impl<P: PageSize> Sub<usize> for $TypeName<P> {
+            impl<P: PageSize + 'static> Sub<usize> for $TypeName<P> {
                 type Output = $TypeName<P>;
                 fn sub(self, rhs: usize) -> $TypeName<P> {
                     $TypeName {
                         number: self.number.saturating_sub(rhs * P::NUM_4K_PAGES),
-                        size: self.size,
+                        size: self.size
                     }
                 }
             }
-            impl<P: PageSize + Copy> SubAssign<usize> for $TypeName<P> {
+            impl<P: PageSize + Copy + 'static> SubAssign<usize> for $TypeName<P> {
                 fn sub_assign(&mut self, rhs: usize) {
                     *self = (*self).sub(rhs);
                 }
             }
-            impl<P: PageSize> Step for $TypeName<P> {
+            impl<P: PageSize + 'static> Step for $TypeName<P> {
                 #[inline]
                 fn steps_between(start: &$TypeName<P>, end: &$TypeName<P>) -> Option<usize> {
                     Step::steps_between(&start.number, &end.number).map(|n| n / P::NUM_4K_PAGES)
@@ -453,27 +445,6 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl TryFrom<$TypeName<Page2MiB>> for $TypeName<Page1GiB> {
-                type Error = &'static str;
-                fn try_from(p: $TypeName<Page2MiB>) -> Result<Self, &'static str> {
-                     if p.number % Page1GiB::NUM_4K_PAGES == 0 { 
-                        return Ok ($TypeName {
-                            number: p.number,
-                            size: PhantomData,
-                        });
-                    } else {
-                        return Err("Could not convert 2MiB to 1GiB page.");
-                    }
-                }
-            }
-            impl From<$TypeName<Page1GiB>> for $TypeName<Page2MiB> {
-                fn from(p: $TypeName<Page1GiB>) -> Self { 
-                    Self {                             
-                        number: p.number,
-                        size: PhantomData
-                    }
-                }
-            }
             impl From<$TypeName<Page1GiB>> for $TypeName {
                 fn from(p: $TypeName<Page1GiB>) -> Self { 
                     Self {                             
@@ -498,7 +469,7 @@ implement_page_frame!(Page, "virtual", "v", VirtualAddress);
 implement_page_frame!(Frame, "physical", "p", PhysicalAddress);
 
 // Implement other functions for the `Page` type that aren't relevant for `Frame.
-impl<P: PageSize> Page<P> {
+impl<P: PageSize + 'static> Page<P> {
     /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P4 page table entries list.
     pub const fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
@@ -538,7 +509,7 @@ macro_rules! implement_page_frame_range {
             impl $TypeName {
                 #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
                 pub const fn empty() -> $TypeName {
-                    $TypeName::new($chunk { number: 11, size: PhantomData }, $chunk { number: 0, size: PhantomData })
+                    $TypeName::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
                 }
 
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
@@ -556,7 +527,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
-            impl<P: PageSize + 'static + Copy> $TypeName<P> {
+            impl<P: PageSize + Copy + 'static> $TypeName<P> {
                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
                 pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
                     $TypeName(RangeInclusive::new(start, end))
@@ -572,7 +543,7 @@ macro_rules! implement_page_frame_range {
                     This is instant, because it doesn't need to iterate over each entry, unlike normal iterators."]
                 pub const fn [<size_in_ $chunk:lower s>](&self) -> usize {
                     // add 1 because it's an inclusive range
-                    (self.0.end().number + 1).saturating_sub(self.0.start().number) / P::NUM_4K_PAGES
+                    (self.0.end().number + (1 * P::NUM_4K_PAGES)).saturating_sub(self.0.start().number) / P::NUM_4K_PAGES
                 }
 
                 #[doc = "Returns the size of this range in bytes."]
@@ -645,12 +616,6 @@ macro_rules! implement_page_frame_range {
                     && (other.start() >= self.start())
                     && (other.end() <= self.end())
                 }
-
-                #[doc = "Changes this `" $TypeName "` to have a size of 4KiB. This does not perform any alignment. \
-                It simply changes the marker type for usage with functions that want a range of default-sized pages."]
-                pub fn as_4kb_range(&self) -> $TypeName {
-                    $TypeName(RangeInclusive::new(self.start().as_4kb(), self.end().as_4kb()))
-                }
             }
             impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -693,13 +658,23 @@ macro_rules! implement_page_frame_range {
                     Self::new(cr.start, cr.end)
                 }
             }
+            impl From<$TypeName<Page2MiB>> for $TypeName {
+                fn from(r: $TypeName<Page2MiB>) -> Self {
+                    Self::new($chunk::from(*r.start()), $chunk::from(*r.end()))
+                }
+            }
+            impl From<$TypeName<Page1GiB>> for $TypeName {
+                fn from(r: $TypeName<Page1GiB>) -> Self {
+                    Self::new($chunk::from(*r.start()), $chunk::from(*r.end()))
+                }
+            }
             impl TryFrom<$TypeName> for $TypeName<Page2MiB> {
                 type Error = &'static str;
                 fn try_from(p: $TypeName) -> Result<Self, &'static str> {
-                    if (p.[<size_in_ $chunk:lower s>]() - 1) % 512 == 0 {
+                    if let Ok(aligned_upper_bound) = $chunk::<Page2MiB>::try_from(*p.end() + 1) {
                         return Ok(Self::new(
                             $chunk::<Page2MiB>::try_from(*p.start())?,
-                            $chunk::<Page2MiB>::try_from(*p.end())?
+                            aligned_upper_bound - 1,
                         ));
                     } else {
                         return Err("Could not convert 4KiB page range into 2MiB page range.");
@@ -709,10 +684,10 @@ macro_rules! implement_page_frame_range {
             impl TryFrom<$TypeName> for $TypeName<Page1GiB> {
                 type Error = &'static str;
                 fn try_from(p: $TypeName) -> Result<Self, &'static str> {
-                    if (p.[<size_in_ $chunk:lower s>]() - 1) % (512 * 512) == 0 {
+                    if let Ok(aligned_upper_bound) = $chunk::<Page1GiB>::try_from(*p.end() + 1) {
                         return Ok(Self::new(
                             $chunk::<Page1GiB>::try_from(*p.start())?,
-                            $chunk::<Page1GiB>::try_from(*p.end())?
+                            aligned_upper_bound - 1,
                         ));
                     } else {
                         return Err("Could not convert 4KiB page range into 1GiB page range.");
