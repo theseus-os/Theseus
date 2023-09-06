@@ -40,7 +40,7 @@ impl ContextRegular {
             // it's used by the `ret` instruction
             x30_link_register: start_address,
 
-            // interrupts are initially masked/disabled
+            // interrupts are initially unmasked/enabled
             pstate: 0,
         }
     }
