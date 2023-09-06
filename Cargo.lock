@@ -3408,7 +3408,6 @@ dependencies = [
  "fault_crate_swap",
  "fault_log",
  "fs_node",
- "irq_safety",
  "lazy_static",
  "log",
  "memory",

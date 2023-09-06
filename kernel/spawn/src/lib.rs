@@ -28,7 +28,6 @@ use log::{error, info, debug};
 use cpu::CpuId;
 use debugit::debugit;
 use spin::Mutex;
-use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
@@ -714,16 +713,7 @@ where
         );
     }
 
-    // The first time that a task runs, its entry function `task_wrapper()` is jumped to
-    // from the `task_switch()` function, right after the context switch occurred.
-    // Since the `task_switch()` function was originally invoked from an interrupt handler,
-    // interrupts were disabled but never had the chance to be re-enabled
-    // because we did not return from the interrupt handler as usual.
-    // Therefore, we need to re-enable interrupts and preemption here to ensure that
-    // things continue to run as normal, with interrupts and preemption enabled
-    // such that we can properly preempt this task.
     drop(recovered_preemption_guard);
-    enable_interrupts();
 
     // This synchronizes with the acquire fence in `JoinableTaskRef::join()`.
     fence(Ordering::Release);
