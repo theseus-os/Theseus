@@ -32,17 +32,9 @@ impl ContextRegular {
     /// Task containing it to begin its execution at the given `rip`.
     pub fn new(rip: usize) -> ContextRegular {
         ContextRegular {
-            // From Intel Manual Volume 1, Chapter 3.4.3:
-            //
-            // > Following initialization of the processor the state of the
-            // > EFLAGS register is 00000002H.
-            //
-            // Technically speaking, I don't think it's strictly necessary to
-            // set the first bit, because `popfq` will ignore reserved bits
-            // anyway, but it doesn't hurt.
-            //
-            // The ninth bit is the interrupt enable flag.
-            rflags: 1 << 1 | 1 << 9,
+            // The ninth bit is the interrupt enable flag. When a task is first
+            // run, interrupts should already be enabled.
+            rflags: 1 << 9,
             r15: 0,
             r14: 0,
             r13: 0,
