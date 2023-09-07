@@ -10,6 +10,7 @@ use zerocopy::FromBytes;
 #[derive(FromBytes)]
 #[repr(C, packed)]
 pub struct ContextRegular {
+    rflags: usize,
     r15: usize, 
     r14: usize,
     r13: usize,
@@ -31,6 +32,9 @@ impl ContextRegular {
     /// Task containing it to begin its execution at the given `rip`.
     pub fn new(rip: usize) -> ContextRegular {
         ContextRegular {
+            // The ninth bit is the interrupt enable flag. When a task is first
+            // run, interrupts should already be enabled.
+            rflags: 1 << 9,
             r15: 0,
             r14: 0,
             r13: 0,
@@ -88,6 +92,7 @@ macro_rules! save_registers_regular {
             push r13
             push r14
             push r15
+            pushfq
         "#
     );
 }
@@ -122,6 +127,7 @@ macro_rules! restore_registers_regular {
     () => (
         // Restore the next task's general purpose registers.
         r#" 
+            popfq
             pop r15
             pop r14
             pop r13
