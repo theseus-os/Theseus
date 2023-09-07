@@ -154,6 +154,12 @@
 <a href="#154" id="154">154</a>
 <a href="#155" id="155">155</a>
 <a href="#156" id="156">156</a>
+<a href="#157" id="157">157</a>
+<a href="#158" id="158">158</a>
+<a href="#159" id="159">159</a>
+<a href="#160" id="160">160</a>
+<a href="#161" id="161">161</a>
+<a href="#162" id="162">162</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate contains structures and routines for context switching 
 //! when SSE/SIMD extensions are not active. 
 
@@ -166,6 +172,7 @@
 </span><span class="attr">#[derive(FromBytes)]
 #[repr(C, packed)]
 </span><span class="kw">pub struct </span>ContextRegular {
+    rflags: usize,
     r15: usize, 
     r14: usize,
     r13: usize,
@@ -187,6 +194,9 @@
     /// Task containing it to begin its execution at the given `rip`.
     </span><span class="kw">pub fn </span>new(rip: usize) -&gt; ContextRegular {
         ContextRegular {
+            <span class="comment">// The ninth bit is the interrupt enable flag. When a task is first
+            // run, interrupts should already be enabled.
+            </span>rflags: <span class="number">1 </span>&lt;&lt; <span class="number">9</span>,
             r15: <span class="number">0</span>,
             r14: <span class="number">0</span>,
             r13: <span class="number">0</span>,
@@ -244,6 +254,7 @@
             push r13
             push r14
             push r15
+            pushfq
         &quot;#
     </span>);
 }
@@ -278,6 +289,7 @@
     () =&gt; (
         <span class="comment">// Restore the next task&#39;s general purpose registers.
         </span><span class="string">r#&quot; 
+            popfq
             pop r15
             pop r14
             pop r13

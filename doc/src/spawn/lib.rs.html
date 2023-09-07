@@ -1019,10 +1019,6 @@
 <a href="#1019" id="1019">1019</a>
 <a href="#1020" id="1020">1020</a>
 <a href="#1021" id="1021">1021</a>
-<a href="#1022" id="1022">1022</a>
-<a href="#1023" id="1023">1023</a>
-<a href="#1024" id="1024">1024</a>
-<a href="#1025" id="1025">1025</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1053,7 +1049,6 @@
 <span class="kw">use </span>cpu::CpuId;
 <span class="kw">use </span>debugit::debugit;
 <span class="kw">use </span>spin::Mutex;
-<span class="kw">use </span>irq_safety::enable_interrupts;
 <span class="kw">use </span>memory::{get_kernel_mmi_ref, MmiRef};
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
@@ -1688,7 +1683,13 @@
     R: Send + <span class="lifetime">&#39;static</span>,
     F: FnOnce(A) -&gt; R,
 {
-    <span class="kw">let </span>task_entry_func;
+    <span class="comment">// The first time a task runs, its entry function `task_wrapper()` is
+    // jumped to from the `task_switch()` function, right after the context
+    // switch occured. However, we set the context of the new task to have
+    // interrupts enabled (in `ContextRegular::new`), so interrupts are enabled
+    // as soon as the new task is switched to.
+
+    </span><span class="kw">let </span>task_entry_func;
     <span class="kw">let </span>task_arg;
     <span class="kw">let </span>recovered_preemption_guard;
     <span class="kw">let </span>exitable_taskref;
@@ -1732,16 +1733,7 @@
         );
     }
 
-    <span class="comment">// The first time that a task runs, its entry function `task_wrapper()` is jumped to
-    // from the `task_switch()` function, right after the context switch occurred.
-    // Since the `task_switch()` function was originally invoked from an interrupt handler,
-    // interrupts were disabled but never had the chance to be re-enabled
-    // because we did not return from the interrupt handler as usual.
-    // Therefore, we need to re-enable interrupts and preemption here to ensure that
-    // things continue to run as normal, with interrupts and preemption enabled
-    // such that we can properly preempt this task.
-    </span>drop(recovered_preemption_guard);
-    enable_interrupts();
+    drop(recovered_preemption_guard);
 
     <span class="comment">// This synchronizes with the acquire fence in `JoinableTaskRef::join()`.
     </span>fence(Ordering::Release);
