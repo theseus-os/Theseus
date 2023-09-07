@@ -386,9 +386,12 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + Copy + 'static> AddAssign<usize> for $TypeName<P> {
+            impl<P: PageSize + 'static> AddAssign<usize> for $TypeName<P> {
                 fn add_assign(&mut self, rhs: usize) {
-                    *self = (*self).add(rhs * P::NUM_4K_PAGES)
+                    *self = $TypeName {
+                        number: core::cmp::min(MAX_PAGE_NUMBER, self.number.saturating_add(rhs * P::NUM_4K_PAGES)),
+                        size: self.size,
+                    }
                 }
             }
             impl<P: PageSize + 'static> Sub<usize> for $TypeName<P> {
@@ -400,9 +403,12 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + Copy + 'static> SubAssign<usize> for $TypeName<P> {
+            impl<P: PageSize + 'static> SubAssign<usize> for $TypeName<P> {
                 fn sub_assign(&mut self, rhs: usize) {
-                    *self = (*self).sub(rhs);
+                    *self = $TypeName {
+                        number: self.number.saturating_sub(rhs * P::NUM_4K_PAGES),
+                        size: self.size
+                    }
                 }
             }
             impl<P: PageSize + 'static> Step for $TypeName<P> {
@@ -527,7 +533,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
-            impl<P: PageSize + Copy + 'static> $TypeName<P> {
+            impl<P: PageSize + 'static> $TypeName<P> {
                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
                 pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
                     $TypeName(RangeInclusive::new(start, end))
@@ -548,7 +554,7 @@ macro_rules! implement_page_frame_range {
 
                 #[doc = "Returns the size of this range in bytes."]
                 pub const fn size_in_bytes(&self) -> usize {
-                    self.[<size_in_ $chunk:lower s>]() * PAGE_SIZE
+                    self.[<size_in_ $chunk:lower s>]() * P::SIZE_IN_BYTES
                 }
 
                 #[doc = "Returns `true` if this `" $TypeName "` contains the given [`" $address "`]."]
@@ -597,6 +603,14 @@ macro_rules! implement_page_frame_range {
                     $TypeName::new(start.clone(), end.clone())
                 }
 
+                #[doc = "Returns `true` if the `other` `" $TypeName "` is fully contained within this `" $TypeName "`."]
+                pub fn contains_range(&self, other: &$TypeName<P>) -> bool {
+                    !other.is_empty()
+                    && (other.start() >= self.start())
+                    && (other.end() <= self.end())
+                }
+            }
+            impl<P: PageSize + Copy + 'static> $TypeName<P> {
                 #[doc = "Returns an inclusive `" $TypeName "` representing the [`" $chunk "`]s that overlap \
                     across this `" $TypeName "` and the given other `" $TypeName "`.\n\n \
                     If there is no overlap between the two ranges, `None` is returned."]
@@ -608,13 +622,6 @@ macro_rules! implement_page_frame_range {
                     } else {
                         None
                     }
-                }
-
-                #[doc = "Returns `true` if the `other` `" $TypeName "` is fully contained within this `" $TypeName "`."]
-                pub fn contains_range(&self, other: &$TypeName<P>) -> bool {
-                    !other.is_empty()
-                    && (other.start() >= self.start())
-                    && (other.end() <= self.end())
                 }
             }
             impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {

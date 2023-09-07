@@ -13,6 +13,7 @@ fn huge_2mb_range_size() {
     assert_eq!(r.end().number(), 512);
     assert_eq!(r.start().number(), 512);
     assert_eq!(r.size_in_pages(), 1);
+    assert_eq!(r.size_in_bytes(), 2097152);
 }
 
 #[test]
@@ -24,6 +25,31 @@ fn huge_2mb_range_size2() {
     assert_eq!(r.end().number(), 1536);
     assert_eq!(r.start().number(), 512);
     assert_eq!(r.size_in_pages(), 3);
+    assert_eq!(r.size_in_bytes(), 6291456);
+}
+
+#[test]
+fn huge_1gb_range_size() {
+    let r = PageRange::<Page1GiB>::new(
+        Page::<Page1GiB>::containing_address_1gb(VirtualAddress::new(0x40000000).unwrap()),
+        Page::<Page1GiB>::containing_address_1gb(VirtualAddress::new(0x80000000 - 1).unwrap()));
+
+    assert_eq!(r.end().number(), 262144);
+    assert_eq!(r.start().number(), 262144);
+    assert_eq!(r.size_in_pages(), 1);
+    assert_eq!(r.size_in_bytes(), 1073741824);
+}
+
+#[test]
+fn huge_1gb_range_size2() {
+    let r = PageRange::<Page1GiB>::new(
+        Page::<Page1GiB>::containing_address_1gb(VirtualAddress::new(0x40000000).unwrap()),
+        Page::<Page1GiB>::containing_address_1gb(VirtualAddress::new(0x100000000 - 1).unwrap()));
+
+    assert_eq!(r.end().number(), 786432); // 0xc0000000
+    assert_eq!(r.start().number(), 262144);
+    assert_eq!(r.size_in_pages(), 3);
+    assert_eq!(r.size_in_bytes(), 3221225472);
 }
 
 #[test]
@@ -167,4 +193,27 @@ fn try_from_conversions() {
     let new1gb = PageRange::<Page1GiB>::try_from(r).unwrap();
     assert!(matches!(new1gb.start().page_size(), MemChunkSize::Huge1G));
     assert_eq!(new1gb.size_in_pages(), 1);
+}
+
+#[test]
+fn test_chunk_addition() {
+    let page_2mb = Page::<Page2MiB>::containing_address_2mb(VirtualAddress::new(0x200000).unwrap());
+    let page_1gb = Page::<Page1GiB>::containing_address_1gb(VirtualAddress::new(0x40000000).unwrap());
+
+    // original page num = 512. 512 + 1 = 1024 (which is the next huge page)
+    assert_eq!((page_2mb + 1).number(), 1024);
+    assert_eq!((page_1gb + 1).number(), 524288);
+
+    assert_eq!((page_2mb + 2).number(), 1536);
+    assert_eq!((page_1gb + 2).number(), 786432);
+}
+
+#[test]
+fn test_chunk_subtraction() {
+    let page_2mb = Page::<Page2MiB>::containing_address_2mb(VirtualAddress::new(0x400000).unwrap());
+    let page_1gb = Page::<Page1GiB>::containing_address_1gb(VirtualAddress::new(0x80000000).unwrap());
+
+    // original page num = 512. 512 + 1 = 1024 (which is the next huge page)
+    assert_eq!((page_2mb - 1).number(), 512);
+    assert_eq!((page_1gb - 1).number(), 262144);
 }
