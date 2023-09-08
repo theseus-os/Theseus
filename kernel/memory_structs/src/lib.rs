@@ -393,7 +393,7 @@ macro_rules! implement_page_frame {
                     $TypeName {
                         number: core::cmp::min(
                             MAX_PAGE_NUMBER,
-                            self.number.saturating_add(rhs * P::NUM_4K_PAGES)
+                            self.number.saturating_add(rhs.saturating_mul(P::NUM_4K_PAGES))
                         ),
                         size: self.size,
                     }
@@ -404,7 +404,7 @@ macro_rules! implement_page_frame {
                     *self = $TypeName {
                         number: core::cmp::min(
                             MAX_PAGE_NUMBER,
-                            self.number.saturating_add(rhs * P::NUM_4K_PAGES)
+                            self.number.saturating_add(rhs.saturating_mul(P::NUM_4K_PAGES))
                         ),
                         size: self.size,
                     }
@@ -414,7 +414,7 @@ macro_rules! implement_page_frame {
                 type Output = $TypeName<P>;
                 fn sub(self, rhs: usize) -> $TypeName<P> {
                     $TypeName {
-                        number: self.number.saturating_sub(rhs * P::NUM_4K_PAGES),
+                        number: self.number.saturating_sub(rhs.saturating_mul(P::NUM_4K_PAGES)),
                         size: self.size
                     }
                 }
@@ -422,7 +422,7 @@ macro_rules! implement_page_frame {
             impl<P: PageSize + 'static> SubAssign<usize> for $TypeName<P> {
                 fn sub_assign(&mut self, rhs: usize) {
                     *self = $TypeName {
-                        number: self.number.saturating_sub(rhs * P::NUM_4K_PAGES),
+                        number: self.number.saturating_sub(rhs.saturating_mul(P::NUM_4K_PAGES)),
                         size: self.size
                     }
                 }
