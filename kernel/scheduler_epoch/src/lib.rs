@@ -9,7 +9,6 @@
 //! to set and get priorities  of each task.
 
 #![no_std]
-// #![feature(let_chains)]
 
 extern crate alloc;
 
@@ -56,16 +55,10 @@ impl Scheduler {
             .queue
             .iter()
             .enumerate()
-            .find(|(_, task)| task.is_runnable())
+            .find(|(_, task)| task.is_runnable() && task.tokens_remaining > 0)
         {
-            // FIXME: Idiomise
-            let modified_tokens = {
-                let chosen_task = self.queue.get(task_index);
-                match chosen_task.map(|m| m.tokens_remaining) {
-                    Some(x) => x.saturating_sub(1),
-                    None => 0,
-                }
-            };
+            let chosen_task = self.queue.get(task_index).unwrap();
+            let modified_tokens = chosen_task.tokens_remaining.saturating_sub(1);
 
             let task = self.update_and_move_to_end(task_index, modified_tokens);
             task
@@ -171,7 +164,9 @@ impl task::scheduler::Scheduler for Scheduler {
 }
 
 impl task::scheduler::PriorityScheduler for Scheduler {
-    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+    fn set_priority(&mut self, task: &TaskRef, mut priority: u8) -> bool {
+        priority = core::cmp::min(priority, MAX_PRIORITY);
+
         for epoch_task in self.queue.iter_mut() {
             if epoch_task.task == *task {
                 epoch_task.priority = priority;

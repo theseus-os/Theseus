@@ -1,4 +1,4 @@
-// //! This scheduler implements a priority algorithm.
+//! This scheduler implements a priority algorithm.
 
 #![no_std]
 

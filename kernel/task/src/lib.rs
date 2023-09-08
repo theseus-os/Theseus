@@ -26,7 +26,6 @@
 #![no_std]
 #![feature(negative_impls)]
 #![feature(thread_local)]
-#![feature(const_mut_refs)]
 
 extern crate alloc;
 
