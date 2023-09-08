@@ -3015,8 +3015,8 @@ dependencies = [
 name = "rq"
 version = "0.1.0"
 dependencies = [
- "apic",
  "app_io",
+ "cpu",
  "getopts",
  "task",
 ]

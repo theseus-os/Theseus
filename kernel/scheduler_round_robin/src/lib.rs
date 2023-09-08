@@ -6,7 +6,7 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::VecDeque};
+use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
 
 use task::TaskRef;
 
@@ -71,5 +71,9 @@ impl task::scheduler::Scheduler for Scheduler {
 
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_> {
         Box::new(self.queue.drain(..))
+    }
+
+    fn dump(&self) -> Vec<TaskRef> {
+        self.queue.clone().into()
     }
 }

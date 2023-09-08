@@ -108,12 +108,14 @@ where
 pub fn add_task(task: TaskRef) {
     let locked = SCHEDULERS.lock();
 
-    let max_busyness = usize::MAX;
+    let mut min_busyness = usize::MAX;
     let mut least_busy_index = None;
 
     for (i, (_, scheduler)) in locked.iter().enumerate() {
-        if scheduler.lock().busyness() < max_busyness {
+        let busyness = scheduler.lock().busyness();
+        if busyness < min_busyness {
             least_busy_index = Some(i);
+            min_busyness = busyness;
         }
     }
 
@@ -179,6 +181,8 @@ pub trait Scheduler: Send + Sync + 'static {
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
 
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_>;
+
+    fn dump(&self) -> Vec<TaskRef>;
 }
 
 pub trait PriorityScheduler {
@@ -270,4 +274,16 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
             set_priority(task, priority);
         }
     }
+}
+
+/// Returns a list of
+///
+/// This should only be used for debugging.
+pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
+    let schedulers = SCHEDULERS.lock().clone();
+    schedulers
+        .into_iter()
+        .map(|(cpu, scheduler)| (cpu, scheduler.lock().dump()))
+        // We want to eagerly collect so that all the locking predictably happens in this function.
+        .collect()
 }

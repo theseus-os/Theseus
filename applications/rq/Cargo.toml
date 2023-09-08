@@ -2,6 +2,7 @@
 name = "rq"
 version = "0.1.0"
 authors = ["Christine Wang <chrissywang54@gmail.com>"]
+edition = "2021"
 
 [dependencies]
 getopts = "0.2.21"
@@ -9,8 +10,8 @@ getopts = "0.2.21"
 [dependencies.app_io]
 path = "../../kernel/app_io"
 
-[dependencies.apic]
-path = "../../kernel/apic"
+[dependencies.cpu]
+path = "../../kernel/cpu"
 
 [dependencies.task]
 path = "../../kernel/task"

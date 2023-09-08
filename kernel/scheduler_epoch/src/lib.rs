@@ -12,7 +12,7 @@
 
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::VecDeque};
+use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
 use core::ops::{Deref, DerefMut};
 
 use task::TaskRef;
@@ -21,6 +21,7 @@ const MAX_PRIORITY: u8 = 40;
 const DEFAULT_PRIORITY: u8 = 20;
 const INITIAL_TOKENS: usize = 10;
 
+#[derive(Clone)]
 pub struct Scheduler {
     idle_task: TaskRef,
     queue: VecDeque<EpochTaskRef>,
@@ -160,6 +161,14 @@ impl task::scheduler::Scheduler for Scheduler {
 
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_> {
         Box::new(self.queue.drain(..).map(|epoch_task| epoch_task.task))
+    }
+
+    fn dump(&self) -> Vec<TaskRef> {
+        self.queue
+            .clone()
+            .into_iter()
+            .map(|epoch_task| epoch_task.task)
+            .collect()
     }
 }
 

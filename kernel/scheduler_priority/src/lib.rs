@@ -12,6 +12,7 @@ use time::Instant;
 
 const DEFAULT_PRIORITY: u8 = 0;
 
+#[derive(Clone)]
 pub struct Scheduler {
     idle_task: TaskRef,
     queue: BinaryHeap<PriorityTaskRef>,
@@ -78,6 +79,14 @@ impl task::scheduler::Scheduler for Scheduler {
 
     fn drain(&mut self) -> alloc::boxed::Box<dyn Iterator<Item = TaskRef> + '_> {
         Box::new(self.queue.drain().map(|priority_task| priority_task.task))
+    }
+
+    fn dump(&self) -> Vec<TaskRef> {
+        self.queue
+            .clone()
+            .into_iter()
+            .map(|priority_task| priority_task.task)
+            .collect()
     }
 }
 
