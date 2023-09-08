@@ -21,7 +21,6 @@ const MAX_PRIORITY: u8 = 40;
 const DEFAULT_PRIORITY: u8 = 20;
 const INITIAL_TOKENS: usize = 10;
 
-#[derive(Clone)]
 pub struct Scheduler {
     idle_task: TaskRef,
     queue: VecDeque<EpochTaskRef>,

@@ -11,6 +11,10 @@ use crate::TaskRef;
 ///
 /// This is primarily used for spawning tasks, either to find the least busy CPU
 /// or spawn a task pinned to a particular CPU.
+///
+/// The outer mutex does not need to be preemption-safe, because it is never
+/// accessed from `schedule`. In fact, ideally it would be a blocking mutex, but
+/// that leads to circular dependencies.
 static SCHEDULERS: Mutex<Vec<(CpuId, Arc<ConcurrentScheduler>)>> = Mutex::new(Vec::new());
 
 /// A reference to the current CPUs scheduler.
@@ -119,7 +123,6 @@ pub fn add_task(task: TaskRef) {
         }
     }
 
-    // TODO
     locked[least_busy_index.unwrap()].1.lock().add(task);
 }
 
@@ -178,13 +181,20 @@ pub trait Scheduler: Send + Sync + 'static {
     /// Removes a task from the run queue.
     fn remove(&mut self, task: &TaskRef) -> bool;
 
+    /// Returns the scheduler as a priority scheduler, if it is one.
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
 
+    /// Clears the scheduler, returning all contained tasks as an iterator.
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_>;
 
+    /// Returns a list of contained tasks.
+    ///
+    /// The list should be considered out-of-date as soon as it is called, but
+    /// can be useful as a heuristic.
     fn dump(&self) -> Vec<TaskRef>;
 }
 
+/// A task scheduler with some notion of priority.
 pub trait PriorityScheduler {
     /// Sets the priority of the given task.
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool;
@@ -276,14 +286,22 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
     }
 }
 
-/// Returns a list of
+/// Returns the list of tasks running on each CPU.
 ///
-/// This should only be used for debugging.
+/// To avoid race conditions with migrating tasks, this function takes a lock
+/// over all system schedulers. This is incredibly disruptive and should be
+/// avoided at all costs.
 pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
     let schedulers = SCHEDULERS.lock().clone();
-    schedulers
-        .into_iter()
-        .map(|(cpu, scheduler)| (cpu, scheduler.lock().dump()))
-        // We want to eagerly collect so that all the locking predictably happens in this function.
-        .collect()
+    let locked = schedulers
+        .iter()
+        .map(|(cpu, scheduler)| (cpu, scheduler.lock()))
+        // We eagerly collect so that all schedulers are actually locked.
+        .collect::<Vec<_>>();
+    let result = locked
+        .iter()
+        .map(|(cpu, locked_scheduler)| (**cpu, locked_scheduler.dump()))
+        .collect();
+    drop(locked);
+    result
 }

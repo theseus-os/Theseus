@@ -12,7 +12,6 @@ use time::Instant;
 
 const DEFAULT_PRIORITY: u8 = 0;
 
-#[derive(Clone)]
 pub struct Scheduler {
     idle_task: TaskRef,
     queue: BinaryHeap<PriorityTaskRef>,
@@ -64,7 +63,7 @@ impl task::scheduler::Scheduler for Scheduler {
         self.queue
             .retain(|priority_task| priority_task.task != *task);
         let new_len = self.queue.len();
-        // We should have at most removed one task from the run queue.
+        // We should have removed at most one task from the run queue.
         debug_assert!(
             old_len - new_len < 2,
             "difference between run queue lengths was: {}",
