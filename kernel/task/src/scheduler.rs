@@ -45,8 +45,7 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.",
-        // cpu::current_cpu());
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
         return false;
     }
 
@@ -58,9 +57,7 @@ pub fn schedule() -> bool {
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
 
-    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts
-    // are {}", cpu_id, super::get_my_current_task(),
-    // irq_safety::interrupts_enabled());
+    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, super::get_my_current_task(), irq_safety::interrupts_enabled());
 
     drop(recovered_preemption_guard);
     did_switch
@@ -81,20 +78,16 @@ where
             let mut old_scheduler_index = None;
             for (i, (cpu, scheduler)) in locked.iter().enumerate() {
                 if *cpu == cpu_id {
-                    if ptr::eq(old_scheduler, scheduler) {
-                        old_scheduler_index = Some(i);
-                        break;
-                    } else {
-                        panic!();
-                    }
+                    debug_assert!(ptr::eq(old_scheduler, scheduler));
+                    old_scheduler_index = Some(i);
+                    break;
                 }
             }
 
             if let Some(old_scheduler_index) = old_scheduler_index {
                 locked.swap_remove(old_scheduler_index);
             } else {
-                // TODO: Log error.
-                panic!();
+                log::error!("BUG: current scheduler not found in `SCHEDULERS`");
             }
 
             let mut new_scheduler = scheduler.lock();
@@ -250,9 +243,7 @@ pub fn busyness(cpu_id: CpuId) -> Option<usize> {
 ///
 /// Returns a guard which reverts the change when dropped.
 pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
-    let current_task = super::get_my_current_task().unwrap();
-
-    let current_priority = priority(&current_task);
+    let current_priority = super::with_current_task(|current_task| priority(current_task)).unwrap();
     let other_priority = priority(task);
 
     if let (Some(current_priority), Some(other_priority)) =
@@ -296,7 +287,7 @@ pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
     let locked = schedulers
         .iter()
         .map(|(cpu, scheduler)| (cpu, scheduler.lock()))
-        // We eagerly collect so that all schedulers are actually locked.
+        // We eagerly evaluate so that all schedulers are actually locked.
         .collect::<Vec<_>>();
     let result = locked
         .iter()
