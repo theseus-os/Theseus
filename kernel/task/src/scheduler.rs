@@ -243,7 +243,7 @@ pub fn busyness(cpu_id: CpuId) -> Option<usize> {
 ///
 /// Returns a guard which reverts the change when dropped.
 pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
-    let current_priority = super::with_current_task(|current_task| priority(current_task)).unwrap();
+    let current_priority = super::with_current_task(priority).unwrap();
     let other_priority = priority(task);
 
     if let (Some(current_priority), Some(other_priority)) =

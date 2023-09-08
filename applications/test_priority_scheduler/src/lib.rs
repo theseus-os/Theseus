@@ -39,7 +39,7 @@ pub fn main(_args: Vec<String>) -> isize {
         let periodic_task_1 = periodic_tb1.spawn().unwrap();
         
         // Set the periods of the task
-        scheduler::set_priority(&periodic_task_1, 200).unwrap();
+        scheduler::set_priority(&periodic_task_1, 200);
 
         // start the tasks
         periodic_task_1.unblock().unwrap();

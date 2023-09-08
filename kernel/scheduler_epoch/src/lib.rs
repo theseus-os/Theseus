@@ -59,9 +59,7 @@ impl Scheduler {
         {
             let chosen_task = self.queue.get(task_index).unwrap();
             let modified_tokens = chosen_task.tokens_remaining.saturating_sub(1);
-
-            let task = self.update_and_move_to_end(task_index, modified_tokens);
-            task
+            self.update_and_move_to_end(task_index, modified_tokens)
         } else {
             None
         }
