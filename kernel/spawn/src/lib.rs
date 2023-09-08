@@ -669,6 +669,12 @@ where
     R: Send + 'static,
     F: FnOnce(A) -> R,
 {
+    // The first time a task runs, its entry function `task_wrapper()` is
+    // jumped to from the `task_switch()` function, right after the context
+    // switch occured. However, we set the context of the new task to have
+    // interrupts enabled (in `ContextRegular::new`), so interrupts are enabled
+    // as soon as the new task is switched to.
+
     let task_entry_func;
     let task_arg;
     let recovered_preemption_guard;
