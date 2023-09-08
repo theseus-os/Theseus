@@ -184,13 +184,6 @@ impl task::scheduler::PriorityScheduler for Scheduler {
         }
         None
     }
-
-    fn inherit_priority(
-        &mut self,
-        _task: &TaskRef,
-    ) -> task::scheduler::PriorityInheritanceGuard<'_> {
-        todo!()
-    }
 }
 
 #[derive(Debug, Clone)]

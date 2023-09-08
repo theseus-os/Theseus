@@ -26,6 +26,7 @@
 #![no_std]
 #![feature(negative_impls)]
 #![feature(thread_local)]
+#![feature(let_chains)]
 
 extern crate alloc;
 

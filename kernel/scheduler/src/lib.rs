@@ -16,8 +16,8 @@
 
 use interrupts::{self, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
 
-/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
-pub use task::scheduler::{priority, schedule, set_priority};
+/// Re-exports for convenience and legacy compatibility.
+pub use task::scheduler::{inherit_priority, priority, schedule, set_priority};
 
 
 /// Initializes the scheduler on this system using the policy set at compiler time.
