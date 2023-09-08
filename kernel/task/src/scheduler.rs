@@ -104,6 +104,7 @@ where
     });
 }
 
+/// Adds the given task to the least busy run queue.
 pub fn add_task(task: TaskRef) {
     let locked = SCHEDULERS.lock();
 
@@ -120,6 +121,7 @@ pub fn add_task(task: TaskRef) {
     locked[least_busy_index.unwrap()].1.lock().add(task);
 }
 
+/// Adds the given task to the specified CPU's run queue.
 pub fn add_task_to(cpu_id: CpuId, task: TaskRef) {
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
@@ -129,19 +131,23 @@ pub fn add_task_to(cpu_id: CpuId, task: TaskRef) {
     }
 }
 
+/// Adds the given task to the current CPU's run queue.
 pub fn add_task_to_current(task: TaskRef) {
     SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().add(task))
 }
 
+/// Removes the given task from all run queues.
 pub fn remove_task(task: &TaskRef) -> bool {
     for (_, scheduler) in SCHEDULERS.lock().iter() {
         if scheduler.lock().remove(task) {
+            // A task will only be on one run queue.
             return true;
         }
     }
     false
 }
 
+/// Removes the given task from the specified CPU's run queue.
 pub fn remove_task_from(task: &TaskRef, cpu_id: CpuId) -> bool {
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
@@ -151,10 +157,12 @@ pub fn remove_task_from(task: &TaskRef, cpu_id: CpuId) -> bool {
     false
 }
 
+/// Removes the given task from the current CPU's run queue.
 pub fn remove_task_from_current(task: &TaskRef) -> bool {
     SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().remove(task))
 }
 
+/// A task scheduler.
 pub trait Scheduler: Send + Sync + 'static {
     /// Returns the next task to run.
     fn next(&mut self) -> TaskRef;
@@ -196,6 +204,9 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
     }
 }
 
+/// Returns the priority of the given task.
+///
+/// Returns `None` if the task is not on a priority run queue.
 pub fn priority(task: &TaskRef) -> Option<u8> {
     for (_, scheduler) in SCHEDULERS.lock().iter() {
         if let Some(priority) = scheduler
@@ -209,6 +220,9 @@ pub fn priority(task: &TaskRef) -> Option<u8> {
     None
 }
 
+/// Sets the priority of the given task.
+///
+/// Returns `None` if the task is not on a priority run queue.
 pub fn set_priority(task: &TaskRef, priority: u8) -> bool {
     for (_, scheduler) in SCHEDULERS.lock().iter() {
         if let Some(true) = scheduler
@@ -222,6 +236,7 @@ pub fn set_priority(task: &TaskRef, priority: u8) -> bool {
     false
 }
 
+/// Returns the busyness of the scheduler on the given CPU.
 pub fn busyness(cpu_id: CpuId) -> Option<usize> {
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
