@@ -69,7 +69,7 @@ pub fn init(
         }
     }
     task::scheduler::set_policy(cpu_id, scheduler);
-    task::scheduler::add_task_to(exitable_bootstrap_task.clone(), cpu_id);
+    task::scheduler::add_task_to(cpu_id, exitable_bootstrap_task.clone());
 
     Ok(BootstrapTaskRef {
         cpu_id,
@@ -441,7 +441,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Idle tasks are not stored on the run queue.
         if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
-                task::scheduler::add_task_to(task_ref.clone(), cpu);
+                task::scheduler::add_task_to(cpu, task_ref.clone());
             } else {
                 task::scheduler::add_task(task_ref.clone());
             }

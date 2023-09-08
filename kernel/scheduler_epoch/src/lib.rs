@@ -181,7 +181,7 @@ impl task::scheduler::PriorityScheduler for Scheduler {
         false
     }
 
-    fn get_priority(&mut self, task: &TaskRef) -> Option<u8> {
+    fn priority(&mut self, task: &TaskRef) -> Option<u8> {
         for epoch_task in self.queue.iter() {
             if epoch_task.task == *task {
                 return Some(epoch_task.priority);

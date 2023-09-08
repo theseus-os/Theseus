@@ -102,7 +102,7 @@ impl task::scheduler::PriorityScheduler for Scheduler {
         }
     }
 
-    fn get_priority(&mut self, task: &TaskRef) -> Option<u8> {
+    fn priority(&mut self, task: &TaskRef) -> Option<u8> {
         for priority_task in self.queue.iter() {
             if priority_task.task == *task {
                 return Some(priority_task.priority);

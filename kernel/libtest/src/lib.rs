@@ -41,10 +41,7 @@ macro_rules! CPU_ID {
 
 /// Helper function return the tasks in a given `cpu`'s runqueue
 pub fn nr_tasks_in_rq(cpu: CpuId) -> Option<usize> {
-	match runqueue::get_runqueue(cpu.into_u8()).map(|rq| rq.read()) {
-		Some(rq) => { Some(rq.len()) }
-		_ => { None }
-	}
+	return task::scheduler::busyness(cpu);
 }
 
 

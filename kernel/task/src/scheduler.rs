@@ -120,7 +120,7 @@ pub fn add_task(task: TaskRef) {
     locked[least_busy_index.unwrap()].1.lock().add(task);
 }
 
-pub fn add_task_to(task: TaskRef, cpu_id: CpuId) {
+pub fn add_task_to(cpu_id: CpuId, task: TaskRef) {
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
             scheduler.lock().add(task);
@@ -178,7 +178,7 @@ pub trait PriorityScheduler {
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool;
 
     /// Gets the priority of the given task.
-    fn get_priority(&mut self, task: &TaskRef) -> Option<u8>;
+    fn priority(&mut self, task: &TaskRef) -> Option<u8>;
 
     fn inherit_priority(&mut self, task: &TaskRef) -> PriorityInheritanceGuard<'_>;
 }
@@ -196,12 +196,12 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
     }
 }
 
-pub fn get_priority(task: &TaskRef) -> Option<u8> {
+pub fn priority(task: &TaskRef) -> Option<u8> {
     for (_, scheduler) in SCHEDULERS.lock().iter() {
         if let Some(priority) = scheduler
             .lock()
             .as_priority_scheduler()
-            .and_then(|priority_scheduler| priority_scheduler.get_priority(task))
+            .and_then(|priority_scheduler| priority_scheduler.priority(task))
         {
             return Some(priority);
         }
@@ -220,6 +220,15 @@ pub fn set_priority(task: &TaskRef, priority: u8) -> bool {
         }
     }
     false
+}
+
+pub fn busyness(cpu_id: CpuId) -> Option<usize> {
+    for (cpu, scheduler) in SCHEDULERS.lock().iter() {
+        if *cpu == cpu_id {
+            return Some(scheduler.lock().busyness());
+        }
+    }
+    None
 }
 
 // /// Modifies the given task's priority to be the maximum of its priority and

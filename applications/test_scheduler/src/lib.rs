@@ -52,9 +52,9 @@ pub fn main(_args: Vec<String>) -> isize {
 
     debug!("Spawned all tasks");
 
-    let _priority1 = scheduler::get_priority(&taskref1);
-    let _priority2 = scheduler::get_priority(&taskref2);
-    let _priority3 = scheduler::get_priority(&taskref3);
+    let _priority1 = scheduler::priority(&taskref1);
+    let _priority2 = scheduler::priority(&taskref2);
+    let _priority3 = scheduler::priority(&taskref3);
 
     #[cfg(epoch_scheduler)]
     {
