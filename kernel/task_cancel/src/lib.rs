@@ -4,8 +4,7 @@
 #![feature(abi_x86_interrupt, try_blocks)]
 #![no_std]
 
-use core::sync::atomic::Ordering;
-use task::{KillReason, TaskRef};
+use task::KillReason;
 use x86_64::structures::idt::InterruptStackFrame;
 
 pub fn set_trap_flag(stack_frame: &mut InterruptStackFrame) {
