@@ -1,5 +1,4 @@
 use core::arch::global_asm;
-use core::ops::DerefMut;
 use core::fmt;
 
 use crate::EoiBehaviour;
@@ -10,35 +9,31 @@ use tock_registers::interfaces::Writeable;
 use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
+use interrupt_controller::{
+    LocalInterruptController, SystemInterruptController, InterruptDestination,
+    LocalInterruptControllerApi, SystemInterruptControllerApi,
+};
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
-use gic::{ArmGic, IpiTargetCpu, Version as GicVersion, SpiDestination};
-use arm_boards::{BOARD_CONFIG, InterruptControllerConfig};
-use sync_irq::{IrqSafeRwLock, IrqSafeMutex};
-use memory::get_kernel_mmi_ref;
-use log::{info, error};
+use arm_boards::BOARD_CONFIG;
+use sync_irq::IrqSafeRwLock;
+use cpu::current_cpu;
+use log::error;
 use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
-pub use gic::InterruptNumber;
+pub use interrupt_controller::InterruptNumber;
 
 // This assembly file contains trampolines to `extern "C"` functions defined below.
 global_asm!(include_str!("table.s"));
 
-// The global Generic Interrupt Controller singleton
-static INTERRUPT_CONTROLLER: IrqSafeMutex<Option<ArmGic>> = IrqSafeMutex::new(None);
+/// The IRQ number reserved for the PL011 Single-Serial-Port Controller
+/// which Theseus currently uses for logging and UART console.
+pub const PL011_RX_SPI: InterruptNumber = BOARD_CONFIG.pl011_rx_spi;
 
 /// The IRQ number reserved for CPU-local timer interrupts,
 /// which Theseus currently uses for preemptive task switching.
-//
-// aarch64 manuals define the default timer IRQ number to be 30.
-pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = 30;
-
-/// The IRQ number reserved for the PL011 Single-Serial-Port Controller
-/// which Theseus currently uses for logging and UART console.
-//
-// Qemu attributes number 33 to this interrupt.
-pub const PL011_RX_SPI: InterruptNumber = 33;
+pub const CPU_LOCAL_TIMER_IRQ: InterruptNumber = BOARD_CONFIG.cpu_local_timer_ppi;
 
 /// The IRQ/IPI number for TLB Shootdowns
 ///
@@ -148,12 +143,12 @@ pub fn init_ap() {
     set_vbar_el1();
 
     // Enable the CPU-local timer
-    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-    let int_ctrl = int_ctrl.as_mut().expect("BUG: init_ap(): INTERRUPT_CONTROLLER was uninitialized");
+    let int_ctrl = LocalInterruptController::get();
     int_ctrl.init_secondary_cpu_interface();
-    int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
-    int_ctrl.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
     int_ctrl.set_minimum_priority(0);
+
+    int_ctrl.enable_local_interrupt(TLB_SHOOTDOWN_IPI, true);
+    int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
 
     enable_timer(true);
 }
@@ -163,43 +158,15 @@ pub fn init_ap() {
 /// This initializes the Generic Interrupt Controller
 /// using the addresses which are valid on qemu's "virt" VM.
 pub fn init() -> Result<(), &'static str> {
-    let period_femtoseconds = read_timer_period_femtoseconds();
-    register_clock_source::<PhysicalSystemCounter>(Period::new(period_femtoseconds));
+    let period = Period::new(read_timer_period_femtoseconds());
+    register_clock_source::<PhysicalSystemCounter>(period);
 
-    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-    if int_ctrl.is_some() {
-        Err("The interrupt controller has already been initialized!")
-    } else {
-        set_vbar_el1();
+    set_vbar_el1();
 
-        info!("Configuring the interrupt controller");
-        match BOARD_CONFIG.interrupt_controller {
-            InterruptControllerConfig::GicV3(gicv3_cfg) => {
-                let kernel_mmi_ref = get_kernel_mmi_ref()
-                    .ok_or("interrupts::aarch64::init: couldn't get kernel MMI ref")?;
+    let int_ctrl = LocalInterruptController::get();
+    int_ctrl.set_minimum_priority(0);
 
-                let mut mmi = kernel_mmi_ref.lock();
-                let page_table = &mut mmi.deref_mut().page_table;
-
-                let mut inner = ArmGic::init(
-                    page_table,
-                    GicVersion::InitV3 {
-                        dist: gicv3_cfg.distributor_base_address,
-                        redist: gicv3_cfg.redistributor_base_addresses,
-                    },
-                )?;
-
-                inner.set_minimum_priority(0);
-                inner.set_interrupt_state(TLB_SHOOTDOWN_IPI, true);
-                inner.set_interrupt_state(PL011_RX_SPI, true);
-                *int_ctrl = Some(inner);
-            },
-        }
-
-        info!("Done Configuring the interrupt controller");
-
-        Ok(())
-    }
+    Ok(())
 }
 
 /// This function registers an interrupt handler for the CPU-local
@@ -214,11 +181,10 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 
     // Route the IRQ to this core (implicit as IRQ < 32) & Enable the interrupt.
     {
-        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-        let int_ctrl = int_ctrl.as_mut().ok_or("INTERRUPT_CONTROLLER is uninitialized")?;
+        let int_ctrl = LocalInterruptController::get();
 
         // enable routing of this interrupt
-        int_ctrl.set_interrupt_state(CPU_LOCAL_TIMER_IRQ, true);
+        int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
     }
 
     Ok(())
@@ -226,23 +192,19 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 
 /// This function registers an interrupt handler for an inter-processor interrupt
 /// and handles interrupt controller configuration for that interrupt.
-pub fn setup_ipi_handler(handler: InterruptHandler, irq_num: InterruptNumber) -> Result<(), &'static str> {
-    assert!(irq_num < 16, "Inter-processor interrupts must have a number in the range 0..16");
-
+pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) -> Result<(), &'static str> {
     // register the handler
-    if let Err(existing_handler) = register_interrupt(irq_num, handler) {
+    if let Err(existing_handler) = register_interrupt(local_num, handler) {
         if handler as *const InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for that IPI");
         }
     }
 
-    // Route the IRQ to this core (implicit as irq_num < 32) & Enable the interrupt.
     {
-        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-        let int_ctrl = int_ctrl.as_mut().ok_or("INTERRUPT_CONTROLLER is uninitialized")?;
+        let int_ctrl = LocalInterruptController::get();
 
         // enable routing of this interrupt
-        int_ctrl.set_interrupt_state(irq_num, true);
+        int_ctrl.enable_local_interrupt(local_num, true);
     }
 
     Ok(())
@@ -250,14 +212,8 @@ pub fn setup_ipi_handler(handler: InterruptHandler, irq_num: InterruptNumber) ->
 
 /// Enables the PL011 "RX" SPI and routes it to the current CPU.
 pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
-    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-    let int_ctrl = int_ctrl.as_mut().ok_or("INTERRUPT_CONTROLLER is uninitialized")?;
-
-    // enable routing of this interrupt
-    int_ctrl.set_interrupt_state(PL011_RX_SPI, true);
-    int_ctrl.set_spi_target(PL011_RX_SPI, SpiDestination::Specific(cpu::current_cpu()));
-
-    Ok(())
+    let int_ctrl = SystemInterruptController::get();
+    int_ctrl.set_destination(PL011_RX_SPI, current_cpu(), u8::MAX)
 }
 
 /// Disables the timer, schedules its next tick, and re-enables it
@@ -292,15 +248,15 @@ pub fn enable_timer(enable: bool) {
 /// The function fails if the interrupt number is reserved or is already in use.
 ///
 /// # Arguments 
-/// * `irq_num`: the interrupt (IRQ vector) that is being requested.
+/// * `int_num`: the interrupt number that is being requested.
 /// * `func`: the handler to be registered, which will be invoked when the interrupt occurs.
 ///
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `irq_num` was already in use.
-pub fn register_interrupt(irq_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
+pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
-    let index = irq_num as usize;
+    let index = int_num as usize;
 
     let value = handlers[index] as *const InterruptHandler;
     let default = default_irq_handler as *const InterruptHandler;
@@ -309,7 +265,7 @@ pub fn register_interrupt(irq_num: InterruptNumber, func: InterruptHandler) -> R
         handlers[index] = func;
         Ok(())
     } else {
-        error!("register_interrupt: the requested interrupt IRQ {} was already in use", irq_num);
+        error!("register_interrupt: the requested interrupt IRQ {} was already in use", index);
         Err(value)
     }
 }
@@ -321,11 +277,11 @@ pub fn register_interrupt(irq_num: InterruptNumber, func: InterruptHandler) -> R
 /// This function returns an error if the currently-registered handler does not match 'func'.
 ///
 /// # Arguments
-/// * `interrupt_num`: the IRQ that needs to be deregistered
+/// * `int_num`: the interrupt number that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
-pub fn deregister_interrupt(irq_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
+pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
-    let index = irq_num as usize;
+    let index = int_num as usize;
 
     let value = handlers[index] as *const InterruptHandler;
     let func = func as *const InterruptHandler;
@@ -342,16 +298,14 @@ pub fn deregister_interrupt(irq_num: InterruptNumber, func: InterruptHandler) ->
 /// Broadcast an Inter-Processor Interrupt to all other
 /// cores in the system
 pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
-    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-    let int_ctrl = int_ctrl.as_mut().expect("INTERRUPT_CONTROLLER is uninitialized");
-    int_ctrl.send_ipi(irq_num, IpiTargetCpu::AllOtherCpus);
+    let int_ctrl = LocalInterruptController::get();
+    int_ctrl.send_ipi(irq_num, InterruptDestination::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: InterruptNumber) {
-    let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-    let int_ctrl = int_ctrl.as_mut().expect("BUG: eoi(): INTERRUPT_CONTROLLER was uninitialized");
+    let int_ctrl = LocalInterruptController::get();
     int_ctrl.end_of_interrupt(irq_num);
 }
 
@@ -465,26 +419,19 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 
 #[no_mangle]
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
-    // read IRQ num
-    // read IRQ priority
-    // ackownledge IRQ to the interrupt controller
     let (irq_num, _priority) = {
-        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-        let int_ctrl = int_ctrl.as_mut().expect("INTERRUPT_CONTROLLER is uninitialized");
+        let int_ctrl = LocalInterruptController::get();
         int_ctrl.acknowledge_interrupt()
     };
-    // important: INTERRUPT_CONTROLLER mutex is now implicitly unlocked
-    let irq_num_usize = irq_num as usize;
 
-    let handler = match irq_num_usize < MAX_IRQ_NUM {
-        true => IRQ_HANDLERS.read()[irq_num_usize],
+    let index = irq_num as usize;
+    let handler = match index < MAX_IRQ_NUM {
+        true => IRQ_HANDLERS.read()[index],
         false => default_irq_handler,
     };
 
     if handler(exc) == EoiBehaviour::HandlerDidNotSendEoi {
-        // handler has returned, we can lock again
-        let mut int_ctrl = INTERRUPT_CONTROLLER.lock();
-        int_ctrl.as_mut().unwrap().end_of_interrupt(irq_num);
+        eoi(irq_num);
     }
 }
 

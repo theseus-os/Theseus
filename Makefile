@@ -67,11 +67,15 @@ LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
-	CROSS = x86_64-elf-
+	CROSS = $(ARCH)-elf-
 	## macOS uses a different unmounting utility
 	UNMOUNT = diskutil unmount
 	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
 else
+	## Handle building for aarch64 on x86_64 Linux/WSL
+	ifeq ($(ARCH),aarch64)
+		CROSS = aarch64-linux-gnu-
+	endif
 	## Just use normal umount on Linux/WSL
 	UNMOUNT = umount
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
@@ -220,7 +224,7 @@ build: $(nano_core_binary)
 ## Note: we skip "normal" .rlib archives that have 2 members: a single .o object file and a single .rmeta file.
 ## Note: the below line with `cut` simply removes the `lib` prefix and the `.rlib` suffix from the file name.
 	@for f in $(shell find $(TARGET_DEPS_DIR)/ -name "*.rlib"); do                                          \
-		if [ "`$(CROSS)ar -t $${f} | wc -l`" != "2" ]; then                                                 \
+		if [ `$(CROSS)ar -t $${f} | wc -l` != "2" ]; then                                                   \
 			echo -e "\033[1;34mUnarchiving multi-file rlib: \033[0m $${f}"                                  \
 				&& mkdir -p "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/"                       \
 				&& $(CROSS)ar -xo --output "$(BUILD_DIR)/extracted_rlibs/`basename $${f}`-unpacked/" $${f}  \
@@ -295,6 +299,10 @@ else
 $(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
 
+## Sixth, fix up CPU local sections.
+	@echo -e "Parsing CPU local sections"
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --dir $(OBJECT_FILES_BUILD_DIR)
+
 #############################
 ### end of "build" target ###
 #############################
@@ -349,6 +357,8 @@ endif
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
+## Fix up CLS sections.
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --file $(nano_core_binary)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -933,6 +943,9 @@ else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -machine virt,gic-version=3
 	QEMU_FLAGS += -device ramfb
 	QEMU_FLAGS += -cpu cortex-a72
+	QEMU_FLAGS += -usb
+	QEMU_FLAGS += -device usb-ehci,id=ehci
+	QEMU_FLAGS += -device usb-kbd
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif

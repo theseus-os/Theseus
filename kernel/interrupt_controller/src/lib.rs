@@ -1,5 +1,6 @@
 #![no_std]
 #![allow(unused_variables, unused_mut)]
+#![feature(array_try_from_fn)]
 
 extern crate alloc;
 
@@ -18,50 +19,65 @@ pub use arch::{
     SystemInterruptControllerVersion,
     SystemInterruptControllerId,
     LocalInterruptControllerId,
-    SystemInterruptNumber,
-    LocalInterruptNumber,
     Priority,
     SystemInterruptController,
     LocalInterruptController,
+    init,
 };
+
+pub type InterruptNumber = u8;
 
 /// The Cpu where this interrupt should be handled, as well as
 /// the local interrupt number this gets translated to.
 ///
-/// On aarch64, the system interrupt number and the local interrupt
-/// number must be the same.
+/// On aarch64, there is no `local_number` field as the system interrupt
+/// number and the local interrupt number must be the same.
 #[derive(Debug, Copy, Clone)]
-pub struct InterruptDestination {
-    pub cpu: CpuId,
-    pub local_number: LocalInterruptNumber,
+pub enum InterruptDestination {
+    SpecificCpu(CpuId),
+    AllOtherCpus,
 }
 
 pub trait SystemInterruptControllerApi {
+    fn get() -> &'static Self;
+
     fn id(&self) -> SystemInterruptControllerId;
     fn version(&self) -> SystemInterruptControllerVersion;
 
     fn get_destination(
         &self,
-        interrupt_num: SystemInterruptNumber,
-    ) -> Result<(Vec<InterruptDestination>, Priority), &'static str>;
+        interrupt_num: InterruptNumber,
+    ) -> Result<(Vec<CpuId>, Priority), &'static str>;
 
     fn set_destination(
         &self,
-        sys_int_num: SystemInterruptNumber,
-        destination: InterruptDestination,
+        sys_int_num: InterruptNumber,
+        destination: CpuId,
         priority: Priority,
     ) -> Result<(), &'static str>;
 }
 
 pub trait LocalInterruptControllerApi {
-    fn id(&self) -> LocalInterruptControllerId;
-    fn get_local_interrupt_priority(&self, num: LocalInterruptNumber) -> Priority;
-    fn set_local_interrupt_priority(&self, num: LocalInterruptNumber, priority: Priority);
-    fn is_local_interrupt_enabled(&self, num: LocalInterruptNumber) -> bool;
-    fn enable_local_interrupt(&self, num: LocalInterruptNumber, enabled: bool);
+    fn get() -> &'static Self;
 
-    /// Sends an inter-processor interrupt to a specific CPU.
-    fn send_ipi(&self, destination: InterruptDestination);
+    /// Aarch64-specific way to initialize the secondary CPU interfaces.
+    ///
+    /// Must be called once from every secondary CPU.
+    ///
+    /// Always panics on x86_64.
+    fn init_secondary_cpu_interface(&self);
+
+    fn id(&self) -> LocalInterruptControllerId;
+    fn get_local_interrupt_priority(&self, num: InterruptNumber) -> Priority;
+    fn set_local_interrupt_priority(&self, num: InterruptNumber, priority: Priority);
+    fn is_local_interrupt_enabled(&self, num: InterruptNumber) -> bool;
+    fn enable_local_interrupt(&self, num: InterruptNumber, enabled: bool);
+
+    /// Sends an inter-processor interrupt.
+    ///
+    /// If `dest` is Some, the interrupt is sent to a specific CPU.
+    /// If it's None, all CPUs except the sender receive the interrupt.
+    fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination);
 
     /// Reads the minimum priority for an interrupt to reach this CPU.
     ///
@@ -76,8 +92,8 @@ pub trait LocalInterruptControllerApi {
     /// Aarch64-specific way to read the current pending interrupt number & priority.
     ///
     /// Always panics on x86_64.
-    fn acknowledge_interrupt(&self) -> (LocalInterruptNumber, Priority);
+    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority);
 
     /// Tell the interrupt controller that the current interrupt has been handled.
-    fn end_of_interrupt(&self, number: LocalInterruptNumber);
+    fn end_of_interrupt(&self, number: InterruptNumber);
 }

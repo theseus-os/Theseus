@@ -1,4 +1,5 @@
-use super::{E1000_NIC, NetworkInterfaceCard, TransmitBuffer};
+use super::{E1000_NIC, TransmitBuffer};
+use net::NetworkDevice;
 
 pub fn test_e1000_nic_driver(_: Option<u64>) {
     match dhcp_request_packet() {
@@ -75,5 +76,6 @@ pub fn dhcp_request_packet() -> Result<(), &'static str> {
         buffer.copy_from_slice(&packet);
     }
     let mut e1000_nic = E1000_NIC.get().ok_or("e1000 NIC hasn't been initialized yet")?.lock();
-    e1000_nic.send_packet(transmit_buffer)
+    e1000_nic.send(transmit_buffer);
+    Ok(())
 }

@@ -2,6 +2,7 @@
 name = "test_ixgbe"
 version = "0.1.0"
 authors = ["Ramla Ijaz <ijazramla@gmail.com>"]
+edition = "2021"
 
 [dependencies]
 getopts = "0.2.21"
@@ -18,7 +19,5 @@ path = "../../kernel/ixgbe"
 [dependencies.spawn]
 path = "../../kernel/spawn"
 
-[dependencies.network_interface_card]
-path = "../../kernel/network_interface_card"
-
-
+[dependencies.net]
+path = "../../kernel/net"

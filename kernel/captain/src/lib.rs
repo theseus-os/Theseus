@@ -103,6 +103,9 @@ pub fn init(
     // arch-gate: the IDT & special stacks are x86_64 specific
     #[cfg(target_arch = "x86_64")]
     let idt = {
+        // does nothing at the moment on x86_64
+        interrupt_controller::init()?;
+
         let (double_fault_stack, privilege_stack) = {
             let mut kernel_mmi = kernel_mmi_ref.lock();
             (
@@ -116,6 +119,9 @@ pub fn init(
     };
 
     #[cfg(target_arch = "aarch64")] {
+        // Initialize the GIC
+        interrupt_controller::init()?;
+
         interrupts::init()?;
 
         // register BSP CpuId
@@ -124,7 +130,7 @@ pub fn init(
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
-    per_cpu::init(bsp_id)?;
+    cls_allocator::reload_current_cpu();
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.

@@ -248,6 +248,8 @@ pub struct LoadedCrate {
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
     pub tls_sections: BTreeSet<Shndx>,
+    /// The set of CPU-local storage (CLS) symbols in this crate.
+    pub cls_sections: BTreeSet<Shndx>,
     /// The set of `.data` and `.bss` sections in this crate.
     /// The `Shndx` values in this set are the section index (shndx) numbers, 
     /// which can be used as the key to look up the actual `LoadedSection` in the `sections` list above.
@@ -508,6 +510,7 @@ impl LoadedCrate {
                 SectionType::Rodata
                 | SectionType::TlsBss
                 | SectionType::TlsData
+                | SectionType::Cls
                 | SectionType::GccExceptTable
                 | SectionType::EhFrame => new_rodata_pages_locked
                     .as_mut()
@@ -609,6 +612,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
     static BSS              : Once<StrRef> = Once::new();
     static TLS_DATA         : Once<StrRef> = Once::new();
     static TLS_BSS          : Once<StrRef> = Once::new();
+    static CLS              : Once<StrRef> = Once::new();
     static GCC_EXCEPT_TABLE : Once<StrRef> = Once::new();
     static EH_FRAME         : Once<StrRef> = Once::new();
 
@@ -619,6 +623,7 @@ pub fn section_name_str_ref(section_type: &SectionType) -> StrRef {
         SectionType::Bss            => &BSS,
         SectionType::TlsData        => &TLS_DATA,
         SectionType::TlsBss         => &TLS_BSS,
+        SectionType::Cls            => &CLS,
         SectionType::GccExceptTable => &GCC_EXCEPT_TABLE,
         SectionType::EhFrame        => &EH_FRAME,
     };
@@ -911,6 +916,7 @@ impl fmt::Debug for LoadedSection {
         // Add the rest of the typical fields
         dbg.field("vaddr", &self.virt_addr)
             .field("size", &self.size)
+            .field("mapped_pages_offset", &self.mapped_pages_offset)
             .finish_non_exhaustive()
     }
 }

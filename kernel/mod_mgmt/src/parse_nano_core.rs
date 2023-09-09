@@ -6,7 +6,7 @@
 #![allow(clippy::type_complexity)]
 
 use alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
-use crate::{CrateNamespace, mp_range};
+use crate::{CrateNamespace, mp_range, CLS_SECTION_FLAG};
 use fs_node::FileRef;
 use path::Path;
 use rustc_demangle::demangle;
@@ -188,6 +188,7 @@ fn parse_nano_core_symbol_file_or_binary(
         data_pages:          Some((data_pages.clone(),   mp_range(data_pages))),
         global_sections:     BTreeSet::new(),
         tls_sections:        BTreeSet::new(),
+        cls_sections:        BTreeSet::new(),
         data_sections:       BTreeSet::new(),
         reexported_symbols:  BTreeSet::new(),
     });
@@ -252,7 +253,9 @@ fn parse_nano_core_symbol_file(
     let mut bss_shndx:      Option<Shndx> = None;
     let mut tls_data_info:  Option<(Shndx, VirtualAddress)> = None;
     let mut tls_bss_info:   Option<(Shndx, VirtualAddress)> = None;
+    let mut cls_info:       Option<(Shndx, VirtualAddress)> = None;
     let mut total_tls_size: usize = 0;
+    let mut total_cls_size: usize = 0;
 
     /// An internal function that parses a section header's index (e.g., "[7]") out of the given str.
     /// Returns a tuple of the parsed `Shndx` and the rest of the unparsed str after the shndx.
@@ -326,6 +329,15 @@ fn parse_nano_core_symbol_file(
                     })
                 );
         }
+        else if line.contains(".cls") && line.contains("PROGBITS") {
+            cls_info = parse_section_ndx(line)
+                .and_then(|(shndx, rest_of_line)| parse_section_vaddr_size(rest_of_line)
+                    .map(|(vaddr, size)| {
+                        total_cls_size += size;
+                        (shndx, vaddr)
+                    })
+                );
+        }
         else if line.contains(".data ") && line.contains("PROGBITS") {
             data_shndx = parse_section_ndx(line).map(|(shndx, _)| shndx);
         }
@@ -381,8 +393,15 @@ fn parse_nano_core_symbol_file(
     let data_shndx    = data_shndx  .ok_or("parse_nano_core_symbol_file(): couldn't find .data section index")?;
     let bss_shndx     = bss_shndx   .ok_or("parse_nano_core_symbol_file(): couldn't find .bss section index")?;
     let main_sec_info = MainSectionInfo {
-        text_shndx, rodata_shndx, data_shndx, bss_shndx,
-        tls_data_info, tls_bss_info, total_tls_size,
+        text_shndx,
+        rodata_shndx,
+        data_shndx,
+        bss_shndx,
+        tls_data_info,
+        tls_bss_info,
+        cls_info,
+        total_tls_size,
+        total_cls_size,
     };
 
     // second, skip ahead to the start of the symbol table: a line which contains ".symtab" but does NOT contain "SYMTAB"
@@ -405,6 +424,8 @@ fn parse_nano_core_symbol_file(
         // third, parse each symbol table entry
         for (_line_num, line) in file_iterator {
             if line.is_empty() { continue; }
+            // CLS symbols have an OS specific symbol type which messes with the parser.
+            let line = line.replace("<OS specific>: ", "");
             
             // we need the following items from a symbol table entry:
             // * Value (address),      column 1
@@ -523,7 +544,9 @@ fn parse_nano_core_binary(
     let mut bss_shndx:      Option<Shndx> = None;
     let mut tls_data_info:  Option<(Shndx, VirtualAddress)> = None;
     let mut tls_bss_info:   Option<(Shndx, VirtualAddress)> = None;
+    let mut cls_info:       Option<(Shndx, VirtualAddress)> = None;
     let mut total_tls_size: usize = 0;
+    let mut total_cls_size: usize = 0;
 
     // We will fill in these crate items while parsing the symbol file.
     let mut crate_items = ParsedCrateItems::empty();
@@ -576,8 +599,17 @@ fn parse_nano_core_binary(
                 }
                 let sec_vaddr = VirtualAddress::new(sec.address() as usize)
                     .ok_or("the nano_core .tbss section had an invalid virtual address")?;
-                    tls_bss_info = Some((shndx, sec_vaddr));
-                    total_tls_size += sec_size;
+                tls_bss_info = Some((shndx, sec_vaddr));
+                total_tls_size += sec_size;
+            }
+            Ok(".cls") => {
+                if sec.flags() & (SHF_ALLOC | SHF_WRITE | SHF_EXECINSTR | CLS_SECTION_FLAG) != (SHF_ALLOC | SHF_WRITE | CLS_SECTION_FLAG) {
+                    return Err(".cls section had wrong flags!");
+                }
+                let sec_vaddr = VirtualAddress::new(sec.address() as usize)
+                    .ok_or("the nano_core .cls section had an invalid virtual address")?;
+                cls_info = Some((shndx, sec_vaddr));
+                total_cls_size += sec_size;
             }
             Ok(".gcc_except_table") => {
                 let sec_vaddr = VirtualAddress::new(sec.address() as usize)
@@ -632,8 +664,15 @@ fn parse_nano_core_binary(
     let data_shndx    = data_shndx.ok_or("couldn't find .data section in nano_core ELF")?;
     let bss_shndx     = bss_shndx.ok_or("couldn't find .bss section in nano_core ELF")?;
     let main_sec_info = MainSectionInfo {
-        text_shndx, rodata_shndx, data_shndx, bss_shndx,
-        tls_data_info, tls_bss_info, total_tls_size,
+        text_shndx,
+        rodata_shndx,
+        data_shndx,
+        bss_shndx,
+        tls_data_info,
+        tls_bss_info,
+        cls_info,
+        total_tls_size,
+        total_cls_size,
     };
     
     {
@@ -712,8 +751,10 @@ struct MainSectionInfo {
     data_shndx:      Shndx,
     bss_shndx:       Shndx,
     tls_data_info:   Option<(Shndx, VirtualAddress)>,
+    cls_info:        Option<(Shndx, VirtualAddress)>,
     tls_bss_info:    Option<(Shndx, VirtualAddress)>,
     total_tls_size:  usize,
+    total_cls_size:  usize,
 }
 
 /// A convenience function that separates out the logic 
@@ -819,7 +860,7 @@ fn add_new_section(
             new_crate_weak_ref.clone(),
         );
         // Add this new TLS section to this namespace's TLS area image.
-        let tls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+        let tls_section_ref = namespace.tls_initializer.lock().add_existing_static_section(
             tls_section,
             tls_offset,
             main_section_info.total_tls_size,
@@ -850,14 +891,36 @@ fn add_new_section(
             new_crate_weak_ref.clone(),
         );
         // Add this new TLS section to this namespace's TLS area image.
-        let tls_section_ref = namespace.tls_initializer.lock().add_existing_static_tls_section(
+        let tls_section_ref = namespace.tls_initializer.lock().add_existing_static_section(
             tls_section,
             tls_offset,
             main_section_info.total_tls_size,
         ).map_err(|_| "BUG: failed to add static TLS section to the TLS area initializer")?;
         Some(tls_section_ref)
     }
-    else {
+    else if main_section_info.cls_info.map_or(false, |(shndx, _)| sec_ndx == shndx) {
+        let cls_offset = sec_vaddr;
+        let cls_sec_data_vaddr = main_section_info.cls_info.unwrap().1 + cls_offset; 
+
+        let cls_section = LoadedSection::new(
+            SectionType::Cls,
+            sec_name,
+            Arc::clone(rodata_pages),
+            // CLS sections are lumped into the ".rodata" MappedPages with the read-only data sections.
+            rodata_pages_locked.offset_of_address(cls_sec_data_vaddr).ok_or("nano_core CLS .cls section wasn't covered by the .rodata mapped pages!")?,
+            VirtualAddress::new(cls_offset).ok_or("new TLS .cls section had invalid virtual address (CLS offset)")?,
+            sec_size,
+            global,
+            new_crate_weak_ref.clone(),
+        );
+        // Add this new CLS section to this namespace's CLS area image.
+        let cls_section_ref = cls_allocator::add_static_section(
+            cls_section,
+            cls_offset,
+            main_section_info.total_cls_size,
+        ).map_err(|_| "BUG: failed to add static CLS section to the CLS area")?;
+        Some(cls_section_ref)
+    } else {
         crate_items.init_symbols.insert(String::from(sec_name.as_str()), sec_vaddr);
         None
     };

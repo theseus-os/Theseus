@@ -11,7 +11,6 @@ cfg-if = "1.0.0"
 
 task_cancel = { path = "../task_cancel" }
 cpu = { path = "../cpu" }
-cpu_local_preemption = { path = "../cpu_local_preemption" }
 interrupts = { path = "../interrupts" }
 sleep = { path = "../sleep" }
 task = { path = "../task" }

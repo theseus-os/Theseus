@@ -26,6 +26,8 @@ pub use memory_structs::*;
 pub use page_allocator::{
     AllocatedPages,
     AllocationRequest,
+    allocate_pages_deferred,
+    allocate_pages_by_bytes_deferred,
     allocate_pages,
     allocate_pages_at,
     allocate_pages_by_bytes,
@@ -36,6 +38,9 @@ pub use page_allocator::{
 };
 pub use frame_allocator::{
     AllocatedFrames,
+    UnmappedFrames,
+    allocate_frames_deferred,
+    allocate_frames_by_bytes_deferred,
     allocate_frames,
     allocate_frames_at,
     allocate_frames_by_bytes,
@@ -56,7 +61,7 @@ use log::debug;
 use spin::Once;
 use sync_irq::IrqSafeMutex;
 use alloc::{sync::Arc, vec::Vec};
-use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType};
+use frame_allocator::{PhysicalMemoryRegion, MemoryRegionType, FramesIteratorRequest};
 use no_drop::NoDrop;
 pub use kernel_config::memory::PAGE_SIZE;
 
@@ -157,6 +162,69 @@ pub fn create_mapping<F: Into<PteFlagsArch>>(
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_mapping(): couldn't allocate pages!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages(allocated_pages, flags)
+}
+
+
+/// Creates an identity mapping at a random available virtual and physical address.
+///
+/// The returned `MappedPages` is guaranteed to have virtual pages mapped to physical frames
+/// with the same virtual addresses as physical addresses.
+pub fn create_identity_mapping<F: Into<PteFlagsArch>>(
+    num_pages: usize,
+    flags: F,
+) -> Result<MappedPages, &'static str> {
+    let kernel_mmi_ref = get_kernel_mmi_ref()
+        .ok_or("create_identity_mapping(): KERNEL_MMI was not yet initialized!")?;
+
+    let mut allocated_pages = None;
+    // We first iterate over all free general-purpose frames,
+    // as there are far fewer available frames than available pages.
+    // Once we find a suitable free chunk of frames,
+    // we then attempt to allocate the corresponding identity pages,
+    // and if that succeeds, we allow the frame allocator to proceed
+    // with allocating the range of frames that matches those pages.
+    let allocated_frames = frame_allocator::inspect_then_allocate_free_frames(&mut |frames| {
+        if frames.size_in_frames() < num_pages {
+            // log::trace!("[{num_pages} pages] Skipping too small {:?}", frames);
+            return FramesIteratorRequest::Next;
+        }
+        let Some(start_vaddr) = VirtualAddress::new(frames.start_address().value()) else {
+            // log::trace!("[{num_pages} pages] Skipping {:?} with invalid starting vaddr", frames);
+            return FramesIteratorRequest::Next;
+        };
+        let Some(end_vaddr) = VirtualAddress::new(frames.end().start_address().value()) else {
+            // log::trace!("[{num_pages} pages] Skipping {:?} with invalid ending vaddr", frames);
+            return FramesIteratorRequest::Next;
+        };
+        let ap_result = allocate_pages_in_range(
+            num_pages,
+            &PageRange::new(
+                Page::containing_address(start_vaddr),
+                Page::containing_address(end_vaddr),
+            )
+        );
+        if let Ok(ap) = ap_result {
+            let start_addr = PhysicalAddress::new_canonical(ap.start_address().value());
+            allocated_pages = Some(ap);
+            // Tell the `inspect_then_allocate_free_frames` function that we want to proceed
+            // with allocating the identity frames corresponding to the pages allocated above.
+            FramesIteratorRequest::AllocateAt {
+                requested_frame: Frame::containing_address(start_addr),
+                num_frames: num_pages,
+            }
+        } else {
+            // log::trace!("[{num_pages} pages] Skipping {:?}, identity pages couldn't be allocated", frames);
+            FramesIteratorRequest::Next
+        }
+    });
+
+    match (allocated_pages, allocated_frames) {
+        (Some(ap), Ok(Some(af))) => {
+            assert!(ap.start_address().value() == af.start_address().value()); // sanity check
+            kernel_mmi_ref.lock().page_table.map_allocated_pages_to(ap, af, flags)
+        }
+        _ => Err("Couldn't allocate frames or pages for an identity mapping"),
+    }
 }
 
 

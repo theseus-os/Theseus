@@ -37,6 +37,12 @@ use alloc::{
 use hashbrown::HashMap;
 use serde::{Deserialize, Serialize};
 
+/// The flag identifying CLS sections.
+pub const CLS_SECTION_FLAG: u64 = 0x100000;
+
+/// The type identifying CLS symbols.
+pub const CLS_SYMBOL_TYPE: u8 = 0xa;
+
 /// A (de)serializable representation of a loaded crate that is `serde`-compatible.
 ///
 /// See `LoadedCrate` for more detail on the fields of this struct.
@@ -46,10 +52,12 @@ pub struct SerializedCrate {
     pub crate_name: String,
     /// A map containing all the sections of the crate.
     pub sections: HashMap<Shndx, SerializedSection>,
-    /// A set containing the global sectinos of the crate.
+    /// A set containing the global sections of the crate.
     pub global_sections: BTreeSet<Shndx>,
     /// A set containing the thread-local storage (TLS) sections of the crate.
     pub tls_sections: BTreeSet<Shndx>,
+    /// The CLS section of the crate.
+    pub cls_sections: BTreeSet<Shndx>,
     /// A set containing the `.data` and `.bss` sections of the crate.
     pub data_sections: BTreeSet<Shndx>,
     /// A map of symbol names to their constant values, which contain assembler and linker
@@ -87,6 +95,7 @@ pub const DATA_SECTION_NAME             : &str = ".data";
 pub const BSS_SECTION_NAME              : &str = ".bss";
 pub const TLS_DATA_SECTION_NAME         : &str = ".tdata";
 pub const TLS_BSS_SECTION_NAME          : &str = ".tbss";
+pub const CLS_SECTION_NAME              : &str = ".cls";
 pub const GCC_EXCEPT_TABLE_SECTION_NAME : &str = ".gcc_except_table";
 pub const EH_FRAME_SECTION_NAME         : &str = ".eh_frame";
 
@@ -107,6 +116,9 @@ pub enum SectionType {
     /// A `.tbss` section is a read-only section that holds all-zero data for a thread-local storage (TLS) area.
     /// This is is effectively an empty placeholder: the all-zero data section doesn't actually exist in memory.
     TlsBss,
+    /// A `.cls` section is a read-only section that holds the initial data "image" for a CPU-local
+    /// (CLS) area.
+    Cls,
     /// A `.gcc_except_table` section contains landing pads for exception handling,
     /// comprising the LSDA (Language Specific Data Area),
     /// which is effectively used to determine when we should stop the stack unwinding process
@@ -137,6 +149,7 @@ impl SectionType {
             Self::Bss            => BSS_SECTION_NAME,
             Self::TlsData        => TLS_DATA_SECTION_NAME,
             Self::TlsBss         => TLS_BSS_SECTION_NAME,
+            Self::Cls            => CLS_SECTION_NAME,
             Self::GccExceptTable => GCC_EXCEPT_TABLE_SECTION_NAME,
             Self::EhFrame        => EH_FRAME_SECTION_NAME,
         }

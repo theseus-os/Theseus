@@ -10,7 +10,7 @@ Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) t
 For more info, check out Theseus's [documentation](#Documentation) or our [published academic papers](https://theseus-os.github.io/Theseus/book/misc/papers_presentations.html), which describe Theseus's design and implementation. 
 
 Theseus is under active development, and although it is not yet mature, we envision that Theseus will be useful in high-end embedded systems or edge datacenter environments. 
-We are continually working to improve the OS, including its fault recovery abilities for higher system availability without redundancy, as well as easier and more arbitrary live evolution and runtime flexbility.
+We are continually working to improve the OS, including its fault recovery abilities for higher system availability without redundancy, as well as easier and more arbitrary live evolution and runtime flexibility.
 
 
 # Quick start
@@ -47,7 +47,7 @@ Currently, we support building Theseus on the following platforms:
  * Linux, 64-bit Debian-based distributions like Ubuntu, tested on Ubuntu 16.04, 18.04, 20.04. 
    - Arch Linux and Fedora have also been reported to work correctly. 
  * Windows, using the Windows Subsystem for Linux (WSL), tested on the Ubuntu version of WSL and WSL2.
- * MacOS, tested on versions High Sierra (10.13) and Catalina (10.15.2).
+ * MacOS, tested on versions High Sierra (v10.13), Catalina (v10.15), and Ventura (v13.5).
  * Docker, atop any host OS that can run a Docker container.
 
 
@@ -100,7 +100,7 @@ If you're on WSL, also do the following steps:
     rm -rf /tmp/theseus_tools_src
     ```
 
-  * If you're building Theseus on an M1-based Mac, you may need to use x86 emulation
+  * If you're building Theseus on an M1-based Mac, you may need to use `gmake` instead of `make` for build commands. Alternatively, you can use `bash` with x86 emulation, but this is generally not necessary. 
     ```sh
     arch -x86_64 bash   # or another shell of your choice
     ```
@@ -121,7 +121,7 @@ Note: building and running Theseus within a Docker container may be slower than 
     ``` 
     * After docker installs, enable your user account to run docker without root privileges:   
       `sudo groupadd docker; sudo usermod -aG docker $USER`    
-      Then, **log out and log back in** (or restart your computer) for the user/group changes to take effet.
+      Then, **log out and log back in** (or restart your computer) for the user/group changes to take effect.
  
  3. Build the docker image:     
     ```
@@ -164,7 +164,7 @@ Feel free to try newer versions, however they may not work.
 
 
 ## Targeting ARMv8 (aarch64)
-There is an ongoing effort to port Theseus to ARMv8 (aarch64); this is currently a work-in-progress.
+Support for Theseus on aarch64 is an ongoing effort, but most of the core subsystems are complete.
 
 To build and run Theseus on aarch64, first install the required dependencies:
 * On Debian-like Linux (Ubuntu, etc):
@@ -175,16 +175,24 @@ To build and run Theseus on aarch64, first install the required dependencies:
   ```bash
   sudo pacman -S aarch64-linux-gnu-gcc qemu-system-aarch64
   ```
+* On macOS, the `mac_os_build_setup` script should have already installed this for you, but if not:
+  ```zsh
+  brew install aarch64-elf-gcc aarch64-elf-binutils
+
+  ```
 
 Then, build Theseus and run it in QEMU:
 ```bash
-make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run
+make ARCH=aarch64 run
 ```
+
+Doing a "full" build of all Theseus crates isn't yet supported on aarch64,
+as our aarch64 support in Theseus doesn't yet cover *all* crates in the entire repo.
 
 
 ## Using QEMU
 QEMU allows us to run Theseus quickly and easily in its own virtual machine.
-To release, press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>G</kbd> (or just <kbd>Ctrl</kbd> + <kbd>Alt</kbd> on some systems), which releases your keyboard and mouse focus from the QEMU window. 
+To release your keyboard and mouse focus from the QEMU window, press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>G</kbd>, or <kbd>Ctrl</kbd> + <kbd>Alt</kbd> on some systems, or just <kbd>Cmd</kbd> + <kbd>Tab</kbd> out to another app on macOS.
 To exit QEMU, in the terminal window that you originally ran `make run`, press <kbd>Ctrl</kbd> + <kbd>A</kbd> then <kbd>X</kbd>, or you can also click the GUI `ⓧ` button on the title bar if running QEMU in graphical mode.
 
 To investigate the hardware/machine state of the running QEMU VM, you can switch to the QEMU console by pressing <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>2</kbd>.
@@ -209,6 +217,9 @@ To enable KVM support, add `host=yes` to your make command, e.g.,
 make run host=yes
 ```
 
+Note that KVM acceleration is only supported on native Linux hosts.
+
+
 # Documentation
 Theseus includes two forms of documentation:
 1. The [source-level documentation](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html), generated from code and inline comments (via *rustdoc*).
@@ -226,7 +237,7 @@ make view-book  ## for the Theseus book
 
 ## Booting on Real Hardware
 We have tested Theseus on a variety of real machines, including Intel NUC devices, various Thinkpad laptops, and Supermicro servers. 
-Currently, the only limiting factor is that the device support booting via USB or PXE using traditional BIOS rather than UEFI; support for UEFI is a work-in-progress. 
+Currently, we have only tested booting Theseus via USB or PXE using a traditional BIOS bootloader rather than UEFI, but UEFI is fully supported so it should work.
 
 To boot over USB, simply run `make boot usb=sdc`, in which `sdc` is the device node for the USB disk itself *(**not a partition** like sdc2)* to which you want to write the OS image.
 On WSL or other host environments where `/dev` device nodes don't exist, you can simply run `make iso` and burn the `.iso` file in the `build/` directory to a USB, e.g., using [Rufus](https://rufus.ie/) on Windows.
@@ -266,7 +277,7 @@ We don't yet have a patched version of GDB for aarch64 targets, but we can use t
 
 2. Build Theseus for aarch64 and run it in QEMU:
     ```sh
-    make ARCH=aarch64 FEATURES= CROSS=aarch64-linux-gnu- run ## or use `run_pause`
+    make ARCH=aarch64 run ## or use `run_pause`
     ```
 3. In another terminal window, run the following to start GDB and attach it to the running QEMU instance:
     ```sh
