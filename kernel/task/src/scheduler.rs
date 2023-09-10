@@ -24,7 +24,7 @@ static SCHEDULERS: Mutex<Vec<(CpuId, Arc<ConcurrentScheduler>)>> = Mutex::new(Ve
 #[cls::cpu_local]
 static SCHEDULER: Option<Arc<ConcurrentScheduler>> = None;
 
-type ConcurrentScheduler = PreemptionSafeMutex<Box<dyn Scheduler>>;
+type ConcurrentScheduler = PreemptionSafeMutex<dyn Scheduler>;
 
 /// Yields the current CPU by selecting a new `Task` to run next,
 /// and then switches to that new `Task`.
@@ -51,8 +51,7 @@ pub fn schedule() -> bool {
 
     let cpu_id = preemption_guard.cpu_id();
 
-    let next_task =
-        SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().as_mut().next());
+    let next_task = SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().next());
 
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
@@ -68,8 +67,7 @@ pub fn set_policy<T>(cpu_id: CpuId, scheduler: T)
 where
     T: Scheduler,
 {
-    let boxed: Box<dyn Scheduler> = Box::new(scheduler);
-    let mutex = PreemptionSafeMutex::new(boxed);
+    let mutex = PreemptionSafeMutex::new(scheduler);
     let scheduler = Arc::new(mutex);
 
     let mut locked = SCHEDULERS.lock();
@@ -96,8 +94,8 @@ where
             }
         }
 
-        locked.push((cpu_id, scheduler.clone()));
-        *current_scheduler = Some(scheduler);
+        locked.push((cpu_id, scheduler.clone() as _));
+        *current_scheduler = Some(scheduler as _);
     });
 }
 
