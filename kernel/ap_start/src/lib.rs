@@ -51,6 +51,7 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
+    irq_safety::disable_fast_interrupts();
     irq_safety::disable_interrupts();
 
     info!("Booted CPU {}, proc: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
@@ -100,6 +101,7 @@ pub fn kstart_ap(
 
     #[cfg(target_arch = "aarch64")] {
         interrupts::init_ap();
+        irq_safety::enable_fast_interrupts();
 
         // Register this CPU as online in the system
         // This is the equivalent of `LocalApic::init` on aarch64
