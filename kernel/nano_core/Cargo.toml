@@ -12,7 +12,7 @@ multiboot2 = { version = "0.14.0", optional = true }
 libm = "0.2.1"
 log = "0.4.8"
 
-irq_safety = { path = "../../../irq_safety" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 
 kernel_config = { path = "../kernel_config" }
 state_store = { path = "../state_store" }

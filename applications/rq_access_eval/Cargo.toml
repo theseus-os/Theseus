@@ -9,6 +9,6 @@ edition = "2021"
 app_io = { path = "../../kernel/app_io" }
 cpu = { path = "../../kernel/cpu" }
 getopts = "0.2"
-irq_safety = { path = "../../../irq_safety" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 runqueue = { path = "../../kernel/runqueue" }
 time = { path = "../../kernel/time" }

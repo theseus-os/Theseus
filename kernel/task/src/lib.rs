@@ -930,7 +930,7 @@ fn task_switch_inner(
     // on this CPU during the schedule/task_switch routines cannot observe inconsistencies
     // in task runstates, e.g., when an interrupt handler accesses the current task context.
     {
-        let _held_interrupts = hold_interrupts("task_switch_inner");
+        let _held_interrupts = hold_interrupts();
         next.0.task.running_on_cpu().store(Some(cpu_id).into());
         next.set_as_current_task();
         drop(_held_interrupts);

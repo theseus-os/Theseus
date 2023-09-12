@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 log = "0.4.8"
-irq_safety = { path = "../../../irq_safety" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 memory = { path = "../memory" }
 cpu = { path = "../cpu" }
 sync_irq = { path = "../../libs/sync_irq" }

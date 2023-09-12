@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 log = "0.4.8"
 
-irq_safety = { path = "../../../irq_safety" }
+irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
 dfqueue = { path = "../../libs/dfqueue", version = "0.1.0" }
 interrupt_controller = { path = "../interrupt_controller" }
 multicore_bringup = { path = "../multicore_bringup" }
