@@ -19,6 +19,14 @@ use dist_interface::{DistRegsP1, DistRegsP6};
 use cpu_interface_gicv2::CpuRegsP1;
 use redist_interface::{RedistRegsP1, RedistRegsSgiPpi};
 
+#[repr(u32)]
+pub enum InterruptGroup {
+    // FIQs
+    Group0 = 0,
+    // IRQs
+    Group1 = 1,
+}
+
 /// Boolean
 pub type Enabled = bool;
 
@@ -241,18 +249,18 @@ impl ArmGicDistributor {
     /// Returns whether the given interrupt is forwarded by the distributor.
     ///
     /// Panics if `int` is not in the SPI range (>= 32).
-    pub fn get_spi_state(&self, int: InterruptNumber) -> Enabled {
+    pub fn get_spi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
         assert!(int >= 32, "get_spi_state: `int` must be >= 32");
-        self.distributor().is_spi_enabled(int)
+        self.distributor().get_spi_state(int)
     }
 
     /// Enables or disables the forwarding of the given interrupt
     /// by the distributor.
     ///
     /// Panics if `int` is not in the SPI range (>= 32).
-    pub fn set_spi_state(&mut self, int: InterruptNumber, enabled: Enabled) {
+    pub fn set_spi_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {
         assert!(int >= 32, "set_spi_state: `int` must be >= 32");
-        self.distributor_mut().enable_spi(int, enabled)
+        self.distributor_mut().set_spi_state(int, state)
     }
 
     /// Returns the priority of the given interrupt.
@@ -372,11 +380,11 @@ impl ArmGicCpuComponents {
     ///
     /// Panics if `int` is greater than or equal to 16;
     /// on aarch64, IPIs much be sent to an interrupt number less than 16.
-    pub fn send_ipi(&mut self, int: InterruptNumber, target: IpiTargetCpu) {
+    pub fn send_ipi(&mut self, int: InterruptNumber, target: IpiTargetCpu, group: InterruptGroup) {
         assert!(int < 16, "IPIs must have a number below 16 on ARMv8");
 
         if let Self::V3 { .. } = self {
-            cpu_interface_gicv3::send_ipi(int, target)
+            cpu_interface_gicv3::send_ipi(int, target, group)
         } else {
             // we don't have access to the distributor... code would be:
             // dist_interface::send_ipi_gicv2(&mut dist_regs, int, target)
@@ -394,10 +402,12 @@ impl ArmGicCpuComponents {
     /// being handled by this CPU.
     ///
     /// Returns a tuple of the interrupt's number and priority.
-    pub fn acknowledge_interrupt(&mut self) -> (InterruptNumber, Priority) {
+    ///
+    /// Returns None if a spurious interrupt is detected.
+    pub fn acknowledge_interrupt(&mut self, group: InterruptGroup) -> Option<(InterruptNumber, Priority)> {
         match self {
-            Self::V2 { registers, .. } => registers.acknowledge_interrupt(),
-            Self::V3 { .. } => cpu_interface_gicv3::acknowledge_interrupt(),
+            Self::V2 { registers, .. } => registers.acknowledge_interrupt(/* no way to specify a group in GICv2 */),
+            Self::V3 { .. } => cpu_interface_gicv3::acknowledge_interrupt(group),
         }
     }
 
@@ -406,10 +416,10 @@ impl ArmGicCpuComponents {
     /// the current CPU.
     ///
     /// This implies that the CPU is ready to process interrupts again.
-    pub fn end_of_interrupt(&mut self, int: InterruptNumber) {
+    pub fn end_of_interrupt(&mut self, int: InterruptNumber, group: InterruptGroup) {
         match self {
-            Self::V2 { registers, .. } => registers.end_of_interrupt(int),
-            Self::V3 { .. } => cpu_interface_gicv3::end_of_interrupt(int),
+            Self::V2 { registers, .. } => registers.end_of_interrupt(int, /* no way to specify a group in GICv2 */),
+            Self::V3 { .. } => cpu_interface_gicv3::end_of_interrupt(int, group),
         }
     }
 
@@ -417,17 +427,17 @@ impl ArmGicCpuComponents {
     ///
     /// Panics if `int` is greater than or equal to 32, which is beyond the range
     /// of local interrupt numbers.
-    pub fn get_interrupt_state(&self, int: InterruptNumber) -> Enabled {
+    pub fn get_interrupt_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
         assert!(int < 32, "get_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
-            redist_regs.redist_sgippi.is_sgippi_enabled(int)
+            redist_regs.redist_sgippi.get_sgippi_state(int)
         } else {
             // there is no redistributor and we don't have access to the distributor
             log::error!("GICv2 doesn't support enabling/disabling local interrupt");
 
             // should we panic?
-            true
+            Some(InterruptGroup::Group1)
         }
     }
 
@@ -435,11 +445,11 @@ impl ArmGicCpuComponents {
     ///
     /// Panics if `int` is greater than or equal to 32, which is beyond the range
     /// of local interrupt numbers.
-    pub fn set_interrupt_state(&mut self, int: InterruptNumber, enabled: Enabled) {
+    pub fn set_interrupt_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {
         assert!(int < 32, "set_interrupt_state: `int` doesn't lie in the SGI/PPI (local interrupt) range");
 
         if let Self::V3 { redist_regs } = self {
-            redist_regs.redist_sgippi.enable_sgippi(int, enabled);
+            redist_regs.redist_sgippi.set_sgippi_state(int, state);
         } else {
             // there is no redistributor and we don't have access to the distributor
             log::error!("GICv2 doesn't support enabling/disabling local interrupt");

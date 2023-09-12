@@ -16,6 +16,7 @@
 use super::IpiTargetCpu;
 use super::SpiDestination;
 use super::InterruptNumber;
+use super::InterruptGroup;
 use super::Enabled;
 use super::Priority;
 use super::TargetList;
@@ -75,7 +76,7 @@ pub struct DistRegsP6 {     // base offset
 }
 
 // enable group 0
-// const CTLR_ENGRP0: u32 = 0b01;
+const CTLR_ENGRP0: u32 = 0b01;
 
 // enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
@@ -96,9 +97,6 @@ const SGIR_TARGET_ALL_OTHER_PE: u32 = 1 << 24;
 //   0 = route to specific PE
 const P6IROUTER_ANY_AVAILABLE_PE: u64 = 1 << 31;
 
-// const GROUP_0: u32 = 0;
-const GROUP_1: u32 = 1;
-
 // bit 15: which interrupt group to target
 const SGIR_NSATT_GRP1: u32 = 1 << 15;
 
@@ -112,6 +110,7 @@ impl DistRegsP1 {
     /// states.
     pub fn init(&mut self) -> Enabled {
         let mut reg = self.ctlr.read();
+        reg |= CTLR_ENGRP0;
         reg |= CTLR_ENGRP1;
         reg |= CTLR_E1NWF;
         self.ctlr.write(reg);
@@ -124,25 +123,26 @@ impl DistRegsP1 {
 
     /// Returns whether the given SPI (shared peripheral interrupt) will be
     /// forwarded by the distributor
-    pub fn is_spi_enabled(&self, int: InterruptNumber) -> Enabled {
-        // enabled?
-        read_array_volatile::<32>(&self.set_enable, int) > 0
-        &&
-        // part of group 1?
-        read_array_volatile::<32>(&self.group, int) == GROUP_1
+    pub fn get_spi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
+        let enabled = read_array_volatile::<32>(&self.set_enable, int) == 1;
+        match enabled {
+            true => match read_array_volatile::<32>(&self.group, int) {
+                0 => Some(InterruptGroup::Group0),
+                1 => Some(InterruptGroup::Group1),
+                _ => unreachable!(),
+            },
+            false => None,
+        }
     }
 
     /// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt)
-    pub fn enable_spi(&mut self, int: InterruptNumber, enabled: Enabled) {
-        let reg_base = match enabled {
-            true  => &mut self.set_enable,
-            false => &mut self.clear_enable,
-        };
-        write_array_volatile::<32>(reg_base, int, 1);
-
-        // whether we're enabling or disabling,
-        // set as part of group 1
-        write_array_volatile::<32>(&mut self.group, int, GROUP_1);
+    pub fn set_spi_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {
+        if let Some(group) = state {
+            write_array_volatile::<32>(&mut self.group, int, group as u32);
+            write_array_volatile::<32>(&mut self.set_enable, int, 1);
+        } else {
+            write_array_volatile::<32>(&mut self.clear_enable, int, 1);
+        }
     }
 
     /// Returns the priority of an SPI.

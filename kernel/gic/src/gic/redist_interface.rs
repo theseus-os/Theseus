@@ -10,7 +10,7 @@
 //! - Getting or setting the priority of PPIs & SGIs based on their numbers
 
 use super::InterruptNumber;
-use super::Enabled;
+use super::InterruptGroup;
 use super::Priority;
 use super::read_array_volatile;
 use super::write_array_volatile;
@@ -77,9 +77,6 @@ const CTLR_DPG1NS: u32 = 1 << 25;
 
 /// If bit is set, the PE cannot be selected for group 0 "1 of N" interrupts.
 const CTLR_DPG0: u32 = 1 << 24;
-
-/// const GROUP_0: u32 = 0;
-const GROUP_1: u32 = 1;
 
 /// This timeout value works on some ARM SoCs:
 /// - qemu's virt virtual machine
@@ -150,26 +147,28 @@ impl RedistRegsP1 {
 impl RedistRegsSgiPpi {
     /// Returns whether the given SGI (software generated interrupts) or
     /// PPI (private peripheral interrupts) will be forwarded by the redistributor
-    pub fn is_sgippi_enabled(&self, int: InterruptNumber) -> Enabled {
-        read_array_volatile::<32>(&self.set_enable, int) > 0
-        &&
-        // part of group 1?
-        read_array_volatile::<32>(&self.group, int) == GROUP_1
+    pub fn get_sgippi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
+        let enabled = read_array_volatile::<32>(&self.set_enable, int) == 1;
+        match enabled {
+            true => match read_array_volatile::<32>(&self.group, int) {
+                0 => Some(InterruptGroup::Group0),
+                1 => Some(InterruptGroup::Group1),
+                _ => unreachable!(),
+            },
+            false => None,
+        }
     }
 
     /// Enables or disables the forwarding of a particular
     /// SGI (software generated interrupts) or PPI (private
     /// peripheral interrupts)
-    pub fn enable_sgippi(&mut self, int: InterruptNumber, enabled: Enabled) {
-        let reg = match enabled {
-            true => &mut self.set_enable,
-            false => &mut self.clear_enable,
-        };
-        write_array_volatile::<32>(reg, int, 1);
-
-        // whether we're enabling or disabling,
-        // set as part of group 1
-        write_array_volatile::<32>(&mut self.group, int, GROUP_1);
+    pub fn set_sgippi_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {
+        if let Some(group) = state {
+            write_array_volatile::<32>(&mut self.group, int, group as u32);
+            write_array_volatile::<32>(&mut self.set_enable, int, 1);
+        } else {
+            write_array_volatile::<32>(&mut self.clear_enable, int, 1);
+        }
     }
 
     /// Returns the priority of an SGI/PPI.
