@@ -224,6 +224,16 @@ impl PteFlagsX86_64 {
         self
     }
 
+    /// Returns a copy of this `PteFlagsX86_64` with the `HUGE` bit set or cleared.
+    ///
+    /// * If `enable` is `true`, this page will be treated as a huge page.
+    /// * If `enable` is `false`, this page will be treated as a page of standard 4KiB size.
+    #[must_use]
+    pub fn huge(mut self, enable: bool) -> Self {
+        self.set(Self::HUGE_PAGE, enable);
+        self
+    }
+
     #[doc(alias("present"))]
     pub const fn is_valid(&self) -> bool {
         self.contains(Self::VALID)
@@ -271,10 +281,10 @@ impl PteFlagsX86_64 {
     ///   * P4, P3, and P2 entries should never set `NOT_EXECUTABLE`,
     ///     only the lowest-level P1 entry should.
     /// * Clears the `EXCLUSIVE` bit.
-    ///   * Currently, we do not use the `EXCLUSIVE` bit for P4, P3, or P2 entries,
+    ///   * Currently, we only use the `EXCLUSIVE` bit for leaf nodes that directly map a frame in the page table,
     ///     because another page table frame may re-use it (create another alias to it)
     ///     without our page table implementation knowing about it.
-    ///   * Only P1-level PTEs can map a frame exclusively.
+    ///   * Only P1-level PTEs, and in the case of huge pages, P2 and P3-level PTEs, can map a frame exclusively.
     /// * Clears the PAT index value, as we only support PAT on P1-level PTEs.
     /// * Sets the `VALID` bit, as every P4, P3, and P2 entry must be valid.
     #[must_use]

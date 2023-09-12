@@ -32,9 +32,11 @@ mod static_array_rb_tree;
 
 use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
-use memory_structs::{VirtualAddress, Page, PageRange};
+use memory_structs::{VirtualAddress, Page, PageRange, Page1G, Page2M, Page4K, MemChunkSize};
 use spin::{Mutex, Once};
 use static_array_rb_tree::*;
+
+use core::convert::TryFrom;
 
 
 /// Certain regions are pre-designated for special usage, specifically the kernel's initial identity mapping.
@@ -139,6 +141,189 @@ pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'
 	Ok(())
 }
 
+/// An enum used to wrap the generic PageRange variants corresponding to different page sizes.
+/// Additional methods corresponding to PageRange methods are provided in order to destructure the enum variants.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PageRangeSized {
+	Normal4KiB(PageRange),
+	Huge2MiB(PageRange<Page2M>),
+	Huge1GiB(PageRange<Page1G>),
+}
+
+// These methods mostly destructure the enum in order to call internal methods
+impl PageRangeSized {
+	/// Get the size of the pages for the contained PageRange
+	pub fn page_size(&self) -> MemChunkSize {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.start().page_size()
+			}
+			PageRangeSized::Huge2MiB(pr) => {
+				pr.start().page_size()
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+				pr.start().page_size()
+			}
+		}
+	}
+
+	pub fn range(&self) -> Option<&PageRange> {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				Some(pr)
+			}
+			_ => {
+				None
+			}
+		}
+	}
+	
+	/// range() equivalent for 2MiB page ranges
+	pub fn range_2mb(&self) -> Result<PageRange<Page2M>, &'static str> {
+		match self {
+			PageRangeSized::Huge2MiB(pr) => {
+				Ok(pr.clone())
+			}
+			// PageRangeSized::Normal4KiB(pr) => {
+			// 	Ok(PageRange::<Page2M>::try_from(*pr)?)
+			// }
+			_ => {
+				Err("Called range_2mb on a PageRange with a size other than 2mb")
+			}
+		}
+	}
+
+	/// range() equivalent for 1GiB page ranges
+	pub fn range_1gb(&self) -> Result<PageRange<Page1G>, &'static str> {
+		match self {
+			PageRangeSized::Huge1GiB(pr) => {
+				Ok(pr.clone())
+			}
+			// PageRangeSized::Normal4KiB(pr) => {
+			// 	Ok(PageRange::<Page1G>::try_from(*pr)?)
+			// }
+			_ => {
+				Err("Called range_1gb on a PageRange with a size other than 1gb")
+			}
+		}
+	}
+
+	pub fn contains(&self, page: &Page) -> bool {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.contains(page)
+			}
+			// PageRangeSized::Huge2MiB(pr) => {
+			// 	pr.contains(page)
+			// }
+			// PageRangeSized::Huge1GiB(pr) => {
+			// 	pr.contains(page)
+			// }
+			_ => {
+				false // TODO: change placeholder value
+			}
+		}
+	}
+
+	pub const fn offset_of_address(&self, addr: VirtualAddress) -> Option<usize> {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.offset_of_address(addr)
+			}
+			PageRangeSized::Huge2MiB(pr) => {
+				pr.offset_of_address(addr)
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+				pr.offset_of_address(addr)
+			}
+		}
+	}
+
+	pub const fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.address_at_offset(offset)
+			}
+			PageRangeSized::Huge2MiB(pr) => {
+				pr.address_at_offset(offset)
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+				pr.address_at_offset(offset)
+			}
+		}
+	}
+	
+	/// Returns the starting `VirtualAddress` in this range of pages.
+	pub fn start_address(&self) -> VirtualAddress {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.start_address()
+			}
+			PageRangeSized::Huge2MiB(pr) => {
+				pr.start_address()
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+				pr.start_address()
+			}
+		}
+	}
+
+	/// Returns the size in bytes of this range of pages.
+	pub fn size_in_bytes(&self) -> usize {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.size_in_bytes()
+			}
+			PageRangeSized::Huge2MiB(pr) => {
+				pr.size_in_bytes()
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+				pr.size_in_bytes()
+			}
+		}
+	}
+
+	/// Returns the size in number of pages of this range of pages.
+	pub fn size_in_pages(&self) -> usize {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.size_in_pages()
+			}
+			PageRangeSized::Huge2MiB(pr) => {
+				pr.size_in_pages()
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+				pr.size_in_pages()
+			}
+		}
+	}
+
+	/// Returns the starting `Page` in this range of pages.
+	/// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+	pub fn start(&self) -> &Page {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.start()
+			}
+			_ => {
+				panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+			}
+		}
+	}
+
+	/// Returns the ending `Page` (inclusive) in this range of pages.
+	/// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+	pub fn end(&self) -> &Page {
+		match self {
+			PageRangeSized::Normal4KiB(pr) => {
+				pr.end()
+			}
+			_ => {
+				panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+			}
+		}
+	}
+}
 
 /// A range of contiguous pages.
 ///
@@ -159,7 +344,7 @@ struct Chunk {
 impl Chunk {
 	fn as_allocated_pages(&self) -> AllocatedPages {
 		AllocatedPages {
-			pages: self.pages.clone(),
+			pages: PageRangeSized::Normal4KiB(self.pages.clone()),
 		}
 	}
 
@@ -206,7 +391,7 @@ impl Borrow<Page> for &'_ Chunk {
 /// This object represents ownership of the allocated virtual pages;
 /// if this object falls out of scope, its allocated pages will be auto-deallocated upon drop. 
 pub struct AllocatedPages {
-	pages: PageRange,
+	pages: PageRangeSized,
 }
 
 // AllocatedPages must not be Cloneable, and it must not expose its inner pages as mutable.
@@ -223,7 +408,7 @@ impl AllocatedPages {
     /// Can be used as a placeholder, but will not permit any real usage. 
     pub const fn empty() -> AllocatedPages {
         AllocatedPages {
-			pages: PageRange::empty()
+			pages: PageRangeSized::Normal4KiB(PageRange::empty())
 		}
 	}
 
@@ -254,7 +439,17 @@ impl AllocatedPages {
 
 	/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
 	pub fn range(&self) -> &PageRange {
-		&self.pages
+		&self.pages.range().expect("Called range() on a PageRange with a size other than 4kb")
+	}
+
+	/// Returns the inner `PageRange<Page2M>`, which is cloneable/iterable.
+	pub fn range_2mb(&self) -> PageRange<Page2M> {
+		self.pages.range_2mb().expect("Called range_2mb() on a PageRange with a size other than 2mb")
+	}
+
+	/// Returns the inner `PageRange<Page1G>`, which is cloneable/iterable.
+	pub fn range_1gb(&self) -> PageRange<Page1G> {
+		self.pages.range_1gb().expect("Called range_1gb() on a PageRange with a size other than 1gb")
 	}
 
 	/// Returns the offset of the given `VirtualAddress` within this range of pages,
@@ -294,7 +489,7 @@ impl AllocatedPages {
 		if *ap.start() != (*self.end() + 1) {
 			return Err(ap);
 		}
-		self.pages = PageRange::new(*self.start(), *ap.end());
+		self.pages = PageRangeSized::Normal4KiB(PageRange::new(*self.start(), *ap.end()));
 		// ensure the now-merged AllocatedPages doesn't run its drop handler and free its pages.
 		core::mem::forget(ap); 
 		Ok(())
@@ -337,9 +532,32 @@ impl AllocatedPages {
         // ensure the original AllocatedPages doesn't run its drop handler and free its pages.
         core::mem::forget(self);   
         Ok((
-            AllocatedPages { pages: first }, 
-            AllocatedPages { pages: second },
+            AllocatedPages { pages: PageRangeSized::Normal4KiB(first) }, 
+            AllocatedPages { pages: PageRangeSized::Normal4KiB(second) },
         ))
+    }
+
+	/// Returns the size of the pages in this page range.
+	pub fn page_size(&self) -> MemChunkSize {
+		self.pages.page_size()
+	}
+
+    pub fn to_2mb_allocated_pages(&mut self) {
+        self.pages = PageRangeSized::Huge2MiB(
+            PageRange::<Page2M>::try_from(
+                self.pages
+                    .range()
+                    .unwrap()
+                    .clone()).unwrap())
+    }
+
+    pub fn to_1gb_allocated_pages(&mut self) {
+        self.pages = PageRangeSized::Huge1GiB(
+            PageRange::<Page1G>::try_from(
+                self.pages
+                    .range()
+                    .unwrap()
+                    .clone()).unwrap())
     }
 }
 
@@ -348,8 +566,19 @@ impl Drop for AllocatedPages {
 		if self.size_in_pages() == 0 { return; }
 		// trace!("page_allocator: deallocating {:?}", self);
 
+		// Convert huge pages back to default size if needed.
+		let pages = match self.page_size() {
+			MemChunkSize::Normal4K => self.pages.range().unwrap().clone(),
+			MemChunkSize::Huge2M => { 
+				PageRange::<Page4K>::from(self.pages.range_2mb().unwrap())
+			},
+			MemChunkSize::Huge1G => { 
+				PageRange::<Page4K>::from(self.pages.range_1gb().unwrap())
+			}
+		};
+
 		let chunk = Chunk {
-			pages: self.pages.clone(),
+			pages: pages,
 		};
 		let mut list = FREE_PAGE_LIST.lock();
 		match &mut list.0 {
