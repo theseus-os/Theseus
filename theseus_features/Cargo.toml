@@ -42,6 +42,7 @@ unified_channel = { path = "../kernel/unified_channel", optional = true }
 
 
 ## Test applications.
+run_tests = { path = "../applications/run_tests", optional = true }
 example = { path = "../applications/example", optional = true }
 hello = { path = "../applications/hello", optional = true }
 raw_mode = { path = "../applications/raw_mode", optional = true }
@@ -62,7 +63,7 @@ test_preemption_counter = { path = "../applications/test_preemption_counter", op
 test_priority_scheduler = { path = "../applications/test_priority_scheduler", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_scheduler = { path = "../applications/test_scheduler", optional = true }
-test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
+serial_echo = { path = "../applications/serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
 test_sync_block = { path = "../applications/test_sync_block", optional = true }
 test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
@@ -143,6 +144,7 @@ theseus_benchmarks = [
 
 ## Includes all test application crates in the build.
 theseus_tests = [
+    "run_tests",
     "example",
     "hello",
     "raw_mode",
@@ -162,7 +164,7 @@ theseus_tests = [
     "test_priority_scheduler",
     "test_restartable",
     "test_scheduler",
-    "test_serial_echo",
+    "serial_echo",
     "test_std_fs",
     "test_sync_block",
     "test_task_cancel",

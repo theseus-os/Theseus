@@ -3088,6 +3088,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "run_tests"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "path",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "runqueue"
 version = "0.1.0"
 dependencies = [
@@ -3295,6 +3305,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.98",
+]
+
+[[package]]
+name = "serial_echo"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "io",
+ "log",
+ "serial_port",
+ "sync_irq",
+ "task",
 ]
 
 [[package]]
@@ -3907,19 +3930,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_serial_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "io",
- "log",
- "serial_port",
- "sync_irq",
- "task",
-]
-
-[[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
@@ -4044,8 +4054,10 @@ dependencies = [
  "rq",
  "rq_access_eval",
  "rq_eval",
+ "run_tests",
  "scheduler_eval",
  "seconds_counter",
+ "serial_echo",
  "shell",
  "swap",
  "test_aligned_page_allocation",
@@ -4063,7 +4075,6 @@ dependencies = [
  "test_priority_scheduler",
  "test_restartable",
  "test_scheduler",
- "test_serial_echo",
  "test_std_fs",
  "test_sync_block",
  "test_task_cancel",
