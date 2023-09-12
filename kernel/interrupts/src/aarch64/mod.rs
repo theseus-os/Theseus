@@ -204,7 +204,7 @@ pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'st
 /// Enables the PL011 "RX" SPI and routes it to the current CPU.
 pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
     let int_ctrl = SystemInterruptController::get();
-    int_ctrl.set_destination(PL011_RX_SPI, current_cpu(), u8::MAX)
+    int_ctrl.set_destination(PL011_RX_SPI, Some(current_cpu()), u8::MAX)
 }
 
 /// Disables the timer, schedules its next tick, and re-enables it

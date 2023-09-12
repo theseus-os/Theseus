@@ -55,7 +55,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
     fn set_destination(
         &self,
         sys_int_num: InterruptNumber,
-        destination: CpuId,
+        destination: Option<CpuId>,
         priority: Priority,
     ) -> Result<(), &'static str> {
         let mut int_ctlr = get_ioapic(self.id).expect("BUG: set_destination(): get_ioapic() returned None");
@@ -63,7 +63,11 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         // no support for priority on x86_64
         let _ = priority;
 
-        int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num /* <- is this correct? */)
+        if let Some(destination) = destination {
+            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num /* <- is this correct? */)
+        } else {
+            Err("SystemInterruptController::set_destination: todo on x86")
+        }
     }
 }
 
