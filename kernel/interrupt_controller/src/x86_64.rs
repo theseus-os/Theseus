@@ -73,10 +73,6 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         unimplemented!()
     }
 
-    fn init_secondary_cpu_interface(&self) {
-        panic!("This must not be used on x86_64")
-    }
-
     fn id(&self) -> LocalInterruptControllerId {
         let int_ctlr = get_my_apic().expect("BUG: id(): get_my_apic() returned None");
         let int_ctlr = int_ctlr.read();
@@ -110,20 +106,6 @@ impl LocalInterruptControllerApi for LocalInterruptController {
             SpecificCpu(cpu) => LapicIpiDestination::One(cpu.into()),
             AllOtherCpus => LapicIpiDestination::AllButMe,
         });
-    }
-
-    fn get_minimum_priority(&self) -> Priority {
-        // No priority support on x86_64
-        Priority
-    }
-
-    fn set_minimum_priority(&self, priority: Priority) {
-        // No priority support on x86_64
-        let _ = priority;
-    }
-
-    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
-        panic!("This must not be used on x86_64")
     }
 
     fn end_of_interrupt(&self, _number: InterruptNumber) {

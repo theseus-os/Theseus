@@ -145,11 +145,6 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         &ctrls[index]
     }
 
-    fn init_secondary_cpu_interface(&self) {
-        let mut cpu_ctrl = self.0.lock();
-        cpu_ctrl.init_secondary_cpu_interface();
-    }
-
     fn id(&self) -> LocalInterruptControllerId {
         let cpu_ctrl = self.0.lock();
         LocalInterruptControllerId(cpu_ctrl.get_cpu_interface_id())
@@ -190,24 +185,31 @@ impl LocalInterruptControllerApi for LocalInterruptController {
         });
     }
 
-    fn get_minimum_priority(&self) -> Priority {
+    fn end_of_interrupt(&self, number: InterruptNumber) {
+        let mut cpu_ctrl = self.0.lock();
+        cpu_ctrl.end_of_interrupt(number as _)
+    }
+}
+
+impl LocalInterruptController {
+    pub fn get_minimum_priority(&self) -> Priority {
         let cpu_ctrl = self.0.lock();
         cpu_ctrl.get_minimum_priority()
     }
 
-    fn set_minimum_priority(&self, priority: Priority) {
+    pub fn set_minimum_priority(&self, priority: Priority) {
         let mut cpu_ctrl = self.0.lock();
         cpu_ctrl.set_minimum_priority(priority)
     }
 
-    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
+    pub fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
         let mut cpu_ctrl = self.0.lock();
         let (num, prio) = cpu_ctrl.acknowledge_interrupt();
         (num as _, prio)
     }
 
-    fn end_of_interrupt(&self, number: InterruptNumber) {
+    pub fn init_secondary_cpu_interface(&self) {
         let mut cpu_ctrl = self.0.lock();
-        cpu_ctrl.end_of_interrupt(number as _)
+        cpu_ctrl.init_secondary_cpu_interface();
     }
 }
