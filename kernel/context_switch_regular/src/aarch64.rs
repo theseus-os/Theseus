@@ -22,6 +22,7 @@ pub struct ContextRegular {
 
     // only NZCV & DAIF bits are saved and restored
     pstate: usize,
+    padding: usize,
 }
 
 impl ContextRegular {
@@ -42,6 +43,7 @@ impl ContextRegular {
 
             // interrupts are initially unmasked/enabled
             pstate: 0,
+            padding: 0,
         }
     }
 
