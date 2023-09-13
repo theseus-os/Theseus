@@ -13,7 +13,7 @@ use memory::{
 };
 
 pub fn main(_args: Vec<String>) -> isize {
-    println!("NOTE: Before running, make sure you Theseus has been run with enough memory (make orun QEMU_MEMORY=3G).");
+    println!("NOTE: Before running, make sure you Theseus has been run with enough memory (make orun QEMU_MEMORY=5G).");
     let kernel_mmi_ref = memory::get_kernel_mmi_ref()
         .ok_or("KERNEL_MMI was not yet initialized!")
         .unwrap();

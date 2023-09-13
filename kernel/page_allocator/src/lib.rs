@@ -167,6 +167,7 @@ impl PageRangeSized {
 		}
 	}
 
+    /// Returns a reference to the contained PageRange holding 4kb pages. Returns None if called on a PageRange holding huge pages.
 	pub fn range(&self) -> Option<&PageRange> {
 		match self {
 			PageRangeSized::Normal4KiB(pr) => {
@@ -184,9 +185,6 @@ impl PageRangeSized {
 			PageRangeSized::Huge2MiB(pr) => {
 				Ok(pr.clone())
 			}
-			// PageRangeSized::Normal4KiB(pr) => {
-			// 	Ok(PageRange::<Page2M>::try_from(*pr)?)
-			// }
 			_ => {
 				Err("Called range_2mb on a PageRange with a size other than 2mb")
 			}
@@ -199,9 +197,6 @@ impl PageRangeSized {
 			PageRangeSized::Huge1GiB(pr) => {
 				Ok(pr.clone())
 			}
-			// PageRangeSized::Normal4KiB(pr) => {
-			// 	Ok(PageRange::<Page1G>::try_from(*pr)?)
-			// }
 			_ => {
 				Err("Called range_1gb on a PageRange with a size other than 1gb")
 			}
@@ -213,14 +208,14 @@ impl PageRangeSized {
 			PageRangeSized::Normal4KiB(pr) => {
 				pr.contains(page)
 			}
-			// PageRangeSized::Huge2MiB(pr) => {
-			// 	pr.contains(page)
-			// }
-			// PageRangeSized::Huge1GiB(pr) => {
-			// 	pr.contains(page)
-			// }
-			_ => {
-				false // TODO: change placeholder value
+            // page is a Page<Page4K>, so we need to perform a temporary conversion for other sizes
+			PageRangeSized::Huge2MiB(pr) => { 
+                let pr_4k = PageRange::<Page4K>::from(pr.clone());
+				pr_4k.contains(page)
+			}
+			PageRangeSized::Huge1GiB(pr) => {
+                let pr_4k = PageRange::<Page4K>::from(pr.clone());
+				pr_4k.contains(page)
 			}
 		}
 	}
@@ -428,16 +423,19 @@ impl AllocatedPages {
     }
 
 	/// Returns the starting `Page` in this range of pages.
+	/// This should ONLY be called on 4kb pages, and panics if called on huge pages. TODO: Change the panic behaviour
 	pub fn start(&self) -> &Page {
 		self.pages.start()
 	}
 
-	/// Returns the ending `Page` (inclusive) in this range of pages.
+	/// Returns the ending `Page` (inclusive) in this range of
+	/// This should ONLY be called on 4kb pages, and panics if called on huge pages. TODO: Change the panic behaviour
 	pub fn end(&self) -> &Page {
 		self.pages.end()
 	}
 
 	/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
+	/// Use alternative range() methods for  `PageRange<Page2M>` and  `PageRange<Page1G>`.
 	pub fn range(&self) -> &PageRange {
 		&self.pages.range().expect("Called range() on a PageRange with a size other than 4kb")
 	}
@@ -542,6 +540,7 @@ impl AllocatedPages {
 		self.pages.page_size()
 	}
 
+    /// Converts a range of 4kb `AllocatedPages` into a range of 2mb `AllocatedPages`.
     pub fn to_2mb_allocated_pages(&mut self) {
         self.pages = PageRangeSized::Huge2MiB(
             PageRange::<Page2M>::try_from(
@@ -551,6 +550,7 @@ impl AllocatedPages {
                     .clone()).unwrap())
     }
 
+    /// Converts a range of 4kb `AllocatedPages` into a range of 1gb `AllocatedPages`.
     pub fn to_1gb_allocated_pages(&mut self) {
         self.pages = PageRangeSized::Huge1GiB(
             PageRange::<Page1G>::try_from(
