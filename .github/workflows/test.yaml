@@ -14,5 +14,4 @@ jobs:
         run: sudo apt install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
       - name: "Run tests"
         working-directory: .
-        run: |
-          make test
+        run: make test

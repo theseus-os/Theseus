@@ -1,3 +1,9 @@
+//! An automated test runner.
+//!
+//! The application assumes it is running in a QEMU virtual machine and exits
+//! from QEMU with different exit codes depending on whether the tests passed or
+//! failed.
+
 #![no_std]
 
 use alloc::{boxed::Box, string::String, vec::Vec};
@@ -63,8 +69,8 @@ pub fn main(_: Vec<String>) -> isize {
     let result_str = if num_failed > 0 { "failed" } else { "ok" };
     let num_passed = total - num_failed;
     println!(
-        "test result: {result_str}. {num_passed} passed; {num_failed} failed; \
-         {num_ignored} ignored",
+        "test result: {result_str}. {num_passed} passed; {num_failed} failed; {num_ignored} \
+         ignored",
     );
 
     if num_failed == 0 {
@@ -95,7 +101,13 @@ pub fn run_test(path: Path) -> Result<(), ()> {
 }
 
 fn ignore(name: &str) -> bool {
-    const IGNORED_TESTS: [&str; 2] = ["test_libc", "test_panic"];
+    const IGNORED_TESTS: [&str; 2] = [
+        // `test_libc` requires extra Make commands to run.
+        "test_libc",
+        // `test_panic` panics on success, which isn't easily translatable to
+        // `ExitValue::Completed(0)`.
+        "test_panic",
+    ];
     for test in IGNORED_TESTS {
         if name.starts_with(test) {
             return true;

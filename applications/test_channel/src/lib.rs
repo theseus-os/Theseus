@@ -65,11 +65,6 @@ pub fn main(args: Vec<String>) -> isize {
     opts.optopt("x", "panic_in_send", "Injects a panic at specified message in sender in multiple tests (default no panic)", "SEND_PANIC");
     opts.optopt("y", "panic_in_receive", "Injects a panic at specified message in receiver in multiple tests (default no panic)", "RECEIVE_PANIC");
 
-    opts.optflag("r", "rendezvous", "run the test on the rendezvous-based synchronous channel");
-    opts.optflag("a", "asynchronous", "run the test on the asynchronous buffered channel");
-    opts.optflag("o", "oneshot", "run the 'oneshot' test variant, in which {ITER} tasks are spawned to send/receive one message each.");
-    opts.optflag("m", "multiple", "run the 'multiple' test, in which one sender and one receiver task are spawned to send/receive {ITER} messages.");
-    
     let matches = match opts.parse(args) {
         Ok(m) => m,
         Err(_f) => {
