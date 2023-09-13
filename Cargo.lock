@@ -2838,6 +2838,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qemu-exit"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bb0fd6580eeed0103c054e3fba2c2618ff476943762f28a645b63b8692b21c9"
+
+[[package]]
+name = "qemu_test"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "path",
+ "qemu-exit",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "qp-trie"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3085,16 +3102,6 @@ dependencies = [
  "spin 0.9.4",
  "state_store",
  "x86_64",
-]
-
-[[package]]
-name = "run_tests"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "path",
- "spawn",
- "task",
 ]
 
 [[package]]
@@ -4037,12 +4044,12 @@ dependencies = [
  "print_fault_log",
  "ps",
  "pwd",
+ "qemu_test",
  "raw_mode",
  "rm",
  "rq",
  "rq_access_eval",
  "rq_eval",
- "run_tests",
  "scheduler_eval",
  "seconds_counter",
  "serial_echo",

@@ -28,7 +28,8 @@ use path::Path;
 
 /// See the crate-level docs and this crate's `Cargo.toml` for more.
 const FIRST_APPLICATION_CRATE_NAME: &str = {
-    #[cfg(target_arch = "x86_64")] { "shell-" }
+    #[cfg(all(target_arch = "x86_64", qemu_test))] { "qemu_test-" }
+    #[cfg(all(target_arch = "x86_64", not(qemu_test)))] { "shell-" }
     #[cfg(target_arch = "aarch64")] { "hello-" }
 };
 

@@ -42,12 +42,12 @@ unified_channel = { path = "../kernel/unified_channel", optional = true }
 
 
 ## Test applications.
-run_tests = { path = "../applications/run_tests", optional = true }
 example = { path = "../applications/example", optional = true }
 hello = { path = "../applications/hello", optional = true }
 raw_mode = { path = "../applications/raw_mode", optional = true }
 print_fault_log = { path = "../applications/print_fault_log", optional = true }
 seconds_counter = { path = "../applications/seconds_counter", optional = true }
+qemu_test = { path = "../applications/qemu_test", optional = true }
 test_aligned_page_allocation = { path = "../applications/test_aligned_page_allocation", optional = true }
 test_async = { path = "../applications/test_async", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
@@ -143,7 +143,6 @@ theseus_benchmarks = [
 
 ## Includes all test application crates in the build.
 theseus_tests = [
-    "run_tests",
     "example",
     "hello",
     "raw_mode",
