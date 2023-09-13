@@ -1,6 +1,7 @@
 [package]
 name = "qemu_test"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
 description = "Automated test runner"
 edition = "2021"
 
