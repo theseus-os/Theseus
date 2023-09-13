@@ -1,0 +1,20 @@
+name: QEMU Test
+on:
+  pull_request:
+    types: [synchronize, opened, reopened]
+jobs:
+  run-clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Initialize git submodules"
+        run: |
+          git submodule update --init --recursive
+      - name: "Install nasm"
+        run: sudo apt install nasm
+      - name: "Run tests"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: .
+        run: |
+          make test
