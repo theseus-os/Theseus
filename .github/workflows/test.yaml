@@ -3,7 +3,7 @@ on:
   pull_request:
     types: [synchronize, opened, reopened]
 jobs:
-  run-clippy:
+  run-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -12,9 +12,9 @@ jobs:
           git submodule update --init --recursive
       - name: "Install nasm"
         run: sudo apt install nasm
+      - name: "Install QEMU"
+        run: sudo apt install qemu
       - name: "Run tests"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         working-directory: .
         run: |
           make test
