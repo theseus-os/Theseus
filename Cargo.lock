@@ -3891,18 +3891,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_priority_scheduler"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "log",
- "scheduler",
- "sleep",
- "spawn",
- "time",
-]
-
-[[package]]
 name = "test_restartable"
 version = "0.1.0"
 dependencies = [
@@ -4078,7 +4066,6 @@ dependencies = [
  "test_mlx5",
  "test_panic",
  "test_preemption_counter",
- "test_priority_scheduler",
  "test_restartable",
  "test_scheduler",
  "test_serial_echo",
