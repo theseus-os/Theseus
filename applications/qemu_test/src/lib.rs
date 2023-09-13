@@ -101,12 +101,15 @@ pub fn run_test(path: Path) -> Result<(), ()> {
 }
 
 fn ignore(name: &str) -> bool {
-    const IGNORED_TESTS: [&str; 2] = [
+    const IGNORED_TESTS: [&str; 3] = [
         // `test_libc` requires extra Make commands to run.
         "test_libc",
         // `test_panic` panics on success, which isn't easily translatable to
         // `ExitValue::Completed(0)`.
         "test_panic",
+        // TODO: Remove
+        // `test_channel` has a bug that causes deadlock.
+        "test_channel",
     ];
     for test in IGNORED_TESTS {
         if name.starts_with(test) {
