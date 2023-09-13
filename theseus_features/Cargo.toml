@@ -29,6 +29,7 @@ ps = { path = "../applications/ps", optional = true }
 pwd = { path = "../applications/pwd", optional = true }
 rm = { path = "../applications/rm", optional = true }
 rq = { path = "../applications/rq", optional = true }
+serial_echo = { path = "../applications/serial_echo", optional = true }
 shell = { path = "../applications/shell", optional = true }
 swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
@@ -62,13 +63,12 @@ test_panic = { path = "../applications/test_panic", optional = true }
 test_preemption_counter = { path = "../applications/test_preemption_counter", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_scheduler = { path = "../applications/test_scheduler", optional = true }
-serial_echo = { path = "../applications/serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
 test_sync_block = { path = "../applications/test_sync_block", optional = true }
 test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
+test_tls  = { path = "../applications/test_tls", optional = true }
 test_wait_queue = { path = "../applications/test_wait_queue", optional = true }
 test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
-tls_test = { path = "../applications/tls_test", optional = true }
 
 
 ## Benchmark crates.
@@ -125,6 +125,7 @@ theseus_apps = [
     "pwd",
     "rm",
     "rq",
+    "serial_echo",
     "shell",
     "swap",
     "upd",
@@ -161,12 +162,11 @@ theseus_tests = [
     "test_preemption_counter",
     "test_restartable",
     "test_scheduler",
-    "serial_echo",
     "test_std_fs",
     "test_sync_block",
     "test_task_cancel",
+    "test_tls",
     "test_wait_queue",
     "test_wasmtime",
-    "tls_test",
     "unwind_test",
 ]
