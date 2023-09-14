@@ -48,5 +48,9 @@ ota_update_client = { path = "../ota_update_client" }
 ## Therefore, it has to be unconditionally included.
 simd_personality = { path = "../simd_personality" }
 
+[features]
+qemu_test = ["first_application/qemu_test"]
+shell = ["first_application/shell"]
+
 [lib]
 crate-type = ["rlib"]

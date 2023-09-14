@@ -30,6 +30,8 @@ endif
 ## Set up configuration based on the chosen bootloader specification (boot_spec).
 export override FEATURES+=--features nano_core/$(boot_spec)
 
+export override FEATURES+=--features captain/shell
+
 ifeq ($(boot_spec), bios)
 	ISO_EXTENSION := iso
 else ifeq ($(boot_spec), uefi)
@@ -1082,9 +1084,7 @@ endif
 
 test: export override QEMU_FLAGS += -device isa-debug-exit,iobase=0xf4,iosize=0x04
 test: export override QEMU_FLAGS += -nographic
-test: export override FEATURES +=--features theseus_tests
-test: export override FEATURES +=--features qemu_test
-test: export override RUSTFLAGS +=--cfg qemu_test
+test: export override FEATURES =--features theseus_tests --features captain/qemu_test
 test: $(iso)
 	# We exit with an exit code of 0 if QEMU's exit code is 17, and 2 otherwise.
 	# This is because `qemu_test` uses a value of 0x11 to indicate success.

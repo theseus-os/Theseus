@@ -1181,6 +1181,7 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
+ "qemu_test",
  "shell",
  "spawn",
 ]
