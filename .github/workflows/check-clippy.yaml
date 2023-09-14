@@ -11,7 +11,9 @@ jobs:
         run: |
           git submodule update --init --recursive
       - name: "Install nasm"
-        run: sudo apt install nasm
+        run: |
+          sudo apt update
+          sudo apt install nasm
       - name: "Run Clippy"
         working-directory: .
         run: |
