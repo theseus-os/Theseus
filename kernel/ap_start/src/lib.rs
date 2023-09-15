@@ -51,8 +51,9 @@ pub fn kstart_ap(
     nmi_lint: u8,
     nmi_flags: u16,
 ) -> ! {
-    irq_safety::disable_fast_interrupts();
     irq_safety::disable_interrupts();
+    #[cfg(target_arch = "aarch64")]
+    irq_safety::disable_fast_interrupts();
 
     info!("Booted CPU {}, proc: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}",
         cpu_id, processor_id, _stack_start, _stack_end, nmi_lint, nmi_flags

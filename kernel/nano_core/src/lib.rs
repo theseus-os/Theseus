@@ -87,8 +87,10 @@ fn nano_core<B>(
 where
     B: boot_info::BootInformation
 {
-    irq_safety::disable_fast_interrupts();
     irq_safety::disable_interrupts();
+    #[cfg(target_arch = "aarch64")]
+    irq_safety::disable_fast_interrupts();
+
     println!("nano_core(): Entered early setup. Interrupts disabled.");
 
     #[cfg(target_arch = "x86_64")]
