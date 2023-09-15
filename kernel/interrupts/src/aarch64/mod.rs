@@ -424,7 +424,6 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
             // will use LocalInterruptController
             eoi(irq_num);
         }
-        return;
     } else {
         log::error!("Unhandled IRQ: {}\r\n{:?}\r\n[looping forever now]", irq_num, exc);
         loop { core::hint::spin_loop() }
@@ -450,7 +449,6 @@ extern "C" fn current_elx_fiq(exc: &mut ExceptionContext) {
             let int_ctrl = LocalInterruptController::get();
             unsafe { int_ctrl.end_of_fast_interrupt(irq_num) };
         }
-        return;
     } else {
         log::error!("Unhandled FIQ: {}\r\n{:?}\r\n[looping forever now]", irq_num, exc);
         loop { core::hint::spin_loop() }
