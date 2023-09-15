@@ -4040,6 +4040,7 @@ dependencies = [
  "date",
  "deps",
  "example",
+ "first_application",
  "heap_eval",
  "hello",
  "hull",

@@ -10,6 +10,7 @@ edition = "2021"
 
 [dependencies]
 theseus_std = { path = "../ports/theseus_std", optional = true }
+first_application = { path = "../kernel/first_application", optional = true }
 
 ## Regular applications.
 cat = { path = "../applications/cat", optional = true }

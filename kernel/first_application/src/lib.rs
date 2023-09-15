@@ -26,13 +26,10 @@ use alloc::format;
 use mod_mgmt::CrateNamespace;
 use path::Path;
 
-#[cfg(all(feature = "qemu_test", feature = "shell"))]
-compile_error!("feature \"qemu_test\" and feature \"shell\" cannot be enabled at the same time");
-
 /// See the crate-level docs and this crate's `Cargo.toml` for more.
 const FIRST_APPLICATION_CRATE_NAME: &str = {
     #[cfg(all(target_arch = "x86_64", feature = "qemu_test"))] { "qemu_test-" }
-    #[cfg(all(target_arch = "x86_64", feature = "shell"))] { "shell-" }
+    #[cfg(all(target_arch = "x86_64", not(feature = "qemu_test")))] { "shell-" }
     #[cfg(target_arch = "aarch64")] { "hello-" }
 };
 
