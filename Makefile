@@ -648,7 +648,7 @@ doc:
 		--package stdio \
 		--package str_ref
 ## Now, build the docs for all of Theseus's main kernel crates.
-	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios --features first_application/shell
+	@cargo doc --workspace --no-deps $(addprefix --exclude , $(APP_CRATE_NAMES)) --features nano_core/bios
 	@rustdoc --output target/doc --crate-name "___Theseus_Crates___" $(ROOT_DIR)/kernel/_doc_root.rs
 	@rm -rf $(RUSTDOC_OUT)
 	@mkdir -p $(RUSTDOC_OUT)
