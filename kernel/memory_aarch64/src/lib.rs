@@ -21,11 +21,13 @@ use core::arch::asm;
 
 const THESEUS_ASID: u16 = 0;
 
+/* allow attribute is there for cross-platform doc building */
 /// Flushes the specific virtual address in TLB.
 ///
 /// TLBI => tlb invalidate instruction
 /// "va" => all translations at execution level using the supplied address
 /// "e1" => execution level
+#[allow(unused_variables)]
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
     #[cfg(target_arch = "aarch64")]
     unsafe {

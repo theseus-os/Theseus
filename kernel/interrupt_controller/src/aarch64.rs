@@ -225,27 +225,8 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 }
 
-impl LocalInterruptController {
-    pub unsafe fn acknowledge_fast_interrupt(&self) -> Option<(InterruptNumber, Priority)> {
-        // we cannot lock here
-        // this has to be unsafe
-        let mut_mutex = self.0.get().as_mut().unwrap();
-        let mut cpu_ctrl = mut_mutex.get_mut();
-
-        let opt = cpu_ctrl.acknowledge_interrupt(InterruptGroup::Group0);
-        opt.map(|(num, prio)| (num as _, prio))
-    }
-
-    pub unsafe fn end_of_fast_interrupt(&self, number: InterruptNumber) {
-        // we cannot lock here
-        // this has to be unsafe
-        let mut_mutex = self.0.get().as_mut().unwrap();
-        let mut cpu_ctrl = mut_mutex.get_mut();
-
-        cpu_ctrl.end_of_interrupt(number as _, InterruptGroup::Group0)
-    }
-
-    pub fn enable_fast_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
+impl AArch64LocalInterruptControllerApi for LocalInterruptController {
+    fn enable_fast_local_interrupt(&self, num: InterruptNumber, enabled: bool) {
         assert!(num < 32, "local interrupts have a number < 32");
         let state = match enabled {
             true => Some(InterruptGroup::Group0),
@@ -255,7 +236,7 @@ impl LocalInterruptController {
         cpu_ctrl.set_interrupt_state(num as _, state);
     }
 
-    pub fn send_fast_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
+    fn send_fast_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
         use InterruptDestination::*;
         assert!(num < 16, "IPIs have a number < 16");
 
@@ -269,24 +250,43 @@ impl LocalInterruptController {
         cpu_ctrl.send_ipi(num as _, dest, InterruptGroup::Group0);
     }
 
-    pub fn get_minimum_priority(&self) -> Priority {
+    fn get_minimum_priority(&self) -> Priority {
         let cpu_ctrl = lock!(self);
         cpu_ctrl.get_minimum_priority()
     }
 
-    pub fn set_minimum_priority(&self, priority: Priority) {
+    fn set_minimum_priority(&self, priority: Priority) {
         let mut cpu_ctrl = lock!(self);
         cpu_ctrl.set_minimum_priority(priority)
     }
 
-    pub fn acknowledge_interrupt(&self) -> Option<(InterruptNumber, Priority)> {
+    fn acknowledge_interrupt(&self) -> Option<(InterruptNumber, Priority)> {
         let mut cpu_ctrl = lock!(self);
         let opt = cpu_ctrl.acknowledge_interrupt(InterruptGroup::Group1);
         opt.map(|(num, prio)| (num as _, prio))
     }
 
-    pub fn init_secondary_cpu_interface(&self) {
+    fn init_secondary_cpu_interface(&self) {
         let mut cpu_ctrl = lock!(self);
         cpu_ctrl.init_secondary_cpu_interface();
+    }
+
+    unsafe fn acknowledge_fast_interrupt(&self) -> Option<(InterruptNumber, Priority)> {
+        // we cannot lock here
+        // this has to be unsafe
+        let mut_mutex = self.0.get().as_mut().unwrap();
+        let mut cpu_ctrl = mut_mutex.get_mut();
+
+        let opt = cpu_ctrl.acknowledge_interrupt(InterruptGroup::Group0);
+        opt.map(|(num, prio)| (num as _, prio))
+    }
+
+    unsafe fn end_of_fast_interrupt(&self, number: InterruptNumber) {
+        // we cannot lock here
+        // this has to be unsafe
+        let mut_mutex = self.0.get().as_mut().unwrap();
+        let mut cpu_ctrl = mut_mutex.get_mut();
+
+        cpu_ctrl.end_of_interrupt(number as _, InterruptGroup::Group0)
     }
 }

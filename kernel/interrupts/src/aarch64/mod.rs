@@ -11,7 +11,7 @@ use tock_registers::registers::InMemoryRegister;
 
 use interrupt_controller::{
     LocalInterruptController, SystemInterruptController, InterruptDestination,
-    LocalInterruptControllerApi, SystemInterruptControllerApi,
+    LocalInterruptControllerApi, AArch64LocalInterruptControllerApi, SystemInterruptControllerApi,
 };
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
