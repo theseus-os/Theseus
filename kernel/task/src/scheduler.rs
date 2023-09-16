@@ -100,6 +100,9 @@ where
 }
 
 /// Adds the given task to the least busy run queue.
+///
+/// However, if the task is pinned to a a CPU, this function will respect that,
+/// and only add the task to that CPUs runqueue.
 pub fn add_task(task: TaskRef) {
     if let Some(cpu) = task.pinned_cpu() {
         add_task_to(cpu, task)
