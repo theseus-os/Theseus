@@ -356,7 +356,7 @@ impl TaskRef {
             .runstate()
             .compare_exchange(RunState::Blocked, RunState::Runnable)
             .is_ok()
-            && self.0.is_on_run_queue.load(Ordering::Acquire)
+            && !self.0.is_on_run_queue.load(Ordering::Acquire)
         {
             scheduler::add_task(self.clone());
         }

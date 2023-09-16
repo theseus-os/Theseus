@@ -31,6 +31,7 @@ use spin::Mutex;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
+use task_struct::ExposedTask;
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -387,6 +388,10 @@ impl<F, A, R> TaskBuilder<F, A, R>
         )?;
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
+
+        let exposed = ExposedTask { task: new_task };
+        exposed.inner().lock().pinned_cpu = self.pin_on_cpu;
+        let ExposedTask { task: mut new_task } = exposed;
     
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
@@ -438,12 +443,8 @@ impl<F, A, R> TaskBuilder<F, A, R>
         fence(Ordering::Release);
         
         // Idle tasks are not stored on the run queue.
-        if !self.idle {
-            if let Some(cpu) = self.pin_on_cpu {
-                task::scheduler::add_task_to(cpu, task_ref.clone());
-            } else {
-                task::scheduler::add_task(task_ref.clone());
-            }
+        if !self.idle & !self.blocked {
+            task::scheduler::add_task(task_ref.clone());
         }
 
         Ok(task_ref)

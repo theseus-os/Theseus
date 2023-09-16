@@ -3411,6 +3411,7 @@ dependencies = [
  "spin 0.9.4",
  "stack",
  "task",
+ "task_struct",
  "thread_local_macro",
 ]
 
