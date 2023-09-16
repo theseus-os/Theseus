@@ -101,20 +101,26 @@ where
 
 /// Adds the given task to the least busy run queue.
 pub fn add_task(task: TaskRef) {
-    let locked = SCHEDULERS.lock();
+    if let Some(cpu) = task.pinned_cpu() {
+        add_task_to(cpu, task)
+    } else {
+        let locked = SCHEDULERS.lock();
 
-    let mut min_busyness = usize::MAX;
-    let mut least_busy_index = None;
+        let mut min_busyness = usize::MAX;
+        let mut least_busy_index = None;
 
-    for (i, (_, scheduler)) in locked.iter().enumerate() {
-        let busyness = scheduler.lock().busyness();
-        if busyness < min_busyness {
-            least_busy_index = Some(i);
-            min_busyness = busyness;
+        for (i, (_, scheduler)) in locked.iter().enumerate() {
+            let busyness = scheduler.lock().busyness();
+            if busyness < min_busyness {
+                least_busy_index = Some(i);
+                min_busyness = busyness;
+            }
         }
-    }
 
-    locked[least_busy_index.unwrap()].1.lock().add(task);
+        // TODO: This will break if the scheduler is removed betwen the for loop and
+        // here. This isn't currently a problem because we never remove schedulers.
+        locked[least_busy_index.unwrap()].1.lock().add(task);
+    }
 }
 
 /// Adds the given task to the specified CPU's run queue.
