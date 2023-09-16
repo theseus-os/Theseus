@@ -1,11 +1,12 @@
 //! This scheduler implements a priority algorithm.
 
 #![no_std]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, collections::BinaryHeap, vec::Vec};
-use core::cmp::Ordering;
+use core::{cmp, intrinsics::unlikely, sync::atomic};
 
 use task::TaskRef;
 use time::Instant;
@@ -24,34 +25,41 @@ impl Scheduler {
             queue: BinaryHeap::new(),
         }
     }
+
+    fn add_priority_task(&mut self, task: PriorityTaskRef) {
+        task.task
+            .expose_is_on_run_queue()
+            .store(true, atomic::Ordering::Release);
+        self.queue.push(task);
+    }
 }
 
 impl task::scheduler::Scheduler for Scheduler {
     fn next(&mut self) -> TaskRef {
-        // This is a temporary solution before the PR to only store runnable tasks in
-        // the run queue is merged.
-        let mut blocked_tasks = Vec::with_capacity(2);
-        while let Some(mut task) = self.queue.pop() {
+        while let Some(task) = self.queue.pop() {
             if task.task.is_runnable() {
-                for t in blocked_tasks {
-                    self.queue.push(t)
-                }
-                task.last_ran = time::now::<time::Monotonic>();
-                self.queue.push(task.clone());
+                self.add_priority_task(task.clone());
                 return task.task;
             } else {
-                blocked_tasks.push(task);
+                task.task
+                    .expose_is_on_run_queue()
+                    .store(false, atomic::Ordering::Release);
+                // This check prevents an interleaving where `TaskRef::unblock` wouldn't add
+                // the task back onto the run queue. `TaskRef::unblock` sets the run state and
+                // then checks `is_on_run_queue` so we have to do the opposite.
+                //
+                // TODO: This could be a relaxed load followed by a fence in the if statement.
+                if unlikely(task.task.is_runnable()) {
+                    self.add_priority_task(task.clone());
+                    return task.task;
+                }
             }
-        }
-        for task in blocked_tasks {
-            self.queue.push(task);
         }
         self.idle_task.clone()
     }
 
     fn add(&mut self, task: TaskRef) {
-        self.queue
-            .push(PriorityTaskRef::new(task, DEFAULT_PRIORITY));
+        self.add_priority_task(PriorityTaskRef::new(task, DEFAULT_PRIORITY));
     }
 
     fn busyness(&self) -> usize {
@@ -144,10 +152,10 @@ impl PartialEq for PriorityTaskRef {
 }
 
 impl PartialOrd for PriorityTaskRef {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
         match self.priority.cmp(&other.priority) {
             // Tasks that were ran longer ago should be prioritised.
-            Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
+            cmp::Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
             ordering => Some(ordering),
         }
     }

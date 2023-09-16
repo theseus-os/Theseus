@@ -3,10 +3,12 @@
 //! This task is then moved to the back of the queue.
 
 #![no_std]
+#![feature(core_intrinsics)]
 
 extern crate alloc;
 
 use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
+use core::{intrinsics::unlikely, sync::atomic::Ordering};
 
 use task::TaskRef;
 
@@ -26,18 +28,25 @@ impl Scheduler {
 
 impl task::scheduler::Scheduler for Scheduler {
     fn next(&mut self) -> TaskRef {
-        if let Some((task_index, _)) = self
-            .queue
-            .iter()
-            .enumerate()
-            .find(|(_, task)| task.is_runnable())
-        {
-            let task = self.queue.swap_remove_front(task_index).unwrap();
-            self.queue.push_back(task.clone());
-            task
-        } else {
-            self.idle_task.clone()
+        while let Some(task) = self.queue.pop_front() {
+            if task.is_runnable() {
+                self.add(task.clone());
+                return task;
+            } else {
+                task.expose_is_on_run_queue()
+                    .store(false, Ordering::Release);
+                // This check prevents an interleaving where `TaskRef::unblock` wouldn't add
+                // the task back onto the run queue. `TaskRef::unblock` sets the run state and
+                // then checks `is_on_run_queue` so we have to do the opposite.
+                //
+                // TODO: This could be a relaxed load followed by a fence in the if statement.
+                if unlikely(task.is_runnable()) {
+                    self.add(task.clone());
+                    return task;
+                }
+            }
         }
+        self.idle_task.clone()
     }
 
     fn busyness(&self) -> usize {
@@ -45,6 +54,7 @@ impl task::scheduler::Scheduler for Scheduler {
     }
 
     fn add(&mut self, task: TaskRef) {
+        task.expose_is_on_run_queue().store(true, Ordering::Release);
         self.queue.push_back(task);
     }
 

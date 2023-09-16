@@ -49,7 +49,7 @@ use core::{
 };
 use cpu::CpuId;
 use irq_safety::hold_interrupts;
-use log::error;
+use log::{error, warn};
 use environment::Environment;
 use memory::MmiRef;
 use no_drop::NoDrop;
@@ -280,6 +280,56 @@ impl TaskRef {
     fn set_as_current_task(&self) {
         // SAFETY: We don't drop the TLS area until the task is finished.
         unsafe { self.0.task.tls_area().set_as_current_tls() };
+    }
+
+    /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
+    ///
+    /// Returns the previous runstate on success, and the current runstate on error.
+    /// This will only succeed if the task is runnable or already blocked.
+    pub fn block(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        let run_state = self.0.task.runstate();
+
+        if run_state.compare_exchange(Runnable, Blocked).is_ok() {
+            Ok(Runnable)
+        } else if run_state.compare_exchange(Blocked, Blocked).is_ok() {
+            warn!("Blocked an already blocked task: {:?}", self);
+            Ok(Blocked)
+        } else {
+            Err(run_state.load())
+        }
+    }
+
+    /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
+    ///
+    /// Returns the previous runstate on success, and the current runstate on
+    /// error. Will only succed if the task is blocked or already runnable.
+    pub fn unblock(&self) -> Result<RunState, RunState> {
+        use RunState::{Blocked, Runnable};
+
+        let exposed_task = &self.0.task;
+        let run_state = exposed_task.runstate();
+
+        if run_state.compare_exchange(Blocked, Runnable).is_ok() {
+            if !exposed_task.is_on_run_queue().load(Ordering::Acquire) {
+                scheduler::add_task(self.clone());
+            }
+            Ok(Blocked)
+        } else if run_state.compare_exchange(Runnable, Runnable).is_ok() {
+            warn!("Unblocked an already runnable task: {:?}", self);
+            if !exposed_task.is_on_run_queue().load(Ordering::Acquire) {
+                scheduler::add_task(self.clone());
+            }
+            Ok(Runnable)
+        } else {
+            Err(run_state.load())
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn expose_is_on_run_queue(&self) -> &AtomicBool {
+        self.0.task.is_on_run_queue()
     }
 }
 

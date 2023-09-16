@@ -234,6 +234,7 @@ pub struct Task {
     ///
     /// This is not public because it permits interior mutability.
     suspended: AtomicBool,
+    is_on_run_queue: AtomicBool,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -337,6 +338,7 @@ impl Task {
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
             suspended: AtomicBool::new(false),
+            is_on_run_queue: AtomicBool::new(false),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -468,23 +470,6 @@ impl Task {
         self.inner.lock().restart_info.is_some()
     }
 
-    /// Blocks this `Task` by setting its runstate to [`RunState::Blocked`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on error.
-    /// This will only succeed if the task is runnable or already blocked.
-    pub fn block(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable};
-
-        if self.runstate.compare_exchange(Runnable, Blocked).is_ok() {
-            Ok(Runnable)
-        } else if self.runstate.compare_exchange(Blocked, Blocked).is_ok() {
-            warn!("Blocked an already blocked task: {:?}", self);
-            Ok(Blocked)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-
     /// Blocks this `Task` if it is a newly-spawned task currently being initialized.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -500,23 +485,6 @@ impl Task {
         }
     }
 
-    /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
-    ///
-    /// Returns the previous runstate on success, and the current runstate on
-    /// error. Will only succed if the task is blocked or already runnable.
-    pub fn unblock(&self) -> Result<RunState, RunState> {
-        use RunState::{Blocked, Runnable};
-
-        if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
-            Ok(Blocked)
-        } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
-            warn!("Unblocked an already runnable task: {:?}", self);
-            Ok(Runnable)
-        } else {
-            Err(self.runstate.load())
-        }
-    }
-    
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
@@ -607,6 +575,10 @@ impl ExposedTask {
     #[inline(always)]
     pub fn running_on_cpu(&self) -> &AtomicCell<OptionalCpuId> {
         &self.running_on_cpu
+    }
+    #[inline(always)]
+    pub fn is_on_run_queue(&self) -> &AtomicBool {
+        &self.is_on_run_queue
     }
     #[inline(always)]
     pub fn runstate(&self) -> &AtomicCell<RunState> {
