@@ -31,6 +31,7 @@ pub fn test_pinned() {
     let tasks = cpus()
         .map(|cpu| {
             (
+                #[allow(clippy::clone_on_copy)]
                 cpu.clone(),
                 (0..100)
                     .map(move |id| {
@@ -70,7 +71,9 @@ pub fn test_pinned() {
 
     fn pinned_worker(pinned_cpu: CpuId) {
         let mut rng = random::init_rng::<rand::rngs::SmallRng>().unwrap();
-        while !READY.load(Ordering::Acquire) {}
+        while !READY.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
 
         let locked = TASKS.read();
         let tasks = &locked.iter().find(|(cpu, _)| *cpu == pinned_cpu).unwrap().1;
@@ -89,9 +92,9 @@ pub fn test_pinned() {
                 continue;
             }
 
-            let _ = random_task.block_no_log();
+            random_task.block_no_log();
             task::schedule();
-            let _ = random_task.unblock_no_log();
+            random_task.unblock_no_log();
         }
     }
 }
@@ -124,10 +127,10 @@ pub fn test_unpinned() {
     let mut rng = random::init_rng::<rand::rngs::SmallRng>().unwrap();
     while NUM_RUNNING.load(Ordering::Relaxed) != 0 {
         let random_task = tasks.choose(&mut rng).unwrap();
-        let _ = random_task.block_no_log();
+        random_task.block_no_log();
         // Let the worker tasks on this core run.
         task::schedule();
-        let _ = random_task.unblock_no_log();
+        random_task.unblock_no_log();
     }
 
     for task in tasks {
@@ -135,7 +138,9 @@ pub fn test_unpinned() {
     }
 
     fn unpinned_worker(_: ()) {
-        while !READY.load(Ordering::Acquire) {}
+        while !READY.load(Ordering::Acquire) {
+            core::hint::spin_loop();
+        }
 
         for _ in 0..1000 {
             task::schedule();
