@@ -3812,10 +3812,13 @@ dependencies = [
 name = "test_scheduler"
 version = "0.1.0"
 dependencies = [
+ "app_io",
  "cpu",
  "log",
- "scheduler",
+ "rand",
+ "random",
  "spawn",
+ "sync_block",
  "task",
 ]
 

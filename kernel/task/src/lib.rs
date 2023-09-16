@@ -304,6 +304,20 @@ impl TaskRef {
         }
     }
 
+    /// Same as [`block`], but doesn't print a warning if the task is already
+    /// blocked.
+    ///
+    /// This method can be useful if blocking potentially blocked tasks in a
+    /// loop (e.g. `test_scheduler`). Logging is very slow, and this function
+    /// can lead to a `100x` performance improvement.
+    pub fn block_no_log(&self) {
+        let _ = self
+            .0
+            .task
+            .runstate()
+            .compare_exchange(RunState::Runnable, RunState::Blocked);
+    }
+
     /// Unblocks this `Task` by setting its runstate to [`RunState::Runnable`].
     ///
     /// Returns the previous runstate on success, and the current runstate on
@@ -326,6 +340,26 @@ impl TaskRef {
             Ok(Runnable)
         } else {
             Err(run_state.load())
+        }
+    }
+
+    /// Same as [`unblock`], but doesn't print a warning if the task is already
+    /// unblocked.
+    ///
+    /// This method can be useful if unblocking potentially unblocked tasks in a
+    /// loop (e.g. `test_scheduler`). Logging is very slow, and this function
+    /// can lead to a `100x` performance improvement.
+    pub fn unblock_no_log(&self) {
+        if self
+            .0
+            .task
+            .runstate()
+            .compare_exchange(RunState::Blocked, RunState::Runnable)
+            .is_ok()
+        {
+            if !self.0.is_on_run_queue.load(Ordering::Acquire) {
+                scheduler::add_task(self.clone());
+            }
         }
     }
 
