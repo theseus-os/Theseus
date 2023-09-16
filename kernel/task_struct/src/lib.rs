@@ -234,7 +234,6 @@ pub struct Task {
     ///
     /// This is not public because it permits interior mutability.
     suspended: AtomicBool,
-    is_on_run_queue: AtomicBool,
     /// Memory management details: page tables, mappings, allocators, etc.
     /// This is shared among all other tasks in the same address space.
     pub mmi: MmiRef, 
@@ -338,7 +337,6 @@ impl Task {
             running_on_cpu: AtomicCell::new(None.into()),
             runstate: AtomicCell::new(RunState::Initing),
             suspended: AtomicBool::new(false),
-            is_on_run_queue: AtomicBool::new(false),
             mmi,
             is_an_idle_task: false,
             app_crate,
@@ -575,10 +573,6 @@ impl ExposedTask {
     #[inline(always)]
     pub fn running_on_cpu(&self) -> &AtomicCell<OptionalCpuId> {
         &self.running_on_cpu
-    }
-    #[inline(always)]
-    pub fn is_on_run_queue(&self) -> &AtomicBool {
-        &self.is_on_run_queue
     }
     #[inline(always)]
     pub fn runstate(&self) -> &AtomicCell<RunState> {

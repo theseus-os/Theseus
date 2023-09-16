@@ -136,6 +136,8 @@ struct TaskRefInner {
     ///
     /// This is not public because it permits interior mutability.
     joinable: AtomicBool,
+    /// Whether a task is on the run queue.
+    is_on_run_queue: AtomicBool,
 }
 
 impl TaskRef {
@@ -163,6 +165,7 @@ impl TaskRef {
             exit_value_mailbox,
             // A new task is joinable until its `JoinableTaskRef` is dropped.
             joinable: AtomicBool::new(true),
+            is_on_run_queue: AtomicBool::new(false),
         }));
 
         // Add the new TaskRef to the global task list.
@@ -308,17 +311,16 @@ impl TaskRef {
     pub fn unblock(&self) -> Result<RunState, RunState> {
         use RunState::{Blocked, Runnable};
 
-        let exposed_task = &self.0.task;
-        let run_state = exposed_task.runstate();
+        let run_state = &self.0.task.runstate();
 
         if run_state.compare_exchange(Blocked, Runnable).is_ok() {
-            if !exposed_task.is_on_run_queue().load(Ordering::Acquire) {
+            if !self.0.is_on_run_queue.load(Ordering::Acquire) {
                 scheduler::add_task(self.clone());
             }
             Ok(Blocked)
         } else if run_state.compare_exchange(Runnable, Runnable).is_ok() {
             warn!("Unblocked an already runnable task: {:?}", self);
-            if !exposed_task.is_on_run_queue().load(Ordering::Acquire) {
+            if !self.0.is_on_run_queue.load(Ordering::Acquire) {
                 scheduler::add_task(self.clone());
             }
             Ok(Runnable)
@@ -329,7 +331,7 @@ impl TaskRef {
 
     #[doc(hidden)]
     pub fn expose_is_on_run_queue(&self) -> &AtomicBool {
-        self.0.task.is_on_run_queue()
+        &self.0.is_on_run_queue
     }
 }
 

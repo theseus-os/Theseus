@@ -37,9 +37,7 @@ impl task::scheduler::Scheduler for Scheduler {
                     .store(false, Ordering::Release);
                 // This check prevents an interleaving where `TaskRef::unblock` wouldn't add
                 // the task back onto the run queue. `TaskRef::unblock` sets the run state and
-                // then checks `is_on_run_queue` so we have to do the opposite.
-                //
-                // TODO: This could be a relaxed load followed by a fence in the if statement.
+                // then checks `is_on_run_queue` so we have to do the inverse.
                 if unlikely(task.is_runnable()) {
                     self.add(task.clone());
                     return task;

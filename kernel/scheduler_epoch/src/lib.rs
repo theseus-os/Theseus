@@ -42,22 +42,6 @@ impl Scheduler {
         }
     }
 
-    // /// Moves the `TaskRef` at the given index in this `RunQueue` to the end
-    // /// (back) of this `RunQueue`, and returns a cloned reference to that
-    // /// `TaskRef`. The number of tokens is reduced by one and number of context
-    // /// switches is increased by one. This function is used when the task is
-    // /// selected by the scheduler
-    // fn update_and_move_to_end(&mut self, index: usize, tokens: usize) ->
-    // Option<TaskRef> {     if let Some(mut priority_task_ref) =
-    // self.queue.remove(index) {         priority_task_ref.tokens_remaining =
-    // tokens;         let task_ref = priority_task_ref.task.clone();
-    //         self.queue.push_back(priority_task_ref);
-    //         Some(task_ref)
-    //     } else {
-    //         None
-    //     }
-    // }
-
     fn try_next(&mut self) -> Option<TaskRef> {
         while let Some(task) = self.have_tokens.pop_front() {
             if task.task.is_runnable() {
@@ -68,11 +52,9 @@ impl Scheduler {
                 task.task
                     .expose_is_on_run_queue()
                     .store(false, Ordering::Release);
-                // Checking this prevents an interleaving where `TaskRef::unblock` wouldn't add
+                // This check prevents an interleaving where `TaskRef::unblock` wouldn't add
                 // the task back onto the run queue. `TaskRef::unblock` sets the run state and
-                // then checks is_on_run_queue so we have to do the opposite.
-                //
-                // TODO: This could be a relaxed load followed by a fence in the if statement.
+                // then checks `is_on_run_queue` so we have to do the inverse.
                 if unlikely(task.task.is_runnable()) {
                     if let Some(task) = self.add_epoch_task(task) {
                         return Some(task);
