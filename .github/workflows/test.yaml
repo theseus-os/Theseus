@@ -1,21 +1,20 @@
-name: Clippy Checks
+name: QEMU Test
 on:
   pull_request:
     types: [synchronize, opened, reopened]
 jobs:
-  run-clippy:
+  run-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: "Initialize git submodules"
         run: |
           git submodule update --init --recursive
-      - name: "Install nasm"
+      - name: "Install dependencies"
         run: |
           sudo apt update
-          sudo apt install nasm
-      - name: "Run Clippy"
+          sudo apt install make gcc nasm pkg-config grub-pc-bin mtools xorriso qemu qemu-kvm wget
+      - name: "Run tests"
         working-directory: .
-        run: |
-          make clippy ARCH=x86_64
-          make clippy ARCH=aarch64
+        run: make test
+        timeout-minutes: 10
