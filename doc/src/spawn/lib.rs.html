@@ -1019,6 +1019,11 @@
 <a href="#1019" id="1019">1019</a>
 <a href="#1020" id="1020">1020</a>
 <a href="#1021" id="1021">1021</a>
+<a href="#1022" id="1022">1022</a>
+<a href="#1023" id="1023">1023</a>
+<a href="#1024" id="1024">1024</a>
+<a href="#1025" id="1025">1025</a>
+<a href="#1026" id="1026">1026</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1052,6 +1057,7 @@
 <span class="kw">use </span>memory::{get_kernel_mmi_ref, MmiRef};
 <span class="kw">use </span>stack::Stack;
 <span class="kw">use </span>task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
+<span class="kw">use </span>task_struct::ExposedTask;
 <span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 <span class="kw">use </span>path::Path;
 <span class="kw">use </span>fs_node::FileOrDir;
@@ -1402,7 +1408,11 @@
         )<span class="question-mark">?</span>;
         <span class="comment">// If a Task name wasn&#39;t provided, then just use the function&#39;s name.
         </span>new_task.name = <span class="self">self</span>.name.unwrap_or_else(|| String::from(core::any::type_name::&lt;F&gt;()));
-    
+
+        <span class="kw">let </span>exposed = ExposedTask { task: new_task };
+        exposed.inner().lock().pinned_cpu = <span class="self">self</span>.pin_on_cpu;
+        <span class="kw">let </span>ExposedTask { task: <span class="kw-2">mut </span>new_task } = exposed;    
+
         <span class="attr">#[cfg(simd_personality)] </span>{  
             new_task.simd = <span class="self">self</span>.simd;
         }
