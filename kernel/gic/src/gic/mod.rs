@@ -19,11 +19,12 @@ use dist_interface::{DistRegsP1, DistRegsP6};
 use cpu_interface_gicv2::CpuRegsP1;
 use redist_interface::{RedistRegsP1, RedistRegsSgiPpi};
 
+/// Whether an interrupt is put in Group 0 (FIQs) or Group 1 (IRQs)
 #[repr(u32)]
 pub enum InterruptGroup {
-    // FIQs
+    /// Group 0 is used for FIQs (fast interrupts)
     Group0 = 0,
-    // IRQs
+    /// Group 1 is used for IRQs (regular interrupts)
     Group1 = 1,
 }
 
@@ -130,6 +131,7 @@ impl SpiDestination {
 }
 
 const U32BITS: usize = u32::BITS as usize;
+const SPURIOUS_INTERRUPT_NUM: InterruptNumber = 1023;
 
 // Reads one item of an array spanning across
 // multiple u32s.
@@ -248,6 +250,11 @@ impl ArmGicDistributor {
 
     /// Returns whether the given interrupt is forwarded by the distributor.
     ///
+    /// This returns:
+    /// - `None` if the interrupt is disabled.
+    /// - [`InterruptGroup::Group0`] if the interrupt is enabled and configured as a Group 0 interrupt.
+    /// - [`InterruptGroup::Group1`] if the interrupt is enabled and configured as a Group 1 interrupt.
+    ///
     /// Panics if `int` is not in the SPI range (>= 32).
     pub fn get_spi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
         assert!(int >= 32, "get_spi_state: `int` must be >= 32");
@@ -256,6 +263,11 @@ impl ArmGicDistributor {
 
     /// Enables or disables the forwarding of the given interrupt
     /// by the distributor.
+    ///
+    /// If `state` is `None`, the interrupt will be disabled.
+    /// If it contains [`InterruptGroup::Group0`], the interrupt will be enabled and
+    /// configured as a Group 0 interrupt; if it contains [`InterruptGroup::Group1`],
+    /// the interrupt will be enabled and configured as a Group 1 interrupt.
     ///
     /// Panics if `int` is not in the SPI range (>= 32).
     pub fn set_spi_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {

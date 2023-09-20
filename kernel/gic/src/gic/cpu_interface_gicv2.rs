@@ -8,6 +8,7 @@
 
 use super::Priority;
 use super::InterruptNumber;
+use super::SPURIOUS_INTERRUPT_NUM;
 
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
@@ -97,7 +98,7 @@ impl CpuRegsP1 {
         let priority = self.running_prio.read() as u8;
 
         match int_num {
-            1023 => None,
+            SPURIOUS_INTERRUPT_NUM => None,
             _ => Some((int_num, priority))
         }
     }

@@ -12,6 +12,7 @@ use super::IpiTargetCpu;
 use super::Priority;
 use super::InterruptNumber;
 use super::InterruptGroup;
+use super::SPURIOUS_INTERRUPT_NUM;
 
 const SGIR_TARGET_ALL_OTHER_PE: u64 = 1 << 40;
 const IGRPEN_ENABLED: u64 = 1;
@@ -95,9 +96,9 @@ pub fn acknowledge_interrupt(group: InterruptGroup) -> Option<(InterruptNumber, 
 
     let int_num = int_num & 0xffffff;
     let priority = priority & 0xff;
-    match int_num {
-        1023 => None,
-        _ => Some((int_num as InterruptNumber, priority as u8))
+    match int_num as InterruptNumber {
+        SPURIOUS_INTERRUPT_NUM => None,
+        n => Some((n, priority as u8)),
     }
 }
 
