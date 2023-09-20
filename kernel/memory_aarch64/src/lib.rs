@@ -16,29 +16,28 @@ use pte_flags::PteFlags;
 use boot_info::{BootInformation, ElfSection};
 use kernel_config::memory::KERNEL_OFFSET;
 
-#[cfg(target_arch = "aarch64")]
+#[cfg(any(doc, target_arch = "aarch64"))]
 use core::arch::asm;
 
 const THESEUS_ASID: u16 = 0;
 
-/* allow attribute is there for cross-platform doc building */
 /// Flushes the specific virtual address in TLB.
 ///
 /// TLBI => tlb invalidate instruction
 /// "va" => all translations at execution level using the supplied address
 /// "e1" => execution level
-#[allow(unused_variables)]
+#[cfg(any(doc, target_arch = "aarch64"))]
 pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
-    #[cfg(target_arch = "aarch64")]
-    unsafe {
-        // unsure here: where should the original address ASID go?
-        // it's zero in theseus so it's not important for us
+    // unsure here: where should the original address ASID go?
+    // it's zero in theseus so it's not important for us
 
-        // about the 48 bit shift:
-        // If the implementation supports 16 bits of ASID, then the
-        // upper 8 bits of the ASID must be written to 0 by software
-        // when the context being invalidated only uses 8 bits
-        let value = ((THESEUS_ASID as usize) << 48) | (vaddr.value() >> 12);
+    // about the 48 bit shift:
+    // If the implementation supports 16 bits of ASID, then the
+    // upper 8 bits of the ASID must be written to 0 by software
+    // when the context being invalidated only uses 8 bits
+    let value = ((THESEUS_ASID as usize) << 48) | (vaddr.value() >> 12);
+
+    unsafe {
         asm!("tlbi vae1, {}", in(reg) value)
     };
 }
@@ -52,8 +51,8 @@ pub fn tlb_flush_virt_addr(vaddr: VirtualAddress) {
 /// "va" => all translations at execution level using the supplied address
 /// "e1" => execution level
 /// "os" => outer shareable domain
+#[cfg(any(doc, target_arch = "aarch64"))]
 pub fn tlb_flush_virt_addr_all_cpus(vaddr: VirtualAddress) {
-    #[cfg(target_arch = "aarch64")]
     unsafe {
         let value = ((THESEUS_ASID as usize) << 48) | (vaddr.value() >> 12);
         asm!(".arch armv8.4-a\ntlbi vae1os, {}", in(reg) value)
@@ -67,11 +66,12 @@ pub fn tlb_flush_virt_addr_all_cpus(vaddr: VirtualAddress) {
 /// TLBI => tlb invalidate instruction
 /// "asid" => all entries with specific ASID
 /// "e1" => execution level
+#[cfg(any(doc, target_arch = "aarch64"))]
 pub fn tlb_flush_by_theseus_asid() {
-    #[cfg(target_arch = "aarch64")]
     unsafe { asm!("tlbi aside1, {:x}", in(reg) THESEUS_ASID) };
 }
 
+#[cfg(any(doc, target_arch = "aarch64"))]
 pub use tlb_flush_by_theseus_asid as tlb_flush_all;
 
 /// Returns the current top-level page table address.
