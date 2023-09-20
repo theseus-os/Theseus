@@ -184,8 +184,32 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
     Ok(())
 }
 
+/// This function registers an interrupt handler for an inter-processor interrupt
+/// and handles interrupt controller configuration for that interrupt.
+///
+/// Returns an error if the specified interrupt number already has a registered handler.
+pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) -> Result<(), &'static str> {
+    // register the handler
+    if let Err(existing_handler) = register_interrupt(local_num, handler) {
+        if handler as *const InterruptHandler != existing_handler {
+            return Err("A different interrupt handler has already been setup for that IPI");
+        }
+    }
+
+    {
+        let int_ctrl = LocalInterruptController::get();
+
+        // enable routing of this interrupt
+        int_ctrl.enable_local_interrupt(local_num, true);
+    }
+
+    Ok(())
+}
+
 /// This function registers an interrupt handler for the TLB Shootdown IPI
 /// and handles interrupt controller configuration for that interrupt.
+///
+/// Returns an error if the TLB Shootdown interrupt number already has a registered handler.
 pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'static str> {
     if let Err(existing_handler) = register_interrupt(TLB_SHOOTDOWN_IPI, handler) {
         if handler as *const InterruptHandler != existing_handler {
@@ -194,6 +218,7 @@ pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'st
     }
 
     {
+        // enable this interrupt as a Fast interrupt (FIQ / Group 0 interrupt)
         let int_ctrl = LocalInterruptController::get();
         int_ctrl.enable_fast_local_interrupt(TLB_SHOOTDOWN_IPI, true);
     }
