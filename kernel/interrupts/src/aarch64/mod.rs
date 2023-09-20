@@ -308,8 +308,16 @@ pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) ->
     }
 }
 
+/// Broadcast an Inter-Processor Interrupt to all other CPU cores in the system
+pub fn broadcast_ipi(ipi_num: InterruptNumber) {
+    let int_ctrl = LocalInterruptController::get();
+    int_ctrl.send_ipi(ipi_num, InterruptDestination::AllOtherCpus);
+}
+
 /// Broadcast the TLB Shootdown Inter-Processor Interrupt to all other
 /// CPU cores in the system
+///
+/// This IPI uses fast interrupts (FIQs) as an NMI alternative.
 pub fn broadcast_tlb_shootdown_ipi() {
     let int_ctrl = LocalInterruptController::get();
     int_ctrl.send_fast_ipi(TLB_SHOOTDOWN_IPI, InterruptDestination::AllOtherCpus);
