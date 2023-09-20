@@ -40,7 +40,8 @@ pub fn init() {
 pub fn handle_tlb_shootdown_ipi() -> bool {
     let pages_to_invalidate = TLB_SHOOTDOWN_IPI_PAGES.read().clone();
     if let Some(pages) = pages_to_invalidate {
-        // THIS LOG USAGE CAN CAUSE A DEADLOCK ON AARCH64
+        // Note: logging in a NMI (x86_64) or FIQ (aarch64) context can cause deadlock,
+        // so this should only be used sparingly to help debug problems with TLB shootdowns.
         // log::trace!("handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}", apic::current_cpu(), pages);
         for page in pages {
             tlb_flush_virt_addr(page.start_address());
