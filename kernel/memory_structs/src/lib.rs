@@ -3,7 +3,7 @@
 //! The types of interest are divided into three categories:
 //! 1. addresses: `VirtualAddress` and `PhysicalAddress`.
 //! 2. "chunk" types: `Page` and `Frame`.
-//! 3. ranges of chunks: `PageRange` and `FrameRange`.  
+//! 3. ranges of chunks: `PageRange` and `FrameRange`.
 
 #![no_std]
 #![feature(step_trait)]
@@ -100,9 +100,9 @@ macro_rules! implement_address {
 
             #[doc = "A " $desc " memory address, which is a `usize` under the hood."]
             #[derive(
-                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, 
-                Binary, Octal, LowerHex, UpperHex, 
-                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign, 
+                Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default,
+                Binary, Octal, LowerHex, UpperHex,
+                BitAnd, BitOr, BitXor, BitAndAssign, BitOrAssign, BitXorAssign,
                 Add, Sub, AddAssign, SubAssign,
                 FromBytes,
             )]
@@ -111,7 +111,7 @@ macro_rules! implement_address {
 
             impl $TypeName {
                 #[doc = "Creates a new `" $TypeName "`, returning an error if the address is not canonical.\n\n \
-                    This is useful for checking whether an address is valid before using it. 
+                    This is useful for checking whether an address is valid before using it.
                     For example, on x86_64, virtual addresses are canonical
                     if their upper bits `(64:48]` are sign-extended from bit 47,
                     and physical addresses are canonical if their upper bits `(64:52]` are 0."]
@@ -471,17 +471,26 @@ macro_rules! implement_page_frame {
                 }
             }
             impl From<$TypeName<Page1G>> for $TypeName<Page4K> {
-                fn from(p: $TypeName<Page1G>) -> Self { 
-                    Self {                             
+                fn from(p: $TypeName<Page1G>) -> Self {
+                    Self {
                         number: p.number,
                         size: PhantomData
                     }
                 }
             }
             impl From<$TypeName<Page2M>> for $TypeName<Page4K> {
-                fn from(p: $TypeName<Page2M>) -> Self { 
-                    Self {                             
+                fn from(p: $TypeName<Page2M>) -> Self {
+                    Self {
                         number: p.number,
+                        size: PhantomData
+                    }
+                }
+            }
+
+            impl<P: PageSize> $TypeName<P> {
+                pub fn convert_to_4k(&self) -> $TypeName<Page4K> {
+                    $TypeName {
+                        number: self.number,
                         size: PhantomData
                     }
                 }
@@ -526,16 +535,16 @@ impl<P: PageSize + 'static> Page<P> {
 macro_rules! implement_page_frame_range {
     ($TypeName:ident, $desc:literal, $short:ident, $chunk:ident, $address:ident) => {
         paste! { // using the paste crate's macro for easy concatenation
-                        
+
             #[doc = "A range of [`" $chunk "`]s that are contiguous in " $desc " memory."]
             #[derive(Clone, PartialEq, Eq)]
             pub struct $TypeName<P: PageSize = Page4K>(RangeInclusive<$chunk::<P>>);
 
             impl $TypeName<Page4K> {
-                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
-                pub const fn empty() -> Self {
-                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
-                }
+                // #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
+                // pub const fn empty() -> Self {
+                //     Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
+                // }
 
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
                     all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
@@ -552,7 +561,24 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
+            impl $TypeName<Page2M> {
+                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
+                pub const fn empty_2mb() -> Self {
+                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
+                }
+            }
+            impl $TypeName<Page1G> {
+                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
+                pub const fn empty_1gb() -> Self {
+                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
+                }
+            }
             impl<P: PageSize + 'static> $TypeName<P> {
+                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
+                pub const fn empty() -> Self {
+                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
+                }
+
                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
                 pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
                     $TypeName(RangeInclusive::new(start, end))
@@ -669,7 +695,7 @@ macro_rules! implement_page_frame_range {
                 }
             }
 
-            
+
             #[doc = "A `" $TypeName "` that implements `Copy`."]
             #[derive(Clone, Copy)]
             pub struct [<Copyable $TypeName>]<P: PageSize = Page4K> {
@@ -719,6 +745,233 @@ macro_rules! implement_page_frame_range {
                         ));
                     } else {
                         return Err("Could not convert 4KiB page range into 1GiB page range.");
+                    }
+                }
+            }
+
+            /// An enum used to wrap the generic $TypeName variants corresponding to different page sizes.
+            /// Additional methods corresponding to $TypeName methods are provided in order to destructure the enum variants.
+            #[derive(Debug, Clone, PartialEq, Eq)]
+            pub enum [<$TypeName Sized>] {
+                Normal4KiB($TypeName),
+                Huge2MiB($TypeName<Page2M>),
+                Huge1GiB($TypeName<Page1G>),
+            }
+
+            // These methods mostly destructure the enum in order to call internal methods
+            impl [<$TypeName Sized>] {
+                /// Get the size of the pages for the contained $TypeName
+                pub fn page_size(&self) -> MemChunkSize {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.start().page_size()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.start().page_size()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.start().page_size()
+                        }
+                    }
+                }
+
+                /// Returns a reference to the contained $TypeName holding 4kb pages. Returns None if called on a $TypeName holding huge pages.
+                pub fn range(&self) -> Option<&$TypeName> {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            Some(pr)
+                        }
+                        _ => {
+                            None
+                        }
+                    }
+                }
+
+                /// range() equivalent for 2MiB page ranges
+                pub fn range_2mb(&self) -> Result<$TypeName<Page2M>, &'static str> {
+                    match self {
+                        Self::Huge2MiB(pr) => {
+                            Ok(pr.clone())
+                        }
+                        _ => {
+                            Err("Called range_2mb on a $TypeName with a size other than 2mb")
+                        }
+                    }
+                }
+
+                /// range() equivalent for 1GiB page ranges
+                pub fn range_1gb(&self) -> Result<$TypeName<Page1G>, &'static str> {
+                    match self {
+                        Self::Huge1GiB(pr) => {
+                            Ok(pr.clone())
+                        }
+                        _ => {
+                            Err("Called range_1gb on a $TypeName with a size other than 1gb")
+                        }
+                    }
+                }
+
+                pub fn contains(&self, page: &$chunk) -> bool {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.contains(page)
+                        }
+                        // 'page' is a 4kb chunk, so we need to perform a temporary conversion for other sizes
+                        Self::Huge2MiB(pr) => {
+                            let pr_4k = $TypeName::<Page4K>::from(pr.clone());
+                            pr_4k.contains(page)
+                        }
+                        Self::Huge1GiB(pr) => {
+                            let pr_4k = $TypeName::<Page4K>::from(pr.clone());
+                            pr_4k.contains(page)
+                        }
+                    }
+                }
+
+                pub const fn offset_of_address(&self, addr: $address) -> Option<usize> {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.offset_of_address(addr)
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.offset_of_address(addr)
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.offset_of_address(addr)
+                        }
+                    }
+                }
+
+                pub const fn address_at_offset(&self, offset: usize) -> Option<$address> {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.address_at_offset(offset)
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.address_at_offset(offset)
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.address_at_offset(offset)
+                        }
+                    }
+                }
+
+                /// Returns the starting `VirtualAddress` in this range of pages.
+                pub fn start_address(&self) -> $address {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.start_address()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.start_address()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.start_address()
+                        }
+                    }
+                }
+
+                /// Returns the size in bytes of this range of pages.
+                pub fn size_in_bytes(&self) -> usize {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.size_in_bytes()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.size_in_bytes()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.size_in_bytes()
+                        }
+                    }
+                }
+
+                /// Returns the size in number of pages of this range of pages.
+                pub fn [<size_in_ $chunk:lower s>](&self) -> usize {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.[<size_in_ $chunk:lower s>]()
+                        }
+                        Self::Huge2MiB(pr) => {
+                            pr.[<size_in_ $chunk:lower s>]()
+                        }
+                        Self::Huge1GiB(pr) => {
+                            pr.[<size_in_ $chunk:lower s>]()
+                        }
+                    }
+                }
+
+                /// Returns the starting `$chunk` in this range of pages.
+                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                pub fn start(&self) -> &$chunk {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.start()
+                        }
+                        _ => {
+                            panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                /// Returns the ending `$chunk` (inclusive) in this range of pages.
+                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                pub fn end(&self) -> &$chunk {
+                    match self {
+                        Self::Normal4KiB(pr) => {
+                            pr.end()
+                        }
+                        _ => {
+                            panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                pub fn start_2m(&self) -> &$chunk<Page2M> {
+                    match self {
+                        Self::Huge2MiB(pr) => {
+                            pr.start()
+                        }
+                        _ => {
+                            panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                /// Returns the ending `$chunk` (inclusive) in this range of pages.
+                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                pub fn end_2m(&self) -> &$chunk<Page2M> {
+                    match self {
+                        Self::Huge2MiB(pr) => {
+                            pr.end()
+                        }
+                        _ => {
+                            panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                pub fn start_1g(&self) -> &$chunk<Page1G> {
+                    match self {
+                        Self::Huge1GiB(pr) => {
+                            pr.start()
+                        }
+                        _ => {
+                            panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+                        }
+                    }
+                }
+
+                /// Returns the ending `$chunk` (inclusive) in this range of pages.
+                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                pub fn end_1g(&self) -> &$chunk<Page1G> {
+                    match self {
+                        Self::Huge1GiB(pr) => {
+                            pr.end()
+                        }
+                        _ => {
+                            panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+                        }
                     }
                 }
             }

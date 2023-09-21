@@ -32,7 +32,7 @@ mod static_array_rb_tree;
 
 use core::{borrow::Borrow, cmp::{Ordering, max, min}, fmt, ops::{Deref, DerefMut}};
 use kernel_config::memory::*;
-use memory_structs::{VirtualAddress, Page, PageRange, Page1G, Page2M, Page4K, MemChunkSize};
+use memory_structs::{VirtualAddress, Page, PageRange, Page1G, Page2M, Page4K, MemChunkSize, PageRangeSized};
 use spin::{Mutex, Once};
 use static_array_rb_tree::*;
 
@@ -143,182 +143,182 @@ pub fn init(end_vaddr_of_low_designated_region: VirtualAddress) -> Result<(), &'
 
 /// An enum used to wrap the generic PageRange variants corresponding to different page sizes.
 /// Additional methods corresponding to PageRange methods are provided in order to destructure the enum variants.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PageRangeSized {
-	Normal4KiB(PageRange),
-	Huge2MiB(PageRange<Page2M>),
-	Huge1GiB(PageRange<Page1G>),
-}
+// #[derive(Debug, Clone, PartialEq, Eq)]
+// pub enum PageRangeSized {
+// 	Normal4KiB(PageRange),
+// 	Huge2MiB(PageRange<Page2M>),
+// 	Huge1GiB(PageRange<Page1G>),
+// }
 
-// These methods mostly destructure the enum in order to call internal methods
-impl PageRangeSized {
-	/// Get the size of the pages for the contained PageRange
-	pub fn page_size(&self) -> MemChunkSize {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.start().page_size()
-			}
-			PageRangeSized::Huge2MiB(pr) => {
-				pr.start().page_size()
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-				pr.start().page_size()
-			}
-		}
-	}
+// // These methods mostly destructure the enum in order to call internal methods
+// impl PageRangeSized {
+// 	/// Get the size of the pages for the contained PageRange
+// 	pub fn page_size(&self) -> MemChunkSize {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.start().page_size()
+// 			}
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				pr.start().page_size()
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				pr.start().page_size()
+// 			}
+// 		}
+// 	}
 
-    /// Returns a reference to the contained PageRange holding 4kb pages. Returns None if called on a PageRange holding huge pages.
-	pub fn range(&self) -> Option<&PageRange> {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				Some(pr)
-			}
-			_ => {
-				None
-			}
-		}
-	}
+//     /// Returns a reference to the contained PageRange holding 4kb pages. Returns None if called on a PageRange holding huge pages.
+// 	pub fn range(&self) -> Option<&PageRange> {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				Some(pr)
+// 			}
+// 			_ => {
+// 				None
+// 			}
+// 		}
+// 	}
 	
-	/// range() equivalent for 2MiB page ranges
-	pub fn range_2mb(&self) -> Result<PageRange<Page2M>, &'static str> {
-		match self {
-			PageRangeSized::Huge2MiB(pr) => {
-				Ok(pr.clone())
-			}
-			_ => {
-				Err("Called range_2mb on a PageRange with a size other than 2mb")
-			}
-		}
-	}
+// 	/// range() equivalent for 2MiB page ranges
+// 	pub fn range_2mb(&self) -> Result<PageRange<Page2M>, &'static str> {
+// 		match self {
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				Ok(pr.clone())
+// 			}
+// 			_ => {
+// 				Err("Called range_2mb on a PageRange with a size other than 2mb")
+// 			}
+// 		}
+// 	}
 
-	/// range() equivalent for 1GiB page ranges
-	pub fn range_1gb(&self) -> Result<PageRange<Page1G>, &'static str> {
-		match self {
-			PageRangeSized::Huge1GiB(pr) => {
-				Ok(pr.clone())
-			}
-			_ => {
-				Err("Called range_1gb on a PageRange with a size other than 1gb")
-			}
-		}
-	}
+// 	/// range() equivalent for 1GiB page ranges
+// 	pub fn range_1gb(&self) -> Result<PageRange<Page1G>, &'static str> {
+// 		match self {
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				Ok(pr.clone())
+// 			}
+// 			_ => {
+// 				Err("Called range_1gb on a PageRange with a size other than 1gb")
+// 			}
+// 		}
+// 	}
 
-	pub fn contains(&self, page: &Page) -> bool {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.contains(page)
-			}
-            // page is a Page<Page4K>, so we need to perform a temporary conversion for other sizes
-			PageRangeSized::Huge2MiB(pr) => { 
-                let pr_4k = PageRange::<Page4K>::from(pr.clone());
-				pr_4k.contains(page)
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-                let pr_4k = PageRange::<Page4K>::from(pr.clone());
-				pr_4k.contains(page)
-			}
-		}
-	}
+// 	pub fn contains(&self, page: &Page) -> bool {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.contains(page)
+// 			}
+//             // page is a Page<Page4K>, so we need to perform a temporary conversion for other sizes
+// 			PageRangeSized::Huge2MiB(pr) => { 
+//                 let pr_4k = PageRange::<Page4K>::from(pr.clone());
+// 				pr_4k.contains(page)
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+//                 let pr_4k = PageRange::<Page4K>::from(pr.clone());
+// 				pr_4k.contains(page)
+// 			}
+// 		}
+// 	}
 
-	pub const fn offset_of_address(&self, addr: VirtualAddress) -> Option<usize> {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.offset_of_address(addr)
-			}
-			PageRangeSized::Huge2MiB(pr) => {
-				pr.offset_of_address(addr)
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-				pr.offset_of_address(addr)
-			}
-		}
-	}
+// 	pub const fn offset_of_address(&self, addr: VirtualAddress) -> Option<usize> {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.offset_of_address(addr)
+// 			}
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				pr.offset_of_address(addr)
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				pr.offset_of_address(addr)
+// 			}
+// 		}
+// 	}
 
-	pub const fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.address_at_offset(offset)
-			}
-			PageRangeSized::Huge2MiB(pr) => {
-				pr.address_at_offset(offset)
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-				pr.address_at_offset(offset)
-			}
-		}
-	}
+// 	pub const fn address_at_offset(&self, offset: usize) -> Option<VirtualAddress> {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.address_at_offset(offset)
+// 			}
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				pr.address_at_offset(offset)
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				pr.address_at_offset(offset)
+// 			}
+// 		}
+// 	}
 	
-	/// Returns the starting `VirtualAddress` in this range of pages.
-	pub fn start_address(&self) -> VirtualAddress {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.start_address()
-			}
-			PageRangeSized::Huge2MiB(pr) => {
-				pr.start_address()
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-				pr.start_address()
-			}
-		}
-	}
+// 	/// Returns the starting `VirtualAddress` in this range of pages.
+// 	pub fn start_address(&self) -> VirtualAddress {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.start_address()
+// 			}
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				pr.start_address()
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				pr.start_address()
+// 			}
+// 		}
+// 	}
 
-	/// Returns the size in bytes of this range of pages.
-	pub fn size_in_bytes(&self) -> usize {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.size_in_bytes()
-			}
-			PageRangeSized::Huge2MiB(pr) => {
-				pr.size_in_bytes()
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-				pr.size_in_bytes()
-			}
-		}
-	}
+// 	/// Returns the size in bytes of this range of pages.
+// 	pub fn size_in_bytes(&self) -> usize {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.size_in_bytes()
+// 			}
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				pr.size_in_bytes()
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				pr.size_in_bytes()
+// 			}
+// 		}
+// 	}
 
-	/// Returns the size in number of pages of this range of pages.
-	pub fn size_in_pages(&self) -> usize {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.size_in_pages()
-			}
-			PageRangeSized::Huge2MiB(pr) => {
-				pr.size_in_pages()
-			}
-			PageRangeSized::Huge1GiB(pr) => {
-				pr.size_in_pages()
-			}
-		}
-	}
+// 	/// Returns the size in number of pages of this range of pages.
+// 	pub fn size_in_pages(&self) -> usize {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.size_in_pages()
+// 			}
+// 			PageRangeSized::Huge2MiB(pr) => {
+// 				pr.size_in_pages()
+// 			}
+// 			PageRangeSized::Huge1GiB(pr) => {
+// 				pr.size_in_pages()
+// 			}
+// 		}
+// 	}
 
-	/// Returns the starting `Page` in this range of pages.
-	/// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
-	pub fn start(&self) -> &Page {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.start()
-			}
-			_ => {
-				panic!("Attempt to get the start of a huge page range as a 4KiB page.");
-			}
-		}
-	}
+// 	/// Returns the starting `Page` in this range of pages.
+// 	/// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+// 	pub fn start(&self) -> &Page {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.start()
+// 			}
+// 			_ => {
+// 				panic!("Attempt to get the start of a huge page range as a 4KiB page.");
+// 			}
+// 		}
+// 	}
 
-	/// Returns the ending `Page` (inclusive) in this range of pages.
-	/// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
-	pub fn end(&self) -> &Page {
-		match self {
-			PageRangeSized::Normal4KiB(pr) => {
-				pr.end()
-			}
-			_ => {
-				panic!("Attempt to get the end of a huge page range as a 4KiB page.");
-			}
-		}
-	}
-}
+// 	/// Returns the ending `Page` (inclusive) in this range of pages.
+// 	/// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+// 	pub fn end(&self) -> &Page {
+// 		match self {
+// 			PageRangeSized::Normal4KiB(pr) => {
+// 				pr.end()
+// 			}
+// 			_ => {
+// 				panic!("Attempt to get the end of a huge page range as a 4KiB page.");
+// 			}
+// 		}
+// 	}
+// }
 
 /// A range of contiguous pages.
 ///
@@ -1136,6 +1136,45 @@ pub fn allocate_pages_by_bytes_in_range(
 		.map(|(ap, _action)| ap)
 }
 
+/// Allocates the given number of 2MB huge pages with no constraints on the starting virtual address.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_2mb_pages(num_pages: usize) -> Option<AllocatedPages> {
+    let huge_num_pages = num_pages * 512;
+	let ap = allocate_pages_deferred(AllocationRequest::AlignedTo { alignment_4k_pages: 512 }, huge_num_pages)
+		.map(|(ap, _action)| ap)
+		.ok();
+    match ap {
+        None => {
+            None
+        }
+        Some(mut p) => { // Since this function converts *this* AllocatedPages, it needs to be
+                         // mutable
+            p.to_2mb_allocated_pages();
+            Some(p)
+        }
+    }
+}
+
+/// Allocates the given number of 1GB huge pages with no constraints on the starting virtual address.
+/// 
+/// See [`allocate_pages_deferred()`](fn.allocate_pages_deferred.html) for more details. 
+pub fn allocate_1gb_pages(num_pages: usize) -> Option<AllocatedPages> {
+    let huge_num_pages = num_pages * 512 * 512;
+	let ap = allocate_pages_deferred(AllocationRequest::AlignedTo { alignment_4k_pages: 512 * 512 }, huge_num_pages)
+		.map(|(ap, _action)| ap)
+		.ok();
+    match ap { 
+        None => {
+            None
+        }
+        Some(mut p) => { // Since this function converts *this* AllocatedPages, it needs to be
+                         // mutable
+            p.to_1gb_allocated_pages();
+            Some(p)
+        }
+    }
+}
 
 /// Converts the page allocator from using static memory (a primitive array) to dynamically-allocated memory.
 /// 

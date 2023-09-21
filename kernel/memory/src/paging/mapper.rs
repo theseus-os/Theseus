@@ -19,7 +19,7 @@ use core::{
 };
 use log::{error, warn, debug, trace};
 use memory_structs::{Page4K, Page2M, Page1G, MemChunkSize};
-use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, PageRange, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames}; 
+use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, PageRange, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames, AllocatedFrame};
 use crate::paging::{
     get_current_p4,
     table::{P4, UPCOMING_P4, Table, Level4},
@@ -241,14 +241,14 @@ impl Mapper {
                 }
             }
             MemChunkSize::Huge2M => {
-                if pages_count * 512 != frames_count {
+                if pages_count != frames_count {
                     error!("map_allocated_pages_to(): pages {:?} count {} must equal frames {:?} count {}!", 
                         pages, pages_count, frames.borrow(), frames_count
                     );
                     return Err("map_allocated_pages_to(): page count must equal frame count");
                 }
                 // Temporarily define a custom step over the page range until correct behaviour is implemented for huge pages
-                for (page, frame) in pages.range_2mb().clone().into_iter().zip(frames.borrow().into_iter().step_by(512)) {
+                for (page, frame) in pages.range_2mb().clone().into_iter().zip(frames.borrow().into_iter() /*into_iter().step_by(512)*/) {
                     actual_flags = actual_flags.huge(true);
                     let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
                     let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
@@ -258,7 +258,8 @@ impl Mapper {
                         return Err("map_allocated_pages_to(): page was already in use");
                     }
 
-                    p2[page.p2_index()].set_entry(frame, actual_flags);
+                    // let af = Frame::<Page4K>::from(*frame.start());
+                    p2[page.p2_index()].set_entry(frame ,actual_flags);
                 }
             }
             MemChunkSize::Huge1G => {

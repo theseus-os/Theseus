@@ -1,17 +1,17 @@
 //! Provides an allocator for physical memory frames.
-//! The minimum unit of allocation is a single frame. 
+//! The minimum unit of allocation is a single frame.
 //!
 //! This is currently a modified and more complex version of the `page_allocator` crate.
 //! TODO: extract the common code and create a generic allocator that can be specialized to allocate pages or frames.
-//! 
-//! This also supports early allocation of frames before heap allocation is available, 
-//! and does so behind the scenes using the same single interface. 
+//!
+//! This also supports early allocation of frames before heap allocation is available,
+//! and does so behind the scenes using the same single interface.
 //! Early pre-heap allocations are limited to tracking a small number of available chunks (currently 32).
-//! 
+//!
 //! Once heap allocation is available, it uses a dynamically-allocated list of frame chunks to track allocations.
-//! 
-//! The core allocation function is [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html), 
-//! but there are several convenience functions that offer simpler interfaces for general usage. 
+//!
+//! The core allocation function is [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html),
+//! but there are several convenience functions that offer simpler interfaces for general usage.
 //!
 //! # Notes and Missing Features
 //! This allocator only makes one attempt to merge deallocated frames into existing
@@ -23,6 +23,7 @@
 #![allow(clippy::blocks_in_if_conditions)]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
+#![feature(step_trait)]
 
 extern crate alloc;
 #[cfg(test)]
@@ -31,11 +32,11 @@ mod test;
 mod static_array_rb_tree;
 // mod static_array_linked_list;
 
-use core::{borrow::Borrow, cmp::{Ordering, min, max}, ops::{Deref, DerefMut}, fmt};
+use core::{iter::Step, borrow::Borrow, cmp::{Ordering, min, max}, ops::{Deref, DerefMut}, fmt};
 use intrusive_collections::Bound;
 use kernel_config::memory::*;
 use log::{error, warn, debug, trace};
-use memory_structs::{PhysicalAddress, Frame, FrameRange, MemoryState};
+use memory_structs::{PhysicalAddress, Frame, FrameRange, MemoryState, MemChunkSize, Page4K, Page2M, Page1G, Page, PageSize, FrameRangeSized};
 use spin::Mutex;
 use static_array_rb_tree::*;
 use static_assertions::assert_not_impl_any;
@@ -44,40 +45,39 @@ const FRAME_SIZE: usize = PAGE_SIZE;
 const MIN_FRAME: Frame = Frame::containing_address(PhysicalAddress::zero());
 const MAX_FRAME: Frame = Frame::containing_address(PhysicalAddress::new_canonical(usize::MAX));
 
-// Note: we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster. 
+// Note: we keep separate lists for "free, general-purpose" areas and "reserved" areas, as it's much faster.
 
-/// The single, system-wide list of free physical memory frames available for general usage. 
-static FREE_GENERAL_FRAMES_LIST: Mutex<StaticArrayRBTree<FreeFrames>> = Mutex::new(StaticArrayRBTree::empty()); 
-/// The single, system-wide list of free physical memory frames reserved for specific usage. 
-static FREE_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<FreeFrames>> = Mutex::new(StaticArrayRBTree::empty()); 
+/// The single, system-wide list of free physical memory frames available for general usage.
+static FREE_GENERAL_FRAMES_LIST: Mutex<StaticArrayRBTree<FreeFrames>> = Mutex::new(StaticArrayRBTree::empty());
+/// The single, system-wide list of free physical memory frames reserved for specific usage.
+static FREE_RESERVED_FRAMES_LIST: Mutex<StaticArrayRBTree<FreeFrames>> = Mutex::new(StaticArrayRBTree::empty());
 
 /// The fixed list of all known regions that are available for general use.
-/// This does not indicate whether these regions are currently allocated, 
+/// This does not indicate whether these regions are currently allocated,
 /// rather just where they exist and which regions are known to this allocator.
 static GENERAL_REGIONS: Mutex<StaticArrayRBTree<PhysicalMemoryRegion>> = Mutex::new(StaticArrayRBTree::empty());
-/// The fixed list of all known regions that are reserved for specific purposes. 
-/// This does not indicate whether these regions are currently allocated, 
+/// The fixed list of all known regions that are reserved for specific purposes.
+/// This does not indicate whether these regions are currently allocated,
 /// rather just where they exist and which regions are known to this allocator.
 static RESERVED_REGIONS: Mutex<StaticArrayRBTree<PhysicalMemoryRegion>> = Mutex::new(StaticArrayRBTree::empty());
-
 
 /// Initialize the frame allocator with the given list of available and reserved physical memory regions.
 ///
 /// Any regions in either of the lists may overlap, this is checked for and handled properly.
 /// Reserved regions take priority -- if a reserved region partially or fully overlaps any part of a free region,
-/// that portion will be considered reserved, not free. 
-/// 
-/// The iterator (`R`) over reserved physical memory regions must be cloneable, 
-/// as this runs before heap allocation is available, and we may need to iterate over it multiple times. 
-/// 
+/// that portion will be considered reserved, not free.
+///
+/// The iterator (`R`) over reserved physical memory regions must be cloneable,
+/// as this runs before heap allocation is available, and we may need to iterate over it multiple times.
+///
 /// ## Return
 /// Upon success, this function returns a callback function that allows the caller
-/// (the memory subsystem init function) to convert a range of unmapped frames 
+/// (the memory subsystem init function) to convert a range of unmapped frames
 /// back into an [`UnmappedFrames`] object.
 pub fn init<F, R, P>(
     free_physical_memory_areas: F,
     reserved_physical_memory_areas: R,
-) -> Result<fn(FrameRange) -> UnmappedFrames, &'static str> 
+) -> Result<fn(FrameRange) -> UnmappedFrames, &'static str>
     where P: Borrow<PhysicalMemoryRegion>,
           F: IntoIterator<Item = P>,
           R: IntoIterator<Item = P> + Clone,
@@ -85,7 +85,7 @@ pub fn init<F, R, P>(
     if  FREE_GENERAL_FRAMES_LIST .lock().len() != 0 ||
         FREE_RESERVED_FRAMES_LIST.lock().len() != 0 ||
         GENERAL_REGIONS          .lock().len() != 0 ||
-        RESERVED_REGIONS         .lock().len() != 0 
+        RESERVED_REGIONS         .lock().len() != 0
     {
         return Err("BUG: Frame allocator was already initialized, cannot be initialized twice.");
     }
@@ -144,7 +144,7 @@ pub fn init<F, R, P>(
     }
 
 
-    // Finally, one last sanity check -- ensure no two regions overlap. 
+    // Finally, one last sanity check -- ensure no two regions overlap.
     let all_areas = free_list[..free_list_idx].iter().flatten()
         .chain(reserved_list.iter().flatten());
     for (i, elem) in all_areas.clone().enumerate() {
@@ -183,7 +183,7 @@ pub fn init<F, R, P>(
 }
 
 
-/// The main logic of the initialization routine 
+/// The main logic of the initialization routine
 /// used to populate the list of free frame chunks.
 ///
 /// This function recursively iterates over the given `area` of frames
@@ -198,9 +198,9 @@ fn check_and_add_free_region<P, R>(
     where P: Borrow<PhysicalMemoryRegion>,
           R: IntoIterator<Item = P> + Clone,
 {
-    // This will be set to the frame that is the start of the current free region. 
+    // This will be set to the frame that is the start of the current free region.
     let mut current_start = *area.start();
-    // This will be set to the frame that is the end of the current free region. 
+    // This will be set to the frame that is the end of the current free region.
     let mut current_end = *area.end();
     // trace!("looking at sub-area {:X?} to {:X?}", current_start, current_end);
 
@@ -260,7 +260,7 @@ fn check_and_add_free_region<P, R>(
 /// since it ignores their actual range of frames.
 #[derive(Clone, Debug, Eq)]
 pub struct PhysicalMemoryRegion {
-    /// The Frames covered by this region, an inclusive range. 
+    /// The Frames covered by this region, an inclusive range.
     pub frames: FrameRange,
     /// The type of this memory region, e.g., whether it's in a free or reserved region.
     pub typ: MemoryRegionType,
@@ -270,7 +270,7 @@ impl PhysicalMemoryRegion {
         PhysicalMemoryRegion { frames, typ }
     }
 
-    /// Returns a new `PhysicalMemoryRegion` with an empty range of frames. 
+    /// Returns a new `PhysicalMemoryRegion` with an empty range of frames.
     #[allow(unused)]
     const fn empty() -> PhysicalMemoryRegion {
         PhysicalMemoryRegion {
@@ -311,8 +311,8 @@ impl Borrow<Frame> for &'_ PhysicalMemoryRegion {
 pub enum MemoryRegionType {
     /// Memory that is available for any general purpose.
     Free,
-    /// Memory that is reserved for special use and is only ever allocated from if specifically requested. 
-    /// This includes custom memory regions added by third parties, e.g., 
+    /// Memory that is reserved for special use and is only ever allocated from if specifically requested.
+    /// This includes custom memory regions added by third parties, e.g.,
     /// device memory discovered and added by device drivers later during runtime.
     Reserved,
     /// Memory of an unknown type.
@@ -325,7 +325,7 @@ pub enum MemoryRegionType {
 ///
 /// Each `Frames` object is globally unique, meaning that the owner of a `Frames` object
 /// has globally-exclusive access to the range of frames it contains.
-/// 
+///
 /// A `Frames` object can be in one of four states:
 /// * `Free`: frames are owned by the frame allocator and have not been allocated for any use.
 /// * `Allocated`: frames have been removed from the allocator's free list and are owned elsewhere;
@@ -345,7 +345,7 @@ pub enum MemoryRegionType {
 /// ```
 /// (Free) <---> (Allocated) --> (Mapped) --> (Unmapped) --> (Allocated) <---> (Free)
 /// ```
-/// 
+///
 /// # Ordering and Equality
 ///
 /// `Frames` implements the `Ord` trait, and its total ordering is ONLY based on
@@ -355,7 +355,7 @@ pub enum MemoryRegionType {
 /// both of which are also based ONLY on the **starting** `Frame` of the `Frames`.
 /// Thus, comparing two `Frames` with the `==` or `!=` operators may not work as expected.
 /// since it ignores their actual range of frames.
-/// 
+///
 /// Similarly, `Frames` implements the `Borrow` trait to return a `Frame`,
 /// not a `FrameRange`. This is required so we can search for `Frames` in a sorted collection
 /// using a `Frame` value.
@@ -365,7 +365,7 @@ pub struct Frames<const S: MemoryState> {
     /// The type of this memory chunk, e.g., whether it's in a free or reserved region.
     typ: MemoryRegionType,
     /// The Frames covered by this chunk, an inclusive range.
-    frames: FrameRange
+    frames: FrameRangeSized
 }
 
 /// A type alias for `Frames` in the `Free` state.
@@ -390,14 +390,14 @@ impl FreeFrames {
     /// The frame allocator logic is responsible for ensuring that no two `Frames` objects overlap.
     pub(crate) fn new(typ: MemoryRegionType, frames: FrameRange) -> Self {
         Frames {
-            typ,
-            frames,
+            typ: typ,
+            frames: FrameRangeSized::Normal4KiB(frames),
         }
     }
 
     /// Consumes this `Frames` in the `Free` state and converts them into the `Allocated` state.
-    pub fn into_allocated_frames(mut self) -> AllocatedFrames {  
-        let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+    pub fn into_allocated_frames(mut self) -> AllocatedFrames {
+        let frames = core::mem::replace(&mut self.frames, FrameRangeSized::Normal4KiB(FrameRange::empty()));
         let af = Frames {
             typ: self.typ,
             frames,
@@ -410,8 +410,8 @@ impl FreeFrames {
 impl AllocatedFrames {
     /// Consumes this `Frames` in the `Allocated` state and converts them into the `Mapped` state.
     /// This should only be called once a `MappedPages` has been created from the `Frames`.
-    pub fn into_mapped_frames(mut self) -> MappedFrames {    
-        let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+    pub fn into_mapped_frames(mut self) -> MappedFrames {
+        let frames = core::mem::replace(&mut self.frames, FrameRangeSized::Normal4KiB(FrameRange::empty()));
         let mf = Frames {
             typ: self.typ,
             frames,
@@ -431,12 +431,34 @@ impl AllocatedFrames {
             _phantom: core::marker::PhantomData,
         }
     }
+
+    pub fn into_2mb_allocated_frames(self) -> Result<AllocatedFrames, &'static str> {
+        Ok(AllocatedFrames {
+            typ: self.typ,
+            frames: FrameRangeSized::Huge2MiB(
+                FrameRange::<Page2M>::try_from(self.frames
+                    .range()
+                    .unwrap()
+                    .clone())?)
+        })
+    }
+
+    pub fn into_1gb_allocated_frames(self) -> Result<AllocatedFrames, &'static str> {
+        Ok(AllocatedFrames {
+            typ: self.typ,
+            frames: FrameRangeSized::Huge1GiB(
+                FrameRange::<Page1G>::try_from(self.frames
+                    .range()
+                    .unwrap()
+                    .clone())?)
+        })
+    }
 }
 
 impl UnmappedFrames {
     /// Consumes this `Frames` in the `Unmapped` state and converts them into the `Allocated` state.
-    pub fn into_allocated_frames(mut self) -> AllocatedFrames {    
-        let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+    pub fn into_allocated_frames(mut self) -> AllocatedFrames {
+        let frames = core::mem::replace(&mut self.frames, FrameRangeSized::Normal4KiB(FrameRange::empty()));
         let af = Frames {
             typ: self.typ,
             frames
@@ -450,7 +472,7 @@ impl UnmappedFrames {
 /// This function is a callback used to convert `UnmappedFrameRange` into `UnmappedFrames`.
 ///
 /// `UnmappedFrames` represents frames that have been unmapped by a page that had
-/// previously exclusively mapped them, indicating that no others pages have been mapped 
+/// previously exclusively mapped them, indicating that no others pages have been mapped
 /// to those same frames, and thus, those frames can be safely deallocated.
 ///
 /// This exists to break the cyclic dependency chain between this crate and
@@ -462,7 +484,7 @@ pub(crate) fn into_unmapped_frames(frames: FrameRange) -> UnmappedFrames {
     } else {
         MemoryRegionType::Free
     };
-    Frames{ typ, frames }
+    Frames{ typ: typ, frames: FrameRangeSized::Normal4KiB(frames) }
 }
 
 
@@ -471,16 +493,17 @@ impl<const S: MemoryState> Drop for Frames<S> {
         match S {
             MemoryState::Free => {
                 if self.size_in_frames() == 0 { return; }
-        
-                let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+
+                let frames = core::mem::replace(&mut self.frames, FrameRangeSized::Normal4KiB(FrameRange::empty()));
+                // Now, you can match against FrameRangeSized and convert the specific P to Page4K if necessary
                 let free_frames: FreeFrames = Frames { typ: self.typ, frames };
-        
+
                 let mut list = if free_frames.typ == MemoryRegionType::Reserved {
                     FREE_RESERVED_FRAMES_LIST.lock()
                 } else {
                     FREE_GENERAL_FRAMES_LIST.lock()
-                };        
-            
+                };
+
                 match &mut list.0 {
                     // For early allocations, just add the deallocated chunk to the free pages list.
                     Inner::Array(_) => {
@@ -490,8 +513,8 @@ impl<const S: MemoryState> Drop for Frames<S> {
                             error!("Failed to insert deallocated frames into the list (array). The initial static array should be created with a larger size.");
                         }
                     }
-                    
-                    // For full-fledged deallocations, determine if we can merge the deallocated frames 
+
+                    // For full-fledged deallocations, determine if we can merge the deallocated frames
                     // with an existing contiguously-adjacent chunk or if we need to insert a new chunk.
                     Inner::RBTree(ref mut tree) => {
                         let mut cursor_mut = tree.lower_bound_mut(Bound::Included(free_frames.start()));
@@ -544,14 +567,14 @@ impl<const S: MemoryState> Drop for Frames<S> {
                 }
                 log::error!("BUG: couldn't insert deallocated {:?} into free frames list", self.frames);
             }
-            MemoryState::Allocated => { 
+            MemoryState::Allocated => {
                 // trace!("Converting AllocatedFrames to FreeFrames. Drop handler will be called again {:?}", self.frames);
-                let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
-                let _to_drop = FreeFrames { typ: self.typ, frames }; 
+                let frames = core::mem::replace(&mut self.frames, FrameRangeSized::Normal4KiB(FrameRange::empty()));
+                let _to_drop = FreeFrames { typ: self.typ, frames };
             }
             MemoryState::Mapped => panic!("We should never drop a mapped frame! It should be forgotten instead."),
             MemoryState::Unmapped => {
-                let frames = core::mem::replace(&mut self.frames, FrameRange::empty());  
+                let frames = core::mem::replace(&mut self.frames, FrameRangeSized::Normal4KiB(FrameRange::empty()));
                 let _to_drop = AllocatedFrames { typ: self.typ, frames };
             }
         }
@@ -562,10 +585,38 @@ impl<'f> IntoIterator for &'f AllocatedFrames {
     type IntoIter = AllocatedFramesIter<'f>;
     type Item = AllocatedFrame<'f>;
     fn into_iter(self) -> Self::IntoIter {
-        AllocatedFramesIter {
-            _owner: self,
-            range: self.frames.iter(),
+        match self.frames.page_size() {
+            MemChunkSize::Normal4K => {
+                AllocatedFramesIter {
+                    _owner: self,
+                    range: self.range().unwrap().iter()
+                }
+            }
+            MemChunkSize::Huge2M => {
+                AllocatedFramesIter {
+                    _owner: self,
+                    range: FrameRange::<Page4K>::from(self.range_2mb().unwrap()).iter()
+                }
+            //     AllocatedFramesIter {
+            //         _owner: self,
+            //         range: range_inclusive::RangeInclusive::new(FrameSized::Huge2M(*self.start_2m()), FrameSized::Huge2M(*self.end_2m())).iter()
+            //    }
+            }
+            MemChunkSize::Huge1G => {
+                AllocatedFramesIter {
+                    _owner: self,
+                    range: FrameRange::<Page4K>::from(self.range_1gb().unwrap()).iter()
+                }
+                // AllocatedFramesIter {
+                //     _owner: self,
+                //     range: range_inclusive::RangeInclusive::new(FrameSized::Huge1G(*self.start_1g()), FrameSized::Huge1G(*self.end_1g())).iter()
+                // }
+            }
         }
+        // AllocatedFramesIter {
+        //     _owner: self,
+        //     range: self.range().unwrap().iter(),
+        // }
     }
 }
 
@@ -579,13 +630,18 @@ impl<'f> IntoIterator for &'f AllocatedFrames {
 /// [`RangeInclusive`] instances rather than borrowing a reference to it.
 ///
 /// [`RangeInclusive`]: range_inclusive::RangeInclusive
-pub struct AllocatedFramesIter<'f> {
+pub struct AllocatedFramesIter<'f, P: PageSize = Page4K> {
     _owner: &'f AllocatedFrames,
-    range: range_inclusive::RangeInclusiveIterator<Frame>,
+    range: range_inclusive::RangeInclusiveIterator<Frame<P>>,
 }
-impl<'f> Iterator for AllocatedFramesIter<'f> {
-    type Item = AllocatedFrame<'f>;
+impl<'f, P: 'static + PageSize> Iterator for AllocatedFramesIter<'f, P> {
+    type Item = AllocatedFrame<'f, P>;
     fn next(&mut self) -> Option<Self::Item> {
+        // match self._owner.page_size() {
+        //     MemChunkSize::Normal4K => {}
+        //     MemChunkSize::Huge2M => {}
+        //     MemChunkSize::Huge1G => {}
+        // }
         self.range.next().map(|frame|
             AllocatedFrame {
                 frame, _phantom: core::marker::PhantomData,
@@ -594,16 +650,17 @@ impl<'f> Iterator for AllocatedFramesIter<'f> {
     }
 }
 
+
 /// A reference to a single frame within a range of `AllocatedFrames`.
-/// 
+///
 /// The lifetime of this type is tied to the lifetime of its owning `AllocatedFrames`.
 #[derive(Debug)]
-pub struct AllocatedFrame<'f> {
-    frame: Frame,
-    _phantom: core::marker::PhantomData<&'f Frame>,
+pub struct AllocatedFrame<'f, P: 'static + PageSize = Page4K> {
+    frame: Frame<P>,
+    _phantom: core::marker::PhantomData<&'f Frame<P>>,
 }
-impl<'f> Deref for AllocatedFrame<'f> {
-    type Target = Frame;
+impl<'f, P: PageSize> Deref for AllocatedFrame<'f, P> {
+    type Target = Frame<P>;
     fn deref(&self) -> &Self::Target {
         &self.frame
     }
@@ -622,12 +679,12 @@ impl<const S: MemoryState> Frames<S> {
         self.typ
     }
 
-    /// Returns a new `Frames` with an empty range of frames. 
+    /// Returns a new `Frames` with an empty range of frames.
     /// Can be used as a placeholder, but will not permit any real usage.
     pub const fn empty() -> Frames<S> {
         Frames {
             typ: MemoryRegionType::Unknown,
-            frames: FrameRange::empty(),
+            frames: FrameRangeSized::Normal4KiB(FrameRange::empty()),
         }
     }
 
@@ -636,19 +693,19 @@ impl<const S: MemoryState> Frames<S> {
     /// This function performs no allocation or re-mapping, it exists for convenience and usability purposes.
     ///
     /// The given `other` must be physically contiguous with `self`, i.e., come immediately before or after `self`.
-    /// That is, either `self.start == other.end + 1` or `self.end + 1 == other.start` must be true. 
+    /// That is, either `self.start == other.end + 1` or `self.end + 1 == other.start` must be true.
     ///
     /// If either of those conditions are met, `self` is modified and `Ok(())` is returned,
     /// otherwise `Err(other)` is returned.
     pub fn merge(&mut self, other: Self) -> Result<(), Self> {
-        if self.is_empty() || other.is_empty() {
+        if self.range().unwrap().is_empty() || other.range().unwrap().is_empty() {
             return Err(other);
         }
 
         let frames = if *self.start() == *other.end() + 1 {
             // `other` comes contiguously before `self`
             FrameRange::new(*other.start(), *self.end())
-        } 
+        }
         else if *self.end() + 1 == *other.start() {
             // `self` comes contiguously before `other`
             FrameRange::new(*self.start(), *other.end())
@@ -659,31 +716,31 @@ impl<const S: MemoryState> Frames<S> {
         };
 
         // ensure the now-merged Frames doesn't run its drop handler
-        core::mem::forget(other); 
-        self.frames = frames;
+        core::mem::forget(other);
+        self.frames = FrameRangeSized::Normal4KiB(frames);
         Ok(())
     }
 
     /// Splits up the given `Frames` into multiple smaller `Frames`.
-    /// 
+    ///
     /// Returns a `SplitFrames` instance containing three `Frames`:
     /// 1. The range of frames in `self` that are before the beginning of `frames_to_extract`.
     /// 2. The `Frames` containing the requested range of frames, `frames_to_extract`.
     /// 3. The range of frames in `self` that are after the end of `frames_to_extract`.
-    /// 
+    ///
     /// If `frames_to_extract` is not contained within `self`, then `self` is returned unchanged within an `Err`.
     pub fn split_range(
         self,
         frames_to_extract: FrameRange
     ) -> Result<SplitFrames<S>, Self> {
-        
-        if !self.contains_range(&frames_to_extract) {
+
+        if !self.range().unwrap().contains_range(&frames_to_extract) {
             return Err(self);
         }
-        
+
         let start_frame = *frames_to_extract.start();
         let start_to_end = frames_to_extract;
-        
+
         let before_start = if start_frame == MIN_FRAME || start_frame == *self.start() {
             None
         } else {
@@ -699,27 +756,27 @@ impl<const S: MemoryState> Frames<S> {
         let typ = self.typ;
         // ensure the original Frames doesn't run its drop handler and free its frames.
         core::mem::forget(self);
-        Ok(SplitFrames { 
-            before_start: before_start.map(|frames| Frames { typ, frames }),
-            start_to_end: Frames { typ, frames: start_to_end }, 
-            after_end: after_end.map(|frames| Frames { typ, frames }),
+        Ok(SplitFrames {
+            before_start: before_start.map(|frames| Frames { typ: typ, frames: FrameRangeSized::Normal4KiB(frames) }),
+            start_to_end: Frames { typ, frames: FrameRangeSized::Normal4KiB(start_to_end) },
+            after_end: after_end.map(|frames| Frames { typ, frames: FrameRangeSized::Normal4KiB(frames) }),
         })
     }
 
     /// Splits this `Frames` into two separate `Frames` objects:
     /// * `[beginning : at_frame - 1]`
     /// * `[at_frame : end]`
-    /// 
+    ///
     /// This function follows the behavior of [`core::slice::split_at()`],
-    /// thus, either one of the returned `Frames` objects may be empty. 
+    /// thus, either one of the returned `Frames` objects may be empty.
     /// * If `at_frame == self.start`, the first returned `Frames` object will be empty.
     /// * If `at_frame == self.end + 1`, the second returned `Frames` object will be empty.
-    /// 
+    ///
     /// Returns an `Err` containing this `Frames` if `at_frame` is otherwise out of bounds, or if `self` was empty.
-    /// 
+    ///
     /// [`core::slice::split_at()`]: https://doc.rust-lang.org/core/primitive.slice.html#method.split_at
     pub fn split_at(self, at_frame: Frame) -> Result<(Self, Self), Self> {
-        if self.is_empty() { return Err(self); }
+        if self.range().unwrap().is_empty() { return Err(self); }
 
         let end_of_first = at_frame - 1;
 
@@ -727,9 +784,9 @@ impl<const S: MemoryState> Frames<S> {
             let first  = FrameRange::empty();
             let second = FrameRange::new(at_frame, *self.end());
             (first, second)
-        } 
+        }
         else if at_frame == (*self.end() + 1) && end_of_first >= *self.start() {
-            let first  = FrameRange::new(*self.start(), *self.end()); 
+            let first  = FrameRange::new(*self.start(), *self.end());
             let second = FrameRange::empty();
             (first, second)
         }
@@ -744,17 +801,17 @@ impl<const S: MemoryState> Frames<S> {
 
         let typ = self.typ;
         // ensure the original Frames doesn't run its drop handler and free its frames.
-        core::mem::forget(self);   
+        core::mem::forget(self);
         Ok((
-            Frames { typ, frames: first }, 
-            Frames { typ, frames: second },
+            Frames { typ, frames: FrameRangeSized::Normal4KiB(first) },
+            Frames { typ, frames: FrameRangeSized::Normal4KiB(second) },
         ))
     }
 }
 
 impl<const S: MemoryState> Deref for Frames<S> {
-    type Target = FrameRange;
-    fn deref(&self) -> &FrameRange {
+    type Target = FrameRangeSized;
+    fn deref(&self) -> &FrameRangeSized {
         &self.frames
     }
 }
@@ -787,17 +844,17 @@ impl<const S: MemoryState> fmt::Debug for Frames<S> {
 
 
 /// A series of pending actions related to frame allocator bookkeeping,
-/// which may result in heap allocation. 
-/// 
-/// The actions are triggered upon dropping this struct. 
-/// This struct can be returned from the `allocate_frames()` family of functions 
-/// in order to allow the caller to precisely control when those actions 
-/// that may result in heap allocation should occur. 
-/// Such actions include adding chunks to lists of free frames or frames in use. 
-/// 
-/// The vast majority of use cases don't care about such precise control, 
+/// which may result in heap allocation.
+///
+/// The actions are triggered upon dropping this struct.
+/// This struct can be returned from the `allocate_frames()` family of functions
+/// in order to allow the caller to precisely control when those actions
+/// that may result in heap allocation should occur.
+/// Such actions include adding chunks to lists of free frames or frames in use.
+///
+/// The vast majority of use cases don't care about such precise control,
 /// so you can simply drop this struct at any time or ignore it
-/// with a `let _ = ...` binding to instantly drop it. 
+/// with a `let _ = ...` binding to instantly drop it.
 pub struct DeferredAllocAction<'list> {
     /// A reference to the list into which we will insert the free general-purpose `Chunk`s.
     free_list: &'list Mutex<StaticArrayRBTree<FreeFrames>>,
@@ -809,7 +866,7 @@ pub struct DeferredAllocAction<'list> {
     free2: FreeFrames,
 }
 impl<'list> DeferredAllocAction<'list> {
-    fn new<F1, F2>(free1: F1, free2: F2) -> DeferredAllocAction<'list> 
+    fn new<F1, F2>(free1: F1, free2: F2) -> DeferredAllocAction<'list>
         where F1: Into<Option<FreeFrames>>,
               F2: Into<Option<FreeFrames>>,
     {
@@ -827,8 +884,8 @@ impl<'list> Drop for DeferredAllocAction<'list> {
     fn drop(&mut self) {
         let frames1 = core::mem::replace(&mut self.free1, Frames::empty());
         let frames2 = core::mem::replace(&mut self.free2, Frames::empty());
-        
-        // Insert all of the chunks, both allocated and free ones, into the list. 
+
+        // Insert all of the chunks, both allocated and free ones, into the list.
         if frames1.size_in_frames() > 0 {
             match frames1.typ() {
                 MemoryRegionType::Free     => { self.free_list.lock().insert(frames1).unwrap(); }
@@ -854,7 +911,7 @@ enum AllocationError {
     AddressNotFree(Frame, usize),
     /// The requested address was outside the range of this allocator.
     AddressNotFound(Frame, usize),
-    /// The address space was full, or there was not a large-enough chunk 
+    /// The address space was full, or there was not a large-enough chunk
     /// or enough remaining chunks that could satisfy the requested allocation size.
     OutOfAddressSpace(usize),
     /// The starting address was found, but not all successive contiguous frames were available.
@@ -902,7 +959,7 @@ fn find_specific_chunk(
                         return allocate_from_chosen_chunk(FrameRange::new(requested_frame, requested_frame + num_frames - 1), ValueRefMut::RBTree(cursor_mut), None);
                     } else {
                         // We found the chunk containing the requested address, but it was too small to cover all of the requested frames.
-                        // Let's try to merge the next-highest contiguous chunk to see if those two chunks together 
+                        // Let's try to merge the next-highest contiguous chunk to see if those two chunks together
                         // cover enough frames to fulfill the allocation request.
                         //
                         // trace!("Frame allocator: found chunk containing requested address, but it was too small. \
@@ -914,7 +971,7 @@ fn find_specific_chunk(
                             cursor_mut.move_next();// cursor now points to the next chunk
                             if let Some(next_chunk) = cursor_mut.get().map(|w| w.deref()) {
                                 if *chunk.end() + 1 == *next_chunk.start() {
-                                    // Here: next chunk was contiguous with the original chunk. 
+                                    // Here: next chunk was contiguous with the original chunk.
                                     if requested_end_frame <= *next_chunk.end() {
                                         // trace!("Frame allocator: found suitably-large contiguous next {:?} after initial too-small {:?}", next_chunk, chunk);
                                         let next = cursor_mut.remove().map(|f| f.into_inner());
@@ -940,10 +997,10 @@ fn find_specific_chunk(
                             }
                         };
                         if let Some(next_chunk) = next_contiguous_chunk {
-                            // We found a suitable chunk that came contiguously after the initial too-small chunk. 
+                            // We found a suitable chunk that came contiguously after the initial too-small chunk.
                             // We would like to merge it into the initial chunk with just the reference (since we have a cursor pointing to it already),
                             // but we can't get a mutable reference to the element the cursor is pointing to.
-                            // So both chunks will be removed and then merged. 
+                            // So both chunks will be removed and then merged.
                             return allocate_from_chosen_chunk(FrameRange::new(requested_frame, requested_frame + num_frames - 1), ValueRefMut::RBTree(cursor_mut), Some(next_chunk));
                         }
                     }
@@ -969,7 +1026,7 @@ fn find_any_chunk(
                     // Skip chunks that are too-small or in the designated regions.
                     if  chunk.size_in_frames() < num_frames || chunk.typ() != MemoryRegionType::Free {
                         continue;
-                    } 
+                    }
                     else {
                         return allocate_from_chosen_chunk(FrameRange::new(*chunk.start(), *chunk.start() + num_frames - 1), ValueRefMut::Array(elem), None);
                     }
@@ -977,8 +1034,8 @@ fn find_any_chunk(
             }
         }
         Inner::RBTree(ref mut tree) => {
-            // Because we allocate new frames by peeling them off from the beginning part of a chunk, 
-            // it's MUCH faster to start the search for free frames from higher addresses moving down. 
+            // Because we allocate new frames by peeling them off from the beginning part of a chunk,
+            // it's MUCH faster to start the search for free frames from higher addresses moving down.
             // This results in an O(1) allocation time in the general case, until all address ranges are already in use.
             let mut cursor = tree.upper_bound_mut(Bound::<&FreeFrames>::Unbounded);
             while let Some(chunk) = cursor.get().map(|w| w.deref()) {
@@ -1002,12 +1059,12 @@ fn find_any_chunk(
 }
 
 
-/// Removes a `Frames` object from the RBTree. 
+/// Removes a `Frames` object from the RBTree.
 /// `frames_ref` is basically a wrapper over the cursor which stores the position of the frames.
 fn retrieve_frames_from_ref(mut frames_ref: ValueRefMut<FreeFrames>) -> Option<FreeFrames> {
     // Remove the chosen chunk from the free frame list.
     let removed_val = frames_ref.remove();
-    
+
     match removed_val {
         RemovedValue::Array(c) => c,
         RemovedValue::RBTree(option_frames) => {
@@ -1016,10 +1073,10 @@ fn retrieve_frames_from_ref(mut frames_ref: ValueRefMut<FreeFrames>) -> Option<F
     }
 }
 
-/// The final part of the main allocation routine that optionally merges two contiguous chunks and 
+/// The final part of the main allocation routine that optionally merges two contiguous chunks and
 /// then splits the resulting chunk into multiple smaller chunks, thereby "allocating" frames from it.
 ///
-/// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames` 
+/// This function breaks up that chunk into multiple ones and returns an `AllocatedFrames`
 /// from (part of) that chunk that has the same range as `frames_to_allocate`.
 fn allocate_from_chosen_chunk(
     frames_to_allocate: FrameRange,
@@ -1029,7 +1086,7 @@ fn allocate_from_chosen_chunk(
     // Remove the initial chunk from the free frame list.
     let mut chosen_chunk = retrieve_frames_from_ref(initial_chunk_ref)
         .expect("BUG: Failed to retrieve chunk from free list");
-    
+
     // This should always succeed, since we've already checked the conditions for a merge and split.
     // We should return the chunks back to the list, but a failure at this point implies a bug in the frame allocator.
 
@@ -1084,13 +1141,13 @@ fn contains_any(
     false
 }
 
-/// Adds the given `frames` to the given `regions_list` and `frames_list` as a chunk of reserved frames. 
-/// 
-/// Returns the range of **new** frames that were added to the lists, 
+/// Adds the given `frames` to the given `regions_list` and `frames_list` as a chunk of reserved frames.
+///
+/// Returns the range of **new** frames that were added to the lists,
 /// which will be a subset of the given input `frames`.
 ///
 /// Currently, this function adds no new frames at all if any frames within the given `frames` list
-/// overlap any existing regions at all. 
+/// overlap any existing regions at all.
 /// TODO: handle partially-overlapping regions by extending existing regions on either end.
 fn add_reserved_region_to_lists(
     regions_list: &mut StaticArrayRBTree<PhysicalMemoryRegion>,
@@ -1107,7 +1164,7 @@ fn add_reserved_region_to_lists(
     match &mut frames_list.0 {
         Inner::Array(ref mut arr) => {
             for chunk in arr.iter().flatten() {
-                if let Some(_overlap) = chunk.overlap(&frames) {
+                if let Some(_overlap) = chunk.range().unwrap().overlap(&frames) {
                     // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
                     //     frames, _overlap, chunk
                     // );
@@ -1123,7 +1180,7 @@ fn add_reserved_region_to_lists(
                     // so we can stop looking for overlapping regions once we pass the end of the new frames to add.
                     break;
                 }
-                if let Some(_overlap) = chunk.overlap(&frames) {
+                if let Some(_overlap) = chunk.range().unwrap().overlap(&frames) {
                     // trace!("Failed to add reserved region {:?} due to overlap {:?} with existing chunk {:?}",
                     //     frames, _overlap, chunk
                     // );
@@ -1150,25 +1207,25 @@ fn add_reserved_region_to_lists(
 
 /// The core frame allocation routine that allocates the given number of physical frames,
 /// optionally at the requested starting `PhysicalAddress`.
-/// 
-/// This simply reserves a range of frames; it does not perform any memory mapping. 
+///
+/// This simply reserves a range of frames; it does not perform any memory mapping.
 /// Thus, the memory represented by the returned `AllocatedFrames` isn't directly accessible
 /// until you map virtual pages to them.
-/// 
+///
 /// Allocation is based on a red-black tree and is thus `O(log(n))`.
 /// Fragmentation isn't cleaned up until we're out of address space, but that's not really a big deal.
-/// 
+///
 /// # Arguments
 /// * `requested_paddr`: if `Some`, the returned `AllocatedFrames` will start at the `Frame`
-///   containing this `PhysicalAddress`. 
+///   containing this `PhysicalAddress`.
 ///   If `None`, the first available `Frame` range will be used, starting at any random physical address.
-/// * `num_frames`: the number of `Frame`s to be allocated. 
-/// 
+/// * `num_frames`: the number of `Frame`s to be allocated.
+///
 /// # Return
 /// If successful, returns a tuple of two items:
 /// * the frames that were allocated, and
-/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation. 
-///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped, 
+/// * an opaque struct representing details of bookkeeping-related actions that may cause heap allocation.
+///   Those actions are deferred until this returned `DeferredAllocAction` struct object is dropped,
 ///   allowing the caller (such as the heap implementation itself) to control when heap allocation may occur.
 pub fn allocate_frames_deferred(
     requested_paddr: Option<PhysicalAddress>,
@@ -1178,7 +1235,7 @@ pub fn allocate_frames_deferred(
         warn!("frame_allocator: requested an allocation of 0 frames... stupid!");
         return Err("cannot allocate zero frames");
     }
-    
+
     if let Some(paddr) = requested_paddr {
         let start_frame = Frame::containing_address(paddr);
         let mut free_reserved_frames_list = FREE_RESERVED_FRAMES_LIST.lock();
@@ -1224,9 +1281,9 @@ pub fn allocate_frames_deferred(
 
 
 /// Similar to [`allocated_frames_deferred()`](fn.allocate_frames_deferred.html),
-/// but accepts a size value for the allocated frames in number of bytes instead of number of frames. 
-/// 
-/// This function still allocates whole frames by rounding up the number of bytes. 
+/// but accepts a size value for the allocated frames in number of bytes instead of number of frames.
+///
+/// This function still allocates whole frames by rounding up the number of bytes.
 pub fn allocate_frames_by_bytes_deferred(
     requested_paddr: Option<PhysicalAddress>,
     num_bytes: usize,
@@ -1242,8 +1299,8 @@ pub fn allocate_frames_by_bytes_deferred(
 
 
 /// Allocates the given number of frames with no constraints on the starting physical address.
-/// 
-/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+///
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details.
 pub fn allocate_frames(num_frames: usize) -> Option<AllocatedFrames> {
     allocate_frames_deferred(None, num_frames)
         .map(|(af, _action)| af)
@@ -1251,11 +1308,11 @@ pub fn allocate_frames(num_frames: usize) -> Option<AllocatedFrames> {
 }
 
 
-/// Allocates frames with no constraints on the starting physical address, 
-/// with a size given by the number of bytes. 
-/// 
-/// This function still allocates whole frames by rounding up the number of bytes. 
-/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+/// Allocates frames with no constraints on the starting physical address,
+/// with a size given by the number of bytes.
+///
+/// This function still allocates whole frames by rounding up the number of bytes.
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details.
 pub fn allocate_frames_by_bytes(num_bytes: usize) -> Option<AllocatedFrames> {
     allocate_frames_by_bytes_deferred(None, num_bytes)
         .map(|(af, _action)| af)
@@ -1263,10 +1320,10 @@ pub fn allocate_frames_by_bytes(num_bytes: usize) -> Option<AllocatedFrames> {
 }
 
 
-/// Allocates frames starting at the given `PhysicalAddress` with a size given in number of bytes. 
-/// 
-/// This function still allocates whole frames by rounding up the number of bytes. 
-/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+/// Allocates frames starting at the given `PhysicalAddress` with a size given in number of bytes.
+///
+/// This function still allocates whole frames by rounding up the number of bytes.
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details.
 pub fn allocate_frames_by_bytes_at(paddr: PhysicalAddress, num_bytes: usize) -> Result<AllocatedFrames, &'static str> {
     allocate_frames_by_bytes_deferred(Some(paddr), num_bytes)
         .map(|(af, _action)| af)
@@ -1274,8 +1331,8 @@ pub fn allocate_frames_by_bytes_at(paddr: PhysicalAddress, num_bytes: usize) -> 
 
 
 /// Allocates the given number of frames starting at (inclusive of) the frame containing the given `PhysicalAddress`.
-/// 
-/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details. 
+///
+/// See [`allocate_frames_deferred()`](fn.allocate_frames_deferred.html) for more details.
 pub fn allocate_frames_at(paddr: PhysicalAddress, num_frames: usize) -> Result<AllocatedFrames, &'static str> {
     allocate_frames_deferred(Some(paddr), num_frames)
         .map(|(af, _action)| af)
@@ -1319,7 +1376,7 @@ where
                 FramesIteratorRequest::AllocateAt { requested_frame, num_frames } => {
                     frame_alloc_request = Some((requested_frame, num_frames));
                     break;
-                } 
+                }
             }
         }
 
@@ -1337,10 +1394,10 @@ where
 
 
 /// Converts the frame allocator from using static memory (a primitive array) to dynamically-allocated memory.
-/// 
-/// Call this function once heap allocation is available. 
+///
+/// Call this function once heap allocation is available.
 /// Calling this multiple times is unnecessary but harmless, as it will do nothing after the first invocation.
-#[doc(hidden)] 
+#[doc(hidden)]
 pub fn convert_frame_allocator_to_heap_based() {
     FREE_GENERAL_FRAMES_LIST.lock().convert_to_heap_allocated();
     FREE_RESERVED_FRAMES_LIST.lock().convert_to_heap_allocated();
@@ -1348,8 +1405,8 @@ pub fn convert_frame_allocator_to_heap_based() {
     RESERVED_REGIONS.lock().convert_to_heap_allocated();
 }
 
-/// A debugging function used to dump the full internal state of the frame allocator. 
-#[doc(hidden)] 
+/// A debugging function used to dump the full internal state of the frame allocator.
+#[doc(hidden)]
 pub fn dump_frame_allocator_state() {
     debug!("----------------- FREE GENERAL FRAMES ---------------");
     FREE_GENERAL_FRAMES_LIST.lock().iter().for_each(|e| debug!("\t {:?}", e) );

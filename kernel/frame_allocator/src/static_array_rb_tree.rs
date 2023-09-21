@@ -89,7 +89,7 @@ impl<T: Ord> StaticArrayRBTree<T> {
 }
 
 
-impl<T: Ord + 'static> StaticArrayRBTree<T> {
+impl<T: Ord + core::fmt::Debug + 'static> StaticArrayRBTree<T> {
     /// Push the given `value` into this collection.
     ///
     /// If the inner collection is an array, it is pushed onto the back of the array.
@@ -105,7 +105,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 						return Ok(ValueRefMut::Array(elem));
 					}
 				}
-				log::error!("Out of space in StaticArrayRBTree's inner array, failed to insert value.");
+				log::error!("Out of space in StaticArrayRBTree's inner array, failed to insert value. {:?}", value);
 				Err(value)
 			}
 			Inner::RBTree(tree) => {
@@ -176,7 +176,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 	// }
 }
 
-
+#[derive(Debug)]
 pub enum RemovedValue<T: Ord> {
 	Array(Option<T>),
 	RBTree(Option<Box<Wrapper<T>>>),

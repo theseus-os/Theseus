@@ -59,9 +59,11 @@ pub fn main(_args: Vec<String>) -> isize {
             PhysicalAddress::new_canonical(0x60000000),
             512).expect("Could not allocate frames. Make sure you have enough memory for the kernel (compile with make orun QEMU_MEMORY=3G).");
 
+    let allocated_2mb_frames = aligned_4k_frames.into_2mb_allocated_frames().expect("Could not convert range of allocated frames into huge allocated frames");
+
     let mut mapped_2mb_page = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
         aligned_2mb_page,
-        aligned_4k_frames,
+        allocated_2mb_frames,
         PteFlags::new().valid(true).writable(true),
     ).expect("test_huge_pages: call to map_allocated_pages failed");
     
@@ -90,6 +92,5 @@ pub fn main(_args: Vec<String>) -> isize {
     // Dump entries to see if dropping has unmapped everything properly
     drop(mapped_2mb_page);
     kernel_mmi_ref.lock().page_table.dump_pte(VirtualAddress::new_canonical(0x20000000));
-    
     0
 }

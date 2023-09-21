@@ -112,6 +112,12 @@ pub struct RangeInclusiveIterator<Idx> {
     end: Idx
 }
 
+impl<A: Step> RangeInclusiveIterator<A> {
+    pub fn current(&self) -> &A {
+        &self.current
+    }
+}
+
 impl<A: Step> Iterator for RangeInclusiveIterator<A> {
     type Item = A;
 

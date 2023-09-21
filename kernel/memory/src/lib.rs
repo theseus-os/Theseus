@@ -39,6 +39,7 @@ pub use page_allocator::{
 pub use frame_allocator::{
     AllocatedFrames,
     UnmappedFrames,
+    AllocatedFrame,
     allocate_frames_deferred,
     allocate_frames_by_bytes_deferred,
     allocate_frames,
