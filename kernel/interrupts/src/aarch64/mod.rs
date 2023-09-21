@@ -438,6 +438,11 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
     default_exception_handler(e, "current_elx_synchronous");
 }
 
+// When this is entered, FIQs are enabled / unmasked, because we use
+// them as an NMI alternative, so they must be allowed at all times.
+//
+// Spurious interrupts are often the result of an FIQ being handled
+// after we started handling an IRQ but before we acknowledged it.
 #[no_mangle]
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
@@ -463,6 +468,10 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     }
 }
 
+// When this is entered, FIQs are disabled / masked: there must be
+// only one FIQ (that we use as an NMI alternative) at a time.
+//
+// Currently, FIQs are only used for TLB shootdown.
 #[no_mangle]
 extern "C" fn current_elx_fiq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
