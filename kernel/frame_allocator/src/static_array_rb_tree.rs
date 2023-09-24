@@ -51,10 +51,10 @@ impl <T: Ord> Wrapper<T> {
 
 
 /// A convenience wrapper that abstracts either an intrustive `RBTree<T>` or a primitive array `[T; N]`.
-///
-/// This allows the caller to create an array statically in a const context,
-/// and then abstract over both that and the inner `RBTree` when using it.
-///
+/// 
+/// This allows the caller to create an array statically in a const context, 
+/// and then abstract over both that and the inner `RBTree` when using it. 
+/// 
 /// TODO: use const generics to allow this to be of any arbitrary size beyond 32 elements.
 pub struct StaticArrayRBTree<T: Ord>(pub(crate) Inner<T>);
 
@@ -118,8 +118,8 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 
 	/// Converts the contained collection from a primitive array into a RBTree.
 	/// If the contained collection is already using heap allocation, this is a no-op.
-	///
-	/// Call this function once heap allocation is available.
+	/// 
+	/// Call this function once heap allocation is available. 
 	pub fn convert_to_heap_allocated(&mut self) {
 		let new_tree = match &mut self.0 {
 			Inner::Array(arr) => {
@@ -136,9 +136,9 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 		*self = StaticArrayRBTree(Inner::RBTree(new_tree));
 	}
 
-	/// Returns the number of elements in this collection.
+	/// Returns the number of elements in this collection. 
 	///
-	/// Note that this an O(N) linear-time operation, not an O(1) constant-time operation.
+	/// Note that this an O(N) linear-time operation, not an O(1) constant-time operation. 
 	/// This is because the internal collection types do not separately maintain their current length.
 	pub fn len(&self) -> usize {
 		match &self.0 {
@@ -176,6 +176,7 @@ impl<T: Ord + 'static> StaticArrayRBTree<T> {
 	// }
 }
 
+
 pub enum RemovedValue<T: Ord> {
 	Array(Option<T>),
 	RBTree(Option<Box<Wrapper<T>>>),
@@ -190,7 +191,7 @@ impl<T: Ord> RemovedValue<T> {
 	}
 }
 
-/// A mutable reference to a value in the `StaticArrayRBTree`.
+/// A mutable reference to a value in the `StaticArrayRBTree`. 
 pub enum ValueRefMut<'list, T: Ord> {
 	Array(&'list mut Option<T>),
 	RBTree(CursorMut<'list, WrapperAdapter<T>>),
@@ -209,9 +210,9 @@ impl <'list, T: Ord> ValueRefMut<'list, T> {
 	}
 
 
-	/// Removes this value from the collection and replaces it with the given `new_value`.
+	/// Removes this value from the collection and replaces it with the given `new_value`. 
 	///
-	/// Returns the removed value, if one existed. If not, the
+	/// Returns the removed value, if one existed. If not, the 
 	#[allow(dead_code)]
 	pub fn replace_with(&mut self, new_value: T) -> Result<Option<T>, T> {
 		match self {
