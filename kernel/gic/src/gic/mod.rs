@@ -250,10 +250,10 @@ impl ArmGicDistributor {
 
     /// Returns whether the given interrupt is forwarded by the distributor.
     ///
-    /// This returns:
-    /// - `None` if the interrupt is disabled.
-    /// - [`InterruptGroup::Group0`] if the interrupt is enabled and configured as a Group 0 interrupt.
-    /// - [`InterruptGroup::Group1`] if the interrupt is enabled and configured as a Group 1 interrupt.
+    /// # Return
+    /// * `None` if the interrupt is disabled.
+    /// * `Some(`[`InterruptGroup::Group0`]`)` if the interrupt is enabled and configured as a Group 0 interrupt.
+    /// * `Some(`[`InterruptGroup::Group1`]`)` if the interrupt is enabled and configured as a Group 1 interrupt.
     ///
     /// Panics if `int` is not in the SPI range (>= 32).
     pub fn get_spi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
@@ -264,10 +264,10 @@ impl ArmGicDistributor {
     /// Enables or disables the forwarding of the given interrupt
     /// by the distributor.
     ///
-    /// If `state` is `None`, the interrupt will be disabled.
-    /// If it contains [`InterruptGroup::Group0`], the interrupt will be enabled and
-    /// configured as a Group 0 interrupt; if it contains [`InterruptGroup::Group1`],
-    /// the interrupt will be enabled and configured as a Group 1 interrupt.
+    /// # Arguments
+    /// * `int`: the interrupt number whose state we are modifying.
+    /// * `state`: whether the interrupt will be disabled (`None`),
+    ///   enabled as `Group0` (regular IRQs), or enabled as `Group1` (fast interrupts, FIQs).
     ///
     /// Panics if `int` is not in the SPI range (>= 32).
     pub fn set_spi_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {
