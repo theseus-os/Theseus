@@ -900,7 +900,6 @@ macro_rules! implement_page_frame_range {
                 }
 
                 #[doc = "Returns the starting `" $chunk" ` in this range. TODO: Find an alternative to panic when called on wrong size."
-                // TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
                 pub fn start(&self) -> &$chunk {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -913,7 +912,6 @@ macro_rules! implement_page_frame_range {
                 }
 
                 #[doc = "Returns the ending `" $chunk "` (inclusive) in this range. TODO: Find an alternative to panic when called on wrong size."]
-                // TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
                 pub fn end(&self) -> &$chunk {
                     match self {
                         Self::Normal4KiB(pr) => {
