@@ -148,15 +148,14 @@ impl RedistRegsSgiPpi {
     /// Returns whether the given SGI (software generated interrupts) or
     /// PPI (private peripheral interrupts) will be forwarded by the redistributor
     pub fn get_sgippi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
-        let enabled = read_array_volatile::<32>(&self.set_enable, int) == 1;
-        match enabled {
-            true => match read_array_volatile::<32>(&self.group, int) {
-                0 => Some(InterruptGroup::Group0),
-                1 => Some(InterruptGroup::Group1),
-                _ => unreachable!(),
-            },
-            false => None,
+        if read_array_volatile::<32>(&self.set_enable, int) == 1 {
+            match read_array_volatile::<32>(&self.group, int) {
+                0 => return Some(InterruptGroup::Group0),
+                1 => return Some(InterruptGroup::Group1),
+                _ => { }
+            }
         }
+        None
     }
 
     /// Enables or disables the forwarding of a particular
