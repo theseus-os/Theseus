@@ -122,20 +122,19 @@ impl DistRegsP1 {
     }
 
     /// Returns whether the given SPI (shared peripheral interrupt) will be
-    /// forwarded by the distributor
+    /// forwarded by the distributor.
     pub fn get_spi_state(&self, int: InterruptNumber) -> Option<InterruptGroup> {
-        let enabled = read_array_volatile::<32>(&self.set_enable, int) == 1;
-        match enabled {
-            true => match read_array_volatile::<32>(&self.group, int) {
-                0 => Some(InterruptGroup::Group0),
-                1 => Some(InterruptGroup::Group1),
-                _ => unreachable!(),
-            },
-            false => None,
+        if read_array_volatile::<32>(&self.set_enable, int) == 1 {
+            match read_array_volatile::<32>(&self.group, int) {
+                0 => return Some(InterruptGroup::Group0),
+                1 => return Some(InterruptGroup::Group1),
+                _ => { }
+            }
         }
+        None
     }
 
-    /// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt)
+    /// Enables or disables the forwarding of a particular SPI (shared peripheral interrupt).
     pub fn set_spi_state(&mut self, int: InterruptNumber, state: Option<InterruptGroup>) {
         if let Some(group) = state {
             write_array_volatile::<32>(&mut self.group, int, group as u32);
