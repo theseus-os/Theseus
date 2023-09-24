@@ -197,7 +197,7 @@ pub enum ValueRefMut<'list, T: Ord> {
 	RBTree(CursorMut<'list, WrapperAdapter<T>>),
 }
 impl <'list, T: Ord> ValueRefMut<'list, T> {
-	/// Removes this value from the collection and returns the removed value, if one existed.
+	/// Removes this value from the collection and returns the removed value, if one existed. 
 	pub fn remove(&mut self) -> RemovedValue<T> {
 		match self {
 			Self::Array(ref mut arr_ref) => {
