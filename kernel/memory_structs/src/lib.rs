@@ -535,7 +535,6 @@ impl<P: PageSize + 'static> Page<P> {
 macro_rules! implement_page_frame_range {
     ($TypeName:ident, $desc:literal, $short:ident, $chunk:ident, $address:ident) => {
         paste! { // using the paste crate's macro for easy concatenation
-
             #[doc = "A range of [`" $chunk "`]s that are contiguous in " $desc " memory."]
             #[derive(Clone, PartialEq, Eq)]
             pub struct $TypeName<P: PageSize = Page4K>(RangeInclusive<$chunk::<P>>);
@@ -749,8 +748,8 @@ macro_rules! implement_page_frame_range {
                 }
             }
 
-            /// An enum used to wrap the generic $TypeName variants corresponding to different page sizes.
-            /// Additional methods corresponding to $TypeName methods are provided in order to destructure the enum variants.
+            #[doc = "An enum used to wrap the generic `" $TypeName "` variants corresponding to different `" $chunk "` sizes. \
+            Additional methods are provided in order to destructure the enum variants."]
             #[derive(Debug, Clone, PartialEq, Eq)]
             pub enum [<$TypeName Sized>] {
                 Normal4KiB($TypeName),
@@ -758,9 +757,8 @@ macro_rules! implement_page_frame_range {
                 Huge1GiB($TypeName<Page1G>),
             }
 
-            // These methods mostly destructure the enum in order to call internal methods
             impl [<$TypeName Sized>] {
-                /// Get the size of the pages for the contained $TypeName
+                #[doc = "Get the size of the pages for the contained `" $TypeName"` ."
                 pub fn page_size(&self) -> MemChunkSize {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -775,7 +773,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns a reference to the contained $TypeName holding 4kb pages. Returns None if called on a $TypeName holding huge pages.
+                #[doc = "Returns a reference to the contained `" $TypeName "` holding 4kb `" $chunk "`s. Returns None if called on a `" $TypeName "` holding huge pages."]
                 pub fn range(&self) -> Option<&$TypeName> {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -787,7 +785,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// range() equivalent for 2MiB page ranges
+                #[doc = "range() equivalent for 2MiB memory ranges"]
                 pub fn range_2mb(&self) -> Result<$TypeName<Page2M>, &'static str> {
                     match self {
                         Self::Huge2MiB(pr) => {
@@ -799,7 +797,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// range() equivalent for 1GiB page ranges
+                #[doc = "range() equivalent for 1GiB memory ranges"]
                 pub fn range_1gb(&self) -> Result<$TypeName<Page1G>, &'static str> {
                     match self {
                         Self::Huge1GiB(pr) => {
@@ -856,7 +854,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the starting `VirtualAddress` in this range of pages.
+                #[doc = "Returns the starting `" $address "` in this range."]
                 pub fn start_address(&self) -> $address {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -871,7 +869,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the size in bytes of this range of pages.
+                #[doc = "Returns the size in bytes of this range."]
                 pub fn size_in_bytes(&self) -> usize {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -886,7 +884,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the size in number of pages of this range of pages.
+                #[doc = "Returns the size, in number of `" $chunk "`s, of this range."]
                 pub fn [<size_in_ $chunk:lower s>](&self) -> usize {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -901,8 +899,8 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the starting `$chunk` in this range of pages.
-                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                #[doc = "Returns the starting `" $chunk" ` in this range. TODO: Find an alternative to panic when called on wrong size."
+                // TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
                 pub fn start(&self) -> &$chunk {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -914,8 +912,8 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the ending `$chunk` (inclusive) in this range of pages.
-                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                #[doc = "Returns the ending `" $chunk "` (inclusive) in this range. TODO: Find an alternative to panic when called on wrong size."]
+                // TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
                 pub fn end(&self) -> &$chunk {
                     match self {
                         Self::Normal4KiB(pr) => {
@@ -927,6 +925,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
+                #[doc = "start() equivalent for 2mb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
                 pub fn start_2m(&self) -> &$chunk<Page2M> {
                     match self {
                         Self::Huge2MiB(pr) => {
@@ -938,8 +937,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the ending `$chunk` (inclusive) in this range of pages.
-                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                #[doc = "start() equivalent for 2mb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
                 pub fn end_2m(&self) -> &$chunk<Page2M> {
                     match self {
                         Self::Huge2MiB(pr) => {
@@ -951,6 +949,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
+                #[doc = "start() equivalent for 1gb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
                 pub fn start_1g(&self) -> &$chunk<Page1G> {
                     match self {
                         Self::Huge1GiB(pr) => {
@@ -962,8 +961,7 @@ macro_rules! implement_page_frame_range {
                     }
                 }
 
-                /// Returns the ending `$chunk` (inclusive) in this range of pages.
-                /// TODO: This function panics if called on a huge page of any size, and it really shouldn't. Use an alternative method for handling this case.
+                #[doc = "start() equivalent for 1gb `" $TypeName "`s. TODO: Find an alternative to panic when called on wrong size."]
                 pub fn end_1g(&self) -> &$chunk<Page1G> {
                     match self {
                         Self::Huge1GiB(pr) => {
