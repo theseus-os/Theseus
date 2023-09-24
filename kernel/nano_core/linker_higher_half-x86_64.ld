@@ -113,7 +113,6 @@ SECTIONS {
 	}
 }
 
-
 /* These definitions must be placed at the end of the file so that the .cls,
 .tdata, and .tbss sections are placed in the correct order. */
 __THESEUS_CLS_SIZE = SIZEOF(.cls);
