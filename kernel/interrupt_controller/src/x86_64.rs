@@ -64,9 +64,9 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         let _ = priority;
 
         if let Some(destination) = destination {
-            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num /* <- is this correct? */)
+            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num)
         } else {
-            Err("SystemInterruptController::set_destination: todo on x86")
+            Err("SystemInterruptController::set_destination: todo on x86: set the IOREDTBL MASK bit")
         }
     }
 }
