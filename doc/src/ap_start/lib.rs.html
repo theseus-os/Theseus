@@ -135,6 +135,9 @@
 <a href="#135" id="135">135</a>
 <a href="#136" id="136">136</a>
 <a href="#137" id="137">137</a>
+<a href="#138" id="138">138</a>
+<a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Routines for booting up secondary CPU cores, 
 //! aka application processors (APs) on x86_64.
 //! 
@@ -189,6 +192,8 @@
     nmi_flags: u16,
 ) -&gt; ! {
     irq_safety::disable_interrupts();
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span>irq_safety::disable_fast_interrupts();
 
     <span class="macro">info!</span>(<span class="string">&quot;Booted CPU {}, proc: {}, stack: {:#X} to {:#X}, nmi_lint: {}, nmi_flags: {:#X}&quot;</span>,
         cpu_id, processor_id, _stack_start, _stack_end, nmi_lint, nmi_flags
@@ -237,6 +242,7 @@
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
         interrupts::init_ap();
+        irq_safety::enable_fast_interrupts();
 
         <span class="comment">// Register this CPU as online in the system
         // This is the equivalent of `LocalApic::init` on aarch64

@@ -482,6 +482,33 @@
 <a href="#482" id="482">482</a>
 <a href="#483" id="483">483</a>
 <a href="#484" id="484">484</a>
+<a href="#485" id="485">485</a>
+<a href="#486" id="486">486</a>
+<a href="#487" id="487">487</a>
+<a href="#488" id="488">488</a>
+<a href="#489" id="489">489</a>
+<a href="#490" id="490">490</a>
+<a href="#491" id="491">491</a>
+<a href="#492" id="492">492</a>
+<a href="#493" id="493">493</a>
+<a href="#494" id="494">494</a>
+<a href="#495" id="495">495</a>
+<a href="#496" id="496">496</a>
+<a href="#497" id="497">497</a>
+<a href="#498" id="498">498</a>
+<a href="#499" id="499">499</a>
+<a href="#500" id="500">500</a>
+<a href="#501" id="501">501</a>
+<a href="#502" id="502">502</a>
+<a href="#503" id="503">503</a>
+<a href="#504" id="504">504</a>
+<a href="#505" id="505">505</a>
+<a href="#506" id="506">506</a>
+<a href="#507" id="507">507</a>
+<a href="#508" id="508">508</a>
+<a href="#509" id="509">509</a>
+<a href="#510" id="510">510</a>
+<a href="#511" id="511">511</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate implements the virtual memory subsystem interfaces for Theseus on aarch64.
 //! `memory` uses this crate to get the memory layout and do other arch-specific operations on aarch64.  
 //! 
@@ -500,35 +527,62 @@
 <span class="kw">use </span>boot_info::{BootInformation, ElfSection};
 <span class="kw">use </span>kernel_config::memory::KERNEL_OFFSET;
 
-<span class="attr">#[cfg(any(target_arch = <span class="string">&quot;aarch64&quot;</span>, doc))]
+<span class="attr">#[cfg(any(doc, target_arch = <span class="string">&quot;aarch64&quot;</span>))]
 </span><span class="kw">use </span>core::arch::asm;
 
 <span class="kw">const </span>THESEUS_ASID: u16 = <span class="number">0</span>;
 
-<span class="attr">#[cfg(any(target_arch = <span class="string">&quot;aarch64&quot;</span>, doc))]
-</span><span class="doccomment">/// Flushes the specific virtual address in TLB.
+<span class="doccomment">/// Flushes the specific virtual address in TLB.
 ///
 /// TLBI =&gt; tlb invalidate instruction
-/// &quot;va&quot; =&gt; all translations at execution level
-///         using the supplied address
+/// &quot;va&quot; =&gt; all translations at execution level using the supplied address
 /// &quot;e1&quot; =&gt; execution level
+</span><span class="attr">#[cfg(any(doc, target_arch = <span class="string">&quot;aarch64&quot;</span>))]
 </span><span class="kw">pub fn </span>tlb_flush_virt_addr(vaddr: VirtualAddress) {
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span><span class="kw">unsafe </span>{ <span class="macro">asm!</span>(<span class="string">&quot;tlbi vae1, {}&quot;</span>, <span class="kw">in</span>(reg) vaddr.value()) };
+    <span class="comment">// unsure here: where should the original address ASID go?
+    // it&#39;s zero in theseus so it&#39;s not important for us
+
+    // about the 48 bit shift:
+    // If the implementation supports 16 bits of ASID, then the
+    // upper 8 bits of the ASID must be written to 0 by software
+    // when the context being invalidated only uses 8 bits
+    </span><span class="kw">let </span>value = ((THESEUS_ASID <span class="kw">as </span>usize) &lt;&lt; <span class="number">48</span>) | (vaddr.value() &gt;&gt; <span class="number">12</span>);
+
+    <span class="kw">unsafe </span>{
+        <span class="macro">asm!</span>(<span class="string">&quot;tlbi vae1, {}&quot;</span>, <span class="kw">in</span>(reg) value)
+    };
 }
 
-<span class="attr">#[cfg(any(target_arch = <span class="string">&quot;aarch64&quot;</span>, doc))]
+<span class="comment">/* NO SUPPORT IN QEMU
+
+/// Flushes the specific virtual address in the TLB of any CPU
+/// in the outer shareable domain.
+///
+/// TLBI =&gt; tlb invalidate instruction
+/// &quot;va&quot; =&gt; all translations at execution level using the supplied address
+/// &quot;e1&quot; =&gt; execution level
+/// &quot;os&quot; =&gt; outer shareable domain
+#[cfg(any(doc, target_arch = &quot;aarch64&quot;))]
+pub fn tlb_flush_virt_addr_all_cpus(vaddr: VirtualAddress) {
+    unsafe {
+        let value = ((THESEUS_ASID as usize) &lt;&lt; 48) | (vaddr.value() &gt;&gt; 12);
+        asm!(&quot;.arch armv8.4-a\ntlbi vae1os, {}&quot;, in(reg) value)
+    };
+}
+
+*/
+
 </span><span class="doccomment">/// Flushes all TLB entries with Theseus&#39; ASID (=0).
 ///
 /// TLBI =&gt; tlb invalidate instruction
 /// &quot;asid&quot; =&gt; all entries with specific ASID
 /// &quot;e1&quot; =&gt; execution level
+</span><span class="attr">#[cfg(any(doc, target_arch = <span class="string">&quot;aarch64&quot;</span>))]
 </span><span class="kw">pub fn </span>tlb_flush_by_theseus_asid() {
-    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span><span class="kw">unsafe </span>{ <span class="macro">asm!</span>(<span class="string">&quot;tlbi aside1, {:x}&quot;</span>, <span class="kw">in</span>(reg) THESEUS_ASID) };
+    <span class="kw">unsafe </span>{ <span class="macro">asm!</span>(<span class="string">&quot;tlbi aside1, {:x}&quot;</span>, <span class="kw">in</span>(reg) THESEUS_ASID) };
 }
 
-<span class="attr">#[cfg(any(target_arch = <span class="string">&quot;aarch64&quot;</span>, doc))]
+<span class="attr">#[cfg(any(doc, target_arch = <span class="string">&quot;aarch64&quot;</span>))]
 </span><span class="kw">pub use </span>tlb_flush_by_theseus_asid <span class="kw">as </span>tlb_flush_all;
 
 <span class="doccomment">/// Returns the current top-level page table address.

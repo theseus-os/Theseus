@@ -120,6 +120,12 @@
 <a href="#120" id="120">120</a>
 <a href="#121" id="121">121</a>
 <a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Support for broadcasting and handling TLB shootdown IPIs. 
 
 </span><span class="attr">#![no_std]
@@ -150,7 +156,7 @@
     memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span>interrupts::setup_ipi_handler(tlb_shootdown_ipi_handler, interrupts::TLB_SHOOTDOWN_IPI).unwrap();
+    </span>interrupts::setup_tlb_shootdown_handler(tlb_shootdown_ipi_handler).unwrap();
 }
 
 <span class="doccomment">/// Handles a TLB shootdown IPI requested by another CPU.
@@ -162,7 +168,9 @@
 </span><span class="kw">pub fn </span>handle_tlb_shootdown_ipi() -&gt; bool {
     <span class="kw">let </span>pages_to_invalidate = TLB_SHOOTDOWN_IPI_PAGES.read().clone();
     <span class="kw">if let </span><span class="prelude-val">Some</span>(pages) = pages_to_invalidate {
-        <span class="comment">// log::trace!(&quot;handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}&quot;, apic::current_cpu(), pages);
+        <span class="comment">// Note: logging in a NMI (x86_64) or FIQ (aarch64) context can cause deadlock,
+        // so this should only be used sparingly to help debug problems with TLB shootdowns.
+        // log::trace!(&quot;handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}&quot;, apic::current_cpu(), pages);
         </span><span class="kw">for </span>page <span class="kw">in </span>pages {
             tlb_flush_virt_addr(page.start_address());
         }
@@ -219,7 +227,7 @@
     </span>}
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-    </span>interrupts::send_ipi_to_all_other_cpus(interrupts::TLB_SHOOTDOWN_IPI);
+    </span>interrupts::broadcast_tlb_shootdown_ipi();
 
     <span class="comment">// wait for all other cores to handle this IPI
     // it must be a blocking, synchronous operation to ensure stale TLB entries don&#39;t cause problems
@@ -233,6 +241,10 @@
 
     <span class="comment">// release lock
     </span>TLB_SHOOTDOWN_IPI_LOCK.store(<span class="bool-val">false</span>, Ordering::Release); 
+
+    <span class="kw">if </span><span class="bool-val">false </span>{
+        <span class="macro">log::warn!</span>(<span class="string">&quot;send_tlb_shootdown_ipi(): from CPU {:?}, complete&quot;</span>, cpu::current_cpu());
+    }
 }
 
 <span class="doccomment">/// Interrupt Handler for TLB Shootdowns on aarch64

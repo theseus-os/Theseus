@@ -97,6 +97,23 @@
 <a href="#97" id="97">97</a>
 <a href="#98" id="98">98</a>
 <a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
+<a href="#109" id="109">109</a>
+<a href="#110" id="110">110</a>
+<a href="#111" id="111">111</a>
+<a href="#112" id="112">112</a>
+<a href="#113" id="113">113</a>
+<a href="#114" id="114">114</a>
+<a href="#115" id="115">115</a>
+<a href="#116" id="116">116</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 #![allow(unused_variables, unused_mut)]
 #![feature(array_try_from_fn)]
@@ -151,20 +168,13 @@
     <span class="kw">fn </span>set_destination(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         sys_int_num: InterruptNumber,
-        destination: CpuId,
+        destination: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
         priority: Priority,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 }
 
 <span class="kw">pub trait </span>LocalInterruptControllerApi {
     <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self</span>;
-
-    <span class="doccomment">/// Aarch64-specific way to initialize the secondary CPU interfaces.
-    ///
-    /// Must be called once from every secondary CPU.
-    ///
-    /// Always panics on x86_64.
-    </span><span class="kw">fn </span>init_secondary_cpu_interface(<span class="kw-2">&amp;</span><span class="self">self</span>);
 
     <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId;
     <span class="kw">fn </span>get_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; Priority;
@@ -178,22 +188,46 @@
     /// If it&#39;s None, all CPUs except the sender receive the interrupt.
     </span><span class="kw">fn </span>send_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, dest: InterruptDestination);
 
+    <span class="doccomment">/// Tell the interrupt controller that the current interrupt has been handled.
+    </span><span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: InterruptNumber);
+}
+
+<span class="doccomment">/// AArch64-specific methods of a local interrupt controller
+</span><span class="kw">pub trait </span>AArch64LocalInterruptControllerApi {
+    <span class="doccomment">/// Same as [`LocalInterruptControllerApi::enable_local_interrupt`] but for fast interrupts (FIQs).
+    </span><span class="kw">fn </span>enable_fast_local_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, enabled: bool);
+
+    <span class="doccomment">/// Same as [`LocalInterruptControllerApi::send_ipi`] but for fast interrupts (FIQs).
+    </span><span class="kw">fn </span>send_fast_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, dest: InterruptDestination);
+
     <span class="doccomment">/// Reads the minimum priority for an interrupt to reach this CPU.
-    ///
-    /// Note: aarch64-only, at the moment.
     </span><span class="kw">fn </span>get_minimum_priority(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Priority;
 
     <span class="doccomment">/// Changes the minimum priority for an interrupt to reach this CPU.
-    ///
-    /// Note: aarch64-only, at the moment.
     </span><span class="kw">fn </span>set_minimum_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, priority: Priority);
 
     <span class="doccomment">/// Aarch64-specific way to read the current pending interrupt number &amp; priority.
-    ///
-    /// Always panics on x86_64.
-    </span><span class="kw">fn </span>acknowledge_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (InterruptNumber, Priority);
+    </span><span class="kw">fn </span>acknowledge_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(InterruptNumber, Priority)&gt;;
 
-    <span class="doccomment">/// Tell the interrupt controller that the current interrupt has been handled.
-    </span><span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: InterruptNumber);
+    <span class="doccomment">/// Aarch64-specific way to initialize the secondary CPU interfaces.
+    ///
+    /// Must be called once from every secondary CPU.
+    </span><span class="kw">fn </span>init_secondary_cpu_interface(<span class="kw-2">&amp;</span><span class="self">self</span>);
+
+    <span class="doccomment">/// Same as [`Self::acknowledge_interrupt`] but for fast interrupts (FIQs)
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it circumvents the internal Mutex.
+    /// It must only be used by the `interrupts` crate when handling an FIQ.
+    </span><span class="kw">unsafe fn </span>acknowledge_fast_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(InterruptNumber, Priority)&gt;;
+
+    <span class="doccomment">/// Same as [`LocalInterruptControllerApi::end_of_interrupt`] but for fast interrupts (FIQs)
+    ///
+    /// # Safety
+    ///
+    /// This is unsafe because it circumvents the internal Mutex.
+    /// It must only be used by the `interrupts` crate when handling an FIQ.
+    </span><span class="kw">unsafe fn </span>end_of_fast_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: InterruptNumber);
 }
 </code></pre></div></section></main></body></html>

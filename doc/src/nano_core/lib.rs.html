@@ -286,6 +286,9 @@
 <a href="#286" id="286">286</a>
 <a href="#287" id="287">287</a>
 <a href="#288" id="288">288</a>
+<a href="#289" id="289">289</a>
+<a href="#290" id="290">290</a>
+<a href="#291" id="291">291</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The aptly-named tiny crate containing the first OS code to run.
 //!
 //! The `nano_core` is very simple, and only does the following things:
@@ -376,6 +379,9 @@
     </span>B: boot_info::BootInformation
 {
     irq_safety::disable_interrupts();
+    <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+    </span>irq_safety::disable_fast_interrupts();
+
     <span class="macro">println!</span>(<span class="string">&quot;nano_core(): Entered early setup. Interrupts disabled.&quot;</span>);
 
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
@@ -419,7 +425,7 @@
         <span class="kw">let </span>logger_ports = [take_serial_port(SerialPortAddress::COM1)];
         logger::early_init(<span class="prelude-val">None</span>, IntoIterator::into_iter(logger_ports).flatten());
         <span class="macro">log::info!</span>(<span class="string">&quot;initialized early logger with aarch64 serial ports.&quot;</span>);
-        <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized early logger  with aarch64 serial ports.&quot;</span>);
+        <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized early logger with aarch64 serial ports.&quot;</span>);
     }
 
     <span class="macro">println!</span>(<span class="string">&quot;nano_core(): initialized memory subsystem.&quot;</span>);

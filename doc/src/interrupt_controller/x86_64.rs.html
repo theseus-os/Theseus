@@ -120,20 +120,6 @@
 <a href="#120" id="120">120</a>
 <a href="#121" id="121">121</a>
 <a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a>
-<a href="#136" id="136">136</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">use </span>{
@@ -191,7 +177,7 @@
     <span class="kw">fn </span>set_destination(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
         sys_int_num: InterruptNumber,
-        destination: CpuId,
+        destination: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
         priority: Priority,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = get_ioapic(<span class="self">self</span>.id).expect(<span class="string">&quot;BUG: set_destination(): get_ioapic() returned None&quot;</span>);
@@ -199,7 +185,11 @@
         <span class="comment">// no support for priority on x86_64
         </span><span class="kw">let _ </span>= priority;
 
-        int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num <span class="comment">/* &lt;- is this correct? */</span>)
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(destination) = destination {
+            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Err</span>(<span class="string">&quot;SystemInterruptController::set_destination: todo on x86: set the IOREDTBL MASK bit&quot;</span>)
+        }
     }
 }
 
@@ -207,10 +197,6 @@
 <span class="kw">impl </span>LocalInterruptControllerApi <span class="kw">for </span>LocalInterruptController {
     <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self </span>{
         <span class="macro">unimplemented!</span>()
-    }
-
-    <span class="kw">fn </span>init_secondary_cpu_interface(<span class="kw-2">&amp;</span><span class="self">self</span>) {
-        <span class="macro">panic!</span>(<span class="string">&quot;This must not be used on x86_64&quot;</span>)
     }
 
     <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId {
@@ -246,20 +232,6 @@
             SpecificCpu(cpu) =&gt; LapicIpiDestination::One(cpu.into()),
             AllOtherCpus =&gt; LapicIpiDestination::AllButMe,
         });
-    }
-
-    <span class="kw">fn </span>get_minimum_priority(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Priority {
-        <span class="comment">// No priority support on x86_64
-        </span>Priority
-    }
-
-    <span class="kw">fn </span>set_minimum_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, priority: Priority) {
-        <span class="comment">// No priority support on x86_64
-        </span><span class="kw">let _ </span>= priority;
-    }
-
-    <span class="kw">fn </span>acknowledge_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (InterruptNumber, Priority) {
-        <span class="macro">panic!</span>(<span class="string">&quot;This must not be used on x86_64&quot;</span>)
     }
 
     <span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, _number: InterruptNumber) {
