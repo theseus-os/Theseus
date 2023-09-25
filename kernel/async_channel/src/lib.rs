@@ -498,26 +498,26 @@ impl <T: Send, P: DeadlockPrevention> Receiver<T, P> {
 }
 
 
-/// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
-/// and notify all of the `Senders`
-impl<T: Send, P: DeadlockPrevention> Drop for Receiver<T, P> {
-    fn drop(&mut self) {
-        // trace!("Dropping a receiver");
-        if self.channel.receiver_count.fetch_sub(1, Ordering::SeqCst) == 1 {
-            self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
-            self.channel.waiting_senders.notify_all();
-        }
-    }
-}
+// /// When the only remaining `Receiver` is dropped, we mark the channel as disconnected
+// /// and notify all of the `Senders`
+// impl<T: Send, P: DeadlockPrevention> Drop for Receiver<T, P> {
+//     fn drop(&mut self) {
+//         // trace!("Dropping a receiver");
+//         if self.channel.receiver_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+//             self.channel.channel_status.store(ChannelStatus::ReceiverDisconnected);
+//             self.channel.waiting_senders.notify_all();
+//         }
+//     }
+// }
 
-/// When the only remaining `Sender` is dropped, we mark the channel as disconnected
-/// and notify all of the `Receivers`
-impl<T: Send, P: DeadlockPrevention> Drop for Sender<T, P> {
-    fn drop(&mut self) {
-        // trace!("Dropping a sender");
-        if self.channel.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
-            self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
-            self.channel.waiting_receivers.notify_all();
-        }
-    }
-}
+// /// When the only remaining `Sender` is dropped, we mark the channel as disconnected
+// /// and notify all of the `Receivers`
+// impl<T: Send, P: DeadlockPrevention> Drop for Sender<T, P> {
+//     fn drop(&mut self) {
+//         // trace!("Dropping a sender");
+//         if self.channel.sender_count.fetch_sub(1, Ordering::SeqCst) == 1 {
+//             self.channel.channel_status.store(ChannelStatus::SenderDisconnected);
+//             self.channel.waiting_receivers.notify_all();
+//         }
+//     }
+// }
