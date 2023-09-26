@@ -2670,15 +2670,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pl011"
-version = "1.0.0"
-source = "git+https://github.com/theseus-os/pl011/?rev=464dbf22#464dbf2288a5d9e7445b0b1f404ddd41b1fd1c1e"
-dependencies = [
- "log",
- "volatile-register",
-]
-
-[[package]]
 name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3347,11 +3338,10 @@ name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
  "arm_boards",
- "memory",
- "pl011",
  "port_io",
  "spin 0.9.4",
  "sync_irq",
+ "uart_pl011",
 ]
 
 [[package]]
@@ -4199,6 +4189,16 @@ name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
+
+[[package]]
+name = "uart_pl011"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "volatile 0.2.7",
+ "zerocopy",
+]
 
 [[package]]
 name = "uefi-bootloader-api"
