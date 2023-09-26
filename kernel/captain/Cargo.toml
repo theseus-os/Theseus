@@ -15,6 +15,7 @@ multicore_bringup = { path = "../multicore_bringup" }
 device_manager = { path = "../device_manager" }
 early_printer = { path = "../early_printer" }
 tlb_shootdown = { path = "../tlb_shootdown" }
+cls_allocator = { path = "../cls_allocator" }
 kernel_config = { path = "../kernel_config" }
 interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
@@ -28,7 +29,6 @@ spawn = { path = "../spawn" }
 stack = { path = "../stack" }
 task = { path = "../task" }
 cpu = { path = "../cpu" }
-per_cpu = { path = "../per_cpu" }
 first_application = { path = "../first_application" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

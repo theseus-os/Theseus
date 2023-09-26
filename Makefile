@@ -67,11 +67,15 @@ LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
 UNAME = $(shell uname -s)
 ifeq ($(UNAME),Darwin)
-	CROSS = x86_64-elf-
+	CROSS = $(ARCH)-elf-
 	## macOS uses a different unmounting utility
 	UNMOUNT = diskutil unmount
 	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
 else
+	## Handle building for aarch64 on x86_64 Linux/WSL
+	ifeq ($(ARCH),aarch64)
+		CROSS = aarch64-linux-gnu-
+	endif
 	## Just use normal umount on Linux/WSL
 	UNMOUNT = umount
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
@@ -295,6 +299,10 @@ else
 $(error Error: unsupported option "debug=$(debug)". Options are 'full', 'none', or 'base')
 endif
 
+## Sixth, fix up CPU local sections.
+	@echo -e "Parsing CPU local sections"
+	@cargo run --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --dir $(OBJECT_FILES_BUILD_DIR)
+
 #############################
 ### end of "build" target ###
 #############################
@@ -349,6 +357,8 @@ endif
 ## This builds the nano_core binary itself, which is the fully-linked code that first runs right after the bootloader
 $(nano_core_binary): cargo $(nano_core_static_lib) $(linker_script)
 	$(CROSS)ld -n -T $(linker_script) -o $(nano_core_binary) $(compiled_nano_core_asm) $(nano_core_static_lib)
+## Fix up CLS sections.
+	cargo run --release --manifest-path $(ROOT_DIR)/tools/elf_cls/Cargo.toml -- $(ARCH) --file $(nano_core_binary)
 ## Dump readelf output for verification. See pull request #542 for more details:
 ##	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/demangle_readelf_file/Cargo.toml \
 ##		<($(CROSS)readelf -s -W $(nano_core_binary) | sed '/OBJECT  LOCAL .* str\./d;/NOTYPE  LOCAL  /d;/FILE    LOCAL  /d;/SECTION LOCAL  /d;') \
@@ -1070,3 +1080,14 @@ endif
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
+
+test: export override QEMU_FLAGS += -device isa-debug-exit,iobase=0xf4,iosize=0x04
+test: export override QEMU_FLAGS += -nographic
+test: export override FEATURES =--features theseus_tests --features first_application/qemu_test
+test: $(iso)
+	# We exit with an exit code of 0 if QEMU's exit code is 17, and 2 otherwise.
+	# This is because `qemu_test` uses a value of 0x11 to indicate success.
+	$(QEMU_BIN) $(QEMU_FLAGS); \
+	EXIT_CODE=$$?; \
+	test $$EXIT_CODE -eq 17 && exit 0; \
+	exit 2

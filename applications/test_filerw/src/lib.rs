@@ -97,11 +97,11 @@ fn test_filerw() -> Result<(), &'static str> {
 }
 
 pub fn main(_args: Vec<String>) -> isize {
-
     match test_filerw() {
-        Ok(()) => { },
-        Err(err) => println!("{}", err)
+        Ok(()) => 0, 
+        Err(err) => {
+            println!("error {}", err);
+            -1
+        }
     }
-
-    0
 }

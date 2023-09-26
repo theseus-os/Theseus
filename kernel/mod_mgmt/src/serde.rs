@@ -24,6 +24,13 @@ pub(crate) fn into_loaded_crate(
         .filter_map(|shndx| serialized_crate.sections.get(shndx))
         .map(|tls_sec| tls_sec.size)
         .sum();
+
+    let total_cls_size: usize = serialized_crate.cls_sections
+        .iter()
+        .filter_map(|shndx| serialized_crate.sections.get(shndx))
+        .map(|cls_sec| cls_sec.size)
+        .sum();
+
     
     // The sections need a weak reference back to the loaded_crate, and so we first create
     // the loaded_crate so we have something to reference when loading the sections.
@@ -37,6 +44,7 @@ pub(crate) fn into_loaded_crate(
         data_pages:          Some((Arc::clone(data_pages), mp_range(data_pages))),
         global_sections:     serialized_crate.global_sections,
         tls_sections:        serialized_crate.tls_sections,
+        cls_sections:        serialized_crate.cls_sections,
         data_sections:       serialized_crate.data_sections,
         reexported_symbols:  BTreeSet::new(),
     });
@@ -58,6 +66,7 @@ pub(crate) fn into_loaded_crate(
                 rodata_pages,
                 data_pages,
                 total_tls_size,
+                total_cls_size,
             )?,
         );
     }
@@ -86,6 +95,7 @@ pub(crate) fn into_loaded_crate(
 
 
 /// Convert the given [`SerializedSection`] into a [`LoadedSection`].
+#[allow(clippy::too_many_arguments)]
 fn into_loaded_section(
     serialized_section: SerializedSection,
     parent_crate:       WeakCrateRef,
@@ -94,12 +104,14 @@ fn into_loaded_section(
     rodata_pages:       &Arc<Mutex<MappedPages>>,
     data_pages:         &Arc<Mutex<MappedPages>>,
     total_tls_size:     usize,
+    total_cls_size:     usize,
 ) -> Result<Arc<LoadedSection>, &'static str> {
     let mapped_pages = match serialized_section.ty {
         SectionType::Text => Arc::clone(text_pages),
         SectionType::Rodata
         | SectionType::TlsData
         | SectionType::TlsBss
+        | SectionType::Cls
         | SectionType::GccExceptTable
         | SectionType::EhFrame => Arc::clone(rodata_pages),
         SectionType::Data
@@ -124,13 +136,16 @@ fn into_loaded_section(
     );
 
     if serialized_section.ty.is_tls() {
-        namespace.tls_initializer.lock().add_existing_static_tls_section(
+        namespace.tls_initializer.lock().add_existing_static_section(
             loaded_section,
             // TLS sections encode their TLS offset in the virtual address field,
             // which is necessary to properly calculate relocation entries that depend upon them.
             serialized_section.virtual_address,
             total_tls_size,
         ).map_err(|_| "BUG: failed to add deserialized static TLS section to the TLS area")
+        // On AArch64, the linker includes a _TLS_MODULE_BASE_ zero sized symbol that we don't want to add.
+    } else if serialized_section.ty == SectionType::Cls && serialized_section.size > 0 {
+        cls_allocator::add_static_section(loaded_section, serialized_section.virtual_address, total_cls_size).map_err(|e| panic!("{:?}", e))
     } else {
         Ok(Arc::new(loaded_section))
     }

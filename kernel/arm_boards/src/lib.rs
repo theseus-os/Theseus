@@ -25,6 +25,8 @@ pub struct PciEcamConfig {
     pub size_bytes: usize,
 }
 
+/// This excludes GICv2 because there's no way to send IPIs
+/// with GICv2 via the current driver API.
 #[derive(Debug, Copy, Clone)]
 pub enum InterruptControllerConfig {
     GicV3(GicV3InterruptControllerConfig),

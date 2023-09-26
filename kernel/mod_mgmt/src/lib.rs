@@ -8,8 +8,8 @@
 
 use core::{fmt, ops::{Deref, Range}};
 use alloc::{
-    collections::{BTreeMap, btree_map, BTreeSet}, 
-    string::{String, ToString}, 
+    collections::{BTreeMap, btree_map, BTreeSet},
+    string::{String, ToString},
     sync::{Arc, Weak}, vec::Vec
 };
 use spin::{Mutex, Once};
@@ -24,8 +24,9 @@ use vfs_node::VFSDirectory;
 use path::Path;
 use memfs::MemFile;
 use hashbrown::HashMap;
+use crate_metadata_serde::{CLS_SECTION_FLAG, CLS_SYMBOL_TYPE};
 
-pub use tls_initializer::{TlsInitializer, TlsDataImage};
+pub use local_storage_initializer::{TlsInitializer, TlsDataImage};
 pub use crate_name_utils::*;
 pub use crate_metadata::*;
 
@@ -59,27 +60,26 @@ pub fn get_namespaces_directory() -> Option<DirRef> {
 /// The thread-local storage (TLS) area "image" that is used as the initial data for each `Task`.
 /// When spawning a new task, the new task will create its own local TLS area
 /// with this `TlsInitializer` as the initial data values.
-/// 
+///
 /// # Implementation Notes/Shortcomings
 /// Currently, a single system-wide `TlsInitializer` instance is shared across all namespaces.
 /// In the future, each namespace should hold its own TLS sections in its TlsInitializer area.
-/// 
+///
 /// However, this is quite complex because each namespace must be aware of the TLS sections
 /// in BOTH its underlying recursive namespace AND its (multiple) "parent" namespace(s)
 /// that recursively depend on it, since no two TLS sections can conflict (have the same offset).
-/// 
+///
 /// Thus, we stick with a singleton `TlsInitializer` instance, which makes sense 
 /// because it behaves much like an allocator, in that it reserves space (index ranges) in the TLS area.
-static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::empty());
-
+static TLS_INITIALIZER: Mutex<TlsInitializer> = Mutex::new(TlsInitializer::new());
 
 /// Create a new application `CrateNamespace` that uses the default application directory 
 /// and is structured atop the given `recursive_namespace`. 
 /// If no `recursive_namespace` is provided, the default initial kernel namespace will be used. 
-/// 
+///
 /// # Return
 /// The returned `CrateNamespace` will itself be empty, having no crates and no symbols in its map.
-/// 
+///
 pub fn create_application_namespace(recursive_namespace: Option<Arc<CrateNamespace>>) -> Result<Arc<CrateNamespace>, &'static str> {
     // (1) use the initial kernel CrateNamespace as the new app namespace's recursive namespace if none was provided.
     let recursive_namespace = recursive_namespace
@@ -119,10 +119,10 @@ pub fn init(
 /// and placing them into namespace-specific directories according to their name prefix, e.g., "k#", "ksse#".
 /// This function does not create any namespaces, it just populates the files and directories
 /// such that namespaces can be created based on those files.
-/// 
+///
 /// If a file does not have an expected crate prefix according to [`CrateType::from_module_name()`],
 /// then it is treated as part of "extra_files"; see [`parse_extra_file()`] for more.
-/// 
+///
 /// Returns a tuple of: 
 /// * the top-level root "namespaces" directory that contains all other namespace directories,
 /// * the directory of the default kernel crate namespace.
@@ -232,14 +232,14 @@ fn parse_bootloader_modules_into_files(
 }
 
 /// Adds the given extra file to the directory of extra files
-/// 
+///
 /// See the top-level Makefile target "extra_files" for an explanation of how these work.
 /// Basically, they are arbitrary files that are included by the bootloader as modules
 /// (files that exist as areas of pre-loaded memory).
-/// 
+///
 /// Their file paths are encoded by flattening directory hierarchies into a the file name,
 /// using `'!'` (exclamation marks) to replace the directory delimiter `'/'`.
-/// 
+///
 /// Thus, for example, a file named `"foo!bar!me!test.txt"` will be placed at the path
 /// `/extra_files/foo/bar/me/test.txt`.
 fn parse_extra_file(
@@ -248,9 +248,8 @@ fn parse_extra_file(
     extra_file_mp: MappedPages,
     extra_files_dir: DirRef
 ) -> Result<FileRef, &'static str> {
-
     let mut file_name = extra_file_name;
-    
+
     let mut parent_dir = extra_files_dir;
     let mut iter = extra_file_name.split(EXTRA_FILES_DIRECTORY_DELIMITER).peekable();
     while let Some(path_component) = iter.next() {
@@ -278,7 +277,7 @@ fn parse_extra_file(
 
 
 
-/// A "symbol map" from a fully-qualified demangled symbol String  
+/// A "symbol map" from a fully-qualified demangled symbol String
 /// to weak reference to a `LoadedSection`.
 /// This is used for relocations, and for looking up function names.
 pub type SymbolMap = Trie<StrRef, WeakSectionRef>;
@@ -286,9 +285,9 @@ pub type SymbolMap = Trie<StrRef, WeakSectionRef>;
 
 /// A wrapper around a `Directory` reference that offers special convenience functions
 /// for getting and inserting crate object files into a directory.  
-/// 
+///
 /// Auto-derefs into a `DirRef`.
-#[derive(Clone)] 
+#[derive(Clone)]
 pub struct NamespaceDir(DirRef);
 
 impl Deref for NamespaceDir {
@@ -312,10 +311,10 @@ impl NamespaceDir {
     /// Creates a new `NamespaceDir` that wraps the given `DirRef`.
     pub fn new(dir: DirRef) -> NamespaceDir {
         NamespaceDir(dir)
-    }    
+    }
 
     /// Finds the single file in this directory whose name starts with the given `prefix`.
-    /// 
+    ///
     /// # Return
     /// If a single file matches, then that file is returned. 
     /// Otherwise, if no files or multiple files match, then `None` is returned.
@@ -347,11 +346,11 @@ impl NamespaceDir {
     }
 
     /// Gets the given object file based on its crate name prefix. 
-    /// 
+    ///
     /// # Arguments
     /// * `crate_object_file_name`: the name of the object file to be returned, 
     ///    with or without a preceding `CrateType` prefix.
-    /// 
+    ///
     /// # Examples 
     /// * The name "k#keyboard-36be916209949cef.o" will look for and return the file "keyboard-36be916209949cef.o".
     /// * The name "keyboard-36be916209949cef.o" will look for and return the file "keyboard-36be916209949cef.o".
@@ -362,12 +361,12 @@ impl NamespaceDir {
     }
 
     /// Insert the given crate object file based on its crate type prefix. 
-    /// 
+    ///
     /// # Arguments
     /// * `crate_object_file_name`: the name of the object file to be inserted, 
     ///    with a preceding `CrateType` prefix.
     /// * `content`: the bytes that will be written into the file.
-    /// 
+    ///
     /// # Examples 
     /// * The file "k#keyboard-36be916209949cef.o" will be written to "./keyboard-36be916209949cef.o". 
     /// * The file "a#ps.o" will be placed into "./ps.o". 
@@ -381,7 +380,7 @@ impl NamespaceDir {
 
 
 /// A type that can be converted into a crate object file.
-/// 
+///
 /// We use an enum rather than implement `TryInto` because we need additional information
 /// to resolve a `Prefix`, namely the `CrateNamespace` in which to search for the prefix.
 pub enum IntoCrateObjectFile {
@@ -410,9 +409,9 @@ impl fmt::Debug for IntoCrateObjectFile {
 
 
 /// An application crate that has been loaded into a `CrateNamespace`.
-/// 
+///
 /// This type auto-derefs into the application's `StrongCrateRef`.
-/// 
+///
 /// When dropped, the application crate will be removed 
 /// from the `CrateNamespace` into which it was originally loaded.
 pub struct AppCrateRef {
@@ -455,11 +454,11 @@ impl Drop for AppCrateRef {
 /// that have all been loaded and linked against each other, 
 /// completely separate and in isolation from any other crate namespace 
 /// (although a given crate may be shared across multiple namespaces).
-/// 
+///
 /// Each `CrateNamespace` can be treated as a separate OS personality, 
 /// but are significantly more efficient than library OS-style personalities. 
 /// A `CrateNamespace` is also useful to create a process (task group) abstraction.
-/// 
+///
 /// `CrateNamespace`s can also optionally be recursive. 
 /// For example, a namespace that holds just application crates and symbols 
 /// can recursively rely upon (link against) the crates and symbols in a lower-level namespace
@@ -499,7 +498,7 @@ pub struct CrateNamespace {
     /// that is spawned and runs within this `CrateNamespace`.
     /// When spawning a new task, the new task will create its own local TLS area
     /// with this `tls_initializer` as the local data.
-    /// 
+    ///
     /// NOTE: this is currently a global system-wide singleton. See the static [`static@TLS_INITIALIZER`] for more.
     tls_initializer: &'static Mutex<TlsInitializer>,
 
@@ -509,7 +508,7 @@ pub struct CrateNamespace {
     /// Fuzzy matching should only be successful if there is just a single matching symbol; 
     /// if there are multiple matches (e.g., `my_crate::foo::h456` and `my_crate::foo::h789` both exist),
     /// then the dependency should fail to be resolved.
-    /// 
+    ///
     /// This is a potentially dangerous setting because it overrides the compiler-chosen dependency links.
     /// Thus, it is false by default, and should only be enabled with expert knowledge, 
     /// ideally only temporarily in order to manually load a given crate.
@@ -533,7 +532,7 @@ impl CrateNamespace {
             symbol_map: Mutex::new(SymbolMap::new()),
             fuzzy_symbol_matching: false,
         }
-    } 
+    }
 
     /// Returns the name of this `CrateNamespace`, which is just used for debugging purposes. 
     pub fn name(&self) -> &str {
@@ -593,7 +592,7 @@ impl CrateNamespace {
 
     /// Iterates over all crates in this namespace and calls the given function `f` on each crate.
     /// If `recursive` is true, crates in recursive namespaces are included in the iteration as well.
-    /// 
+    ///
     /// The function `f` is called with two arguments: the name of the crate, and a reference to the crate.
     /// The function `f` must return a boolean value that indicates whether to continue iterating; 
     /// if `true`, the iteration will continue, if `false`, the iteration will stop. 
@@ -619,7 +618,7 @@ impl CrateNamespace {
     /// Acquires the lock on this `CrateNamespace`'s crate list and returns the crate 
     /// that matches the given `crate_name`, if it exists in this namespace.
     /// If it does not exist in this namespace, then the recursive namespace is searched as well.
-    /// 
+    ///
     /// # Important note about Return value
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
@@ -638,7 +637,7 @@ impl CrateNamespace {
     /// This function is similar to the [`get_crate`](#method.get_crate) method,
     /// but it also returns the `CrateNamespace` in which the crate was found.
     /// It is an associated function rather than a method so it can operate on `Arc<CrateNamespace>`s.
-    /// 
+    ///
     /// # Important note about Return value
     /// Returns a `StrongCrateReference` that **has not** been marked as a shared crate reference,
     /// so if the caller wants to keep the returned `StrongCrateRef` as a shared crate 
@@ -654,18 +653,18 @@ impl CrateNamespace {
     }
 
     /// Finds the `LoadedCrate`s whose names start with the given `crate_name_prefix`.
-    /// 
+    ///
     /// # Return
     /// Returns a list of matching crates, in the form of a tuple containing the crate's name, 
     /// a shallow-cloned reference to the crate, and a reference to the namespace in which the matching crate was found.
     /// If you want to add the returned crate to another namespace, 
     /// you MUST fully `clone()` the returned crate reference in order to mark that crate as shared across namespaces. 
-    /// 
+    ///
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with "`-`".
     /// This may provide results more in line with the caller's expectations; see the last example below about a trailing "`-`". 
     /// This works because the delimiter between a crate name and its trailing hash value is "`-`".
-    /// 
+    ///
     /// # Example
     /// * This `CrateNamespace` contains the crates `my_crate-843a613894da0c24` and 
     ///   `my_crate_new-933a635894ce0f12`. 
@@ -673,7 +672,7 @@ impl CrateNamespace {
     pub fn get_crates_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name_prefix: &str
-    ) -> Vec<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Vec<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> {
         // First, we make a list of matching crates in this namespace. 
         let crates = namespace.crate_tree.lock();
         let mut crates_in_this_namespace = crates.iter_prefix(crate_name_prefix.as_bytes())
@@ -687,24 +686,24 @@ impl CrateNamespace {
 
         // Third, we combine the lists into one list that spans all namespaces.
         crates_in_this_namespace.append(&mut crates_in_recursive_namespace);
-        crates_in_this_namespace        
+        crates_in_this_namespace
     }
 
     /// Finds the `LoadedCrate` whose name starts with the given `crate_name_prefix`,
     /// *if and only if* there is a single matching crate in this namespace or any of its recursive namespaces.
     /// This is a convenience wrapper around the [`get_crates_starting_with()`](#method.get_crates_starting_with) method. 
-    /// 
+    ///
     /// # Return
     /// Returns a tuple containing the crate's name, a shallow-cloned reference to the crate, 
     /// and a reference to the namespace in which the matching crate was found.
     /// If you want to add the returned crate to another namespace, 
     /// you MUST fully `clone()` the returned crate reference in order to mark that crate as shared across namespaces. 
-    /// 
+    ///
     /// # Important Usage Note
     /// To avoid greedily matching more crates than expected, you may wish to end the `crate_name_prefix` with "`-`".
     /// This may provide results more in line with the caller's expectations; see the last example below about a trailing "`-`". 
     /// This works because the delimiter between a crate name and its trailing hash value is "`-`".
-    /// 
+    ///
     /// # Example
     /// * This `CrateNamespace` contains the crates `my_crate-843a613894da0c24` and 
     ///   `my_crate_new-933a635894ce0f12`. 
@@ -714,20 +713,20 @@ impl CrateNamespace {
     pub fn get_crate_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         crate_name_prefix: &str
-    ) -> Option<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Option<(StrRef, StrongCrateRef, &'n Arc<CrateNamespace>)> {
         let mut crates_iter = Self::get_crates_starting_with(namespace, crate_name_prefix).into_iter();
         crates_iter.next().filter(|_| crates_iter.next().is_none()) // ensure single element
     }
 
     /// Like [`get_crates_starting_with()`](#method.get_crates_starting_with),
     /// but for crate *object file*s instead of loaded crates. 
-    /// 
+    ///
     /// Returns a list of matching object files and the namespace in which they were found,
     /// inclusive of recursive namespaces.
     pub fn get_crate_object_files_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         file_name_prefix: &str
-    ) -> Vec<(FileRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Vec<(FileRef, &'n Arc<CrateNamespace>)> {
         // First, we make a list of matching files in this namespace. 
         let mut files = namespace.dir
             .get_files_starting_with(file_name_prefix)
@@ -742,18 +741,18 @@ impl CrateNamespace {
 
         // Third, we combine the lists into one list that spans all namespaces.
         files.append(&mut files_in_recursive_namespace);
-        files        
+        files
     }
 
     /// Like [`get_crate_starting_with()`](#method.get_crate_starting_with),
     /// but for crate *object file*s instead of loaded crates. 
-    /// 
+    ///
     /// Returns the matching object file and the namespace in which it was found,
     /// if and only if there was a single match (inclusive of recursive namespaces).
     pub fn get_crate_object_file_starting_with<'n>(
         namespace: &'n Arc<CrateNamespace>,
         file_name_prefix: &str
-    ) -> Option<(FileRef, &'n Arc<CrateNamespace>)> { 
+    ) -> Option<(FileRef, &'n Arc<CrateNamespace>)> {
         let mut files_iter = Self::get_crate_object_files_starting_with(namespace, file_name_prefix).into_iter();
         files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
     }
@@ -762,13 +761,13 @@ impl CrateNamespace {
     /// Same as `get_crate_object_files_starting_with()`,
     /// but is a method instead of an associated function,
     /// and also returns `&CrateNamespace` instead of `&Arc<CrateNamespace>`.
-    /// 
+    ///
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
     pub fn method_get_crate_object_files_starting_with(
         &self,
         file_name_prefix: &str
-    ) -> Vec<(FileRef, &CrateNamespace)> { 
+    ) -> Vec<(FileRef, &CrateNamespace)> {
         // First, we make a list of matching files in this namespace. 
         let mut files = self.dir
             .get_files_starting_with(file_name_prefix)
@@ -783,37 +782,37 @@ impl CrateNamespace {
 
         // Third, we combine the lists into one list that spans all namespaces.
         files.append(&mut files_in_recursive_namespace);
-        files        
+        files
     }
 
     /// Same as `get_crate_object_file_starting_with()`,
     /// but is a method instead of an associated function,
     /// and also returns `&CrateNamespace` instead of `&Arc<CrateNamespace>`.
-    /// 
+    ///
     /// This is only necessary because I can't figure out how to make a generic function
     /// that accepts and returns either `&CrateNamespace` or `&Arc<CrateNamespace>`.
     pub fn method_get_crate_object_file_starting_with(
         &self,
         file_name_prefix: &str
-    ) -> Option<(FileRef, &CrateNamespace)> { 
+    ) -> Option<(FileRef, &CrateNamespace)> {
         let mut files_iter = self.method_get_crate_object_files_starting_with(file_name_prefix).into_iter();
         files_iter.next().filter(|_| files_iter.next().is_none()) // ensure single element
     }
 
     /// Loads the specified application crate into this `CrateNamespace`, allowing it to be run.
-    /// 
+    ///
     /// The new application crate's public symbols are added to this `CrateNamespace`'s symbol map,
     /// allowing other crates in this namespace to depend upon it.
-    /// 
+    ///
     /// Application crates are added to the CrateNamespace just like kernel crates,
     /// so to load an application crate multiple times to spawn multiple instances of it,
     /// you can create a new top-level namespace to hold that application crate.
-    /// 
+    ///
     /// Returns a Result containing the newly-loaded application crate itself.
     pub fn load_crate_as_application(
         namespace: &Arc<CrateNamespace>,
-        crate_object_file: &FileRef, 
-        kernel_mmi_ref: &MmiRef, 
+        crate_object_file: &FileRef,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<AppCrateRef, &'static str> {
         debug!("load_crate_as_application(): trying to load application crate at {:?}", crate_object_file.lock().get_absolute_path());
@@ -836,7 +835,7 @@ impl CrateNamespace {
     /// Loads the specified crate into memory, allowing it to be invoked.  
     /// Returns a Result containing the number of symbols that were added to the symbol map
     /// as a result of loading this crate.
-    /// 
+    ///
     /// # Arguments
     /// * `crate_object_file`: the crate object file that will be loaded into this `CrateNamespace`.
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be searched for missing symbols 
@@ -848,21 +847,20 @@ impl CrateNamespace {
     pub fn load_crate(
         &self,
         crate_object_file: &FileRef,
-        temp_backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi_ref: &MmiRef, 
+        temp_backup_namespace: Option<&CrateNamespace>,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<(StrongCrateRef, usize), &'static str> {
-
         #[cfg(not(loscd_eval))]
         debug!("load_crate: trying to load crate at {:?}", crate_object_file.lock().get_absolute_path());
         let new_crate_ref = self.load_crate_internal(crate_object_file, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
-        
+
         let (new_crate_name, _num_sections, new_syms) = {
             let new_crate = new_crate_ref.lock_as_ref();
             let new_syms = self.add_symbols(new_crate.sections.values(), verbose_log);
             (new_crate.crate_name.clone(), new_crate.sections.len(), new_syms)
         };
-            
+
         #[cfg(not(loscd_eval))]
         info!("loaded new crate {:?}, num sections: {}, added {} new symbols.", new_crate_name, _num_sections, new_syms);
         self.crate_tree.lock().insert(new_crate_name, new_crate_ref.clone_shallow());
@@ -875,8 +873,8 @@ impl CrateNamespace {
     /// See [`load_crate`](#method.load_crate) and [`load_crate_as_application`](#fn.load_crate_as_application).
     fn load_crate_internal(&self,
         crate_object_file: &FileRef,
-        temp_backup_namespace: Option<&CrateNamespace>, 
-        kernel_mmi_ref: &MmiRef, 
+        temp_backup_namespace: Option<&CrateNamespace>,
+        kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> Result<StrongCrateRef, &'static str> {
         let cf = crate_object_file.lock();
@@ -885,13 +883,13 @@ impl CrateNamespace {
         Ok(new_crate_ref)
     }
 
-    
+
     /// This function first loads all of the given crates' sections and adds them to the symbol map,
     /// and only after *all* crates are loaded does it move on to linking/relocation calculations. 
-    /// 
+    ///
     /// This allows multiple object files with circular dependencies on one another
     /// to be loaded all at once, as if they were a single entity.
-    /// 
+    ///
     /// # Example
     /// If crate `A` depends on crate `B`, and crate `B` depends on crate `A`,
     /// this function will load both crate `A` and `B` before trying to resolve their dependencies individually. 
@@ -901,7 +899,7 @@ impl CrateNamespace {
         temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool,
-    ) -> Result<(), &'static str> 
+    ) -> Result<(), &'static str>
         where I: Iterator<Item = &'f FileRef>
     {
         // First, lock all of the crate object files.
@@ -911,13 +909,13 @@ impl CrateNamespace {
         }
 
         // Second, do all of the section parsing and loading, and add all public symbols to the symbol map.
-        let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(locked_crate_files.len()); 
-        for locked_crate_file in &locked_crate_files {            
+        let mut partially_loaded_crates: Vec<(StrongCrateRef, ElfFile)> = Vec::with_capacity(locked_crate_files.len());
+        for locked_crate_file in &locked_crate_files {
             let (new_crate_ref, elf_file) = self.load_crate_sections(locked_crate_file.deref(), kernel_mmi_ref, verbose_log)?;
             let _new_syms = self.add_symbols(new_crate_ref.lock_as_ref().sections.values(), verbose_log);
             partially_loaded_crates.push((new_crate_ref, elf_file));
         }
-        
+
         // Finally, we do all of the relocations.
         for (new_crate_ref, elf_file) in partially_loaded_crates {
             self.perform_relocations(&elf_file, &new_crate_ref, temp_backup_namespace, kernel_mmi_ref, verbose_log)?;
@@ -932,11 +930,11 @@ impl CrateNamespace {
     /// Duplicates this `CrateNamespace` into a new `CrateNamespace`, 
     /// but uses a copy-on-write/clone-on-write semantic that creates 
     /// a special shared reference to each crate that indicates it is shared across multiple namespaces.
-    /// 
+    ///
     /// In other words, crates in the new namespace returned by this fucntions 
     /// are fully shared with crates in *this* namespace, 
     /// until either namespace attempts to modify a shared crate in the future.
-    /// 
+    ///
     /// When modifying crates in the new namespace, e.g., swapping crates, 
     /// any crates in the new namespace that are still shared with the old namespace
     /// must be deeply copied into a new crate that is exclusively owned,
@@ -949,7 +947,7 @@ impl CrateNamespace {
     /// that now depend on `A2` instead of `A`. 
     /// The existing versions of `B` and `C` would still depend on `A`, 
     /// but they would no longer be part of the new namespace. 
-    /// 
+    ///
     pub fn clone_on_write(&self) -> CrateNamespace {
         CrateNamespace {
             name: self.name.clone(),
@@ -972,7 +970,6 @@ impl CrateNamespace {
         new_section: &StrongSectionRef,
         kernel_mmi_ref: &MmiRef
     ) -> Result<(), &'static str> {
-
         for weak_dep in &old_section.inner.read().sections_dependent_on_me {
             let target_sec = weak_dep.section.upgrade().ok_or("couldn't upgrade WeakDependent.section")?;
             let relocation_entry = weak_dep.relocation;
@@ -1001,7 +998,7 @@ impl CrateNamespace {
                     target_sec_mapped_pages.remap(&mut kernel_mmi_ref.lock().page_table, target_sec_initial_flags)?;
                 };
             }
-            
+
             // Tell the new source_sec that the existing target_sec depends on it.
             // Note that we don't need to do this if we're re-swapping in a cached crate,
             // because that crate's sections' dependents are already properly set up from when it was first swapped in.
@@ -1036,13 +1033,13 @@ impl CrateNamespace {
     /// The primary internal routine for parsing and loading all sections in a crate object file.
     /// This does not perform any relocations or linking, so the crate **is not yet ready to use after this function**,
     /// since its sections are totally incomplete and non-executable.
-    /// 
+    ///
     /// However, it does add all of the newly-loaded crate sections to the symbol map (yes, even before relocation/linking),
     /// since we can use them to resolve missing symbols for relocations.
-    /// 
+    ///
     /// Parses each section in the given `crate_file` object file and copies its contents to each section.
     /// Returns a tuple of a reference to the new `LoadedCrate` and the crate's ELF file (to avoid having to re-parse it).
-    /// 
+    ///
     /// # Arguments
     /// * `crate_file`: the object file for the crate that will be loaded into this `CrateNamespace`.
     /// * `kernel_mmi_ref`: the kernel's MMI struct, for memory mapping use.
@@ -1053,7 +1050,6 @@ impl CrateNamespace {
         kernel_mmi_ref: &MmiRef,
         _verbose_log: bool
     ) -> Result<(StrongCrateRef, ElfFile<'f>), &'static str> {
-        
         let mapped_pages  = crate_file.as_mapping()?;
         let size_in_bytes = crate_file.len();
         let abs_path      = Path::new(crate_file.get_absolute_path());
@@ -1070,7 +1066,7 @@ impl CrateNamespace {
         // It's probably better to pass in the actual crate file reference so we can use it here,
         // but since we don't currently do that, we just get another reference to the crate object file via its Path.
         let crate_object_file = match Path::get_absolute(&abs_path) {
-            Some(FileOrDir::File(f)) => f, 
+            Some(FileOrDir::File(f)) => f,
             _ => return Err("BUG: load_crate_sections(): couldn't get crate object file path"),
         };
 
@@ -1104,19 +1100,20 @@ impl CrateNamespace {
         let new_crate = CowArc::new(LoadedCrate {
             crate_name,
             debug_symbols_file:      Arc::downgrade(&crate_object_file),
-            object_file:             crate_object_file, 
+            object_file:             crate_object_file,
             sections:                HashMap::new(),
             text_pages:              text_pages.clone(),
             rodata_pages:            rodata_pages.clone(),
             data_pages:              data_pages.clone(),
             global_sections:         BTreeSet::new(),
             tls_sections:            BTreeSet::new(),
+            cls_sections:            BTreeSet::new(),
             data_sections:           BTreeSet::new(),
             reexported_symbols:      BTreeSet::new(),
         });
         let new_crate_weak_ref = CowArc::downgrade(&new_crate);
 
-        let load_sections_fn = if sections_are_merged { 
+        let load_sections_fn = if sections_are_merged {
             Self::load_crate_with_merged_sections
         } else {
             Self::load_crate_with_separate_sections
@@ -1126,6 +1123,7 @@ impl CrateNamespace {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
          } = load_sections_fn(
             self,
@@ -1143,8 +1141,12 @@ impl CrateNamespace {
             new_crate_mut.sections        = loaded_sections;
             new_crate_mut.global_sections = global_sections;
             new_crate_mut.tls_sections    = tls_sections;
+            new_crate_mut.cls_sections    = cls_sections;
             new_crate_mut.data_sections   = data_sections;
         }
+
+        // TODO: Should be reload().
+        cls_allocator::reload_current_cpu();
 
         Ok((new_crate, elf_file))
     }
@@ -1152,10 +1154,10 @@ impl CrateNamespace {
 
     /// An internal routine to load and populate the sections of a crate's object file
     /// if those sections have already been merged.
-    /// 
+    ///
     /// This is the "new, acclerated" way to load sections, and is used by `load_crate_sections()`
     /// for object files that **have** been modified by Theseus's special partial relinking script.
-    /// 
+    ///
     /// This works by iterating over all symbols in the object file 
     /// and creating section entries for each one of those symbols only.
     /// The actual section data can be loaded quickly because they have been merged into top-level sections,
@@ -1168,17 +1170,17 @@ impl CrateNamespace {
         rodata_pages: Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         data_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
     ) -> Result<SectionMetadata, &'static str> {
-        
+
         let mut text_pages_locked       = text_pages  .as_ref().map(|(tp, tp_range)| (tp.clone(), tp.lock(), tp_range.start));
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, rp_range)| (rp.clone(), rp.lock(), rp_range.start));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, dp_range)| (dp.clone(), dp.lock(), dp_range.start));
 
         // The section header offset of the first read-only section, which is, in order of existence:
-        // .rodata, .eh_frame, .gcc_except_table, .tdata
+        // .rodata, .eh_frame, .gcc_except_table, .tdata, .cls
         let mut read_only_offset: Option<usize> = None;
         // The section header offset of the first read-write section, which is .data or .bss
         let mut read_write_offset:   Option<usize> = None;
- 
+
         // We need to track various section `shndx`s to differentiate between 
         // the different types of "OBJECT" symbols and "TLS" symbols.
         //
@@ -1192,11 +1194,13 @@ impl CrateNamespace {
         let mut bss_shndx_and_offset:    Option<(Shndx, usize)>            = None;
         let mut tdata_shndx_and_section: Option<(Shndx, StrongSectionRef)> = None;
         let mut tbss_shndx_and_section:  Option<(Shndx, StrongSectionRef)> = None;
+        let mut cls_shndx_and_section:   Option<(Shndx, StrongSectionRef)> = None;
 
         // The set of `LoadedSections` that will be parsed and populated into this `new_crate`.
-        let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new(); 
+        let mut loaded_sections: HashMap<usize, StrongSectionRef> = HashMap::new();
         let mut data_sections:   BTreeSet<usize> = BTreeSet::new();
         let mut tls_sections:    BTreeSet<usize> = BTreeSet::new();
+        let mut cls_sections:    BTreeSet<usize> = BTreeSet::new();
         let mut last_shndx = 0;
 
         // Iterate over all "allocated" sections to copy their data from the object file into the above `MappedPages`s.
@@ -1207,15 +1211,16 @@ impl CrateNamespace {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
-                continue; 
+                continue;
             }
 
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size   = sec.size()   as usize;
             let sec_offset = sec.offset() as usize;
-            let is_write   = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec    = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls     = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write   = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec    = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls     = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls     = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
 
             let mut is_rodata = false;
             let mut is_eh_frame = false;
@@ -1238,8 +1243,8 @@ impl CrateNamespace {
                     .ok_or("BUG: ELF file contained a .text section, but no text_pages were allocated")?;
             }
 
-            // Otherwise, if writable (excluding TLS), copy the .data/.bss section into `data_pages`.
-            else if is_write && !is_tls {
+            // Otherwise, if writable (excluding TLS and CLS), copy the .data/.bss section into `data_pages`.
+            else if is_write && !is_tls && !is_cls {
                 match sec.get_type() {
                     Ok(ShType::ProgBits) => {
                         typ = SectionType::Data;
@@ -1289,9 +1294,28 @@ impl CrateNamespace {
                 (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
                     .map(|(rp_ref, rp, _)| (rp_ref, rp))
                     .ok_or("BUG: ELF file contained a .tdata/.tbss section, but no rodata_pages were allocated")?;
-                // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_tls_section()` below.
-                virt_addr = VirtualAddress::zero(); 
+                // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_section()` below.
+                virt_addr = VirtualAddress::zero();
                 tls_sections.insert(shndx);
+            } else if is_cls {
+                match sec.get_type() {
+                    Ok(ShType::ProgBits) => {
+                        typ = SectionType::Cls;
+                        let read_only_start = read_only_offset.get_or_insert(sec_offset);
+                        mapped_pages_offset = sec_offset - *read_only_start;
+
+                        (mapped_pages_ref, mapped_pages) = read_only_pages_locked.as_mut()
+                            .map(|(rp_ref, rp, _)| (rp_ref, rp))
+                            .ok_or("BUG: ELF file contained a .cls section, but no rodata_pages were allocated")?;
+                        // Use a placeholder vaddr; it will be replaced in `add_new_dynamic_section()` below.
+                        virt_addr = VirtualAddress::zero();
+                        cls_sections.insert(shndx);
+                    }
+                    ty => {
+                        error!("CLS section had incorrect type: {ty:?}");
+                        return Err("CLS section had incorrect type");
+                    },
+                }
             }
 
             // Otherwise, if .rodata, .eh_frame, or .gcc_except_table, copy its data into `rodata_pages`.
@@ -1369,7 +1393,7 @@ impl CrateNamespace {
                 // This will also update the section's virtual address field to hold that offset value,
                 // which is used for relocation entries that ask for a section's offset from the TLS base.
                 let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                    .add_new_dynamic_tls_section(new_section, sec.align() as usize)
+                    .add_new_dynamic_section(new_section, sec.align() as usize)
                     .map_err(|_| "Failed to add new dynamic TLS section")?;
 
                 // trace!("Updated new TLS section to have offset {:#X}: {:?}", _tls_offset, new_tls_section);
@@ -1379,6 +1403,11 @@ impl CrateNamespace {
                     tbss_shndx_and_section = Some((shndx, Arc::clone(&new_tls_section)));
                 }
                 new_tls_section
+            } else if is_cls {
+                let (_, new_cls_section) = cls_allocator::add_dynamic_section(new_section, sec.align() as usize)
+                    .map_err(|_| "Failed to add new dynamic CLS section")?;
+                cls_shndx_and_section = Some((shndx, Arc::clone(&new_cls_section)));
+                new_cls_section
             } else {
                 Arc::new(new_section)
             };
@@ -1420,6 +1449,7 @@ impl CrateNamespace {
             })?;
             let is_global = sec_binding == Binding::Global;
             let is_tls = sec_type == Type::Tls;
+            let is_cls = sec_type == Type::OsSpecific(CLS_SYMBOL_TYPE);
             let demangled = demangle(sec_name).to_string().as_str().into();
 
             // Declare the items we need to create a new `LoadedSection`.
@@ -1453,9 +1483,9 @@ impl CrateNamespace {
                     typ = SectionType::Rodata;
                     mapped_pages = rp_ref;
                     // no additional offset below, because .rodata is always the first read-only section.
-                    mapped_pages_offset = sec_value; 
+                    mapped_pages_offset = sec_value;
                     virt_addr = rp_start_vaddr + mapped_pages_offset;
-                } 
+                }
                 // Handle .data/.bss symbol
                 else {
                     data_sections.insert(last_shndx);
@@ -1515,6 +1545,23 @@ impl CrateNamespace {
                 mapped_pages = rp_ref;
             }
 
+            else if is_cls {
+                let sym_shndx = symbol_entry.shndx() as Shndx;
+                let rp_ref = read_only_pages_locked.as_ref()
+                    .map(|(mp_arc, ..)| mp_arc)
+                    .ok_or("BUG: found CLS symbol but no rodata_pages were allocated")?;
+
+                if let Some((cls_shndx, ref cls_sec)) = cls_shndx_and_section && sym_shndx == cls_shndx {
+                    typ = SectionType::Cls;
+                    mapped_pages_offset = cls_sec.mapped_pages_offset + sec_value;
+                    virt_addr = cls_sec.virt_addr + sec_value;
+                } else {
+                    error!("BUG: found CLS symbol with an shndx that wasn't in .cls: {}", symbol_entry as &dyn Entry);
+                    return Err("BUG: found CLS symbol with an shndx that wasn't in .cls");
+                };
+                mapped_pages = rp_ref;
+            }
+
             else {
                 error!("Found unexpected symbol type: {}", symbol_entry as &dyn Entry);
                 return Err("Found unexpected symbol type");
@@ -1538,10 +1585,9 @@ impl CrateNamespace {
             if is_global {
                 global_sections.insert(last_shndx);
             }
-        
+
             last_shndx += 1;
         } // end of iterating over all symbol table entries
-
 
         // // Quick test to ensure that all .data and .bss sections are fully covered 
         // // by overlapping OBJECT symbols.
@@ -1581,10 +1627,11 @@ impl CrateNamespace {
         //     }
         // }
 
-        Ok(SectionMetadata { 
+        Ok(SectionMetadata {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
         })
     }
@@ -1592,10 +1639,10 @@ impl CrateNamespace {
 
     /// An internal routine to load and populate the sections of a crate's object file
     /// if those sections have not been merged.
-    /// 
+    ///
     /// This is the "legacy" way to load sections, and is used by `load_crate_sections()`
     /// for object files that have **not** been modified by Theseus's special partial relinking script.
-    /// 
+    ///
     /// This works by iterating over all section headers in the object file
     /// and extracting the symbol names from each section name, which is quite slow. 
     fn load_crate_with_separate_sections(
@@ -1605,8 +1652,8 @@ impl CrateNamespace {
         text_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         rodata_pages: Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
         data_pages:   Option<(Arc<Mutex<MappedPages>>, Range<VirtualAddress>)>,
-    ) -> Result<SectionMetadata, &'static str> { 
-        
+    ) -> Result<SectionMetadata, &'static str> {
+
         // Check the symbol table to get the set of sections that are global (publicly visible).
         let global_sections: BTreeSet<Shndx> = {
             // For us to properly load the ELF file, it must NOT have been fully stripped,
@@ -1619,7 +1666,7 @@ impl CrateNamespace {
                 // Include all symbols with "GLOBAL" binding, regardless of visibility.  
                 if entry.get_binding() == Ok(xmas_elf::symbol_table::Binding::Global) {
                     match entry.get_type() {
-                        Ok(xmas_elf::symbol_table::Type::Func 
+                        Ok(xmas_elf::symbol_table::Type::Func
                             | xmas_elf::symbol_table::Type::Object
                             | xmas_elf::symbol_table::Type::Tls) => {
                             globals.insert(entry.shndx() as Shndx);
@@ -1628,7 +1675,7 @@ impl CrateNamespace {
                     }
                 }
             }
-            globals 
+            globals
         };
 
         // Since .text sections come at the beginning of the object file,
@@ -1655,12 +1702,13 @@ impl CrateNamespace {
         // we copy them into their respective pages individually on a per-section basis, 
         // keeping track of the offset into each of their MappedPages as we go.
         let (mut rodata_offset, mut data_offset) = (0 , 0);
-                    
+
         const TEXT_PREFIX:             &str = ".text.";
         const UNLIKELY_PREFIX:         &str = "unlikely."; // the full section prefix is ".text.unlikely."
         const RODATA_PREFIX:           &str = ".rodata.";
         const DATA_PREFIX:             &str = ".data.";
         const BSS_PREFIX:              &str = ".bss.";
+        const CLS_PREFIX:              &str = ".cls.";
         const TLS_DATA_PREFIX:         &str = ".tdata.";
         const TLS_BSS_PREFIX:          &str = ".tbss.";
         // const RELRO_PREFIX:            &str = "rel.ro.";
@@ -1669,12 +1717,12 @@ impl CrateNamespace {
 
         /// A convenient macro to obtain the rest of the symbol name after its prefix,
         /// i.e., the characters after '.text', '.rodata', '.data', etc.
-        /// 
+        ///
         /// * If the name isn't long enough, the macro prints and returns an error str.
         /// * If the name isn't long enough but is an empty section (e.g., just ".text", ".rodata", etc)
         ///   this macro `continue`s to the next iteration of the loop.
         /// * The `$prefix` argument must be `const` so it can be `concat!()`-ed into a const &str.
-        /// 
+        ///
         /// Note: I'd prefer this to be a const function that accepts the prefix as a const &'static str,
         ///       but Rust does not support concat!()-ing const generic parameters yet.
         macro_rules! try_get_symbol_name_after_prefix {
@@ -1702,23 +1750,23 @@ impl CrateNamespace {
         }
 
         // this maps section header index (shndx) to LoadedSection
-        let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new(); 
+        let mut loaded_sections: HashMap<Shndx, StrongSectionRef> = HashMap::new();
         // the set of Shndxes for .data and .bss sections
         let mut data_sections: BTreeSet<Shndx> = BTreeSet::new();
         // the set of Shndxes for TLS sections (.tdata, .tbss)
         let mut tls_sections: BTreeSet<Shndx> = BTreeSet::new();
+        // the set of Shndxes for CLS sections (.cls)
+        let mut cls_sections: BTreeSet<Shndx> = BTreeSet::new();
 
         let mut read_only_pages_locked  = rodata_pages.as_ref().map(|(rp, _)| (rp.clone(), rp.lock()));
         let mut read_write_pages_locked = data_pages  .as_ref().map(|(dp, _)| (dp.clone(), dp.lock()));
-
-
         // In this loop, we handle only "allocated" sections that occupy memory in the actual loaded object file.
         // This includes .text, .rodata, .data, .bss, .gcc_except_table, .eh_frame, and potentially others.
         for (shndx, sec) in elf_file.section_iter().enumerate() {
             let sec_flags = sec.flags();
             // Skip non-allocated sections, because they don't appear in the loaded object file.
             if sec_flags & SHF_ALLOC == 0 {
-                continue; 
+                continue;
             }
 
             // Even if we're using the next section's data (for a zero-sized section, as handled below),
@@ -1761,9 +1809,10 @@ impl CrateNamespace {
             // get the relevant section info, i.e., size, alignment, and data contents
             let sec_size  = sec.size()  as usize;
             let sec_align = sec.align() as usize;
-            let is_write  = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec   = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls    = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write  = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec   = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls    = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls    = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
 
 
             // First, check for executable sections, which can only be .text sections.
@@ -1791,7 +1840,7 @@ impl CrateNamespace {
                     let dest_vaddr = tp_range.start + text_offset;
 
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             SectionType::Text,
                             demangled,
@@ -1847,24 +1896,70 @@ impl CrateNamespace {
                         demangled,
                         Arc::clone(rp_ref),
                         mapped_pages_offset,
-                        VirtualAddress::zero(), // will be replaced in `add_new_dynamic_tls_section()` below
+                        VirtualAddress::zero(), // will be replaced in `add_new_dynamic_section()` below
                         sec_size,
                         global_sections.contains(&shndx),
                         new_crate.clone(),
                     );
                     // trace!("Loaded new TLS section: {:?}", new_tls_section);
-                    
+
                     // Add the new TLS section to this namespace's initial TLS area,
                     // which will reserve/obtain a new offset into that TLS area which holds this section's data.
                     // This will also update the section's virtual address field to hold that offset value,
                     // which is used for relocation entries that ask for a section's offset from the TLS base.
                     let (_tls_offset, new_tls_section) = self.tls_initializer.lock()
-                        .add_new_dynamic_tls_section(new_tls_section, sec_align)
+                        .add_new_dynamic_section(new_tls_section, sec_align)
                         .map_err(|_| "Failed to add new TLS section")?;
 
                     // trace!("\t --> updated new TLS section: {:?}", new_tls_section);
                     loaded_sections.insert(shndx, new_tls_section);
                     tls_sections.insert(shndx);
+
+                    rodata_offset += sec_size.next_multiple_of(sec_align);
+                }
+                else {
+                    return Err("no rodata_pages were allocated when handling TLS section");
+                }
+            }
+
+            else if is_cls {
+                if sec.get_type() != Ok(ShType::ProgBits) {
+                    return Err("CLS section had wrong type");
+                }
+
+                let name = try_get_symbol_name_after_prefix!(sec_name, CLS_PREFIX);
+                let demangled = demangle(name).to_string().as_str().into();
+
+                if let Some((ref rp_ref, ref mut rp)) = read_only_pages_locked {
+                    let (mapped_pages_offset, sec_typ) = {
+                        // Here: copy the TLS .tdata section's contents to the proper address in the read-only pages.
+                        let dest_slice: &mut [u8] = rp.as_slice_mut(rodata_offset, sec_size)?;
+                        match sec.get_data(elf_file) {
+                            Ok(SectionData::Undefined(sec_data)) => dest_slice.copy_from_slice(sec_data),
+                            _other => {
+                                error!("load_crate_sections(): Couldn't get section data for CLS .cls section [{}] {}: {:?}", shndx, sec_name, _other);
+                                return Err("couldn't get section data in CLS .cls section");
+                            }
+                        };
+                        // As with all other normal sections, use the current offset for these read-only pages.
+                        (rodata_offset, SectionType::Cls)
+                    };
+
+                    let new_cls_section = LoadedSection::new(
+                        sec_typ,
+                        demangled,
+                        Arc::clone(rp_ref),
+                        mapped_pages_offset,
+                        VirtualAddress::zero(), // will be replaced in `add_dynamic_section()` below
+                        sec_size,
+                        global_sections.contains(&shndx),
+                        new_crate.clone(),
+                    );
+                    let (_, new_cls_section) = cls_allocator::add_dynamic_section(new_cls_section, sec_align)
+                        .map_err(|_| "Failed to add new CLS section")?;
+
+                    loaded_sections.insert(shndx, new_cls_section);
+                    cls_sections.insert(shndx);
 
                     rodata_offset += sec_size.next_multiple_of(sec_align);
                 }
@@ -1891,7 +1986,7 @@ impl CrateNamespace {
                         // })
                 };
                 let demangled = demangle(name).to_string().as_str().into();
-                
+
                 if let Some((ref dp_ref, ref mut dp)) = read_write_pages_locked {
                     // here: we're ready to copy the data/bss section to the proper address
                     let dest_vaddr = dp.address_at_offset(data_offset)
@@ -1905,7 +2000,7 @@ impl CrateNamespace {
                             return Err("couldn't get section data in .data section");
                         }
                     }
-                    
+
                     loaded_sections.insert(
                         shndx,
                         Arc::new(LoadedSection::new(
@@ -1946,9 +2041,9 @@ impl CrateNamespace {
                             return Err("couldn't get section data in .rodata section");
                         }
                     }
-                    
+
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             SectionType::Rodata,
                             demangled,
@@ -1993,7 +2088,7 @@ impl CrateNamespace {
 
                     let typ = SectionType::GccExceptTable;
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             typ,
                             section_name_str_ref(&typ),
@@ -2032,7 +2127,7 @@ impl CrateNamespace {
 
                     let typ = SectionType::EhFrame;
                     loaded_sections.insert(
-                        shndx, 
+                        shndx,
                         Arc::new(LoadedSection::new(
                             typ,
                             section_name_str_ref(&typ),
@@ -2063,15 +2158,16 @@ impl CrateNamespace {
             }
         }
 
-        Ok(SectionMetadata { 
+        Ok(SectionMetadata {
             loaded_sections,
             global_sections,
             tls_sections,
+            cls_sections,
             data_sections,
         })
     }
 
-        
+
     /// The second stage of parsing and loading a new kernel crate, 
     /// filling in the missing relocation information in the already-loaded sections. 
     /// It also remaps the `new_crate`'s MappedPages according to each of their section permissions.
@@ -2092,9 +2188,9 @@ impl CrateNamespace {
         // Iterate over every non-zero relocation section in the file
         for sec in elf_file.section_iter().filter(|sec| sec.get_type() == Ok(ShType::Rela) && sec.size() != 0) {
             use xmas_elf::sections::SectionData::Rela64;
-            if verbose_log { 
+            if verbose_log {
                 trace!("Found Rela section name: {:?}, type: {:?}, target_sec_index: {:?}", 
-                sec.get_name(elf_file), sec.get_type(), sec.info()); 
+                sec.get_name(elf_file), sec.get_type(), sec.info());
             }
 
             // Debug sections are handled separately
@@ -2109,23 +2205,23 @@ impl CrateNamespace {
                 _ => {
                     error!("Found Rela section that wasn't able to be parsed as Rela64: {:?}", sec);
                     return Err("Found Rela section that wasn't able to be parsed as Rela64");
-                } 
+                }
             };
 
             // The target section is where we write the relocation data to.
             // The source section is where we get the data from. 
             // There is one target section per rela section (`rela_array`), and one source section per rela_entry in this rela section.
             // The "info" field in the Rela section specifies which section is the target of the relocation.
-                
+
             // Get the target section (that we already loaded) for this rela_array Rela section.
             let target_sec_shndx = sec.info() as usize;
             let target_sec = new_crate.sections.get(&target_sec_shndx).ok_or_else(|| {
                 error!("ELF file error: target section was not loaded for Rela section {:?}!", sec.get_name(elf_file));
                 "target section was not loaded for Rela section"
-            })?; 
+            })?;
 
             let mut target_sec_data_was_modified = false;
-            
+
             let mut target_sec_dependencies: Vec<StrongDependency> = Vec::new();
             #[cfg(internal_deps)]
             let mut target_sec_internal_dependencies: Vec<InternalDependency> = Vec::new();
@@ -2138,16 +2234,16 @@ impl CrateNamespace {
 
                 // iterate through each relocation entry in the relocation array for the target_sec
                 for rela_entry in rela_array {
-                    if verbose_log { 
+                    if verbose_log {
                         trace!("      Rela64 offset: {:#X}, addend: {:#X}, symtab_index: {}, type: {:#X}", 
                             rela_entry.get_offset(), rela_entry.get_addend(), rela_entry.get_symbol_table_index(), rela_entry.get_type());
                     }
 
                     use xmas_elf::symbol_table::Entry;
                     let source_sec_entry = &symtab[rela_entry.get_symbol_table_index() as usize];
-                    let source_sec_shndx = source_sec_entry.shndx() as usize; 
+                    let source_sec_shndx = source_sec_entry.shndx() as usize;
                     let source_sec_value = source_sec_entry.value() as usize;
-                    if verbose_log { 
+                    if verbose_log {
                         let source_sec_header_name = source_sec_entry.get_section_header(elf_file, rela_entry.get_symbol_table_index() as usize)
                             .and_then(|s| s.get_name(elf_file));
                         trace!("             relevant section [{}]: {:?}, value: {:#X}", source_sec_shndx, source_sec_header_name, source_sec_value);
@@ -2156,7 +2252,7 @@ impl CrateNamespace {
                         //     source_sec_entry.get_other(), source_sec_entry.get_binding(), source_sec_entry.get_type(), 
                         //     source_sec_entry.shndx(), source_sec_entry.value(), source_sec_entry.size());
                     }
-                    
+
                     let mut source_and_target_in_same_crate = false;
 
                     // We first try to get the source section from loaded_sections, which works if the section is in the crate currently being loaded.
@@ -2177,6 +2273,43 @@ impl CrateNamespace {
                                 } else {
                                     source_sec_name
                                 };
+
+                                // See `cls_macros` for more details.
+                                if source_sec_name == "__THESEUS_CLS_SIZE" {
+                                    #[cfg(target_arch = "aarch64")]
+                                    {
+                                        return Err("encountered `__THESEUS_CLS_SIZE` relocation on AArch64");
+                                    }
+                                    #[cfg(target_arch = "x86_64")]
+                                    {
+                                        let cls_size = VirtualAddress::new(usize::MAX).unwrap();
+                                        let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                        write_relocation(
+                                            relocation_entry,
+                                            target_sec_slice,
+                                            target_sec.mapped_pages_offset,
+                                            cls_size,
+                                            verbose_log,
+                                        )?;
+                                        continue;
+                                    }
+                                } else if source_sec_name == "__THESEUS_TLS_SIZE" {
+                                    #[cfg(target_arch = "x86_64")]
+                                    let tls_size = VirtualAddress::new(usize::MAX).unwrap();
+                                    #[cfg(target_arch = "aarch64")]
+                                    let tls_size = VirtualAddress::zero();
+
+                                    let relocation_entry = RelocationEntry::from_elf_relocation(rela_entry);
+                                    write_relocation(
+                                        relocation_entry,
+                                        target_sec_slice,
+                                        target_sec.mapped_pages_offset,
+                                        tls_size,
+                                        verbose_log,
+                                    )?;
+                                    continue;
+                                }
+                                
                                 let demangled = demangle(source_sec_name).to_string();
 
                                 // search for the symbol's demangled name in the kernel's symbol map
@@ -2219,13 +2352,13 @@ impl CrateNamespace {
                             relocation: relocation_entry,
                         };
                         source_sec.inner.write().sections_dependent_on_me.push(weak_dep);
-                        
+
                         // tell the target_sec that it has a strong dependency on the source_sec
                         let strong_dep = StrongDependency {
                             section: Arc::clone(&source_sec),
                             relocation: relocation_entry,
                         };
-                        target_sec_dependencies.push(strong_dep);          
+                        target_sec_dependencies.push(strong_dep);
                     }
                 }
             }
@@ -2233,7 +2366,7 @@ impl CrateNamespace {
             // If the target section of the relocation was a TLS section, 
             // that TLS section's initializer data has now changed.
             // Thus, we need to invalidate the TLS initializer area's cached data.
-            if target_sec_data_was_modified && 
+            if target_sec_data_was_modified &&
                 (target_sec.typ == SectionType::TlsData || target_sec.typ == SectionType::TlsBss)
             {
                 // debug!("Invalidating TlsInitializer due to relocation written to section {:?}", &*target_sec);
@@ -2253,7 +2386,7 @@ impl CrateNamespace {
 
         // We need to remap each section's mapped pages with the proper permission bits, 
         // since we initially mapped them all as writable.
-        if let Some(ref tp) = new_crate.text_pages { 
+        if let Some(ref tp) = new_crate.text_pages {
             tp.0.lock().remap(&mut kernel_mmi_ref.lock().page_table, TEXT_SECTION_FLAGS)?;
         }
         if let Some(ref rp) = new_crate.rodata_pages {
@@ -2265,13 +2398,13 @@ impl CrateNamespace {
         // By default, we can safely remove the metadata for all private (non-global) .rodata sections
         // that do not have any strong dependencies (its `sections_i_depend_on` list is empty).
         // If you want all sections to be kept, e.g., for debugging, you can set the below cfg option.
-        #[cfg(not(keep_private_rodata))] 
+        #[cfg(not(keep_private_rodata))]
         {
             new_crate.sections.retain(|_shndx, sec| {
-                let should_remove = !sec.global 
+                let should_remove = !sec.global
                     && sec.typ == SectionType::Rodata
                     && sec.inner.read().sections_i_depend_on.is_empty();
-                
+
                 // For an element to be removed, this closure should return `false`.
                 !should_remove
             });
@@ -2280,7 +2413,7 @@ impl CrateNamespace {
         Ok(())
     }
 
-    
+
     /// Adds the given symbol to this namespace's symbol map.
     /// If the symbol already exists in the symbol map, this replaces the existing symbol with the new one, warning if they differ in size.
     /// Returns true if the symbol was added, and false if it already existed and thus was merely replaced.
@@ -2297,7 +2430,7 @@ impl CrateNamespace {
                         // debug!("       add_symbol(): replacing section: old: {:?}, new: {:?}", old_sec, new_section);
                         if new_section.size != old_sec.size {
                             warn!("Unexpectedly replacing differently-sized section: old: ({}B) {:?}, new: ({}B) {:?}", old_sec.size, old_sec.name, new_section.size, new_section.name);
-                        } 
+                        }
                         else {
                             warn!("Replacing new symbol already present: old {:?}, new: {:?}", old_sec.name, new_section.name);
                         }
@@ -2307,7 +2440,7 @@ impl CrateNamespace {
                 false
             }
             qp_trie::Entry::Vacant(new_entry) => {
-                if log_replacements { 
+                if log_replacements {
                     debug!("         add_symbol(): Adding brand new symbol: new: {:?}", new_section);
                 }
                 new_entry.insert(Arc::downgrade(new_section));
@@ -2317,12 +2450,12 @@ impl CrateNamespace {
     }
 
     /// Adds only *global* symbols in the given `sections` iterator to this namespace's symbol map,
-    /// 
+    ///
     /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
-    /// 
+    ///
     /// Returns the number of *new* unique symbols added.
     pub fn add_symbols<'a, I>(
-        &self, 
+        &self,
         sections: I,
         _log_replacements: bool,
     ) -> usize
@@ -2334,12 +2467,12 @@ impl CrateNamespace {
 
     /// Adds symbols in the given `sections` iterator to this namespace's symbol map,
     /// but only sections that are *global* AND for which the given `filter_func` returns true. 
-    /// 
+    ///
     /// If a symbol already exists in the symbol map, this replaces the existing symbol but does not count it as a newly-added one.
-    /// 
+    ///
     /// Returns the number of *new* unique symbols added.
     fn add_symbols_filtered<'a, I, F>(
-        &self, 
+        &self,
         sections: I,
         filter_func: F,
         log_replacements: bool,
@@ -2361,34 +2494,34 @@ impl CrateNamespace {
                 }
             }
         }
-        
+
         count
     }
 
-    
+
     /// Finds the crate that contains the given `VirtualAddress` in its loaded code.
-    /// 
+    ///
     /// By default, only executable sections (`.text`) are searched, since typically the only use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
-    /// 
+    ///
     /// # Usage
     /// This is mostly useful for printing symbol names for a stack trace (backtrace).
     /// It is also similar in functionality to the tool `addr2line`, 
     /// but gives the section itself rather than the line of code.
-    /// 
+    ///
     /// # Locking
     /// This can obtain the lock on every crate and every section, 
     /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
     /// It does *not* need to obtain locks on the underlying `MappedPages` regions.
-    /// 
+    ///
     /// # Note
     /// This is a slow procedure because, in the worst case,
     /// it will iterate through **every** loaded crate in this namespace (and its recursive namespace).
     pub fn get_crate_containing_address(
-        &self, 
-        virt_addr: VirtualAddress, 
+        &self,
+        virt_addr: VirtualAddress,
         search_all_section_types: bool,
     ) -> Option<StrongCrateRef> {
 
@@ -2396,7 +2529,7 @@ impl CrateNamespace {
         let crate_contains_vaddr = |crate_ref: &StrongCrateRef| {
             let krate = crate_ref.lock_as_ref();
             if let Some(ref tp) = krate.text_pages {
-                if tp.1.contains(&virt_addr) { 
+                if tp.1.contains(&virt_addr) {
                     return true;
                 }
             }
@@ -2414,7 +2547,7 @@ impl CrateNamespace {
             }
             false
         };
-        
+
         let mut found_crate = None;
 
         // Here, we didn't find the symbol when searching from the starting crate, 
@@ -2434,29 +2567,29 @@ impl CrateNamespace {
 
 
     /// Finds the section that contains the given `VirtualAddress` in its loaded code.
-    /// 
+    ///
     /// By default, only executable sections (`.text`) are searched, since the typical use case 
     /// for this function is to search for an instruction pointer (program counter) address.
     /// However, if `search_all_section_types` is `true`, both the read-only and read-write sections
     /// will be included in the search, e.g., `.rodata`, `.data`, `.bss`. 
-    /// 
+    ///
     /// # Usage
     /// This is mostly useful for printing symbol names for a stack trace (backtrace).
     /// It is also similar in functionality to the tool `addr2line`, 
     /// but gives the section itself rather than the line of code.
-    /// 
+    ///
     /// # Locking
     /// This can obtain the lock on every crate in this namespace and its recursive namespaces, 
     /// so to avoid deadlock, please ensure that the caller task does not hold any such locks.
-    /// 
+    ///
     /// # Note
     /// This is a slow procedure because, in the worst case,
     /// it will iterate through **every** section in **every** loaded crate 
     /// in this namespace (and its recursive namespace),
     /// not just the publicly-visible (global) sections. 
     pub fn get_section_containing_address(
-        &self, 
-        virt_addr: VirtualAddress, 
+        &self,
+        virt_addr: VirtualAddress,
         search_all_section_types: bool,
     ) -> Option<(StrongSectionRef, usize)> {
 
@@ -2475,7 +2608,7 @@ impl CrateNamespace {
         for sec in crate_locked.sections.values() {
             // .text sections are always included, other sections are included if requested.
             let eligible_section = sec.typ == SectionType::Text || search_all_section_types;
-            
+
             // If the section's address bounds contain the address, then we've found it.
             // Only a single section can contain the address, so it's safe to stop once we've found a match.
             if eligible_section
@@ -2484,7 +2617,7 @@ impl CrateNamespace {
             {
                 let offset = virt_addr.value() - sec.virt_addr.value();
                 merged_section_and_offset = Some((sec.clone(), offset));
-                
+
                 if sec.name.as_str() == sec.typ.name() {
                     // If this section is a merged section, it will have the standard name
                     // for its section type, e.g., ".text", ".data", ".rodata", etc.
@@ -2527,23 +2660,23 @@ impl CrateNamespace {
     /// similar to the simpler function `get_symbol()`, but takes the additional step of trying to 
     /// automatically find and/or load the crate containing that symbol 
     /// (and does so recursively for any of its crate dependencies).
-    /// 
+    ///
     /// (1) First, it recursively searches this namespace's and its recursive namespaces' symbol maps, 
     ///     and returns the symbol if already loaded.
-    /// 
+    ///
     /// (2) Second, if the symbol is missing from this namespace, it looks in the `temp_backup_namespace`. 
     ///     If we find it there, then we add that symbol and its containing crate as a shared crate in this namespace.
-    /// 
+    ///
     /// (3) Third, if this namespace has `fuzzy_symbol_matching` enabled, it searches the backup namespace
     ///     for symbols that match the given `demangled_full_symbol` without the hash suffix. 
-    /// 
+    ///
     /// (4) Fourth, if the missing symbol isn't in the backup namespace either, 
     ///     try to load its containing crate from the object file. 
     ///     This can only be done for symbols that have a leading crate name, such as "my_crate::foo";
     ///     if a symbol was given the `no_mangle` attribute, then we will not be able to find it,
     ///     and that symbol's containing crate should be manually loaded before invoking this. 
-    /// 
-    /// 
+    ///
+    ///
     /// # Arguments
     /// * `demangled_full_symbol`: a fully-qualified symbol string, e.g., "my_crate::MyStruct::foo::h843a9ea794da0c24".
     /// * `temp_backup_namespace`: the `CrateNamespace` that should be temporarily searched (just during this call)
@@ -2551,9 +2684,9 @@ impl CrateNamespace {
     ///   If `temp_backup_namespace` is `None`, then only this namespace (and its recursive namespaces) will be searched.
     /// * `kernel_mmi_ref`: a reference to the kernel's `MemoryManagementInfo`, which must not be locked.
     pub fn get_symbol_or_load(
-        &self, 
-        demangled_full_symbol: &str, 
-        temp_backup_namespace: Option<&CrateNamespace>, 
+        &self,
+        demangled_full_symbol: &str,
+        temp_backup_namespace: Option<&CrateNamespace>,
         kernel_mmi_ref: &MmiRef,
         verbose_log: bool
     ) -> WeakSectionRef {
@@ -2597,7 +2730,7 @@ impl CrateNamespace {
 
 
     /// Looks for the given `demangled_full_symbol` in the `temp_backup_namespace` and returns a reference to the matching section. 
-    /// 
+    ///
     /// This is the second and third attempts to find a symbol within [`get_symbol_or_load()`](#method.get_symbol_or_load).
     fn get_symbol_from_backup_namespace(
         &self,
@@ -2636,7 +2769,7 @@ impl CrateNamespace {
         })?;
 
         // Here, we found the matching section in the temp_backup_namespace.
-        let parent_crate_ref = { 
+        let parent_crate_ref = {
             sec.parent_crate.upgrade().or_else(|| {
                 error!("BUG: Found symbol \"{}\" in backup namespace, but unexpectedly couldn't get its parent crate!", demangled_full_symbol);
                 None
@@ -2652,7 +2785,7 @@ impl CrateNamespace {
             self.add_symbols(Some(sec.clone()).iter(), verbose_log);
             parent_crate.crate_name.clone()
         };
-        
+
         #[cfg(not(loscd_eval))]
         info!("Symbol {:?} not initially found, using {}symbol {} from crate {:?} in backup namespace {:?} in new namespace {:?}",
             demangled_full_symbol, 
@@ -2671,24 +2804,24 @@ impl CrateNamespace {
 
 
     /// Attempts to find and load the crate that may contain the given `demangled_full_symbol`. 
-    /// 
+    ///
     /// If successful, the new crate is loaded into this `CrateNamespace` and the symbol's section is returned.
     /// If this namespace does not contain any matching crates, its recursive namespaces are searched as well.
-    /// 
+    ///
     /// This approach only works for mangled symbols that contain a crate name, such as "my_crate::foo". 
     /// If "foo()" was marked no_mangle, then we don't know which crate to load because there is no "my_crate::" prefix before it.
-    /// 
+    ///
     /// Note: while attempting to find the missing `demangled_full_symbol`, this function may end up
     /// loading *multiple* crates into this `CrateNamespace` or its recursive namespaces, due to two reasons:
     /// 1. The `demangled_full_symbol` may have multiple crate prefixes within it.
     ///    * For example, `<page_allocator::AllocatedPages as core::ops::drop::Drop>::drop::h55e0a4c312ccdd63`
     ///      contains two possible crate prefixes: `page_allocator` and `core`.
     /// 2. There may be multiple versions of a single crate.
-    /// 
+    ///
     /// Possible crates are iteratively loaded and searched until the missing symbol is found.
     /// Currently, crates that were loaded but did *not* contain the missing symbol are *not* unloaded,
     /// but you could manually unload them later with no adverse effects to reclaim memory.
-    /// 
+    ///
     /// This is the final attempt to find a symbol within [`CrateNamespace::get_symbol_or_load()`].
     fn load_crate_for_missing_symbol(
         &self,
@@ -2700,7 +2833,7 @@ impl CrateNamespace {
         // Some symbols may have multiple potential containing crates, so we try to load each one to find the missing symbol.
         for potential_crate_name in get_containing_crate_name(demangled_full_symbol) {
             let potential_crate_name = format!("{potential_crate_name}-");
- 
+
             // Try to find and load the missing crate object file from this namespace's directory or its recursive namespace's directory,
             // (or from the backup namespace's directory set).
             // The object files from the recursive namespace(s) are appended after the files in the initial namespace,
@@ -2733,7 +2866,7 @@ impl CrateNamespace {
                         // We *could* return an error here, but we might as well continue on to trying to load other crates.
                     }
                 }
-            } 
+            }
         }
 
         warn!("Couldn't find/load crate(s) that may contain the missing symbol {:?}", demangled_full_symbol);
@@ -2744,16 +2877,16 @@ impl CrateNamespace {
     /// Returns a copied list of the corresponding `LoadedSection`s 
     /// with names that start with the given `symbol_prefix`.
     /// This will also search the recursive namespace's symbol map. 
-    /// 
+    ///
     /// This method causes allocation because it creates a copy
     /// of the matching entries in the symbol map.
-    /// 
+    ///
     /// # Example
     /// The symbol map contains `my_crate::foo::h843a613894da0c24` and 
     /// `my_crate::foo::h933a635894ce0f12`. 
     /// Calling `find_symbols_starting_with("my_crate::foo")` will return 
     /// a vector containing both sections, which can then be iterated through.
-    pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> { 
+    pub fn find_symbols_starting_with(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef)> {
         let mut syms: Vec<(String, WeakSectionRef)> = self.symbol_map.lock()
             .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone()))
@@ -2769,7 +2902,7 @@ impl CrateNamespace {
 
     /// Similar to `find_symbols_starting_with`, but also includes a reference to the exact `CrateNamespace`
     /// where the matching symbol was found.
-    pub fn find_symbols_starting_with_and_namespace(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef, &CrateNamespace)> { 
+    pub fn find_symbols_starting_with_and_namespace(&self, symbol_prefix: &str) -> Vec<(String, WeakSectionRef, &CrateNamespace)> {
         let mut syms: Vec<(String, WeakSectionRef, &CrateNamespace)> = self.symbol_map.lock()
             .iter_prefix(symbol_prefix.as_bytes())
             .map(|(k, v)| (String::from(k.as_str()), v.clone(), self))
@@ -2786,12 +2919,12 @@ impl CrateNamespace {
     /// Returns a weak reference to the `LoadedSection` whose name beings with the given `symbol_prefix`,
     /// *if and only if* the symbol map only contains a single possible matching symbol.
     /// This will also search the recursive namespace's symbol map. 
-    /// 
+    ///
     /// # Important Usage Note
     /// To avoid greedily matching more symbols than expected, you may wish to end the `symbol_prefix` with "`::`".
     /// This may provide results more in line with the caller's expectations; see the last example below about a trailing "`::`". 
     /// This works because the delimiter between a symbol and its trailing hash value is "`::`".
-    /// 
+    ///
     /// # Example
     /// * The symbol map contains `my_crate::foo::h843a613894da0c24` 
     ///   and no other symbols that start with `my_crate::foo`. 
@@ -2808,21 +2941,21 @@ impl CrateNamespace {
     ///   because it will match both `foo` and `foo_new`. 
     ///   To match only `foo`, call this function as `get_symbol_starting_with("my_crate::foo::")`
     ///   (note the trailing "`::`").
-    pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef { 
+    pub fn get_symbol_starting_with(&self, symbol_prefix: &str) -> WeakSectionRef {
         self.get_symbol_starting_with_internal(symbol_prefix)
             .unwrap_or_default()
     }
 
     /// This is an internal version of method: [`get_symbol_starting_with()`](#method.get_symbol_starting_with) 
     /// that returns an Option to allow easier recursive use.
-    fn get_symbol_starting_with_internal(&self, symbol_prefix: &str) -> Option<WeakSectionRef> { 
+    fn get_symbol_starting_with_internal(&self, symbol_prefix: &str) -> Option<WeakSectionRef> {
         // First, we see if there's a single matching symbol in this namespace. 
         let map = self.symbol_map.lock();
         let mut iter = map.iter_prefix(symbol_prefix.as_bytes()).map(|tuple| tuple.1);
         let symbol_in_this_namespace = iter.next()
             .filter(|_| iter.next().is_none()) // ensure single element
             .cloned();
-        
+
         // Second, we see if there's a single matching symbol in the recursive namespace.
         let symbol_in_recursive_namespace = self.recursive_namespace.as_ref().and_then(|r_ns| r_ns.get_symbol_starting_with_internal(symbol_prefix));
 
@@ -2830,7 +2963,7 @@ impl CrateNamespace {
         symbol_in_this_namespace.xor(symbol_in_recursive_namespace)
     }
 
-    
+
     /// Simple debugging function that returns the entire symbol map as a String.
     /// This includes only symbols from this namespace, and excludes symbols from recursive namespaces.
     pub fn dump_symbol_map(&self) -> String {
@@ -2864,6 +2997,7 @@ struct SectionMetadata {
     loaded_sections: HashMap<usize, Arc<LoadedSection>>,
     global_sections: BTreeSet<usize>,
     tls_sections:    BTreeSet<usize>,
+    cls_sections:    BTreeSet<usize>,
     data_sections:   BTreeSet<usize>,
 }
 
@@ -2950,9 +3084,10 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             let addend = size.next_multiple_of(align);
 
             // filter flags for ones we care about (we already checked that it's loaded (SHF_ALLOC))
-            let is_write = sec_flags & SHF_WRITE     == SHF_WRITE;
-            let is_exec  = sec_flags & SHF_EXECINSTR == SHF_EXECINSTR;
-            let is_tls   = sec_flags & SHF_TLS       == SHF_TLS;
+            let is_write = sec_flags & SHF_WRITE        == SHF_WRITE;
+            let is_exec  = sec_flags & SHF_EXECINSTR    == SHF_EXECINSTR;
+            let is_tls   = sec_flags & SHF_TLS          == SHF_TLS;
+            let is_cls   = sec_flags & CLS_SECTION_FLAG == CLS_SECTION_FLAG;
             // trace!("  Looking at sec {:?}, size {:#X}, align {:#X} --> addend {:#X}", sec.get_name(elf_file), size, align, addend);
             if is_exec {
                 // this includes only .text sections
@@ -2965,8 +3100,13 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
                     ro_bytes += addend;
                 }
                 // Ignore .tbss sections, which have type `NoBits`.
-            }
-            else if is_write {
+            } else if is_cls {
+                if sec.get_type() == Ok(ShType::ProgBits) {
+                    ro_bytes += addend;
+                } else {
+                    return Err("CLS section had unexpected type");
+                }
+            } else if is_write {
                 // this includes both .bss and .data sections
                 rw_bytes += addend;
             }
@@ -2990,7 +3130,7 @@ fn allocate_section_pages(elf_file: &ElfFile, kernel_mmi_ref: &MmiRef) -> Result
             allocate_pages_by_bytes(size_in_bytes)
                 .ok_or("Couldn't allocate pages for new section")?
         };
-    
+
         kernel_mmi_ref.lock().page_table.map_allocated_pages(
             allocated_pages,
             flags.valid(true).writable(true)
@@ -3059,7 +3199,7 @@ fn dump_weak_dependents(sec: &LoadedSection, prefix: String) {
 
 
 /// Returns a reference to the symbol table in the given `ElfFile`.
-pub fn find_symbol_table<'e>(elf_file: &'e ElfFile) 
+pub fn find_symbol_table<'e>(elf_file: &'e ElfFile)
     -> Result<&'e [xmas_elf::symbol_table::Entry64], &'static str>
     {
     use xmas_elf::sections::SectionData::SymbolTable64;

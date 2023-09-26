@@ -1,0 +1,10 @@
+[package]
+name = "elf_cls"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Tool that prepares ELF files with CPU local sections to be loaded by Theseus"
+edition = "2021"
+
+[dependencies]
+crate_metadata_serde = { path = "../../kernel/crate_metadata_serde" }
+goblin = "0.7"

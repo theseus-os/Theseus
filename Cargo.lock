@@ -91,6 +91,7 @@ name = "ap_start"
 version = "0.1.0"
 dependencies = [
  "apic",
+ "cls_allocator",
  "cpu",
  "early_tls",
  "interrupts",
@@ -100,7 +101,6 @@ dependencies = [
  "memory",
  "no_drop",
  "page_attribute_table",
- "per_cpu",
  "scheduler",
  "spawn",
  "stack",
@@ -397,6 +397,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "app_io",
+ "cls_allocator",
  "console",
  "cpu",
  "device_manager",
@@ -418,7 +419,6 @@ dependencies = [
  "no_drop",
  "ota_update_client",
  "page_attribute_table",
- "per_cpu",
  "scheduler",
  "simd_personality",
  "spawn",
@@ -511,6 +511,17 @@ dependencies = [
  "preemption",
  "tock-registers",
  "x86_64",
+]
+
+[[package]]
+name = "cls_allocator"
+version = "0.1.0"
+dependencies = [
+ "cpu",
+ "crate_metadata",
+ "irq_safety",
+ "local_storage_initializer",
+ "sync_spin",
 ]
 
 [[package]]
@@ -691,19 +702,6 @@ dependencies = [
  "derive_more",
  "sync_irq",
  "tock-registers",
-]
-
-[[package]]
-name = "cpu_local"
-version = "0.1.0"
-dependencies = [
- "cortex-a",
- "irq_safety",
- "memory",
- "preemption",
- "sync_spin",
- "tock-registers",
- "x86_64",
 ]
 
 [[package]]
@@ -1060,8 +1058,8 @@ dependencies = [
 name = "early_tls"
 version = "0.1.0"
 dependencies = [
+ "local_storage_initializer",
  "spin 0.9.4",
- "tls_initializer",
 ]
 
 [[package]]
@@ -1213,6 +1211,7 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
+ "qemu_test",
  "shell",
  "spawn",
 ]
@@ -1415,7 +1414,8 @@ dependencies = [
  "cpu",
  "log",
  "memory",
- "static_assertions",
+ "spin 0.9.4",
+ "volatile 0.2.7",
  "zerocopy",
 ]
 
@@ -1611,6 +1611,7 @@ dependencies = [
  "ioapic",
  "log",
  "memory",
+ "spin 0.9.4",
  "sync_irq",
 ]
 
@@ -1690,7 +1691,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#0e32fe775fdb93be1fc6f85b306d109aea5d920e"
+source = "git+https://github.com/theseus-os/irq_safety#11bfab9f410a898df1e42ad6213488612e20c926"
 dependencies = [
  "spin 0.9.4",
 ]
@@ -1890,6 +1891,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "local_storage_initializer"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "crate_metadata",
+ "log",
+ "memory_structs",
+ "rangemap",
+ "spin 0.9.4",
+ "tock-registers",
+ "x86_64",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2013,15 +2028,6 @@ name = "memoffset"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
-name = "memoffset"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d61c719bcfbcf5d62b3a09efa6088de8c54bc0bfcd3ea7ae39fcc186108b8de1"
 dependencies = [
  "autocfg",
 ]
@@ -2175,6 +2181,7 @@ version = "0.1.0"
 dependencies = [
  "bincode",
  "bootloader_modules",
+ "cls_allocator",
  "const_format",
  "cow_arc",
  "cpio_reader",
@@ -2186,6 +2193,7 @@ dependencies = [
  "fs_node",
  "hashbrown",
  "kernel_config",
+ "local_storage_initializer",
  "log",
  "lz4_flex",
  "memfs",
@@ -2197,7 +2205,6 @@ dependencies = [
  "rustc-demangle",
  "serde",
  "spin 0.9.4",
- "tls_initializer",
  "vfs_node",
  "xmas-elf",
 ]
@@ -2639,19 +2646,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "per_cpu"
-version = "0.1.0"
-dependencies = [
- "cpu",
- "cpu_local",
- "log",
- "memoffset 0.8.0",
- "no_drop",
- "preemption",
- "task",
-]
-
-[[package]]
 name = "percent-encoding"
 version = "1.0.2"
 
@@ -2880,6 +2874,23 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "getopts",
+ "task",
+]
+
+[[package]]
+name = "qemu-exit"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bb0fd6580eeed0103c054e3fba2c2618ff476943762f28a645b63b8692b21c9"
+
+[[package]]
+name = "qemu_test"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "path",
+ "qemu-exit",
+ "spawn",
  "task",
 ]
 
@@ -3344,6 +3355,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_echo"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "io",
+ "log",
+ "serial_port",
+ "sync_irq",
+ "task",
+]
+
+[[package]]
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
@@ -3521,7 +3545,6 @@ dependencies = [
  "fault_crate_swap",
  "fault_log",
  "fs_node",
- "irq_safety",
  "lazy_static",
  "log",
  "memory",
@@ -3534,6 +3557,7 @@ dependencies = [
  "spin 0.9.4",
  "stack",
  "task",
+ "task_struct",
  "thread_local_macro",
 ]
 
@@ -3750,7 +3774,6 @@ dependencies = [
  "cls",
  "context_switch",
  "cpu",
- "cpu_local",
  "crossbeam-utils",
  "environment",
  "irq_safety",
@@ -3795,6 +3818,15 @@ dependencies = [
  "spin 0.9.4",
  "stack",
  "sync_irq",
+]
+
+[[package]]
+name = "test_aligned_page_allocation"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "memory",
 ]
 
 [[package]]
@@ -3912,18 +3944,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_priority_scheduler"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "log",
- "scheduler",
- "sleep",
- "spawn",
- "time",
-]
-
-[[package]]
 name = "test_restartable"
 version = "0.1.0"
 dependencies = [
@@ -3942,19 +3962,6 @@ dependencies = [
  "log",
  "scheduler",
  "spawn",
- "task",
-]
-
-[[package]]
-name = "test_serial_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "io",
- "log",
- "serial_port",
- "sync_irq",
  "task",
 ]
 
@@ -3997,6 +4004,16 @@ dependencies = [
  "log",
  "spawn",
  "task",
+]
+
+[[package]]
+name = "test_tls"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "test_thread_local",
+ "thread_local_macro",
 ]
 
 [[package]]
@@ -4063,6 +4080,7 @@ dependencies = [
  "date",
  "deps",
  "example",
+ "first_application",
  "heap_eval",
  "hello",
  "hull",
@@ -4078,6 +4096,7 @@ dependencies = [
  "print_fault_log",
  "ps",
  "pwd",
+ "qemu_test",
  "raw_mode",
  "rm",
  "rq",
@@ -4085,8 +4104,10 @@ dependencies = [
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
+ "serial_echo",
  "shell",
  "swap",
+ "test_aligned_page_allocation",
  "test_async",
  "test_backtrace",
  "test_block_io",
@@ -4098,18 +4119,16 @@ dependencies = [
  "test_mlx5",
  "test_panic",
  "test_preemption_counter",
- "test_priority_scheduler",
  "test_restartable",
  "test_scheduler",
- "test_serial_echo",
  "test_std_fs",
  "test_sync_block",
  "test_task_cancel",
  "test_thread_local",
+ "test_tls",
  "test_wait_queue",
  "test_wasmtime",
  "theseus_std",
- "tls_test",
  "unified_channel",
  "unwind_test",
  "upd",
@@ -4176,30 +4195,6 @@ dependencies = [
  "memory_aarch64",
  "memory_x86_64",
  "sync_irq",
-]
-
-[[package]]
-name = "tls_initializer"
-version = "0.1.0"
-dependencies = [
- "cortex-a",
- "crate_metadata",
- "log",
- "memory_structs",
- "rangemap",
- "spin 0.9.4",
- "tock-registers",
- "x86_64",
-]
-
-[[package]]
-name = "tls_test"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "log",
- "test_thread_local",
- "thread_local_macro",
 ]
 
 [[package]]

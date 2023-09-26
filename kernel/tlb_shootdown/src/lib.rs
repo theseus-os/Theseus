@@ -28,7 +28,7 @@ pub fn init() {
     memory::set_broadcast_tlb_shootdown_cb(broadcast_tlb_shootdown);
 
     #[cfg(target_arch = "aarch64")]
-    interrupts::setup_ipi_handler(tlb_shootdown_ipi_handler, interrupts::TLB_SHOOTDOWN_IPI).unwrap();
+    interrupts::setup_tlb_shootdown_handler(tlb_shootdown_ipi_handler).unwrap();
 }
 
 /// Handles a TLB shootdown IPI requested by another CPU.
@@ -40,6 +40,8 @@ pub fn init() {
 pub fn handle_tlb_shootdown_ipi() -> bool {
     let pages_to_invalidate = TLB_SHOOTDOWN_IPI_PAGES.read().clone();
     if let Some(pages) = pages_to_invalidate {
+        // Note: logging in a NMI (x86_64) or FIQ (aarch64) context can cause deadlock,
+        // so this should only be used sparingly to help debug problems with TLB shootdowns.
         // log::trace!("handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}", apic::current_cpu(), pages);
         for page in pages {
             tlb_flush_virt_addr(page.start_address());
@@ -97,7 +99,7 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
     }
 
     #[cfg(target_arch = "aarch64")]
-    interrupts::send_ipi_to_all_other_cpus(interrupts::TLB_SHOOTDOWN_IPI);
+    interrupts::broadcast_tlb_shootdown_ipi();
 
     // wait for all other cores to handle this IPI
     // it must be a blocking, synchronous operation to ensure stale TLB entries don't cause problems
@@ -111,6 +113,10 @@ fn broadcast_tlb_shootdown(pages_to_invalidate: PageRange) {
 
     // release lock
     TLB_SHOOTDOWN_IPI_LOCK.store(false, Ordering::Release); 
+
+    if false {
+        log::warn!("send_tlb_shootdown_ipi(): from CPU {:?}, complete", cpu::current_cpu());
+    }
 }
 
 /// Interrupt Handler for TLB Shootdowns on aarch64

@@ -65,6 +65,11 @@ SECTIONS {
         *(.tbss .tbss.*)
     }
 
+    .cls ALIGN(4K) : AT(ADDR(.cls) - KERNEL_OFFSET)
+    {
+        *(.cls)
+    }
+
     .data ALIGN(4K) : AT(ADDR(.data) - KERNEL_OFFSET)
     {
         *(.padata)
@@ -116,3 +121,8 @@ SECTIONS {
         *(.data.rel.ro.local*) *(.data.rel.ro .data.rel.ro.*)
     }
 }
+
+/* This definition must be placed at the end of the file so that the .tdata, and
+.tbss sections are placed in the correct order. */
+__THESEUS_TLS_SIZE = SIZEOF(.tdata) + SIZEOF(.tbss);
+/* We don't need the CLS size on AArch64. */

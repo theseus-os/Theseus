@@ -11,6 +11,8 @@ use core::arch::asm;
 use super::IpiTargetCpu;
 use super::Priority;
 use super::InterruptNumber;
+use super::InterruptGroup;
+use super::SPURIOUS_INTERRUPT_NUM;
 
 const SGIR_TARGET_ALL_OTHER_PE: u64 = 1 << 40;
 const IGRPEN_ENABLED: u64 = 1;
@@ -28,61 +30,80 @@ pub fn init() {
 
     // Enable Group 0
     // bit 0 = group 0 enable
-    // unsafe { asm!("msr ICC_IGRPEN0_EL1, {}", in(reg) IGRPEN_ENABLED) };
+    unsafe { asm!("msr ICC_IGRPEN0_EL1, {}", in(reg) IGRPEN_ENABLED) };
 
     // Enable Groupe 1 (non-secure)
     // bit 0 = group 1 (non-secure) enable
     unsafe { asm!("msr ICC_IGRPEN1_EL1, {}", in(reg) IGRPEN_ENABLED) };
 }
 
-/// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're queued
-/// until this CPU or another one is ready to handle
-/// them
+/// Retrieves the current priority threshold for the current CPU.
+///
+/// Interrupts have a priority; if their priority is lower or
+/// equal to this threshold, they're queued until the current CPU
+/// is ready to handle them.
 pub fn get_minimum_priority() -> Priority {
     let mut reg_value: u64;
     unsafe { asm!("mrs {}, ICC_PMR_EL1", out(reg) reg_value) };
     u8::MAX - (reg_value as u8)
 }
 
-/// Interrupts have a priority; if their priority
-/// is lower or equal to this one, they're queued
-/// until this CPU or another one is ready to handle
-/// them
+/// Sets the current priority threshold for the current CPU.
+///
+/// Interrupts have a priority; if their priority is lower or
+/// equal to this threshold, they're queued until the current CPU
+/// is ready to handle them.
 pub fn set_minimum_priority(priority: Priority) {
     let reg_value = (u8::MAX - priority) as u64;
     unsafe { asm!("msr ICC_PMR_EL1, {}", in(reg) reg_value) };
 }
 
-/// Signals to the controller that the currently processed interrupt has
-/// been fully handled, by zeroing the current priority level of this CPU.
+/// Signals to the controller that the currently processed interrupt
+/// has been fully handled, by zeroing the current priority level of
+/// the current CPU.
+///
 /// This implies that the CPU is ready to process interrupts again.
-pub fn end_of_interrupt(int: InterruptNumber) {
+pub fn end_of_interrupt(int: InterruptNumber, group: InterruptGroup) {
     let reg_value = int as u64;
-    unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) };
+    
+    match group {
+        InterruptGroup::Group0 => unsafe { asm!("msr ICC_EOIR0_EL1, {}", in(reg) reg_value) },
+        InterruptGroup::Group1 => unsafe { asm!("msr ICC_EOIR1_EL1, {}", in(reg) reg_value) },
+    }
 }
 
-/// Acknowledge the currently serviced interrupt
-/// and fetches its number; this tells the GIC that
-/// the requested interrupt is being handled by
-/// this CPU.
-pub fn acknowledge_interrupt() -> (InterruptNumber, Priority) {
+/// Acknowledge the currently serviced interrupt and fetches its
+/// number.
+///
+/// This tells the GIC that the requested interrupt is being
+/// handled by this CPU.
+///
+/// Returns None if a spurious interrupt is detected.
+pub fn acknowledge_interrupt(group: InterruptGroup) -> Option<(InterruptNumber, Priority)> {
     let int_num: u64;
     let priority: u64;
 
     // Reading the interrupt number has the side effect
     // of acknowledging the interrupt.
+    match group {
+        InterruptGroup::Group0 => unsafe { asm!("mrs {}, ICC_IAR0_EL1", out(reg) int_num) },
+        InterruptGroup::Group1 => unsafe { asm!("mrs {}, ICC_IAR1_EL1", out(reg) int_num) },
+    }
+
     unsafe {
-        asm!("mrs {}, ICC_IAR1_EL1", out(reg) int_num);
         asm!("mrs {}, ICC_RPR_EL1", out(reg) priority);
     }
 
     let int_num = int_num & 0xffffff;
     let priority = priority & 0xff;
-    (int_num as InterruptNumber, priority as u8)
+    match int_num as InterruptNumber {
+        SPURIOUS_INTERRUPT_NUM => None,
+        n => Some((n, priority as u8)),
+    }
 }
 
-pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
+/// Generates an interrupt in CPU interfaces of the system
+pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu, group: InterruptGroup) {
     let mut value = match target {
         IpiTargetCpu::Specific(cpu) => {
             let mpidr: cpu::MpidrValue = cpu.into();
@@ -112,5 +133,8 @@ pub fn send_ipi(int_num: InterruptNumber, target: IpiTargetCpu) {
     };
 
     value |= (int_num as u64) << 24;
-    unsafe { asm!("msr ICC_SGI1R_EL1, {}", in(reg) value) };
+    match group {
+        InterruptGroup::Group0 => unsafe { asm!("msr ICC_SGI0R_EL1, {}", in(reg) value) },
+        InterruptGroup::Group1 => unsafe { asm!("msr ICC_SGI1R_EL1, {}", in(reg) value) },
+    }
 }

@@ -28,10 +28,10 @@ use log::{error, info, debug};
 use cpu::CpuId;
 use debugit::debugit;
 use spin::Mutex;
-use irq_safety::enable_interrupts;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
+use task_struct::ExposedTask;
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -101,10 +101,10 @@ pub fn cleanup_bootstrap_tasks(num_tasks: u32) -> Result<(), &'static str> {
             }
             info!("Cleaned up all {} bootstrap tasks.", total_tasks);
             *BOOTSTRAP_TASKS.lock() = Vec::new(); // replace the Vec to drop it
-            // Now that all bootstrap tasks are finished executing and have been cleaned up,
-            // we can safely deallocate the early TLS data image because it is guaranteed
-            // to no longer be in use on any CPU.
-            early_tls::drop();
+            // SAFETY: Now that all bootstrap tasks are finished executing and have been cleaned up,
+            // we can safely deallocate the early TLS data image because it is guaranteed to no
+            // longer be in use on any CPU.
+            unsafe { early_tls::drop() };
         },
         num_tasks,
     )
@@ -382,7 +382,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
         )?;
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
-    
+
+        let exposed = ExposedTask { task: new_task };
+        exposed.inner().lock().pinned_cpu = self.pin_on_cpu;
+        let ExposedTask { task: mut new_task } = exposed;    
+
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
         }
@@ -663,6 +667,12 @@ where
     R: Send + 'static,
     F: FnOnce(A) -> R,
 {
+    // The first time a task runs, its entry function `task_wrapper()` is
+    // jumped to from the `task_switch()` function, right after the context
+    // switch occured. However, we set the context of the new task to have
+    // interrupts enabled (in `ContextRegular::new`), so interrupts are enabled
+    // as soon as the new task is switched to.
+
     let task_entry_func;
     let task_arg;
     let recovered_preemption_guard;
@@ -707,16 +717,7 @@ where
         );
     }
 
-    // The first time that a task runs, its entry function `task_wrapper()` is jumped to
-    // from the `task_switch()` function, right after the context switch occurred.
-    // Since the `task_switch()` function was originally invoked from an interrupt handler,
-    // interrupts were disabled but never had the chance to be re-enabled
-    // because we did not return from the interrupt handler as usual.
-    // Therefore, we need to re-enable interrupts and preemption here to ensure that
-    // things continue to run as normal, with interrupts and preemption enabled
-    // such that we can properly preempt this task.
     drop(recovered_preemption_guard);
-    enable_interrupts();
 
     // This synchronizes with the acquire fence in `JoinableTaskRef::join()`.
     fence(Ordering::Release);

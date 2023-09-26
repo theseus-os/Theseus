@@ -123,6 +123,7 @@ pub fn init(
         interrupt_controller::init()?;
 
         interrupts::init()?;
+        irq_safety::enable_fast_interrupts();
 
         // register BSP CpuId
         cpu::register_cpu(true)?;
@@ -130,7 +131,7 @@ pub fn init(
     
     // get BSP's CPU ID
     let bsp_id = cpu::bootstrap_cpu().ok_or("captain::init(): couldn't get ID of bootstrap CPU!")?;
-    per_cpu::init(bsp_id)?;
+    cls_allocator::reload_current_cpu();
 
     // Initialize the scheduler and create the initial `Task`,
     // which is bootstrapped from this current execution context.

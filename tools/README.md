@@ -5,6 +5,7 @@ This directory contains tools used in Theseus's build process or for testing pur
 ## Build-related tools
 * `copy_latest_crate_objects`: a Rust program that selects the latest version of a compiled crate object file and copies it to the OS image for creating a GRUB image. 
 * `demangle_readelf_file`: a Rust program that demangles the output of `readelf`.
+* `elf_cls`: A tool that prepares ELF files with CPU local sections to be loaded by Theseus. See `cls` for more details.
 * `limine_compress_modules`: a Rust program that takes all object files generated from a Theseus build and compresses them into a single archive. 
     * This is needed when using the `limine` bootloader, which doesn't readily support booting an OS with hundreds of boot modules.
     * This may also offer performance improvements for GRUB when booting Theseus, but it is not enabled by default.

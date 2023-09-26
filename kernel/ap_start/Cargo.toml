@@ -16,8 +16,8 @@ interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
 spawn = { path = "../spawn" }
 kernel_config = { path = "../kernel_config" }
+cls_allocator = { path = "../cls_allocator" }
 cpu = { path = "../cpu" }
-per_cpu = { path = "../per_cpu" }
 no_drop = { path = "../no_drop" }
 early_tls = { path = "../early_tls" }
 
