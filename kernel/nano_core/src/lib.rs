@@ -88,6 +88,9 @@ where
     B: boot_info::BootInformation
 {
     irq_safety::disable_interrupts();
+    #[cfg(target_arch = "aarch64")]
+    irq_safety::disable_fast_interrupts();
+
     println!("nano_core(): Entered early setup. Interrupts disabled.");
 
     #[cfg(target_arch = "x86_64")]
@@ -131,7 +134,7 @@ where
         let logger_ports = [take_serial_port(SerialPortAddress::COM1)];
         logger::early_init(None, IntoIterator::into_iter(logger_ports).flatten());
         log::info!("initialized early logger with aarch64 serial ports.");
-        println!("nano_core(): initialized early logger  with aarch64 serial ports.");
+        println!("nano_core(): initialized early logger with aarch64 serial ports.");
     }
 
     println!("nano_core(): initialized memory subsystem.");

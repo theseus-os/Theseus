@@ -11,7 +11,7 @@ use tock_registers::registers::InMemoryRegister;
 
 use interrupt_controller::{
     LocalInterruptController, SystemInterruptController, InterruptDestination,
-    LocalInterruptControllerApi, SystemInterruptControllerApi,
+    LocalInterruptControllerApi, AArch64LocalInterruptControllerApi, SystemInterruptControllerApi,
 };
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
@@ -48,7 +48,7 @@ const MAX_IRQ_NUM: usize = 256;
 // it's an array of function pointers which are meant to handle IRQs.
 // Synchronous Exceptions (including syscalls) are not IRQs on aarch64;
 // this crate doesn't expose any way to handle them at the moment.
-static IRQ_HANDLERS: IrqSafeRwLock<[InterruptHandler; MAX_IRQ_NUM]> = IrqSafeRwLock::new([default_irq_handler; MAX_IRQ_NUM]);
+static IRQ_HANDLERS: IrqSafeRwLock<[Option<InterruptHandler>; MAX_IRQ_NUM]> = IrqSafeRwLock::new([None; MAX_IRQ_NUM]);
 
 /// The Saved Program Status Register at the time of the exception.
 #[repr(transparent)]
@@ -98,12 +98,6 @@ fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
     loop { core::hint::spin_loop() }
 }
 
-// called for all unhandled interrupt requests
-extern "C" fn default_irq_handler(exc: &ExceptionContext) -> EoiBehaviour {
-    log::error!("Unhandled IRQ:\r\n{:?}\r\n[looping forever now]", exc);
-    loop { core::hint::spin_loop() }
-}
-
 fn read_timer_period_femtoseconds() -> u64 {
     let counter_freq_hz = CNTFRQ_EL0.get();
     let fs_in_one_sec = 1_000_000_000_000_000;
@@ -144,7 +138,10 @@ pub fn init_ap() {
     int_ctrl.init_secondary_cpu_interface();
     int_ctrl.set_minimum_priority(0);
 
-    int_ctrl.enable_local_interrupt(TLB_SHOOTDOWN_IPI, true);
+    // on the bootstrap CPU, this is done in setup_tlb_shootdown_handler
+    int_ctrl.enable_fast_local_interrupt(TLB_SHOOTDOWN_IPI, true);
+
+    // on the bootstrap CPU, this is done in init_timer
     int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
 
     enable_timer(true);
@@ -189,6 +186,8 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 
 /// This function registers an interrupt handler for an inter-processor interrupt
 /// and handles interrupt controller configuration for that interrupt.
+///
+/// Returns an error if the specified interrupt number already has a registered handler.
 pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) -> Result<(), &'static str> {
     // register the handler
     if let Err(existing_handler) = register_interrupt(local_num, handler) {
@@ -202,6 +201,26 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
 
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(local_num, true);
+    }
+
+    Ok(())
+}
+
+/// This function registers an interrupt handler for the TLB Shootdown IPI
+/// and handles interrupt controller configuration for that interrupt.
+///
+/// Returns an error if the TLB Shootdown interrupt number already has a registered handler.
+pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'static str> {
+    if let Err(existing_handler) = register_interrupt(TLB_SHOOTDOWN_IPI, handler) {
+        if handler as *const InterruptHandler != existing_handler {
+            return Err("A different interrupt handler has already been setup for that IPI");
+        }
+    }
+
+    {
+        // enable this interrupt as a Fast interrupt (FIQ / Group 0 interrupt)
+        let int_ctrl = LocalInterruptController::get();
+        int_ctrl.enable_fast_local_interrupt(TLB_SHOOTDOWN_IPI, true);
     }
 
     Ok(())
@@ -255,15 +274,12 @@ pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> R
     let mut handlers = IRQ_HANDLERS.write();
     let index = int_num as usize;
 
-    let value = handlers[index] as *const InterruptHandler;
-    let default = default_irq_handler as *const InterruptHandler;
-
-    if value == default {
-        handlers[index] = func;
-        Ok(())
-    } else {
+    if let Some(handler) = handlers[index] {
         error!("register_interrupt: the requested interrupt IRQ {} was already in use", index);
-        Err(value)
+        Err(handler as *const _)
+    } else {
+        handlers[index] = Some(func);
+        Ok(())
     }
 }
 
@@ -276,27 +292,35 @@ pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> R
 /// # Arguments
 /// * `int_num`: the interrupt number that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
-pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
+pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), Option<*const InterruptHandler>> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = int_num as usize;
 
-    let value = handlers[index] as *const InterruptHandler;
     let func = func as *const InterruptHandler;
+    let handler = handlers[index].map(|h| h as *const InterruptHandler);
 
-    if value == func {
-        handlers[index] = default_irq_handler;
-        Ok(())
-    } else {
+    if handler != Some(func) {
         error!("deregister_interrupt: Cannot free interrupt due to incorrect handler function");
-        Err(value)
+        Err(handler)
+    } else {
+        handlers[index] = None;
+        Ok(())
     }
 }
 
-/// Broadcast an Inter-Processor Interrupt to all other
-/// cores in the system
-pub fn send_ipi_to_all_other_cpus(irq_num: InterruptNumber) {
+/// Broadcast an Inter-Processor Interrupt to all other CPU cores in the system
+pub fn broadcast_ipi(ipi_num: InterruptNumber) {
     let int_ctrl = LocalInterruptController::get();
-    int_ctrl.send_ipi(irq_num, InterruptDestination::AllOtherCpus);
+    int_ctrl.send_ipi(ipi_num, InterruptDestination::AllOtherCpus);
+}
+
+/// Broadcast the TLB Shootdown Inter-Processor Interrupt to all other
+/// CPU cores in the system
+///
+/// This IPI uses fast interrupts (FIQs) as an NMI alternative.
+pub fn broadcast_tlb_shootdown_ipi() {
+    let int_ctrl = LocalInterruptController::get();
+    int_ctrl.send_fast_ipi(TLB_SHOOTDOWN_IPI, InterruptDestination::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
@@ -414,21 +438,62 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
     default_exception_handler(e, "current_elx_synchronous");
 }
 
+// When this is entered, FIQs are enabled / unmasked, because we use
+// them as an NMI alternative, so they must be allowed at all times.
+//
+// Spurious interrupts are often the result of an FIQ being handled
+// after we started handling an IRQ but before we acknowledged it.
 #[no_mangle]
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
         let int_ctrl = LocalInterruptController::get();
-        int_ctrl.acknowledge_interrupt()
+        match int_ctrl.acknowledge_interrupt() {
+            Some(irq_prio_tuple) => irq_prio_tuple,
+            None /* spurious interrupt */ => return,
+        }
     };
 
     let index = irq_num as usize;
-    let handler = match index < MAX_IRQ_NUM {
-        true => IRQ_HANDLERS.read()[index],
-        false => default_irq_handler,
+    let handler = IRQ_HANDLERS.read().get(index).copied().flatten();
+    let result = handler.map(|handler| handler(exc));
+
+    if let Some(result) = result {
+        if result == EoiBehaviour::HandlerDidNotSendEoi {
+            // will use LocalInterruptController
+            eoi(irq_num);
+        }
+    } else {
+        log::error!("Unhandled IRQ: {}\r\n{:?}\r\n[looping forever now]", irq_num, exc);
+        loop { core::hint::spin_loop() }
+    }
+}
+
+// When this is entered, FIQs are disabled / masked: there must be
+// only one FIQ (that we use as an NMI alternative) at a time.
+//
+// Currently, FIQs are only used for TLB shootdown.
+#[no_mangle]
+extern "C" fn current_elx_fiq(exc: &mut ExceptionContext) {
+    let (irq_num, _priority) = {
+        let int_ctrl = LocalInterruptController::get();
+        let ack = unsafe { int_ctrl.acknowledge_fast_interrupt() };
+        match ack {
+            Some(irq_prio_tuple) => irq_prio_tuple,
+            None /* spurious interrupt */ => return,
+        }
     };
 
-    if handler(exc) == EoiBehaviour::HandlerDidNotSendEoi {
-        eoi(irq_num);
+    let handler = IRQ_HANDLERS.read().get(irq_num as usize).copied().flatten();
+    let result = handler.map(|handler| handler(exc));
+
+    if let Some(result) = result {
+        if result == EoiBehaviour::HandlerDidNotSendEoi {
+            let int_ctrl = LocalInterruptController::get();
+            unsafe { int_ctrl.end_of_fast_interrupt(irq_num) };
+        }
+    } else {
+        log::error!("Unhandled FIQ: {}\r\n{:?}\r\n[looping forever now]", irq_num, exc);
+        loop { core::hint::spin_loop() }
     }
 }
 

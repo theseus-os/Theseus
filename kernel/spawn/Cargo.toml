@@ -18,6 +18,7 @@ stack = { path = "../stack" }
 cpu = { path = "../cpu" }
 preemption = { path = "../preemption" }
 task = { path = "../task" }
+task_struct = { path = "../task_struct" }
 runqueue = { path = "../runqueue" }
 scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }

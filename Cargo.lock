@@ -1181,6 +1181,7 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
+ "qemu_test",
  "shell",
  "spawn",
 ]
@@ -1660,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#0e32fe775fdb93be1fc6f85b306d109aea5d920e"
+source = "git+https://github.com/theseus-os/irq_safety#11bfab9f410a898df1e42ad6213488612e20c926"
 dependencies = [
  "spin 0.9.4",
 ]
@@ -2838,6 +2839,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "qemu-exit"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bb0fd6580eeed0103c054e3fba2c2618ff476943762f28a645b63b8692b21c9"
+
+[[package]]
+name = "qemu_test"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "path",
+ "qemu-exit",
+ "spawn",
+ "task",
+]
+
+[[package]]
 name = "qp-trie"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3298,6 +3316,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_echo"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "io",
+ "log",
+ "serial_port",
+ "sync_irq",
+ "task",
+]
+
+[[package]]
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
@@ -3487,6 +3518,7 @@ dependencies = [
  "spin 0.9.4",
  "stack",
  "task",
+ "task_struct",
  "thread_local_macro",
 ]
 
@@ -3895,19 +3927,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_serial_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "io",
- "log",
- "serial_port",
- "sync_irq",
- "task",
-]
-
-[[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
@@ -3946,6 +3965,16 @@ dependencies = [
  "log",
  "spawn",
  "task",
+]
+
+[[package]]
+name = "test_tls"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "test_thread_local",
+ "thread_local_macro",
 ]
 
 [[package]]
@@ -4012,6 +4041,7 @@ dependencies = [
  "date",
  "deps",
  "example",
+ "first_application",
  "heap_eval",
  "hello",
  "hull",
@@ -4027,6 +4057,7 @@ dependencies = [
  "print_fault_log",
  "ps",
  "pwd",
+ "qemu_test",
  "raw_mode",
  "rm",
  "rq",
@@ -4034,6 +4065,7 @@ dependencies = [
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
+ "serial_echo",
  "shell",
  "swap",
  "test_aligned_page_allocation",
@@ -4050,15 +4082,14 @@ dependencies = [
  "test_preemption_counter",
  "test_restartable",
  "test_scheduler",
- "test_serial_echo",
  "test_std_fs",
  "test_sync_block",
  "test_task_cancel",
  "test_thread_local",
+ "test_tls",
  "test_wait_queue",
  "test_wasmtime",
  "theseus_std",
- "tls_test",
  "unified_channel",
  "unwind_test",
  "upd",
@@ -4125,16 +4156,6 @@ dependencies = [
  "memory_aarch64",
  "memory_x86_64",
  "sync_irq",
-]
-
-[[package]]
-name = "tls_test"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "log",
- "test_thread_local",
- "thread_local_macro",
 ]
 
 [[package]]

@@ -64,9 +64,9 @@ impl SystemInterruptControllerApi for SystemInterruptController {
         let _ = priority;
 
         if let Some(destination) = destination {
-            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num /* <- is this correct? */)
+            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num)
         } else {
-            Err("SystemInterruptController::set_destination: todo on x86")
+            Err("SystemInterruptController::set_destination: todo on x86: set the IOREDTBL MASK bit")
         }
     }
 }
@@ -75,10 +75,6 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 impl LocalInterruptControllerApi for LocalInterruptController {
     fn get() -> &'static Self {
         unimplemented!()
-    }
-
-    fn init_secondary_cpu_interface(&self) {
-        panic!("This must not be used on x86_64")
     }
 
     fn id(&self) -> LocalInterruptControllerId {
@@ -114,20 +110,6 @@ impl LocalInterruptControllerApi for LocalInterruptController {
             SpecificCpu(cpu) => LapicIpiDestination::One(cpu.into()),
             AllOtherCpus => LapicIpiDestination::AllButMe,
         });
-    }
-
-    fn get_minimum_priority(&self) -> Priority {
-        // No priority support on x86_64
-        Priority
-    }
-
-    fn set_minimum_priority(&self, priority: Priority) {
-        // No priority support on x86_64
-        let _ = priority;
-    }
-
-    fn acknowledge_interrupt(&self) -> (InterruptNumber, Priority) {
-        panic!("This must not be used on x86_64")
     }
 
     fn end_of_interrupt(&self, _number: InterruptNumber) {

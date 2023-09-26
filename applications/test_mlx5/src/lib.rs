@@ -31,8 +31,13 @@ pub fn main(_args: Vec<String>) -> isize {
 }
 
 fn rmain() -> Result<(), &'static str> {
-    
-    let mut nic = mlx5::get_mlx5_nic().ok_or("mlx5 nic isn't initialized")?.lock();
+    let mut nic = match mlx5::get_mlx5_nic() {
+        Some(nic) => nic.lock(),
+        None => {
+            println!("MLX5 NIC isn't initialized");
+            return Ok(());
+        }
+    };
     let mac_address = nic.mac_address();
     let num_packets = 8192;
     
