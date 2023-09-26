@@ -82,7 +82,7 @@ pub fn init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
 ) -> Option<&'static Arc<IrqSafeMutex<SerialPort>>> {
-    // IF WE'RE CALLED BY device_manager, WE PROBABLY CANNOT LOG
+    // Note: if we're called by device_manager, we cannot log (as we're modifying the logger config)
 
     #[cfg(target_arch = "aarch64")]
     if serial_port_address != SerialPortAddress::COM1 {
