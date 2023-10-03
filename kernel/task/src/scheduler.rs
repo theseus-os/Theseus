@@ -51,7 +51,10 @@ pub fn schedule() -> bool {
 
     let cpu_id = preemption_guard.cpu_id();
 
-    let next_task = SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().next());
+    let next_task = SCHEDULER.update_guarded(
+        |scheduler| scheduler.as_ref().unwrap().lock().next(),
+        &preemption_guard,
+    );
 
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
