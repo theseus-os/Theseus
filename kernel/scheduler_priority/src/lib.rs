@@ -80,7 +80,7 @@ impl task::scheduler::Scheduler for Scheduler {
         Box::new(self.queue.drain().map(|priority_task| priority_task.task))
     }
 
-    fn dump(&self) -> Vec<TaskRef> {
+    fn tasks(&self) -> Vec<TaskRef> {
         self.queue
             .clone()
             .into_iter()

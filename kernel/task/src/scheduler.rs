@@ -182,7 +182,7 @@ pub trait Scheduler: Send + Sync + 'static {
     ///
     /// The list should be considered out-of-date as soon as it is called, but
     /// can be useful as a heuristic.
-    fn dump(&self) -> Vec<TaskRef>;
+    fn tasks(&self) -> Vec<TaskRef>;
 }
 
 /// A task scheduler with some notion of priority.
@@ -280,7 +280,7 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
 /// To avoid race conditions with migrating tasks, this function takes a lock
 /// over all system schedulers. This is incredibly disruptive and should be
 /// avoided at all costs.
-pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
+pub fn tasks() -> Vec<(CpuId, Vec<TaskRef>)> {
     let schedulers = SCHEDULERS.lock().clone();
     let locked = schedulers
         .iter()
@@ -289,7 +289,7 @@ pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
         .collect::<Vec<_>>();
     let result = locked
         .iter()
-        .map(|(cpu, locked_scheduler)| (**cpu, locked_scheduler.dump()))
+        .map(|(cpu, locked_scheduler)| (**cpu, locked_scheduler.tasks()))
         .collect();
     drop(locked);
     result
