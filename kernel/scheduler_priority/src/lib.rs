@@ -4,43 +4,156 @@
 
 extern crate alloc;
 
-use alloc::vec::Vec;
-use log::error;
-use runqueue_priority::RunQueue;
+use alloc::{boxed::Box, collections::BinaryHeap, vec::Vec};
+use core::cmp::Ordering;
+
 use task::TaskRef;
+use time::Instant;
 
-pub use runqueue_priority::{
-    get_priority, inherit_priority, set_priority, PriorityInheritanceGuard,
-};
+const DEFAULT_PRIORITY: u8 = 0;
 
-/// This defines the priority scheduler policy.
-/// Returns None if there is no schedule-able task
-pub fn select_next_task(apic_id: u8) -> Option<TaskRef> {
-    let mut runqueue_locked = match RunQueue::get_runqueue(apic_id) {
-        Some(rq) => rq.write(),
-        _ => {
-            error!("BUG: select_next_task_priority(): couldn't get runqueue for core {apic_id}",);
-            return None;
+pub struct Scheduler {
+    idle_task: TaskRef,
+    queue: BinaryHeap<PriorityTaskRef>,
+}
+
+impl Scheduler {
+    pub fn new(idle_task: TaskRef) -> Self {
+        Self {
+            idle_task,
+            queue: BinaryHeap::new(),
         }
-    };
+    }
+}
 
-    // This is a temporary solution before the PR to only store runnable tasks in
-    // the run queue is merged.
-    let mut blocked_tasks = Vec::with_capacity(2);
-    while let Some(mut task) = runqueue_locked.pop() {
-        if task.is_runnable() {
-            for t in blocked_tasks {
-                runqueue_locked.push(t)
+impl task::scheduler::Scheduler for Scheduler {
+    fn next(&mut self) -> TaskRef {
+        // This is a temporary solution before the PR to only store runnable tasks in
+        // the run queue is merged.
+        let mut blocked_tasks = Vec::with_capacity(2);
+        while let Some(mut task) = self.queue.pop() {
+            if task.task.is_runnable() {
+                for t in blocked_tasks {
+                    self.queue.push(t)
+                }
+                task.last_ran = time::now::<time::Monotonic>();
+                self.queue.push(task.clone());
+                return task.task;
+            } else {
+                blocked_tasks.push(task);
             }
-            task.last_ran = time::now::<time::Monotonic>();
-            runqueue_locked.push(task.clone());
-            return Some(task.task);
+        }
+        for task in blocked_tasks {
+            self.queue.push(task);
+        }
+        self.idle_task.clone()
+    }
+
+    fn add(&mut self, task: TaskRef) {
+        self.queue
+            .push(PriorityTaskRef::new(task, DEFAULT_PRIORITY));
+    }
+
+    fn busyness(&self) -> usize {
+        self.queue.len()
+    }
+
+    fn remove(&mut self, task: &TaskRef) -> bool {
+        let old_len = self.queue.len();
+        self.queue
+            .retain(|priority_task| priority_task.task != *task);
+        let new_len = self.queue.len();
+        // We should have removed at most one task from the run queue.
+        debug_assert!(
+            old_len - new_len < 2,
+            "difference between run queue lengths was: {}",
+            old_len - new_len
+        );
+        new_len != old_len
+    }
+
+    fn as_priority_scheduler(&mut self) -> Option<&mut dyn task::scheduler::PriorityScheduler> {
+        Some(self)
+    }
+
+    fn drain(&mut self) -> alloc::boxed::Box<dyn Iterator<Item = TaskRef> + '_> {
+        Box::new(self.queue.drain().map(|priority_task| priority_task.task))
+    }
+
+    fn tasks(&self) -> Vec<TaskRef> {
+        self.queue
+            .clone()
+            .into_iter()
+            .map(|priority_task| priority_task.task)
+            .collect()
+    }
+}
+
+impl task::scheduler::PriorityScheduler for Scheduler {
+    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+        let previous_len = self.queue.len();
+        self.queue.retain(|t| t.task != *task);
+
+        if previous_len != self.queue.len() {
+            // We should have at most removed one task from the run queue.
+            debug_assert_eq!(self.queue.len() + 1, previous_len);
+            self.queue.push(PriorityTaskRef {
+                task: task.clone(),
+                priority,
+                // Not technically correct, but this will be reset next time it is run.
+                last_ran: Instant::ZERO,
+            });
+            true
         } else {
-            blocked_tasks.push(task);
+            false
         }
     }
-    for task in blocked_tasks {
-        runqueue_locked.push(task);
+
+    fn priority(&mut self, task: &TaskRef) -> Option<u8> {
+        for priority_task in self.queue.iter() {
+            if priority_task.task == *task {
+                return Some(priority_task.priority);
+            }
+        }
+        None
     }
-    Some(runqueue_locked.idle_task().clone())
+}
+
+#[derive(Clone, Debug, Eq)]
+struct PriorityTaskRef {
+    task: TaskRef,
+    priority: u8,
+    last_ran: Instant,
+}
+
+impl PriorityTaskRef {
+    pub const fn new(task: TaskRef, priority: u8) -> Self {
+        Self {
+            task,
+            priority,
+            last_ran: Instant::ZERO,
+        }
+    }
+}
+
+impl PartialEq for PriorityTaskRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.priority.eq(&other.priority) && self.last_ran.eq(&other.last_ran)
+    }
+}
+
+impl PartialOrd for PriorityTaskRef {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        match self.priority.cmp(&other.priority) {
+            // Tasks that were ran longer ago should be prioritised.
+            Ordering::Equal => Some(self.last_ran.cmp(&other.last_ran).reverse()),
+            ordering => Some(ordering),
+        }
+    }
+}
+
+impl Ord for PriorityTaskRef {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.priority.cmp(&other.priority)
+    }
 }

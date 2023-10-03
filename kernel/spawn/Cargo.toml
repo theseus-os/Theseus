@@ -7,6 +7,7 @@ edition = "2018"
 
 
 [dependencies]
+cfg-if = "1.0.0"
 log = "0.4.8"
 spin = "0.9.4"
 lazy_static = { features = ["spin_no_std"], version = "1.4.0" }
@@ -19,7 +20,6 @@ cpu = { path = "../cpu" }
 preemption = { path = "../preemption" }
 task = { path = "../task" }
 task_struct = { path = "../task_struct" }
-runqueue = { path = "../runqueue" }
 scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }
 context_switch = { path = "../context_switch" }
@@ -28,6 +28,10 @@ fs_node = { path = "../fs_node" }
 thread_local_macro = { path = "../thread_local_macro" }
 no_drop = { path = "../no_drop" }
 early_tls = { path = "../early_tls" }
+
+scheduler_epoch = { path = "../scheduler_epoch" }
+scheduler_priority = { path = "../scheduler_priority" }
+scheduler_round_robin = { path = "../scheduler_round_robin" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 fault_crate_swap = { path = "../fault_crate_swap" }

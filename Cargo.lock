@@ -325,7 +325,6 @@ dependencies = [
  "path",
  "pmu_x86",
  "rendezvous",
- "runqueue",
  "scheduler",
  "simple_ipc",
  "spawn",
@@ -1102,7 +1101,6 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
  "signal_handler",
  "stack_trace",
  "task",
@@ -1450,7 +1448,6 @@ dependencies = [
  "libtest",
  "log",
  "qp-trie",
- "runqueue",
  "spawn",
 ]
 
@@ -1699,7 +1696,6 @@ dependencies = [
  "pic",
  "pit_clock_basic",
  "rand",
- "runqueue",
  "spin 0.9.4",
  "sync_irq",
  "virtual_nic",
@@ -1747,7 +1743,6 @@ dependencies = [
  "app_io",
  "debugit",
  "getopts",
- "runqueue",
  "task",
 ]
 
@@ -1823,7 +1818,6 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
  "spin 0.9.4",
  "task",
 ]
@@ -2559,7 +2553,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "runqueue",
  "stack_trace",
  "stack_trace_frame_pointers",
  "task",
@@ -3031,23 +3024,10 @@ dependencies = [
 name = "rq"
 version = "0.1.0"
 dependencies = [
- "apic",
- "app_io",
- "getopts",
- "runqueue",
- "task",
-]
-
-[[package]]
-name = "rq_access_eval"
-version = "0.1.0"
-dependencies = [
  "app_io",
  "cpu",
  "getopts",
- "irq_safety",
- "runqueue",
- "time",
+ "task",
 ]
 
 [[package]]
@@ -3060,7 +3040,6 @@ dependencies = [
  "hpet",
  "libtest",
  "log",
- "runqueue",
  "spawn",
  "task",
 ]
@@ -3094,55 +3073,6 @@ dependencies = [
  "spin 0.9.4",
  "state_store",
  "x86_64",
-]
-
-[[package]]
-name = "runqueue"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "cfg-if 1.0.0",
- "lazy_static",
- "log",
- "runqueue_epoch",
- "runqueue_priority",
- "runqueue_round_robin",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
-]
-
-[[package]]
-name = "runqueue_epoch"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
-]
-
-[[package]]
-name = "runqueue_priority"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "sync_preemption",
- "task",
- "time",
-]
-
-[[package]]
-name = "runqueue_round_robin"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
 ]
 
 [[package]]
@@ -3183,9 +3113,6 @@ dependencies = [
  "cpu",
  "interrupts",
  "log",
- "scheduler_epoch",
- "scheduler_priority",
- "scheduler_round_robin",
  "sleep",
  "task",
  "x86_64",
@@ -3196,8 +3123,6 @@ name = "scheduler_epoch"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue",
- "runqueue_epoch",
  "spin 0.9.4",
  "task",
 ]
@@ -3219,7 +3144,6 @@ name = "scheduler_priority"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue_priority",
  "task",
  "time",
 ]
@@ -3229,8 +3153,6 @@ name = "scheduler_round_robin"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue",
- "runqueue_round_robin",
  "spin 0.9.4",
  "task",
 ]
@@ -3374,7 +3296,6 @@ dependencies = [
  "log",
  "path",
  "root",
- "runqueue",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -3489,6 +3410,7 @@ name = "spawn"
 version = "0.1.0"
 dependencies = [
  "catch_unwind",
+ "cfg-if 1.0.0",
  "context_switch",
  "cpu",
  "debugit",
@@ -3503,8 +3425,10 @@ dependencies = [
  "no_drop",
  "path",
  "preemption",
- "runqueue",
  "scheduler",
+ "scheduler_epoch",
+ "scheduler_priority",
+ "scheduler_round_robin",
  "spin 0.9.4",
  "stack",
  "task",
@@ -3737,6 +3661,7 @@ dependencies = [
  "stack",
  "static_assertions",
  "sync_irq",
+ "sync_preemption",
  "task_struct",
  "waker_generic",
 ]
@@ -4051,7 +3976,6 @@ dependencies = [
  "raw_mode",
  "rm",
  "rq",
- "rq_access_eval",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
