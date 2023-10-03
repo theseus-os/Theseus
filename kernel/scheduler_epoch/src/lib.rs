@@ -99,7 +99,7 @@ impl Scheduler {
                 continue;
             }
 
-            // we give zero tokens to none runnable tasks
+            // we give zero tokens to non-runnable tasks
             if !t.is_runnable() {
                 continue;
             }
