@@ -69,7 +69,7 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
         let acpi_tables = ACPI_TABLES.lock();
         if let Some(waet) = waet::Waet::get(&acpi_tables) {
             // here: do something with the WAET here, if desired.
-            debug!("WAET: RTC? {:?}. ACPI PM timer: {:?}",
+            debug!("WAET: RTC? {:?}. ACPI PM timer? {:?}",
                 waet.rtc_good(), waet.acpi_pm_timer_good(),
             );
         }
