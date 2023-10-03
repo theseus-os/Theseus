@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["DEFAULT_PRIORITY","INITIAL_TOKENS","MAX_PRIORITY"],"fn":["get_priority","inherit_priority","set_priority"],"struct":["EpochTaskRef","PriorityInheritanceGuard","RunQueue"]};

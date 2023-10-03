@@ -78,50 +78,6 @@
 <a href="#78" id="78">78</a>
 <a href="#79" id="79">79</a>
 <a href="#80" id="80">80</a>
-<a href="#81" id="81">81</a>
-<a href="#82" id="82">82</a>
-<a href="#83" id="83">83</a>
-<a href="#84" id="84">84</a>
-<a href="#85" id="85">85</a>
-<a href="#86" id="86">86</a>
-<a href="#87" id="87">87</a>
-<a href="#88" id="88">88</a>
-<a href="#89" id="89">89</a>
-<a href="#90" id="90">90</a>
-<a href="#91" id="91">91</a>
-<a href="#92" id="92">92</a>
-<a href="#93" id="93">93</a>
-<a href="#94" id="94">94</a>
-<a href="#95" id="95">95</a>
-<a href="#96" id="96">96</a>
-<a href="#97" id="97">97</a>
-<a href="#98" id="98">98</a>
-<a href="#99" id="99">99</a>
-<a href="#100" id="100">100</a>
-<a href="#101" id="101">101</a>
-<a href="#102" id="102">102</a>
-<a href="#103" id="103">103</a>
-<a href="#104" id="104">104</a>
-<a href="#105" id="105">105</a>
-<a href="#106" id="106">106</a>
-<a href="#107" id="107">107</a>
-<a href="#108" id="108">108</a>
-<a href="#109" id="109">109</a>
-<a href="#110" id="110">110</a>
-<a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
-<a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Offers the ability to control or configure the active task scheduling policy.
 //!
 //! ## What is and isn&#39;t in this crate?
@@ -138,21 +94,10 @@
 </span><span class="attr">#![no_std]
 #![cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, feature(abi_x86_interrupt))]
 
-</span><span class="macro">cfg_if::cfg_if! </span>{
-    <span class="kw">if </span><span class="attr">#[cfg(epoch_scheduler)] </span>{
-        <span class="kw">extern crate </span>scheduler_epoch <span class="kw">as </span>scheduler;
-    } <span class="kw">else if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
-        <span class="kw">extern crate </span>scheduler_priority <span class="kw">as </span>scheduler;
-    } <span class="kw">else </span>{
-        <span class="kw">extern crate </span>scheduler_round_robin <span class="kw">as </span>scheduler;
-    }
-}
+</span><span class="kw">use </span>interrupts::{<span class="self">self</span>, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
 
-<span class="kw">use </span>interrupts::{<span class="self">self</span>, CPU_LOCAL_TIMER_IRQ, interrupt_handler, eoi, EoiBehaviour};
-<span class="kw">use </span>task::{<span class="self">self</span>, TaskRef};
-
-<span class="doccomment">/// A re-export of [`task::schedule()`] for convenience and legacy compatibility.
-</span><span class="kw">pub use </span>task::schedule;
+<span class="doccomment">/// Re-exports for convenience and legacy compatibility.
+</span><span class="kw">pub use </span>task::scheduler::{inherit_priority, priority, schedule, set_priority};
 
 
 <span class="doccomment">/// Initializes the scheduler on this system using the policy set at compiler time.
@@ -165,8 +110,6 @@
 /// - `make THESEUS_CONFIG=epoch_scheduler`: epoch scheduler
 /// - `make THESEUS_CONFIG=priority_scheduler`: priority scheduler
 </span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    task::set_scheduler_policy(scheduler::select_next_task);
-
     <span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)] </span>{
         interrupts::register_interrupt(
             CPU_LOCAL_TIMER_IRQ,
@@ -215,35 +158,4 @@
 
     EoiBehaviour::HandlerSentEoi
 });
-
-<span class="doccomment">/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum prriority).
-/// This function returns an error when a scheduler without priority is loaded. 
-</span><span class="kw">pub fn </span>set_priority(_task: <span class="kw-2">&amp;</span>TaskRef, _priority: u8) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-    <span class="attr">#[cfg(any(epoch_scheduler, priority_scheduler))]
-    </span>{
-        <span class="prelude-val">Ok</span>(scheduler::set_priority(_task, _priority))
-    }
-    <span class="attr">#[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    </span>{
-        <span class="prelude-val">Err</span>(<span class="string">&quot;called set priority on scheduler that doesn&#39;t support set priority&quot;</span>)
-    }
-}
-
-<span class="doccomment">/// Returns the priority of a given task.
-/// This function returns None when a scheduler without priority is loaded.
-</span><span class="kw">pub fn </span>get_priority(_task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-    <span class="attr">#[cfg(any(epoch_scheduler, priority_scheduler))]
-    </span>{
-        scheduler::get_priority(_task)
-    }
-    <span class="attr">#[cfg(not(any(epoch_scheduler, priority_scheduler)))]
-    </span>{
-        <span class="prelude-val">None
-    </span>}
-}
-
-<span class="kw">pub fn </span>inherit_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; scheduler::PriorityInheritanceGuard&lt;<span class="lifetime">&#39;_</span>&gt; {
-    scheduler::inherit_priority(task)
-}
 </code></pre></div></section></main></body></html>

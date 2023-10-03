@@ -129,10 +129,6 @@ var sourcesIndex = JSON.parse('{\
 "rsdp":["",[],["lib.rs"]],\
 "rsdt":["",[],["lib.rs"]],\
 "rtc":["",[],["lib.rs"]],\
-"runqueue":["",[],["lib.rs"]],\
-"runqueue_epoch":["",[],["lib.rs"]],\
-"runqueue_priority":["",[],["lib.rs"]],\
-"runqueue_round_robin":["",[],["lib.rs"]],\
 "scheduler":["",[],["lib.rs"]],\
 "scheduler_epoch":["",[],["lib.rs"]],\
 "scheduler_priority":["",[],["lib.rs"]],\
@@ -161,7 +157,7 @@ var sourcesIndex = JSON.parse('{\
 "str_ref":["",[],["lib.rs"]],\
 "sync_block":["",[],["condvar.rs","lib.rs"]],\
 "sync_preemption":["",[],["lib.rs"]],\
-"task":["",[],["lib.rs"]],\
+"task":["",[],["lib.rs","scheduler.rs"]],\
 "task_fs":["",[],["lib.rs"]],\
 "task_struct":["",[],["lib.rs"]],\
 "text_display":["",[],["lib.rs"]],\

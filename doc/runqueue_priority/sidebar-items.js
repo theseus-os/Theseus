@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["get_priority","inherit_priority","set_priority"],"struct":["PriorityInheritanceGuard","PriorityTaskRef","RunQueue"]};

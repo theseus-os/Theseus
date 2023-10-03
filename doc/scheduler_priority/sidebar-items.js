@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["get_priority","inherit_priority","select_next_task","set_priority"],"struct":["PriorityInheritanceGuard"]};
+window.SIDEBAR_ITEMS = {"struct":["Scheduler"]};

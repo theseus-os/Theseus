@@ -179,185 +179,269 @@
 <a href="#179" id="179">179</a>
 <a href="#180" id="180">180</a>
 <a href="#181" id="181">181</a>
-</pre></div><pre class="rust"><code><span class="doccomment">//! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed
-//! among tasks depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all
-//! tasks) * length of epoch]. Each time a task is picked, the token count of
-//! the task is decremented by 1. A task is executed only if it has tokens
-//! remaining. When all tokens of all runnable task are exhausted a new
-//! scheduling epoch is initiated. In addition this crate offers the interfaces
-//! to set and get priorities  of each task.
+<a href="#182" id="182">182</a>
+<a href="#183" id="183">183</a>
+<a href="#184" id="184">184</a>
+<a href="#185" id="185">185</a>
+<a href="#186" id="186">186</a>
+<a href="#187" id="187">187</a>
+<a href="#188" id="188">188</a>
+<a href="#189" id="189">189</a>
+<a href="#190" id="190">190</a>
+<a href="#191" id="191">191</a>
+<a href="#192" id="192">192</a>
+<a href="#193" id="193">193</a>
+<a href="#194" id="194">194</a>
+<a href="#195" id="195">195</a>
+<a href="#196" id="196">196</a>
+<a href="#197" id="197">197</a>
+<a href="#198" id="198">198</a>
+<a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! This crate implements a token-based epoch scheduling policy.
+//!
+//! At the begining of each scheduling epoch, a set of tokens is distributed
+//! among all runnable tasks, based on their priority relative to all other
+//! runnable tasks in the runqueue. The formula for this is:
+//! ```ignore
+//! tokens_assigned_to_task_i = (priority_task_i / sum_priority_all_tasks) * epoch_length;
+//! ```
+//! * Each time a task is picked, its token count is decremented by 1.
+//! * A task can only be selected for next execution if it has tokens remaining.
+//! * When all tokens of all runnable task are exhausted, a new scheduling epoch begins.
+//!
+//! This epoch scheduler is also a priority-based scheduler, so it allows
+//! getting and setting the priorities of each task.
 
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
 
-<span class="kw">use </span>log::error;
-<span class="kw">use </span>runqueue_epoch::{RunQueue, MAX_PRIORITY};
+<span class="kw">use </span>alloc::{boxed::Box, collections::VecDeque, vec::Vec};
+<span class="kw">use </span>core::ops::{Deref, DerefMut};
 <span class="kw">use </span>task::TaskRef;
 
-<span class="kw">pub use </span>runqueue_epoch::{inherit_priority, PriorityInheritanceGuard};
+<span class="kw">const </span>MAX_PRIORITY: u8 = <span class="number">40</span>;
+<span class="kw">const </span>DEFAULT_PRIORITY: u8 = <span class="number">20</span>;
+<span class="kw">const </span>INITIAL_TOKENS: usize = <span class="number">10</span>;
 
-<span class="doccomment">/// A data structure to transfer data from select_next_task_priority
-/// to select_next_task
-</span><span class="kw">struct </span>NextTaskResult {
-    taskref: <span class="prelude-ty">Option</span>&lt;TaskRef&gt;,
-    idle_task: bool,
+<span class="doccomment">/// An instance of an epoch scheduler, typically one per CPU.
+</span><span class="kw">pub struct </span>Scheduler {
+    idle_task: TaskRef,
+    queue: VecDeque&lt;EpochTaskRef&gt;,
 }
 
-<span class="doccomment">/// Changes the priority of the given task with the given priority level.
-/// Priority values must be between 40 (maximum priority) and 0 (minimum
-/// prriority).
-</span><span class="kw">pub fn </span>set_priority(task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) {
-    <span class="kw">let </span>priority = core::cmp::min(priority, MAX_PRIORITY);
-    runqueue_epoch::set_priority(task, priority);
-}
+<span class="kw">impl </span>Scheduler {
+    <span class="doccomment">/// Creates a new epoch scheduler instance with the given idle task.
+    </span><span class="kw">pub const fn </span>new(idle_task: TaskRef) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            idle_task,
+            queue: VecDeque::new(),
+        }
+    }
 
-<span class="doccomment">/// Returns the priority of the given task.
-</span><span class="kw">pub fn </span>get_priority(task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
-    runqueue_epoch::get_priority(task)
-}
+    <span class="doccomment">/// Moves the `TaskRef` at the given `index` in this scheduler&#39;s runqueue
+    /// to the end (back) of the runqueue.
+    ///
+    /// Sets the number of tokens for that task to the given `tokens`
+    /// and increments that task&#39;s number of context switches.
+    ///
+    /// Returns a cloned reference to the `TaskRef` at the given `index`.
+    </span><span class="kw">fn </span>update_and_move_to_end(<span class="kw-2">&amp;mut </span><span class="self">self</span>, index: usize, tokens: usize) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>priority_task_ref) = <span class="self">self</span>.queue.remove(index) {
+            priority_task_ref.tokens_remaining = tokens;
+            <span class="kw">let </span>task_ref = priority_task_ref.task.clone();
+            <span class="self">self</span>.queue.push_back(priority_task_ref);
+            <span class="prelude-val">Some</span>(task_ref)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
 
-<span class="doccomment">/// This defines the priority scheduler policy.
-/// Returns None if there is no schedule-able task.
-</span><span class="kw">pub fn </span>select_next_task(apic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
-    <span class="kw">let </span>next_task = select_next_task_priority(apic_id)<span class="question-mark">?</span>;
-    <span class="comment">// If the selected task is idle task we begin a new scheduling epoch
-    </span><span class="kw">if </span>next_task.idle_task {
-        assign_tokens(apic_id);
-        select_next_task_priority(apic_id)<span class="question-mark">?</span>.taskref
-    } <span class="kw">else </span>{
-        next_task.taskref
+    <span class="kw">fn </span>try_next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;TaskRef&gt; {
+        <span class="kw">if let </span><span class="prelude-val">Some</span>((task_index, <span class="kw">_</span>)) = <span class="self">self
+            </span>.queue
+            .iter()
+            .enumerate()
+            .find(|(<span class="kw">_</span>, task)| task.is_runnable() &amp;&amp; task.tokens_remaining &gt; <span class="number">0</span>)
+        {
+            <span class="kw">let </span>chosen_task = <span class="self">self</span>.queue.get(task_index).unwrap();
+            <span class="kw">let </span>modified_tokens = chosen_task.tokens_remaining.saturating_sub(<span class="number">1</span>);
+            <span class="self">self</span>.update_and_move_to_end(task_index, modified_tokens)
+        } <span class="kw">else </span>{
+            <span class="prelude-val">None
+        </span>}
+    }
+
+    <span class="kw">fn </span>assign_tokens(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="comment">// We begin with total priorities = 1 to avoid division by zero
+        </span><span class="kw">let </span><span class="kw-2">mut </span>total_priorities: usize = <span class="number">1</span>;
+
+        <span class="comment">// This loop calculates the total priorities of the runqueue
+        </span><span class="kw">for </span>(_i, t) <span class="kw">in </span><span class="self">self</span>.queue.iter().enumerate() {
+            <span class="comment">// we assign tokens only to runnable tasks
+            </span><span class="kw">if </span>!t.is_runnable() {
+                <span class="kw">continue</span>;
+            }
+
+            total_priorities = total_priorities
+                .saturating_add(<span class="number">1</span>)
+                .saturating_add(t.priority <span class="kw">as </span>usize);
+        }
+
+        <span class="comment">// Each epoch lasts for a total of 100 tokens by default.
+        // However, as this granularity could skip over low priority tasks
+        // when many concurrent tasks are running, we increase the epoch in such cases.
+        </span><span class="kw">let </span>epoch: usize = core::cmp::max(total_priorities, <span class="number">100</span>);
+
+        <span class="kw">for </span>(_i, t) <span class="kw">in </span><span class="self">self</span>.queue.iter_mut().enumerate() {
+            <span class="comment">// we give zero tokens to the idle tasks
+            </span><span class="kw">if </span>t.is_an_idle_task {
+                <span class="kw">continue</span>;
+            }
+
+            <span class="comment">// we give zero tokens to non-runnable tasks
+            </span><span class="kw">if </span>!t.is_runnable() {
+                <span class="kw">continue</span>;
+            }
+
+            <span class="comment">// task_tokens = epoch * (taskref + 1) / total_priorities;
+            </span><span class="kw">let </span>task_tokens = epoch
+                .saturating_mul((t.priority <span class="kw">as </span>usize).saturating_add(<span class="number">1</span>))
+                .wrapping_div(total_priorities);
+
+            t.tokens_remaining = task_tokens;
+            <span class="comment">// debug!(&quot;assign_tokens(): CPU {} chose Task {:?}&quot;, cpu_id, &amp;*t);
+        </span>}
     }
 }
 
-<span class="doccomment">/// this defines the priority scheduler policy.
-/// Returns None if there is no runqueue
-/// Otherwise returns a task with a flag indicating whether its an idle task.
-</span><span class="kw">fn </span>select_next_task_priority(apic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;NextTaskResult&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>runqueue_locked = <span class="kw">match </span>RunQueue::get_runqueue(apic_id) {
-        <span class="prelude-val">Some</span>(rq) =&gt; rq.write(),
-        <span class="kw">_ </span>=&gt; {
-            <span class="comment">// #[cfg(not(loscd_eval))]
-            // error!(&quot;BUG: select_next_task_priority(): couldn&#39;t get runqueue for core {}&quot;,
-            // apic_id);
-            </span><span class="kw">return </span><span class="prelude-val">None</span>;
-        }
-    };
+<span class="kw">impl </span>task::scheduler::Scheduler <span class="kw">for </span>Scheduler {
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; TaskRef {
+        <span class="self">self</span>.try_next()
+            .or_else(|| {
+                <span class="self">self</span>.assign_tokens();
+                <span class="self">self</span>.try_next()
+            })
+            .unwrap_or_else(|| <span class="self">self</span>.idle_task.clone())
+    }
 
-    <span class="kw">if let </span><span class="prelude-val">Some</span>((task_index, <span class="kw">_</span>)) = runqueue_locked
-        .iter()
-        .enumerate()
-        .find(|(<span class="kw">_</span>, task)| task.is_runnable())
-    {
-        <span class="kw">let </span>modified_tokens = {
-            <span class="kw">let </span>chosen_task = runqueue_locked.get(task_index);
-            <span class="kw">match </span>chosen_task.map(|m| m.tokens_remaining) {
-                <span class="prelude-val">Some</span>(x) =&gt; x.saturating_sub(<span class="number">1</span>),
-                <span class="prelude-val">None </span>=&gt; <span class="number">0</span>,
+    <span class="kw">fn </span>add(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: TaskRef) {
+        <span class="kw">let </span>priority_task_ref = EpochTaskRef::new(task);
+        <span class="self">self</span>.queue.push_back(priority_task_ref);
+    }
+
+    <span class="kw">fn </span>busyness(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+        <span class="self">self</span>.queue.len()
+    }
+
+    <span class="kw">fn </span>remove(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; bool {
+        <span class="kw">let </span><span class="kw-2">mut </span>task_index = <span class="prelude-val">None</span>;
+        <span class="kw">for </span>(i, t) <span class="kw">in </span><span class="self">self</span>.queue.iter().enumerate() {
+            <span class="kw">if </span><span class="kw-2">**</span>t == <span class="kw-2">*</span>task {
+                task_index = <span class="prelude-val">Some</span>(i);
+                <span class="kw">break</span>;
             }
-        };
+        }
 
-        <span class="kw">let </span>task = runqueue_locked.update_and_move_to_end(task_index, modified_tokens);
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(task_index) = task_index {
+            <span class="self">self</span>.queue.remove(task_index);
+            <span class="bool-val">true
+        </span>} <span class="kw">else </span>{
+            <span class="bool-val">false
+        </span>}
+    }
 
-        <span class="prelude-val">Some</span>(NextTaskResult {
-            taskref: task,
-            idle_task: <span class="bool-val">false</span>,
-        })
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Some</span>(NextTaskResult {
-            taskref: <span class="prelude-val">Some</span>(runqueue_locked.idle_task().clone()),
-            idle_task: <span class="bool-val">true</span>,
-        })
+    <span class="kw">fn </span>as_priority_scheduler(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;mut </span><span class="kw">dyn </span>task::scheduler::PriorityScheduler&gt; {
+        <span class="prelude-val">Some</span>(<span class="self">self</span>)
+    }
+
+    <span class="kw">fn </span>drain(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; Box&lt;<span class="kw">dyn </span>Iterator&lt;Item = TaskRef&gt; + <span class="lifetime">&#39;_</span>&gt; {
+        Box::new(<span class="self">self</span>.queue.drain(..).map(|epoch_task| epoch_task.task))
+    }
+
+    <span class="kw">fn </span>tasks(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Vec&lt;TaskRef&gt; {
+        <span class="self">self</span>.queue
+            .clone()
+            .into_iter()
+            .map(|epoch_task| epoch_task.task)
+            .collect()
     }
 }
 
-<span class="doccomment">/// This assigns tokens between tasks.
-/// Returns true if successful.
-/// Tokens are assigned based on  (prioirty of each task / prioirty of all
-/// tasks).
-</span><span class="kw">fn </span>assign_tokens(apic_id: u8) -&gt; bool {
-    <span class="kw">let </span><span class="kw-2">mut </span>runqueue_locked = <span class="kw">match </span>RunQueue::get_runqueue(apic_id) {
-        <span class="prelude-val">Some</span>(rq) =&gt; rq.write(),
-        <span class="kw">_ </span>=&gt; {
-            <span class="comment">// #[cfg(not(loscd_eval))]
-            // error!(&quot;BUG: assign_tokens(): couldn&#39;t get runqueue for core {}&quot;, apic_id);
-            </span><span class="kw">return </span><span class="bool-val">false</span>;
-        }
-    };
-
-    <span class="comment">// We begin with total priorities = 1 to avoid division by zero
-    </span><span class="kw">let </span><span class="kw-2">mut </span>total_priorities: usize = <span class="number">1</span>;
-
-    <span class="comment">// This loop calculates the total priorities of the runqueue
-    </span><span class="kw">for </span>(_i, t) <span class="kw">in </span>runqueue_locked.iter().enumerate() {
-        <span class="comment">// we skip the idle task, it contains zero tokens as it is picked last
-        </span><span class="kw">if </span>t.is_an_idle_task {
-            <span class="kw">continue</span>;
-        }
-
-        <span class="comment">// we assign tokens only to runnable tasks
-        </span><span class="kw">if </span>!t.is_runnable() {
-            <span class="kw">continue</span>;
-        }
-
-        <span class="comment">// if this task is pinned, it must not be pinned to a different core
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
-            <span class="kw">if </span>pinned.into_u8() != apic_id {
-                <span class="comment">// with per-core runqueues, this should never happen!
-                </span><span class="macro">error!</span>(
-                    <span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>,
-                    apic_id, t
-                );
-                <span class="kw">return </span><span class="bool-val">false</span>;
+<span class="kw">impl </span>task::scheduler::PriorityScheduler <span class="kw">for </span>Scheduler {
+    <span class="kw">fn </span>set_priority(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef, priority: u8) -&gt; bool {
+        <span class="kw">let </span>priority = core::cmp::min(priority, MAX_PRIORITY);
+        <span class="kw">for </span>epoch_task <span class="kw">in </span><span class="self">self</span>.queue.iter_mut() {
+            <span class="kw">if </span>epoch_task.task == <span class="kw-2">*</span>task {
+                epoch_task.priority = priority;
+                <span class="kw">return </span><span class="bool-val">true</span>;
             }
         }
-
-        total_priorities = total_priorities
-            .saturating_add(<span class="number">1</span>)
-            .saturating_add(t.priority <span class="kw">as </span>usize);
-    }
-
-    <span class="comment">// We keep each epoch for 100 tokens by default
-    // However since this granularity could miss low priority tasks when
-    // many concurrent tasks are running, we increase the epoch in such cases
-    </span><span class="kw">let </span>epoch: usize = core::cmp::max(total_priorities, <span class="number">100</span>);
-
-    <span class="comment">// We iterate through each task in runqueue
-    // We dont use iterator as items are modified in the process
-    </span><span class="kw">for </span>(_i, t) <span class="kw">in </span>runqueue_locked.iter_mut().enumerate() {
-        <span class="comment">// we give zero tokens to the idle tasks
-        </span><span class="kw">if </span>t.is_an_idle_task {
-            <span class="kw">continue</span>;
-        }
-
-        <span class="comment">// we give zero tokens to none runnable tasks
-        </span><span class="kw">if </span>!t.is_runnable() {
-            <span class="kw">continue</span>;
-        }
-
-        <span class="comment">// if this task is pinned, it must not be pinned to a different core
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(pinned) = t.pinned_cpu() {
-            <span class="kw">if </span>pinned.into_u8() != apic_id {
-                <span class="comment">// with per-core runqueues, this should never happen!
-                </span><span class="macro">error!</span>(
-                    <span class="string">&quot;select_next_task() (AP {}) found a task pinned to a different core: {:?}&quot;</span>,
-                    apic_id, <span class="kw-2">&amp;*</span>t
-                );
-                <span class="kw">return </span><span class="bool-val">false</span>;
-            }
-        }
-        <span class="comment">// task_tokens = epoch * (taskref + 1) / total_priorities;
-        </span><span class="kw">let </span>task_tokens = epoch
-            .saturating_mul((t.priority <span class="kw">as </span>usize).saturating_add(<span class="number">1</span>))
-            .wrapping_div(total_priorities);
-
-        t.tokens_remaining = task_tokens;
-        <span class="comment">// debug!(&quot;assign_tokens(): AP {} chose Task {:?}&quot;, apic_id, &amp;*t);
-        // break;
+        <span class="bool-val">false
     </span>}
 
-    <span class="bool-val">true
-</span>}
+    <span class="kw">fn </span>priority(<span class="kw-2">&amp;mut </span><span class="self">self</span>, task: <span class="kw-2">&amp;</span>TaskRef) -&gt; <span class="prelude-ty">Option</span>&lt;u8&gt; {
+        <span class="kw">for </span>epoch_task <span class="kw">in </span><span class="self">self</span>.queue.iter() {
+            <span class="kw">if </span>epoch_task.task == <span class="kw-2">*</span>task {
+                <span class="kw">return </span><span class="prelude-val">Some</span>(epoch_task.priority);
+            }
+        }
+        <span class="prelude-val">None
+    </span>}
+}
+
+<span class="attr">#[derive(Debug, Clone)]
+</span><span class="kw">struct </span>EpochTaskRef {
+    task: TaskRef,
+    priority: u8,
+    tokens_remaining: usize,
+}
+
+<span class="kw">impl </span>Deref <span class="kw">for </span>EpochTaskRef {
+    <span class="kw">type </span>Target = TaskRef;
+
+    <span class="kw">fn </span>deref(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>TaskRef {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.task
+    }
+}
+
+<span class="kw">impl </span>DerefMut <span class="kw">for </span>EpochTaskRef {
+    <span class="kw">fn </span>deref_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>TaskRef {
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>.task
+    }
+}
+
+<span class="kw">impl </span>EpochTaskRef {
+    <span class="kw">fn </span>new(task: TaskRef) -&gt; EpochTaskRef {
+        EpochTaskRef {
+            task,
+            priority: DEFAULT_PRIORITY,
+            tokens_remaining: INITIAL_TOKENS,
+        }
+    }
+}
 </code></pre></div></section></main></body></html>

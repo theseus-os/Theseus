@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["add_task","add_task_to","add_task_to_current","busyness","inherit_priority","priority","remove_task","remove_task_from","remove_task_from_current","schedule","set_policy","set_priority","tasks"],"struct":["PriorityInheritanceGuard"],"trait":["PriorityScheduler","Scheduler"]};

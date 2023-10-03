@@ -1016,14 +1016,6 @@
 <a href="#1016" id="1016">1016</a>
 <a href="#1017" id="1017">1017</a>
 <a href="#1018" id="1018">1018</a>
-<a href="#1019" id="1019">1019</a>
-<a href="#1020" id="1020">1020</a>
-<a href="#1021" id="1021">1021</a>
-<a href="#1022" id="1022">1022</a>
-<a href="#1023" id="1023">1023</a>
-<a href="#1024" id="1024">1024</a>
-<a href="#1025" id="1025">1025</a>
-<a href="#1026" id="1026">1026</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! This crate offers routines for spawning new tasks
 //! and convenient builder patterns for customizing new tasks. 
 //! 
@@ -1085,11 +1077,17 @@
         .spawn_restartable(<span class="prelude-val">None</span>)<span class="question-mark">?
         </span>.clone();
 
-    runqueue::init(cpu_id.into_u8(), idle_task)<span class="question-mark">?</span>;
-    runqueue::add_task_to_specific_runqueue(
-        cpu_id.into_u8(),
-        exitable_bootstrap_task.clone(),
-    )<span class="question-mark">?</span>;
+    <span class="macro">cfg_if::cfg_if! </span>{
+        <span class="kw">if </span><span class="attr">#[cfg(epoch_scheduler)] </span>{
+            <span class="kw">let </span>scheduler = scheduler_epoch::Scheduler::new(idle_task);
+        } <span class="kw">else if </span><span class="attr">#[cfg(priority_scheduler)] </span>{
+            <span class="kw">let </span>scheduler = scheduler_priority::Scheduler::new(idle_task);
+        } <span class="kw">else </span>{
+            <span class="kw">let </span>scheduler = scheduler_round_robin::Scheduler::new(idle_task);
+        }
+    }
+    task::scheduler::set_policy(cpu_id, scheduler);
+    task::scheduler::add_task_to(cpu_id, exitable_bootstrap_task.clone());
 
     <span class="prelude-val">Ok</span>(BootstrapTaskRef {
         cpu_id,
@@ -1465,9 +1463,9 @@
         <span class="comment">// Idle tasks are not stored on the run queue.
         </span><span class="kw">if </span>!<span class="self">self</span>.idle {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(cpu) = <span class="self">self</span>.pin_on_cpu {
-                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())<span class="question-mark">?</span>;
+                task::scheduler::add_task_to(cpu, task_ref.clone());
             } <span class="kw">else </span>{
-                runqueue::add_task_to_any_runqueue(task_ref.clone())<span class="question-mark">?</span>;
+                task::scheduler::add_task(task_ref.clone());
             }
         }
 
@@ -1903,7 +1901,7 @@
 </span><span class="attr">#[inline(always)]
 </span><span class="kw">fn </span>task_cleanup_final_internal(current_task: <span class="kw-2">&amp;</span>ExitableTaskRef) {
     <span class="comment">// First, remove the task from its runqueue(s).
-    </span>remove_current_task_from_runqueue(current_task);
+    </span>task::scheduler::remove_task_from_current(current_task);
 
     <span class="comment">// Second, run TLS object destructors, which will drop any TLS objects
     // that were lazily initialized during this execution of this task.
@@ -2020,21 +2018,7 @@
 
 <span class="doccomment">/// Helper function to remove a task from its runqueue and drop it.
 </span><span class="kw">fn </span>remove_current_task_from_runqueue(current_task: <span class="kw-2">&amp;</span>ExitableTaskRef) {
-    <span class="comment">// Special behavior when evaluating runqueues
-    </span><span class="attr">#[cfg(rq_eval)] </span>{
-        runqueue::remove_task_from_all(current_task).unwrap();
-    }
-
-    <span class="comment">// In the regular case, we do not perform task migration between cores,
-    // so we can use the heuristic that the task is only on the current core&#39;s runqueue.
-    </span><span class="attr">#[cfg(not(rq_eval))] </span>{
-        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
-            .ok_or(<span class="string">&quot;couldn&#39;t get this CPU&#39;s ID or runqueue to remove exited task from it&quot;</span>)
-            .and_then(|rq| rq.write().remove_task(current_task)) 
-        {
-            <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t remove exited task from runqueue: {}&quot;</span>, e);
-        }
-    }
+    task::scheduler::remove_task(current_task);
 }
 
 <span class="doccomment">/// A basic idle task that does nothing but loop endlessly.
