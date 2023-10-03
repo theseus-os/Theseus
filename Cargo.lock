@@ -19,6 +19,7 @@ dependencies = [
  "rsdt",
  "spin 0.9.4",
  "time",
+ "waet",
 ]
 
 [[package]]
@@ -43,6 +44,7 @@ dependencies = [
  "madt",
  "memory",
  "rsdt",
+ "waet",
 ]
 
 [[package]]
@@ -4316,6 +4318,16 @@ checksum = "d257817081c7dffcdbab24b9e62d2def62e2ff7d00b1c20062551e6cccc145ff"
 dependencies = [
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "waet"
+version = "0.1.0"
+dependencies = [
+ "acpi_table",
+ "memory",
+ "sdt",
+ "zerocopy",
 ]
 
 [[package]]
