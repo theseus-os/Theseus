@@ -174,6 +174,7 @@ var sourcesIndex = JSON.parse('{\
 "vfs_node":["",[],["lib.rs"]],\
 "vga_buffer":["",[],["lib.rs"]],\
 "virtual_nic":["",[],["lib.rs"]],\
+"waet":["",[],["lib.rs"]],\
 "wait_condition":["",[],["lib.rs"]],\
 "wait_guard":["",[],["lib.rs"]],\
 "wait_queue":["",[],["lib.rs"]],\

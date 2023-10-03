@@ -45,6 +45,7 @@
 <a href="#45" id="45">45</a>
 <a href="#46" id="46">46</a>
 <a href="#47" id="47">47</a>
+<a href="#48" id="48">48</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Handles ACPI tables based on signatures.
 //! 
 //! Essentially a giant multiplexer that invokes the proper
@@ -82,6 +83,7 @@
         </span>rsdt::RSDT_SIGNATURE |
         rsdt::XSDT_SIGNATURE =&gt; rsdt::handle(acpi_tables, signature, length, phys_addr),
         fadt::FADT_SIGNATURE =&gt; fadt::handle(acpi_tables, signature, length, phys_addr),
+        waet::WAET_SIGNATURE =&gt; waet::handle(acpi_tables, signature, length, phys_addr),
         hpet::HPET_SIGNATURE =&gt; hpet::handle(acpi_tables, signature, length, phys_addr),
         madt::MADT_SIGNATURE =&gt; madt::handle(acpi_tables, signature, length, phys_addr),
         dmar::DMAR_SIGNATURE =&gt; dmar::handle(acpi_tables, signature, length, phys_addr),

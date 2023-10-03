@@ -122,7 +122,18 @@
 <a href="#122" id="122">122</a>
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
-</pre></div><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables, based off of Redox. 
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
+<a href="#129" id="129">129</a>
+<a href="#130" id="130">130</a>
+<a href="#131" id="131">131</a>
+<a href="#132" id="132">132</a>
+<a href="#133" id="133">133</a>
+<a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+</pre></div><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables.
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">extern crate </span>alloc;
@@ -187,6 +198,17 @@
         <span class="comment">// here: do something with the DSDT here, when needed.
         // debug!(&quot;DSDT physical address: {:#X}&quot;, {_fadt.dsdt});
     </span>}
+
+    <span class="comment">// WAET is optional, and contains info about potentially optimizing timer-related actions.
+    </span>{
+        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(waet) = waet::Waet::get(<span class="kw-2">&amp;</span>acpi_tables) {
+            <span class="comment">// here: do something with the WAET here, if desired.
+            </span><span class="macro">debug!</span>(<span class="string">&quot;WAET: RTC? {:?}. ACPI PM timer? {:?}&quot;</span>,
+                waet.rtc_good(), waet.acpi_pm_timer_good(),
+            );
+        }
+    }
     
     <span class="comment">// HPET is optional, but usually present.
     </span>{

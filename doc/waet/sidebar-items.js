@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["WAET_SIGNATURE"],"fn":["handle"],"struct":["Waet"]};

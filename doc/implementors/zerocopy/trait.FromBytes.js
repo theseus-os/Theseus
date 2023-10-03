@@ -16,5 +16,6 @@
 "pci":[["impl FromBytes for <a class=\"struct\" href=\"pci/struct.MsixVectorEntry.html\" title=\"struct pci::MsixVectorEntry\">MsixVectorEntry</a>"]],
 "rsdp":[["impl FromBytes for <a class=\"struct\" href=\"rsdp/struct.Rsdp.html\" title=\"struct rsdp::Rsdp\">Rsdp</a>"]],
 "sdt":[["impl FromBytes for <a class=\"struct\" href=\"sdt/struct.Sdt.html\" title=\"struct sdt::Sdt\">Sdt</a>"],["impl FromBytes for <a class=\"struct\" href=\"sdt/struct.GenericAddressStructure.html\" title=\"struct sdt::GenericAddressStructure\">GenericAddressStructure</a>"]],
-"uart_pl011":[["impl FromBytes for <a class=\"struct\" href=\"uart_pl011/struct.Pl011_Regs.html\" title=\"struct uart_pl011::Pl011_Regs\">Pl011_Regs</a>"]]
+"uart_pl011":[["impl FromBytes for <a class=\"struct\" href=\"uart_pl011/struct.Pl011_Regs.html\" title=\"struct uart_pl011::Pl011_Regs\">Pl011_Regs</a>"]],
+"waet":[["impl FromBytes for <a class=\"struct\" href=\"waet/struct.Waet.html\" title=\"struct waet::Waet\">Waet</a>"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
