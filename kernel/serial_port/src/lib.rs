@@ -82,6 +82,8 @@ pub fn init_serial_port(
     serial_port_address: SerialPortAddress,
     serial_port: SerialPortBasic,
 ) -> Option<&'static Arc<IrqSafeMutex<SerialPort>>> {
+    // Note: if we're called by device_manager, we cannot log (as we're modifying the logger config)
+
     #[cfg(target_arch = "aarch64")]
     if serial_port_address != SerialPortAddress::COM1 {
         return None;
@@ -309,7 +311,7 @@ fn serial_port_receive_deferred(
     let mut buf = DataChunk::empty();
     let bytes_read;
     let base_port;
-    
+
     let mut input_was_ignored = false;
     let mut send_result = Ok(());
 
@@ -331,9 +333,6 @@ fn serial_port_receive_deferred(
             // other than data being received, which is the only one we currently care about.
             return Ok(());
         }
-
-        #[cfg(target_arch = "aarch64")]
-        sp.enable_interrupt(SerialPortInterruptEvent::DataReceived, true);
     }
 
     if let Err(e) = send_result {
@@ -387,15 +386,18 @@ static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 
 // Cross-platform interrupt handler for COM1 and COM3 (IRQ 0x24 on x86_64).
 interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
-    // trace!("COM1/COM3 serial handler");
+    // log::trace!("COM1/COM3 serial handler");
+
     #[cfg(target_arch = "aarch64")] {
         let mut sp = COM1_SERIAL_PORT.get().unwrap().as_ref().lock();
-        sp.enable_interrupt(SerialPortInterruptEvent::DataReceived, false);
+        sp.acknowledge_interrupt(SerialPortInterruptEvent::DataReceived);
     }
 
     if let Some(func) = INTERRUPT_ACTION_COM1_COM3.get() {
         func()
     }
+
+    // log::trace!("COM1/COM3 serial handler done");
     EoiBehaviour::HandlerDidNotSendEoi
 });
 
