@@ -86,8 +86,6 @@ impl Scheduler {
         // many concurrent tasks are running, we increase the epoch in such cases
         let epoch: usize = core::cmp::max(total_priorities, 100);
 
-        // We iterate through each task in runqueue
-        // We dont use iterator as items are modified in the process
         for (_i, t) in self.queue.iter_mut().enumerate() {
             // we give zero tokens to the idle tasks
             if t.is_an_idle_task {
