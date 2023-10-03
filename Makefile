@@ -1079,3 +1079,14 @@ endif
 	@sudo cp -vf $(iso) /var/lib/tftpboot/theseus/
 	@sudo systemctl restart isc-dhcp-server 
 	@sudo systemctl restart tftpd-hpa
+
+test: export override QEMU_FLAGS += -device isa-debug-exit,iobase=0xf4,iosize=0x04
+test: export override QEMU_FLAGS += -nographic
+test: export override FEATURES =--features theseus_tests --features first_application/qemu_test
+test: $(iso)
+	# We exit with an exit code of 0 if QEMU's exit code is 17, and 2 otherwise.
+	# This is because `qemu_test` uses a value of 0x11 to indicate success.
+	$(QEMU_BIN) $(QEMU_FLAGS); \
+	EXIT_CODE=$$?; \
+	test $$EXIT_CODE -eq 17 && exit 0; \
+	exit 2
