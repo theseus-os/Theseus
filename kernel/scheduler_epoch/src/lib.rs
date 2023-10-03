@@ -1,12 +1,17 @@
-//! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed
-//! among tasks depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all
-//! tasks) * length of epoch]. Each time a task is picked, the token count of
-//! the task is decremented by 1. A task is executed only if it has tokens
-//! remaining. When all tokens of all runnable task are exhausted a new
-//! scheduling epoch is initiated. In addition this crate offers the interfaces
-//! to set and get priorities  of each task.
+//! This crate implements a token-based epoch scheduling policy.
+//!
+//! At the begining of each scheduling epoch, a set of tokens is distributed
+//! among all runnable tasks, based on their priority relative to all other
+//! runnable tasks in the runqueue. The formula for this is:
+//! ```ignore
+//! tokens_assigned_to_task_i = (priority_task_i / sum_priority_all_tasks) * epoch_length;
+//! ```
+//! * Each time a task is picked, its token count is decremented by 1.
+//! * A task can only be selected for next execution if it has tokens remaining.
+//! * When all tokens of all runnable task are exhausted, a new scheduling epoch begins.
+//!
+//! This epoch scheduler is also a priority-based scheduler, so it allows
+//! getting and setting the priorities of each task.
 
 #![no_std]
 
@@ -14,19 +19,20 @@ extern crate alloc;
 
 use alloc::{boxed::Box, collections::VecDeque, vec::Vec};
 use core::ops::{Deref, DerefMut};
-
 use task::TaskRef;
 
 const MAX_PRIORITY: u8 = 40;
 const DEFAULT_PRIORITY: u8 = 20;
 const INITIAL_TOKENS: usize = 10;
 
+/// An instance of an epoch scheduler, typically one per CPU.
 pub struct Scheduler {
     idle_task: TaskRef,
     queue: VecDeque<EpochTaskRef>,
 }
 
 impl Scheduler {
+    /// Creates a new epoch scheduler instance with the given idle task.
     pub const fn new(idle_task: TaskRef) -> Self {
         Self {
             idle_task,
@@ -34,11 +40,13 @@ impl Scheduler {
         }
     }
 
-    /// Moves the `TaskRef` at the given index in this `RunQueue` to the end
-    /// (back) of this `RunQueue`, and returns a cloned reference to that
-    /// `TaskRef`. The number of tokens is reduced by one and number of context
-    /// switches is increased by one. This function is used when the task is
-    /// selected by the scheduler
+    /// Moves the `TaskRef` at the given `index` in this scheduler's runqueue
+    /// to the end (back) of the runqueue.
+    ///
+    /// Sets the number of tokens for that task to the given `tokens`
+    /// and increments that task's number of context switches.
+    ///
+    /// Returns a cloned reference to the `TaskRef` at the given `index`.
     fn update_and_move_to_end(&mut self, index: usize, tokens: usize) -> Option<TaskRef> {
         if let Some(mut priority_task_ref) = self.queue.remove(index) {
             priority_task_ref.tokens_remaining = tokens;
@@ -81,9 +89,9 @@ impl Scheduler {
                 .saturating_add(t.priority as usize);
         }
 
-        // We keep each epoch for 100 tokens by default
-        // However since this granularity could miss low priority tasks when
-        // many concurrent tasks are running, we increase the epoch in such cases
+        // Each epoch lasts for a total of 100 tokens by default.
+        // However, as this granularity could skip over low priority tasks
+        // when many concurrent tasks are running, we increase the epoch in such cases.
         let epoch: usize = core::cmp::max(total_priorities, 100);
 
         for (_i, t) in self.queue.iter_mut().enumerate() {
@@ -103,8 +111,7 @@ impl Scheduler {
                 .wrapping_div(total_priorities);
 
             t.tokens_remaining = task_tokens;
-            // debug!("assign_tokens(): AP {} chose Task {:?}", apic_id, &*t);
-            // break;
+            // debug!("assign_tokens(): CPU {} chose Task {:?}", cpu_id, &*t);
         }
     }
 }
@@ -116,7 +123,7 @@ impl task::scheduler::Scheduler for Scheduler {
                 self.assign_tokens();
                 self.try_next()
             })
-            .unwrap_or(self.idle_task.clone())
+            .unwrap_or_else(|| self.idle_task.clone())
     }
 
     fn add(&mut self, task: TaskRef) {
@@ -163,9 +170,8 @@ impl task::scheduler::Scheduler for Scheduler {
 }
 
 impl task::scheduler::PriorityScheduler for Scheduler {
-    fn set_priority(&mut self, task: &TaskRef, mut priority: u8) -> bool {
-        priority = core::cmp::min(priority, MAX_PRIORITY);
-
+    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+        let priority = core::cmp::min(priority, MAX_PRIORITY);
         for epoch_task in self.queue.iter_mut() {
             if epoch_task.task == *task {
                 epoch_task.priority = priority;
