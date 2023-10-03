@@ -169,26 +169,27 @@ pub trait Scheduler: Send + Sync + 'static {
     /// Adds a task to the run queue.
     fn add(&mut self, task: TaskRef);
 
-    /// Returns a measure of how busy the scheduler is.
+    /// Returns a measure of how busy the scheduler is, with higher values
+    /// representing a busier scheduler.
     fn busyness(&self) -> usize;
 
     /// Removes a task from the run queue.
     fn remove(&mut self, task: &TaskRef) -> bool;
 
-    /// Returns the scheduler as a priority scheduler, if it is one.
+    /// Returns a reference to this scheduler as a priority scheduler, if it is one.
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
 
-    /// Clears the scheduler, returning all contained tasks as an iterator.
+    /// Clears the scheduler's runqueue, returning an iterator over all contained tasks.
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_>;
 
-    /// Returns a list of contained tasks.
+    /// Returns a cloned list of contained tasks being scheduled by this scheduler.
     ///
-    /// The list should be considered out-of-date as soon as it is called, but
-    /// can be useful as a heuristic.
+    /// The list should be considered out-of-date as soon as it is called,
+    /// but can be useful as a heuristic or for debugging.
     fn tasks(&self) -> Vec<TaskRef>;
 }
 
-/// A task scheduler with some notion of priority.
+/// A task scheduler that supports some notion of priority.
 pub trait PriorityScheduler {
     /// Sets the priority of the given task.
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool;
@@ -229,7 +230,8 @@ pub fn set_priority(task: &TaskRef, priority: u8) -> bool {
     false
 }
 
-/// Returns the busyness of the scheduler on the given CPU.
+/// Returns the busyness of the scheduler on the given CPU,
+/// in which higher values indicate a busier scheduler.
 pub fn busyness(cpu_id: CpuId) -> Option<usize> {
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
@@ -239,8 +241,8 @@ pub fn busyness(cpu_id: CpuId) -> Option<usize> {
     None
 }
 
-/// Modifies the given task's priority to be the maximum of its priority and the
-/// current task's priority.
+/// Modifies the given task's priority to be the maximum of its priority
+/// and the current task's priority.
 ///
 /// Returns a guard which reverts the change when dropped.
 pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
@@ -265,11 +267,10 @@ pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
     }
 }
 
-/// Lowers the task's priority to its previous value when dropped.
+/// A guard that lowers a task's priority back to its previous value when dropped.
 pub struct PriorityInheritanceGuard<'a> {
     inner: Option<(&'a TaskRef, u8)>,
 }
-
 impl<'a> Drop for PriorityInheritanceGuard<'a> {
     fn drop(&mut self) {
         if let Some((task, priority)) = self.inner {
