@@ -173,6 +173,7 @@ var sourcesIndex = JSON.parse('{\
 "tsc":["",[],["lib.rs"]],\
 "tss":["",[],["lib.rs"]],\
 "tty":["",[],["channel.rs","discipline.rs","lib.rs"]],\
+"uart_pl011":["",[],["lib.rs"]],\
 "unwind":["",[],["lib.rs","lsda.rs","registers.rs"]],\
 "vfs_node":["",[],["lib.rs"]],\
 "vga_buffer":["",[],["lib.rs"]],\

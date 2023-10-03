@@ -276,6 +276,11 @@
 <a href="#276" id="276">276</a>
 <a href="#277" id="277">277</a>
 <a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>core::{convert::TryFrom, fmt, str::FromStr};
 <span class="kw">use super</span>::{TriState, SerialPortInterruptEvent};
 <span class="kw">use </span>port_io::Port;
@@ -464,6 +469,11 @@
             <span class="self">self</span>.interrupt_enable.write(new);
         }
     }
+
+    <span class="doccomment">/// Clears an interrupt in the serial port controller
+    </span><span class="kw">pub fn </span>acknowledge_interrupt(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _event: SerialPortInterruptEvent) {
+        <span class="comment">// no-op on x86_64
+    </span>}
 
     <span class="doccomment">/// Write the given string to the serial port, blocking until data can be transmitted.
     ///
