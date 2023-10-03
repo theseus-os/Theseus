@@ -71,11 +71,6 @@ impl Scheduler {
 
         // This loop calculates the total priorities of the runqueue
         for (_i, t) in self.queue.iter().enumerate() {
-            // we skip the idle task, it contains zero tokens as it is picked last
-            if t.is_an_idle_task {
-                continue;
-            }
-
             // we assign tokens only to runnable tasks
             if !t.is_runnable() {
                 continue;
