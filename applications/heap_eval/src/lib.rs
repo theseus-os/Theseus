@@ -7,7 +7,6 @@ extern crate hpet;
 extern crate hashbrown;
 extern crate qp_trie;
 extern crate apic;
-extern crate runqueue;
 extern crate libtest;
 extern crate spawn;
 extern crate cpu;

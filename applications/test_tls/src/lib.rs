@@ -14,15 +14,9 @@ use alloc::vec::Vec;
 use alloc::string::String;
 
 
-pub fn main(args: Vec<String>) -> isize {
-
-    match args.first() {
-        Some(first) if first == "macro" => {
-            test_macro();
-            return 0;
-        }
-        _ => { }
-    }
+pub fn main(_: Vec<String>) -> isize {
+    println!("Testing TLS macro");
+    test_macro();
 
     println!("Invoking test_thread_local::test_tls()...");
     test_thread_local::test_tls(10);

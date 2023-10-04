@@ -31,6 +31,7 @@ use spin::Mutex;
 use memory::{get_kernel_mmi_ref, MmiRef};
 use stack::Stack;
 use task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
+use task_struct::ExposedTask;
 use mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
 use path::Path;
 use fs_node::FileOrDir;
@@ -58,11 +59,17 @@ pub fn init(
         .spawn_restartable(None)?
         .clone();
 
-    runqueue::init(cpu_id.into_u8(), idle_task)?;
-    runqueue::add_task_to_specific_runqueue(
-        cpu_id.into_u8(),
-        exitable_bootstrap_task.clone(),
-    )?;
+    cfg_if::cfg_if! {
+        if #[cfg(epoch_scheduler)] {
+            let scheduler = scheduler_epoch::Scheduler::new(idle_task);
+        } else if #[cfg(priority_scheduler)] {
+            let scheduler = scheduler_priority::Scheduler::new(idle_task);
+        } else {
+            let scheduler = scheduler_round_robin::Scheduler::new(idle_task);
+        }
+    }
+    task::scheduler::set_policy(cpu_id, scheduler);
+    task::scheduler::add_task_to(cpu_id, exitable_bootstrap_task.clone());
 
     Ok(BootstrapTaskRef {
         cpu_id,
@@ -381,7 +388,11 @@ impl<F, A, R> TaskBuilder<F, A, R>
         )?;
         // If a Task name wasn't provided, then just use the function's name.
         new_task.name = self.name.unwrap_or_else(|| String::from(core::any::type_name::<F>()));
-    
+
+        let exposed = ExposedTask { task: new_task };
+        exposed.inner().lock().pinned_cpu = self.pin_on_cpu;
+        let ExposedTask { task: mut new_task } = exposed;    
+
         #[cfg(simd_personality)] {  
             new_task.simd = self.simd;
         }
@@ -434,9 +445,9 @@ impl<F, A, R> TaskBuilder<F, A, R>
         // Idle tasks are not stored on the run queue.
         if !self.idle {
             if let Some(cpu) = self.pin_on_cpu {
-                runqueue::add_task_to_specific_runqueue(cpu.into_u8(), task_ref.clone())?;
+                task::scheduler::add_task_to(cpu, task_ref.clone());
             } else {
-                runqueue::add_task_to_any_runqueue(task_ref.clone())?;
+                task::scheduler::add_task(task_ref.clone());
             }
         }
 
@@ -872,7 +883,7 @@ fn task_restartable_cleanup_failure<F, A, R>(current_task: ExitableTaskRef, kill
 #[inline(always)]
 fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
     // First, remove the task from its runqueue(s).
-    remove_current_task_from_runqueue(current_task);
+    task::scheduler::remove_task_from_current(current_task);
 
     // Second, run TLS object destructors, which will drop any TLS objects
     // that were lazily initialized during this execution of this task.
@@ -989,21 +1000,7 @@ where
 
 /// Helper function to remove a task from its runqueue and drop it.
 fn remove_current_task_from_runqueue(current_task: &ExitableTaskRef) {
-    // Special behavior when evaluating runqueues
-    #[cfg(rq_eval)] {
-        runqueue::remove_task_from_all(current_task).unwrap();
-    }
-
-    // In the regular case, we do not perform task migration between cores,
-    // so we can use the heuristic that the task is only on the current core's runqueue.
-    #[cfg(not(rq_eval))] {
-        if let Err(e) = runqueue::get_runqueue(cpu::current_cpu().into_u8())
-            .ok_or("couldn't get this CPU's ID or runqueue to remove exited task from it")
-            .and_then(|rq| rq.write().remove_task(current_task)) 
-        {
-            error!("BUG: couldn't remove exited task from runqueue: {}", e);
-        }
-    }
+    task::scheduler::remove_task(current_task);
 }
 
 /// A basic idle task that does nothing but loop endlessly.

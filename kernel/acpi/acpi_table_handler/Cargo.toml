@@ -20,6 +20,9 @@ path = "../rsdt"
 [dependencies.fadt]
 path = "../fadt"
 
+[dependencies.waet]
+path = "../waet"
+
 [dependencies.hpet]
 path = "../hpet"
 

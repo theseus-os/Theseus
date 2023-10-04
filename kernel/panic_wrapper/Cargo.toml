@@ -13,7 +13,6 @@ log = "0.4.8"
 fault_log = { path = "../fault_log" }
 memory = { path = "../memory" }
 mod_mgmt = { path = "../mod_mgmt" }
-runqueue = { path = "../runqueue" }
 task = { path = "../task" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

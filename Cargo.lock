@@ -19,6 +19,7 @@ dependencies = [
  "rsdt",
  "spin 0.9.4",
  "time",
+ "waet",
 ]
 
 [[package]]
@@ -43,6 +44,7 @@ dependencies = [
  "madt",
  "memory",
  "rsdt",
+ "waet",
 ]
 
 [[package]]
@@ -325,7 +327,6 @@ dependencies = [
  "path",
  "pmu_x86",
  "rendezvous",
- "runqueue",
  "scheduler",
  "simple_ipc",
  "spawn",
@@ -1102,7 +1103,6 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
  "signal_handler",
  "stack_trace",
  "task",
@@ -1181,6 +1181,7 @@ dependencies = [
  "log",
  "mod_mgmt",
  "path",
+ "qemu_test",
  "shell",
  "spawn",
 ]
@@ -1449,7 +1450,6 @@ dependencies = [
  "libtest",
  "log",
  "qp-trie",
- "runqueue",
  "spawn",
 ]
 
@@ -1660,7 +1660,7 @@ dependencies = [
 [[package]]
 name = "irq_safety"
 version = "0.1.1"
-source = "git+https://github.com/theseus-os/irq_safety#0e32fe775fdb93be1fc6f85b306d109aea5d920e"
+source = "git+https://github.com/theseus-os/irq_safety#11bfab9f410a898df1e42ad6213488612e20c926"
 dependencies = [
  "spin 0.9.4",
 ]
@@ -1698,7 +1698,6 @@ dependencies = [
  "pic",
  "pit_clock_basic",
  "rand",
- "runqueue",
  "spin 0.9.4",
  "sync_irq",
  "virtual_nic",
@@ -1746,7 +1745,6 @@ dependencies = [
  "app_io",
  "debugit",
  "getopts",
- "runqueue",
  "task",
 ]
 
@@ -1822,7 +1820,6 @@ dependencies = [
  "log",
  "memory",
  "pmu_x86",
- "runqueue",
  "spin 0.9.4",
  "task",
 ]
@@ -2558,7 +2555,6 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
- "runqueue",
  "stack_trace",
  "stack_trace_frame_pointers",
  "task",
@@ -2666,15 +2662,6 @@ dependencies = [
  "log",
  "port_io",
  "spin 0.9.4",
-]
-
-[[package]]
-name = "pl011"
-version = "1.0.0"
-source = "git+https://github.com/theseus-os/pl011/?rev=464dbf22#464dbf2288a5d9e7445b0b1f404ddd41b1fd1c1e"
-dependencies = [
- "log",
- "volatile-register",
 ]
 
 [[package]]
@@ -2834,6 +2821,23 @@ version = "0.1.0"
 dependencies = [
  "app_io",
  "getopts",
+ "task",
+]
+
+[[package]]
+name = "qemu-exit"
+version = "3.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bb0fd6580eeed0103c054e3fba2c2618ff476943762f28a645b63b8692b21c9"
+
+[[package]]
+name = "qemu_test"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "path",
+ "qemu-exit",
+ "spawn",
  "task",
 ]
 
@@ -3022,23 +3026,10 @@ dependencies = [
 name = "rq"
 version = "0.1.0"
 dependencies = [
- "apic",
- "app_io",
- "getopts",
- "runqueue",
- "task",
-]
-
-[[package]]
-name = "rq_access_eval"
-version = "0.1.0"
-dependencies = [
  "app_io",
  "cpu",
  "getopts",
- "irq_safety",
- "runqueue",
- "time",
+ "task",
 ]
 
 [[package]]
@@ -3051,7 +3042,6 @@ dependencies = [
  "hpet",
  "libtest",
  "log",
- "runqueue",
  "spawn",
  "task",
 ]
@@ -3085,55 +3075,6 @@ dependencies = [
  "spin 0.9.4",
  "state_store",
  "x86_64",
-]
-
-[[package]]
-name = "runqueue"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "cfg-if 1.0.0",
- "lazy_static",
- "log",
- "runqueue_epoch",
- "runqueue_priority",
- "runqueue_round_robin",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
-]
-
-[[package]]
-name = "runqueue_epoch"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
-]
-
-[[package]]
-name = "runqueue_priority"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "sync_preemption",
- "task",
- "time",
-]
-
-[[package]]
-name = "runqueue_round_robin"
-version = "0.1.0"
-dependencies = [
- "atomic_linked_list",
- "log",
- "single_simd_task_optimization",
- "sync_preemption",
- "task",
 ]
 
 [[package]]
@@ -3174,9 +3115,6 @@ dependencies = [
  "cpu",
  "interrupts",
  "log",
- "scheduler_epoch",
- "scheduler_priority",
- "scheduler_round_robin",
  "sleep",
  "task",
  "x86_64",
@@ -3187,8 +3125,6 @@ name = "scheduler_epoch"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue",
- "runqueue_epoch",
  "spin 0.9.4",
  "task",
 ]
@@ -3210,7 +3146,6 @@ name = "scheduler_priority"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue_priority",
  "task",
  "time",
 ]
@@ -3220,8 +3155,6 @@ name = "scheduler_round_robin"
 version = "0.1.0"
 dependencies = [
  "log",
- "runqueue",
- "runqueue_round_robin",
  "spin 0.9.4",
  "task",
 ]
@@ -3298,6 +3231,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serial_echo"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "core2",
+ "io",
+ "log",
+ "serial_port",
+ "sync_irq",
+ "task",
+]
+
+[[package]]
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
@@ -3316,11 +3262,10 @@ name = "serial_port_basic"
 version = "0.1.0"
 dependencies = [
  "arm_boards",
- "memory",
- "pl011",
  "port_io",
  "spin 0.9.4",
  "sync_irq",
+ "uart_pl011",
 ]
 
 [[package]]
@@ -3353,7 +3298,6 @@ dependencies = [
  "log",
  "path",
  "root",
- "runqueue",
  "scheduler",
  "spawn",
  "spin 0.9.4",
@@ -3468,6 +3412,7 @@ name = "spawn"
 version = "0.1.0"
 dependencies = [
  "catch_unwind",
+ "cfg-if 1.0.0",
  "context_switch",
  "cpu",
  "debugit",
@@ -3482,11 +3427,14 @@ dependencies = [
  "no_drop",
  "path",
  "preemption",
- "runqueue",
  "scheduler",
+ "scheduler_epoch",
+ "scheduler_priority",
+ "scheduler_round_robin",
  "spin 0.9.4",
  "stack",
  "task",
+ "task_struct",
  "thread_local_macro",
 ]
 
@@ -3715,6 +3663,7 @@ dependencies = [
  "stack",
  "static_assertions",
  "sync_irq",
+ "sync_preemption",
  "task_struct",
  "waker_generic",
 ]
@@ -3898,19 +3847,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "test_serial_echo"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "core2",
- "io",
- "log",
- "serial_port",
- "sync_irq",
- "task",
-]
-
-[[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
@@ -3949,6 +3885,16 @@ dependencies = [
  "log",
  "spawn",
  "task",
+]
+
+[[package]]
+name = "test_tls"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "log",
+ "test_thread_local",
+ "thread_local_macro",
 ]
 
 [[package]]
@@ -4015,6 +3961,7 @@ dependencies = [
  "date",
  "deps",
  "example",
+ "first_application",
  "heap_eval",
  "hello",
  "hull",
@@ -4030,13 +3977,14 @@ dependencies = [
  "print_fault_log",
  "ps",
  "pwd",
+ "qemu_test",
  "raw_mode",
  "rm",
  "rq",
- "rq_access_eval",
  "rq_eval",
  "scheduler_eval",
  "seconds_counter",
+ "serial_echo",
  "shell",
  "swap",
  "test_aligned_page_allocation",
@@ -4053,15 +4001,14 @@ dependencies = [
  "test_preemption_counter",
  "test_restartable",
  "test_scheduler",
- "test_serial_echo",
  "test_std_fs",
  "test_sync_block",
  "test_task_cancel",
  "test_thread_local",
+ "test_tls",
  "test_wait_queue",
  "test_wasmtime",
  "theseus_std",
- "tls_test",
  "unified_channel",
  "unwind_test",
  "upd",
@@ -4131,16 +4078,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tls_test"
-version = "0.1.0"
-dependencies = [
- "app_io",
- "log",
- "test_thread_local",
- "thread_local_macro",
-]
-
-[[package]]
 name = "tock-registers"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4181,6 +4118,16 @@ name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcf81ac59edc17cc8697ff311e8f5ef2d99fcbd9817b34cec66f90b6c3dfd987"
+
+[[package]]
+name = "uart_pl011"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "memory",
+ "volatile 0.2.7",
+ "zerocopy",
+]
 
 [[package]]
 name = "uefi-bootloader-api"
@@ -4374,6 +4321,16 @@ checksum = "d257817081c7dffcdbab24b9e62d2def62e2ff7d00b1c20062551e6cccc145ff"
 dependencies = [
  "proc-macro2",
  "quote",
+]
+
+[[package]]
+name = "waet"
+version = "0.1.0"
+dependencies = [
+ "acpi_table",
+ "memory",
+ "sdt",
+ "zerocopy",
 ]
 
 [[package]]

@@ -27,6 +27,9 @@ path = "rsdt"
 [dependencies.fadt]
 path = "fadt"
 
+[dependencies.waet]
+path = "waet"
+
 [dependencies.madt]
 path = "madt"
 

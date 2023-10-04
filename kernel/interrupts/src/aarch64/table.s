@@ -77,9 +77,11 @@ __exception_vector_start:
 .org 0x200
     CALL_WITH_CONTEXT current_elx_synchronous
 .org 0x280
+    // this first instruction re-enables (unmasks) fast interrupts so that IRQs can be interrupted by FIQs.
+    msr daifclr, #1
     CALL_WITH_CONTEXT current_elx_irq
 .org 0x300
-    FIQ_SUSPEND
+    CALL_WITH_CONTEXT current_elx_fiq
 .org 0x380
     CALL_WITH_CONTEXT current_elx_serror
 

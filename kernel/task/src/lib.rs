@@ -26,8 +26,11 @@
 #![no_std]
 #![feature(negative_impls)]
 #![feature(thread_local)]
+#![feature(let_chains)]
 
 extern crate alloc;
+
+pub mod scheduler;
 
 use alloc::{
     boxed::Box,
@@ -45,7 +48,6 @@ use core::{
     task::Waker,
 };
 use cpu::CpuId;
-use crossbeam_utils::atomic::AtomicCell;
 use irq_safety::hold_interrupts;
 use log::error;
 use environment::Environment;
@@ -65,6 +67,7 @@ pub use task_struct::{
 };
 #[cfg(simd_personality)]
 pub use task_struct::SimdExt;
+pub use scheduler::schedule;
 
 
 /// The list of all Tasks in the system.
@@ -583,75 +586,6 @@ pub fn take_kill_handler() -> Option<KillHandler> {
         .ok()
         .flatten()
 }
-
-
-pub use scheduler::*;
-mod scheduler {
-    use super::*;
-
-    /// Yields the current CPU by selecting a new `Task` to run next,
-    /// and then switches to that new `Task`.
-    ///
-    /// The new "next" `Task` to run will be selected by the currently-active
-    /// scheduler policy.
-    ///
-    /// Preemption will be disabled while this function runs,
-    /// but interrupts are not disabled because it is not necessary.
-    ///
-    /// ## Return
-    /// * `true` if a new task was selected and switched to.
-    /// * `false` if no new task was selected,
-    ///    meaning the current task will continue running.
-    #[doc(alias("yield"))]
-    pub fn schedule() -> bool {
-        let preemption_guard = preemption::hold_preemption();
-        // If preemption was not previously enabled (before we disabled it above),
-        // then we shouldn't perform a task switch here.
-        if !preemption_guard.preemption_was_enabled() {
-            // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
-            return false;
-        }
-
-        let cpu_id = preemption_guard.cpu_id();
-
-        let Some(next_task) = (SELECT_NEXT_TASK_FUNC.load())(cpu_id.into_u8()) else {
-            return false; // keep running the same current task
-        };
-
-        let (did_switch, recovered_preemption_guard) = task_switch(
-            next_task,
-            cpu_id,
-            preemption_guard,
-        ); 
-
-        // trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, task::get_my_current_task(), irq_safety::interrupts_enabled());
-
-        drop(recovered_preemption_guard);
-        did_switch
-    }
-
-    /// The signature for the function that selects the next task for the given CPU.
-    ///
-    /// This is used when the [`schedule()`] function is invoked.
-    pub type SchedulerFunc = fn(u8) -> Option<TaskRef>;
-
-    /// The function currently registered as the system-wide scheduler policy.
-    ///
-    /// This is initialized to a dummy function that returns no "next" task,
-    /// meaning that no scheduling will occur until it is initialized.
-    /// Currently, this is initialized from within `scheduler::init()`.
-    static SELECT_NEXT_TASK_FUNC: AtomicCell<SchedulerFunc> = AtomicCell::new(|_| None);
-
-    /// Sets the active scheduler policy used by [`schedule()`] to select the next task.
-    ///
-    /// Currently, we only support one scheduler policy for the whole system,
-    /// but supporting different policies on a per-CPU, per-namespace, or per-arbitrary domain basis
-    /// would be a relatively simple immprovement.
-    pub fn set_scheduler_policy(select_next_task_func: SchedulerFunc) {
-        SELECT_NEXT_TASK_FUNC.store(select_next_task_func);
-    }
-}
-
 
 /// Switches from the current task to the given `next` task.
 ///

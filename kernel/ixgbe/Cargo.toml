@@ -55,9 +55,6 @@ features = [ "alloc", "small_rng" ]
 [dependencies.hpet]
 path = "../acpi/hpet"
 
-[dependencies.runqueue]
-path = "../runqueue"
-
 [dependencies.nic_initialization]
 path = "../nic_initialization"
 
