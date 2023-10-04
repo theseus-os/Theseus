@@ -478,23 +478,11 @@ impl Task {
         if self.runstate.compare_exchange(Runnable, Blocked).is_ok() {
             Ok(Runnable)
         } else if self.runstate.compare_exchange(Blocked, Blocked).is_ok() {
-            warn!("Blocked an already blocked task: {:?}", self);
+            // warn!("Blocked an already blocked task: {:?}", self);
             Ok(Blocked)
         } else {
             Err(self.runstate.load())
         }
-    }
-
-    /// Same as [`block`], but doesn't print a warning if the task is already
-    /// blocked.
-    ///
-    /// This method can be useful if blocking potentially blocked tasks in a
-    /// loop (e.g. `test_scheduler`). Logging is very slow, and this function
-    /// can lead to a `100x` performance improvement.
-    pub fn block_no_log(&self) {
-        let _ = self
-            .runstate
-            .compare_exchange(RunState::Runnable, RunState::Blocked);
     }
 
     /// Blocks this `Task` if it is a newly-spawned task currently being initialized.
@@ -522,25 +510,13 @@ impl Task {
         if self.runstate.compare_exchange(Blocked, Runnable).is_ok() {
             Ok(Blocked)
         } else if self.runstate.compare_exchange(Runnable, Runnable).is_ok() {
-            warn!("Unblocked an already runnable task: {:?}", self);
+            // warn!("Unblocked an already runnable task: {:?}", self);
             Ok(Runnable)
         } else {
             Err(self.runstate.load())
         }
     }
     
-    /// Same as [`unblock`], but doesn't print a warning if the task is already
-    /// unblocked.
-    ///
-    /// This method can be useful if unblocking potentially unblocked tasks in a
-    /// loop (e.g. `test_scheduler`). Logging is very slow, and this function
-    /// can lead to a `100x` performance improvement.
-    pub fn unblock_no_log(&self) {
-        let _ = self
-            .runstate
-            .compare_exchange(RunState::Blocked, RunState::Runnable);
-    }
-
     /// Makes this `Task` `Runnable` if it is a newly-spawned and fully initialized task.
     ///
     /// This is a special case only to be used when spawning a new task that
