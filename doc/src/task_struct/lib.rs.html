@@ -1137,8 +1137,8 @@
         <span class="kw">if </span><span class="self">self</span>.runstate.compare_exchange(Runnable, Blocked).is_ok() {
             <span class="prelude-val">Ok</span>(Runnable)
         } <span class="kw">else if </span><span class="self">self</span>.runstate.compare_exchange(Blocked, Blocked).is_ok() {
-            <span class="macro">warn!</span>(<span class="string">&quot;Blocked an already blocked task: {:?}&quot;</span>, <span class="self">self</span>);
-            <span class="prelude-val">Ok</span>(Blocked)
+            <span class="comment">// warn!(&quot;Blocked an already blocked task: {:?}&quot;, self);
+            </span><span class="prelude-val">Ok</span>(Blocked)
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(<span class="self">self</span>.runstate.load())
         }
@@ -1169,8 +1169,8 @@
         <span class="kw">if </span><span class="self">self</span>.runstate.compare_exchange(Blocked, Runnable).is_ok() {
             <span class="prelude-val">Ok</span>(Blocked)
         } <span class="kw">else if </span><span class="self">self</span>.runstate.compare_exchange(Runnable, Runnable).is_ok() {
-            <span class="macro">warn!</span>(<span class="string">&quot;Unblocked an already runnable task: {:?}&quot;</span>, <span class="self">self</span>);
-            <span class="prelude-val">Ok</span>(Runnable)
+            <span class="comment">// warn!(&quot;Unblocked an already runnable task: {:?}&quot;, self);
+            </span><span class="prelude-val">Ok</span>(Runnable)
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(<span class="self">self</span>.runstate.load())
         }

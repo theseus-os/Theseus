@@ -73,6 +73,10 @@
 <a href="#73" id="73">73</a>
 <a href="#74" id="74">74</a>
 <a href="#75" id="75">75</a>
+<a href="#76" id="76">76</a>
+<a href="#77" id="77">77</a>
+<a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Implements functions for accessing CPU-specific information on x86_64,
 //! which is primarily a simple wrapper around [`apic`]-provided features.
 
@@ -101,6 +105,10 @@
     }
 }
 
+<span class="comment">// Returns an iterator over the available CPUs.
+</span><span class="kw">pub fn </span>cpus() -&gt; <span class="kw">impl </span>Iterator&lt;Item = CpuId&gt; {
+    apic::get_lapics().iter().map(|(apic_id, <span class="kw">_</span>)| (<span class="kw-2">*</span>apic_id).into())
+}
 
 <span class="doccomment">/// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
