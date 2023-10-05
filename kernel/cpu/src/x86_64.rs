@@ -26,6 +26,10 @@ impl TryFrom<u32> for CpuId {
     }
 }
 
+// Returns an iterator over the available CPUs.
+pub fn cpus() -> impl Iterator<Item = CpuId> {
+    apic::get_lapics().iter().map(|(apic_id, _)| (*apic_id).into())
+}
 
 /// Returns the number of CPUs (SMP cores) that exist and
 /// are currently initialized on this system.
