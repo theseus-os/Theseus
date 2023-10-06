@@ -1,4 +1,9 @@
 //! USB controller support
+//!
+//! Current support:
+//! - EHCI controllers:
+//!    * control transfers: full support
+//!    * other transfer types: unused, no API support
 
 #![no_std]
 
@@ -10,8 +15,6 @@ use zerocopy::FromBytes;
 use volatile::{Volatile, ReadOnly};
 use bilge::prelude::*;
 use sleep::{Duration, sleep};
-use alloc::vec;
-use alloc::vec::Vec;
 use core::mem::size_of;
 
 mod ehci;
@@ -21,51 +24,17 @@ pub enum Standard<T> {
 }
 
 pub fn init(pci_device: Standard<&PciDevice>) -> Result<(), &'static str> {
-    match pci_device {
-        Standard::Ehci(dev) => ehci::init(dev),
-    }
+    let mut ctrl = match pci_device {
+        Standard::Ehci(dev) => ehci::EhciController::new(dev)?,
+    };
+
+    ctrl.probe_ports()?;
+    ctrl.turn_off()?;
+
+    Ok(())
 }
 
-/*
-
-#[derive(Debug, Default, FromBytes)]
-pub struct Allocator<const N: usize, T: FromBytes> {
-    slots: [T; N],
-    occupied: [bool; N],
-}
-
-impl<const N: usize, T: FromBytes> Allocator<N, T> {
-    pub fn init(&mut self) {
-        self.occupied.fill(false);
-    }
-
-    pub fn alloc(&mut self, value: T) -> Result<(usize, u32), &'static str> {
-        for i in 0..N {
-            if !self.occupied[i] {
-                self.occupied[i] = true;
-                let mut_ref = &mut self.slots[i];
-                *mut_ref = value;
-                let addr = mut_ref as *const Request as usize;
-
-                return Ok((i, addr as u32))
-            }
-        }
-
-        Err("Allocator: Out of slots")
-    }
-
-    pub fn get(&self, index: usize) -> Option<&T> {
-        self.slots.get(index)
-    }
-
-    pub fn get_mut(&self, index: usize) -> Option<&mut T> {
-        self.slots.get_mut(index)
-    }
-}
-
-*/
-
-#[derive(Debug, Default, FromBytes)]
+#[derive(Copy, Clone, Debug, Default, FromBytes)]
 #[repr(C)]
 pub struct DeviceDescriptor {
     pub len: u8,
@@ -143,4 +112,53 @@ enum RequestName {
 
     #[fallback]
     Reserved = 0xff,
+}
+
+#[macro_export]
+macro_rules! allocator {
+    ($name:ident, $ty:ty, $cap:literal) => {
+
+        #[derive(Debug, FromBytes)]
+        struct $name {
+            slots: [$ty; $cap],
+            occupied: [u8; $cap],
+        }
+
+        impl $name {
+            const OCCUPIED_TRUE: u8 = 1;
+            const OCCUPIED_FALSE: u8 = 0;
+
+            pub fn init(&mut self) {
+                self.occupied.fill(Self::OCCUPIED_FALSE);
+            }
+
+            pub fn alloc(&mut self, value: $ty) -> Result<(usize, u32), &'static str> {
+                log::info!("Allocating one {} out of {}", stringify!($ty), $cap);
+                for i in 0..$cap {
+                    if self.occupied[i] == Self::OCCUPIED_FALSE {
+                        self.occupied[i] = Self::OCCUPIED_TRUE;
+                        let mut_ref = &mut self.slots[i];
+                        *mut_ref = value;
+                        let addr = mut_ref as *mut _ as usize as u32;
+
+                        log::info!("slot addr: 0x{:x}", addr);
+                        return Ok((i, addr))
+                    }
+                }
+
+                Err(concat!(stringify!($name), ": Out of slots"))
+            }
+
+            pub fn get(&self, index: usize) -> Result<&$ty, &'static str> {
+                let err_msg = concat!(stringify!($name), ": Invalid slot index");
+                self.slots.get(index).ok_or(err_msg)
+            }
+
+            pub fn get_mut(&mut self, index: usize) -> Result<&mut $ty, &'static str> {
+                let err_msg = concat!(stringify!($name), ": Invalid slot index");
+                self.slots.get_mut(index).ok_or(err_msg)
+            }
+        }
+
+    }
 }

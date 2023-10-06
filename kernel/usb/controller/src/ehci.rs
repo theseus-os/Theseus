@@ -1,105 +1,218 @@
 #![allow(dead_code)]
 
+use hashbrown::HashMap;
+
 use super::*;
 
-pub fn init(ehci_pci_dev: &PciDevice) -> Result<(), &'static str> {
-    let base = (ehci_pci_dev.bars[0] as usize) & !0xff;
-    log::error!("Mapping 0x{:x} as EHCI", base);
-    let base = PhysicalAddress::new(base).ok_or("Invalid PCI BAR for EHCI USB controller")?;
+type DeviceAddress = u8;
 
-    let (mut alloc, four_gig_segment) = UsbAlloc::new(24, 24, 24, 24)?;
-
-    let mut mapped_pages = map_frame_range(base, PAGE_SIZE, MMIO_FLAGS)?;
-    let capa_regs = mapped_pages.as_type::<CapabilityRegisters>(0)?;
-
-    let op_offset = capa_regs.cap_length.read() as usize;
-    let hcs_params = capa_regs.hcs_params.read();
-
-    let op_regs = mapped_pages.as_type_mut::<OperationRegisters>(op_offset)?;
-
-    op_regs.segment.write(four_gig_segment);
-    op_regs.command.update(|cmd| cmd.set_async_schedule(false));
-    op_regs.command.update(|cmd| cmd.set_periodic_schedule(false));
-    op_regs.command.update(|cmd| cmd.set_run_stop(true));
-    op_regs.config_flag.update(|cmd| cmd.set_inner(ConfigureFlag::Use));
-
-    sleep(Duration::from_millis(10)).unwrap();
-
-    log::error!("Initializing an EHCI USB controller with {} ports and {} companion controllers",
-        hcs_params.port_num(),
-        hcs_params.comp_ctrl_num());
-
-    let port_num = hcs_params.port_num().value() as usize;
-    for i in 0..port_num {
-        let port = &mut op_regs.ports[i];
-        if port.read().connected() {
-            // reset the device; it will now reply to requests targeted at address zero
-            port.update(|port| port.set_port_state(false));
-            port.update(|port| port.set_port_reset(true));
-            sleep(Duration::from_millis(10)).unwrap();
-            port.update(|port| port.set_port_reset(false));
-            log::error!("CONNECTED: {:#?}", port.read());
-        }
-    }
-
-    let data_sz = size_of::<DeviceDescriptor>();
-
-    let req = Request::new(
-        RequestRecipient::Device,
-        RequestType::Standard,
-        Direction::In,
-        RequestName::GetDescriptor,
-        0x0100,
-        0,
-        data_sz as _,
-    );
-
-    let (desc_offset, desc) = alloc.alloc_desc(DeviceDescriptor::default())?;
-
-    let (qh, qh_index, setup, status) = create_read_request(&mut alloc, 0, req, data_sz, 8, desc)?;
-
-    op_regs.async_list.write(qh);
-    op_regs.command.update(|cmd| cmd.set_async_schedule(true));
-
-    loop {
-        let setup_qtd = alloc.get_qtd_mut(setup)?;
-        if setup_qtd.token.read().active() {
-            sleep(Duration::from_millis(10)).unwrap();
-        } else {
-            break;
-        }
-    }
-
-    loop {
-        let setup_qtd = alloc.get_qtd_mut(status)?;
-        if setup_qtd.token.read().active() {
-            sleep(Duration::from_millis(10)).unwrap();
-        } else {
-            break;
-        }
-    }
-
-    op_regs.command.update(|cmd| cmd.set_async_schedule(false));
-
-    let descriptor = alloc.get_desc_mut(desc_offset)?;
-    log::warn!("DESCRIPTOR: {:#x?}", *descriptor);
-
-    Ok(())
+#[derive(Debug)]
+struct Device {
+    descriptor: DeviceDescriptor,
 }
 
-fn create_read_request(
-    alloc: &mut UsbAlloc,
+allocator!(DeviceDescriptorAlloc, DeviceDescriptor, 16);
+allocator!(TransferDescriptorAlloc, TransferDescriptor, 16);
+allocator!(QueueHeadAlloc, QueueHead, 16);
+allocator!(RequestAlloc, Request, 16);
+
+impl Device {
+    pub fn new(ctrl: &mut EhciController) -> Result<Self, &'static str> {
+        let data_sz = size_of::<DeviceDescriptor>();
+
+        let req = Request::new(
+            RequestRecipient::Device,
+            RequestType::Standard,
+            Direction::In,
+            RequestName::GetDescriptor,
+            0x0100,
+            0,
+            data_sz as _,
+        );
+
+        let shmem = ctrl.alloc()?;
+        let (desc_offset, desc) = shmem.device_descriptors.alloc(DeviceDescriptor::default())?;
+        let (qh, _qh_index, setup, status) = create_request(shmem, 0, req, data_sz, 8, desc)?;
+
+        let op_regs = ctrl.op_regs()?;
+        op_regs.async_list.write(qh);
+        op_regs.command.update(|cmd| cmd.set_async_schedule(true));
+
+        let mut timeout = 10;
+
+        let shmem = ctrl.alloc()?;
+        loop {
+            let setup_qtd = shmem.queue_heads.get(setup)?;
+            if timeout == 0 {
+                return Err("Timeout 1");
+            } else if setup_qtd.token.read().active() {
+                timeout -= 1;
+                sleep(Duration::from_millis(10)).unwrap();
+            } else {
+                break;
+            }
+        }
+
+        timeout = 10;
+
+        loop {
+            let setup_qtd = shmem.transfer_descriptors.get(status)?;
+            if timeout == 0 {
+                return Err("Timeout 2");
+            } else if setup_qtd.token.read().active() {
+                timeout -= 1;
+                sleep(Duration::from_millis(10)).unwrap();
+            } else {
+                break;
+            }
+        }
+
+        let op_regs = ctrl.op_regs()?;
+        op_regs.command.update(|cmd| cmd.set_async_schedule(false));
+
+        let shmem = ctrl.alloc()?;
+        let descriptor = *shmem.device_descriptors.get(desc_offset)?;
+        log::warn!("DESCRIPTOR: {:#x?}", descriptor);
+
+        Ok(Self {
+            descriptor,
+        })
+    }
+
+    pub fn init(&mut self, _address: DeviceAddress) {
+        // todo
+    }
+}
+
+#[derive(Debug, FromBytes)]
+pub struct UsbAlloc {
+    device_descriptors: DeviceDescriptorAlloc,
+    transfer_descriptors: TransferDescriptorAlloc,
+    queue_heads: QueueHeadAlloc,
+    requests: RequestAlloc,
+}
+
+#[derive(Debug)]
+pub struct EhciController {
+    devices: HashMap<DeviceAddress, Device>,
+    config_space: MappedPages,
+    hcs_params: HcsParams,
+    op_offset: usize,
+    usb_alloc: MappedPages,
+}
+
+impl EhciController {
+    pub fn new(ehci_pci_dev: &PciDevice) -> Result<Self, &'static str> {
+        let base = (ehci_pci_dev.bars[0] as usize) & !0xff;
+        let base = PhysicalAddress::new(base).ok_or("Invalid PCI BAR for EHCI USB controller")?;
+
+        let (usb_alloc, four_gig_segment) = {
+            // todo 1: make sure this doesn't cross a 4GiB boundary
+            // todo 2: no need to ID-map this but then
+            // I'd need to convert pages to frames very often
+            let needed_mem = size_of::<UsbAlloc>();
+            log::info!("EHCI USB allocator size: {} bytes", needed_mem);
+            let num_pages = (needed_mem + (PAGE_SIZE - 1)) / PAGE_SIZE;
+            let mut usb_alloc = create_identity_mapping(num_pages, MMIO_FLAGS)?;
+            usb_alloc.as_slice_mut(0, needed_mem)?.fill(0u8);
+            let addr = usb_alloc.start_address().value();
+            let four_gig_segment = (addr >> 32) as u32;
+            log::info!("EHCI USB allocator virtual addr: 0x{:x}", addr);
+            (usb_alloc, four_gig_segment)
+        };
+
+        let mut config_space = map_frame_range(base, PAGE_SIZE, MMIO_FLAGS)?;
+        let capa_regs = config_space.as_type::<CapabilityRegisters>(0)?;
+
+        let op_offset = capa_regs.cap_length.read() as usize;
+        let hcs_params = capa_regs.hcs_params.read();
+
+        let op_regs = config_space.as_type_mut::<OperationRegisters>(op_offset)?;
+
+        op_regs.segment.write(four_gig_segment);
+        op_regs.command.update(|cmd| cmd.set_async_schedule(false));
+        op_regs.command.update(|cmd| cmd.set_periodic_schedule(false));
+        op_regs.command.update(|cmd| cmd.set_run_stop(true));
+        op_regs.config_flag.update(|cmd| cmd.set_inner(ConfigureFlag::Use));
+
+        sleep(Duration::from_millis(10)).unwrap();
+
+        log::info!("Initialized an EHCI USB controller with {} ports and {} companion controllers",
+            hcs_params.port_num(),
+            hcs_params.comp_ctrl_num());
+
+        Ok(Self {
+            devices: HashMap::new(),
+            config_space,
+            hcs_params,
+            op_offset,
+            usb_alloc,
+        })
+    }
+
+    fn alloc(&mut self) -> Result<&mut UsbAlloc, &'static str> {
+        self.usb_alloc.as_type_mut::<UsbAlloc>(0)
+    }
+
+    fn op_regs(&mut self) -> Result<&mut OperationRegisters, &'static str> {
+        self.config_space.as_type_mut::<OperationRegisters>(self.op_offset)
+    }
+
+    pub fn probe_ports(&mut self) -> Result<(), &'static str> {
+        let port_num = self.hcs_params.port_num().value() as usize;
+        for i in 0..port_num {
+            let port = &mut self.op_regs()?.ports[i];
+            log::error!("P{}.connected_change: {}", i, port.read().connected_change());
+            if port.read().connected_change() {
+                // writing true makes it false (spec)
+                port.update(|port| port.set_connected_change(true));
+
+                if port.read().connected() {
+                    // reset the device; it will now reply to requests targeted at address zero
+                    port.update(|port| port.set_port_state(false));
+                    port.update(|port| port.set_port_reset(true));
+                    sleep(Duration::from_millis(10)).unwrap();
+                    port.update(|port| port.set_port_reset(false));
+                    log::error!("CONNECTED: {:#?}", port.read());
+
+                    let mut device = Device::new(self)?;
+                    let mut addr = Err("Out of device addresses");
+
+                    for i in 0..128 {
+                        if !self.devices.contains_key(&i) {
+                            addr = Ok(i);
+                            break;
+                        }
+                    }
+
+                    device.init(addr?);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn turn_off(&mut self) -> Result<(), &'static str> {
+        self.op_regs()?.command.update(|cmd| cmd.set_run_stop(false));
+        Ok(())
+    }
+}
+
+fn create_request(
+    shmem: &mut UsbAlloc,
     dev_addr: u8,
     req: Request,
     mut data_size: usize,
     max_packet_size: usize,
     mut in_buf: u32,
 ) -> Result<(u32, usize, usize, usize), &'static str> {
-    let (_, req_ptr) = alloc.alloc_req(req)?;
+    let (_, req_ptr) = shmem.requests.alloc(req)?;
     let req_bp = BufferPointerWithOffset::from(req_ptr);
 
     let zero_bp = BufferPointer::from(0);
     let no_next = PointerNoType::from(1);
+    let alt_no_next = AltNextQtdPointer::from(1);
     let mut data_toggle = false;
 
     let setup_token = QtdToken::new(
@@ -126,8 +239,13 @@ fn create_read_request(
         bp4: Volatile::new(zero_bp),
     };
 
-    let (first_qtd_offset, first_qtd_ptr) = alloc.alloc_qtd(setup_qtd)?;
+    let (first_qtd_offset, first_qtd_ptr) = shmem.transfer_descriptors.alloc(setup_qtd)?;
     let mut prev_qtd_offset = first_qtd_offset;
+
+    let pid_code = match req.direction() {
+        Direction::Out => PidCode::Out,
+        Direction::In => PidCode::In,
+    };
 
     while data_size > 0 {
         let progress = data_size.min(max_packet_size);
@@ -137,7 +255,7 @@ fn create_read_request(
             false, false, false, false, false, false, false,
 
             true,
-            PidCode::In,
+            pid_code,
             u2::new(3),
             u3::new(0),
             true,
@@ -158,9 +276,9 @@ fn create_read_request(
             bp4: Volatile::new(zero_bp),
         };
 
-        let (part_qtd_offset, part_qtd_ptr) = alloc.alloc_qtd(in_qtd)?;
+        let (part_qtd_offset, part_qtd_ptr) = shmem.transfer_descriptors.alloc(in_qtd)?;
 
-        let prev_qtd = alloc.get_qtd_mut(prev_qtd_offset)?;
+        let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_offset)?;
         prev_qtd.next.write(PointerNoType::from(part_qtd_ptr));
 
         prev_qtd_offset = part_qtd_offset;
@@ -194,9 +312,9 @@ fn create_read_request(
         bp4: Volatile::new(zero_bp),
     };
 
-    let (status_qtd_offset, status_qtd_ptr) = alloc.alloc_qtd(status_qtd)?;
+    let (status_qtd_offset, status_qtd_ptr) = shmem.transfer_descriptors.alloc(status_qtd)?;
 
-    let prev_qtd = alloc.get_qtd_mut(prev_qtd_offset)?;
+    let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_offset)?;
     prev_qtd.next.write(PointerNoType::from(status_qtd_ptr));
 
     let qh_endpoint = QhEndpoint::new(
@@ -226,7 +344,7 @@ fn create_read_request(
 
         // Transfer Overlay
         next_qtd: Volatile::new(first_qtd_bp),
-        alt_next_qtd: Volatile::new(AltNextQtdPointer::from(0)),
+        alt_next_qtd: Volatile::new(alt_no_next),
         token: Volatile::new(QtdToken::from(0)),
         bp0: Volatile::new(BufferPointerWithOffset::from(0)),
         bp1: Volatile::new(QhBp1::from(0)),
@@ -235,181 +353,14 @@ fn create_read_request(
         bp4: Volatile::new(BufferPointer::from(0)),
     };
 
-    let (qh_offset, queue_head) = alloc.alloc_qh(qh)?;
+    let (qh_offset, queue_head) = shmem.queue_heads.alloc(qh)?;
 
     // circular queue
-    let qh_mut = alloc.get_qh_mut(qh_offset)?;
+    let qh_mut = shmem.queue_heads.get_mut(qh_offset)?;
     qh_mut.next.write(Pointer::new(false, PointerType::QueueHead, u27::new(queue_head >> 5)));
 
     Ok((queue_head, qh_offset, first_qtd_offset, status_qtd_offset))
 }
-
-struct UsbAlloc {
-    req_obj_offset: usize,
-    req_offset: usize,
-    req_slots: usize,
-
-    qh_obj_offset: usize,
-    qh_offset: usize,
-    qh_slots: usize,
-
-    qtd_obj_offset: usize,
-    qtd_offset: usize,
-    qtd_slots: usize,
-
-    desc_obj_offset: usize,
-    desc_offset: usize,
-    desc_slots: usize,
-
-    in_use: Vec<bool>,
-    bytes: MappedPages,
-}
-
-impl UsbAlloc {
-    /// Returns (self, four_gig_segment)
-    pub fn new(
-        req_slots: usize,
-        qh_slots: usize,
-        qtd_slots: usize,
-        desc_slots: usize,
-    ) -> Result<(Self, u32), &'static str> {
-        let mut total_size = 0;
-        let mut total_objs = 0;
-
-        let req_offset = total_size;
-        let req_obj_offset = total_objs;
-        total_size += req_slots * size_of::<Request>();
-        total_objs += req_slots;
-
-        let qh_offset = total_size;
-        let qh_obj_offset = total_objs;
-        total_size += qh_slots * size_of::<QueueHead>();
-        total_objs += qh_slots;
-
-        let qtd_offset = total_size;
-        let qtd_obj_offset = total_objs;
-        total_size += qtd_slots * size_of::<TransferDescriptor>();
-        total_objs += qtd_slots;
-
-        let desc_offset = total_size;
-        let desc_obj_offset = total_objs;
-        total_size += desc_slots * size_of::<DeviceDescriptor>();
-        total_objs += desc_slots;
-
-        // todo: make sure this doesn't cross a 4GiB boundary
-        let num_pages = (total_size + (PAGE_SIZE - 1)) / PAGE_SIZE;
-        let bytes = create_identity_mapping(num_pages, MMIO_FLAGS)?;
-        let four_gig_segment = (bytes.start_address().value() >> 32) as u32;
-
-        let this = Self {
-            req_obj_offset,
-            req_offset,
-            req_slots,
-
-            qh_obj_offset,
-            qh_offset,
-            qh_slots,
-
-            qtd_obj_offset,
-            qtd_offset,
-            qtd_slots,
-
-            desc_obj_offset,
-            desc_offset,
-            desc_slots,
-
-            in_use: vec![false; total_objs],
-            bytes,
-        };
-
-        Ok((this, four_gig_segment))
-    }
-
-    pub fn alloc_req(&mut self, req: Request) -> Result<(usize, u32), &'static str> {
-        for i in 0..self.req_slots {
-            let obj = self.req_obj_offset + i;
-            if !self.in_use[obj] {
-                self.in_use[obj] = true;
-                let offset = self.req_offset + i * size_of::<Request>();
-                let mut_ref = self.bytes.as_type_mut(offset)?;
-                *mut_ref = req;
-                let addr = mut_ref as *const Request as usize;
-
-                return Ok((offset, addr as u32))
-            }
-        }
-
-        Err("UsbAlloc: Out of slots")
-    }
-
-    pub fn get_req_mut(&mut self, offset: usize) -> Result<&mut Request, &'static str> {
-        self.bytes.as_type_mut(offset)
-    }
-
-    pub fn alloc_qh(&mut self, qh: QueueHead) -> Result<(usize, u32), &'static str> {
-        for i in 0..self.qh_slots {
-            let obj = self.qh_obj_offset + i;
-            if !self.in_use[obj] {
-                self.in_use[obj] = true;
-                let offset = self.qh_offset + i * size_of::<QueueHead>();
-                let mut_ref = self.bytes.as_type_mut(offset)?;
-                *mut_ref = qh;
-                let addr = mut_ref as *const QueueHead as usize;
-
-                return Ok((offset, addr as u32))
-            }
-        }
-
-        Err("UsbAlloc: Out of slots")
-    }
-
-    pub fn get_qh_mut(&mut self, offset: usize) -> Result<&mut QueueHead, &'static str> {
-        self.bytes.as_type_mut(offset)
-    }
-
-    pub fn alloc_qtd(&mut self, qtd: TransferDescriptor) -> Result<(usize, u32), &'static str> {
-        for i in 0..self.qtd_slots {
-            let obj = self.qtd_obj_offset + i;
-            if !self.in_use[obj] {
-                self.in_use[obj] = true;
-                let offset = self.qtd_offset + i * size_of::<TransferDescriptor>();
-                let mut_ref = self.bytes.as_type_mut(offset)?;
-                *mut_ref = qtd;
-                let addr = mut_ref as *const TransferDescriptor as usize;
-
-                return Ok((offset, addr as u32))
-            }
-        }
-
-        Err("UsbAlloc: Out of slots")
-    }
-
-    pub fn get_qtd_mut(&mut self, offset: usize) -> Result<&mut TransferDescriptor, &'static str> {
-        self.bytes.as_type_mut(offset)
-    }
-
-    pub fn alloc_desc(&mut self, desc: DeviceDescriptor) -> Result<(usize, u32), &'static str> {
-        for i in 0..self.desc_slots {
-            let obj = self.desc_obj_offset + i;
-            if !self.in_use[obj] {
-                self.in_use[obj] = true;
-                let offset = self.desc_offset + i * size_of::<DeviceDescriptor>();
-                let mut_ref = self.bytes.as_type_mut(offset)?;
-                *mut_ref = desc;
-                let addr = mut_ref as *const DeviceDescriptor as usize;
-
-                return Ok((offset, addr as u32))
-            }
-        }
-
-        Err("UsbAlloc: Out of slots")
-    }
-
-    pub fn get_desc_mut(&mut self, offset: usize) -> Result<&mut DeviceDescriptor, &'static str> {
-        self.bytes.as_type_mut(offset)
-    }
-}
-
 
 /// Memory-Mapped EHCI Capability Registers
 #[derive(Debug, FromBytes)]
@@ -835,8 +786,9 @@ enum TransactionPosition {
     End = 3,
 }
 
+/// Queue Element Transfer Descriptor
 #[derive(Debug, FromBytes)]
-#[repr(C)]
+#[repr(C, align(32))]
 struct TransferDescriptor {
     next: Volatile<PointerNoType>,
     alt_next: Volatile<PointerNoType>,
@@ -869,7 +821,7 @@ struct QtdToken {
 }
 
 #[bitsize(2)]
-#[derive(Debug, FromBits)]
+#[derive(Copy, Clone, Debug, FromBits)]
 enum PidCode {
     Out = 0,
     In = 1,
@@ -878,7 +830,7 @@ enum PidCode {
 }
 
 #[derive(Debug, FromBytes)]
-#[repr(C)]
+#[repr(C, align(32))]
 struct QueueHead {
     next: Volatile<Pointer>,
     /// Endpoint Capabilities and Characteristics
