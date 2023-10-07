@@ -1,7 +1,8 @@
 [package]
 name = "test_scheduler"
 version = "0.1.0"
-authors = ["Namitha Liyanage <namithaliyanage@gmail.com>"]
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "An application to test the scheduler"
 edition = "2021"
 
 [dependencies]

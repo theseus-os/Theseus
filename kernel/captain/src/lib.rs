@@ -123,6 +123,7 @@ pub fn init(
         interrupt_controller::init()?;
 
         interrupts::init()?;
+        irq_safety::enable_fast_interrupts();
 
         // register BSP CpuId
         cpu::register_cpu(true)?;

@@ -27,17 +27,15 @@ fn rmain() -> Result<(), &'static str> {
     for num_pages in TEST_SET.into_iter() {
         for alignment in TEST_SET.into_iter() {
             println!("Attempting to allocate {num_pages} pages with alignment of {alignment} 4K pages...");
-            match memory::allocate_pages_deferred(
-                AllocationRequest::AlignedTo { alignment_4k_pages: alignment },
+            let (ap, _action) = memory::allocate_pages_deferred(
+                AllocationRequest::AlignedTo {
+                    alignment_4k_pages: alignment,
+                },
                 num_pages,
-            ) {
-                Ok((ap, _action)) => {
-                    assert_eq!(ap.start().number() % alignment, 0);
-                    assert_eq!(ap.size_in_pages(), num_pages);
-                    println!("    Success: {ap:?}");
-                }
-                Err(e) => println!("    !! FAILURE: {e:?}"),
-            }
+            )?;
+            assert_eq!(ap.start().number() % alignment, 0);
+            assert_eq!(ap.size_in_pages(), num_pages);
+            println!("    Success: {ap:?}");
         }
     }
     

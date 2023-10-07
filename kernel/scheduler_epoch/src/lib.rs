@@ -1,12 +1,18 @@
-//! This crate picks the next task on token based scheduling policy.
-//! At the begining of each scheduling epoch a set of tokens is distributed
-//! among tasks depending on their priority.
-//! [tokens assigned to each task = (prioirty of each task / prioirty of all
-//! tasks) * length of epoch]. Each time a task is picked, the token count of
-//! the task is decremented by 1. A task is executed only if it has tokens
-//! remaining. When all tokens of all runnable task are exhausted a new
-//! scheduling epoch is initiated. In addition this crate offers the interfaces
-//! to set and get priorities  of each task.
+//! This crate implements a token-based epoch scheduling policy.
+//!
+//! At the begining of each scheduling epoch, a set of tokens is distributed
+//! among all runnable tasks, based on their priority relative to all other
+//! runnable tasks in the runqueue. The formula for this is:
+//! ```ignore
+//! tokens_assigned_to_task_i = (priority_task_i / sum_priority_all_tasks) * epoch_length;
+//! ```
+//! * Each time a task is picked, its token count is decremented by 1.
+//! * A task can only be selected for next execution if it has tokens remaining.
+//! * When all tokens of all runnable task are exhausted, a new scheduling epoch
+//!   begins.
+//!
+//! This epoch scheduler is also a priority-based scheduler, so it allows
+//! getting and setting the priorities of each task.
 
 #![no_std]
 #![feature(core_intrinsics)]
@@ -27,6 +33,7 @@ const MAX_PRIORITY: u8 = 40;
 const DEFAULT_PRIORITY: u8 = 20;
 const INITIAL_TOKENS: usize = 10;
 
+/// An instance of an epoch scheduler, typically one per CPU.
 pub struct Scheduler {
     idle_task: TaskRef,
     have_tokens: VecDeque<EpochTaskRef>,
@@ -34,6 +41,7 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    /// Creates a new epoch scheduler instance with the given idle task.
     pub const fn new(idle_task: TaskRef) -> Self {
         Self {
             idle_task,
@@ -93,6 +101,9 @@ impl Scheduler {
             total_priorities += 1 + task.priority as usize;
         }
 
+        // Each epoch lasts for a total of 100 tokens by default. However, as this
+        // granularity could skip over low priority tasks when many concurrent tasks are
+        // running, we increase the epoch in such cases.
         let epoch = max(total_priorities, 100);
 
         for task in self.have_tokens.iter_mut() {
@@ -114,7 +125,7 @@ impl task::scheduler::Scheduler for Scheduler {
                 self.assign_tokens();
                 self.try_next()
             })
-            .unwrap_or(self.idle_task.clone())
+            .unwrap_or_else(|| self.idle_task.clone())
     }
 
     fn add(&mut self, task: TaskRef) {
@@ -154,7 +165,7 @@ impl task::scheduler::Scheduler for Scheduler {
         )
     }
 
-    fn dump(&self) -> Vec<TaskRef> {
+    fn tasks(&self) -> Vec<TaskRef> {
         self.have_tokens
             .clone()
             .into_iter()
@@ -165,8 +176,8 @@ impl task::scheduler::Scheduler for Scheduler {
 }
 
 impl task::scheduler::PriorityScheduler for Scheduler {
-    fn set_priority(&mut self, task: &TaskRef, mut priority: u8) -> bool {
-        priority = core::cmp::min(priority, MAX_PRIORITY);
+    fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool {
+        let priority = core::cmp::min(priority, MAX_PRIORITY);
 
         for epoch_task in self
             .have_tokens

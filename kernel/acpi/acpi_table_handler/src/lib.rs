@@ -35,6 +35,7 @@ pub fn acpi_table_handler(
         rsdt::RSDT_SIGNATURE |
         rsdt::XSDT_SIGNATURE => rsdt::handle(acpi_tables, signature, length, phys_addr),
         fadt::FADT_SIGNATURE => fadt::handle(acpi_tables, signature, length, phys_addr),
+        waet::WAET_SIGNATURE => waet::handle(acpi_tables, signature, length, phys_addr),
         hpet::HPET_SIGNATURE => hpet::handle(acpi_tables, signature, length, phys_addr),
         madt::MADT_SIGNATURE => madt::handle(acpi_tables, signature, length, phys_addr),
         dmar::DMAR_SIGNATURE => dmar::handle(acpi_tables, signature, length, phys_addr),

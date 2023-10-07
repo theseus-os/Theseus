@@ -86,7 +86,7 @@ impl task::scheduler::Scheduler for Scheduler {
         Box::new(self.queue.drain().map(|priority_task| priority_task.task))
     }
 
-    fn dump(&self) -> Vec<TaskRef> {
+    fn tasks(&self) -> Vec<TaskRef> {
         self.queue
             .clone()
             .into_iter()
@@ -104,7 +104,6 @@ impl task::scheduler::PriorityScheduler for Scheduler {
             // We should have at most removed one task from the run queue.
             debug_assert_eq!(self.queue.len() + 1, previous_len);
             self.queue.push(PriorityTaskRef {
-                // TODO: Don't take reference?
                 task: task.clone(),
                 priority,
                 // Not technically correct, but this will be reset next time it is run.

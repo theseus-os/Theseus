@@ -8,6 +8,7 @@
 
 use super::Priority;
 use super::InterruptNumber;
+use super::SPURIOUS_INTERRUPT_NUM;
 
 use volatile::{Volatile, ReadOnly, WriteOnly};
 use zerocopy::FromBytes;
@@ -42,7 +43,7 @@ pub struct CpuRegsP1 {            // base offset
 }
 
 // enable group 0
-// const CTLR_ENGRP0: u32 = 0b01;
+const CTLR_ENGRP0: u32 = 0b01;
 
 // enable group 1
 const CTLR_ENGRP1: u32 = 0b10;
@@ -51,6 +52,7 @@ impl CpuRegsP1 {
     /// Enables routing of group 1 interrupts for the current CPU.
     pub fn init(&mut self) {
         let mut reg = self.ctlr.read();
+        reg |= CTLR_ENGRP0;
         reg |= CTLR_ENGRP1;
         self.ctlr.write(reg);
     }
@@ -87,12 +89,17 @@ impl CpuRegsP1 {
     ///
     /// This tells the GIC that the requested interrupt is being
     /// handled by this CPU.
-    pub fn acknowledge_interrupt(&mut self) -> (InterruptNumber, Priority) {
+    ///
+    /// Returns None if a spurious interrupt is detected.
+    pub fn acknowledge_interrupt(&mut self) -> Option<(InterruptNumber, Priority)> {
         // Reading the interrupt number has the side effect
         // of acknowledging the interrupt.
         let int_num = self.acknowledge.read() as InterruptNumber;
         let priority = self.running_prio.read() as u8;
 
-        (int_num, priority)
+        match int_num {
+            SPURIOUS_INTERRUPT_NUM => None,
+            _ => Some((int_num, priority))
+        }
     }
 }

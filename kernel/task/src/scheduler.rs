@@ -51,7 +51,10 @@ pub fn schedule() -> bool {
 
     let cpu_id = preemption_guard.cpu_id();
 
-    let next_task = SCHEDULER.update(|scheduler| scheduler.as_ref().unwrap().lock().next());
+    let next_task = SCHEDULER.update_guarded(
+        |scheduler| scheduler.as_ref().unwrap().lock().next(),
+        &preemption_guard,
+    );
 
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
@@ -104,6 +107,7 @@ where
 /// However, if the task is pinned to a a CPU, this function will respect that,
 /// and only add the task to that CPUs runqueue.
 pub fn add_task(task: TaskRef) {
+    log::info!("adding task: {task:?}");
     if let Some(cpu) = task.pinned_cpu() {
         add_task_to(cpu, task)
     } else {
@@ -128,6 +132,7 @@ pub fn add_task(task: TaskRef) {
 
 /// Adds the given task to the specified CPU's run queue.
 pub fn add_task_to(cpu_id: CpuId, task: TaskRef) {
+    // TODO: Check if pinned to CPU?
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
             scheduler.lock().add(task);
@@ -175,26 +180,27 @@ pub trait Scheduler: Send + Sync + 'static {
     /// Adds a task to the run queue.
     fn add(&mut self, task: TaskRef);
 
-    /// Returns a measure of how busy the scheduler is.
+    /// Returns a measure of how busy the scheduler is, with higher values
+    /// representing a busier scheduler.
     fn busyness(&self) -> usize;
 
     /// Removes a task from the run queue.
     fn remove(&mut self, task: &TaskRef) -> bool;
 
-    /// Returns the scheduler as a priority scheduler, if it is one.
+    /// Returns a reference to this scheduler as a priority scheduler, if it is one.
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
 
-    /// Clears the scheduler, returning all contained tasks as an iterator.
+    /// Clears the scheduler's runqueue, returning an iterator over all contained tasks.
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_>;
 
-    /// Returns a list of contained tasks.
+    /// Returns a cloned list of contained tasks being scheduled by this scheduler.
     ///
-    /// The list should be considered out-of-date as soon as it is called, but
-    /// can be useful as a heuristic.
-    fn dump(&self) -> Vec<TaskRef>;
+    /// The list should be considered out-of-date as soon as it is called,
+    /// but can be useful as a heuristic or for debugging.
+    fn tasks(&self) -> Vec<TaskRef>;
 }
 
-/// A task scheduler with some notion of priority.
+/// A task scheduler that supports some notion of priority.
 pub trait PriorityScheduler {
     /// Sets the priority of the given task.
     fn set_priority(&mut self, task: &TaskRef, priority: u8) -> bool;
@@ -235,7 +241,8 @@ pub fn set_priority(task: &TaskRef, priority: u8) -> bool {
     false
 }
 
-/// Returns the busyness of the scheduler on the given CPU.
+/// Returns the busyness of the scheduler on the given CPU, in which higher
+/// values indicate a busier scheduler.
 pub fn busyness(cpu_id: CpuId) -> Option<usize> {
     for (cpu, scheduler) in SCHEDULERS.lock().iter() {
         if *cpu == cpu_id {
@@ -271,7 +278,7 @@ pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
     }
 }
 
-/// Lowers the task's priority to its previous value when dropped.
+/// A guard that lowers a task's priority back to its previous value when dropped.
 pub struct PriorityInheritanceGuard<'a> {
     inner: Option<(&'a TaskRef, u8)>,
 }
@@ -289,7 +296,7 @@ impl<'a> Drop for PriorityInheritanceGuard<'a> {
 /// To avoid race conditions with migrating tasks, this function takes a lock
 /// over all system schedulers. This is incredibly disruptive and should be
 /// avoided at all costs.
-pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
+pub fn tasks() -> Vec<(CpuId, Vec<TaskRef>)> {
     let schedulers = SCHEDULERS.lock().clone();
     let locked = schedulers
         .iter()
@@ -298,7 +305,7 @@ pub fn dump() -> Vec<(CpuId, Vec<TaskRef>)> {
         .collect::<Vec<_>>();
     let result = locked
         .iter()
-        .map(|(cpu, locked_scheduler)| (**cpu, locked_scheduler.dump()))
+        .map(|(cpu, locked_scheduler)| (**cpu, locked_scheduler.tasks()))
         .collect();
     drop(locked);
     result

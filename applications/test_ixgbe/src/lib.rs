@@ -73,7 +73,10 @@ fn rmain(matches: &Matches, _opts: &Options) -> Result<(), &'static str> {
     
     let (dev_id, mac_address) = {
         let ixgbe_devs = get_ixgbe_nics_list().ok_or("Ixgbe NICs list not initialized")?;
-        if ixgbe_devs.is_empty() { return Err("No ixgbe device available"); }
+        if ixgbe_devs.is_empty() {
+            println!("no IXGBE devices available");
+            return Ok(());
+        }
         let nic = ixgbe_devs[0].lock();
         (nic.device_id(), nic.mac_address())
     };

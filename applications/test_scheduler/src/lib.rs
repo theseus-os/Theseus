@@ -92,9 +92,9 @@ pub fn test_pinned() {
                 continue;
             }
 
-            random_task.block_no_log();
+            let _ = random_task.block();
             task::schedule();
-            random_task.unblock_no_log();
+            let _ = random_task.unblock();
         }
     }
 }
@@ -127,10 +127,10 @@ pub fn test_unpinned() {
     let mut rng = random::init_rng::<rand::rngs::SmallRng>().unwrap();
     while NUM_RUNNING.load(Ordering::Relaxed) != 0 {
         let random_task = tasks.choose(&mut rng).unwrap();
-        random_task.block_no_log();
+        let _ = random_task.block();
         // Let the worker tasks on this core run.
         task::schedule();
-        random_task.unblock_no_log();
+        let _ = random_task.unblock();
     }
 
     for task in tasks {

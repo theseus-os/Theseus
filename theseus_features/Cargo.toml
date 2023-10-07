@@ -10,6 +10,7 @@ edition = "2021"
 
 [dependencies]
 theseus_std = { path = "../ports/theseus_std", optional = true }
+first_application = { path = "../kernel/first_application", optional = true }
 
 ## Regular applications.
 cat = { path = "../applications/cat", optional = true }
@@ -29,6 +30,7 @@ ps = { path = "../applications/ps", optional = true }
 pwd = { path = "../applications/pwd", optional = true }
 rm = { path = "../applications/rm", optional = true }
 rq = { path = "../applications/rq", optional = true }
+serial_echo = { path = "../applications/serial_echo", optional = true }
 shell = { path = "../applications/shell", optional = true }
 swap = { path = "../applications/swap", optional = true }
 upd = { path = "../applications/upd", optional = true }
@@ -47,6 +49,7 @@ hello = { path = "../applications/hello", optional = true }
 raw_mode = { path = "../applications/raw_mode", optional = true }
 print_fault_log = { path = "../applications/print_fault_log", optional = true }
 seconds_counter = { path = "../applications/seconds_counter", optional = true }
+qemu_test = { path = "../applications/qemu_test", optional = true }
 test_aligned_page_allocation = { path = "../applications/test_aligned_page_allocation", optional = true }
 test_async = { path = "../applications/test_async", optional = true }
 test_backtrace = { path = "../applications/test_backtrace", optional = true }
@@ -61,13 +64,12 @@ test_panic = { path = "../applications/test_panic", optional = true }
 test_preemption_counter = { path = "../applications/test_preemption_counter", optional = true }
 test_restartable = { path = "../applications/test_restartable", optional = true }
 test_scheduler = { path = "../applications/test_scheduler", optional = true }
-test_serial_echo = { path = "../applications/test_serial_echo", optional = true }
 test_std_fs = { path = "../applications/test_std_fs", optional = true }
 test_sync_block = { path = "../applications/test_sync_block", optional = true }
 test_task_cancel = { path = "../applications/test_task_cancel", optional = true }
+test_tls = { path = "../applications/test_tls", optional = true }
 test_wait_queue = { path = "../applications/test_wait_queue", optional = true }
 test_wasmtime = { path = "../applications/test_wasmtime", optional = true }
-tls_test = { path = "../applications/tls_test", optional = true }
 
 
 ## Benchmark crates.
@@ -123,6 +125,7 @@ theseus_apps = [
     "pwd",
     "rm",
     "rq",
+    "serial_echo",
     "shell",
     "swap",
     "upd",
@@ -158,12 +161,11 @@ theseus_tests = [
     "test_preemption_counter",
     "test_restartable",
     "test_scheduler",
-    "test_serial_echo",
     "test_std_fs",
     "test_sync_block",
     "test_task_cancel",
+    "test_tls",
     "test_wait_queue",
     "test_wasmtime",
-    "tls_test",
     "unwind_test",
 ]

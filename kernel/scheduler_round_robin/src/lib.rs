@@ -81,7 +81,7 @@ impl task::scheduler::Scheduler for Scheduler {
         Box::new(self.queue.drain(..))
     }
 
-    fn dump(&self) -> Vec<TaskRef> {
+    fn tasks(&self) -> Vec<TaskRef> {
         self.queue.clone().into()
     }
 }

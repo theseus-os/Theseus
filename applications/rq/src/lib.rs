@@ -28,7 +28,7 @@ pub fn main(args: Vec<String>) -> isize {
     }
     let bootstrap_cpu = cpu::bootstrap_cpu();
 
-    for (cpu, task_list) in task::scheduler::dump() {
+    for (cpu, task_list) in task::scheduler::tasks() {
         let core_type = if Some(cpu) == bootstrap_cpu {
             "Boot CPU"
         } else {
