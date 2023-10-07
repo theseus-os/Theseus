@@ -140,7 +140,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 }
 
 
-/// Struct representing per-CPU interrupt controller chips.
+/// Struct representing a per-CPU interrupt controller chip.
 ///
 /// On aarch64 w/ GIC, this corresponds to a Redistributor & CPU interface.
 ///

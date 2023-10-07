@@ -74,7 +74,7 @@ impl SystemInterruptControllerApi for SystemInterruptController {
 }
 
 
-/// Struct representing per-cpu-core interrupt controller chips.
+/// Struct representing a per-CPU interrupt controller chip.
 ///
 /// On x86_64, this corresponds to a LocalApic.
 pub struct LocalInterruptController(&'static IrqSafeRwLock<LocalApic>);
