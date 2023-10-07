@@ -104,17 +104,9 @@
 <a href="#104" id="104">104</a>
 <a href="#105" id="105">105</a>
 <a href="#106" id="106">106</a>
-<a href="#107" id="107">107</a>
-<a href="#108" id="108">108</a>
-<a href="#109" id="109">109</a>
-<a href="#110" id="110">110</a>
-<a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-</pre></div><pre class="rust"><code><span class="attr">#![no_std]
+</pre></div><pre class="rust"><code><span class="doccomment">//! Support for accessing interupt controllers across multiple architectures.
+
+</span><span class="attr">#![no_std]
 #![allow(unused_variables, unused_mut)]
 #![feature(array_try_from_fn)]
 
@@ -122,14 +114,11 @@
 
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>cpu::CpuId;
+<span class="kw">use </span>memory::MmiRef;
 
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-#[path = <span class="string">&quot;aarch64.rs&quot;</span>]
-</span><span class="kw">pub mod </span>arch;
-
-<span class="attr">#[cfg(target_arch = <span class="string">&quot;x86_64&quot;</span>)]
-#[path = <span class="string">&quot;x86_64.rs&quot;</span>]
-</span><span class="kw">pub mod </span>arch;
+<span class="attr">#[cfg_attr(target_arch = <span class="string">&quot;x86_64&quot;</span>, path = <span class="string">&quot;x86_64.rs&quot;</span>)]
+#[cfg_attr(target_arch = <span class="string">&quot;aarch64&quot;</span>, path = <span class="string">&quot;aarch64.rs&quot;</span>)]
+</span><span class="kw">mod </span>arch;
 
 <span class="kw">pub use </span>arch::{
     SystemInterruptControllerVersion,
@@ -138,12 +127,30 @@
     Priority,
     SystemInterruptController,
     LocalInterruptController,
-    init,
 };
+
+<span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
+</span><span class="kw">pub use </span>arch::AArch64LocalInterruptControllerApi;
 
 <span class="kw">pub type </span>InterruptNumber = u8;
 
-<span class="doccomment">/// The Cpu where this interrupt should be handled, as well as
+
+<span class="doccomment">/// Initializes the interrupt controller(s) on this system.
+///
+/// Depending on the architecture, this includes both the system-wide
+/// interrupt controller(s) and one or more local (per-CPU) interrupt controllers.
+/// * On x86_64 systems, this initializes the I/O APIC(s) (there may be more than one)
+///   as the system-wide interrupt controller(s), and the Local APIC for the BSP
+///   (bootstrap processor) only as the first local interrupt controller.
+///   * Other Local APICs are initialized by those CPUs when they are brought online.
+/// * On aarch64 systems with GIC, this initializes both the system-wide
+///   interrupt controller (the GIC Distributor) as well as the local controllers
+///   for all CPUs (their Redistributors and CPU interfaces).
+</span><span class="kw">pub fn </span>init(kernel_mmi: <span class="kw-2">&amp;</span>MmiRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    arch::init(kernel_mmi)
+}
+
+<span class="doccomment">/// The CPU where an interrupt should be handled, as well as
 /// the local interrupt number this gets translated to.
 ///
 /// On aarch64, there is no `local_number` field as the system interrupt
@@ -154,80 +161,53 @@
     AllOtherCpus,
 }
 
-<span class="kw">pub trait </span>SystemInterruptControllerApi {
-    <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self</span>;
+<span class="doccomment">/// Functionality provided by system-wide interrupt controllers.
+///
+/// Note that a system may actually have *multiple* system-wide interrupt controllers.
+///
+/// * On x86_64, this corresponds to an I/O APIC (IOAPIC).
+/// * On aarch64 (with GIC), this corresponds to the Distributor.
+</span><span class="kw">pub trait </span>SystemInterruptControllerApi {
+    <span class="doccomment">/// Returns the unique ID of this system-wide interrupt controller.
+    </span><span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerId;
 
-    <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerId;
-    <span class="kw">fn </span>version(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerVersion;
+    <span class="doccomment">/// Returns the version ID of this system-wide interrupt controller.
+    </span><span class="kw">fn </span>version(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerVersion;
 
-    <span class="kw">fn </span>get_destination(
+    <span class="doccomment">/// Returns the destination(s) that the given `interrupt` is routed to
+    /// by this system-wide interrupt controller.
+    </span><span class="kw">fn </span>get_destination(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        interrupt_num: InterruptNumber,
+        interrupt: InterruptNumber,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(Vec&lt;CpuId&gt;, Priority), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
-
-    <span class="kw">fn </span>set_destination(
+    
+    <span class="doccomment">/// Routes the given `interrupt` to the given `destination` with the given `priority`. 
+    </span><span class="kw">fn </span>set_destination(
         <span class="kw-2">&amp;</span><span class="self">self</span>,
-        sys_int_num: InterruptNumber,
+        interrupt: InterruptNumber,
         destination: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
         priority: Priority,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;;
 }
 
-<span class="kw">pub trait </span>LocalInterruptControllerApi {
-    <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self</span>;
+<span class="doccomment">/// Functionality provided by local interrupt controllers,
+/// which exist on a per-CPU basis.
+///
+/// * On x86_64, this corresponds to a Local APIC.
+/// * On aarch64 (with GIC), this corresponds to the GIC Redistributor + CPU interface.
+</span><span class="kw">pub trait </span>LocalInterruptControllerApi {
+    <span class="doccomment">/// Returns the unique ID of this local interrupt controller.
+    </span><span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId;
+    
+    <span class="doccomment">/// Enables or disables the local timer interrupt for this local interrupt controller.
+    </span><span class="kw">fn </span>enable_local_timer_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, enable: bool);
 
-    <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId;
-    <span class="kw">fn </span>get_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; Priority;
-    <span class="kw">fn </span>set_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, priority: Priority);
-    <span class="kw">fn </span>is_local_interrupt_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; bool;
-    <span class="kw">fn </span>enable_local_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, enabled: bool);
-
-    <span class="doccomment">/// Sends an inter-processor interrupt.
-    ///
-    /// If `dest` is Some, the interrupt is sent to a specific CPU.
-    /// If it&#39;s None, all CPUs except the sender receive the interrupt.
+    <span class="doccomment">/// Sends an inter-processor interrupt from this local interrupt controller
+    /// to the given destination.
     </span><span class="kw">fn </span>send_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, dest: InterruptDestination);
 
-    <span class="doccomment">/// Tell the interrupt controller that the current interrupt has been handled.
+    <span class="doccomment">/// Tells this local interrupt controller that the interrupt being currently serviced
+    /// has been completely handled.
     </span><span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: InterruptNumber);
-}
-
-<span class="doccomment">/// AArch64-specific methods of a local interrupt controller
-</span><span class="kw">pub trait </span>AArch64LocalInterruptControllerApi {
-    <span class="doccomment">/// Same as [`LocalInterruptControllerApi::enable_local_interrupt`] but for fast interrupts (FIQs).
-    </span><span class="kw">fn </span>enable_fast_local_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, enabled: bool);
-
-    <span class="doccomment">/// Same as [`LocalInterruptControllerApi::send_ipi`] but for fast interrupts (FIQs).
-    </span><span class="kw">fn </span>send_fast_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, dest: InterruptDestination);
-
-    <span class="doccomment">/// Reads the minimum priority for an interrupt to reach this CPU.
-    </span><span class="kw">fn </span>get_minimum_priority(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Priority;
-
-    <span class="doccomment">/// Changes the minimum priority for an interrupt to reach this CPU.
-    </span><span class="kw">fn </span>set_minimum_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, priority: Priority);
-
-    <span class="doccomment">/// Aarch64-specific way to read the current pending interrupt number &amp; priority.
-    </span><span class="kw">fn </span>acknowledge_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(InterruptNumber, Priority)&gt;;
-
-    <span class="doccomment">/// Aarch64-specific way to initialize the secondary CPU interfaces.
-    ///
-    /// Must be called once from every secondary CPU.
-    </span><span class="kw">fn </span>init_secondary_cpu_interface(<span class="kw-2">&amp;</span><span class="self">self</span>);
-
-    <span class="doccomment">/// Same as [`Self::acknowledge_interrupt`] but for fast interrupts (FIQs)
-    ///
-    /// # Safety
-    ///
-    /// This is unsafe because it circumvents the internal Mutex.
-    /// It must only be used by the `interrupts` crate when handling an FIQ.
-    </span><span class="kw">unsafe fn </span>acknowledge_fast_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;(InterruptNumber, Priority)&gt;;
-
-    <span class="doccomment">/// Same as [`LocalInterruptControllerApi::end_of_interrupt`] but for fast interrupts (FIQs)
-    ///
-    /// # Safety
-    ///
-    /// This is unsafe because it circumvents the internal Mutex.
-    /// It must only be used by the `interrupts` crate when handling an FIQ.
-    </span><span class="kw">unsafe fn </span>end_of_fast_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, number: InterruptNumber);
 }
 </code></pre></div></section></main></body></html>

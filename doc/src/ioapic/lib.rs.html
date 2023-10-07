@@ -176,21 +176,14 @@
 <a href="#176" id="176">176</a>
 <a href="#177" id="177">177</a>
 <a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
-<a href="#182" id="182">182</a>
-<a href="#183" id="183">183</a>
-<a href="#184" id="184">184</a>
-<a href="#185" id="185">185</a>
 </pre></div><pre class="rust"><code><span class="attr">#![no_std]
 
 </span><span class="kw">use </span>log::debug;
-<span class="kw">use </span>spin::{Mutex, MutexGuard};
+<span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>volatile::{Volatile, WriteOnly};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
-<span class="kw">use </span>atomic_linked_list::atomic_map::AtomicMap;
+<span class="kw">use </span>atomic_linked_list::atomic_map::{AtomicMap, AtomicMapIter};
 <span class="kw">use </span>apic::ApicId;
 
 
@@ -199,23 +192,16 @@
 </span><span class="kw">static </span>IOAPICS: AtomicMap&lt;u8, Mutex&lt;IoApic&gt;&gt; = AtomicMap::new();
 
 
-<span class="doccomment">/// Returns a reference to the list of IoApics.
-</span><span class="kw">pub fn </span>get_ioapics() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>AtomicMap&lt;u8, Mutex&lt;IoApic&gt;&gt; {
-	<span class="kw-2">&amp;</span>IOAPICS
+<span class="doccomment">/// Returns an iterator over the list of `IoApic`s.
+</span><span class="kw">pub fn </span>get_ioapics() -&gt; AtomicMapIter&lt;<span class="lifetime">&#39;static</span>, u8, Mutex&lt;IoApic&gt;&gt; {
+	IOAPICS.iter()
 }
 
 <span class="doccomment">/// If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex)
 /// and return the locked `IoApic`.
-</span><span class="kw">pub fn </span>get_ioapic(ioapic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;MutexGuard&lt;<span class="lifetime">&#39;static</span>, IoApic&gt;&gt; {
-	IOAPICS.get(<span class="kw-2">&amp;</span>ioapic_id).map(|ioapic| ioapic.lock())
+</span><span class="kw">pub fn </span>get_ioapic(ioapic_id: u8) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mutex&lt;IoApic&gt;&gt; {
+	IOAPICS.get(<span class="kw-2">&amp;</span>ioapic_id)
 }
-
-<span class="doccomment">/// Returns the first `IoApic` that was created, if any, after locking it.
-/// This is not necessarily the default one.
-</span><span class="kw">pub fn </span>get_first_ioapic() -&gt; <span class="prelude-ty">Option</span>&lt;MutexGuard&lt;<span class="lifetime">&#39;static</span>, IoApic&gt;&gt; {
-	IOAPICS.iter().next().map(|(_id, ioapic)| ioapic.lock())
-}
-
 
 
 <span class="attr">#[derive(FromBytes)]

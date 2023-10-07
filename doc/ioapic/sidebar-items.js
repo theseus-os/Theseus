@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["get_first_ioapic","get_ioapic","get_ioapics"],"struct":["IoApic"]};
+window.SIDEBAR_ITEMS = {"fn":["get_ioapic","get_ioapics"],"struct":["IoApic"]};

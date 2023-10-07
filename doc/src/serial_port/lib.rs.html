@@ -409,6 +409,9 @@
 <a href="#409" id="409">409</a>
 <a href="#410" id="410">410</a>
 <a href="#411" id="411">411</a>
+<a href="#412" id="412">412</a>
+<a href="#413" id="413">413</a>
+<a href="#414" id="414">414</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! A full serial driver with more advanced I/O support, e.g., interrupt-based data receival.
 //!
 //! This crate builds on  [`serial_port_basic`], which provides the lower-level types
@@ -431,7 +434,7 @@
 <span class="kw">use </span>log::{info, error, warn};
 <span class="kw">use </span>alloc::format;
 
-<span class="kw">use </span>deferred_interrupt_tasks::{InterruptRegistrationError};
+<span class="kw">use </span>deferred_interrupt_tasks::InterruptRegistrationError;
 <span class="kw">pub use </span>serial_port_basic::{
     SerialPortAddress,
     SerialPortInterruptEvent,
@@ -507,7 +510,7 @@
         </span><span class="kw">let </span>(int_num, int_handler) = interrupt_number_handler(<span class="kw-2">&amp;</span>serial_port_address);
 
         <span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)]
-        </span><span class="kw">let </span>(int_num, int_handler) = (PL011_RX_SPI, com1_com3_interrupt_handler);
+        </span><span class="kw">let </span>(int_num, int_handler) = (PL011_RX_SPI, primary_serial_port_interrupt_handler);
 
         SerialPort::register_interrupt_handler(sp.clone(), int_num, int_handler).unwrap();
 
@@ -538,8 +541,8 @@
 ) -&gt; (InterruptNumber, InterruptHandler) {
     <span class="kw">use </span>interrupts::IRQ_BASE_OFFSET;
     <span class="kw">match </span>serial_port_address {
-        SerialPortAddress::COM1 | SerialPortAddress::COM3 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x04</span>, com1_com3_interrupt_handler),
-        SerialPortAddress::COM2 | SerialPortAddress::COM4 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x03</span>, com2_com4_interrupt_handler),
+        SerialPortAddress::COM1 | SerialPortAddress::COM3 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x04</span>, primary_serial_port_interrupt_handler),
+        SerialPortAddress::COM2 | SerialPortAddress::COM4 =&gt; (IRQ_BASE_OFFSET + <span class="number">0x03</span>, secondary_serial_port_interrupt_handler),
     }
 }
 
@@ -795,8 +798,11 @@
 </span><span class="kw">static </span>INTERRUPT_ACTION_COM2_COM4: Once&lt;Box&lt;<span class="kw">dyn </span>Fn() + Send + Sync&gt;&gt; = Once::new();
 
 
-<span class="comment">// Cross-platform interrupt handler for COM1 and COM3 (IRQ 0x24 on x86_64).
-</span><span class="macro">interrupt_handler!</span>(com1_com3_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x4</span>), _stack_frame, {
+<span class="comment">// Cross-platform interrupt handler for the primary serial port.
+//
+// * On x86_64, this is IRQ 0x24, used for COM1 and COM3 serial ports.
+// * On aarch64, this is interrupt 0x21, used for the PL011 UART serial port.
+</span><span class="macro">interrupt_handler!</span>(primary_serial_port_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x4</span>), _stack_frame, {
     <span class="comment">// log::trace!(&quot;COM1/COM3 serial handler&quot;);
 
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
@@ -812,8 +818,8 @@
     </span>EoiBehaviour::HandlerDidNotSendEoi
 });
 
-<span class="comment">// Cross-platform interrupt handler for COM2 and COM4 (IRQ 0x24 on 0x23).
-</span><span class="macro">interrupt_handler!</span>(com2_com4_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x3</span>), _stack_frame, {
+<span class="comment">// Cross-platform interrupt handler, only used on x86_64 for COM2 and COM4 (IRQ 0x23).
+</span><span class="macro">interrupt_handler!</span>(secondary_serial_port_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x3</span>), _stack_frame, {
     <span class="comment">// trace!(&quot;COM2/COM4 serial handler&quot;);
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func()

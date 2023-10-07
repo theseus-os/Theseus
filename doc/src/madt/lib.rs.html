@@ -790,7 +790,7 @@
 
             <span class="comment">// Redirect every IoApic&#39;s interrupts to the one BSP.
             // TODO: long-term, we should distribute interrupts across CPUs more evenly.
-            </span><span class="kw">for </span>(_ioapic_id, ioapic) <span class="kw">in </span>ioapic::get_ioapics().iter() {
+            </span><span class="kw">for </span>(_ioapic_id, ioapic) <span class="kw">in </span>ioapic::get_ioapics() {
                 <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.lock();
 
                 <span class="comment">// Set the BSP to receive regular PIC interrupts routed through the IoApic.
@@ -815,7 +815,7 @@
             <span class="kw">let </span><span class="kw-2">mut </span>handled = <span class="bool-val">false</span>;
 
             <span class="comment">// find the IoApic that should handle this interrupt source override entry
-            </span><span class="kw">for </span>(_id, ioapic) <span class="kw">in </span>ioapic::get_ioapics().iter() {
+            </span><span class="kw">for </span>(_id, ioapic) <span class="kw">in </span>ioapic::get_ioapics() {
                 <span class="kw">let </span><span class="kw-2">mut </span>ioapic_ref = ioapic.lock();
                 <span class="kw">if </span>ioapic_ref.handles_irq(int_src.gsi) {
                     <span class="comment">// using BSP for now, but later we could redirect the IRQ to more (or all) cores

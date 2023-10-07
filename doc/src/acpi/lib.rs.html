@@ -126,13 +126,6 @@
 <a href="#126" id="126">126</a>
 <a href="#127" id="127">127</a>
 <a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
-<a href="#134" id="134">134</a>
-<a href="#135" id="135">135</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Code to parse the ACPI tables.
 </span><span class="attr">#![no_std]
 
@@ -221,13 +214,6 @@
             <span class="macro">warn!</span>(<span class="string">&quot;This machine has no HPET.&quot;</span>);
         }
     };
-    
-    <span class="comment">// MADT is mandatory
-    </span>{
-        <span class="kw">let </span>acpi_tables = ACPI_TABLES.lock();
-        <span class="kw">let </span>madt = madt::Madt::get(<span class="kw-2">&amp;</span>acpi_tables).ok_or(<span class="string">&quot;The required MADT ACPI table wasn&#39;t found (signature &#39;APIC&#39;)&quot;</span>)<span class="question-mark">?</span>;
-        madt.bsp_init(page_table)<span class="question-mark">?</span>;
-    }
 
     <span class="comment">// If we have a DMAR table, use it to obtain IOMMU info. 
     </span>{

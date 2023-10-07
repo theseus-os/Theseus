@@ -109,23 +109,13 @@
 <a href="#109" id="109">109</a>
 <a href="#110" id="110">110</a>
 <a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
-<a href="#122" id="122">122</a>
 </pre></div><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
-<span class="kw">use </span>{
-    apic::{get_my_apic, LapicIpiDestination},
-    ioapic::get_ioapic,
-};
+<span class="kw">use </span>apic::{LocalApic, LapicIpiDestination};
+<span class="kw">use </span>ioapic::IoApic;
+<span class="kw">use </span>madt::Madt;
+<span class="kw">use </span>spin::Mutex;
+<span class="kw">use </span>sync_irq::IrqSafeRwLock;
 
 <span class="attr">#[derive(Debug, Copy, Clone)]
 </span><span class="kw">pub struct </span>SystemInterruptControllerVersion(<span class="kw">pub </span>u32);
@@ -136,35 +126,38 @@
 <span class="attr">#[derive(Debug, Copy, Clone)]
 </span><span class="kw">pub struct </span>Priority;
 
-<span class="doccomment">/// Initializes the interrupt controller (not yet used on x86)
-</span><span class="kw">pub fn </span>init() -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; { <span class="prelude-val">Ok</span>(()) }
+<span class="doccomment">/// Initializes the interrupt controller(s), including the Local APIC for the BSP
+/// (bootstrap processor) and the system-wide IOAPIC(s).
+</span><span class="kw">pub fn </span>init(kernel_mmi: <span class="kw-2">&amp;</span>memory::MmiRef) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
+    apic::init();
+
+    <span class="comment">// Use the MADT ACPI table to initialize more interrupt controller details.
+    </span>{
+        <span class="kw">let </span>acpi_tables = acpi::get_acpi_tables().lock();
+        <span class="kw">let </span>madt = Madt::get(<span class="kw-2">&amp;</span>acpi_tables)
+            .ok_or(<span class="string">&quot;The required MADT ACPI table wasn&#39;t found (signature &#39;APIC&#39;)&quot;</span>)<span class="question-mark">?</span>;
+        madt.bsp_init(<span class="kw-2">&amp;mut </span>kernel_mmi.lock().page_table)<span class="question-mark">?</span>;
+    }
+
+    <span class="prelude-val">Ok</span>(())
+}
 
 <span class="doccomment">/// Structure representing a top-level/system-wide interrupt controller chip,
 /// responsible for routing interrupts between peripherals and CPU cores.
 ///
 /// On x86_64, this corresponds to an IoApic.
-</span><span class="kw">pub struct </span>SystemInterruptController {
-    id: u8,
-}
+</span><span class="kw">pub struct </span>SystemInterruptController(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>Mutex&lt;IoApic&gt;);
 
-<span class="doccomment">/// Struct representing per-cpu-core interrupt controller chips.
-///
-/// On x86_64, this corresponds to a LocalApic.
-</span><span class="kw">pub struct </span>LocalInterruptController;
+<span class="comment">// TODO: implement `SystemInterruptController::get()` for IOAPIC,
+//       but it needs to be able to handle multiple IOAPICs.
 
-<span class="kw">impl </span>SystemInterruptControllerApi <span class="kw">for </span>SystemInterruptController {
-    <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self </span>{
-        <span class="macro">unimplemented!</span>()
-    }
-
+</span><span class="kw">impl </span>SystemInterruptControllerApi <span class="kw">for </span>SystemInterruptController {
     <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerId {
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = get_ioapic(<span class="self">self</span>.id).expect(<span class="string">&quot;BUG: id(): get_ioapic() returned None&quot;</span>);
-        SystemInterruptControllerId(int_ctlr.id())
+        SystemInterruptControllerId(<span class="self">self</span>.<span class="number">0</span>.lock().id())
     }
 
     <span class="kw">fn </span>version(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; SystemInterruptControllerVersion {
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = get_ioapic(<span class="self">self</span>.id).expect(<span class="string">&quot;BUG: version(): get_ioapic() returned None&quot;</span>);
-        SystemInterruptControllerVersion(int_ctlr.version())
+        SystemInterruptControllerVersion(<span class="self">self</span>.<span class="number">0</span>.lock().version())
     }
 
     <span class="kw">fn </span>get_destination(
@@ -180,66 +173,51 @@
         destination: <span class="prelude-ty">Option</span>&lt;CpuId&gt;,
         priority: Priority,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = get_ioapic(<span class="self">self</span>.id).expect(<span class="string">&quot;BUG: set_destination(): get_ioapic() returned None&quot;</span>);
-
         <span class="comment">// no support for priority on x86_64
         </span><span class="kw">let _ </span>= priority;
 
         <span class="kw">if let </span><span class="prelude-val">Some</span>(destination) = destination {
-            int_ctlr.set_irq(sys_int_num, destination.into(), sys_int_num)
+            <span class="self">self</span>.<span class="number">0</span>.lock().set_irq(sys_int_num, destination.into(), sys_int_num)
         } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(<span class="string">&quot;SystemInterruptController::set_destination: todo on x86: set the IOREDTBL MASK bit&quot;</span>)
+            <span class="macro">todo!</span>(<span class="string">&quot;SystemInterruptController::set_destination: todo on x86: set the IOREDTBL MASK bit&quot;</span>)
         }
     }
 }
 
 
+<span class="doccomment">/// Struct representing a per-CPU interrupt controller chip.
+///
+/// On x86_64, this corresponds to a LocalApic.
+</span><span class="kw">pub struct </span>LocalInterruptController(<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>IrqSafeRwLock&lt;LocalApic&gt;);
+<span class="kw">impl </span>LocalInterruptController {
+    <span class="doccomment">/// Returns a reference to the current CPU&#39;s local interrupt controller,
+    /// if it has been initialized.
+    </span><span class="kw">pub fn </span>get() -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt; {
+        apic::get_my_apic().map(<span class="self">Self</span>)
+    }
+}
+
 <span class="kw">impl </span>LocalInterruptControllerApi <span class="kw">for </span>LocalInterruptController {
-    <span class="kw">fn </span>get() -&gt; <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span><span class="self">Self </span>{
-        <span class="macro">unimplemented!</span>()
-    }
-
     <span class="kw">fn </span>id(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; LocalInterruptControllerId {
-        <span class="kw">let </span>int_ctlr = get_my_apic().expect(<span class="string">&quot;BUG: id(): get_my_apic() returned None&quot;</span>);
-        <span class="kw">let </span>int_ctlr = int_ctlr.read();
-        LocalInterruptControllerId(int_ctlr.processor_id())
+        LocalInterruptControllerId(<span class="self">self</span>.<span class="number">0</span>.read().apic_id().value())
     }
 
-    <span class="kw">fn </span>get_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; Priority {
-        <span class="comment">// No priority support on x86_64
-        </span>Priority
-    }
-
-    <span class="kw">fn </span>set_local_interrupt_priority(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, priority: Priority) {
-        <span class="comment">// No priority support on x86_64
-        </span><span class="kw">let _ </span>= priority;
-    }
-
-    <span class="kw">fn </span>is_local_interrupt_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber) -&gt; bool {
-        <span class="macro">todo!</span>()
-    }
-
-    <span class="kw">fn </span>enable_local_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, enabled: bool) {
-        <span class="macro">todo!</span>()
+    <span class="kw">fn </span>enable_local_timer_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, enable: bool) {
+        <span class="self">self</span>.<span class="number">0</span>.write().enable_lvt_timer(enable)
     }
 
     <span class="kw">fn </span>send_ipi(<span class="kw-2">&amp;</span><span class="self">self</span>, num: InterruptNumber, dest: InterruptDestination) {
         <span class="kw">use </span>InterruptDestination::<span class="kw-2">*</span>;
 
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = get_my_apic().expect(<span class="string">&quot;BUG: send_ipi(): get_my_apic() returned None&quot;</span>);
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = int_ctlr.write();
-        int_ctlr.send_ipi(num, <span class="kw">match </span>dest {
+        <span class="self">self</span>.<span class="number">0</span>.write().send_ipi(num, <span class="kw">match </span>dest {
             SpecificCpu(cpu) =&gt; LapicIpiDestination::One(cpu.into()),
             AllOtherCpus =&gt; LapicIpiDestination::AllButMe,
         });
     }
 
     <span class="kw">fn </span>end_of_interrupt(<span class="kw-2">&amp;</span><span class="self">self</span>, _number: InterruptNumber) {
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = get_my_apic().expect(<span class="string">&quot;BUG: end_of_interrupt(): get_my_apic() returned None&quot;</span>);
-        <span class="kw">let </span><span class="kw-2">mut </span>int_ctlr = int_ctlr.write();
-
-        <span class="comment">// On x86, passing the number isn&#39;t required.
-        </span>int_ctlr.eoi();
+        <span class="comment">// When using APIC, we don&#39;t need to pass in an IRQ number.
+        </span><span class="self">self</span>.<span class="number">0</span>.write().eoi();
     }
 }
 </code></pre></div></section></main></body></html>
