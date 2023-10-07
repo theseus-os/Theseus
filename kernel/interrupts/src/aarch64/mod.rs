@@ -17,7 +17,7 @@ use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
 use sync_irq::IrqSafeRwLock;
 use cpu::current_cpu;
-use log::error;
+use log::*;
 use spin::Once;
 
 use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
@@ -134,7 +134,8 @@ pub fn init_ap() {
     set_vbar_el1();
 
     // Enable the CPU-local timer
-    let int_ctrl = LocalInterruptController::get();
+    let int_ctrl = LocalInterruptController::get()
+        .expect("LocalInterruptController was not yet initialized");
     int_ctrl.init_secondary_cpu_interface();
     int_ctrl.set_minimum_priority(0);
 
@@ -157,7 +158,8 @@ pub fn init() -> Result<(), &'static str> {
 
     set_vbar_el1();
 
-    let int_ctrl = LocalInterruptController::get();
+    let int_ctrl = LocalInterruptController::get()
+        .expect("LocalInterruptController was not yet initialized");
     int_ctrl.set_minimum_priority(0);
 
     Ok(())
@@ -175,7 +177,8 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 
     // Route the IRQ to this core (implicit as IRQ < 32) & Enable the interrupt.
     {
-        let int_ctrl = LocalInterruptController::get();
+        let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
 
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
@@ -197,7 +200,8 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
     }
 
     {
-        let int_ctrl = LocalInterruptController::get();
+        let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
 
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(local_num, true);
@@ -219,16 +223,18 @@ pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'st
 
     {
         // enable this interrupt as a Fast interrupt (FIQ / Group 0 interrupt)
-        let int_ctrl = LocalInterruptController::get();
+        let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
         int_ctrl.enable_fast_local_interrupt(TLB_SHOOTDOWN_IPI, true);
     }
 
     Ok(())
 }
 
-/// Enables the PL011 "RX" SPI and routes it to the current CPU.
+/// Enables the PL011 receive interrupt ("RX" SPI) and routes it to the current CPU.
 pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
-    let int_ctrl = SystemInterruptController::get();
+    let int_ctrl = SystemInterruptController::get()
+        .expect("SystemInterruptController was not yet initialized");
     int_ctrl.set_destination(PL011_RX_SPI, Some(current_cpu()), u8::MAX)
 }
 
@@ -250,13 +256,11 @@ pub fn enable_timer(enable: bool) {
         })
     );
 
-    /* DEBUGGING CODE
-
-    info!("timer enabled: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-    info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-    info!("timer status: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
-
-    */
+    if false {
+        info!("timer enabled: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
+        info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
+        info!("timer status: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
+    }
 }
 
 /// Registers an interrupt handler at the given IRQ interrupt number.
@@ -310,7 +314,8 @@ pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) ->
 
 /// Broadcast an Inter-Processor Interrupt to all other CPU cores in the system
 pub fn broadcast_ipi(ipi_num: InterruptNumber) {
-    let int_ctrl = LocalInterruptController::get();
+    let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
     int_ctrl.send_ipi(ipi_num, InterruptDestination::AllOtherCpus);
 }
 
@@ -319,14 +324,16 @@ pub fn broadcast_ipi(ipi_num: InterruptNumber) {
 ///
 /// This IPI uses fast interrupts (FIQs) as an NMI alternative.
 pub fn broadcast_tlb_shootdown_ipi() {
-    let int_ctrl = LocalInterruptController::get();
+    let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
     int_ctrl.send_fast_ipi(TLB_SHOOTDOWN_IPI, InterruptDestination::AllOtherCpus);
 }
 
 /// Send an "end of interrupt" signal, notifying the interrupt chip that
 /// the given interrupt request `irq` has been serviced.
 pub fn eoi(irq_num: InterruptNumber) {
-    let int_ctrl = LocalInterruptController::get();
+    let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
     int_ctrl.end_of_interrupt(irq_num);
 }
 
@@ -446,7 +453,8 @@ extern "C" fn current_elx_synchronous(e: &mut ExceptionContext) {
 #[no_mangle]
 extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
-        let int_ctrl = LocalInterruptController::get();
+        let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
         match int_ctrl.acknowledge_interrupt() {
             Some(irq_prio_tuple) => irq_prio_tuple,
             None /* spurious interrupt */ => return,
@@ -475,7 +483,8 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
 #[no_mangle]
 extern "C" fn current_elx_fiq(exc: &mut ExceptionContext) {
     let (irq_num, _priority) = {
-        let int_ctrl = LocalInterruptController::get();
+        let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
         let ack = unsafe { int_ctrl.acknowledge_fast_interrupt() };
         match ack {
             Some(irq_prio_tuple) => irq_prio_tuple,
@@ -488,7 +497,8 @@ extern "C" fn current_elx_fiq(exc: &mut ExceptionContext) {
 
     if let Some(result) = result {
         if result == EoiBehaviour::HandlerDidNotSendEoi {
-            let int_ctrl = LocalInterruptController::get();
+            let int_ctrl = LocalInterruptController::get()
+    .expect("LocalInterruptController was not yet initialized");
             unsafe { int_ctrl.end_of_fast_interrupt(irq_num) };
         }
     } else {

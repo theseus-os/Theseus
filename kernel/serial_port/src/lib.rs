@@ -20,7 +20,7 @@ extern crate alloc;
 use log::{info, error, warn};
 use alloc::format;
 
-use deferred_interrupt_tasks::{InterruptRegistrationError};
+use deferred_interrupt_tasks::InterruptRegistrationError;
 pub use serial_port_basic::{
     SerialPortAddress,
     SerialPortInterruptEvent,
@@ -384,7 +384,10 @@ static INTERRUPT_ACTION_COM1_COM3: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new();
 
 
-// Cross-platform interrupt handler for COM1 and COM3 (IRQ 0x24 on x86_64).
+// Cross-platform interrupt handler for the primary serial port.
+//
+// * On x86_64, this is IRQ 0x24, used for COM1 and COM3 serial ports.
+// * On aarch64, we also use interrupt 0x24, used for the 
 interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
     // log::trace!("COM1/COM3 serial handler");
 
@@ -401,7 +404,7 @@ interrupt_handler!(com1_com3_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET
     EoiBehaviour::HandlerDidNotSendEoi
 });
 
-// Cross-platform interrupt handler for COM2 and COM4 (IRQ 0x24 on 0x23).
+// Cross-platform interrupt handler, only used on x86_64 for COM2 and COM4 (IRQ 0x23).
 interrupt_handler!(com2_com4_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x3), _stack_frame, {
     // trace!("COM2/COM4 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {

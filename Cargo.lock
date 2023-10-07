@@ -1573,12 +1573,14 @@ dependencies = [
 name = "interrupt_controller"
 version = "0.1.0"
 dependencies = [
+ "acpi",
  "apic",
  "arm_boards",
  "cpu",
  "gic",
  "ioapic",
  "log",
+ "madt",
  "memory",
  "spin 0.9.4",
  "sync_irq",

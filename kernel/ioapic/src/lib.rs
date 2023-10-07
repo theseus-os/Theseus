@@ -1,11 +1,11 @@
 #![no_std]
 
 use log::debug;
-use spin::{Mutex, MutexGuard};
+use spin::Mutex;
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
 use memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
-use atomic_linked_list::atomic_map::AtomicMap;
+use atomic_linked_list::atomic_map::{AtomicMap, AtomicMapIter};
 use apic::ApicId;
 
 
@@ -14,23 +14,16 @@ use apic::ApicId;
 static IOAPICS: AtomicMap<u8, Mutex<IoApic>> = AtomicMap::new();
 
 
-/// Returns a reference to the list of IoApics.
-pub fn get_ioapics() -> &'static AtomicMap<u8, Mutex<IoApic>> {
-	&IOAPICS
+/// Returns an iterator over the list of `IoApic`s.
+pub fn get_ioapics() -> AtomicMapIter<'static, u8, Mutex<IoApic>> {
+	IOAPICS.iter()
 }
 
 /// If an `IoApic` with the given `id` exists, then lock it (acquire its Mutex)
 /// and return the locked `IoApic`.
-pub fn get_ioapic(ioapic_id: u8) -> Option<MutexGuard<'static, IoApic>> {
-	IOAPICS.get(&ioapic_id).map(|ioapic| ioapic.lock())
+pub fn get_ioapic(ioapic_id: u8) -> Option<&'static Mutex<IoApic>> {
+	IOAPICS.get(&ioapic_id)
 }
-
-/// Returns the first `IoApic` that was created, if any, after locking it.
-/// This is not necessarily the default one.
-pub fn get_first_ioapic() -> Option<MutexGuard<'static, IoApic>> {
-	IOAPICS.iter().next().map(|(_id, ioapic)| ioapic.lock())
-}
-
 
 
 #[derive(FromBytes)]
