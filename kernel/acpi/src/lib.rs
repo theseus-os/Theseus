@@ -86,13 +86,6 @@ pub fn init(rsdp_address: Option<PhysicalAddress>, page_table: &mut PageTable) -
             warn!("This machine has no HPET.");
         }
     };
-    
-    // MADT is mandatory
-    {
-        let acpi_tables = ACPI_TABLES.lock();
-        let madt = madt::Madt::get(&acpi_tables).ok_or("The required MADT ACPI table wasn't found (signature 'APIC')")?;
-        madt.bsp_init(page_table)?;
-    }
 
     // If we have a DMAR table, use it to obtain IOMMU info. 
     {

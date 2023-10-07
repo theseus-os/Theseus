@@ -1,21 +1,26 @@
 [package]
-authors = ["Nathan Royer <nathan.royer.pro@gmail.com>"]
-description = "Cross-platform abstraction over interrupt controllers"
-version = "0.1.0"
-edition = "2021"
 name = "interrupt_controller"
+version = "0.1.0"
+authors = [
+    "Nathan Royer <nathan.royer.pro@gmail.com>",
+    "Kevin Boos <kevinaboos@gmail.com>",
+]
+description = "Cross-platform abstraction over interrupt controllers"
+edition = "2021"
 
 [dependencies]
 log = "0.4.8"
 cpu = { path = "../cpu" }
+memory = { path = "../memory" }
+spin = "0.9.4"
+sync_irq = { path = "../../libs/sync_irq" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
-sync_irq = { path = "../../libs/sync_irq" }
 arm_boards = { path = "../arm_boards" }
-memory = { path = "../memory" }
 gic = { path = "../gic" }
-spin = "0.9.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
+acpi = { path = "../acpi" }
 apic = { path = "../apic" }
 ioapic = { path = "../ioapic" }
+madt = { path = "../acpi/madt" }
