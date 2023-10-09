@@ -170,7 +170,7 @@ pub fn init() -> Result<(), &'static str> {
 pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
     if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
-        if timer_tick_handler as *const InterruptHandler != existing_handler {
+        if timer_tick_handler as InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for the timer IRQ number");
         }
     }
@@ -194,7 +194,7 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
 pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) -> Result<(), &'static str> {
     // register the handler
     if let Err(existing_handler) = register_interrupt(local_num, handler) {
-        if handler as *const InterruptHandler != existing_handler {
+        if handler as InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for that IPI");
         }
     }
@@ -216,7 +216,7 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
 /// Returns an error if the TLB Shootdown interrupt number already has a registered handler.
 pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'static str> {
     if let Err(existing_handler) = register_interrupt(TLB_SHOOTDOWN_IPI, handler) {
-        if handler as *const InterruptHandler != existing_handler {
+        if handler as InterruptHandler != existing_handler {
             return Err("A different interrupt handler has already been setup for that IPI");
         }
     }
@@ -274,13 +274,13 @@ pub fn enable_timer(enable: bool) {
 /// # Return
 /// * `Ok(())` if successfully registered, or
 /// * `Err(existing_handler_address)` if the given `irq_num` was already in use.
-pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), *const InterruptHandler> {
+pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), InterruptHandler> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = int_num as usize;
 
     if let Some(handler) = handlers[index] {
         error!("register_interrupt: the requested interrupt IRQ {} was already in use", index);
-        Err(handler as *const _)
+        Err(handler)
     } else {
         handlers[index] = Some(func);
         Ok(())
@@ -296,12 +296,12 @@ pub fn register_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> R
 /// # Arguments
 /// * `int_num`: the interrupt number that needs to be deregistered
 /// * `func`: the handler that should currently be stored for 'interrupt_num'
-pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), Option<*const InterruptHandler>> {
+pub fn deregister_interrupt(int_num: InterruptNumber, func: InterruptHandler) -> Result<(), Option<InterruptHandler>> {
     let mut handlers = IRQ_HANDLERS.write();
     let index = int_num as usize;
 
-    let func = func as *const InterruptHandler;
-    let handler = handlers[index].map(|h| h as *const InterruptHandler);
+    let func = func as InterruptHandler;
+    let handler = handlers[index].map(|h| h as InterruptHandler);
 
     if handler != Some(func) {
         error!("deregister_interrupt: Cannot free interrupt due to incorrect handler function");
