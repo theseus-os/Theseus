@@ -443,7 +443,7 @@ impl<F, A, R> TaskBuilder<F, A, R>
         fence(Ordering::Release);
         
         // Idle tasks are not stored on the run queue.
-        if !self.idle & !self.blocked {
+        if !self.idle || !self.blocked {
             task::scheduler::add_task(task_ref.clone());
         }
 

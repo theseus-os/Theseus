@@ -81,6 +81,7 @@ where
             };
 
             if task.unblock().is_ok() {
+                log::info!("notified task: {task:?}");
                 return true;
             }
         }

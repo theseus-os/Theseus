@@ -73,6 +73,7 @@ impl MutexFlavor for Block {
         // This must be a strong compare exchange, otherwise we could block ourselves
         // when the mutex is unlocked and never be unblocked.
         if let Some(guards) = Self::try_lock(mutex, data) {
+            // log::info!("fast path");
             return guards;
         }
 
@@ -80,6 +81,7 @@ impl MutexFlavor for Block {
         // they release the lock.
         let holder_id = data.holder.load(Ordering::Acquire);
         if holder_id != 0 && let Some(holder_task) = task::get_task(holder_id).and_then(|task| task.upgrade()) {
+            // log::info!("trying mid path");
             // Hypothetically, if holder_task is running on another core and is perfectly in
             // sync with us, we would only ever check if they are running when we are also
             // running and so we wouldn't detect when their timeslice is over. However, the
@@ -94,6 +96,7 @@ impl MutexFlavor for Block {
             // onto the slow path.
 
             if let Some(guards) = Self::try_lock(mutex, data) {
+                // log::info!("mid path");
                 return guards;
             }
 
@@ -101,6 +104,7 @@ impl MutexFlavor for Block {
             #[cfg(priority_inheritance)]
             let _priority_guard = scheduler::inherit_priority(&holder_task);
 
+            // log::info!("slow path");
             data.queue.wait_until(|| Self::try_lock(mutex, data))
         } else {
             // Unlikely case that another thread just acquired the lock, but hasn't yet set
@@ -120,7 +124,9 @@ impl MutexFlavor for Block {
     fn post_unlock(data: &Self::LockData) {
         // See comments in try_lock and lock on why this is necessary.
         data.holder.store(0, Ordering::Release);
-        data.queue.notify_one();
+        // log::info!("notifying one");
+        let notified = data.queue.notify_one();
+        // log::info!("did notify: {notified}");
     }
 }
 

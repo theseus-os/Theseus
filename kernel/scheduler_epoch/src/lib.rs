@@ -119,13 +119,14 @@ impl Scheduler {
 }
 
 impl task::scheduler::Scheduler for Scheduler {
-    fn next(&mut self) -> TaskRef {
-        self.try_next()
+    fn next(&mut self, _current_task: TaskRef) -> Option<TaskRef> {
+        // FIXME: Return none
+        Some(self.try_next()
             .or_else(|| {
                 self.assign_tokens();
                 self.try_next()
             })
-            .unwrap_or_else(|| self.idle_task.clone())
+            .unwrap_or_else(|| self.idle_task.clone()))
     }
 
     fn add(&mut self, task: TaskRef) {

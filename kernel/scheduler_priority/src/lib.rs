@@ -35,11 +35,12 @@ impl Scheduler {
 }
 
 impl task::scheduler::Scheduler for Scheduler {
-    fn next(&mut self) -> TaskRef {
+    fn next(&mut self, _current_task: TaskRef) -> Option<TaskRef> {
+        // FIXME: Return none
         while let Some(task) = self.queue.pop() {
             if task.task.is_runnable() {
                 self.add_priority_task(task.clone());
-                return task.task;
+                return Some(task.task);
             } else {
                 task.task
                     .expose_is_on_run_queue()
@@ -49,11 +50,11 @@ impl task::scheduler::Scheduler for Scheduler {
                 // then checks `is_on_run_queue` so we have to do the inverse.
                 if unlikely(task.task.is_runnable()) {
                     self.add_priority_task(task.clone());
-                    return task.task;
+                    return Some(task.task);
                 }
             }
         }
-        self.idle_task.clone()
+        Some(self.idle_task.clone())
     }
 
     fn add(&mut self, task: TaskRef) {

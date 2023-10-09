@@ -45,21 +45,29 @@ pub fn schedule() -> bool {
     // If preemption was not previously enabled (before we disabled it above),
     // then we shouldn't perform a task switch here.
     if !preemption_guard.preemption_was_enabled() {
-        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.", cpu::current_cpu());
+        // trace!("Note: preemption was disabled on CPU {}, skipping scheduler.",
+        // cpu::current_cpu());
         return false;
     }
 
     let cpu_id = preemption_guard.cpu_id();
+    let Some(current_task) = super::get_my_current_task() else {
+        return false;
+    };
 
-    let next_task = SCHEDULER.update_guarded(
-        |scheduler| scheduler.as_ref().unwrap().lock().next(),
+    let Some(next_task) = SCHEDULER.update_guarded(
+        |scheduler| scheduler.as_ref().unwrap().lock().next(current_task),
         &preemption_guard,
-    );
+    ) else {
+        return false;
+    };
 
     let (did_switch, recovered_preemption_guard) =
         super::task_switch(next_task, cpu_id, preemption_guard);
 
-    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts are {}", cpu_id, super::get_my_current_task(), irq_safety::interrupts_enabled());
+    // log::trace!("AFTER TASK_SWITCH CALL (CPU {}) new current: {:?}, interrupts
+    // are {}", cpu_id, super::get_my_current_task(),
+    // irq_safety::interrupts_enabled());
 
     drop(recovered_preemption_guard);
     did_switch
@@ -175,7 +183,9 @@ pub fn remove_task_from_current(task: &TaskRef) -> bool {
 /// A task scheduler.
 pub trait Scheduler: Send + Sync + 'static {
     /// Returns the next task to run.
-    fn next(&mut self) -> TaskRef;
+    ///
+    /// If the next task is the same as the current task, returns none.
+    fn next(&mut self, current_task: TaskRef) -> Option<TaskRef>;
 
     /// Adds a task to the run queue.
     fn add(&mut self, task: TaskRef);
@@ -187,13 +197,16 @@ pub trait Scheduler: Send + Sync + 'static {
     /// Removes a task from the run queue.
     fn remove(&mut self, task: &TaskRef) -> bool;
 
-    /// Returns a reference to this scheduler as a priority scheduler, if it is one.
+    /// Returns a reference to this scheduler as a priority scheduler, if it is
+    /// one.
     fn as_priority_scheduler(&mut self) -> Option<&mut dyn PriorityScheduler>;
 
-    /// Clears the scheduler's runqueue, returning an iterator over all contained tasks.
+    /// Clears the scheduler's runqueue, returning an iterator over all
+    /// contained tasks.
     fn drain(&mut self) -> Box<dyn Iterator<Item = TaskRef> + '_>;
 
-    /// Returns a cloned list of contained tasks being scheduled by this scheduler.
+    /// Returns a cloned list of contained tasks being scheduled by this
+    /// scheduler.
     ///
     /// The list should be considered out-of-date as soon as it is called,
     /// but can be useful as a heuristic or for debugging.
@@ -278,7 +291,8 @@ pub fn inherit_priority(task: &TaskRef) -> PriorityInheritanceGuard<'_> {
     }
 }
 
-/// A guard that lowers a task's priority back to its previous value when dropped.
+/// A guard that lowers a task's priority back to its previous value when
+/// dropped.
 pub struct PriorityInheritanceGuard<'a> {
     inner: Option<(&'a TaskRef, u8)>,
 }

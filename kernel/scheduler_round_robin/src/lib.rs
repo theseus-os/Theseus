@@ -27,24 +27,58 @@ impl Scheduler {
 }
 
 impl task::scheduler::Scheduler for Scheduler {
-    fn next(&mut self) -> TaskRef {
+    fn next(&mut self, current_task: TaskRef) -> Option<TaskRef> {
+        let mut contains_current = false;
         while let Some(task) = self.queue.pop_front() {
+            // log::info!("popping task: {task:?}");
+            if task == current_task {
+                // log::info!("contains current");
+                contains_current = true;
+                continue;
+            }
             if task.is_runnable() {
                 self.add(task.clone());
-                return task;
+                return Some(task);
             } else {
+                log::info!("removing task: {task:?}");
                 task.expose_is_on_run_queue()
                     .store(false, Ordering::Release);
                 // This check prevents an interleaving where `TaskRef::unblock` wouldn't add
                 // the task back onto the run queue. `TaskRef::unblock` sets the run state and
                 // then checks `is_on_run_queue` so we have to do the inverse.
                 if unlikely(task.is_runnable()) {
+                    log::error!("stinky");
                     self.add(task.clone());
-                    return task;
+                    return Some(task);
                 }
             }
         }
-        self.idle_task.clone()
+
+        if !contains_current && !current_task.is_an_idle_task {
+            log::info!("WTF: {current_task:?}");
+        }
+
+        if contains_current && current_task.is_runnable() {
+            self.add(current_task);
+            None
+        } else if contains_current {
+            log::info!("removing current: {current_task:?}");
+            current_task
+                .expose_is_on_run_queue()
+                .store(false, Ordering::Release);
+            // This check prevents an interleaving where `TaskRef::unblock` wouldn't add
+            // the task back onto the run queue. `TaskRef::unblock` sets the run state and
+            // then checks `is_on_run_queue` so we have to do the inverse.
+            if unlikely(current_task.is_runnable()) {
+                log::error!("stinky");
+                self.add(current_task.clone());
+                return Some(current_task);
+            } else {
+                Some(self.idle_task.clone())
+            }
+        } else {
+            Some(self.idle_task.clone())
+        }
     }
 
     fn busyness(&self) -> usize {

@@ -71,7 +71,7 @@ fn sync_block_task(lock: Arc<Mutex<usize>>) -> Result<(), &'static str> {
         .map_err(|_| "couldn't get current task")?;
     warn!("ENTERED TASK {}", curr_task);
 
-    for _i in 0..1000 {
+    for _i in 0..1 {
         scheduler::schedule(); // give other tasks a chance to acquire the lock
         warn!("{} trying to acquire lock...", curr_task);
         let mut locked = lock.lock();
@@ -131,17 +131,20 @@ fn lockstep_task((lock, remainder): (Arc<Mutex<usize>>, usize)) -> Result<(), &'
 
     for _i in 0..20 {
         loop { 
-            warn!("{} top of loop, remainder {}", curr_task, remainder);
+            if remainder == 1 {
+                warn!("{} top of loop, remainder {}", curr_task, remainder);
+            }
+            // warn!("schedulers: {:#?}", task::scheduler::tasks());
             scheduler::schedule(); // give other tasks a chance to acquire the lock
             let mut locked = lock.lock();
             scheduler::schedule();
             if *locked % 3 == remainder {
-                warn!("Task {} Time to shine, value is {}!", curr_task, *locked);
+                // warn!("Task {} Time to shine, value is {}!", curr_task, *locked);
                 *locked += 1;
                 break;
             } else {
                 scheduler::schedule();
-                warn!("Task {} going back to sleep, value {}, remainder {}!", curr_task, *locked, remainder);
+                // warn!("Task {} going back to sleep, value {}, remainder {}!", curr_task, *locked, remainder);
             }
             scheduler::schedule();
         }
