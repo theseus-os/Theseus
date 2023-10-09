@@ -10,7 +10,7 @@ use tock_registers::interfaces::Readable;
 use tock_registers::registers::InMemoryRegister;
 
 use interrupt_controller::{
-    LocalInterruptController, SystemInterruptController, InterruptDestination,
+    LocalInterruptController, SystemInterruptController, InterruptDestination, Priority,
     LocalInterruptControllerApi, AArch64LocalInterruptControllerApi, SystemInterruptControllerApi,
 };
 use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
@@ -87,6 +87,27 @@ pub struct ExceptionContext {
 
     /// Exception syndrome register.
     esr_el1: EsrEL1,
+}
+
+/// Special exception context that is only available to `current_elx_fiq`.
+///
+/// This has two methods which are only safe to be executed in the context of FIQ handling.
+#[repr(transparent)]
+#[non_exhaustive]
+pub struct ExceptionContextFiq(ExceptionContext);
+
+impl ExceptionContextFiq {
+    fn acknowledge_fast_interrupt(&self) -> Option<(InterruptNumber, Priority)> {
+        let int_ctrl = LocalInterruptController::get()
+            .expect("LocalInterruptController was not yet initialized");
+        unsafe { int_ctrl.acknowledge_fast_interrupt() }
+    }
+
+    fn end_of_fast_interrupt(&self, number: InterruptNumber) {
+        let int_ctrl = LocalInterruptController::get()
+            .expect("LocalInterruptController was not yet initialized");
+        unsafe { int_ctrl.end_of_fast_interrupt(number) }
+    }
 }
 
 pub type InterruptHandler = extern "C" fn(&InterruptStackFrame) -> EoiBehaviour;
@@ -481,28 +502,21 @@ extern "C" fn current_elx_irq(exc: &mut ExceptionContext) {
 //
 // Currently, FIQs are only used for TLB shootdown.
 #[no_mangle]
-extern "C" fn current_elx_fiq(exc: &mut ExceptionContext) {
-    let (irq_num, _priority) = {
-        let int_ctrl = LocalInterruptController::get()
-            .expect("LocalInterruptController was not yet initialized");
-        let ack = unsafe { int_ctrl.acknowledge_fast_interrupt() };
-        match ack {
-            Some(irq_prio_tuple) => irq_prio_tuple,
-            None /* spurious interrupt */ => return,
-        }
+extern "C" fn current_elx_fiq(exc_fiq: &mut ExceptionContextFiq) {
+    let (irq_num, _priority) = match exc_fiq.acknowledge_fast_interrupt() {
+        Some(irq_prio_tuple) => irq_prio_tuple,
+        None /* spurious interrupt */ => return,
     };
 
     let handler = IRQ_HANDLERS.read().get(irq_num as usize).copied().flatten();
-    let result = handler.map(|handler| handler(exc));
+    let result = handler.map(|handler| handler(&exc_fiq.0));
 
     if let Some(result) = result {
         if result == EoiBehaviour::HandlerDidNotSendEoi {
-            let int_ctrl = LocalInterruptController::get()
-                .expect("LocalInterruptController was not yet initialized");
-            unsafe { int_ctrl.end_of_fast_interrupt(irq_num) };
+            exc_fiq.end_of_fast_interrupt(irq_num);
         }
     } else {
-        log::error!("Unhandled FIQ: {}\r\n{:?}\r\n[looping forever now]", irq_num, exc);
+        log::error!("Unhandled FIQ: {}\r\n{:?}\r\n[looping forever now]", irq_num, exc_fiq.0);
         loop { core::hint::spin_loop() }
     }
 }
