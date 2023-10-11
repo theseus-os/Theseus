@@ -3,6 +3,7 @@
 
 use core::{
     future::poll_fn,
+    pin::Pin,
     task::{Context, Poll, Waker},
 };
 
@@ -28,21 +29,19 @@ where
         }
     }
 
-    /// Blocks the current task until the given condition succeeds.
     pub async fn wait_until<F, T>(&self, mut condition: F) -> T
     where
         F: FnMut() -> Option<T>,
     {
-        poll_fn(|context| self.wait_until_raw(context, &mut condition)).await
+        poll_fn(move |context| self.poll_wait_until(context, &mut condition)).await
     }
 
-    // TODO: Don't take ref to condition
-    fn wait_until_raw<F, T>(&self, context: &mut Context, condition: &mut F) -> Poll<T>
+    pub fn poll_wait_until<F, T>(&self, ctx: &mut Context, condition: &mut F) -> Poll<T>
     where
         F: FnMut() -> Option<T>,
     {
         let wrapped_condition = || {
-            if let Some(value) = (*condition)() {
+            if let Some(value) = condition() {
                 Ok(value)
             } else {
                 Err(())
@@ -52,7 +51,7 @@ where
         match self
             .inner
             // TODO: Lazy clone
-            .push_if_fail(context.waker().clone(), wrapped_condition)
+            .push_if_fail(ctx.waker().clone(), wrapped_condition)
         {
             Ok(value) => Poll::Ready(value),
             Err(()) => Poll::Pending,

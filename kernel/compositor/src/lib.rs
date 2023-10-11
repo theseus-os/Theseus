@@ -7,6 +7,8 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
+use async_channel::Channel;
+use futures::StreamExt;
 use zerocopy::FromBytes;
 
 // FIXME
@@ -28,6 +30,7 @@ trait Draw {
     fn set_size(&mut self, width: usize, height: usize);
 }
 
+#[derive(Clone, Copy, PartialEq, Debug, Hash)]
 pub struct Coordinates {
     pub x: usize,
     pub y: usize,
@@ -78,12 +81,6 @@ trait GraphicsDriver {
     fn post_swap();
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Hash)]
-pub struct Coordinates {
-    pub x: isize,
-    pub y: isize,
-}
-
 pub struct Window {
     coordinates: Coordinates,
     // pub border_size: usize,
@@ -123,30 +120,25 @@ impl private::Sealed for AlphaPixel {}
 
 impl Pixel for AlphaPixel {}
 
-pub struct Rectangle {
-    pub coordinates: Coordinates,
-    pub height: usize,
-    pub width: usize,
-}
-
 pub fn init() {
     todo!();
 }
 
-async fn inf() {
-    let keyboard_events = todo!();
-    let mouse_events = todo!();
-    let window_events = todo!();
+async fn compositor_loop() {
+    let mut keyboard_events = Channel::<u8>::new(8);
+    let mut mouse_events = Channel::<u8>::new(8);
+    let mut window_events = Channel::<u8>::new(8);
 
     loop {
-        futures::select!(
-            event = keyboard_events.recv() => {
+        // The select macro is not available on no-std.
+        futures::select_biased!(
+            event = window_events.next() => {
                 todo!();
             }
-            event = mouse_events.recv() => {
+            event = keyboard_events.next() => {
                 todo!();
             }
-            event = window_events.recv() => {
+            event = mouse_events.next() => {
                 todo!();
             }
             complete => panic!("compositor loop exited"),

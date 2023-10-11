@@ -173,6 +173,7 @@ name = "async_channel"
 version = "0.1.0"
 dependencies = [
  "async_wait_queue",
+ "futures",
  "mpmc",
  "sync",
  "sync_spin",
@@ -543,6 +544,8 @@ version = "0.1.0"
 name = "compositor"
 version = "0.1.0"
 dependencies = [
+ "async_channel",
+ "futures",
  "memory",
  "zerocopy",
 ]

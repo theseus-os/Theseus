@@ -1,6 +1,12 @@
 #![no_std]
 
+use core::{
+    pin::Pin,
+    task::{Context, Poll},
+};
+
 use async_wait_queue::WaitQueue;
+use futures::stream::{FusedStream, Stream};
 use mpmc::Queue;
 use sync::DeadlockPrevention;
 use sync_spin::Spin;
@@ -45,9 +51,40 @@ where
             .await;
     }
 
-    pub async fn receive(&self) -> T {
+    pub async fn recv(&self) -> T {
         let value = self.receivers.wait_until(|| self.inner.pop()).await;
         self.senders.notify_one();
         value
+    }
+}
+
+impl<T, P> Stream for Channel<T, P>
+where
+    T: Send,
+    P: DeadlockPrevention,
+{
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self
+            .receivers
+            .poll_wait_until(ctx, &mut || self.inner.pop())
+        {
+            Poll::Ready(value) => {
+                self.senders.notify_one();
+                Poll::Ready(Some(value))
+            }
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
+impl<T, P> FusedStream for Channel<T, P>
+where
+    T: Send,
+    P: DeadlockPrevention,
+{
+    fn is_terminated(&self) -> bool {
+        false
     }
 }
