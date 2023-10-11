@@ -15,9 +15,14 @@ use zerocopy::FromBytes;
 use volatile::{Volatile, ReadOnly};
 use bilge::prelude::*;
 use sleep::{Duration, sleep};
-use core::mem::size_of;
+use core::{mem::size_of, num::NonZeroU8};
+use alloc::string::String;
 
 mod ehci;
+
+pub mod descriptors;
+
+use descriptors::Descriptor;
 
 pub enum Standard<T> {
     Ehci(T),
@@ -34,29 +39,67 @@ pub fn init(pci_device: Standard<&PciDevice>) -> Result<(), &'static str> {
     Ok(())
 }
 
-#[derive(Copy, Clone, Debug, Default, FromBytes)]
-#[repr(C)]
-pub struct DeviceDescriptor {
-    pub len: u8,
-    pub device_type: u8,
-    pub usb_version: u16,
-    pub class: u8,
-    pub sub_class: u8,
-    pub protocol: u8,
-    pub max_packet_size: u8,
-    pub vendor_id: u16,
-    pub product_id: u16,
-    pub device_version: u16,
-    pub vendor_str: u8,
-    pub product_str: u8,
-    pub serial_str: u8,
-    pub conf_count: u8,
+pub type DeviceAddress = u8;
+
+#[bitsize(16)]
+#[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
+pub struct DeviceStatus {
+    self_powered: bool,
+    remote_wakeup: bool,
+    reserved: u14,
+}
+
+/// Specific feature ID; must be appropriate to the recipient
+pub type FeatureId = u16;
+
+pub type InterfaceIndex = u16;
+
+#[bitsize(8)]
+#[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
+pub struct EndpointAddress {
+    ep_number: u4,
+    reserved: u3,
+    // Ignored for control endpoints
+    direction: Direction,
+}
+
+pub type StringIndex = u8;
+
+pub type DescriptorIndex = u8;
+
+pub enum Request<'a> {
+    GetStatus(Target, &'a mut DeviceStatus),
+
+    ClearFeature(Target, FeatureId),
+    SetFeature(Target, FeatureId),
+
+    SetAddress(DeviceAddress),
+
+    GetDescriptor(DescriptorIndex, &'a mut Descriptor),
+    SetDescriptor(DescriptorIndex, Descriptor),
+
+    GetConfiguration(&'a mut Option<NonZeroU8>),
+    SetConfiguration(Option<NonZeroU8>),
+
+    GetInterfaceAltSetting(InterfaceIndex, &'a mut u8),
+    SetInterfaceAltSetting(InterfaceIndex, u8),
+
+    ReadString(StringIndex, &'a mut String),
+
+    // not supported by this driver
+    // SynchFrame(EndpointAddress, u16),
+}
+
+pub enum Target {
+    Device,
+    Interface(InterfaceIndex),
+    Endpoint(EndpointAddress),
 }
 
 #[bitsize(64)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
-struct Request {
-    pub recipient: RequestRecipient,
+struct RawRequest {
+    pub recipient: RawRequestRecipient,
     pub req_type: RequestType,
     pub direction: Direction,
 
@@ -68,7 +111,7 @@ struct Request {
 
 #[bitsize(1)]
 #[derive(Debug, FromBits)]
-enum Direction {
+pub enum Direction {
     /// Host to function
     Out = 0,
     /// Function to host
@@ -77,7 +120,7 @@ enum Direction {
 
 #[bitsize(5)]
 #[derive(Debug, FromBits)]
-enum RequestRecipient {
+enum RawRequestRecipient {
     Device = 0x0,
     Interface = 0x1,
     Endpoint = 0x2,
@@ -106,8 +149,8 @@ enum RequestName {
     SetDescriptor = 0x07,
     GetConfiguration = 0x08,
     SetConfiguration = 0x09,
-    GetIntf = 0x0a,
-    SetIntf = 0x0b,
+    GetInterfaceAltSetting = 0x0a,
+    SetInterfaceAltSetting = 0x0b,
     SyncFrame = 0x0c,
 
     #[fallback]
@@ -132,16 +175,16 @@ macro_rules! allocator {
                 self.occupied.fill(Self::OCCUPIED_FALSE);
             }
 
-            pub fn alloc(&mut self, value: $ty) -> Result<(usize, u32), &'static str> {
-                log::info!("Allocating one {} out of {}", stringify!($ty), $cap);
+            pub fn allocate(&mut self, init_to: Option<$ty>) -> Result<(usize, u32), &'static str> {
                 for i in 0..$cap {
                     if self.occupied[i] == Self::OCCUPIED_FALSE {
                         self.occupied[i] = Self::OCCUPIED_TRUE;
                         let mut_ref = &mut self.slots[i];
-                        *mut_ref = value;
+                        if let Some(value) = init_to {
+                            *mut_ref = value;
+                        }
                         let addr = mut_ref as *mut _ as usize as u32;
 
-                        log::info!("slot addr: 0x{:x}", addr);
                         return Ok((i, addr))
                     }
                 }
@@ -157,6 +200,39 @@ macro_rules! allocator {
             pub fn get_mut(&mut self, index: usize) -> Result<&mut $ty, &'static str> {
                 let err_msg = concat!(stringify!($name), ": Invalid slot index");
                 self.slots.get_mut(index).ok_or(err_msg)
+            }
+
+            pub fn find(&self, addr: u32) -> Result<usize, &'static str> {
+                let err_msg = concat!(stringify!($name), ": Invalid address");
+                let mut_ref = &self.slots[0];
+                let addr_of_first = mut_ref as *const _ as usize as u32;
+
+                let offset = addr.checked_sub(addr_of_first).ok_or(err_msg)? as usize;
+
+                let type_size = core::mem::size_of::<$ty>();
+                let index = (offset / type_size);
+
+                let valid_offset = offset % type_size == 0;
+                let valid_index = index < $cap;
+
+                match (valid_offset, valid_index) {
+                    (true, true) => Ok(index),
+                    _ => Err(err_msg),
+                }
+            }
+
+            pub fn get_by_addr(&self, addr: u32) -> Result<&$ty, &'static str> {
+                self.get(self.find(addr)?)
+            }
+
+            pub fn get_mut_by_addr(&mut self, addr: u32) -> Result<&mut $ty, &'static str> {
+                self.get_mut(self.find(addr)?)
+            }
+
+            pub fn address_of(&self, index: usize) -> Result<u32, &'static str> {
+                let err_msg = concat!(stringify!($name), ": Invalid slot index");
+                let reference = self.slots.get(index).ok_or(err_msg)?;
+                Ok(reference as *const _ as usize as u32)
             }
         }
 
