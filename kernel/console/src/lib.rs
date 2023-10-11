@@ -5,11 +5,11 @@
 extern crate alloc;
 
 use alloc::{format, sync::Arc};
-use async_channel::Receiver;
 use core::sync::atomic::{AtomicU16, Ordering};
 use core2::io::Write;
 use sync_irq::IrqSafeMutex;
 use log::{error, info, warn};
+use mpmc_channel::Receiver;
 use serial_port::{get_serial_port, DataChunk, SerialPort, SerialPortAddress};
 use task::{JoinableTaskRef, KillReason};
 

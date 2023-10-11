@@ -1,14 +1,9 @@
 [package]
 name = "compositor"
 version = "0.1.0"
-authors = ["Wenqiu Yu <yuwenqiuj@gmail.com>"]
-description = "a compositor trait which composites a list of buffers to a single buffer"
+edition = "2021"
 
-[dependencies.framebuffer]
-path = "../framebuffer"
-
-[dependencies.shapes]
-path = "../shapes"
-
-[lib]
-crate-type = ["rlib"]
+[dependencies]
+memory = { path = "../memory" }
+# TODO: Update to 0.7.8
+zerocopy = "0.5.0"

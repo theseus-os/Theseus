@@ -1,5 +1,5 @@
-use async_channel::{Receiver, Sender};
 use core2::io::Result;
+use mpmc_channel::{Receiver, Sender};
 
 #[derive(Clone)]
 pub(crate) struct Channel {
@@ -9,7 +9,7 @@ pub(crate) struct Channel {
 
 impl Channel {
     pub(crate) fn new() -> Self {
-        let (sender, receiver) = async_channel::new_channel(256);
+        let (sender, receiver) = mpmc_channel::new_channel(256);
         Self { sender, receiver }
     }
 

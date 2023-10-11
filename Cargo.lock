@@ -160,20 +160,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b62fc65de8e4e7f52534fb52b0f3ed04746ae267519eef2a83941e8085068b"
 
 [[package]]
-name = "async_channel"
-version = "0.1.0"
-dependencies = [
- "core2",
- "crossbeam-utils",
- "debugit",
- "log",
- "mpmc",
- "sync",
- "sync_spin",
- "wait_queue",
-]
-
-[[package]]
 name = "ata"
 version = "0.1.0"
 dependencies = [
@@ -314,7 +300,6 @@ version = "0.1.0"
 dependencies = [
  "apic",
  "app_io",
- "async_channel",
  "cpu",
  "fs_node",
  "getopts",
@@ -324,6 +309,7 @@ dependencies = [
  "log",
  "memory",
  "mod_mgmt",
+ "mpmc_channel",
  "path",
  "pmu_x86",
  "rendezvous",
@@ -370,6 +356,7 @@ dependencies = [
  "acpi",
  "app_io",
  "cls_allocator",
+ "compositor",
  "console",
  "cpu",
  "device_manager",
@@ -400,7 +387,6 @@ dependencies = [
  "time",
  "tlb_shootdown",
  "tsc",
- "window_manager",
 ]
 
 [[package]]
@@ -503,7 +489,7 @@ dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
  "quote",
- "syn 2.0.26",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -514,8 +500,8 @@ version = "0.1.0"
 name = "compositor"
 version = "0.1.0"
 dependencies = [
- "framebuffer",
- "shapes",
+ "memory",
+ "zerocopy",
 ]
 
 [[package]]
@@ -523,12 +509,12 @@ name = "console"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "async_channel",
  "core2",
  "hull",
  "io",
  "log",
  "mod_mgmt",
+ "mpmc_channel",
  "path",
  "serial_port",
  "spawn",
@@ -948,16 +934,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "displayable"
-version = "0.1.0"
-dependencies = [
- "color",
- "framebuffer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "dmar"
 version = "0.1.0"
 dependencies = [
@@ -1218,34 +1194,6 @@ dependencies = [
  "page_attribute_table",
  "shapes",
  "zerocopy",
-]
-
-[[package]]
-name = "framebuffer_compositor"
-version = "0.1.0"
-dependencies = [
- "compositor",
- "framebuffer",
- "hashbrown",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
-name = "framebuffer_drawer"
-version = "0.1.0"
-dependencies = [
- "framebuffer",
- "shapes",
-]
-
-[[package]]
-name = "framebuffer_printer"
-version = "0.1.0"
-dependencies = [
- "font",
- "framebuffer",
- "shapes",
 ]
 
 [[package]]
@@ -1791,20 +1739,13 @@ version = "0.1.0"
 dependencies = [
  "color",
  "dfqueue",
- "displayable",
  "environment",
  "event_types",
  "font",
- "framebuffer",
- "framebuffer_drawer",
- "framebuffer_printer",
  "log",
  "root",
  "shapes",
- "text_display",
  "time",
- "window",
- "window_manager",
 ]
 
 [[package]]
@@ -2219,6 +2160,20 @@ name = "mpmc"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf78b1242a953be96e01b5f8ed8ffdfc8055c0a2b779899b3835e5d27a69dced"
+
+[[package]]
+name = "mpmc_channel"
+version = "0.1.0"
+dependencies = [
+ "core2",
+ "crossbeam-utils",
+ "debugit",
+ "log",
+ "mpmc",
+ "sync",
+ "sync_spin",
+ "wait_queue",
+]
 
 [[package]]
 name = "mpmc_queue"
@@ -3247,11 +3202,11 @@ dependencies = [
 name = "serial_port"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "core2",
  "deferred_interrupt_tasks",
  "interrupts",
  "log",
+ "mpmc_channel",
  "serial_port_basic",
  "spin 0.9.4",
  "sync_irq",
@@ -3303,7 +3258,6 @@ dependencies = [
  "spin 0.9.4",
  "stdio",
  "task",
- "window_manager",
 ]
 
 [[package]]
@@ -3574,9 +3528,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.26"
+version = "2.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45c3457aacde3c65315de5031ec191ce46604304d2446e803d71ade03308d970"
+checksum = "239814284fd6f1a4ffe4ca893952cdd93c224b6a1571c9a9eadd670295c0c9e2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3743,10 +3697,10 @@ name = "test_channel"
 version = "0.1.0"
 dependencies = [
  "app_io",
- "async_channel",
  "cpu",
  "getopts",
  "log",
+ "mpmc_channel",
  "rendezvous",
  "scheduler",
  "spawn",
@@ -3925,19 +3879,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "text_display"
-version = "0.1.0"
-dependencies = [
- "color",
- "displayable",
- "font",
- "framebuffer",
- "framebuffer_printer",
- "shapes",
- "spin 0.9.4",
-]
-
-[[package]]
 name = "text_terminal"
 version = "0.1.0"
 dependencies = [
@@ -4108,8 +4049,8 @@ dependencies = [
 name = "tty"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "core2",
+ "mpmc_channel",
  "sync_block",
 ]
 
@@ -4162,8 +4103,8 @@ checksum = "f7fe0bb3479651439c9112f72b6c505038574c9fbb575ed1bf3b797fa39dd564"
 name = "unified_channel"
 version = "0.1.0"
 dependencies = [
- "async_channel",
  "cfg-if 0.1.10",
+ "mpmc_channel",
  "rendezvous",
 ]
 
@@ -4589,61 +4530,6 @@ name = "winapi-x86_64-pc-windows-gnu"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
-
-[[package]]
-name = "window"
-version = "0.1.0"
-dependencies = [
- "color",
- "dereffer",
- "event_types",
- "framebuffer",
- "framebuffer_drawer",
- "log",
- "mouse",
- "mpmc",
- "path",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
- "window_manager",
-]
-
-[[package]]
-name = "window_inner"
-version = "0.1.0"
-dependencies = [
- "event_types",
- "framebuffer",
- "mpmc",
- "shapes",
-]
-
-[[package]]
-name = "window_manager"
-version = "0.1.0"
-dependencies = [
- "color",
- "compositor",
- "event_types",
- "font",
- "framebuffer",
- "framebuffer_compositor",
- "framebuffer_drawer",
- "keycodes_ascii",
- "lazy_static",
- "log",
- "mod_mgmt",
- "mouse_data",
- "mpmc",
- "path",
- "scheduler",
- "shapes",
- "spawn",
- "spin 0.9.4",
- "window_inner",
-]
 
 [[package]]
 name = "x86_64"

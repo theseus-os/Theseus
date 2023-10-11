@@ -53,8 +53,8 @@ path = "../../kernel/memory"
 [dependencies.rendezvous]
 path = "../../kernel/rendezvous"
 
-[dependencies.async_channel]
-path = "../../kernel/async_channel"
+[dependencies.mpmc_channel]
+path = "../../kernel/mpmc_channel"
 
 [dependencies.simple_ipc]
 path = "../../kernel/simple_ipc"

@@ -1,6 +1,6 @@
 [package]
 authors = ["Kevin Boos <kevinaboos@gmail.com>"]
-name = "async_channel"
+name = "mpmc_channel"
 description = "Channel for asynchronous Inter-Task Communication via a bounded buffer"
 version = "0.1.0"
 
