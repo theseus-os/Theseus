@@ -5,7 +5,7 @@
 
 use log::{error, warn};
 use spin::Once;
-use mpmc::Queue;
+use async_channel::Channel;
 use event_types::Event;
 use x86_64::structures::idt::InterruptStackFrame;
 use mouse_data::{MouseButtons, MouseEvent, MouseMovementRelative};
@@ -19,7 +19,7 @@ static MOUSE: Once<MouseInterruptParams> = Once::new();
 
 struct MouseInterruptParams {
     mouse: PS2Mouse<'static>,
-    queue: Queue<Event>,
+    queue: Channel<Event>,
 }
 
 /// Initialize the PS/2 mouse driver and register its interrupt handler.
@@ -28,7 +28,7 @@ struct MouseInterruptParams {
 /// * `mouse`: a wrapper around mouse functionality and id, used by the mouse interrupt handler.
 /// * `mouse_queue_producer`: the queue onto which the mouse interrupt handler
 ///    will push new mouse events when a mouse action occurs.
-pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Queue<Event>) -> Result<(), &'static str> {
+pub fn init(mut mouse: PS2Mouse<'static>, mouse_queue_producer: Channel<Event>) -> Result<(), &'static str> {
     // Set MouseId to the highest possible one
     if let Err(e) = mouse.set_mouse_id() {
         error!("Failed to set the mouse id: {e}");
@@ -79,14 +79,14 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
 
 
 /// enqueue a Mouse Event according to the data
-fn handle_mouse_input(mouse_packet: MousePacket, queue: &Queue<Event>) -> Result<(), &'static str> {
+fn handle_mouse_input(mouse_packet: MousePacket, queue: &Channel<Event>) -> Result<(), &'static str> {
     let buttons = Buttons::from(&mouse_packet).0;
     let movement = Movement::from(&mouse_packet).0;
 
     let mouse_event = MouseEvent::new(buttons, movement);
     let event = Event::MouseMovementEvent(mouse_event);
 
-    queue.push(event).map_err(|_| "failed to enqueue the mouse event")
+    queue.try_send(event).map_err(|_| "failed to enqueue the mouse event")
 }
 
 // both MouseMovementRelative and MousePacketBits4 are in different crates, so we need a newtype wrapper:

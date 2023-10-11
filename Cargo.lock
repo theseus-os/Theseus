@@ -945,6 +945,7 @@ version = "0.1.0"
 dependencies = [
  "acpi",
  "apic",
+ "async_channel",
  "console",
  "core2",
  "derive_more",
@@ -960,7 +961,6 @@ dependencies = [
  "memory",
  "mlx5",
  "mouse",
- "mpmc",
  "net",
  "pci",
  "ps2",
@@ -1723,11 +1723,11 @@ version = "0.1.0"
 name = "keyboard"
 version = "0.1.0"
 dependencies = [
+ "async_channel",
  "event_types",
  "interrupts",
  "keycodes_ascii",
  "log",
- "mpmc",
  "once_cell",
  "ps2",
  "spin 0.9.4",
@@ -2204,11 +2204,11 @@ checksum = "7843ec2de400bcbc6a6328c958dc38e5359da6e93e72e37bc5246bf1ae776389"
 name = "mouse"
 version = "0.1.0"
 dependencies = [
+ "async_channel",
  "event_types",
  "interrupts",
  "log",
  "mouse_data",
- "mpmc",
  "ps2",
  "spin 0.9.4",
  "x86_64",

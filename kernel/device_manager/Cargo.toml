@@ -14,10 +14,10 @@ console = { path = "../console" }
 logger = { path = "../logger" }
 pci = { path = "../pci" }
 derive_more = "0.99.0"
-mpmc = "0.1.6"
 log = "0.4.8"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
+async_channel = { path = "../async_channel" }
 memory = { path = "../memory" }
 e1000 = { path = "../e1000" }
 acpi = { path = "../acpi" }

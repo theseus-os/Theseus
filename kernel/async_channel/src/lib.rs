@@ -52,6 +52,10 @@ where
             .await
     }
 
+    pub fn try_send(&self, value: T) -> Result<(), T> {
+        self.inner.push(value)
+    }
+
     pub fn blocking_send(&self, value: T) {
         dreadnought::block_on(self.send(value))
     }

@@ -17,6 +17,7 @@ early_printer = { path = "../early_printer" }
 tlb_shootdown = { path = "../tlb_shootdown" }
 cls_allocator = { path = "../cls_allocator" }
 kernel_config = { path = "../kernel_config" }
+compositor = { path = "../compositor" }
 interrupts = { path = "../interrupts" }
 scheduler = { path = "../scheduler" }
 mod_mgmt = { path = "../mod_mgmt" }

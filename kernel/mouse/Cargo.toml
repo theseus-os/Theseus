@@ -7,9 +7,11 @@ edition = "2021"
 
 [dependencies]
 spin = "0.9.4"
-mpmc = "0.1.6"
 log = "0.4.8"
 x86_64 = "0.14.8"
+
+[dependencies.async_channel]
+path = "../async_channel"
 
 [dependencies.mouse_data]
 path = "../../libs/mouse_data"

@@ -8,7 +8,7 @@ use log::{info, debug};
 #[cfg(target_arch = "x86_64")]
 use {
     log::{error, warn},
-    mpmc::Queue,
+    async_channel::Channel,
     event_types::Event,
     memory::MemoryManagementInfo,
     alloc::vec::Vec,
@@ -48,9 +48,9 @@ pub fn early_init(
 /// * All other devices discovered on the [`pci`] bus.
 pub fn init(
     #[cfg(target_arch = "x86_64")]
-    key_producer: Queue<Event>,
+    key_producer: Channel<Event>,
     #[cfg(target_arch = "x86_64")]
-    mouse_producer: Queue<Event>,
+    mouse_producer: Channel<Event>,
 ) -> Result<(), &'static str>  {
 
     let serial_ports = logger::take_early_log_writers();

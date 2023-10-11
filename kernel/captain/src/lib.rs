@@ -185,9 +185,9 @@ pub fn init(
 
     // arch-gate: no windowing/input support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
-    match window_manager::init() {
-        Ok((key_producer, mouse_producer)) => {
-            device_manager::init(key_producer, mouse_producer)?;
+    match compositor::init() {
+        Ok(compositor::Channels { keyboard, mouse }) => {
+            device_manager::init(keyboard, mouse)?;
         },
         Err(error) => {
             error!("Failed to init window manager (expected if using nographic): {error}");
