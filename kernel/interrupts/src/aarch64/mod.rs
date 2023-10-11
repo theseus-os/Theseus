@@ -13,14 +13,10 @@ use interrupt_controller::{
     LocalInterruptController, SystemInterruptController, InterruptDestination,
     LocalInterruptControllerApi, AArch64LocalInterruptControllerApi, SystemInterruptControllerApi,
 };
-use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
 use arm_boards::BOARD_CONFIG;
 use sync_irq::IrqSafeRwLock;
 use cpu::current_cpu;
 use log::*;
-use spin::Once;
-
-use time::{Monotonic, ClockSource, Instant, Period, register_clock_source};
 
 pub use interrupt_controller::InterruptNumber;
 
@@ -129,7 +125,7 @@ pub fn init_ap() {
     // On the bootstrap CPU, this is done in `setup_timer_interrupt()`.
     int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
 
-    enable_timer(true);
+    generic_timer_aarch64::enable_timer_interrupt(true);
 }
 
 /// Initializes the generic system timer and the system-wide list of interrupt handlers.

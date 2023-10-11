@@ -42,7 +42,7 @@ pub fn init() -> Result<(), &'static str> {
 
     #[cfg(target_arch = "aarch64")] {
         interrupts::setup_timer_interrupt(timer_tick_handler)?;
-        interrupts::enable_timer(true);
+        generic_timer_aarch64::enable_timer_interrupt(true);
         Ok(())
     }
 }
@@ -50,7 +50,7 @@ pub fn init() -> Result<(), &'static str> {
 // Architecture-independent timer interrupt handler for preemptive scheduling.
 interrupt_handler!(timer_tick_handler, None, _stack_frame, {
     #[cfg(target_arch = "aarch64")]
-    interrupts::set_next_timer_interrupt(get_timeslice_ticks);
+    generic_timer_aarch64::set_next_timer_interrupt(get_timeslice_ticks());
 
     // tick count, only used for debugging
     if false {
@@ -80,11 +80,13 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 /// x86_64 can be configured once as a recurring periodic timer.
 #[cfg(target_arch = "aarch64")]
 fn get_timeslice_ticks() -> u64 {
-    static TIMESLICE_TICKS: Once<u64> = Once::new();
+    use kernel_config::time::CONFIG_TIMESLICE_PERIOD_MICROSECONDS;
+
+    static TIMESLICE_TICKS: spin::Once<u64> = spin::Once::new();
 
     *TIMESLICE_TICKS.call_once(|| {
         let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
-        let tick_period_femtosecs = read_timer_period_femtoseconds();
+        let tick_period_femtosecs = generic_timer_aarch64::timer_period_femtoseconds();
         timeslice_femtosecs / tick_period_femtosecs
     })
 }
