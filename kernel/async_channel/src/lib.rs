@@ -11,6 +11,7 @@ use mpmc::Queue;
 use sync::DeadlockPrevention;
 use sync_spin::Spin;
 
+#[derive(Clone)]
 pub struct Channel<T, P = Spin>
 where
     T: Send,
@@ -48,13 +49,21 @@ where
                     None
                 }
             })
-            .await;
+            .await
+    }
+
+    pub fn blocking_send(&self, value: T) {
+        dreadnought::block_on(self.send(value))
     }
 
     pub async fn recv(&self) -> T {
         let value = self.receivers.wait_until(|| self.inner.pop()).await;
         self.senders.notify_one();
         value
+    }
+
+    pub async fn blocking_recv(&self) -> T {
+        dreadnought::block_on(self.recv())
     }
 }
 

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+dreadnought = { path = "../dreadnought" }
 mpmc_queue = { path = "../../libs/mpmc_queue" }
 sync = { path = "../../libs/sync" }
 sync_spin = { path = "../../libs/sync_spin" }

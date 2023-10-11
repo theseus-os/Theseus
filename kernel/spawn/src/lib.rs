@@ -185,6 +185,13 @@ pub fn new_task_builder<F, A, R>(
     TaskBuilder::new(func, argument)
 }
 
+pub fn spawn<F, T>(f: F) -> Result<JoinableTaskRef, &'static str>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    new_task_builder(|_| f(), ()).spawn()
+}
 
 /// Every executable application must have an entry function named "main".
 const ENTRY_POINT_SECTION_NAME: &str = "main";

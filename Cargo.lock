@@ -173,6 +173,7 @@ name = "async_channel"
 version = "0.1.0"
 dependencies = [
  "async_wait_queue",
+ "dreadnought",
  "futures",
  "mpmc",
  "sync",
@@ -183,6 +184,7 @@ dependencies = [
 name = "async_wait_queue"
 version = "0.1.0"
 dependencies = [
+ "dreadnought",
  "mpmc_queue",
  "sync",
  "sync_spin",
@@ -545,6 +547,8 @@ name = "compositor"
 version = "0.1.0"
 dependencies = [
  "async_channel",
+ "dreadnought",
+ "event_types",
  "futures",
  "memory",
  "zerocopy",

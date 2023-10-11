@@ -8,12 +8,10 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use async_channel::Channel;
+use event_types::Event;
 use futures::StreamExt;
-use zerocopy::FromBytes;
-
-// FIXME
-
 use memory::{BorrowedSliceMappedPages, Mutable};
+use zerocopy::FromBytes;
 
 trait Draw {
     fn display<P>(
@@ -120,25 +118,44 @@ impl private::Sealed for AlphaPixel {}
 
 impl Pixel for AlphaPixel {}
 
-pub fn init() {
-    todo!();
+pub fn init() -> Result<Channels, &'static str> {
+    let channels = Channels::new();
+    let cloned = channels.clone();
+    dreadnought::task::spawn_async(compositor_loop(cloned))?;
+    Ok(channels)
 }
 
-async fn compositor_loop() {
-    let mut keyboard_events = Channel::<u8>::new(8);
-    let mut mouse_events = Channel::<u8>::new(8);
-    let mut window_events = Channel::<u8>::new(8);
+#[derive(Clone)]
+pub struct Channels {
+    // FIXME: Event type
+    window: Channel<u8>,
+    // FIXME: Deadlock prevention.
+    keyboard: Channel<Event>,
+    // FIXME: Deadlock prevention.
+    mouse: Channel<Event>,
+}
 
+impl Channels {
+    fn new() -> Self {
+        Self {
+            window: Channel::new(8),
+            keyboard: Channel::new(8),
+            mouse: Channel::new(8),
+        }
+    }
+}
+
+async fn compositor_loop(mut channels: Channels) {
     loop {
         // The select macro is not available on no-std.
         futures::select_biased!(
-            event = window_events.next() => {
+            event = channels.window.next() => {
                 todo!();
             }
-            event = keyboard_events.next() => {
+            event = channels.keyboard.next() => {
                 todo!();
             }
-            event = mouse_events.next() => {
+            event = channels.mouse.next() => {
                 todo!();
             }
             complete => panic!("compositor loop exited"),
