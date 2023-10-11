@@ -1,0 +1,53 @@
+#![no_std]
+
+use async_wait_queue::WaitQueue;
+use mpmc::Queue;
+use sync::DeadlockPrevention;
+use sync_spin::Spin;
+
+pub struct Channel<T, P = Spin>
+where
+    T: Send,
+    P: DeadlockPrevention,
+{
+    inner: Queue<T>,
+    senders: WaitQueue<P>,
+    receivers: WaitQueue<P>,
+}
+
+impl<T, P> Channel<T, P>
+where
+    T: Send,
+    P: DeadlockPrevention,
+{
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            inner: Queue::with_capacity(capacity),
+            senders: WaitQueue::new(),
+            receivers: WaitQueue::new(),
+        }
+    }
+
+    pub async fn send(&self, value: T) {
+        let mut temp = Some(value);
+
+        self.senders
+            .wait_until(|| match self.inner.push(temp.take().unwrap()) {
+                Ok(()) => {
+                    self.receivers.notify_one();
+                    Some(())
+                }
+                Err(value) => {
+                    temp = Some(value);
+                    None
+                }
+            })
+            .await;
+    }
+
+    pub async fn receive(&self) -> T {
+        let value = self.receivers.wait_until(|| self.inner.pop()).await;
+        self.senders.notify_one();
+        value
+    }
+}

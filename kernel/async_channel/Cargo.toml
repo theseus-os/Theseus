@@ -1,0 +1,10 @@
+[package]
+name = "async_channel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+async_wait_queue = { path = "../async_wait_queue" }
+mpmc = "0.1.6"
+sync = { path = "../../libs/sync" }
+sync_spin = { path = "../../libs/sync_spin" }
