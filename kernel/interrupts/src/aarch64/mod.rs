@@ -98,23 +98,6 @@ fn default_exception_handler(exc: &ExceptionContext, origin: &'static str) {
     loop { core::hint::spin_loop() }
 }
 
-fn read_timer_period_femtoseconds() -> u64 {
-    let counter_freq_hz = CNTFRQ_EL0.get();
-    let fs_in_one_sec = 1_000_000_000_000_000;
-    fs_in_one_sec / counter_freq_hz
-}
-
-fn get_timeslice_ticks() -> u64 {
-    // The number of femtoseconds between each internal timer tick
-    static TIMESLICE_TICKS: Once<u64> = Once::new();
-
-    *TIMESLICE_TICKS.call_once(|| {
-        let timeslice_femtosecs = (CONFIG_TIMESLICE_PERIOD_MICROSECONDS as u64) * 1_000_000_000;
-        let tick_period_femtosecs = read_timer_period_femtoseconds();
-        timeslice_femtosecs / tick_period_femtosecs
-    })
-}
-
 /// Sets `VBAR_EL1` to the start of the exception vector
 fn set_vbar_el1() {
     extern "Rust" {
@@ -133,41 +116,40 @@ fn set_vbar_el1() {
 pub fn init_ap() {
     set_vbar_el1();
 
-    // Enable the CPU-local timer
     let int_ctrl = LocalInterruptController::get()
         .expect("LocalInterruptController was not yet initialized");
     int_ctrl.init_secondary_cpu_interface();
     int_ctrl.set_minimum_priority(0);
 
-    // on the bootstrap CPU, this is done in setup_tlb_shootdown_handler
+    // Enable the TLB shootdown IPI to be delivered to this CPU.
+    // On the bootstrap CPU, this is done in `setup_tlb_shootdown_handler()`.
     int_ctrl.enable_fast_local_interrupt(TLB_SHOOTDOWN_IPI, true);
 
-    // on the bootstrap CPU, this is done in init_timer
+    // Enable the CPU-local timer interrupt to be delivered to this CPU.
+    // On the bootstrap CPU, this is done in `setup_timer_interrupt()`.
     int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
 
     enable_timer(true);
 }
 
-/// Please call this (only once) before using this crate.
+/// Initializes the generic system timer and the system-wide list of interrupt handlers.
 ///
-/// This initializes the Generic Interrupt Controller
-/// using the addresses which are valid on qemu's "virt" VM.
+/// This only needs to be invoked once, system-wide.
 pub fn init() -> Result<(), &'static str> {
-    let period = Period::new(read_timer_period_femtoseconds());
-    register_clock_source::<PhysicalSystemCounter>(period);
-
+    generic_timer_aarch64::init();
     set_vbar_el1();
+
+    // TODO: see note in captain::init(): just call interrupt_controller::init() here directly.
 
     let int_ctrl = LocalInterruptController::get()
         .expect("LocalInterruptController was not yet initialized");
     int_ctrl.set_minimum_priority(0);
-
     Ok(())
 }
 
-/// This function registers an interrupt handler for the CPU-local
-/// timer and handles interrupt controller configuration for the timer interrupt.
-pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static str> {
+/// Registers an interrupt handler for the CPU-local timer
+/// and handles interrupt controller configuration for that timer interrupt.
+pub fn setup_timer_interrupt(timer_tick_handler: InterruptHandler) -> Result<(), &'static str> {
     // register/deregister the handler for the timer IRQ.
     if let Err(existing_handler) = register_interrupt(CPU_LOCAL_TIMER_IRQ, timer_tick_handler) {
         if timer_tick_handler as *const InterruptHandler != existing_handler {
@@ -178,7 +160,7 @@ pub fn init_timer(timer_tick_handler: InterruptHandler) -> Result<(), &'static s
     // Route the IRQ to this core (implicit as IRQ < 32) & Enable the interrupt.
     {
         let int_ctrl = LocalInterruptController::get()
-            .expect("LocalInterruptController was not yet initialized");
+            .ok_or("LocalInterruptController was not yet initialized")?;
 
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(CPU_LOCAL_TIMER_IRQ, true);
@@ -201,8 +183,7 @@ pub fn setup_ipi_handler(handler: InterruptHandler, local_num: InterruptNumber) 
 
     {
         let int_ctrl = LocalInterruptController::get()
-            .expect("LocalInterruptController was not yet initialized");
-
+            .ok_or("LocalInterruptController was not yet initialized")?;
         // enable routing of this interrupt
         int_ctrl.enable_local_interrupt(local_num, true);
     }
@@ -224,7 +205,7 @@ pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'st
     {
         // enable this interrupt as a Fast interrupt (FIQ / Group 0 interrupt)
         let int_ctrl = LocalInterruptController::get()
-            .expect("LocalInterruptController was not yet initialized");
+            .ok_or("LocalInterruptController was not yet initialized")?;
         int_ctrl.enable_fast_local_interrupt(TLB_SHOOTDOWN_IPI, true);
     }
 
@@ -234,34 +215,10 @@ pub fn setup_tlb_shootdown_handler(handler: InterruptHandler) -> Result<(), &'st
 /// Enables the PL011 receive interrupt ("RX" SPI) and routes it to the current CPU.
 pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
     let int_ctrl = SystemInterruptController::get()
-        .expect("SystemInterruptController was not yet initialized");
+        .ok_or("SystemInterruptController was not yet initialized")?;
     int_ctrl.set_destination(PL011_RX_SPI, Some(current_cpu()), u8::MAX)
 }
 
-/// Disables the timer, schedules its next tick, and re-enables it
-pub fn schedule_next_timer_tick() {
-    enable_timer(false);
-    CNTP_TVAL_EL0.set(get_timeslice_ticks());
-    enable_timer(true);
-}
-
-/// Enables/Disables the System Timer via the dedicated Arm System Registers
-pub fn enable_timer(enable: bool) {
-    // unmask the interrupt & enable the timer
-    CNTP_CTL_EL0.write(
-          CNTP_CTL_EL0::IMASK.val(0)
-        + CNTP_CTL_EL0::ENABLE.val(match enable {
-            true => 1,
-            false => 0,
-        })
-    );
-
-    if false {
-        info!("timer enabled: {:?}", CNTP_CTL_EL0.read(CNTP_CTL_EL0::ENABLE));
-        info!("timer IMASK: {:?}",   CNTP_CTL_EL0.read(CNTP_CTL_EL0::IMASK));
-        info!("timer status: {:?}",  CNTP_CTL_EL0.read(CNTP_CTL_EL0::ISTATUS));
-    }
-}
 
 /// Registers an interrupt handler at the given IRQ interrupt number.
 ///
@@ -337,19 +294,6 @@ pub fn eoi(irq_num: InterruptNumber) {
     int_ctrl.end_of_interrupt(irq_num);
 }
 
-// A ClockSource for the time crate, implemented using
-// the System Counter of the Generic Arm Timer. The
-// period of this timer is computed in `init` above.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct PhysicalSystemCounter;
-
-impl ClockSource for PhysicalSystemCounter {
-    type ClockType = Monotonic;
-
-    fn now() -> Instant {
-        Instant::new(CNTPCT_EL0.get())
-    }
-}
 
 #[rustfmt::skip]
 impl fmt::Debug for SpsrEL1 {

@@ -1358,6 +1358,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic_timer_aarch64"
+version = "0.1.0"
+dependencies = [
+ "derive_more",
+ "memory_structs",
+]
+
+[[package]]
 name = "getopts"
 version = "0.2.21"
 source = "git+https://github.com/theseus-os/getopts#da1e04828d3ecd6adc90e2da61e2e3cccc7ca97c"
