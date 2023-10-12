@@ -307,8 +307,7 @@ pub fn eoi(irq: Option<u8>) {
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
-
-    eoi(None);
+    eoi(Some(apic::APIC_SPURIOUS_INTERRUPT_IRQ));
 }
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -335,8 +334,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: Interrup
         }
     };
 
-    // TODO: use const generics here to know which IRQ to send an EOI for (only needed for PIC).
-    eoi(None); 
+    eoi(Some(0xFF)); 
 }
 
 
