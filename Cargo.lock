@@ -1106,6 +1106,7 @@ dependencies = [
  "signal_handler",
  "stack_trace",
  "task",
+ "task_cancel",
  "tlb_shootdown",
  "tss",
  "unwind",
@@ -3119,6 +3120,7 @@ dependencies = [
  "log",
  "sleep",
  "task",
+ "task_cancel",
  "x86_64",
 ]
 
@@ -3671,6 +3673,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "task_cancel"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "task",
+ "unwind",
+ "x86_64",
+]
+
+[[package]]
 name = "task_fs"
 version = "0.1.0"
 dependencies = [
@@ -3877,7 +3889,7 @@ dependencies = [
  "log",
  "spawn",
  "spin 0.9.4",
- "task",
+ "task_cancel",
 ]
 
 [[package]]

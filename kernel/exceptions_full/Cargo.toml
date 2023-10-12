@@ -49,5 +49,8 @@ path = "../debug_info"
 [dependencies.signal_handler]
 path = "../signal_handler"
 
+[dependencies.task_cancel]
+path = "../task_cancel"
+
 [lib]
 crate-type = ["rlib"]

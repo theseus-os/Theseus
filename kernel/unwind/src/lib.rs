@@ -403,7 +403,7 @@ impl FallibleIterator for StackFrameIter {
                 // If there is an error code pushed, then we need to account for that additionally beyond the exception stack frame being pushed.
                 let size_of_exception_stack_frame: i64 = 5 * 8;
                 trace!("StackFrameIter: next stack frame is an exception handler: adding {:#X} to cfa, new cfa: {:#X}", size_of_exception_stack_frame, cfa);
-                
+
                 this_frame_is_exception_handler = true;
                 Some(size_of_error_code + size_of_exception_stack_frame)
             } else {
@@ -446,6 +446,88 @@ unsafe fn deref_ptr(ptr: Pointer) -> u64 {
 pub trait FuncWithRegisters = FnMut(Registers) -> Result<(), &'static str>;
 type FuncWithRegistersRefMut<'a> = &'a mut dyn FuncWithRegisters;
 
+/// Returns whether unwinding can begin from the given instruction pointer.
+///
+/// This happens when one of the following two criteria is met:
+///
+/// 1. The pointer is covered by the unwind tables, but does not have an LSDA.
+/// This occurs when the function does not have any associated drop handlers,
+/// either because it has nothing to drop or Rust has determined that the
+/// function will never be unwound.
+///
+/// 2. The pointer is covered by the unwind tables, and has an associated
+/// landing pad. This occurs when the function has associated drop handlers and
+/// the instruction pointer is at an instruction that could cause an unwinding
+/// (usually a call site to a function that can cause an unwinding).
+pub fn can_unwind(instruction_pointer: u64) -> bool {
+    can_unwind_inner(instruction_pointer).is_some()
+}
+
+fn can_unwind_inner(instruction_pointer: u64) -> Option<()> {
+    let task = task::get_my_current_task()?;
+    let instruction_address = VirtualAddress::new(instruction_pointer as usize)?;
+    let krate = task
+        .namespace
+        .get_crate_containing_address(instruction_address, false)?;
+
+    let (eh_frame, base_addresses) = get_eh_frame_info(&krate)
+        .map(|(eh_frame_section, base_addresses)| {
+            (EhFrameReference::Section(eh_frame_section), base_addresses)
+        })
+        .or_else(|| {
+            external_unwind_info::get_unwind_info(instruction_address).map(|unwind_info| {
+                let base_addresses = BaseAddresses::default()
+                    .set_eh_frame(unwind_info.unwind_info.start.value() as u64)
+                    .set_text(unwind_info.text_section.start.value() as u64);
+                (EhFrameReference::External(unwind_info), base_addresses)
+            })
+        })?;
+
+    let unwind_row = UnwindRowReference {
+        caller: instruction_pointer,
+        eh_frame_sec: eh_frame,
+        base_addrs: base_addresses,
+    };
+    let StackFrame {
+        lsda: lsda_address,
+        initial_address,
+        call_site_address,
+        ..
+    } = unwind_row
+        .with_unwind_info(|fde, _| {
+            Ok(StackFrame {
+                personality: None,
+                lsda: fde.lsda().map(|address| unsafe { deref_ptr(address) }),
+                initial_address: fde.initial_address(),
+                call_site_address: instruction_pointer,
+            })
+        })
+        .ok()?;
+
+    let lsda_address = match lsda_address {
+        Some(address) => VirtualAddress::new_canonical(address as usize),
+        // Criteria 1: Covered by unwind tables, but no LSDA.
+        None => return Some(()),
+    };
+
+    let (lsda_section, _) = task
+        .namespace
+        .get_section_containing_address(lsda_address, true)?;
+    let start =
+        lsda_section.mapped_pages_offset + (lsda_address.value() - lsda_section.virt_addr.value());
+    let length = lsda_section.virt_addr.value() + lsda_section.size - lsda_address.value();
+
+    let lsda_pages = lsda_section.mapped_pages.lock();
+    let lsda_slice = lsda_pages.as_slice::<u8>(start, length).ok()?;
+    let table = lsda::GccExceptTableArea::new(lsda_slice, NativeEndian, initial_address);
+
+    let entry = table
+        .call_site_table_entry_for_address(call_site_address)
+        .ok()?;
+
+    // Criteria 2: Covered by unwind tables, and has an associated landing pad.
+    entry.landing_pad_address().map(|_| ())
+}
 
 /// This function saves the current CPU register values onto the stack (to preserve them)
 /// and then invokes the given closure with those registers as the argument.
@@ -699,7 +781,6 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
     Some((eh_frame_sec.clone(), base_addrs))
 }
 
-
 /// Starts the unwinding procedure for the current task 
 /// by working backwards up the call stack starting from the current stack frame.
 /// 
@@ -712,9 +793,19 @@ fn get_eh_frame_info(crate_ref: &StrongCrateRef) -> Option<(StrongSectionRef, Ba
 /// ## Note: Skipping frames
 /// If you are unsure how many frames you could possibly skip, then it's always safe to pass `0`
 /// such that all function frames on the stack are unwound.
-/// 
-#[doc(hidden)]
 pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Result<(), &'static str> {
+    start_unwinding_inner(reason, stack_frames_to_skip, None, None)
+}
+
+/// Starts the unwinding procedure for a specific instruction pointer, and stack pointer.
+///
+/// See [`start_unwinding`] for more information.
+// TODO: Rename. This isn't technically remote unwinding.
+pub fn start_remote_unwinding(reason: KillReason, stack_frames_to_skip: usize, rsp: u64, ip: u64) -> Result<(), &'static str> {
+    start_unwinding_inner(reason, stack_frames_to_skip, Some(rsp), Some(ip))
+}
+
+fn start_unwinding_inner(reason: KillReason, stack_frames_to_skip: usize, rsp: Option<u64>, ip: Option<u64>) -> Result<(), &'static str> {
     // Here we have to be careful to have no resources waiting to be dropped/freed/released on the stack. 
     let unwinding_context_ptr = {
         let current_task = task::get_my_current_task().ok_or("couldn't get current task")?;
@@ -738,11 +829,20 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
 
 
     // We pass a pointer to the unwinding context to this closure. 
-    let res = invoke_with_current_registers(&mut |registers| {
+    let res = invoke_with_current_registers(&mut |mut registers: Registers| {
         // set the proper register values before start the actual unwinding procedure.
         {  
             // SAFE: we just created this pointer above
             let unwinding_context = unsafe { &mut *unwinding_context_ptr };
+            if let Some(rsp) = rsp {
+                registers[X86_64::RSP] = Some(rsp);
+            }
+            if let Some(ip) = ip {
+                // StackFrameIter::next subtracts 1 from the return address to get the call site.
+                // Since we're already providing the call site instruction pointer, we add 1 here
+                // to negate the subtraction later.
+                registers[X86_64::RA] = Some(ip + 1);
+            }
             unwinding_context.stack_frame_iter.registers = registers;
             
             // Skip the first several frames, e.g., to skip unwinding the panic entry point functions themselves.
@@ -769,7 +869,6 @@ pub fn start_unwinding(reason: KillReason, stack_frames_to_skip: usize) -> Resul
     }
     cleanup_unwinding_context(unwinding_context_ptr);
 }
-
 
 /// Continues the unwinding process from the point it left off at, 
 /// which is defined by the given unwinding context.

@@ -136,6 +136,7 @@ struct TaskRefInner {
     ///
     /// This is not public because it permits interior mutability.
     joinable: AtomicBool,
+    pub cancel_requested: AtomicBool,
 }
 
 impl TaskRef {
@@ -163,6 +164,7 @@ impl TaskRef {
             exit_value_mailbox,
             // A new task is joinable until its `JoinableTaskRef` is dropped.
             joinable: AtomicBool::new(true),
+            cancel_requested: AtomicBool::new(false),
         }));
 
         // Add the new TaskRef to the global task list.
@@ -216,6 +218,14 @@ impl TaskRef {
         // TODO FIXME: cause a panic in this Task such that it will start the unwinding process
         // instead of immediately causing it to exit
         self.internal_exit(ExitValue::Killed(reason))
+    }
+
+    pub fn cancel(&self) {
+        self.0.cancel_requested.store(true, Ordering::Relaxed);
+    }
+
+    pub fn is_cancelled(&self) -> bool {
+        self.0.cancel_requested.load(Ordering::Relaxed)
     }
 
     /// The internal routine that actually exits or kills a Task.
@@ -621,7 +631,6 @@ pub fn task_switch(
     cpu_id: CpuId,
     preemption_guard: PreemptionGuard,
 ) -> (bool, PreemptionGuard) {
-
     // We use the `with_current_task_and_value()` closure here in order to ensure that
     // the borrowed reference to the current task is guaranteed to be dropped
     // *before* the actual context switch operation occurs.

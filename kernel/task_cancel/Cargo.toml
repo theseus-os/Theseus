@@ -1,0 +1,12 @@
+[package]
+name = "task_cancel"
+version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Task cancellation"
+edition = "2021"
+
+[dependencies]
+task = { path = "../task" }
+unwind = { path = "../unwind" }
+x86_64 = "0.14"
+log = "0.4"

@@ -29,7 +29,7 @@ pub fn init(idt_ref: &'static LockedIdt) {
 
         // SET UP FIXED EXCEPTION HANDLERS
         idt.divide_error.set_handler_fn(divide_error_handler);
-        idt.debug.set_handler_fn(debug_handler);
+        idt.debug.set_handler_fn(task_cancel::interrupt_handler);
         idt.non_maskable_interrupt.set_handler_fn(nmi_handler);
         idt.breakpoint.set_handler_fn(breakpoint_handler);
         idt.overflow.set_handler_fn(overflow_handler);
@@ -257,15 +257,7 @@ extern "x86-interrupt" fn divide_error_handler(stack_frame: InterruptStackFrame)
     kill_and_halt(0x0, &stack_frame, None, true)
 }
 
-/// exception 0x01
-extern "x86-interrupt" fn debug_handler(stack_frame: InterruptStackFrame) {
-    println_both!("\nEXCEPTION: DEBUG EXCEPTION\n{:#X?}", stack_frame);
-    // don't halt here, this isn't a fatal/permanent failure, just a brief pause.
-}
-
-/// Exception 0x02 is a Non-Maskable Interrupt (NMI).
-///
-/// Theseus uses this for TLB Shootdown IPIs and sampling interrupts.
+/// exception 0x02, also used for TLB Shootdown IPIs and sampling interrupts.
 ///
 /// # Important Note
 /// Acquiring ANY locks in this function, even irq-safe ones, could cause a deadlock

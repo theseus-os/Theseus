@@ -9,6 +9,7 @@ edition = "2018"
 log = "0.4.8"
 cfg-if = "1.0.0"
 
+task_cancel = { path = "../task_cancel" }
 cpu = { path = "../cpu" }
 interrupts = { path = "../interrupts" }
 sleep = { path = "../sleep" }

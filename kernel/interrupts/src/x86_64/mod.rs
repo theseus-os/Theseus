@@ -44,7 +44,15 @@ macro_rules! interrupt_handler {
                 $crate::eoi($x86_64_eoi_param);
             }
         }
-    }
+    };
+    ($name:ident, $x86_64_eoi_param:expr, mut $stack_frame:ident, $code:block) => {
+        extern "x86-interrupt" fn $name(mut sf: $crate::InterruptStackFrame) {
+            let mut $stack_frame = &mut sf;
+            if let $crate::EoiBehaviour::HandlerDidNotSendEoi = $code {
+                $crate::eoi($x86_64_eoi_param);
+            }
+        }
+    };
 }
 
 

@@ -48,7 +48,7 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 // Architecture-independent timer interrupt handler for preemptive scheduling.
-interrupt_handler!(timer_tick_handler, None, _stack_frame, {
+interrupt_handler!(timer_tick_handler, None, mut stack_frame, {
     #[cfg(target_arch = "aarch64")]
     interrupts::schedule_next_timer_tick();
 
@@ -75,6 +75,13 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
     }
 
     schedule();
+
+    if let Some(current_task) = task::get_my_current_task()  {
+        if current_task.is_cancelled() {
+            // Trigger a debug interrupt on the next instruction which will invoke task_cancel::interrupt_handler.
+            task_cancel::set_trap_flag(stack_frame);
+        }
+    }
 
     EoiBehaviour::HandlerSentEoi
 });

@@ -1,11 +1,21 @@
-// TODO: Properly implement Task::kill so the test passes.
+// TODO: Test that the other thread is succesfully cancelled in the following
+// scenarios:
+//
+// 1. In lsda_generator, in which case it should trigger the first criteria of
+// unwind::can_unwind.
+//
+// 2. At the call lsda_generator instruction, in which case it should trigger
+// the second criteria of unwind::can_unwind.
+//
+// 3. At the jmp (loop) instruction, in which case it should continue to the
+// next (call) instruction and then unwind.
 
 #![no_std]
 
 extern crate alloc;
 
 use alloc::{string::String, sync::Arc, vec::Vec};
-use core::sync::atomic::{AtomicBool, Ordering::Relaxed};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering::Relaxed};
 use spin::Mutex;
 
 pub fn main(_: Vec<String>) -> isize {
@@ -19,8 +29,7 @@ pub fn main(_: Vec<String>) -> isize {
 
     while !lock.is_locked() {}
 
-    task.kill(task::KillReason::Requested)
-        .expect("failed to abort task");
+    task.cancel();
 
     log::debug!("waiting for lock to be unlocked");
 
@@ -57,4 +66,8 @@ fn lsda_generator() {
     if FALSE.load(Relaxed) {
         panic!();
     }
+
+    // Spend more time in lsda_generator to increase likelihood of scenario 1.
+    static __COUNTER: AtomicUsize = AtomicUsize::new(0);
+    __COUNTER.fetch_add(1, Relaxed);
 }
