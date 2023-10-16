@@ -1358,6 +1358,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "generic_timer_aarch64"
+version = "0.1.0"
+dependencies = [
+ "cortex-a",
+ "derive_more",
+ "log",
+ "memory_structs",
+ "time",
+ "tock-registers",
+]
+
+[[package]]
 name = "getopts"
 version = "0.2.21"
 source = "git+https://github.com/theseus-os/getopts#da1e04828d3ecd6adc90e2da61e2e3cccc7ca97c"
@@ -1577,6 +1589,7 @@ dependencies = [
  "apic",
  "arm_boards",
  "cpu",
+ "generic_timer_aarch64",
  "gic",
  "ioapic",
  "log",
@@ -1597,6 +1610,7 @@ dependencies = [
  "early_printer",
  "exceptions_early",
  "gdt",
+ "generic_timer_aarch64",
  "gic",
  "interrupt_controller",
  "kernel_config",
@@ -1606,7 +1620,6 @@ dependencies = [
  "pic",
  "spin 0.9.4",
  "sync_irq",
- "time",
  "tock-registers",
  "tss",
  "x86_64",
@@ -3115,9 +3128,12 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 1.0.0",
  "cpu",
+ "generic_timer_aarch64",
  "interrupts",
+ "kernel_config",
  "log",
  "sleep",
+ "spin 0.9.4",
  "task",
  "x86_64",
 ]

@@ -110,8 +110,7 @@ fn remove_next_task_from_delayed_tasklist() {
     }
 }
 
-/// Remove all tasks that have been delayed but are able to be unblocked now,
-/// the current tick count is provided by the system's interrupt tick count.
+/// Remove all tasks that have been delayed but are able to be unblocked now.
 pub fn unblock_sleeping_tasks() {
     let time = now::<Monotonic>();
     while time > NEXT_DELAYED_TASK_UNBLOCK_TIME.load() {

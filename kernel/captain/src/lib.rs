@@ -98,6 +98,7 @@ pub fn init(
     device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())?;
 
     // Initialize local and system-wide interrupt controllers.
+    // TODO: move this into `interrupts::init()`.
     interrupt_controller::init(&kernel_mmi_ref)?;
     
     // Initialize other arch-specific interrupt stuff, e.g., basic interrupt handlers.

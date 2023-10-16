@@ -17,10 +17,10 @@ spin = "0.9.4"
 sync_irq = { path = "../../libs/sync_irq" }
 arm_boards = { path = "../arm_boards" }
 kernel_config = { path = "../kernel_config" }
+generic_timer_aarch64 = { path = "../generic_timer_aarch64" }
 gic = { path = "../gic" }
 tock-registers = "0.7.0"
 cortex-a = "7.5.0"
-time = { path = "../time" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
