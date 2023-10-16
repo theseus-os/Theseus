@@ -75,11 +75,8 @@ pub fn set_next_timer_interrupt(ticks_to_elapse: u64) {
 pub fn enable_timer_interrupt(enable: bool) {
     // Unmask the interrupt (to enable it), and enable the timer.
     CNTP_CTL_EL0.write(
-          CNTP_CTL_EL0::IMASK.val(0)
-        + CNTP_CTL_EL0::ENABLE.val(match enable {
-            true => 1,
-            false => 0,
-        })
+          CNTP_CTL_EL0::IMASK.val(!enable as u64)
+        + CNTP_CTL_EL0::ENABLE.val(enable as u64)
     );
 
     if false {
