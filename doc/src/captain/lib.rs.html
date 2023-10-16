@@ -235,6 +235,7 @@
 <a href="#235" id="235">235</a>
 <a href="#236" id="236">236</a>
 <a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! The main initialization routine and setup logic of the OS. 
 //!
 //! The `captain` steers the ship of Theseus, meaning that it contains basic logic 
@@ -335,6 +336,7 @@
     </span>device_manager::early_init(rsdp_address, kernel_mmi_ref.lock().deref_mut())<span class="question-mark">?</span>;
 
     <span class="comment">// Initialize local and system-wide interrupt controllers.
+    // TODO: move this into `interrupts::init()`.
     </span>interrupt_controller::init(<span class="kw-2">&amp;</span>kernel_mmi_ref)<span class="question-mark">?</span>;
     
     <span class="comment">// Initialize other arch-specific interrupt stuff, e.g., basic interrupt handlers.

@@ -61,6 +61,7 @@ var sourcesIndex = JSON.parse('{\
 "framebuffer_printer":["",[],["lib.rs"]],\
 "fs_node":["",[],["lib.rs"]],\
 "gdt":["",[],["lib.rs"]],\
+"generic_timer_aarch64":["",[],["lib.rs"]],\
 "gic":["",[],["lib.rs"]],\
 "heap":["",[],["lib.rs"]],\
 "heapfile":["",[],["lib.rs"]],\

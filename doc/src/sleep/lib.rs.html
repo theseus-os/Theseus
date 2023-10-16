@@ -177,7 +177,6 @@
 <a href="#177" id="177">177</a>
 <a href="#178" id="178">178</a>
 <a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Provides APIs for tasks to sleep for specified time durations.
 //!
 //! Key functions:
@@ -290,8 +289,7 @@
     }
 }
 
-<span class="doccomment">/// Remove all tasks that have been delayed but are able to be unblocked now,
-/// the current tick count is provided by the system&#39;s interrupt tick count.
+<span class="doccomment">/// Remove all tasks that have been delayed but are able to be unblocked now.
 </span><span class="kw">pub fn </span>unblock_sleeping_tasks() {
     <span class="kw">let </span>time = now::&lt;Monotonic&gt;();
     <span class="kw">while </span>time &gt; NEXT_DELAYED_TASK_UNBLOCK_TIME.load() {

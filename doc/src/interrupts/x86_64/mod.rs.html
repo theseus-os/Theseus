@@ -382,8 +382,6 @@
 <a href="#382" id="382">382</a>
 <a href="#383" id="383">383</a>
 <a href="#384" id="384">384</a>
-<a href="#385" id="385">385</a>
-<a href="#386" id="386">386</a>
 </pre></div><pre class="rust"><code><span class="kw">pub use </span>pic::IRQ_BASE_OFFSET;
 
 <span class="comment">// use rtc;
@@ -693,8 +691,7 @@
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
     <span class="macro">warn!</span>(<span class="string">&quot;APIC SPURIOUS INTERRUPT HANDLER!&quot;</span>);
-
-    eoi(<span class="prelude-val">None</span>);
+    eoi(<span class="prelude-val">Some</span>(apic::APIC_SPURIOUS_INTERRUPT_IRQ));
 }
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -721,8 +718,7 @@
         }
     };
 
-    <span class="comment">// TODO: use const generics here to know which IRQ to send an EOI for (only needed for PIC).
-    </span>eoi(<span class="prelude-val">None</span>); 
+    eoi(<span class="prelude-val">Some</span>(<span class="number">0xFF</span>)); 
 }
 
 
