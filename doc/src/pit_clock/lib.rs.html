@@ -148,6 +148,6 @@
     <span class="kw">let </span>ticks = PIT_TICKS.fetch_add(<span class="number">1</span>, Ordering::Acquire);
     <span class="macro">trace!</span>(<span class="string">&quot;PIT timer interrupt, ticks: {}&quot;</span>, ticks);
 
-    interrupts::eoi(<span class="prelude-val">Some</span>(PIT_CHANNEL_0_IRQ));
+    interrupts::eoi(PIT_CHANNEL_0_IRQ);
 }
 </code></pre></div></section></main></body></html>

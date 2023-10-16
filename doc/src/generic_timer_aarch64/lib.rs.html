@@ -87,6 +87,7 @@
 <a href="#87" id="87">87</a>
 <a href="#88" id="88">88</a>
 <a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Support for aarch64&#39;s generic timer and system counter.
 //!
 //! Docs: &lt;https://developer.arm.com/documentation/102379/latest/&gt;
@@ -158,14 +159,15 @@
     enable_timer_interrupt(<span class="bool-val">true</span>);
 }
 
-<span class="doccomment">/// Enables/disables the generic system timer interrupt on the current CPU.
+<span class="doccomment">/// Enables/disables the generic system timer and its interrupt on the current CPU.
 ///
 /// This writes the `CNTP_CTL_EL0` system register.
 </span><span class="kw">pub fn </span>enable_timer_interrupt(enable: bool) {
-    <span class="comment">// Unmask the interrupt (to enable it), and enable the timer.
+    <span class="comment">// If enable: unmask the interrupt (set bit to 0), and enable the timer.
+    // If disable: mask the interrupt (set bit to 1), and disable the timer.
     </span>CNTP_CTL_EL0.write(
-          CNTP_CTL_EL0::IMASK.val(!enable <span class="kw">as </span>u64)
-        + CNTP_CTL_EL0::ENABLE.val(enable <span class="kw">as </span>u64)
+        CNTP_CTL_EL0::ENABLE.val(enable <span class="kw">as </span>u64)
+        + CNTP_CTL_EL0::IMASK.val(!enable <span class="kw">as </span>u64)
     );
 
     <span class="kw">if </span><span class="bool-val">false </span>{

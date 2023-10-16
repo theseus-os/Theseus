@@ -943,7 +943,7 @@
         <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = e1000_nic.handle_interrupt() {
             <span class="macro">error!</span>(<span class="string">&quot;e1000_handler(): error handling interrupt: {:?}&quot;</span>, e);
         }
-        eoi(<span class="prelude-val">Some</span>(e1000_nic.interrupt_num));
+        eoi(e1000_nic.interrupt_num);
     } <span class="kw">else </span>{
         <span class="macro">error!</span>(<span class="string">&quot;BUG: e1000_handler(): E1000 NIC hasn&#39;t yet been initialized!&quot;</span>);
     }

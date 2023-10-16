@@ -2018,13 +2018,13 @@
 <span class="doccomment">/// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>primary_ata_handler(_stack_frame: InterruptStackFrame ) {
     <span class="macro">info!</span>(<span class="string">&quot;Primary ATA Interrupt ({:#X})&quot;</span>, ATA_PRIMARY_IRQ);
-    interrupts::eoi(<span class="prelude-val">Some</span>(ATA_PRIMARY_IRQ));
+    interrupts::eoi(ATA_PRIMARY_IRQ);
 }
 
 <span class="doccomment">/// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
 </span><span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>secondary_ata_handler(_stack_frame: InterruptStackFrame ) {
     <span class="macro">info!</span>(<span class="string">&quot;Secondary ATA Interrupt ({:#X})&quot;</span>, ATA_SECONDARY_IRQ);
-    interrupts::eoi(<span class="prelude-val">Some</span>(ATA_SECONDARY_IRQ));
+    interrupts::eoi(ATA_SECONDARY_IRQ);
 }
 
 

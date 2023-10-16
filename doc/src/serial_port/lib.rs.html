@@ -802,7 +802,7 @@
 //
 // * On x86_64, this is IRQ 0x24, used for COM1 and COM3 serial ports.
 // * On aarch64, this is interrupt 0x21, used for the PL011 UART serial port.
-</span><span class="macro">interrupt_handler!</span>(primary_serial_port_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x4</span>), _stack_frame, {
+</span><span class="macro">interrupt_handler!</span>(primary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + <span class="number">0x4</span>, _stack_frame, {
     <span class="comment">// log::trace!(&quot;COM1/COM3 serial handler&quot;);
 
     </span><span class="attr">#[cfg(target_arch = <span class="string">&quot;aarch64&quot;</span>)] </span>{
@@ -819,7 +819,7 @@
 });
 
 <span class="comment">// Cross-platform interrupt handler, only used on x86_64 for COM2 and COM4 (IRQ 0x23).
-</span><span class="macro">interrupt_handler!</span>(secondary_serial_port_interrupt_handler, <span class="prelude-val">Some</span>(interrupts::IRQ_BASE_OFFSET + <span class="number">0x3</span>), _stack_frame, {
+</span><span class="macro">interrupt_handler!</span>(secondary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + <span class="number">0x3</span>, _stack_frame, {
     <span class="comment">// trace!(&quot;COM2/COM4 serial handler&quot;);
     </span><span class="kw">if let </span><span class="prelude-val">Some</span>(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func()

@@ -381,7 +381,6 @@
 <a href="#381" id="381">381</a>
 <a href="#382" id="382">382</a>
 <a href="#383" id="383">383</a>
-<a href="#384" id="384">384</a>
 </pre></div><pre class="rust"><code><span class="kw">pub use </span>pic::IRQ_BASE_OFFSET;
 
 <span class="comment">// use rtc;
@@ -421,6 +420,9 @@
 <span class="attr">#[macro_export]
 #[doc = <span class="macro">include_str!</span>(<span class="string">&quot;../macro-doc.md&quot;</span>)]
 </span><span class="macro">macro_rules! </span>interrupt_handler {
+    (<span class="macro-nonterminal">$name</span>:ident, <span class="kw">_</span>, <span class="macro-nonterminal">$stack_frame</span>:ident, <span class="macro-nonterminal">$code</span>:block) =&gt; {
+        <span class="macro">interrupt_handler!</span>(<span class="macro-nonterminal">$name</span>, <span class="number">0</span>, <span class="macro-nonterminal">$stack_frame</span>, <span class="macro-nonterminal">$code</span>);
+    };
     (<span class="macro-nonterminal">$name</span>:ident, <span class="macro-nonterminal">$x86_64_eoi_param</span>:expr, <span class="macro-nonterminal">$stack_frame</span>:ident, <span class="macro-nonterminal">$code</span>:block) =&gt; {
         <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span><span class="macro-nonterminal">$name</span>(sf: <span class="macro-nonterminal">$crate::InterruptStackFrame</span>) {
             <span class="kw">let </span><span class="macro-nonterminal">$stack_frame </span>= <span class="kw-2">&amp;</span>sf;
@@ -428,7 +430,7 @@
                 <span class="macro-nonterminal">$crate::eoi</span>(<span class="macro-nonterminal">$x86_64_eoi_param</span>);
             }
         }
-    }
+    };
 }
 
 
@@ -663,9 +665,9 @@
 /// This function supports all types of interrupt chips -- APIC, x2apic, PIC --
 /// and will perform the correct EOI operation based on which chip is currently active.
 ///
-/// The `irq` argument is only used if the `PIC` chip is active,
-/// but it doesn&#39;t hurt to always provide it.
-</span><span class="kw">pub fn </span>eoi(irq: <span class="prelude-ty">Option</span>&lt;u8&gt;) {
+/// The `irq` argument is only used if the legacy `PIC` chip is active on this system;
+/// newer APIC chips do not use this.
+</span><span class="kw">pub fn </span>eoi(irq: InterruptNumber) {
     <span class="kw">match </span>INTERRUPT_CHIP.load() {
         InterruptChip::APIC | InterruptChip::X2APIC =&gt; {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(my_apic) = apic::get_my_apic() {
@@ -676,11 +678,7 @@
         }
         InterruptChip::PIC =&gt; {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(_pic) = PIC.get() {
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(irq) = irq {
-                    _pic.notify_end_of_interrupt(irq);
-                } <span class="kw">else </span>{
-                    <span class="macro">error!</span>(<span class="string">&quot;BUG: missing required IRQ argument for PIC EOI!&quot;</span>);
-                }   
+                _pic.notify_end_of_interrupt(irq);
             } <span class="kw">else </span>{
                 <span class="macro">error!</span>(<span class="string">&quot;BUG: couldn&#39;t get PIC instance to send EOI!&quot;</span>);
             }  
@@ -691,7 +689,7 @@
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
     <span class="macro">warn!</span>(<span class="string">&quot;APIC SPURIOUS INTERRUPT HANDLER!&quot;</span>);
-    eoi(<span class="prelude-val">Some</span>(apic::APIC_SPURIOUS_INTERRUPT_IRQ));
+    eoi(apic::APIC_SPURIOUS_INTERRUPT_IRQ);
 }
 
 <span class="kw">extern </span><span class="string">&quot;x86-interrupt&quot; </span><span class="kw">fn </span>unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -718,7 +716,7 @@
         }
     };
 
-    eoi(<span class="prelude-val">Some</span>(<span class="number">0xFF</span>)); 
+    eoi(<span class="number">0xFF</span>); 
 }
 
 
@@ -737,7 +735,7 @@
         </span><span class="kw">if </span>irq_regs.master_isr &amp; <span class="number">0x80 </span>== <span class="number">0x80 </span>{
             <span class="macro">println!</span>(<span class="string">&quot;\nGot real IRQ7, not spurious! (Unexpected behavior)&quot;</span>);
             <span class="macro">error!</span>(<span class="string">&quot;Got real IRQ7, not spurious! (Unexpected behavior)&quot;</span>);
-            eoi(<span class="prelude-val">Some</span>(IRQ_BASE_OFFSET + <span class="number">0x7</span>));
+            eoi(IRQ_BASE_OFFSET + <span class="number">0x7</span>);
         }
         <span class="kw">else </span>{
             <span class="comment">// do nothing. Do not send an EOI. 
@@ -762,7 +760,7 @@
 //     // we must ack the interrupt and send EOI before calling the handler, 
 //     // because the handler will not return.
 //     rtc::rtc_ack_irq();
-//     eoi(Some(IRQ_BASE_OFFSET + 0x8));
+//     eoi(IRQ_BASE_OFFSET + 0x8);
     
 //     rtc::handle_rtc_interrupt();
 // }

@@ -190,7 +190,7 @@
         <span class="macro">warn!</span>(<span class="string">&quot;ps2_mouse_handler(): MOUSE isn&#39;t initialized yet, skipping interrupt.&quot;</span>);
     }
 
-    interrupts::eoi(<span class="prelude-val">Some</span>(PS2_MOUSE_IRQ));
+    interrupts::eoi(PS2_MOUSE_IRQ);
 }
 
 

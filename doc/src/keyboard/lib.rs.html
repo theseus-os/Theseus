@@ -320,7 +320,7 @@
         <span class="macro">warn!</span>(<span class="string">&quot;ps2_keyboard_handler(): KEYBOARD isn&#39;t initialized yet, skipping interrupt.&quot;</span>);
     }
     
-    interrupts::eoi(<span class="prelude-val">Some</span>(PS2_KEYBOARD_IRQ));
+    interrupts::eoi(PS2_KEYBOARD_IRQ);
 }
 
 
