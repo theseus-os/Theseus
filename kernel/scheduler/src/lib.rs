@@ -48,7 +48,7 @@ pub fn init() -> Result<(), &'static str> {
 }
 
 // Architecture-independent timer interrupt handler for preemptive scheduling.
-interrupt_handler!(timer_tick_handler, None, _stack_frame, {
+interrupt_handler!(timer_tick_handler, _, _stack_frame, {
     #[cfg(target_arch = "aarch64")]
     generic_timer_aarch64::set_next_timer_interrupt(get_timeslice_ticks());
 
@@ -66,9 +66,6 @@ interrupt_handler!(timer_tick_handler, None, _stack_frame, {
 
     // We must acknowledge the interrupt *before* the end of this handler
     // because we switch tasks here, which doesn't return.
-    #[cfg(target_arch = "x86_64")]
-    eoi(Some(CPU_LOCAL_TIMER_IRQ));
-    #[cfg(target_arch = "aarch64")]
     eoi(CPU_LOCAL_TIMER_IRQ);
 
     schedule();

@@ -54,13 +54,15 @@ struct SpsrEL1(InMemoryRegister<u64, SPSR_EL1::Register>);
 #[repr(transparent)]
 struct EsrEL1(InMemoryRegister<u64, ESR_EL1::Register>);
 
-#[cfg(target_arch = "aarch64")]
 #[macro_export]
 #[doc = include_str!("../macro-doc.md")]
 macro_rules! interrupt_handler {
+    ($name:ident, _, $stack_frame:ident, $code:block) => {
+        interrupt_handler!($name, 0, $stack_frame, $code);
+    };
     ($name:ident, $x86_64_eoi_param:expr, $stack_frame:ident, $code:block) => {
         extern "C" fn $name($stack_frame: &$crate::InterruptStackFrame) -> $crate::EoiBehaviour $code
-    }
+    };
 }
 
 /// The exception context as it is stored on the stack on exception entry.

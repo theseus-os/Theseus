@@ -388,7 +388,7 @@ static INTERRUPT_ACTION_COM2_COM4: Once<Box<dyn Fn() + Send + Sync>> = Once::new
 //
 // * On x86_64, this is IRQ 0x24, used for COM1 and COM3 serial ports.
 // * On aarch64, this is interrupt 0x21, used for the PL011 UART serial port.
-interrupt_handler!(primary_serial_port_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x4), _stack_frame, {
+interrupt_handler!(primary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + 0x4, _stack_frame, {
     // log::trace!("COM1/COM3 serial handler");
 
     #[cfg(target_arch = "aarch64")] {
@@ -405,7 +405,7 @@ interrupt_handler!(primary_serial_port_interrupt_handler, Some(interrupts::IRQ_B
 });
 
 // Cross-platform interrupt handler, only used on x86_64 for COM2 and COM4 (IRQ 0x23).
-interrupt_handler!(secondary_serial_port_interrupt_handler, Some(interrupts::IRQ_BASE_OFFSET + 0x3), _stack_frame, {
+interrupt_handler!(secondary_serial_port_interrupt_handler, interrupts::IRQ_BASE_OFFSET + 0x3, _stack_frame, {
     // trace!("COM2/COM4 serial handler");
     if let Some(func) = INTERRUPT_ACTION_COM2_COM4.get() {
         func()

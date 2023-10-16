@@ -69,14 +69,15 @@ pub fn set_next_timer_interrupt(ticks_to_elapse: u64) {
     enable_timer_interrupt(true);
 }
 
-/// Enables/disables the generic system timer interrupt on the current CPU.
+/// Enables/disables the generic system timer and its interrupt on the current CPU.
 ///
 /// This writes the `CNTP_CTL_EL0` system register.
 pub fn enable_timer_interrupt(enable: bool) {
-    // Unmask the interrupt (to enable it), and enable the timer.
+    // If enable: unmask the interrupt (set bit to 0), and enable the timer.
+    // If disable: mask the interrupt (set bit to 1), and disable the timer.
     CNTP_CTL_EL0.write(
-          CNTP_CTL_EL0::IMASK.val(!enable as u64)
-        + CNTP_CTL_EL0::ENABLE.val(enable as u64)
+        CNTP_CTL_EL0::ENABLE.val(enable as u64)
+        + CNTP_CTL_EL0::IMASK.val(!enable as u64)
     );
 
     if false {

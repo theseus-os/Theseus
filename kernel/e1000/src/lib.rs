@@ -462,7 +462,7 @@ extern "x86-interrupt" fn e1000_handler(_stack_frame: InterruptStackFrame) {
         if let Err(e) = e1000_nic.handle_interrupt() {
             error!("e1000_handler(): error handling interrupt: {:?}", e);
         }
-        eoi(Some(e1000_nic.interrupt_num));
+        eoi(e1000_nic.interrupt_num);
     } else {
         error!("BUG: e1000_handler(): E1000 NIC hasn't yet been initialized!");
     }

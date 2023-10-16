@@ -105,7 +105,7 @@ extern "x86-interrupt" fn ps2_keyboard_handler(_stack_frame: InterruptStackFrame
         warn!("ps2_keyboard_handler(): KEYBOARD isn't initialized yet, skipping interrupt.");
     }
     
-    interrupts::eoi(Some(PS2_KEYBOARD_IRQ));
+    interrupts::eoi(PS2_KEYBOARD_IRQ);
 }
 
 
