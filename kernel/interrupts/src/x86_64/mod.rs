@@ -37,6 +37,9 @@ static RESERVED_IRQ_LIST: [u8; 3] = [
 #[macro_export]
 #[doc = include_str!("../macro-doc.md")]
 macro_rules! interrupt_handler {
+    ($name:ident, _, $stack_frame:ident, $code:block) => {
+        interrupt_handler!($name, 0, $stack_frame, $code);
+    };
     ($name:ident, $x86_64_eoi_param:expr, $stack_frame:ident, $code:block) => {
         extern "x86-interrupt" fn $name(sf: $crate::InterruptStackFrame) {
             let $stack_frame = &sf;
@@ -44,7 +47,7 @@ macro_rules! interrupt_handler {
                 $crate::eoi($x86_64_eoi_param);
             }
         }
-    }
+    };
 }
 
 
@@ -279,9 +282,9 @@ pub fn deregister_interrupt(interrupt_num: u8, func: InterruptHandler) -> Result
 /// This function supports all types of interrupt chips -- APIC, x2apic, PIC --
 /// and will perform the correct EOI operation based on which chip is currently active.
 ///
-/// The `irq` argument is only used if the `PIC` chip is active,
-/// but it doesn't hurt to always provide it.
-pub fn eoi(irq: Option<u8>) {
+/// The `irq` argument is only used if the legacy `PIC` chip is active on this system;
+/// newer APIC chips do not use this.
+pub fn eoi(irq: InterruptNumber) {
     match INTERRUPT_CHIP.load() {
         InterruptChip::APIC | InterruptChip::X2APIC => {
             if let Some(my_apic) = apic::get_my_apic() {
@@ -292,11 +295,7 @@ pub fn eoi(irq: Option<u8>) {
         }
         InterruptChip::PIC => {
             if let Some(_pic) = PIC.get() {
-                if let Some(irq) = irq {
-                    _pic.notify_end_of_interrupt(irq);
-                } else {
-                    error!("BUG: missing required IRQ argument for PIC EOI!");
-                }   
+                _pic.notify_end_of_interrupt(irq);
             } else {
                 error!("BUG: couldn't get PIC instance to send EOI!");
             }  
@@ -307,7 +306,7 @@ pub fn eoi(irq: Option<u8>) {
 
 extern "x86-interrupt" fn apic_spurious_interrupt_handler(_stack_frame: InterruptStackFrame) {
     warn!("APIC SPURIOUS INTERRUPT HANDLER!");
-    eoi(Some(apic::APIC_SPURIOUS_INTERRUPT_IRQ));
+    eoi(apic::APIC_SPURIOUS_INTERRUPT_IRQ);
 }
 
 extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -334,7 +333,7 @@ extern "x86-interrupt" fn unimplemented_interrupt_handler(_stack_frame: Interrup
         }
     };
 
-    eoi(Some(0xFF)); 
+    eoi(0xFF); 
 }
 
 
@@ -353,7 +352,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: Interrupt
         if irq_regs.master_isr & 0x80 == 0x80 {
             println!("\nGot real IRQ7, not spurious! (Unexpected behavior)");
             error!("Got real IRQ7, not spurious! (Unexpected behavior)");
-            eoi(Some(IRQ_BASE_OFFSET + 0x7));
+            eoi(IRQ_BASE_OFFSET + 0x7);
         }
         else {
             // do nothing. Do not send an EOI. 
@@ -378,7 +377,7 @@ extern "x86-interrupt" fn pic_spurious_interrupt_handler(_stack_frame: Interrupt
 //     // we must ack the interrupt and send EOI before calling the handler, 
 //     // because the handler will not return.
 //     rtc::rtc_ack_irq();
-//     eoi(Some(IRQ_BASE_OFFSET + 0x8));
+//     eoi(IRQ_BASE_OFFSET + 0x8);
     
 //     rtc::handle_rtc_interrupt();
 // }

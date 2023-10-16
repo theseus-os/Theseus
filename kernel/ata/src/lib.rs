@@ -894,13 +894,13 @@ const ATA_SECONDARY_IRQ: u8 = interrupts::IRQ_BASE_OFFSET + 0xF;
 /// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
 extern "x86-interrupt" fn primary_ata_handler(_stack_frame: InterruptStackFrame ) {
     info!("Primary ATA Interrupt ({:#X})", ATA_PRIMARY_IRQ);
-    interrupts::eoi(Some(ATA_PRIMARY_IRQ));
+    interrupts::eoi(ATA_PRIMARY_IRQ);
 }
 
 /// The primary ATA interrupt handler. Not yet used for anything, but useful for DMA.
 extern "x86-interrupt" fn secondary_ata_handler(_stack_frame: InterruptStackFrame ) {
     info!("Secondary ATA Interrupt ({:#X})", ATA_SECONDARY_IRQ);
-    interrupts::eoi(Some(ATA_SECONDARY_IRQ));
+    interrupts::eoi(ATA_SECONDARY_IRQ);
 }
 
 
