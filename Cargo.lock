@@ -4335,7 +4335,6 @@ name = "usb_controller"
 version = "0.1.0"
 dependencies = [
  "bilge",
- "hashbrown",
  "log",
  "memory",
  "pci",

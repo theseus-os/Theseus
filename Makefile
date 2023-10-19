@@ -946,7 +946,7 @@ else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -usb
 	QEMU_FLAGS += -device usb-ehci,id=ehci
 	QEMU_FLAGS += -device usb-kbd,bus=ehci.0
-	QEMU_FLAGS += -d trace:usb_*
+	# QEMU_FLAGS += -d trace:usb_*
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif

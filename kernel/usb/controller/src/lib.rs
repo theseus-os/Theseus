@@ -15,14 +15,16 @@ use zerocopy::FromBytes;
 use volatile::{Volatile, ReadOnly};
 use bilge::prelude::*;
 use sleep::{Duration, sleep};
-use core::{mem::size_of, num::NonZeroU8};
+use core::{mem::size_of, num::NonZeroU8, str::from_utf8};
 use alloc::string::String;
 
 mod ehci;
 
 pub mod descriptors;
+pub mod allocators;
 
-use descriptors::Descriptor;
+use descriptors::{Descriptor, DescriptorType};
+use allocators::CommonUsbAlloc;
 
 pub enum Standard<T> {
     Ehci(T),
@@ -90,10 +92,127 @@ pub enum Request<'a> {
     // SynchFrame(EndpointAddress, u16),
 }
 
+impl<'a> Request<'a> {
+    pub(crate) fn get_raw(&self) -> RawRequest {
+        match self {
+            Self::GetStatus(target, _dev_status) => RawRequest::new(
+                (*target).into(),
+                RequestType::Standard,
+                Direction::In,
+                RequestName::GetStatus,
+                0u16,
+                target.index(),
+                2u16,
+            ),
+            Self::ClearFeature(target, feature_id) => RawRequest::new(
+                (*target).into(),
+                RequestType::Standard,
+                Direction::Out,
+                RequestName::ClearFeature,
+                *feature_id,
+                target.index(),
+                0u16,
+            ),
+            Self::SetFeature(target, feature_id) => RawRequest::new(
+                (*target).into(),
+                RequestType::Standard,
+                Direction::Out,
+                RequestName::SetFeature,
+                *feature_id,
+                target.index(),
+                0u16,
+            ),
+            Self::SetAddress(dev_addr) => RawRequest::new(
+                RawRequestRecipient::Device,
+                RequestType::Standard,
+                Direction::Out,
+                RequestName::SetAddress,
+                *dev_addr as u16,
+                0u16,
+                0u16,
+            ),
+            Self::GetDescriptor(desc_index, descriptor) => RawRequest::new(
+                RawRequestRecipient::Device,
+                RequestType::Standard,
+                Direction::In,
+                RequestName::GetDescriptor,
+                (descriptor.get_type() << 8) | (*desc_index as u16),
+                0u16,
+                descriptor.get_length(),
+            ),
+            Self::SetDescriptor(desc_index, descriptor) => RawRequest::new(
+                RawRequestRecipient::Device,
+                RequestType::Standard,
+                Direction::Out,
+                RequestName::SetDescriptor,
+                (descriptor.get_type() << 8) | (*desc_index as u16),
+                0u16,
+                descriptor.get_length(),
+            ),
+            Self::GetConfiguration(_config) => RawRequest::new(
+                RawRequestRecipient::Device,
+                RequestType::Standard,
+                Direction::In,
+                RequestName::GetConfiguration,
+                0u16,
+                0u16,
+                1u16,
+            ),
+            Self::SetConfiguration(config) => RawRequest::new(
+                RawRequestRecipient::Device,
+                RequestType::Standard,
+                Direction::Out,
+                RequestName::SetConfiguration,
+                config.map(|v| v.into()).unwrap_or(0) as u16,
+                0u16,
+                0u16,
+            ),
+            Self::GetInterfaceAltSetting(interface_idx, _alt_setting) => RawRequest::new(
+                RawRequestRecipient::Interface,
+                RequestType::Standard,
+                Direction::In,
+                RequestName::SetConfiguration,
+                0u16,
+                *interface_idx,
+                1u16,
+            ),
+            Self::SetInterfaceAltSetting(interface_idx, alt_setting) => RawRequest::new(
+                RawRequestRecipient::Interface,
+                RequestType::Standard,
+                Direction::Out,
+                RequestName::SetConfiguration,
+                *alt_setting as u16,
+                *interface_idx,
+                0u16,
+            ),
+            Self::ReadString(string_idx, _string) => RawRequest::new(
+                RawRequestRecipient::Device,
+                RequestType::Standard,
+                Direction::In,
+                RequestName::GetDescriptor,
+                ((u8::from(DescriptorType::String) as u16) << 8) | (*string_idx as u16),
+                0u16,
+                2u16,
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum Target {
     Device,
     Interface(InterfaceIndex),
     Endpoint(EndpointAddress),
+}
+
+impl Target {
+    fn index(self) -> u16 {
+        match self {
+            Self::Device => 0u16,
+            Self::Interface(index) => index,
+            Self::Endpoint(addr) => addr.ep_number().value() as u16,
+        }
+    }
 }
 
 #[bitsize(64)]
@@ -129,6 +248,16 @@ enum RawRequestRecipient {
     Reserved = 0x4,
 }
 
+impl From<Target> for RawRequestRecipient {
+    fn from(target: Target) -> RawRequestRecipient {
+        match target {
+            Target::Device => RawRequestRecipient::Device,
+            Target::Interface(_) => RawRequestRecipient::Interface,
+            Target::Endpoint(_) => RawRequestRecipient::Endpoint,
+        }
+    }
+}
+
 #[bitsize(2)]
 #[derive(Debug, FromBits)]
 enum RequestType {
@@ -155,86 +284,4 @@ enum RequestName {
 
     #[fallback]
     Reserved = 0xff,
-}
-
-#[macro_export]
-macro_rules! allocator {
-    ($name:ident, $ty:ty, $cap:literal) => {
-
-        #[derive(Debug, FromBytes)]
-        struct $name {
-            slots: [$ty; $cap],
-            occupied: [u8; $cap],
-        }
-
-        impl $name {
-            const OCCUPIED_TRUE: u8 = 1;
-            const OCCUPIED_FALSE: u8 = 0;
-
-            pub fn init(&mut self) {
-                self.occupied.fill(Self::OCCUPIED_FALSE);
-            }
-
-            pub fn allocate(&mut self, init_to: Option<$ty>) -> Result<(usize, u32), &'static str> {
-                for i in 0..$cap {
-                    if self.occupied[i] == Self::OCCUPIED_FALSE {
-                        self.occupied[i] = Self::OCCUPIED_TRUE;
-                        let mut_ref = &mut self.slots[i];
-                        if let Some(value) = init_to {
-                            *mut_ref = value;
-                        }
-                        let addr = mut_ref as *mut _ as usize as u32;
-
-                        return Ok((i, addr))
-                    }
-                }
-
-                Err(concat!(stringify!($name), ": Out of slots"))
-            }
-
-            pub fn get(&self, index: usize) -> Result<&$ty, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                self.slots.get(index).ok_or(err_msg)
-            }
-
-            pub fn get_mut(&mut self, index: usize) -> Result<&mut $ty, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                self.slots.get_mut(index).ok_or(err_msg)
-            }
-
-            pub fn find(&self, addr: u32) -> Result<usize, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid address");
-                let mut_ref = &self.slots[0];
-                let addr_of_first = mut_ref as *const _ as usize as u32;
-
-                let offset = addr.checked_sub(addr_of_first).ok_or(err_msg)? as usize;
-
-                let type_size = core::mem::size_of::<$ty>();
-                let index = (offset / type_size);
-
-                let valid_offset = offset % type_size == 0;
-                let valid_index = index < $cap;
-
-                match (valid_offset, valid_index) {
-                    (true, true) => Ok(index),
-                    _ => Err(err_msg),
-                }
-            }
-
-            pub fn get_by_addr(&self, addr: u32) -> Result<&$ty, &'static str> {
-                self.get(self.find(addr)?)
-            }
-
-            pub fn get_mut_by_addr(&mut self, addr: u32) -> Result<&mut $ty, &'static str> {
-                self.get_mut(self.find(addr)?)
-            }
-
-            pub fn address_of(&self, index: usize) -> Result<u32, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                let reference = self.slots.get(index).ok_or(err_msg)?;
-                Ok(reference as *const _ as usize as u32)
-            }
-        }
-
-    }
 }

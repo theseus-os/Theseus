@@ -9,6 +9,30 @@ pub enum Descriptor {
     OtherSpeedConfiguration(Configuration),
 }
 
+impl Descriptor {
+    pub fn get_length(&self) -> u16 {
+        (match self {
+            Self::Device(_) => size_of::<Device>(),
+            Self::Configuration(_) => size_of::<Configuration>(),
+            Self::Interface(_) => size_of::<Interface>(),
+            Self::Endpoint(_) => size_of::<Endpoint>(),
+            Self::DeviceQualifier(_) => size_of::<DeviceQualifier>(),
+            Self::OtherSpeedConfiguration(_) => size_of::<Configuration>(),
+        }) as u16
+    }
+
+    pub fn get_type(&self) -> u16 {
+        u8::from(match self {
+            Self::Device(_) => DescriptorType::Device,
+            Self::Configuration(_) => DescriptorType::Configuration,
+            Self::Interface(_) => DescriptorType::Interface,
+            Self::Endpoint(_) => DescriptorType::Endpoint,
+            Self::DeviceQualifier(_) => DescriptorType::DeviceQualifier,
+            Self::OtherSpeedConfiguration(_) => DescriptorType::Configuration,
+        }) as u16
+    }
+}
+
 #[bitsize(8)]
 #[derive(Debug, Copy, Clone, FromBits)]
 pub enum DescriptorType {
@@ -148,4 +172,12 @@ pub enum IsochronousEndpointUsageType {
     Feedback = 0x1,
     ImplicitFeedbackData = 0x2,
     Reserved = 0x3,
+}
+
+#[derive(Copy, Clone, Debug, FromBytes)]
+#[repr(C)]
+pub struct UsbString {
+    pub length: u8,
+    pub descriptor_type: u8,
+    pub unicode_bytes: [u8; 253],
 }
