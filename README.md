@@ -1,10 +1,14 @@
 # Theseus OS
 
-[![Documentation Action](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/docs.yaml?label=docs%20build)](https://github.com/theseus-os/Theseus/actions/workflows/docs.yaml)
 [![Documentation](https://img.shields.io/badge/view-docs-blue)](https://theseus-os.github.io/Theseus/doc/___Theseus_Crates___/index.html)
 [![Book](https://img.shields.io/badge/view-book-blueviolet)](https://theseus-os.github.io/Theseus/book/index.html)
 [![Blog](https://img.shields.io/badge/view-blog-orange)](https://theseus-os.com)
 [![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?style=flat&logo=discord&logoColor=white)](https://discord.gg/NuUnqeYT8R)
+<br>
+[![Build Action](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/docs.yaml?label=build)](https://github.com/theseus-os/Theseus/actions/workflows/docs.yaml)
+[![Clippy Action](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/check-clippy.yaml?label=clippy)](https://github.com/theseus-os/Theseus/actions/workflows/check-clippy.yaml)
+[![QEMU tests](https://img.shields.io/github/actions/workflow/status/theseus-os/Theseus/test.yaml?label=QEMU%20tests)](https://github.com/theseus-os/Theseus/actions/workflows/test.yaml)
+
 
 Theseus is a new OS written from scratch in [Rust](https://www.rust-lang.org/) to experiment with novel OS structure, better state management, and how to leverage **intralingual design** principles to shift OS responsibilities like resource management into the compiler.
 
