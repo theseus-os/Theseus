@@ -271,7 +271,7 @@ impl Path {
     pub fn file_stem(&self) -> Option<&str> {
         self.file_name().map(|name| match name.rsplit_once('.') {
             Some((before, _)) => {
-                if before == "" {
+                if before.is_empty() {
                     // The file starts with a `.` and has no other `.`s within.
                     name
                 } else {
@@ -440,7 +440,7 @@ impl Path {
     pub fn extension(&self) -> Option<&str> {
         self.file_name()
             .and_then(|file_name| file_name.rsplit_once('.'))
-            .and_then(|(before, after)| if before == "" { None } else { Some(after) })
+            .and_then(|(before, after)| if before.is_empty() { None } else { Some(after) })
     }
 }
 
