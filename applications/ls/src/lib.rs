@@ -9,7 +9,6 @@ extern crate path;
 
 use alloc::{
     string::String,
-    string::ToString,
     vec::Vec,
 };
 use core::fmt::Write;
@@ -45,7 +44,7 @@ pub fn main(args: Vec<String>) -> isize {
         return 0;
     }
 
-    let path = Path::new(matches.free[0].to_string());
+    let path: &Path = matches.free[0].as_ref();
 
     // Navigate to the path specified by first argument
     match path.get(&curr_wd) {

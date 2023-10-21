@@ -24,7 +24,7 @@ use core::{
     ops::Deref,
 };
 use alloc::{
-    borrow::Cow,
+    borrow::{Cow, ToOwned},
     collections::BTreeSet,
     string::{String, ToString},
     sync::Arc,
@@ -44,7 +44,7 @@ use mod_mgmt::{
     StrongSectionRef,
     WeakDependent, StrRef,
 };
-use path::Path;
+use path::{Path, PathBuf, Component};
 use by_address::ByAddress;
 
 
@@ -231,7 +231,7 @@ pub fn swap_crates(
         let reexport_new_symbols_as_old = *reexport_new_symbols_as_old;
 
         // Populate the list of new crate names for future usage.
-        let new_crate_name = crate_name_from_path(&Path::new(new_crate_object_file.lock().get_name())).to_string();
+        let new_crate_name = crate_name_from_path(&PathBuf::from(new_crate_object_file.lock().get_name())).ok_or("invalid crate path")?.to_owned();
         new_crate_names.push(new_crate_name.clone());
 
         // Get a reference to the old crate that is currently loaded into the `old_namespace`.
@@ -651,8 +651,8 @@ pub fn swap_crates(
             // FIXME: currently we use a hack to determine which namespace this freshly-loaded crate should be added to,
             //        based on which directory its object file 
             {
-                let objfile_path = Path::new(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
-                if objfile_path.components().nth(1) == Some(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
+                let objfile_path = PathBuf::from(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
+                if objfile_path.components().nth(1) == Some(Component::Normal(mod_mgmt::CrateType::Kernel.default_namespace_name())) {
                     let new_target_ns = this_namespace.recursive_namespace().unwrap_or(this_namespace);
                     #[cfg(not(loscd_eval))]
                     warn!("temp fix: changing target_ns from {} to {}, for crate {:?}", this_namespace.name(), new_target_ns.name(), new_crate_ref);
@@ -919,7 +919,7 @@ impl SwapRequest {
     ///    as the `this_namespace` argument that `swap_crates()` is invoked with. 
     /// 
     /// * `new_crate_object_file`: a type that can be converted into a crate object file.
-    ///    This can either be a direct reference to the file, an absolute `Path` that points to the file,
+    ///    This can either be a direct reference to the file, an absolute `PathBuf` that points to the file,
     ///    or a prefix string used to find the file in the new namespace's directory of crate object files. 
     /// 
     /// * `new_namespace`: the `CrateNamespace` to which the new crate will be loaded and its symbols added.
@@ -957,8 +957,10 @@ impl SwapRequest {
                     let mut matching_files = CrateNamespace::get_crate_object_files_starting_with(&old_namespace, ocn);
                     if matching_files.len() == 1 {
                         let (old_crate_file, real_old_namespace) = matching_files.remove(0);
-                        let old_crate_file_path = Path::new(old_crate_file.lock().get_name());
-                        let old_crate_full_name = crate_name_from_path(&old_crate_file_path).to_string();
+                        let old_crate_file_path = PathBuf::from(old_crate_file.lock().get_name());
+                        let old_crate_full_name = crate_name_from_path(&old_crate_file_path)
+                            .ok_or(InvalidSwapRequest::OldCrateNotFound(old_crate_name.map(|name| name.to_owned()), old_namespace.clone(), Vec::new()))?
+                            .into();
                         (Some(old_crate_full_name), real_old_namespace)
                     } else {
                         // Here, we couldn't find a single matching loaded crate or crate object file, so we return an error. 
@@ -1004,7 +1006,7 @@ impl SwapRequest {
                 _ => if path.is_absolute() {
                     return Err(InvalidSwapRequest::NewCrateAbsolutePathNotFound(path));
                 } else {
-                    return Err(InvalidSwapRequest::NewCratePathNotAbsolute(path));
+                    return Err(InvalidSwapRequest::NewCratePathBufNotAbsolute(path));
                 },
             }
             IntoCrateObjectFile::Prefix(prefix) => {
@@ -1045,10 +1047,10 @@ pub enum InvalidSwapRequest {
     /// The enclosed vector is the list of matching crate names or crate object file names 
     /// along with the `CrateNamespace` in which they were found. 
     OldCrateNotFound(Option<String>, Arc<CrateNamespace>, Vec<(String, Arc<CrateNamespace>)>),
-    /// The given absolute `Path` for the new crate object file could not be resolved.
-    NewCrateAbsolutePathNotFound(Path),
-    /// The given `Path` for the new crate object file was not an absolute path, as expected.
-    NewCratePathNotAbsolute(Path),
+    /// The given absolute `PathBuf` for the new crate object file could not be resolved.
+    NewCrateAbsolutePathNotFound(PathBuf),
+    /// The given `PathBuf` for the new crate object file was not an absolute path, as expected.
+    NewCratePathBufNotAbsolute(PathBuf),
     /// A single crate object file could not be found by matching the given prefix `String`
     /// within the given new `CrateNamespace` (which was searched recursively).
     /// Either zero or multiple crate object files matched the prefix,
@@ -1072,11 +1074,11 @@ impl fmt::Debug for InvalidSwapRequest {
                 }
             }
             Self::NewCrateAbsolutePathNotFound(path) => {
-                dbg.field("reason", &"New Crate Absolute Path Not Found")
+                dbg.field("reason", &"New Crate Absolute PathBuf Not Found")
                     .field("path", &path);
             }
-            Self::NewCratePathNotAbsolute(path) => {
-                dbg.field("reason", &"New Crate Path Not Absolute")
+            Self::NewCratePathBufNotAbsolute(path) => {
+                dbg.field("reason", &"New Crate PathBuf Not Absolute")
                     .field("path", &path);
             }
             Self::NewCratePrefixNotFound(prefix, new_namespace, matches) => {

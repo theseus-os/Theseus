@@ -13,7 +13,7 @@ use alloc::vec::Vec;
 use alloc::string::String;
 use alloc::string::ToString;
 use getopts::Options;
-use path::Path;
+use path::PathBuf;
 use fs_node::{FsNode, FileOrDir};
 
 
@@ -56,7 +56,7 @@ pub fn remove_node(args: Vec<String>) -> Result<(), String> {
     }
 
     for path_string in &matches.free {
-        let path = Path::new(path_string.clone());
+        let path = PathBuf::from(path_string.clone());
         let node_to_delete = match path.get(&working_dir) {
             Some(node) => node,
             _ => return Err(format!("Couldn't find path {path}")),

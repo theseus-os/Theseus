@@ -25,12 +25,12 @@ use crate_metadata::CrateType;
 /// * be absolute or relative,
 /// * optionally end with an extension, e.g., `".o"`,   optionally start 
 /// * optionally start with a module file prefix, e.g., `"k#my_crate-<hash>.o"`.
-pub fn crate_name_from_path(object_file_path: &Path) -> &str {
-    let stem = object_file_path.file_stem();
+pub fn crate_name_from_path(object_file_path: &Path) -> Option<&str> {
+    let stem = object_file_path.file_stem()?;
     if let Ok((_crate_type, _prefix, name)) = CrateType::from_module_name(stem) {
-        name
+        Some(name)
     } else {
-        stem
+        Some(stem)
     }
 }
 

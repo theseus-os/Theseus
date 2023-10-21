@@ -1,9 +1,8 @@
 //! Builtin shell commands.
 
 use crate::{Error, Result, Shell};
-use alloc::{borrow::ToOwned, string::ToString};
+use alloc::string::ToString;
 use app_io::println;
-use path::Path;
 
 // TODO: Decide which builtins we don't need.
 
@@ -64,15 +63,16 @@ impl Shell {
             return Err(Error::Command(1));
         }
 
-        let path = Path::new(if let Some(arg) = args.first() {
-            (*arg).to_owned()
+        let path = if let Some(arg) = args.first() {
+            *arg
         } else {
-            "/".to_owned()
-        });
+            "/"
+        }
+        .as_ref();
 
         let task = task::get_my_current_task().ok_or(Error::CurrentTaskUnavailable)?;
 
-        match task.get_env().lock().chdir(&path) {
+        match task.get_env().lock().chdir(path) {
             Ok(()) => Ok(()),
             Err(_) => {
                 println!("no such file or directory: {path}");
