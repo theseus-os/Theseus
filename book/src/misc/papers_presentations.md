@@ -53,4 +53,4 @@ This page offers a selected collection of the slide decks from those talks (incl
 * [Rust vs. C, with short Rust intro](https://docs.google.com/presentation/d/e/2PACX-1vQYomAnfTNucuCqYgNkPaxpIdrhPxil9Qzle_6-xd7TYfdEBlgML0B3vztdNC2odwc25dLzW3XsithZ/pub?start=false&loop=false) — 
   [[Video Talk](https://www.youtube.com/watch?v=mmJiwscpB4o)]
 
-<!-- cspell:ignore OSDI, PLOS, Ramla Ijaz -->
+<!-- cspell:ignore OSDI, PLOS, KISV, Ramla Ijaz -->
