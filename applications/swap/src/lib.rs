@@ -72,7 +72,7 @@ fn rmain(matches: Matches) -> Result<(), String> {
         return Err("failed to get current task".to_string());
     };
     let override_namespace_crate_dir = if let Some(path) = matches.opt_str("d") {
-        let path = Path::new(path);
+        let path: &Path = path.as_ref();
         let dir = match path.get(&curr_dir) {
             Some(FileOrDir::Dir(dir)) => dir,
             _ => return Err(format!("Error: could not find specified namespace crate directory: {path}.")),
@@ -166,7 +166,7 @@ fn do_swap(
             let (into_new_crate_file, new_namespace) = {
                 if let Some(f) = override_namespace_crate_dir.as_ref().and_then(|ns_dir| ns_dir.get_file_starting_with(new_crate_str)) {
                     (IntoCrateObjectFile::File(f), None)
-                } else if let Some(FileOrDir::File(f)) = Path::new(String::from(new_crate_str)).get(curr_dir) {
+                } else if let Some(FileOrDir::File(f)) = Path::new(new_crate_str).get(curr_dir) {
                     (IntoCrateObjectFile::File(f), None)
                 } else {
                     (IntoCrateObjectFile::Prefix(String::from(new_crate_str)), None)
