@@ -11,13 +11,17 @@ This page offers a selected collection of the slide decks from those talks (incl
       [OSDI 2020 Video Talk](https://www.youtube.com/watch?v=i1pLDZKtlBI) — 
       [OSDI 2020 Short Video](https://www.youtube.com/watch?v=T0Du5vps9aU) — 
       [Slides (PDF)](https://www.usenix.org/sites/default/files/conference/protected-files/osdi20_slides_boos.pdf)
-* \[OSDI 2022\] Poster: [Correct and Performant Device Drivers via Intralingual Design](https://www.usenix.org/conference/osdi22/poster-session)
-    * An overview of in-progress work to use formal verification + intralingual design for better device drivers.
-    * [Poster PDF](https://www.theseus-os.com/kevinaboos/docs/OSDI%202022%20Poster.pdf)
+* \[[KISV 2023](https://kisv-workshop.github.io/program/)\] **[Leveraging Rust for Lightweight OS Correctness](https://dl.acm.org/doi/10.1145/3625275.3625398)**
+    * A paper about extending intralingual design and applying a hybrid approach (type systems plus formal verification) for lightweight correctness guarantees to Theseus's memory management subsystem.
+    * [Paper (PDF)](https://dl.acm.org/doi/pdf/10.1145/3625275.3625398)
+
 * Kevin Boos PhD Dissertation: [Theseus: Rethinking Operating Systems Structure and State Management](https://scholarship.rice.edu/handle/1911/109201)
 * Ramla Ijaz Master's Thesis: [Exploring Intralingual Design in Operating Systems](https://scholarship.rice.edu/handle/1911/109609)
  
-### Older papers
+### Other published works
+* \[OSDI 2022\] Poster: [Correct and Performant Device Drivers via Intralingual Design](https://www.usenix.org/conference/osdi22/poster-session)
+    * An overview of in-progress work to use formal verification + intralingual design for better device drivers.
+    * [Poster PDF](https://www.theseus-os.com/kevinaboos/docs/OSDI%202022%20Poster.pdf)
 * \[PLOS 2017\] [Theseus: A State Spill-free Operating System](https://www.sigops.org/s/conferences/sosp/2017/workshops.html)
     * [Paper PDF](https://www.theseus-os.com/kevinaboos/docs/theseus_plos2017.pdf) — a shorter, outdated ideas paper about early Theseus design.
     * Superseded by the OSDI 2020 paper. 
@@ -28,6 +32,7 @@ This page offers a selected collection of the slide decks from those talks (incl
 
 ## Selected Presentations and Slide Decks
 
+* [Theseus: a Rust-native OS for Safety and Reliability (Sept 2023)](https://docs.google.com/presentation/d/e/2PACX-1vSq144Pl5Ql02OP9zq80wuy7iI1GwUNfCwUelpKay2qeIis4uMY2qOfSgIKeG7Rb053fMoVXXHa3ka9/pub?start=false&loop=false) – [[Video talk](https://www.bilibili.com/video/BV1d34y1373n/)]
 * [How Theseus uses Rust, plus Rust challenges (early 2022)](https://docs.google.com/presentation/d/e/2PACX-1vQ2InjW_5kpdepoJ9vdsH-B1G4mvcjohcj_CA2dzx-tVRz0ee52qo1bwCQ7TnDGE9PiE5doW4sIO_7W/pub?start=false&loop=false)
 * [How Safe-language OSes work, with Theseus examples](https://docs.google.com/presentation/d/e/2PACX-1vSa0gp8sbq8S9MB4V-FYjs6xJGIPm0fsZSVdtZ9U2bQWRX9gngwztXTIJiRwxtAosLWPk0v60abDMTU/pub?start=false&loop=false) — 
   [[Video Talk](https://www.youtube.com/watch?v=n7r8zO7SodE)]
