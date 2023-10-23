@@ -1,0 +1,9 @@
+[package]
+name = "libtheseus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+path = { path = "../path" }
+random = { path = "../random" }
+task = { path = "../task" }

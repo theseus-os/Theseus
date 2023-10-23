@@ -1,0 +1,11 @@
+[package]
+name = "theseus-shim"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+core = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-core' }
+compiler_builtins = { version = "0.1.73", optional = true }
+
+[features]
+rustc-dep-of-std = ['core', 'compiler_builtins']

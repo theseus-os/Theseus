@@ -13,6 +13,7 @@ members = [
 	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
+	"shim",
 ]
 
 
@@ -55,7 +56,6 @@ exclude = [
 
 	## Exclude tlibc and libtheseus, which are currently built separately.
 	"tlibc",
-	"libtheseus",
 
 	########################################################################################
 	## Below, we exclude things that should NEVER be considered part of Theseus's workspace.

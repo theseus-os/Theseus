@@ -511,6 +511,12 @@ name = "color"
 version = "0.1.0"
 
 [[package]]
+name = "compiler_builtins"
+version = "0.1.101"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "01a6d58e9c3408138099a396a98fd0d0e6cfb25d723594d2ae48b5004513fd5b"
+
+[[package]]
 name = "compositor"
 version = "0.1.0"
 dependencies = [
@@ -1827,6 +1833,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "libtheseus"
+version = "0.1.0"
+dependencies = [
+ "path",
+ "random",
+ "task",
+]
+
+[[package]]
 name = "linked_list_allocator"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3086,6 +3101,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "410f7acf3cb3a44527c5d9546bad4bf4e6c460915d5f9f2fc524498bfe8f70ce"
 
 [[package]]
+name = "rustc-std-workspace-core"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1956f5517128a2b6f23ab2dadf1a976f4f5b27962e7724c2bf3d45e539ec098c"
+
+[[package]]
 name = "rustc_version"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3849,6 +3870,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "test_std"
+version = "0.1.0"
+dependencies = [
+ "app_io",
+ "theseus-shim",
+]
+
+[[package]]
 name = "test_std_fs"
 version = "0.1.0"
 dependencies = [
@@ -3950,6 +3979,14 @@ dependencies = [
  "log",
  "unicode-width",
  "vte",
+]
+
+[[package]]
+name = "theseus-shim"
+version = "0.1.0"
+dependencies = [
+ "compiler_builtins",
+ "rustc-std-workspace-core",
 ]
 
 [[package]]
