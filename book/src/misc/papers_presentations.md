@@ -12,7 +12,7 @@ This page offers a selected collection of the slide decks from those talks (incl
       [OSDI 2020 Short Video](https://www.youtube.com/watch?v=T0Du5vps9aU) — 
       [Slides (PDF)](https://www.usenix.org/sites/default/files/conference/protected-files/osdi20_slides_boos.pdf)
 * \[[KISV 2023](https://kisv-workshop.github.io/program/)\] **[Leveraging Rust for Lightweight OS Correctness](https://dl.acm.org/doi/10.1145/3625275.3625398)**
-    * A paper about extending intralingual design and applying a hybrid approach (type systems plus formal verification) for lightweight correctness guarantees to Theseus's memory management subsystem.
+    * A paper about extending intralingual design and applying a hybrid approach (type systems plus formal verification) for proving lightweight correctness guarantees about Theseus's memory management subsystem.
     * [Paper (PDF)](https://dl.acm.org/doi/pdf/10.1145/3625275.3625398)
 
 * Kevin Boos PhD Dissertation: [Theseus: Rethinking Operating Systems Structure and State Management](https://scholarship.rice.edu/handle/1911/109201)

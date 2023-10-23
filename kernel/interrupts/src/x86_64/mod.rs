@@ -294,8 +294,8 @@ pub fn eoi(irq: InterruptNumber) {
             }
         }
         InterruptChip::PIC => {
-            if let Some(pic) = PIC.get() {
-                pic.notify_end_of_interrupt(irq);
+            if let Some(_pic) = PIC.get() {
+                _pic.notify_end_of_interrupt(irq);
             } else {
                 error!("BUG: couldn't get PIC instance to send EOI!");
             }  
