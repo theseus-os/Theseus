@@ -10,11 +10,9 @@ extern crate root;
 extern crate task;
 
 use alloc::string::String;
-use alloc::string::ToString;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use getopts::Options;
-use path::Path;
 
 pub fn main(args: Vec<String>) -> isize {
     let mut opts = Options::new();
@@ -38,8 +36,8 @@ pub fn main(args: Vec<String>) -> isize {
     if matches.free.is_empty() {
         curr_env.lock().working_dir = Arc::clone(root::get_root());
     } else {
-        let path = Path::new(matches.free[0].to_string());
-        match curr_env.lock().chdir(&path) {
+        let path = matches.free[0].as_ref();
+        match curr_env.lock().chdir(path) {
             Err(environment::Error::NotADirectory) => {
                 println!("not a directory: {}", path);
                 return -1;
