@@ -66,7 +66,7 @@ impl AsMut<Path> for str {
     #[inline]
     fn as_mut(&mut self) -> &mut Path {
         // SAFETY: Path has the same type layout as str. This is the same
-        // implementation as std: https://doc.rust-lang.org/src/std/path.rs.html#2044-2048
+        // implementation as std: https://github.com/rust-lang/rust/blob/f654229c27267334023a22233795b88b75fc340e/library/std/src/path.rs#L2047
         unsafe { &mut *(self as *mut str as *mut Path) }
     }
 }
@@ -113,7 +113,7 @@ impl Path {
         S: AsRef<str> + ?Sized,
     {
         // SAFETY: Path has the same type layout as str. This is the same
-        // implementation as std: https://doc.rust-lang.org/src/std/path.rs.html#2040-2042
+        // implementation as std: https://github.com/rust-lang/rust/blob/f654229c27267334023a22233795b88b75fc340e/library/std/src/path.rs#L2041
         unsafe { &*(s.as_ref() as *const str as *const Path) }
     }
 
