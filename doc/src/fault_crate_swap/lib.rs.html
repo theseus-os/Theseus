@@ -538,7 +538,7 @@
     NamespaceDir,
     IntoCrateObjectFile,
 };
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::PathBuf;
 <span class="kw">use </span>crate_swap::{SwapRequest, swap_crates};
 <span class="kw">use </span>fault_log::{RecoveryAction, FaultEntry, remove_unhandled_exceptions, log_handled_fault};
 
@@ -582,7 +582,7 @@
         </span><span class="kw">let </span>(into_new_crate_file, new_namespace) = {
             <span class="kw">if let </span><span class="prelude-val">Some</span>(f) = override_namespace_crate_dir.as_ref().and_then(|ns_dir| ns_dir.get_file_starting_with(crate_name)) {
                 (IntoCrateObjectFile::File(f), <span class="prelude-val">None</span>)
-            } <span class="kw">else if let </span><span class="prelude-val">Some</span>(FileOrDir::File(f)) = Path::new(String::from(crate_name)).get(curr_dir) {
+            } <span class="kw">else if let </span><span class="prelude-val">Some</span>(FileOrDir::File(f)) = PathBuf::from(String::from(crate_name)).get(curr_dir) {
                 (IntoCrateObjectFile::File(f), <span class="prelude-val">None</span>)
             } <span class="kw">else </span>{
                 (IntoCrateObjectFile::Prefix(String::from(crate_name)), <span class="prelude-val">None</span>)

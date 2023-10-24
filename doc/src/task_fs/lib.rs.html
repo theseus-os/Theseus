@@ -521,7 +521,7 @@
 <span class="kw">use </span>fs_node::{DirRef, WeakDirRef, Directory, FileOrDir, File, FileRef, FsNode};
 <span class="kw">use </span>memory::MappedPages;
 <span class="kw">use </span>task::WeakTaskRef;
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::{Path, PathBuf};
 <span class="kw">use </span>io::{ByteReader, ByteWriter, KnownLength, IoError};
 
 
@@ -625,7 +625,7 @@
     <span class="doccomment">/// The name of the directory
     </span><span class="kw">pub </span>name: String,
     <span class="doccomment">/// The absolute path of the TaskDir
-    </span>path: Path,
+    </span>path: PathBuf,
     task_id: usize,
     taskref: WeakTaskRef,
     <span class="doccomment">/// We can store the parent (TaskFs) because it is a persistent directory
@@ -642,7 +642,7 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>directory = TaskDir {
             name,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}&quot;</span>)),
+            path: PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}&quot;</span>)),
             task_id,
             taskref,
             parent: Arc::clone(parent),
@@ -706,7 +706,7 @@
 </span><span class="kw">pub struct </span>TaskFile {
     taskref: WeakTaskRef,
     task_id: usize,
-    path: Path, 
+    path: PathBuf, 
 }
 
 <span class="kw">impl </span>TaskFile {
@@ -714,7 +714,7 @@
         TaskFile {
             taskref,
             task_id,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/task_info&quot;</span>)), 
+            path: PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/task_info&quot;</span>)), 
         }
     }
 
@@ -759,7 +759,7 @@
     }
 
     <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
-        <span class="kw">let </span>path = Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
+        <span class="kw">let </span>path = PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
         <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>path) {
             <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
@@ -812,7 +812,7 @@
 </span><span class="kw">pub struct </span>MmiDir {
     taskref: WeakTaskRef,
     task_id: usize,
-    path: Path, 
+    path: PathBuf, 
 }
 
 <span class="kw">impl </span>MmiDir {
@@ -821,7 +821,7 @@
         MmiDir {
             taskref,
             task_id,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/mmi&quot;</span>)),
+            path: PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/mmi&quot;</span>)),
         }
     }
 }
@@ -862,7 +862,7 @@
     }
 
     <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
-        <span class="kw">let </span>path = Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
+        <span class="kw">let </span>path = PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{}/{}&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
         <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>path) {
             <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
@@ -881,7 +881,7 @@
 </span><span class="kw">pub struct </span>MmiFile {
     taskref: WeakTaskRef,
     task_id: usize,
-    path: Path, 
+    path: PathBuf, 
 }
 
 <span class="kw">impl </span>MmiFile {
@@ -889,7 +889,7 @@
         MmiFile {
             taskref,
             task_id,
-            path: Path::new(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo&quot;</span>)), 
+            path: PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{TASKS_DIRECTORY_PATH}/{task_id}/mmi/MmiInfo&quot;</span>)), 
         }
     }
 
@@ -913,7 +913,7 @@
     }
 
     <span class="kw">fn </span>get_parent_dir(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;DirRef&gt; {
-        <span class="kw">let </span>path = Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
+        <span class="kw">let </span>path = PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{}/{}/mmi&quot;</span>, TASKS_DIRECTORY_PATH, <span class="self">self</span>.task_id));
         <span class="kw">match </span>Path::get_absolute(<span class="kw-2">&amp;</span>path) {
             <span class="prelude-val">Some</span>(FileOrDir::Dir(d)) =&gt; <span class="prelude-val">Some</span>(d),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,

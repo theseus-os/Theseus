@@ -949,7 +949,7 @@
 </span><span class="kw">use </span>alloc::{collections::{BTreeMap, BTreeSet}, string::{String, ToString}, sync::Arc};
 <span class="kw">use crate</span>::{CrateNamespace, mp_range, CLS_SECTION_FLAG};
 <span class="kw">use </span>fs_node::FileRef;
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::PathBuf;
 <span class="kw">use </span>rustc_demangle::demangle;
 <span class="kw">use </span>spin::Mutex;
 <span class="kw">use </span>cow_arc::{CowArc, CowWeak};
@@ -1019,7 +1019,7 @@
         CrateNamespace::get_crate_object_file_starting_with(namespace, NANO_CORE_FILENAME_PREFIX)
             .ok_or(<span class="string">&quot;couldn&#39;t find the expected \&quot;nano_core\&quot; kernel file&quot;</span>)
     );
-    <span class="kw">let </span>nano_core_file_path = Path::new(nano_core_file.lock().get_absolute_path());
+    <span class="kw">let </span>nano_core_file_path = PathBuf::from(nano_core_file.lock().get_absolute_path());
     <span class="macro">debug!</span>(
         <span class="string">&quot;parse_nano_core(): trying to load and parse the nano_core file: {:?}&quot;</span>,
         nano_core_file_path

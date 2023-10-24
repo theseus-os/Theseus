@@ -3222,6 +3222,9 @@
 <a href="#3222" id="3222">3222</a>
 <a href="#3223" id="3223">3223</a>
 <a href="#3224" id="3224">3224</a>
+<a href="#3225" id="3225">3225</a>
+<a href="#3226" id="3226">3226</a>
+<a href="#3227" id="3227">3227</a>
 </pre></div><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(int_roundings)]
@@ -3245,7 +3248,7 @@
 <span class="kw">use </span>qp_trie::Trie;
 <span class="kw">use </span>fs_node::{FileOrDir, File, FileRef, DirRef};
 <span class="kw">use </span>vfs_node::VFSDirectory;
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::{Path, PathBuf};
 <span class="kw">use </span>memfs::MemFile;
 <span class="kw">use </span>hashbrown::HashMap;
 <span class="kw">use </span>crate_metadata_serde::{CLS_SECTION_FLAG, CLS_SYMBOL_TYPE};
@@ -3611,7 +3614,7 @@
     <span class="doccomment">/// A direct reference to the crate object file. This will be used as-is. 
     </span>File(FileRef),
     <span class="doccomment">/// An absolute path that points to the crate object file. 
-    </span>AbsolutePath(Path),
+    </span>AbsolutePath(PathBuf),
     <span class="doccomment">/// A string prefix that will be used to search for the crate object file in the namespace.
     /// This must be able to uniquely identify a single crate object file in the namespace directory (recursively searched). 
     </span>Prefix(String),
@@ -4276,8 +4279,11 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;(StrongCrateRef, ElfFile&lt;<span class="lifetime">&#39;f</span>&gt;), <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
         <span class="kw">let </span>mapped_pages  = crate_file.as_mapping()<span class="question-mark">?</span>;
         <span class="kw">let </span>size_in_bytes = crate_file.len();
-        <span class="kw">let </span>abs_path      = Path::new(crate_file.get_absolute_path());
-        <span class="kw">let </span>crate_name    = StrRef::from(crate_name_from_path(<span class="kw-2">&amp;</span>abs_path));
+        <span class="kw">let </span>abs_path      = PathBuf::from(crate_file.get_absolute_path());
+        <span class="kw">let </span>crate_name    = StrRef::from(
+            crate_name_from_path(<span class="kw-2">&amp;</span>abs_path)
+                .ok_or(<span class="string">&quot;failed to get crate name from path&quot;</span>)<span class="question-mark">?
+        </span>);
 
         <span class="comment">// First, check to make sure this crate hasn&#39;t already been loaded. 
         // Application crates are now added to the CrateNamespace just like kernel crates,
@@ -6063,9 +6069,9 @@
             // The object files from the recursive namespace(s) are appended after the files in the initial namespace,
             // so they&#39;ll only be searched if the symbol isn&#39;t found in the current namespace.
             </span><span class="kw">for </span>(potential_crate_file, ns_of_crate_file) <span class="kw">in </span><span class="self">self</span>.method_get_crate_object_files_starting_with(<span class="kw-2">&amp;</span>potential_crate_name) {
-                <span class="kw">let </span>potential_crate_file_path = Path::new(potential_crate_file.lock().get_absolute_path());
+                <span class="kw">let </span>potential_crate_file_path = PathBuf::from(potential_crate_file.lock().get_absolute_path());
                 <span class="comment">// Check to make sure this crate is not already loaded into this namespace (or its recursive namespace).
-                </span><span class="kw">if </span><span class="self">self</span>.get_crate(crate_name_from_path(<span class="kw-2">&amp;</span>potential_crate_file_path)).is_some() {
+                </span><span class="kw">if </span><span class="self">self</span>.get_crate(crate_name_from_path(<span class="kw-2">&amp;</span>potential_crate_file_path)<span class="question-mark">?</span>).is_some() {
                     <span class="macro">trace!</span>(<span class="string">&quot;  (skipping already-loaded crate {:?})&quot;</span>, potential_crate_file_path);
                     <span class="kw">continue</span>;
                 }

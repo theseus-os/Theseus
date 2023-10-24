@@ -1051,7 +1051,7 @@
 <span class="kw">use </span>task::{Task, TaskRef, RestartInfo, RunState, JoinableTaskRef, ExitableTaskRef, FailureCleanupFunction};
 <span class="kw">use </span>task_struct::ExposedTask;
 <span class="kw">use </span>mod_mgmt::{CrateNamespace, SectionType, SECTION_HASH_DELIMITER};
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::{Path, PathBuf};
 <span class="kw">use </span>fs_node::FileOrDir;
 <span class="kw">use </span>preemption::{hold_preemption, PreemptionGuard};
 <span class="kw">use </span>no_drop::NoDrop;
@@ -1231,7 +1231,7 @@
 ///    If not provided, the new Task will be spawned within the same namespace as the current task.
 /// 
 </span><span class="kw">pub fn </span>new_application_task_builder(
-    crate_object_file: Path, <span class="comment">// TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
+    crate_object_file: <span class="kw-2">&amp;</span>Path, <span class="comment">// TODO FIXME: use `mod_mgmt::IntoCrateObjectFile`,
     </span>new_namespace: <span class="prelude-ty">Option</span>&lt;Arc&lt;CrateNamespace&gt;&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;TaskBuilder&lt;MainFunc, MainFuncArg, MainFuncRet&gt;, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
     
@@ -1240,7 +1240,7 @@
         .ok_or(<span class="string">&quot;spawn::new_application_task_builder(): couldn&#39;t get current task&quot;</span>)<span class="question-mark">?</span>;
     
     <span class="kw">let </span>crate_object_file = <span class="kw">match </span>crate_object_file.get(namespace.dir())
-        .or_else(|| Path::new(<span class="macro">format!</span>(<span class="string">&quot;{}.o&quot;</span>, <span class="kw-2">&amp;</span>crate_object_file)).get(namespace.dir())) <span class="comment">// retry with &quot;.o&quot; extension
+        .or_else(|| PathBuf::from(<span class="macro">format!</span>(<span class="string">&quot;{}.o&quot;</span>, <span class="kw-2">&amp;</span>crate_object_file)).get(namespace.dir())) <span class="comment">// retry with &quot;.o&quot; extension
     </span>{
         <span class="prelude-val">Some</span>(FileOrDir::File(f)) =&gt; f,
         <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;Couldn&#39;t find specified file path for new application crate&quot;</span>),

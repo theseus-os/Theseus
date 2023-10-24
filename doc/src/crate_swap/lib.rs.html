@@ -1099,6 +1099,8 @@
 <a href="#1099" id="1099">1099</a>
 <a href="#1100" id="1100">1100</a>
 <a href="#1101" id="1101">1101</a>
+<a href="#1102" id="1102">1102</a>
+<a href="#1103" id="1103">1103</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Defines functions and types for crate swapping, used in live evolution and fault recovery.
 //! 
 
@@ -1125,7 +1127,7 @@
     ops::Deref,
 };
 <span class="kw">use </span>alloc::{
-    borrow::Cow,
+    borrow::{Cow, ToOwned},
     collections::BTreeSet,
     string::{String, ToString},
     sync::Arc,
@@ -1145,7 +1147,7 @@
     StrongSectionRef,
     WeakDependent, StrRef,
 };
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::{Path, PathBuf, Component};
 <span class="kw">use </span>by_address::ByAddress;
 
 
@@ -1332,7 +1334,7 @@
         <span class="kw">let </span>reexport_new_symbols_as_old = <span class="kw-2">*</span>reexport_new_symbols_as_old;
 
         <span class="comment">// Populate the list of new crate names for future usage.
-        </span><span class="kw">let </span>new_crate_name = crate_name_from_path(<span class="kw-2">&amp;</span>Path::new(new_crate_object_file.lock().get_name())).to_string();
+        </span><span class="kw">let </span>new_crate_name = crate_name_from_path(<span class="kw-2">&amp;</span>PathBuf::from(new_crate_object_file.lock().get_name())).ok_or(<span class="string">&quot;invalid crate path&quot;</span>)<span class="question-mark">?</span>.to_owned();
         new_crate_names.push(new_crate_name.clone());
 
         <span class="comment">// Get a reference to the old crate that is currently loaded into the `old_namespace`.
@@ -1752,8 +1754,8 @@
             <span class="comment">// FIXME: currently we use a hack to determine which namespace this freshly-loaded crate should be added to,
             //        based on which directory its object file 
             </span>{
-                <span class="kw">let </span>objfile_path = Path::new(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
-                <span class="kw">if </span>objfile_path.components().nth(<span class="number">1</span>) == <span class="prelude-val">Some</span>(mod_mgmt::CrateType::Kernel.default_namespace_name()) {
+                <span class="kw">let </span>objfile_path = PathBuf::from(new_crate_ref.lock_as_ref().object_file.lock().get_absolute_path());
+                <span class="kw">if </span>objfile_path.components().nth(<span class="number">1</span>) == <span class="prelude-val">Some</span>(Component::Normal(mod_mgmt::CrateType::Kernel.default_namespace_name())) {
                     <span class="kw">let </span>new_target_ns = this_namespace.recursive_namespace().unwrap_or(this_namespace);
                     <span class="attr">#[cfg(not(loscd_eval))]
                     </span><span class="macro">warn!</span>(<span class="string">&quot;temp fix: changing target_ns from {} to {}, for crate {:?}&quot;</span>, this_namespace.name(), new_target_ns.name(), new_crate_ref);
@@ -2020,7 +2022,7 @@
     ///    as the `this_namespace` argument that `swap_crates()` is invoked with. 
     /// 
     /// * `new_crate_object_file`: a type that can be converted into a crate object file.
-    ///    This can either be a direct reference to the file, an absolute `Path` that points to the file,
+    ///    This can either be a direct reference to the file, an absolute `PathBuf` that points to the file,
     ///    or a prefix string used to find the file in the new namespace&#39;s directory of crate object files. 
     /// 
     /// * `new_namespace`: the `CrateNamespace` to which the new crate will be loaded and its symbols added.
@@ -2058,8 +2060,10 @@
                     </span><span class="kw">let </span><span class="kw-2">mut </span>matching_files = CrateNamespace::get_crate_object_files_starting_with(<span class="kw-2">&amp;</span>old_namespace, ocn);
                     <span class="kw">if </span>matching_files.len() == <span class="number">1 </span>{
                         <span class="kw">let </span>(old_crate_file, real_old_namespace) = matching_files.remove(<span class="number">0</span>);
-                        <span class="kw">let </span>old_crate_file_path = Path::new(old_crate_file.lock().get_name());
-                        <span class="kw">let </span>old_crate_full_name = crate_name_from_path(<span class="kw-2">&amp;</span>old_crate_file_path).to_string();
+                        <span class="kw">let </span>old_crate_file_path = PathBuf::from(old_crate_file.lock().get_name());
+                        <span class="kw">let </span>old_crate_full_name = crate_name_from_path(<span class="kw-2">&amp;</span>old_crate_file_path)
+                            .ok_or(InvalidSwapRequest::OldCrateNotFound(old_crate_name.map(|name| name.to_owned()), old_namespace.clone(), Vec::new()))<span class="question-mark">?
+                            </span>.into();
                         (<span class="prelude-val">Some</span>(old_crate_full_name), real_old_namespace)
                     } <span class="kw">else </span>{
                         <span class="comment">// Here, we couldn&#39;t find a single matching loaded crate or crate object file, so we return an error. 
@@ -2105,7 +2109,7 @@
                 <span class="kw">_ </span>=&gt; <span class="kw">if </span>path.is_absolute() {
                     <span class="kw">return </span><span class="prelude-val">Err</span>(InvalidSwapRequest::NewCrateAbsolutePathNotFound(path));
                 } <span class="kw">else </span>{
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(InvalidSwapRequest::NewCratePathNotAbsolute(path));
+                    <span class="kw">return </span><span class="prelude-val">Err</span>(InvalidSwapRequest::NewCratePathBufNotAbsolute(path));
                 },
             }
             IntoCrateObjectFile::Prefix(prefix) =&gt; {
@@ -2146,10 +2150,10 @@
     /// The enclosed vector is the list of matching crate names or crate object file names 
     /// along with the `CrateNamespace` in which they were found. 
     </span>OldCrateNotFound(<span class="prelude-ty">Option</span>&lt;String&gt;, Arc&lt;CrateNamespace&gt;, Vec&lt;(String, Arc&lt;CrateNamespace&gt;)&gt;),
-    <span class="doccomment">/// The given absolute `Path` for the new crate object file could not be resolved.
-    </span>NewCrateAbsolutePathNotFound(Path),
-    <span class="doccomment">/// The given `Path` for the new crate object file was not an absolute path, as expected.
-    </span>NewCratePathNotAbsolute(Path),
+    <span class="doccomment">/// The given absolute `PathBuf` for the new crate object file could not be resolved.
+    </span>NewCrateAbsolutePathNotFound(PathBuf),
+    <span class="doccomment">/// The given `PathBuf` for the new crate object file was not an absolute path, as expected.
+    </span>NewCratePathBufNotAbsolute(PathBuf),
     <span class="doccomment">/// A single crate object file could not be found by matching the given prefix `String`
     /// within the given new `CrateNamespace` (which was searched recursively).
     /// Either zero or multiple crate object files matched the prefix,
@@ -2173,11 +2177,11 @@
                 }
             }
             <span class="self">Self</span>::NewCrateAbsolutePathNotFound(path) =&gt; {
-                dbg.field(<span class="string">&quot;reason&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;New Crate Absolute Path Not Found&quot;</span>)
+                dbg.field(<span class="string">&quot;reason&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;New Crate Absolute PathBuf Not Found&quot;</span>)
                     .field(<span class="string">&quot;path&quot;</span>, <span class="kw-2">&amp;</span>path);
             }
-            <span class="self">Self</span>::NewCratePathNotAbsolute(path) =&gt; {
-                dbg.field(<span class="string">&quot;reason&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;New Crate Path Not Absolute&quot;</span>)
+            <span class="self">Self</span>::NewCratePathBufNotAbsolute(path) =&gt; {
+                dbg.field(<span class="string">&quot;reason&quot;</span>, <span class="kw-2">&amp;</span><span class="string">&quot;New Crate PathBuf Not Absolute&quot;</span>)
                     .field(<span class="string">&quot;path&quot;</span>, <span class="kw-2">&amp;</span>path);
             }
             <span class="self">Self</span>::NewCratePrefixNotFound(prefix, new_namespace, matches) =&gt; {

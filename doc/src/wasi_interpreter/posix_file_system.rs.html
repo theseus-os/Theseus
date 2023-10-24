@@ -490,9 +490,6 @@
 <a href="#490" id="490">490</a>
 <a href="#491" id="491">491</a>
 <a href="#492" id="492">492</a>
-<a href="#493" id="493">493</a>
-<a href="#494" id="494">494</a>
-<a href="#495" id="495">495</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Types for interacting with Theseus standard I/O and file system via POSIX-style abstraction.
 //!
 //! This module provides APIs to:
@@ -503,12 +500,11 @@
 //!
 
 </span><span class="kw">use </span>alloc::string::String;
-<span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::{cmp, convert::TryFrom <span class="kw">as _</span>};
 <span class="kw">use </span>fs_node::{DirRef, FileOrDir, FileRef, FsNode};
 <span class="kw">use </span>hashbrown::HashMap;
 <span class="kw">use </span>memfs::MemFile;
-<span class="kw">use </span>path::Path;
+<span class="kw">use </span>path::{PathBuf, Path};
 
 <span class="kw">const </span>FIRST_NONRESERVED_FD: wasi::Fd = <span class="number">3</span>;
 
@@ -641,12 +637,12 @@
     /// # Return
     /// Returns relative path of file descriptor as a string.
     </span><span class="kw">pub fn </span>get_relative_path(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; String {
-        <span class="kw">let </span>absolute_path = Path::new(<span class="self">self</span>.theseus_file_or_dir.get_absolute_path());
+        <span class="kw">let </span>absolute_path = PathBuf::from(<span class="self">self</span>.theseus_file_or_dir.get_absolute_path());
         <span class="kw">let </span>wd_path = task::with_current_task(|t|
-            Path::new(t.get_env().lock().cwd())
+            PathBuf::from(t.get_env().lock().cwd())
         ).expect(<span class="string">&quot;couldn&#39;t get current task&quot;</span>);
 
-        <span class="kw">let </span>relative_path: Path = absolute_path.relative(<span class="kw-2">&amp;</span>wd_path).unwrap();
+        <span class="kw">let </span>relative_path = absolute_path.relative(wd_path).unwrap();
         String::from(relative_path)
     }
 
@@ -876,12 +872,10 @@
         }
 
         <span class="comment">// Split path into parent directory path and base path.
-        </span><span class="kw">let </span>file_path: Path = Path::new(String::from(path));
-        <span class="kw">let </span><span class="kw-2">mut </span>file_path_tokens: Vec&lt;<span class="kw-2">&amp;</span>str&gt; = file_path.components().collect();
-        file_path_tokens.truncate(file_path_tokens.len().saturating_sub(<span class="number">1</span>));
-        <span class="kw">let </span>parent_dir_path: Path = Path::new(file_path_tokens.join(<span class="string">&quot;/&quot;</span>));
-        <span class="kw">let </span>base_name: <span class="kw-2">&amp;</span>str = file_path.basename();
-        <span class="kw">let </span>base_path: Path = Path::new(String::from(base_name));
+        </span><span class="kw">let </span>file_path: <span class="kw-2">&amp;</span>Path = path.as_ref();
+        <span class="kw">let </span>parent_dir_path = file_path.parent().ok_or(wasi::ERRNO_NOENT)<span class="question-mark">?</span>;
+        <span class="kw">let </span>base_name = file_path.file_name().ok_or(wasi::ERRNO_NOENT)<span class="question-mark">?</span>;
+        <span class="kw">let </span>base_path: <span class="kw-2">&amp;</span>Path = base_name.as_ref();
 
         <span class="comment">// Get parent directory.
         </span><span class="kw">let </span>parent_dir: DirRef = <span class="kw">match </span>parent_dir_path.get(<span class="kw-2">&amp;</span>starting_dir) {
