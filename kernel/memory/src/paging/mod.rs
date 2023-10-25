@@ -84,7 +84,7 @@ impl PageTable {
             .map_err(|_| ())?;
     
         Ok(PageTable { 
-            mapper: Mapper::with_p4_frame(*current_p4.start()),
+            mapper: Mapper::with_p4_frame(current_p4.start().into_4k_frame()),
             p4_table: current_p4,
         })
     }
@@ -104,7 +104,7 @@ impl PageTable {
         new_p4_frame: AllocatedFrames,
         page: Option<AllocatedPages>,
     ) -> Result<PageTable, &'static str> {
-        let p4_frame = *new_p4_frame.start();
+        let p4_frame = new_p4_frame.start().into_4k_frame();
 
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(page, new_p4_frame, current_page_table)?;
         temporary_page.with_table_and_frame(|new_table, frame| {
@@ -140,14 +140,16 @@ impl PageTable {
         where F: FnOnce(&mut Mapper, &Mapper) -> Result<R, &'static str>
     {
         let active_p4_frame = get_current_p4();
-        if self.p4_table.start() != &active_p4_frame || self.p4_table.end() != &active_p4_frame {
+        if self.p4_table.start().into_4k_frame() != active_p4_frame
+            || self.p4_table.end().into_4k_frame() != active_p4_frame
+        {
             return Err("PageTable::with(): this PageTable ('self') must be the currently active page table.");
         }
 
         // Temporarily take ownership of the other page table's p4 allocated frame and
         // create a new temporary page that maps to that frame.
         let other_p4 = core::mem::replace(&mut other_table.p4_table, AllocatedFrames::empty());
-        let other_p4_frame = *other_p4.start();
+        let other_p4_frame = other_p4.start().into_4k_frame();
         let mut temporary_page = TemporaryPage::create_and_map_table_frame(None, other_p4, self)?;
 
         // Overwrite upcoming page table recursive mapping.

@@ -10,6 +10,7 @@
 #![feature(int_roundings)]
 #![allow(incomplete_features)]
 #![feature(adt_const_params)]
+#![feature(more_qualified_paths)]
 
 #[cfg(test)]
 mod test;
@@ -21,7 +22,7 @@ use core::{
     marker::{ConstParamTy, PhantomData},
     ops::{Add, AddAssign, Deref, DerefMut, Sub, SubAssign},
 };
-use kernel_config::memory::{MAX_PAGE_NUMBER, PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
+use kernel_config::memory::{MAX_PAGE_NUMBER, MAX_VIRTUAL_ADDRESS, PAGE_SIZE, ENTRIES_PER_PAGE_TABLE};
 use zerocopy::FromBytes;
 use paste::paste;
 use derive_more::*;
@@ -39,7 +40,7 @@ pub enum MemChunkSize {
 ///
 /// This is used to parameterize `Page`- and `Frame`-related types with a page size,
 /// in order to define normal and huge pages in a generic manner.
-pub trait PageSize: Ord + PartialOrd + Clone + Copy + private::Sealed {
+pub trait PageSize: Ord + PartialOrd + Clone + Copy + private::Sealed + 'static {
     const SIZE: MemChunkSize;
     const NUM_4K_PAGES: usize;
     const SIZE_IN_BYTES: usize;
@@ -313,6 +314,20 @@ implement_address!(
 
 
 
+/// A macro for applying the same field/method accessors to all variants
+/// in an enum based on the three possible [`PageSize`]s.
+#[macro_export]
+macro_rules! chunk_sized_expr {
+    ($t:ty, $chunk:ident, .$($method:tt)*) => {
+        match $chunk {
+            <$t>::Normal4K(c) => c.$($method)*,
+            <$t>::Huge2M(c)   => c.$($method)*,
+            <$t>::Huge1G(c)   => c.$($method)*,
+        }
+    };
+}
+
+
 /// A macro for defining `Page` and `Frame` structs
 /// and implementing their common traits, which are generally identical.
 macro_rules! implement_page_frame {
@@ -364,7 +379,19 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> $TypeName<P> {
+            impl<P: PageSize> $TypeName<P> {
+                #[doc = "The minimum (smallest) valid value a `" $TypeName "` can have."]
+                pub const MIN: $TypeName<P> = $TypeName {
+                    number: 0,
+                    size: PhantomData,
+                };
+                
+                #[doc = "The maximum (largest) valid value a `" $TypeName "` can have."]
+                pub const MAX: $TypeName<P> = $TypeName {
+                    number: (MAX_VIRTUAL_ADDRESS / P::SIZE_IN_BYTES) * P::NUM_4K_PAGES,
+                    size: PhantomData,
+                };
+
                 #[doc = "Returns the 4K-sized number of this `" $TypeName "`."]
                 #[inline(always)]
                 pub const fn number(&self) -> usize {
@@ -381,12 +408,12 @@ macro_rules! implement_page_frame {
                     P::SIZE
                 }
             }
-            impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {
+            impl<P: PageSize> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                     write!(f, concat!(stringify!($TypeName), "(", $prefix, "{:#X})"), self.start_address())
                 }
             }
-            impl<P: PageSize + 'static> Add<usize> for $TypeName<P> {
+            impl<P: PageSize> Add<usize> for $TypeName<P> {
                 type Output = $TypeName<P>;
                 fn add(self, rhs: usize) -> $TypeName<P> {
                     // cannot exceed max page number (which is also max frame number)
@@ -399,7 +426,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> AddAssign<usize> for $TypeName<P> {
+            impl<P: PageSize> AddAssign<usize> for $TypeName<P> {
                 fn add_assign(&mut self, rhs: usize) {
                     *self = $TypeName {
                         number: core::cmp::min(
@@ -410,7 +437,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> Sub<usize> for $TypeName<P> {
+            impl<P: PageSize> Sub<usize> for $TypeName<P> {
                 type Output = $TypeName<P>;
                 fn sub(self, rhs: usize) -> $TypeName<P> {
                     $TypeName {
@@ -419,7 +446,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> SubAssign<usize> for $TypeName<P> {
+            impl<P: PageSize> SubAssign<usize> for $TypeName<P> {
                 fn sub_assign(&mut self, rhs: usize) {
                     *self = $TypeName {
                         number: self.number.saturating_sub(rhs.saturating_mul(P::NUM_4K_PAGES)),
@@ -427,7 +454,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> Step for $TypeName<P> {
+            impl<P: PageSize> Step for $TypeName<P> {
                 #[inline]
                 fn steps_between(start: &$TypeName<P>, end: &$TypeName<P>) -> Option<usize> {
                     Step::steps_between(&start.number, &end.number)
@@ -486,6 +513,48 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
+
+            #[doc = "A version of `" $TypeName "` that encodes its [`PageSize`]
+                with internal enum variants."]
+            #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+            pub enum [<$TypeName Sized>] {
+                Normal4K($TypeName<Page4K>),
+                Huge2M(  $TypeName<Page2M>),
+                Huge1G(  $TypeName<Page1G>),
+            }
+            impl From<$TypeName<Page4K>> for [<$TypeName Sized>] {
+                fn from(chunk: $TypeName<Page4K>) -> Self {
+                    Self::Normal4K(chunk)
+                }
+            }
+            impl From<$TypeName<Page2M>> for [<$TypeName Sized>] {
+                fn from(chunk: $TypeName<Page2M>) -> Self {
+                    Self::Huge2M(chunk)
+                }
+            }
+            impl From<$TypeName<Page1G>> for [<$TypeName Sized>] {
+                fn from(chunk: $TypeName<Page1G>) -> Self {
+                    Self::Huge1G(chunk)
+                }
+            }
+            impl [<$TypeName Sized>] {
+                pub const fn number(&self) -> usize {
+                    chunk_sized_expr!(Self, self, .number)
+                }
+                pub const fn start_address(&self) -> $address {
+                    chunk_sized_expr!(Self, self, .start_address())
+                }
+                #[doc = "Converts this `" [<$TypeName Sized>] "` into an identical
+                    4K-sized chunk with the same internal number."]
+                pub const fn [<into_4k_ $TypeName:lower>](self) -> $TypeName<Page4K> {
+                    // To make this a const fn, we cannot use the implementations of `Into`.
+                    match self {
+                        Self::Normal4K(c) => c,
+                        Self::Huge2M(c)   => $TypeName::<Page4K> { number: c.number, size: PhantomData },
+                        Self::Huge1G(c)   => $TypeName::<Page4K> { number: c.number, size: PhantomData },
+                    }
+                }
+            }            
         }
     };
 }
@@ -494,7 +563,7 @@ implement_page_frame!(Page, "virtual", "v", VirtualAddress);
 implement_page_frame!(Frame, "physical", "p", PhysicalAddress);
 
 // Implement other functions for the `Page` type that aren't relevant for `Frame.
-impl<P: PageSize + 'static> Page<P> {
+impl<P: PageSize> Page<P> {
     /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P4 page table entries list.
     pub const fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
@@ -532,11 +601,6 @@ macro_rules! implement_page_frame_range {
             pub struct $TypeName<P: PageSize = Page4K>(RangeInclusive<$chunk::<P>>);
 
             impl $TypeName<Page4K> {
-                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
-                pub const fn empty() -> Self {
-                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
-                }
-
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
                     all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
                 pub const fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
@@ -552,7 +616,15 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
-            impl<P: PageSize + 'static> $TypeName<P> {
+            impl<P: PageSize> $TypeName<P> {
+                #[doc = "Creates an empty `" $TypeName "` that will always yield `None` when iterated."]
+                pub const fn empty() -> Self {
+                    Self::new(
+                        $chunk { number: 1, size: PhantomData },
+                        $chunk { number: 0, size: PhantomData },
+                    )
+                }
+
                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
                 pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
                     $TypeName(RangeInclusive::new(start, end))
@@ -630,8 +702,7 @@ macro_rules! implement_page_frame_range {
                     && (other.start() >= self.start())
                     && (other.end() <= self.end())
                 }
-            }
-            impl<P: PageSize + Copy + 'static> $TypeName<P> {
+
                 #[doc = "Returns an inclusive `" $TypeName "` representing the [`" $chunk "`]s that overlap \
                     across this `" $TypeName "` and the given other `" $TypeName "`.\n\n \
                     If there is no overlap between the two ranges, `None` is returned."]
@@ -644,13 +715,32 @@ macro_rules! implement_page_frame_range {
                         None
                     }
                 }
+
+                #[doc = "Converts this range of [`" $chunk "`]s into an identical 4K-sized range."]
+                pub fn [<into_4k_ $chunk:lower s>](self) -> $TypeName<Page4K> {
+                    $TypeName::<Page4K>::new(
+                        $chunk::<Page4K> { number: self.0.start().number, size: PhantomData },
+                        $chunk::<Page4K> {
+                            // Add 1 because the end bound is inclusive;
+                            // Subtract 1 because the 4K end bound should extend right up to the end
+                            // of the 2M or 1G chunk, not one past it.
+                            number: (self.0.end().number + (1 * P::NUM_4K_PAGES) - 1),
+                            size: PhantomData,
+                        },
+                    )
+                }
             }
-            impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {
+            impl<P: PageSize> Default for $TypeName<P> {
+                fn default() -> Self {
+                    Self::empty()
+                }
+            }
+            impl<P: PageSize> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                     write!(f, "{:?}", self.0)
                 }
             }
-            impl<P: PageSize + 'static> Deref for $TypeName<P> {
+            impl<P: PageSize> Deref for $TypeName<P> {
                 type Target = RangeInclusive<$chunk<P>>;
                 fn deref(&self) -> &RangeInclusive<$chunk<P>> {
                     &self.0
@@ -661,7 +751,7 @@ macro_rules! implement_page_frame_range {
                     &mut self.0
                 }
             }
-            impl<P: PageSize + 'static> IntoIterator for $TypeName<P> {
+            impl<P: PageSize> IntoIterator for &'_ $TypeName<P> {
                 type Item = $chunk<P>;
                 type IntoIter = RangeInclusiveIterator<$chunk<P>>;
                 fn into_iter(self) -> Self::IntoIter {
@@ -669,31 +759,14 @@ macro_rules! implement_page_frame_range {
                 }
             }
 
-            
-            #[doc = "A `" $TypeName "` that implements `Copy`."]
-            #[derive(Clone, Copy)]
-            pub struct [<Copyable $TypeName>]<P: PageSize = Page4K> {
-                start: $chunk<P>,
-                end: $chunk<P>,
-            }
-            impl<P: PageSize + Copy + 'static> From<$TypeName<P>> for [<Copyable $TypeName>]<P> {
-                fn from(r: $TypeName<P>) -> Self {
-                    Self { start: *r.start(), end: *r.end() }
-                }
-            }
-            impl<P: PageSize + Copy + 'static> From<[<Copyable $TypeName>]<P>> for $TypeName<P> {
-                fn from(cr: [<Copyable $TypeName>]<P>) -> Self {
-                    Self::new(cr.start, cr.end)
-                }
-            }
             impl From<$TypeName<Page2M>> for $TypeName<Page4K> {
                 fn from(r: $TypeName<Page2M>) -> Self {
-                    Self::new($chunk::from(*r.start()), $chunk::from(*r.end()))
+                    r.[<into_4k_ $chunk:lower s>]()
                 }
             }
             impl From<$TypeName<Page1G>> for $TypeName<Page4K> {
                 fn from(r: $TypeName<Page1G>) -> Self {
-                    Self::new($chunk::from(*r.start()), $chunk::from(*r.end()))
+                    r.[<into_4k_ $chunk:lower s>]()
                 }
             }
             impl TryFrom<$TypeName<Page4K>> for $TypeName<Page2M> {

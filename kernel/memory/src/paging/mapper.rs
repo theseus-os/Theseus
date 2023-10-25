@@ -281,7 +281,7 @@ impl Mapper {
             .valid(true)
             .exclusive(true);
 
-        for page in pages.range().clone() {
+        for page in pages.range().iter() {
             let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
             let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
@@ -537,7 +537,7 @@ impl MappedPages {
             return Ok(());
         }
 
-        for page in self.pages.range().clone() {
+        for page in self.pages.range().iter() {
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))
@@ -613,7 +613,7 @@ impl MappedPages {
         let mut first_frame_range: Option<UnmappedFrames> = None; // this is what we'll return
         let mut current_frame_range: Option<UnmappedFrames> = None;
 
-        for page in self.pages.range().clone() {            
+        for page in self.pages.range().iter() {            
             let p1 = active_table_mapper.p4_mut()
                 .next_table_mut(page.p4_index())
                 .and_then(|p3| p3.next_table_mut(page.p3_index()))

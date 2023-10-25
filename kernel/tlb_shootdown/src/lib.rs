@@ -43,7 +43,7 @@ pub fn handle_tlb_shootdown_ipi() -> bool {
         // Note: logging in a NMI (x86_64) or FIQ (aarch64) context can cause deadlock,
         // so this should only be used sparingly to help debug problems with TLB shootdowns.
         // log::trace!("handle_tlb_shootdown_ipi(): CPU {}, pages: {:?}", apic::current_cpu(), pages);
-        for page in pages {
+        for page in pages.iter() {
             tlb_flush_virt_addr(page.start_address());
         }
         TLB_SHOOTDOWN_IPI_COUNT.fetch_sub(1, Ordering::Relaxed);
