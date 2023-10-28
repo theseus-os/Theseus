@@ -29,7 +29,7 @@ extern crate shapes;
 
 use alloc::collections::BTreeMap;
 use alloc::vec::{Vec};
-use core::hash::{Hash, Hasher, BuildHasher};
+use core::hash::{Hash, BuildHasher};
 use hashbrown::hash_map::{DefaultHashBuilder};
 use compositor::{Compositor, FramebufferUpdates, CompositableRegion};
 use framebuffer::{Framebuffer, Pixel};
@@ -268,8 +268,5 @@ impl Compositor for FrameCompositor {
 
 /// Gets the hash of an item
 fn hash<T: Hash>(item: T) -> u64 {
-    let builder = DefaultHashBuilder::default();
-    let mut hasher = builder.build_hasher();
-    item.hash(&mut hasher);
-    hasher.finish()
+    DefaultHashBuilder::default().hash_one(&item)
 }

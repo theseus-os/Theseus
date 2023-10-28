@@ -135,7 +135,7 @@ impl Shell {
         // TODO: Sort IDs.
         for (id, job) in self.jobs.lock().iter() {
             // TODO: Separate job parts if they are in different states.
-            let Some(state) = &job.parts.get(0).map(|part| &part.state) else {
+            let Some(state) = &job.parts.first().map(|part| &part.state) else {
                 continue;
             };
             let line = &job.string;

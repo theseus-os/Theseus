@@ -792,7 +792,7 @@ impl Shell {
     /// Try to match the incomplete command against all internal commands. Returns a
     /// vector that contains all matching results.
     fn find_internal_cmd_match(&mut self, incomplete_cmd: &String) -> Result<Vec<String>, &'static str> {
-        let internal_cmds = vec!["fg", "bg", "jobs", "clear"];
+        let internal_cmds = ["fg", "bg", "jobs", "clear"];
         let mut match_cmds = Vec::new();
         for cmd in internal_cmds.iter() {
             if cmd.starts_with(incomplete_cmd) {

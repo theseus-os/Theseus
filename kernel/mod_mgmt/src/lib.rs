@@ -141,7 +141,7 @@ fn parse_bootloader_modules_into_files(
 
     // Closure to create the directory for a new namespace.
     let create_dir = |dir_name: &str| -> Result<NamespaceDir, &'static str> {
-        VFSDirectory::create(dir_name.to_string(), &namespaces_dir).map(|d| NamespaceDir(d))
+        VFSDirectory::create(dir_name.to_string(), &namespaces_dir).map(NamespaceDir)
     };
 
     let mut process_module = |name: &str, size, pages| -> Result<_, &'static str> {

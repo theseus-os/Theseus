@@ -889,7 +889,7 @@ fn task_cleanup_final_internal(current_task: &ExitableTaskRef) {
     // that were lazily initialized during this execution of this task.
     for tls_dtor in thread_local_macro::take_current_tls_destructors().into_iter() {
         unsafe {
-            (tls_dtor.dtor)(tls_dtor.object_ptr as *mut u8);
+            (tls_dtor.dtor)(tls_dtor.object_ptr);
         }
     }
 
