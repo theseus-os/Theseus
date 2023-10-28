@@ -26,8 +26,8 @@ use alloc::{collections::BTreeSet, string::{String, ToString}, sync::Arc, vec::V
 use getopts::{Matches, Options};
 use memory::{Page, MappedPages, VirtualAddress, PteFlagsArch, PteFlags};
 use mod_mgmt::{CrateNamespace, StrongDependency, find_symbol_table, RelocationEntry, write_relocation};
-use rustc_demangle::demangle;
 use path::Path;
+use rustc_demangle::demangle;
 use xmas_elf::{
     ElfFile,
     program::SegmentData,
@@ -72,8 +72,7 @@ fn rmain(matches: Matches) -> Result<c_int, String> {
     ).map_err(|_| String::from("failed to get current task"))?;
 
     let path = matches.free.first().ok_or_else(|| "Missing path to ELF executable".to_string())?;
-    let path = Path::new(path.clone());
-    let file_ref = path.get_file(&curr_wd)
+    let file_ref = Path::new(path).get_file(&curr_wd)
         .ok_or_else(|| format!("Failed to access file at {path:?}"))?;
     let file = file_ref.lock();
 

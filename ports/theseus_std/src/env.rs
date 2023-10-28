@@ -12,7 +12,7 @@ pub fn current_dir() -> io::Result<DirRef> {
         )
         .and_then(|task| 
             match theseus_path::Path::get_absolute(
-                &task.get_env().lock().cwd().into()
+                &task.get_env().lock().cwd().as_ref()
             ) {
                 Some(FileOrDir::File(_)) => Err(io::Error::new(
                     io::ErrorKind::Other,

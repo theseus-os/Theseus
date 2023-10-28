@@ -2599,11 +2599,7 @@ name = "path"
 version = "0.1.0"
 dependencies = [
  "fs_node",
- "lazy_static",
- "log",
  "root",
- "spin 0.9.4",
- "vfs_node",
 ]
 
 [[package]]
