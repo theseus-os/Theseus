@@ -1082,13 +1082,27 @@ impl CrateNamespace {
             return Err("not a relocatable elf file");
         }
 
-        // If a `.theseus_merged` section exists, then the object file's sections have been merged by a partial relinking step.
+        // If a `.theseus_merged` section exists (it should come before any .text section),
+        // then the object file's sections have been merged by a partial relinking step.
         // If so, then we can use a much faster version of loading/linking.
         const THESEUS_MERGED_SEC_NAME: &str = ".theseus_merged";
-        const THESEUS_MERGED_SEC_SHNDX: u16 = 1;
-        let sections_are_merged = elf_file.section_header(THESEUS_MERGED_SEC_SHNDX)
-            .map(|sec| sec.get_name(&elf_file) == Ok(THESEUS_MERGED_SEC_NAME))
-            .unwrap_or(false);
+        let sections_are_merged = {
+            let mut found = false;
+            for sec_name in elf_file
+                .section_iter()
+                .filter_map(|sec| sec.get_name(&elf_file).ok())
+            {
+                if sec_name == THESEUS_MERGED_SEC_NAME {
+                    found = true;
+                    break;
+                }
+                else if sec_name.starts_with(TEXT_SECTION_NAME) {
+                    found = false;
+                    break;
+                }
+            }
+            found
+        };
 
         // Allocate enough space to load the sections
         let section_pages = allocate_section_pages(&elf_file, kernel_mmi_ref)?;
