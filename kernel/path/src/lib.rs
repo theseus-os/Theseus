@@ -397,8 +397,8 @@ impl Path {
                     }
                     (None, _) => comps.push(Component::ParentDir),
                     (Some(a), Some(b)) if comps.is_empty() && a == b => (),
-                    (Some(a), Some(b)) if b == Component::CurDir => comps.push(a),
-                    (Some(_), Some(b)) if b == Component::ParentDir => return None,
+                    (Some(a), Some(Component::CurDir)) => comps.push(a),
+                    (Some(_), Some(Component::ParentDir)) => return None,
                     (Some(a), Some(_)) => {
                         comps.push(Component::ParentDir);
                         for _ in itb {
