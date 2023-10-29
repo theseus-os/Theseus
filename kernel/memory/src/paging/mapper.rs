@@ -18,6 +18,7 @@ use core::{
     slice,
 };
 use log::{error, warn, debug, trace};
+use memory_structs::{Page4K, PageSize};
 use crate::{BROADCAST_TLB_SHOOTDOWN_FUNC, VirtualAddress, PhysicalAddress, Page, Frame, FrameRange, AllocatedPages, AllocatedFrames, UnmappedFrames}; 
 use crate::paging::{
     get_current_p4,
@@ -50,7 +51,7 @@ use kernel_config::memory::ENTRIES_PER_PAGE_TABLE;
 /// This is safe because the frame allocator can only be initialized once, and also because
 /// only this crate has access to that function callback and can thus guarantee
 /// that it is only invoked for `UnmappedFrameRange`.
-pub(super) static INTO_UNMAPPED_FRAMES_FUNC: Once<fn(FrameRange) -> UnmappedFrames> = Once::new();
+pub(super) static INTO_UNMAPPED_FRAMES_FUNC: Once<fn(FrameRange) -> UnmappedFrames<Page4K>> = Once::new();
 
 /// A convenience function to translate the given virtual address into a
 /// physical address using the currently-active page table.
@@ -189,14 +190,15 @@ impl Mapper {
     /// 
     /// Returns a tuple of the new `MappedPages` object containing the allocated `pages`
     /// and the allocated `frames` object.
-    pub(super) fn internal_map_to<Frames, Flags>(
+    pub(super) fn internal_map_to<Frames, FS, Flags>(
         &mut self,
         pages: AllocatedPages,
         frames: Frames,
         flags: Flags,
     ) -> Result<(MappedPages, Frames::Inner), &'static str> 
     where
-        Frames: OwnedOrBorrowed<AllocatedFrames>,
+        Frames: OwnedOrBorrowed<AllocatedFrames<FS>>,
+        FS: PageSize,
         Flags: Into<PteFlagsArch>,
     {
         let frames = frames.into_inner();
@@ -246,12 +248,16 @@ impl Mapper {
     /// Maps the given virtual `AllocatedPages` to the given physical `AllocatedFrames`.
     /// 
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object which contains those `AllocatedPages`.
-    pub fn map_allocated_pages_to<F: Into<PteFlagsArch>>(
+    pub fn map_allocated_pages_to<F, P>(
         &mut self,
         pages: AllocatedPages,
-        frames: AllocatedFrames,
+        frames: AllocatedFrames<P>,
         flags: F,
-    ) -> Result<MappedPages, &'static str> {
+    ) -> Result<MappedPages, &'static str>
+    where
+        F: Into<PteFlagsArch>,
+        P: PageSize,
+    {
         let (mapped_pages, frames) = self.internal_map_to(pages, Owned(frames), flags)?;
         
         // Currently we forget the actual `AllocatedFrames` object because
@@ -282,7 +288,8 @@ impl Mapper {
             .exclusive(true);
 
         for page in pages.range().clone() {
-            let af = frame_allocator::allocate_frames(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
+            // TODO
+            let af = frame_allocator::allocate_frames::<Page4K>(1).ok_or("map_allocated_pages(): couldn't allocate new frame, out of memory")?;
 
             let p3 = self.p4_mut().next_table_create(page.p4_index(), higher_level_flags);
             let p2 = p3.next_table_create(page.p3_index(), higher_level_flags);
@@ -325,12 +332,16 @@ impl Mapper {
     /// Consumes the given `AllocatedPages` and returns a `MappedPages` object
     /// which contains those `AllocatedPages`.
     #[doc(hidden)]
-    pub unsafe fn map_to_non_exclusive<F: Into<PteFlagsArch>>(
+    pub unsafe fn map_to_non_exclusive<F, P>(
         mapper: &mut Self,
         pages: AllocatedPages,
-        frames: &AllocatedFrames,
+        frames: &AllocatedFrames<P>,
         flags: F,
-    ) -> Result<MappedPages, &'static str> {
+    ) -> Result<MappedPages, &'static str>
+    where
+        F: Into<PteFlagsArch>,
+        P: PageSize,
+    {
         // In this function, none of the frames can be mapped as exclusive
         // because we're accepting a *reference* to an `AllocatedFrames`, not consuming it.
         mapper.internal_map_to(pages, Borrowed(frames), flags)
@@ -564,7 +575,10 @@ impl MappedPages {
     /// Note that only the first contiguous range of `AllocatedFrames` will be returned, if any were unmapped.
     /// All other non-contiguous ranges will be auto-dropped and deallocated.
     /// This is due to how frame deallocation works.
-    pub fn unmap_into_parts(mut self, active_table_mapper: &mut Mapper) -> Result<(AllocatedPages, Option<AllocatedFrames>), Self> {
+    pub fn unmap_into_parts<P>(mut self, active_table_mapper: &mut Mapper) -> Result<(AllocatedPages, Option<AllocatedFrames<P>>), Self>
+    where
+        P: PageSize,
+    {
         match self.unmap(active_table_mapper) {
             Ok(first_frames) => {
                 let pages = mem::replace(&mut self.pages, AllocatedPages::empty());
@@ -596,7 +610,10 @@ impl MappedPages {
     ///       We could then use `mem::replace(&mut self, MappedPages::empty())` in the drop handler 
     ///       to obtain ownership of `self`, which would allow us to transfer ownership of the dropped `MappedPages` here.
     ///
-    fn unmap(&mut self, active_table_mapper: &mut Mapper) -> Result<Option<AllocatedFrames>, &'static str> {
+    fn unmap<P>(&mut self, active_table_mapper: &mut Mapper) -> Result<Option<AllocatedFrames<P>>, &'static str>
+    where
+        P: PageSize,
+    {
         if self.size_in_pages() == 0 { return Ok(None); }
 
         if active_table_mapper.target_p4 != self.page_table_p4 {
@@ -610,8 +627,8 @@ impl MappedPages {
             );
         }   
 
-        let mut first_frame_range: Option<UnmappedFrames> = None; // this is what we'll return
-        let mut current_frame_range: Option<UnmappedFrames> = None;
+        let mut first_frame_range: Option<UnmappedFrames<Page4K>> = None; // this is what we'll return
+        let mut current_frame_range: Option<UnmappedFrames<Page4K>> = None;
 
         for page in self.pages.range().clone() {            
             let p1 = active_table_mapper.p4_mut()
@@ -681,8 +698,9 @@ impl MappedPages {
         }
 
         // Ensure that we return at least some frame range, even if we broke out of the above loop early.
-        Ok(first_frame_range.map(|f| f.into_allocated_frames())
-            .or(current_frame_range.map(|f| f.into_allocated_frames())))
+        // TODO
+        Ok(first_frame_range.map(|f| f.into_allocated_frames().into_size().unwrap())
+            .or(current_frame_range.map(|f| f.into_allocated_frames().into_size().unwrap())))
     }
 
 
@@ -966,7 +984,8 @@ impl Drop for MappedPages {
         // }
         
         let mut mapper = Mapper::from_current();
-        if let Err(e) = self.unmap(&mut mapper) {
+        // TODO
+        if let Err(e) = self.unmap::<Page4K>(&mut mapper) {
             error!("MappedPages::drop(): failed to unmap, error: {:?}", e);
         }
 

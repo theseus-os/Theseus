@@ -9,6 +9,7 @@
 
 use core::mem::ManuallyDrop;
 use log::error;
+use memory_structs::Page4K;
 use super::{
     AllocatedPages, AllocatedFrames, PageTable, MappedPages, VirtualAddress,
     table::{Table, Level1},
@@ -34,7 +35,7 @@ pub struct TemporaryPage {
     /// once when dropping this `TemporaryPage`.
     /// This is because the `AllocatedFrames` object here is the same one that is 
     /// mapped by the above `mapped_page`.
-    frame: ManuallyDrop<AllocatedFrames>,
+    frame: ManuallyDrop<AllocatedFrames<Page4K>>,
 }
 
 impl TemporaryPage {
@@ -49,7 +50,7 @@ impl TemporaryPage {
     /// * `page_table`: the currently active [`PageTable`].
     pub fn create_and_map_table_frame(
         mut page: Option<AllocatedPages>,
-        frame: AllocatedFrames,
+        frame: AllocatedFrames<Page4K>,
         page_table: &mut PageTable,
     ) -> Result<TemporaryPage, &'static str> {
         let mut vaddr = VirtualAddress::new_canonical(TEMPORARY_PAGE_VIRT_ADDR);
@@ -74,7 +75,7 @@ impl TemporaryPage {
         &mut self,
         f: F,
     ) -> Result<R, &'static str> 
-        where F: FnOnce(&mut Table<Level1>, &AllocatedFrames) -> R
+        where F: FnOnce(&mut Table<Level1>, &AllocatedFrames<Page4K>) -> R
     {
         let res = f(
             self.mapped_page.as_type_mut(0)?,
@@ -86,9 +87,9 @@ impl TemporaryPage {
     /// Call this to clean up a `TemporaryPage` instead of just letting it be dropped.
     ///
     /// A simple wrapper around [`MappedPages::unmap_into_parts()`].
-    pub fn unmap_into_parts(mut self, page_table: &mut PageTable) -> Result<(AllocatedPages, Option<AllocatedFrames>), &'static str> {
+    pub fn unmap_into_parts(mut self, page_table: &mut PageTable) -> Result<(AllocatedPages, Option<AllocatedFrames<Page4K>>), &'static str> {
         let mp = core::mem::replace(&mut self.mapped_page, MappedPages::empty());
-        mp.unmap_into_parts(page_table).map_err(|e_mp| {
+        mp.unmap_into_parts::<Page4K>(page_table).map_err(|e_mp| {
             error!("TemporaryPage::unmap_into_parts(): failed to unmap internal {:?}", e_mp);
             "BUG: TemporaryPage::unmap_into_parts(): failed to unmap internal MappedPages into its parts."
         })

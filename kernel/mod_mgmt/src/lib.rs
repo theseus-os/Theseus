@@ -14,7 +14,7 @@ use alloc::{
 };
 use spin::{Mutex, Once};
 use xmas_elf::{ElfFile, sections::{SHF_ALLOC, SHF_EXECINSTR, SHF_TLS, SHF_WRITE, SectionData, ShType}, symbol_table::{Binding, Type}};
-use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range};
+use memory::{MmiRef, MemoryManagementInfo, VirtualAddress, MappedPages, PteFlags, allocate_pages_by_bytes, allocate_frames_by_bytes_at, PageRange, allocate_pages_by_bytes_in_range, Page4K};
 use bootloader_modules::BootloaderModule;
 use cow_arc::CowArc;
 use rustc_demangle::demangle;
@@ -167,7 +167,7 @@ fn parse_bootloader_modules_into_files(
     };
 
     for m in bootloader_modules {
-        let frames = allocate_frames_by_bytes_at(m.start_address(), m.size_in_bytes())
+        let frames = allocate_frames_by_bytes_at::<Page4K>(m.start_address(), m.size_in_bytes())
             .map_err(|_e| "Failed to allocate frames for bootloader module")?;
         let pages = allocate_pages_by_bytes(m.size_in_bytes())
             .ok_or("Couldn't allocate virtual pages for bootloader module")?;

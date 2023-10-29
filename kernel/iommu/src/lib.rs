@@ -15,7 +15,7 @@ extern crate bitflags;
 
 use spin::Once;
 use sync_irq::IrqSafeMutex;
-use memory::{PageTable, PteFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable};
+use memory::{PageTable, PteFlags, PhysicalAddress, allocate_frames_at, allocate_pages, BorrowedMappedPages, Mutable, Page4K};
 
 mod regs;
 use regs::*;
@@ -55,7 +55,7 @@ pub fn init(host_address_width: u8,
 
     // map memory-mapped registers into virtual address space
     let mp = {
-        let frames = allocate_frames_at(register_base_address, 1)?;
+        let frames = allocate_frames_at::<Page4K>(register_base_address, 1)?;
         let pages = allocate_pages(1).ok_or("Unable to find virtual page!")?;
         let flags = PteFlags::new().valid(true).writable(true).device_memory(true);
         page_table.map_allocated_pages_to(pages, frames, flags)?

@@ -6,7 +6,7 @@ use log::debug;
 use volatile::{Volatile, ReadOnly};
 use zerocopy::FromBytes;
 use spin::{Once, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, PteFlags, BorrowedMappedPages, Mutable};
+use memory::{allocate_pages, allocate_frames_by_bytes_at, PageTable, PhysicalAddress, PteFlags, BorrowedMappedPages, Mutable, Page4K};
 use sdt::{Sdt, GenericAddressStructure};
 use acpi_table::{AcpiTables, AcpiSignature};
 use time::Instant;
@@ -176,7 +176,7 @@ impl HpetAcpiTable {
     ) -> Result<&'static RwLock<BorrowedMappedPages<Hpet, Mutable>>, &'static str> {
         let phys_addr = PhysicalAddress::new(self.gen_addr_struct.phys_addr as usize)
             .ok_or("HPET physical address was invalid")?;
-        let frames = allocate_frames_by_bytes_at(phys_addr, self.header.length as usize)
+        let frames = allocate_frames_by_bytes_at::<Page4K>(phys_addr, self.header.length as usize)
             .map_err(|_e| "Couldn't allocate frames for HPET")?;
         let pages = allocate_pages(frames.size_in_frames())
             .ok_or("Couldn't allocate pages for HPET")?;

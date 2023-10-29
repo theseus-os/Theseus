@@ -12,7 +12,7 @@ compile_error!("The `bios` feature can only be used on x86_64");
 use core::{fmt::{self, Write}, slice, ops::{Deref, DerefMut}};
 use boot_info::{FramebufferInfo, FramebufferFormat};
 use font::FONT_BASIC;
-use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch, PageTable};
+use memory::{BorrowedSliceMappedPages, Mutable, PteFlags, PhysicalAddress, PteFlagsArch, PageTable, Page4K};
 use spin::Mutex;
 
 /// The height in pixels that each character occupies, not including any padding.
@@ -101,7 +101,7 @@ pub fn init(
             "BUG: early framebuffer printer cannot map framebuffer's \
             physical address before the memory subsystem is initialized."
         )?;
-        let frames = memory::allocate_frames_by_bytes_at(
+        let frames = memory::allocate_frames_by_bytes_at::<Page4K>(
             info.phys_addr,
             info.total_size_in_bytes as usize,
         ).map_err(|_| "couldn't allocate frames for early framebuffer printer")?;

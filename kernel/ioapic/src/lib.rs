@@ -4,7 +4,7 @@ use log::debug;
 use spin::Mutex;
 use volatile::{Volatile, WriteOnly};
 use zerocopy::FromBytes;
-use memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable};
+use memory::{PageTable, PhysicalAddress, PteFlags, allocate_pages, allocate_frames_at, BorrowedMappedPages, Mutable, Page4K};
 use atomic_linked_list::atomic_map::{AtomicMap, AtomicMapIter};
 use apic::ApicId;
 
@@ -60,7 +60,7 @@ impl IoApic {
     /// and then adds it to the system-wide list of all IOAPICs.
     pub fn create(page_table: &mut PageTable, id: u8, phys_addr: PhysicalAddress, gsi_base: u32) -> Result<(), &'static str> {
         let new_page = allocate_pages(1).ok_or("IoApic::new(): couldn't allocate_pages!")?;
-        let frame = allocate_frames_at(phys_addr, 1).map_err(|_e| "Couldn't allocate physical frame for IOAPIC")?;
+        let frame = allocate_frames_at::<Page4K>(phys_addr, 1).map_err(|_e| "Couldn't allocate physical frame for IOAPIC")?;
         let ioapic_mapped_page = page_table.map_allocated_pages_to(
             new_page,
             frame, 

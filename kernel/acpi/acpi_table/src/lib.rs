@@ -11,7 +11,7 @@ extern crate alloc;
 
 use alloc::collections::BTreeMap;
 use log::{trace, error};
-use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange};
+use memory::{MappedPages, allocate_pages, allocate_frames_at, PageTable, PteFlags, PhysicalAddress, Frame, FrameRange, Page4K};
 use sdt::Sdt;
 use core::ops::Add;
 use zerocopy::FromBytes;
@@ -82,7 +82,7 @@ impl AcpiTables {
             let new_frames = self.frames.to_extended(first_frame);
             let new_pages = allocate_pages(new_frames.size_in_frames())
                 .ok_or("couldn't allocate pages for ACPI table")?;
-            let af = allocate_frames_at(new_frames.start_address(), new_frames.size_in_frames())
+            let af = allocate_frames_at::<Page4K>(new_frames.start_address(), new_frames.size_in_frames())
                 .map_err(|_e| "Couldn't allocate frames for ACPI table")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
@@ -107,7 +107,7 @@ impl AcpiTables {
             let new_frames = self.frames.to_extended(first_frame.add(1));
             let new_pages = allocate_pages(new_frames.size_in_frames())
                 .ok_or("couldn't allocate pages for ACPI table")?;
-            let af = allocate_frames_at(new_frames.start_address(), new_frames.size_in_frames())
+            let af = allocate_frames_at::<Page4K>(new_frames.start_address(), new_frames.size_in_frames())
                 .map_err(|_e| "Couldn't allocate frames for ACPI table")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 
@@ -135,7 +135,7 @@ impl AcpiTables {
             let new_frames = self.frames.to_extended(last_frame_of_table);
             let new_pages = allocate_pages(new_frames.size_in_frames())
                 .ok_or("couldn't allocate pages for ACPI table")?;
-            let af = allocate_frames_at(new_frames.start_address(), new_frames.size_in_frames())
+            let af = allocate_frames_at::<Page4K>(new_frames.start_address(), new_frames.size_in_frames())
                 .map_err(|_e| "Couldn't allocate frames for ACPI table")?;
             let new_mapped_pages = page_table.map_allocated_pages_to(
                 new_pages, 

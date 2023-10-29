@@ -364,7 +364,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> $TypeName<P> {
+            impl<P: PageSize> $TypeName<P> {
                 #[doc = "Returns the 4K-sized number of this `" $TypeName "`."]
                 #[inline(always)]
                 pub const fn number(&self) -> usize {
@@ -380,13 +380,35 @@ macro_rules! implement_page_frame {
                 pub const fn page_size(&self) -> MemChunkSize {
                     P::SIZE
                 }
+
+                pub fn as_size<Q>(self) -> Result<$TypeName<Q>, &'static str>
+                where
+                    Q: PageSize,
+                {
+                    if self.number % Q::NUM_4K_PAGES == 0 {
+                        Ok($TypeName::<Q> {
+                            number: self.number,
+                            size: PhantomData
+                        })
+                    } else {
+                        // TODO: Concatenate string to specify frame/page
+                        Err("failed to convert frame/page between sizes")
+                    }
+                }
+
+                pub fn as_4k(self) -> $TypeName<Page4K> {
+                    $TypeName::<Page4K> {
+                        number: self.number,
+                        size: PhantomData
+                    }
+                }
             }
-            impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {
+            impl<P: PageSize> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                     write!(f, concat!(stringify!($TypeName), "(", $prefix, "{:#X})"), self.start_address())
                 }
             }
-            impl<P: PageSize + 'static> Add<usize> for $TypeName<P> {
+            impl<P: PageSize> Add<usize> for $TypeName<P> {
                 type Output = $TypeName<P>;
                 fn add(self, rhs: usize) -> $TypeName<P> {
                     // cannot exceed max page number (which is also max frame number)
@@ -399,7 +421,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> AddAssign<usize> for $TypeName<P> {
+            impl<P: PageSize> AddAssign<usize> for $TypeName<P> {
                 fn add_assign(&mut self, rhs: usize) {
                     *self = $TypeName {
                         number: core::cmp::min(
@@ -410,7 +432,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> Sub<usize> for $TypeName<P> {
+            impl<P: PageSize> Sub<usize> for $TypeName<P> {
                 type Output = $TypeName<P>;
                 fn sub(self, rhs: usize) -> $TypeName<P> {
                     $TypeName {
@@ -419,7 +441,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> SubAssign<usize> for $TypeName<P> {
+            impl<P: PageSize> SubAssign<usize> for $TypeName<P> {
                 fn sub_assign(&mut self, rhs: usize) {
                     *self = $TypeName {
                         number: self.number.saturating_sub(rhs.saturating_mul(P::NUM_4K_PAGES)),
@@ -427,7 +449,7 @@ macro_rules! implement_page_frame {
                     }
                 }
             }
-            impl<P: PageSize + 'static> Step for $TypeName<P> {
+            impl<P: PageSize> Step for $TypeName<P> {
                 #[inline]
                 fn steps_between(start: &$TypeName<P>, end: &$TypeName<P>) -> Option<usize> {
                     Step::steps_between(&start.number, &end.number)
@@ -444,46 +466,32 @@ macro_rules! implement_page_frame {
                         .map(|number| $TypeName { number, size: PhantomData })
                 }
             }
+
             impl TryFrom<$TypeName<Page4K>> for $TypeName<Page2M> {
                 type Error = &'static str;
-                fn try_from(p: $TypeName) -> Result<Self, &'static str>  {
-                    if p.number % Page2M::NUM_4K_PAGES == 0 {
-                        Ok(Self {
-                            number: p.number,
-                            size: PhantomData,
-                        })
-                    } else {
-                        Err("Could not convert 4KiB to 2MiB page.")
-                    }
+
+                fn try_from(p: $TypeName) -> Result<Self, Self::Error>  {
+                    p.as_size()
                 }
             }
+
             impl TryFrom<$TypeName<Page4K>> for $TypeName<Page1G> {
                 type Error = &'static str;
-                fn try_from(p: $TypeName) -> Result<Self, &'static str> {
-                     if p.number % Page1G::NUM_4K_PAGES == 0 {
-                        Ok(Self {
-                            number: p.number,
-                            size: PhantomData,
-                        })
-                    } else {
-                        Err("Could not convert 4KiB to 1GiB page.")
-                    }
+
+                fn try_from(p: $TypeName) -> Result<Self, Self::Error> {
+                    p.as_size()
                 }
             }
+
             impl From<$TypeName<Page1G>> for $TypeName<Page4K> {
                 fn from(p: $TypeName<Page1G>) -> Self { 
-                    Self {                             
-                        number: p.number,
-                        size: PhantomData
-                    }
+                    p.as_4k()
                 }
             }
+
             impl From<$TypeName<Page2M>> for $TypeName<Page4K> {
                 fn from(p: $TypeName<Page2M>) -> Self { 
-                    Self {                             
-                        number: p.number,
-                        size: PhantomData
-                    }
+                    p.as_4k()
                 }
             }
         }
@@ -494,7 +502,7 @@ implement_page_frame!(Page, "virtual", "v", VirtualAddress);
 implement_page_frame!(Frame, "physical", "p", PhysicalAddress);
 
 // Implement other functions for the `Page` type that aren't relevant for `Frame.
-impl<P: PageSize + 'static> Page<P> {
+impl<P: PageSize> Page<P> {
     /// Returns the 9-bit part of this `Page`'s [`VirtualAddress`] that is the index into the P4 page table entries list.
     pub const fn p4_index(&self) -> usize {
         (self.number >> 27) & 0x1FF
@@ -532,11 +540,6 @@ macro_rules! implement_page_frame_range {
             pub struct $TypeName<P: PageSize = Page4K>(RangeInclusive<$chunk::<P>>);
 
             impl $TypeName<Page4K> {
-                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
-                pub const fn empty() -> Self {
-                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
-                }
-
                 #[doc = "A convenience method for creating a new `" $TypeName "` that spans \
                     all [`" $chunk "`]s from the given [`" $address "`] to an end bound based on the given size."]
                 pub const fn [<from_ $short _addr>](starting_addr: $address, size_in_bytes: usize) -> $TypeName {
@@ -552,7 +555,12 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
-            impl<P: PageSize + 'static> $TypeName<P> {
+            impl<P: PageSize> $TypeName<P> {
+                #[doc = "Creates a `" $TypeName "` that will always yield `None` when iterated."]
+                pub const fn empty() -> Self {
+                    Self::new($chunk { number: 1, size: PhantomData }, $chunk { number: 0, size: PhantomData })
+                }
+
                 #[doc = "Creates a new range of [`" $chunk "`]s that spans from `start` to `end`, both inclusive bounds."]
                 pub const fn new(start: $chunk<P>, end: $chunk<P>) -> $TypeName<P> {
                     $TypeName(RangeInclusive::new(start, end))
@@ -630,8 +638,20 @@ macro_rules! implement_page_frame_range {
                     && (other.start() >= self.start())
                     && (other.end() <= self.end())
                 }
+
+                pub fn as_4k(&self) -> $TypeName<Page4K> {
+                    $TypeName::<Page4K>::new(self.start().as_4k(), self.end().as_4k())
+                }
+
+                pub fn as_size<Q>(&self) -> Result<$TypeName<Q>, &'static str>
+                where
+                    Q: PageSize
+                {
+                    Ok($TypeName::new(self.start().as_size()?, self.end().as_size()?))
+                }
             }
-            impl<P: PageSize + Copy + 'static> $TypeName<P> {
+
+            impl<P: PageSize + Copy> $TypeName<P> {
                 #[doc = "Returns an inclusive `" $TypeName "` representing the [`" $chunk "`]s that overlap \
                     across this `" $TypeName "` and the given other `" $TypeName "`.\n\n \
                     If there is no overlap between the two ranges, `None` is returned."]
@@ -645,12 +665,12 @@ macro_rules! implement_page_frame_range {
                     }
                 }
             }
-            impl<P: PageSize + 'static> fmt::Debug for $TypeName<P> {
+            impl<P: PageSize> fmt::Debug for $TypeName<P> {
                 fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
                     write!(f, "{:?}", self.0)
                 }
             }
-            impl<P: PageSize + 'static> Deref for $TypeName<P> {
+            impl<P: PageSize> Deref for $TypeName<P> {
                 type Target = RangeInclusive<$chunk<P>>;
                 fn deref(&self) -> &RangeInclusive<$chunk<P>> {
                     &self.0
@@ -661,7 +681,7 @@ macro_rules! implement_page_frame_range {
                     &mut self.0
                 }
             }
-            impl<P: PageSize + 'static> IntoIterator for $TypeName<P> {
+            impl<P: PageSize> IntoIterator for $TypeName<P> {
                 type Item = $chunk<P>;
                 type IntoIter = RangeInclusiveIterator<$chunk<P>>;
                 fn into_iter(self) -> Self::IntoIter {
@@ -676,12 +696,12 @@ macro_rules! implement_page_frame_range {
                 start: $chunk<P>,
                 end: $chunk<P>,
             }
-            impl<P: PageSize + Copy + 'static> From<$TypeName<P>> for [<Copyable $TypeName>]<P> {
+            impl<P: PageSize + Copy> From<$TypeName<P>> for [<Copyable $TypeName>]<P> {
                 fn from(r: $TypeName<P>) -> Self {
                     Self { start: *r.start(), end: *r.end() }
                 }
             }
-            impl<P: PageSize + Copy + 'static> From<[<Copyable $TypeName>]<P>> for $TypeName<P> {
+            impl<P: PageSize + Copy> From<[<Copyable $TypeName>]<P>> for $TypeName<P> {
                 fn from(cr: [<Copyable $TypeName>]<P>) -> Self {
                     Self::new(cr.start, cr.end)
                 }

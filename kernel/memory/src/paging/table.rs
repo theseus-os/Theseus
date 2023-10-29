@@ -11,6 +11,7 @@ use core::ops::{Index, IndexMut};
 use core::marker::PhantomData;
 use super::PageTableEntry;
 use crate::VirtualAddress;
+use memory_structs::Page4K;
 use pte_flags::PteFlagsArch;
 use kernel_config::memory::{
     ENTRIES_PER_PAGE_TABLE,
@@ -138,7 +139,8 @@ impl<L: HierarchicalLevel> Table<L> {
     ) -> &mut Table<L::NextLevel> {
         if self.next_table(index).is_none() {
             assert!(!is_huge(&self[index].flags()), "mapping code does not support huge pages");
-            let af = frame_allocator::allocate_frames(1).expect("next_table_create(): no frames available");
+            // TODO: Tables always take up a 4k frame right?
+            let af = frame_allocator::allocate_frames::<Page4K>(1).expect("next_table_create(): no frames available");
             self[index].set_entry(
                 af.as_allocated_frame(),
                 flags.valid(true).writable(true), // must be valid and writable on x86_64

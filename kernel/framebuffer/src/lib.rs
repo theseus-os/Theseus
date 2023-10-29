@@ -6,7 +6,7 @@
 pub mod pixel;
 use core::{ops::{DerefMut, Deref}, hash::{Hash, Hasher}};
 use log::{info, debug};
-use memory::{PteFlags, PteFlagsArch, PhysicalAddress, Mutable, BorrowedSliceMappedPages};
+use memory::{PteFlags, PteFlagsArch, PhysicalAddress, Mutable, BorrowedSliceMappedPages, Page4K};
 use shapes::Coord;
 pub use pixel::*;
 
@@ -105,7 +105,7 @@ impl<P: Pixel> Framebuffer<P> {
                 flags = flags.device_memory(true);
             }
 
-            let frames = memory::allocate_frames_by_bytes_at(address, size)
+            let frames = memory::allocate_frames_by_bytes_at::<Page4K>(address, size)
                 .map_err(|_e| "Couldn't allocate frames for the final framebuffer")?;
             let fb_mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(
                 pages,

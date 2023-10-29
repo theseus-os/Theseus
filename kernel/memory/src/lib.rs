@@ -122,7 +122,8 @@ pub fn create_contiguous_mapping<F: Into<PteFlagsArch>>(
 ) -> Result<(MappedPages, PhysicalAddress), &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("create_contiguous_mapping(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous pages!")?;
-    let allocated_frames = allocate_frames_by_bytes(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
+    // TODO: Optimise to use huge pages if size is big enough.
+    let allocated_frames = allocate_frames_by_bytes::<Page4K>(size_in_bytes).ok_or("memory::create_contiguous_mapping(): couldn't allocate contiguous frames!")?;
     let starting_phys_addr = allocated_frames.start_address();
     let mp = kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)?;
     Ok((mp, starting_phys_addr))
@@ -141,7 +142,8 @@ pub fn map_frame_range<F: Into<PteFlagsArch>>(
 ) -> Result<MappedPages, &'static str> {
     let kernel_mmi_ref = get_kernel_mmi_ref().ok_or("map_range(): KERNEL_MMI was not yet initialized!")?;
     let allocated_pages = allocate_pages_by_bytes(size_in_bytes).ok_or("memory::map_range(): couldn't allocate contiguous pages!")?;
-    let allocated_frames = allocate_frames_by_bytes_at(start_address, size_in_bytes)
+    // TODO: Optimise to use huge pages if size is big enough.
+    let allocated_frames = allocate_frames_by_bytes_at::<Page4K>(start_address, size_in_bytes)
         .map_err(|_| "memory::map_range(): couldn't allocate contiguous frames!")?;
     kernel_mmi_ref.lock().page_table.map_allocated_pages_to(allocated_pages, allocated_frames, flags)
 }
@@ -183,7 +185,7 @@ pub fn create_identity_mapping<F: Into<PteFlagsArch>>(
     // we then attempt to allocate the corresponding identity pages,
     // and if that succeeds, we allow the frame allocator to proceed
     // with allocating the range of frames that matches those pages.
-    let allocated_frames = frame_allocator::inspect_then_allocate_free_frames(&mut |frames| {
+    let allocated_frames = frame_allocator::inspect_then_allocate_free_frames::<_, Page4K>(&mut |frames| {
         if frames.size_in_frames() < num_pages {
             // log::trace!("[{num_pages} pages] Skipping too small {:?}", frames);
             return FramesIteratorRequest::Next;

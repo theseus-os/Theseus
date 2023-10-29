@@ -11,6 +11,7 @@ mod temporary_page;
 mod mapper;
 mod table;
 
+use memory_structs::Page4K;
 pub use page_table_entry::PageTableEntry;
 
 use crate::EarlyIdentityMappedPages;
@@ -50,7 +51,7 @@ use super::get_vga_mem_addr;
 /// Auto-derefs into a `Mapper` for easy invocation of memory mapping functions.
 pub struct PageTable {
     mapper: Mapper,
-    p4_table: AllocatedFrames,
+    p4_table: AllocatedFrames<Page4K>,
 }
 
 impl fmt::Debug for PageTable {
@@ -101,7 +102,7 @@ impl PageTable {
     /// before using (switching) to this new page table in order to ensure the system keeps running.
     pub fn new_table(
         current_page_table: &mut PageTable,
-        new_p4_frame: AllocatedFrames,
+        new_p4_frame: AllocatedFrames<Page4K>,
         page: Option<AllocatedPages>,
     ) -> Result<PageTable, &'static str> {
         let p4_frame = *new_p4_frame.start();
@@ -223,7 +224,7 @@ pub fn get_current_p4() -> Frame {
 pub fn init(
     boot_info: &impl BootInformation,
     stack_start_virt: VirtualAddress,
-    into_unmapped_frames_fn: fn(FrameRange) -> UnmappedFrames,
+    into_unmapped_frames_fn: fn(FrameRange) -> UnmappedFrames<Page4K>,
 ) -> Result<InitialMemoryMappings, &'static str> {
     // Store the callback from `frame_allocator::init()` that allows the `Mapper` to convert
     // `page_table_entry::UnmappedFrameRange` back into `UnmappedFrames`.
@@ -299,7 +300,7 @@ pub fn init(
         let mut boot_info_mapped_pages:    Option<MappedPages> = None;
 
         let init_pages = page_allocator::allocate_pages_by_bytes_at(init_start_virt, init_end_virt.value() - init_start_virt.value())?;
-        let init_frames = frame_allocator::allocate_frames_by_bytes_at(init_start_phys, init_end_phys.value() - init_start_phys.value())?;
+        let init_frames = frame_allocator::allocate_frames_by_bytes_at::<Page4K>(init_start_phys, init_end_phys.value() - init_start_phys.value())?;
         let init_pages_identity = page_allocator::allocate_pages_by_bytes_at(
             VirtualAddress::new_canonical(init_start_phys.value()),
             init_end_phys.value() - init_start_phys.value(),
@@ -310,7 +311,7 @@ pub fn init(
         let mut init_mapped_pages = new_mapper.map_allocated_pages_to(init_pages, init_frames, init_flags)?;
 
         let text_pages = page_allocator::allocate_pages_by_bytes_at(text_start_virt, text_end_virt.value() - text_start_virt.value())?;
-        let text_frames = frame_allocator::allocate_frames_by_bytes_at(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
+        let text_frames = frame_allocator::allocate_frames_by_bytes_at::<Page4K>(text_start_phys, text_end_phys.value() - text_start_phys.value())?;
         let text_pages_identity = page_allocator::allocate_pages_by_bytes_at(
             VirtualAddress::new_canonical(text_start_phys.value()),
             text_end_phys.value() - text_start_phys.value(),
@@ -322,7 +323,7 @@ pub fn init(
         let text_mapped_pages = NoDrop::new(init_mapped_pages);
 
         let rodata_pages = page_allocator::allocate_pages_by_bytes_at(rodata_start_virt, rodata_end_virt.value() - rodata_start_virt.value())?;
-        let rodata_frames = frame_allocator::allocate_frames_by_bytes_at(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
+        let rodata_frames = frame_allocator::allocate_frames_by_bytes_at::<Page4K>(rodata_start_phys, rodata_end_phys.value() - rodata_start_phys.value())?;
         let rodata_pages_identity = page_allocator::allocate_pages_by_bytes_at(
             VirtualAddress::new_canonical(rodata_start_phys.value()),
             rodata_end_phys.value() - rodata_start_phys.value(),
@@ -333,7 +334,7 @@ pub fn init(
         let rodata_mapped_pages = NoDrop::new(new_mapper.map_allocated_pages_to(rodata_pages, rodata_frames, rodata_flags)?);
 
         let data_pages = page_allocator::allocate_pages_by_bytes_at(data_start_virt, data_end_virt.value() - data_start_virt.value())?;
-        let data_frames = frame_allocator::allocate_frames_by_bytes_at(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
+        let data_frames = frame_allocator::allocate_frames_by_bytes_at::<Page4K>(data_start_phys, data_end_phys.value() - data_start_phys.value())?;
         let data_pages_identity = page_allocator::allocate_pages_by_bytes_at(
             VirtualAddress::new_canonical(data_start_phys.value()),
             data_end_phys.value() - data_start_phys.value(),
@@ -354,7 +355,7 @@ pub fn init(
             // and then reproduce the same mapping in the `new_mapper`.
             let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
-            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
+            let allocated_frame = frame_allocator::allocate_frames_at::<Page4K>(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, data_flags)?;
             if let Some(ref mut stack_mapped_pages) = stack_mapped_pages {
                 stack_mapped_pages.merge(mapped_pages).map_err(|_| "failed to merge stack mapped pages")?;
@@ -377,7 +378,7 @@ pub fn init(
                 VirtualAddress::new_canonical(vga_phys_addr.value()),
                 vga_size_in_bytes,
             )?;
-            let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at(vga_phys_addr, vga_size_in_bytes)?;
+            let vga_display_frames = frame_allocator::allocate_frames_by_bytes_at::<Page4K>(vga_phys_addr, vga_size_in_bytes)?;
             NoDrop::new(new_mapper.map_allocated_pages_to(
                 vga_display_pages_identity, vga_display_frames, vga_flags,
             )?)
@@ -394,7 +395,7 @@ pub fn init(
             // and then reproduce the same mapping in the `new_mapper`.
             let frame = current_mapper.translate_page(page).ok_or("couldn't translate stack page")?;
             let allocated_page = page_allocator::allocate_pages_at(page.start_address(), 1)?;
-            let allocated_frame = frame_allocator::allocate_frames_at(frame.start_address(), 1)?;
+            let allocated_frame = frame_allocator::allocate_frames_at::<Page4K>(frame.start_address(), 1)?;
             let mapped_pages = new_mapper.map_allocated_pages_to(allocated_page, allocated_frame, PteFlags::new())?;
             if let Some(ref mut boot_info_mp) = boot_info_mapped_pages {
                 boot_info_mp.merge(mapped_pages).map_err(|_| "failed to merge boot info pages")?;
