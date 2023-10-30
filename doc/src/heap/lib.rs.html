@@ -191,7 +191,7 @@
     }
 
     <span class="kw">unsafe fn </span>dealloc(<span class="kw-2">&amp;</span><span class="self">self</span>, ptr: <span class="kw-2">*mut </span>u8, layout: Layout) {
-        <span class="kw">if </span>(ptr <span class="kw">as </span>usize) &lt; INITIAL_HEAP_END_ADDR {
+        <span class="kw">if </span>KERNEL_HEAP_START &lt;= (ptr <span class="kw">as </span>usize) &amp;&amp; (ptr <span class="kw">as </span>usize) &lt; INITIAL_HEAP_END_ADDR {
             <span class="self">self</span>.initial_allocator.lock().deallocate(ptr, layout);
         }
         <span class="kw">else </span>{
