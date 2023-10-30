@@ -492,7 +492,7 @@ impl WindowManager {
             bottom_right: self.mouse + (MOUSE_POINTER_SIZE_X as isize, MOUSE_POINTER_SIZE_Y as isize)
         });
         
-        self.refresh_top(bounding_box.into_iter())
+        self.refresh_top(bounding_box)
     }
 
     /// Move mouse. `relative` indicates the new position relative to current position.

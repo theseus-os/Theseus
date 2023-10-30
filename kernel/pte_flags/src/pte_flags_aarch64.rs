@@ -33,6 +33,7 @@ bitflags! {
     ///
     /// [MAIR]: https://docs.rs/cortex-a/latest/cortex_a/registers/MAIR_EL1/index.html
     #[doc(cfg(target_arch = "aarch64"))]
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct PteFlagsAarch64: u64 {
         /// * If set, this page is currently "present" in memory. 
         /// * If not set, this page is not in memory, which could mean one of several things:
@@ -52,7 +53,7 @@ bitflags! {
         /// This page maps "normal" memory, i.e., non-device memory.
         ///
         /// Theseus uses `MAIR_INDEX_0` for this type of memory.
-        const NORMAL_MEMORY      = Self::_MAIR_INDEX_0.bits;
+        const NORMAL_MEMORY      = Self::_MAIR_INDEX_0.bits();
         /// Indicates the page's cacheability is described by MAIR Index 1.
         ///
         /// Theseus uses this index for "device" memory.
@@ -60,7 +61,7 @@ bitflags! {
         /// This page maps device memory, i.e., memory-mapped I/O registers.
         ///
         /// Theseus uses `MAIR_INDEX_1` for this type of memory.
-        const DEVICE_MEMORY      = Self::_MAIR_INDEX_1.bits;
+        const DEVICE_MEMORY      = Self::_MAIR_INDEX_1.bits();
         /// Indicates the page's cacheability is described by MAIR Index 2.
         ///
         /// This is unused in Theseus.
@@ -179,7 +180,7 @@ bitflags! {
         const _USER_EXEC_NEVER   = 1 << 54;
         /// * If set, this page is not executable.
         /// * If not set, this page is executable.
-        const NOT_EXECUTABLE     = Self::_PRIV_EXEC_NEVER.bits | Self::_USER_EXEC_NEVER.bits;
+        const NOT_EXECUTABLE     = Self::_PRIV_EXEC_NEVER.bits() | Self::_USER_EXEC_NEVER.bits();
 
         /// See [PteFlags::EXCLUSIVE].
         ///  We use bit 55 because it is available for custom OS usage on both x86_64 and aarch64.
@@ -217,13 +218,13 @@ impl PteFlagsAarch64 {
     ///       that we don't care about.
     pub const fn new() -> Self {
         Self::from_bits_truncate(
-            Self::NORMAL_MEMORY.bits
-            | Self::OUTER_SHAREABLE.bits
-            | Self::READ_ONLY.bits
-            | Self::PAGE_DESCRIPTOR.bits
-            | Self::ACCESSED.bits
-            | Self::_NOT_GLOBAL.bits
-            | Self::NOT_EXECUTABLE.bits
+            Self::NORMAL_MEMORY.bits()
+            | Self::OUTER_SHAREABLE.bits()
+            | Self::READ_ONLY.bits()
+            | Self::PAGE_DESCRIPTOR.bits()
+            | Self::ACCESSED.bits()
+            | Self::_NOT_GLOBAL.bits()
+            | Self::NOT_EXECUTABLE.bits()
         )
     }
 
@@ -361,7 +362,7 @@ impl PteFlagsAarch64 {
     /// * The three bits `[2:4]` for MAIR index values.
     /// * The two bits `[8:9]` for shareability.
     pub const MASKED_BITS_FOR_CONVERSION: PteFlagsAarch64 = PteFlagsAarch64::from_bits_truncate(
-        SHAREABLE_BITS_MASK.bits | MAIR_BITS_MASK.bits
+        SHAREABLE_BITS_MASK.bits() | MAIR_BITS_MASK.bits()
     );
 
     /// Returns a copy of this `PteFlagsAarch64` with its flags adjusted

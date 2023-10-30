@@ -12,6 +12,7 @@ bitflags! {
     /// To save space, this is expressed using bitflags 
     /// rather than a series of individual booleans, 
     /// because Rust's `bool` type is a whole byte.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct KeyboardModifiers: u16 {
         const CONTROL_LEFT    = 1 <<  0;
         const CONTROL_RIGHT   = 1 <<  1;
