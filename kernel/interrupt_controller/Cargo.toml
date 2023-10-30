@@ -17,6 +17,7 @@ sync_irq = { path = "../../libs/sync_irq" }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 arm_boards = { path = "../arm_boards" }
+generic_timer_aarch64 = { path = "../generic_timer_aarch64" }
 gic = { path = "../gic" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]

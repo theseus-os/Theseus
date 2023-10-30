@@ -74,7 +74,7 @@ extern "x86-interrupt" fn ps2_mouse_handler(_stack_frame: InterruptStackFrame) {
         warn!("ps2_mouse_handler(): MOUSE isn't initialized yet, skipping interrupt.");
     }
 
-    interrupts::eoi(Some(PS2_MOUSE_IRQ));
+    interrupts::eoi(PS2_MOUSE_IRQ);
 }
 
 

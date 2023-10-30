@@ -190,7 +190,7 @@ impl LocalInterruptControllerApi for LocalInterruptController {
     }
 
     fn enable_local_timer_interrupt(&self, enable: bool) {
-        todo!("invoke interrupts::enable_timer(enable)...")
+        generic_timer_aarch64::enable_timer_interrupt(enable)
     }
 
     fn send_ipi(&self, num: InterruptNumber, dest: InterruptDestination) {
