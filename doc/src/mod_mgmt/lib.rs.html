@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mod_mgmt/src/lib.rs`."><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-f40c346f39d9abc1.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mod_mgmt" data-themes="" data-resource-suffix="" data-rustdoc-version="1.72.0-nightly (065a1f5df 2023-06-21)" data-search-js="search-95c92dd01058facf.js" data-settings-js="settings-de11bff964e9d4e5.js" data-settings-css="settings-8c76f75bfb6bd192.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../static.files/source-script-11255107d0a65077.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-190c35055d2a8300.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../mod_mgmt/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `kernel/mod_mgmt/src/lib.rs`."><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="mod_mgmt" data-themes="" data-resource-suffix="" data-rustdoc-version="1.75.0-nightly (aa1a71e9e 2023-10-26)" data-channel="nightly" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f34af1a0ee6bacd.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -3225,6 +3225,20 @@
 <a href="#3225" id="3225">3225</a>
 <a href="#3226" id="3226">3226</a>
 <a href="#3227" id="3227">3227</a>
+<a href="#3228" id="3228">3228</a>
+<a href="#3229" id="3229">3229</a>
+<a href="#3230" id="3230">3230</a>
+<a href="#3231" id="3231">3231</a>
+<a href="#3232" id="3232">3232</a>
+<a href="#3233" id="3233">3233</a>
+<a href="#3234" id="3234">3234</a>
+<a href="#3235" id="3235">3235</a>
+<a href="#3236" id="3236">3236</a>
+<a href="#3237" id="3237">3237</a>
+<a href="#3238" id="3238">3238</a>
+<a href="#3239" id="3239">3239</a>
+<a href="#3240" id="3240">3240</a>
+<a href="#3241" id="3241">3241</a>
 </pre></div><pre class="rust"><code><span class="attr">#![allow(clippy::blocks_in_if_conditions)]
 #![no_std]
 #![feature(int_roundings)]
@@ -3368,7 +3382,7 @@
 
     <span class="comment">// Closure to create the directory for a new namespace.
     </span><span class="kw">let </span>create_dir = |dir_name: <span class="kw-2">&amp;</span>str| -&gt; <span class="prelude-ty">Result</span>&lt;NamespaceDir, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
-        VFSDirectory::create(dir_name.to_string(), <span class="kw-2">&amp;</span>namespaces_dir).map(|d| NamespaceDir(d))
+        VFSDirectory::create(dir_name.to_string(), <span class="kw-2">&amp;</span>namespaces_dir).map(NamespaceDir)
     };
 
     <span class="kw">let </span><span class="kw-2">mut </span>process_module = |name: <span class="kw-2">&amp;</span>str, size, pages| -&gt; <span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>, <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt; {
@@ -4312,13 +4326,27 @@
             <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="string">&quot;not a relocatable elf file&quot;</span>);
         }
 
-        <span class="comment">// If a `.theseus_merged` section exists, then the object file&#39;s sections have been merged by a partial relinking step.
+        <span class="comment">// If a `.theseus_merged` section exists (it should come before any .text section),
+        // then the object file&#39;s sections have been merged by a partial relinking step.
         // If so, then we can use a much faster version of loading/linking.
         </span><span class="kw">const </span>THESEUS_MERGED_SEC_NAME: <span class="kw-2">&amp;</span>str = <span class="string">&quot;.theseus_merged&quot;</span>;
-        <span class="kw">const </span>THESEUS_MERGED_SEC_SHNDX: u16 = <span class="number">1</span>;
-        <span class="kw">let </span>sections_are_merged = elf_file.section_header(THESEUS_MERGED_SEC_SHNDX)
-            .map(|sec| sec.get_name(<span class="kw-2">&amp;</span>elf_file) == <span class="prelude-val">Ok</span>(THESEUS_MERGED_SEC_NAME))
-            .unwrap_or(<span class="bool-val">false</span>);
+        <span class="kw">let </span>sections_are_merged = {
+            <span class="kw">let </span><span class="kw-2">mut </span>found = <span class="bool-val">false</span>;
+            <span class="kw">for </span>sec_name <span class="kw">in </span>elf_file
+                .section_iter()
+                .filter_map(|sec| sec.get_name(<span class="kw-2">&amp;</span>elf_file).ok())
+            {
+                <span class="kw">if </span>sec_name == THESEUS_MERGED_SEC_NAME {
+                    found = <span class="bool-val">true</span>;
+                    <span class="kw">break</span>;
+                }
+                <span class="kw">else if </span>sec_name.starts_with(TEXT_SECTION_NAME) {
+                    found = <span class="bool-val">false</span>;
+                    <span class="kw">break</span>;
+                }
+            }
+            found
+        };
 
         <span class="comment">// Allocate enough space to load the sections
         </span><span class="kw">let </span>section_pages = allocate_section_pages(<span class="kw-2">&amp;</span>elf_file, kernel_mmi_ref)<span class="question-mark">?</span>;

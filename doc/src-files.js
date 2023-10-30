@@ -1,4 +1,4 @@
-var sourcesIndex = JSON.parse('{\
+var srcIndex = JSON.parse('{\
 "___Theseus_Crates___":["",[],["_doc_root.rs"]],\
 "acpi":["",[],["lib.rs"]],\
 "acpi_table":["",[],["lib.rs"]],\
@@ -186,4 +186,4 @@ var sourcesIndex = JSON.parse('{\
 "window_inner":["",[],["lib.rs"]],\
 "window_manager":["",[],["lib.rs"]]\
 }');
-createSourceSidebar();
+createSrcSidebar();
