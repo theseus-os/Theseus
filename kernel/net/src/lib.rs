@@ -63,7 +63,7 @@ pub fn get_interfaces() -> &'static Mutex<Vec<Arc<NetworkInterface>>> {
 
 /// Returns the first available interface.
 pub fn get_default_interface() -> Option<Arc<NetworkInterface>> {
-    NETWORK_INTERFACES.lock().get(0).cloned()
+    NETWORK_INTERFACES.lock().first().cloned()
 }
 
 /// Returns a port in the range reserved for private, dynamic, and ephemeral

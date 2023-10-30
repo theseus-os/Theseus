@@ -1196,13 +1196,13 @@ pub fn allocate_frames_deferred(
                             // because we are searching the general frames list, it doesn't matter if part of the chunk was found
                             // since we only create new reserved frames.
                             trace!("Only part of the requested allocation was found in the general frames list.");
-                            return Err(alloc_err).map_err(From::from);
+                            return Err(From::from(alloc_err));
                         }
-                        Err(_other) => return Err(alloc_err).map_err(From::from),
+                        Err(_other) => return Err(From::from(alloc_err)),
                     }
                 },
                 AllocationError::ContiguousChunkNotFound(f, numf) => (f, numf),
-                _ => return Err(alloc_err).map_err(From::from),
+                _ => return Err(From::from(alloc_err)),
             }
         };
 

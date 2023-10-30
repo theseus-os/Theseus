@@ -41,6 +41,7 @@ const PCI_BAR_PORT_MASK: u16 = 0xFFFC;
 
 bitflags! {
 	/// The possible error values found in an ATA drive's error port.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct AtaError: u8 {
 		const BAD_BLOCK              = 0x80;
 		const UNCORRECTABLE_DATA     = 0x40;
@@ -55,6 +56,7 @@ bitflags! {
 
 bitflags! {
 	/// The possible status values found in an ATA drive's status port.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct AtaStatus: u8 {
 		/// When set, the drive's port values are still changing, so ports shouldn't be accessed. 
 		const BUSY                 = 0x80;
@@ -73,6 +75,7 @@ bitflags! {
 
 bitflags! {
 	/// The possible control values used in an ATA drive's status port.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     struct AtaControl: u8 {
 		/// Set this to read back the High Order Byte of the last-written LBA48 value.
 		const HOB   = 0x80;

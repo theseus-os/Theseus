@@ -183,6 +183,7 @@ bitflags! {
     ///
     /// The least significant bits `[22:0]` are `RsvdZ`,
     /// meaning that they are reserved for future usage and must be set to 0.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct GlobalStatus: u32 {
         /// Compatibility Format Interrupt Status
         const CFIS  = 1 << 23;

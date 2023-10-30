@@ -80,7 +80,7 @@ impl Externals for HostExternals {
 ///
 pub fn execute_binary(wasm_binary: Vec<u8>, args: Vec<String>, preopen_dirs: Vec<String>) -> isize {
     // Load wasm binary and prepare it for instantiation.
-    let module = Module::from_buffer(&wasm_binary).unwrap();
+    let module = Module::from_buffer(wasm_binary).unwrap();
 
     // Construct wasmi WebAssembly state machine.
     let state_machine = wasmi_state_machine::ProcessStateMachine::new(

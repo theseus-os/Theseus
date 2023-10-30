@@ -64,6 +64,7 @@ bitflags! {
     /// 
     /// This type can also be converted *from* `PteFlagsX86_64` and `PteFlagsAarch64`,
     /// but it may be lossy as only the bit flags defined herein are preserved.
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct PteFlags: u64 {
         /// * If set, this page is currently "present" in memory. 
         /// * If not set, this page is not in memory, which could mean one of several things:
@@ -184,8 +185,8 @@ impl PteFlags {
     ///       that we don't care about.
     pub const fn new() -> Self {
         Self::from_bits_truncate(
-            Self::ACCESSED.bits
-            | Self::NOT_EXECUTABLE.bits
+            Self::ACCESSED.bits()
+            | Self::NOT_EXECUTABLE.bits()
         )
     }
 
