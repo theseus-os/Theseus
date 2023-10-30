@@ -29,6 +29,7 @@
 
 #![no_std]
 #![feature(thread_local)]
+#![allow(internal_features)]
 #![feature(allow_internal_unstable)]
 
 // The code from Rust std uses unsafe blocks within unsafe functions,
