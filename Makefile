@@ -54,6 +54,7 @@ IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 ### Basic directory/file path definitions used throughout the makefile.
 ###################################################################################################
 BUILD_DIR               := $(ROOT_DIR)/build
+STD_BUILD_DIR           := $(BUILD_DIR)/std
 NANO_CORE_BUILD_DIR     := $(BUILD_DIR)/nano_core
 iso                     := $(BUILD_DIR)/theseus-$(ARCH).$(ISO_EXTENSION)
 ISOFILES                := $(BUILD_DIR)/isofiles
@@ -177,6 +178,7 @@ endif
 ###       However, this means we must not explicitly not use it for `cargo run` tool invocations,
 ###       because those should be built as normal for the host OS environment.
 export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
+export override RUSTFLAGS += -L $(STD_BUILD_DIR)/aarch64-apple-darwin/stage0-std/$(TARGET)/release/deps
 
 
 ### Convenience targets for building the entire Theseus workspace
@@ -325,6 +327,9 @@ cargo:
 ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
 	$(eval CFLAGS += -DVGA_TEXT_MODE)
 endif
+
+	printenv
+	RUSTFLAGS="" CARGOFLAGS="" ports/rust/x.py build --stage 0 library/std --target  /Users/klim/Projects/theseus-5/cfg/$(TARGET).json --build-dir $(STD_BUILD_DIR)
 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""

@@ -90,7 +90,7 @@ pub fn take_current_tls_destructors() -> Vec<TlsObjectDestructor> {
 /// 
 /// Currently the only value of `dtor` that is used is a type-specific monomorphized
 /// version of the above [`fast::destroy_value()`] function.
-fn register_dtor(object_ptr: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
+pub unsafe fn register_dtor(object_ptr: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
     TLS_DESTRUCTORS.borrow_mut().push(TlsObjectDestructor { object_ptr, dtor });
 }
 

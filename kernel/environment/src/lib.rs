@@ -4,6 +4,7 @@ extern crate alloc;
 
 use alloc::{string::String, sync::Arc};
 use core::fmt;
+
 use fs_node::{DirRef, FileOrDir};
 use hashbrown::HashMap;
 use path::Path;
@@ -44,8 +45,8 @@ impl Environment {
 
     /// Returns the value of the environment variable with the given `key`.
     #[doc(alias("var"))]
-    pub fn get(&self, key: &str) -> Option<&String> {
-        self.variables.get(key)
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.variables.get(key).map(|s| &s[..])
     }
 
     /// Sets an environment variable with the given `key` and `value`.
@@ -76,6 +77,7 @@ impl Default for Environment {
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// The error type for environment operations.
+#[derive(Copy, Clone, Debug)]
 pub enum Error {
     /// A filesystem node was, unexpectedly, not a directory.
     NotADirectory,
