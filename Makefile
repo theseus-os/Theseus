@@ -243,8 +243,18 @@ build: $(nano_core_binary)
 	done; wait
 
 ## Second, copy all object files into the main build directory and prepend the kernel or app prefix appropriately. 
-	@RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+	RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i "$(TARGET_DEPS_DIR)" \
+		--output-objects $(OBJECT_FILES_BUILD_DIR) \
+		--output-deps $(DEPS_BUILD_DIR) \
+		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
+		-k ./kernel \
+		-a ./applications \
+		--kernel-prefix $(KERNEL_PREFIX) \
+		--app-prefix $(APP_PREFIX) \
+		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
+	RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
+		-i "$(STD_BUILD_DIR)/aarch64-apple-darwin/stage0-std/$(TARGET)/release/deps" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_BUILD_DIR) \
 		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
@@ -329,7 +339,8 @@ ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
 endif
 
 	printenv
-	RUSTFLAGS="" CARGOFLAGS="" ports/rust/x.py build --stage 0 library/std --target  /Users/klim/Projects/theseus-5/cfg/$(TARGET).json --build-dir $(STD_BUILD_DIR)
+	echo $(RUSTFLAGS)
+	RUST_TARGET_PATH='$(CFG_DIR)' CARGOFLAGS="" RUSTFLAGS='$(RUSTFLAGS)' ports/rust/x.py build --stage 0 library/std --target $(TARGET) --build-dir $(STD_BUILD_DIR)
 
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
@@ -337,7 +348,7 @@ endif
 	@echo -e "\t APP_PREFIX: \"$(APP_PREFIX)\""
 	@echo -e "\t CFLAGS: \"$(CFLAGS)\""
 	@echo -e "\t THESEUS_CONFIG (before build.rs script): \"$(THESEUS_CONFIG)\""
-	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)' RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) $(BUILD_STD_CARGOFLAGS) --target $(TARGET)
+	THESEUS_CFLAGS='$(CFLAGS)' THESEUS_NANO_CORE_BUILD_DIR='$(NANO_CORE_BUILD_DIR)' RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' cargo build $(CARGOFLAGS) $(FEATURES) --target $(TARGET) $(BUILD_STD_CARGOFLAGS)
 
 ## We tried using the "cargo rustc" command here instead of "cargo build" to avoid cargo unnecessarily rebuilding core/alloc crates,
 ## But it doesn't really seem to work (it's not the cause of cargo rebuilding everything).
@@ -621,9 +632,10 @@ clippy : export override FEATURES := $(subst --workspace,,$(FEATURES))
 endif
 clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
 clippy:
+# TODO: x.py
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 		cargo clippy \
-		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \
+		$(FEATURES) \
 		--target $(TARGET) \
 		-- -D clippy::all
 

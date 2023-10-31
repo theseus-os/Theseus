@@ -13,6 +13,7 @@ libm = "0.2.1"
 log = "0.4.8"
 
 irq_safety = { git = "https://github.com/theseus-os/irq_safety" }
+compiler_builtins = { version = "*", features = ["mem"] }
 
 kernel_config = { path = "../kernel_config" }
 state_store = { path = "../state_store" }

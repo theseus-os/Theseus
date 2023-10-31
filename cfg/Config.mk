@@ -66,14 +66,6 @@ $(error 'BUILD_MODE' value of '$(BUILD_MODE)' is invalid, it must be either 'deb
 endif
 
 
-## Tell cargo to build our own target-specific version of the `core` and `alloc` crates.
-## Also ensure that core memory functions (e.g., memcpy) are included in the build and not name-mangled.
-## We keep these flags separate from the regular CARGOFLAGS for purposes of easily creating a sysroot directory.
-BUILD_STD_CARGOFLAGS += -Z unstable-options
-BUILD_STD_CARGOFLAGS += -Z build-std=core,alloc
-BUILD_STD_CARGOFLAGS += -Z build-std-features=compiler-builtins-mem
-
-
 ## Tell rustc to output the native object file for each crate,
 ## which avoids always having to unpack the crate's .rlib archive to extract the object files within.
 ## Note that we still do have to extract and partially link object files from .rlib archives for crates that
@@ -95,6 +87,9 @@ export override RUSTFLAGS += -D unused-must-use
 ## Thus, we should experiment with removing this to see if it offers any code size reduction benefits
 ## without breaking our loader/linker assumptions.
 export override RUSTFLAGS += -Z share-generics=no
+
+export override RUSTFLAGS += -C codegen-units=1
+export override RUSTFLAGS += -C incremental=no
 
 ## This forces frame pointers to be generated, i.e., the stack base pointer (RBP register on x86_64)
 ## will be used to store the starting address of the current stack frame.
