@@ -36,26 +36,29 @@ impl Descriptor {
 #[bitsize(8)]
 #[derive(Debug, Copy, Clone, FromBits)]
 pub enum DescriptorType {
-    Device = 0x1,
-    Configuration = 0x2,
+    Device = 1,
+    Configuration = 2,
 
-    String = 0x3,
+    String = 3,
 
-    Interface = 0x4,
-    Endpoint = 0x5,
-    DeviceQualifier = 0x6,
+    Interface = 4,
+    Endpoint = 5,
+    DeviceQualifier = 6,
 
     // Same struct as Self::Configuration
-    OtherSpeedConfiguration = 0x7,
+    OtherSpeedConfiguration = 7,
 
     // Couldn't find the definition for this descriptor
-    InterfacePower = 0x8,
+    InterfacePower = 8,
+
+    HumanInputDevice = 33,
+
     #[fallback]
     Reserved = 0xff,
 }
 
-#[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(C)]
+#[derive(Copy, Clone, Debug, FromBytes, Default)]
+#[repr(packed)]
 pub struct Device {
     pub length: u8,
     pub descriptor_type: u8,
@@ -74,7 +77,7 @@ pub struct Device {
 }
 
 #[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(C)]
+#[repr(packed)]
 pub struct DeviceQualifier {
     pub length: u8,
     pub descriptor_type: u8,
@@ -87,9 +90,18 @@ pub struct DeviceQualifier {
     pub reserved: u8,
 }
 
-#[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(C)]
+#[derive(Copy, Clone, FromBytes, Debug)]
+#[repr(packed)]
 pub struct Configuration {
+    pub inner: ConfigInner,
+    // the following are equivalent:
+    //
+    pub details: [u8; 0x1000],
+}
+
+#[derive(Copy, Clone, Debug, FromBytes, Default)]
+#[repr(packed)]
+pub struct ConfigInner {
     pub length: u8,
     pub descriptor_type: u8,
     pub total_length: u16,
@@ -101,8 +113,35 @@ pub struct Configuration {
     pub max_power: u8,
 }
 
+impl Configuration {
+    pub fn find_desc<T: FromBytes>(&self, start_search_at: usize, search: DescriptorType) -> Result<(&T, usize), &'static str> {
+        let len = (self.inner.total_length - 9) as usize;
+        let mut i = start_search_at;
+        while i < len {
+            let desc_len = self.details[i] as usize;
+            let desc_type = self.details[i + 1];
+            if desc_len == 0 {
+                return Err("Malformed descriptor");
+            }
+
+            if u8::from(search) == desc_type {
+                let ptr = (&self.details[i]) as *const u8;
+                let cast_ptr: *const T = ptr.cast();
+                let maybe_ref = unsafe { cast_ptr.as_ref() };
+                return maybe_ref
+                    .ok_or("Failed to point to configuration buffer")
+                    .map(|t| (t, i + desc_len));
+            }
+            
+            i += desc_len;
+        }
+
+        Err("Invalid descriptor index (out of bounds)")
+    }
+}
+
 #[bitsize(8)]
-#[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
+#[derive(DebugBits, Copy, Clone, FromBits, FromBytes, Default)]
 pub struct ConfigurationAttributes {
     reserved: u5,
     remote_wakeup: bool,
@@ -111,21 +150,21 @@ pub struct ConfigurationAttributes {
 }
 
 #[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(C)]
+#[repr(packed)]
 pub struct Interface {
     pub length: u8,
     pub descriptor_type: u8,
     pub interface_number: u8,
     pub alt_setting: u8,
     pub num_endpoints: u8,
-    pub interface_class: u8,
-    pub interface_sub_class: ConfigurationAttributes,
-    pub interface_protocol: u8,
-    pub interface_name: StringIndex,
+    pub class: u8,
+    pub sub_class: u8,
+    pub protocol: u8,
+    pub name: StringIndex,
 }
 
 #[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(C)]
+#[repr(packed)]
 pub struct Endpoint {
     pub length: u8,
     pub descriptor_type: u8,
@@ -175,7 +214,7 @@ pub enum IsochronousEndpointUsageType {
 }
 
 #[derive(Copy, Clone, Debug, FromBytes)]
-#[repr(C)]
+#[repr(packed)]
 pub struct UsbString {
     pub length: u8,
     pub descriptor_type: u8,

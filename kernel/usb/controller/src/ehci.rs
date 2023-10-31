@@ -2,8 +2,8 @@
 
 use super::*;
 
-allocator!(TransferDescriptorAlloc, TransferDescriptor, 16);
-allocator!(QueueHeadAlloc, QueueHead, 16);
+allocator!(TransferDescriptorAlloc, TransferDescriptor, 128);
+allocator!(QueueHeadAlloc, QueueHead, 32);
 
 fn sleep_ms(milliseconds: u64) {
     sleep(Duration::from_millis(milliseconds))
@@ -157,12 +157,52 @@ impl EhciController {
 
                     let addr = addr?;
 
-                    self.request(0, Request::SetAddress(addr))?;
+                    self.request(0, Request::SetAddress(addr), 8)?;
 
-                    for i in 1..25 {
-                        let mut string = String::new();
-                        self.request(addr, Request::ReadString(i, &mut string))?;
-                        log::warn!("STRING {}: {}", i, string);
+                    let mut device = descriptors::Device::default();
+                    self.request(addr, Request::GetDeviceDescriptor(&mut device), 8)?;
+                    log::warn!("device_descriptor: {:#x?}", device);
+
+                    let max_packet_size = device.max_packet_size;
+
+                    let mut config = unsafe { core::mem::MaybeUninit::<descriptors::Configuration>::zeroed().assume_init() };
+                    self.request(addr, Request::GetConfigDescriptor(0, &mut config), max_packet_size)?;
+                    log::warn!("config 0: {:#x?}", config.inner);
+
+                    let mut offset = 0;
+                    for i in 0..config.inner.num_interfaces {
+                        let (interface, o): (&descriptors::Interface, _) = config.find_desc(offset, DescriptorType::Interface)?;
+                        log::warn!("interface: {}", interface.name);
+                        for _ in 0..interface.num_endpoints {
+                            // todo: read HID descriptor here
+                            let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
+                            log::warn!("endpoint: {:#x?}", endpoint);
+                            offset = o;
+                        }
+
+                        if interface.class == 3 {
+                            self.request(addr, Request::HidSetProtocol(i as _, request::HidProtocol::Boot), max_packet_size)?;
+
+                            loop {
+                                let report_type = request::HidReportType::Input;
+                                let report_id = 0;
+                                let mut report = [0u8; 8];
+                                self.request(addr, Request::HidGetReport(i as _, report_type, report_id, &mut report), max_packet_size)?;
+
+                                log::warn!("report: {:x?}", report);
+                                sleep_ms(50);
+                            }
+
+                            /*
+                            // set leds
+                            let report_type = request::HidReportType::Output;
+                            let report_id = 0;
+                            let report = [0b00011111];
+                            self.request(addr, Request::HidSetReport(i as _, report_type, report_id, &report), max_packet_size)?;
+                            */
+                        }
+
+                        offset = o;
                     }
                 }
             }
@@ -176,44 +216,19 @@ impl EhciController {
         Ok(())
     }
 
-    pub fn request(&mut self, dev_addr: DeviceAddress, request: Request) -> Result<(), &'static str> {
+    pub fn request(&mut self, dev_addr: DeviceAddress, request: Request, max_packet_size: u8) -> Result<(), &'static str> {
         let mut raw_req = request.get_raw();
 
         let shmem = self.alloc_mut()?;
-        let (shmem_index, shmem_addr) = match &request {
-            Request::GetStatus(_target, _dev_status) => shmem.common.words.allocate(None)?,
-            Request::ClearFeature(_target, _feature_id) => (0, 0),
-            Request::SetFeature(_target, _feature_id) => (0, 0),
-            Request::SetAddress(_dev_addr) => (0, 0),
-            Request::GetDescriptor(_desc_idx, descriptor) => match descriptor {
-                Descriptor::Device(_d) => shmem.common.descriptors.device.allocate(None)?,
-                Descriptor::Configuration(_c) => shmem.common.descriptors.configuration.allocate(None)?,
-                Descriptor::Interface(_i) => shmem.common.descriptors.interface.allocate(None)?,
-                Descriptor::Endpoint(_e) => shmem.common.descriptors.endpoint.allocate(None)?,
-                Descriptor::DeviceQualifier(_q) => shmem.common.descriptors.device_qualifier.allocate(None)?,
-                Descriptor::OtherSpeedConfiguration(_s) => shmem.common.descriptors.other_speed_configuration.allocate(None)?,
-            },
-            Request::SetDescriptor(_desc_idx, descriptor) => match descriptor {
-                Descriptor::Device(d) => shmem.common.descriptors.device.allocate(Some(*d))?,
-                Descriptor::Configuration(c) => shmem.common.descriptors.configuration.allocate(Some(*c))?,
-                Descriptor::Interface(i) => shmem.common.descriptors.interface.allocate(Some(*i))?,
-                Descriptor::Endpoint(e) => shmem.common.descriptors.endpoint.allocate(Some(*e))?,
-                Descriptor::DeviceQualifier(q) => shmem.common.descriptors.device_qualifier.allocate(Some(*q))?,
-                Descriptor::OtherSpeedConfiguration(s) => shmem.common.descriptors.other_speed_configuration.allocate(Some(*s))?,
-            },
-            Request::GetConfiguration(_config) => shmem.common.bytes.allocate(None)?,
-            Request::SetConfiguration(_config) => (0, 0),
-            Request::GetInterfaceAltSetting(_interface_idx, _alt_setting) => shmem.common.bytes.allocate(None)?,
-            Request::SetInterfaceAltSetting(_interface_idx, _alt_setting) => (0, 0),
-            Request::ReadString(_string_idx, _string) => shmem.common.descriptors.string.allocate(None)?,
-        };
+        let (shmem_index, shmem_addr) = request.allocate_payload(&mut shmem.common)?;
 
+        let mut first_pass = true;
         loop {
             let shmem = self.alloc_mut()?;
             // todo: handle device descriptors case (smaller data size than needed)
             let data_sz = raw_req.len() as usize;
 
-            let (qh_addr, first_qtd_index, req_index) = create_request(shmem, dev_addr, raw_req, data_sz, 8, shmem_addr)?;
+            let (qh_addr, first_qtd_index, req_index) = create_request(shmem, dev_addr, raw_req, data_sz, max_packet_size, shmem_addr)?;
 
             self.push_to_async_schedule(qh_addr)?;
             self.wait_for_all_td_inactive(first_qtd_index)?;
@@ -223,49 +238,20 @@ impl EhciController {
             let shmem = self.alloc_mut()?;
             shmem.common.requests.free(req_index)?;
 
-            if data_sz == 2 {
-                if let Request::ReadString(_string_idx, _string) = &request {
-                    let string_desc = &shmem.common.descriptors.string.get(shmem_index)?;
-                    raw_req.set_len(string_desc.length as u16);
-
-                    continue;
+            if first_pass {
+                match request.adjust_len(&shmem.common, shmem_index)? {
+                    Some(length_update) => raw_req.set_len(length_update),
+                    None => break,
                 }
-            }
 
-            break;
+                first_pass = false;
+            } else {
+                break;
+            }
         }
 
         let shmem = self.alloc_mut()?;
-        let shmem = &mut shmem.common;
-        match request {
-            Request::GetStatus(_target, status) => shmem.words.free(shmem_index).map(|word| *status = word.into()),
-            Request::ClearFeature(_target, _feature_id) => Ok(()),
-            Request::SetFeature(_target, _feature_id) => Ok(()),
-            Request::SetAddress(_dev_addr) => Ok(()),
-            Request::GetDescriptor(_desc_idx, descriptor) => match descriptor {
-                Descriptor::Device(d) => shmem.descriptors.device.free(shmem_index).map(|desc| *d = desc),
-                Descriptor::Configuration(c) => shmem.descriptors.configuration.free(shmem_index).map(|desc| *c = desc),
-                Descriptor::Interface(i) => shmem.descriptors.interface.free(shmem_index).map(|desc| *i = desc),
-                Descriptor::Endpoint(e) => shmem.descriptors.endpoint.free(shmem_index).map(|desc| *e = desc),
-                Descriptor::DeviceQualifier(q) => shmem.descriptors.device_qualifier.free(shmem_index).map(|desc| *q = desc),
-                Descriptor::OtherSpeedConfiguration(s) => shmem.descriptors.other_speed_configuration.free(shmem_index).map(|desc| *s = desc),
-            },
-            Request::SetDescriptor(_desc_idx, _descriptor) => Ok(()),
-            Request::GetConfiguration(config) => shmem.bytes.free(shmem_index).map(|byte| *config = NonZeroU8::new(byte)),
-            Request::SetConfiguration(_config) => Ok(()),
-            Request::GetInterfaceAltSetting(_interface_idx, alt_setting) => shmem.bytes.free(shmem_index).map(|byte| *alt_setting = byte),
-            Request::SetInterfaceAltSetting(_interface_idx, _alt_setting) => Ok(()),
-            Request::ReadString(_string_idx, string) => {
-                let string_desc = &shmem.descriptors.string.free(shmem_index)?;
-                let str_len = string_desc.length.checked_sub(2).unwrap_or(0) as usize;
-                let slice = &string_desc.unicode_bytes[..str_len];
-
-                string.clear();
-                string.push_str(from_utf8(slice).map_err(|_e| "Invalid String Bytes in USB device")?);
-
-                Ok(())
-            },
-        }
+        request.free_and_move_payload(&mut shmem.common, shmem_index)
     }
 
     fn free_qh_and_qtd(&mut self, qh_addr: u32, first_qtd_index: usize) -> Result<(), &'static str> {
@@ -296,7 +282,7 @@ impl EhciController {
 
         loop {
             let qtd_ref = transfer_descriptors.get(qtd_index)?;
-            try_wait_until!(10, 1000, !qtd_ref.token.read().active())?;
+            try_wait_until!(1, 1000, !qtd_ref.token.read().active())?;
 
             let next_pointer = qtd_ref.next.read();
             if next_pointer == no_next {
@@ -311,7 +297,7 @@ impl EhciController {
     fn enable_async_schedule(&mut self, enable: bool) -> Result<(), &'static str> {
         let op_regs = self.op_regs_mut()?;
         op_regs.command.update(|cmd| cmd.set_async_schedule(enable));
-        try_wait_until!(10, 1000, op_regs.status.read().async_schedule_running() == enable)?;
+        try_wait_until!(1, 1000, op_regs.status.read().async_schedule_running() == enable)?;
         Ok(())
     }
 
@@ -385,9 +371,10 @@ fn create_request(
     dev_addr: DeviceAddress,
     req: RawRequest,
     mut data_size: usize,
-    max_packet_size: usize,
+    max_packet_size: u8,
     mut in_buf: u32,
 ) -> Result<(u32, usize, usize), &'static str> {
+    let max_packet_size = max_packet_size as usize;
     let (req_index, req_ptr) = shmem.common.requests.allocate(Some(req))?;
     let req_bp = BufferPointerWithOffset::from(req_ptr);
 

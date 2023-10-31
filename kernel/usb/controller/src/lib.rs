@@ -22,9 +22,11 @@ mod ehci;
 
 pub mod descriptors;
 pub mod allocators;
+pub mod request;
 
-use descriptors::{Descriptor, DescriptorType};
+use descriptors::DescriptorType;
 use allocators::CommonUsbAlloc;
+use request::Request;
 
 pub enum Standard<T> {
     Ehci(T),
@@ -69,135 +71,6 @@ pub type StringIndex = u8;
 
 pub type DescriptorIndex = u8;
 
-pub enum Request<'a> {
-    GetStatus(Target, &'a mut DeviceStatus),
-
-    ClearFeature(Target, FeatureId),
-    SetFeature(Target, FeatureId),
-
-    SetAddress(DeviceAddress),
-
-    GetDescriptor(DescriptorIndex, &'a mut Descriptor),
-    SetDescriptor(DescriptorIndex, Descriptor),
-
-    GetConfiguration(&'a mut Option<NonZeroU8>),
-    SetConfiguration(Option<NonZeroU8>),
-
-    GetInterfaceAltSetting(InterfaceIndex, &'a mut u8),
-    SetInterfaceAltSetting(InterfaceIndex, u8),
-
-    ReadString(StringIndex, &'a mut String),
-
-    // not supported by this driver
-    // SynchFrame(EndpointAddress, u16),
-}
-
-impl<'a> Request<'a> {
-    pub(crate) fn get_raw(&self) -> RawRequest {
-        match self {
-            Self::GetStatus(target, _dev_status) => RawRequest::new(
-                (*target).into(),
-                RequestType::Standard,
-                Direction::In,
-                RequestName::GetStatus,
-                0u16,
-                target.index(),
-                2u16,
-            ),
-            Self::ClearFeature(target, feature_id) => RawRequest::new(
-                (*target).into(),
-                RequestType::Standard,
-                Direction::Out,
-                RequestName::ClearFeature,
-                *feature_id,
-                target.index(),
-                0u16,
-            ),
-            Self::SetFeature(target, feature_id) => RawRequest::new(
-                (*target).into(),
-                RequestType::Standard,
-                Direction::Out,
-                RequestName::SetFeature,
-                *feature_id,
-                target.index(),
-                0u16,
-            ),
-            Self::SetAddress(dev_addr) => RawRequest::new(
-                RawRequestRecipient::Device,
-                RequestType::Standard,
-                Direction::Out,
-                RequestName::SetAddress,
-                *dev_addr as u16,
-                0u16,
-                0u16,
-            ),
-            Self::GetDescriptor(desc_index, descriptor) => RawRequest::new(
-                RawRequestRecipient::Device,
-                RequestType::Standard,
-                Direction::In,
-                RequestName::GetDescriptor,
-                (descriptor.get_type() << 8) | (*desc_index as u16),
-                0u16,
-                descriptor.get_length(),
-            ),
-            Self::SetDescriptor(desc_index, descriptor) => RawRequest::new(
-                RawRequestRecipient::Device,
-                RequestType::Standard,
-                Direction::Out,
-                RequestName::SetDescriptor,
-                (descriptor.get_type() << 8) | (*desc_index as u16),
-                0u16,
-                descriptor.get_length(),
-            ),
-            Self::GetConfiguration(_config) => RawRequest::new(
-                RawRequestRecipient::Device,
-                RequestType::Standard,
-                Direction::In,
-                RequestName::GetConfiguration,
-                0u16,
-                0u16,
-                1u16,
-            ),
-            Self::SetConfiguration(config) => RawRequest::new(
-                RawRequestRecipient::Device,
-                RequestType::Standard,
-                Direction::Out,
-                RequestName::SetConfiguration,
-                config.map(|v| v.into()).unwrap_or(0) as u16,
-                0u16,
-                0u16,
-            ),
-            Self::GetInterfaceAltSetting(interface_idx, _alt_setting) => RawRequest::new(
-                RawRequestRecipient::Interface,
-                RequestType::Standard,
-                Direction::In,
-                RequestName::SetConfiguration,
-                0u16,
-                *interface_idx,
-                1u16,
-            ),
-            Self::SetInterfaceAltSetting(interface_idx, alt_setting) => RawRequest::new(
-                RawRequestRecipient::Interface,
-                RequestType::Standard,
-                Direction::Out,
-                RequestName::SetConfiguration,
-                *alt_setting as u16,
-                *interface_idx,
-                0u16,
-            ),
-            Self::ReadString(string_idx, _string) => RawRequest::new(
-                RawRequestRecipient::Device,
-                RequestType::Standard,
-                Direction::In,
-                RequestName::GetDescriptor,
-                ((u8::from(DescriptorType::String) as u16) << 8) | (*string_idx as u16),
-                0u16,
-                2u16,
-            ),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum Target {
     Device,
@@ -222,7 +95,7 @@ struct RawRequest {
     pub req_type: RequestType,
     pub direction: Direction,
 
-    pub request_name: RequestName,
+    pub request_name: u8,
     pub value: u16,
     pub index: u16,
     pub len: u16,
@@ -267,21 +140,25 @@ enum RequestType {
     Reserved = 0x3,
 }
 
-#[bitsize(8)]
-#[derive(Debug, FromBits)]
-enum RequestName {
-    GetStatus = 0x00,
-    ClearFeature = 0x01,
-    SetFeature = 0x03,
-    SetAddress = 0x05,
-    GetDescriptor = 0x06,
-    SetDescriptor = 0x07,
-    GetConfiguration = 0x08,
-    SetConfiguration = 0x09,
-    GetInterfaceAltSetting = 0x0a,
-    SetInterfaceAltSetting = 0x0b,
-    SyncFrame = 0x0c,
+mod std_req {
+    pub const GET_STATUS: u8 = 0x00;
+    pub const CLEAR_FEATURE: u8 = 0x01;
+    pub const SET_FEATURE: u8 = 0x03;
+    pub const SET_ADDRESS: u8 = 0x05;
+    pub const GET_DESCRIPTOR: u8 = 0x06;
+    pub const SET_DESCRIPTOR: u8 = 0x07;
+    pub const GET_CONFIGURATION: u8 = 0x08;
+    pub const SET_CONFIGURATION: u8 = 0x09;
+    pub const GET_INTERFACE_ALT_SETTING: u8 = 0x0a;
+    pub const SET_INTERFACE_ALT_SETTING: u8 = 0x0b;
+    pub const _SYNC_FRAME: u8 = 0x0c;
+}
 
-    #[fallback]
-    Reserved = 0xff,
+mod hid_req {
+    pub const GET_REPORT: u8 = 0x01;
+    pub const SET_REPORT: u8 = 0x09;
+    pub const GET_PROTOCOL: u8 = 0x03;
+    pub const SET_PROTOCOL: u8 = 0x0B;
+    pub const _GET_IDLE: u8 = 0x02;
+    pub const _SET_IDLE: u8 = 0x0A;
 }

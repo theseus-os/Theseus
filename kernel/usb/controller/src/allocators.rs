@@ -5,9 +5,10 @@ use super::*;
 allocator!(pub(crate) RequestAlloc, RawRequest, 16);
 allocator!(pub(crate) ByteAlloc, u8, 16);
 allocator!(pub(crate) WordAlloc, u16, 16);
+allocator!(pub(crate) PageAlloc, [u8; 0x1000], 4);
 
 allocator!(pub(crate) DeviceDescAlloc, descriptors::Device, 16);
-allocator!(pub(crate) ConfigurationDescAlloc, descriptors::Configuration, 16);
+allocator!(pub(crate) ConfigurationDescAlloc, descriptors::Configuration, 8);
 allocator!(pub(crate) InterfaceDescAlloc, descriptors::Interface, 16);
 allocator!(pub(crate) EndpointDescAlloc, descriptors::Endpoint, 16);
 allocator!(pub(crate) DeviceQualifierDescAlloc, descriptors::DeviceQualifier, 16);
@@ -31,6 +32,7 @@ pub(crate) struct CommonUsbAlloc {
     pub requests: RequestAlloc,
     pub bytes: ByteAlloc,
     pub words: WordAlloc,
+    pub pages: PageAlloc,
 }
 
 #[macro_export]
@@ -64,6 +66,7 @@ macro_rules! allocator {
                         }
                         let addr = mut_ref as *mut _ as usize as u32;
 
+                        // log::warn!("{}: alloc ({})", stringify!($ty), i);
                         return Ok((i, addr))
                     }
                 }
@@ -75,6 +78,7 @@ macro_rules! allocator {
                 let err_msg = concat!(stringify!($name), ": Invalid slot index");
                 let occupied = self.occupied.get_mut(index).ok_or(err_msg)?;
                 *occupied = Self::OCCUPIED_FALSE;
+                // log::warn!("{}: free ({})", stringify!($ty), index);
                 Ok(self.slots.get(index).unwrap().clone())
             }
 
