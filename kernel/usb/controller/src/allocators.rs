@@ -35,6 +35,10 @@ pub(crate) struct CommonUsbAlloc {
     pub pages: PageAlloc,
 }
 
+pub(crate) fn usb_addr<T>(t_ref: &T) -> u32 {
+    t_ref as *const T as usize as u32
+}
+
 #[macro_export]
 macro_rules! allocator {
     ($name:ident, $ty:ty, $cap:literal) => {
@@ -64,7 +68,7 @@ macro_rules! allocator {
                         if let Some(value) = init_to {
                             *mut_ref = value;
                         }
-                        let addr = mut_ref as *mut _ as usize as u32;
+                        let addr = usb_addr(mut_ref);
 
                         // log::warn!("{}: alloc ({})", stringify!($ty), i);
                         return Ok((i, addr))
@@ -95,7 +99,7 @@ macro_rules! allocator {
             pub fn find(&self, addr: u32) -> Result<usize, &'static str> {
                 let err_msg = concat!(stringify!($name), ": Invalid address");
                 let mut_ref = &self.slots[0];
-                let addr_of_first = mut_ref as *const _ as usize as u32;
+                let addr_of_first = usb_addr(mut_ref);
 
                 let offset = addr.checked_sub(addr_of_first).ok_or(err_msg)? as usize;
 
@@ -121,8 +125,7 @@ macro_rules! allocator {
 
             pub fn address_of(&self, index: usize) -> Result<u32, &'static str> {
                 let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                let reference = self.slots.get(index).ok_or(err_msg)?;
-                Ok(reference as *const _ as usize as u32)
+                Ok(usb_addr(self.slots.get(index).ok_or(err_msg)?))
             }
         }
 

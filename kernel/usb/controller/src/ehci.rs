@@ -2,6 +2,8 @@
 
 use super::*;
 
+use allocators::usb_addr;
+
 allocator!(TransferDescriptorAlloc, TransferDescriptor, 128);
 allocator!(QueueHeadAlloc, QueueHead, 32);
 
@@ -34,6 +36,7 @@ pub struct UsbAlloc {
     common: CommonUsbAlloc,
     transfer_descriptors: TransferDescriptorAlloc,
     queue_heads: QueueHeadAlloc,
+    periodic_list: PeriodicList,
 }
 
 #[derive(Debug)]
@@ -73,30 +76,46 @@ impl EhciController {
 
         let op_regs = config_space.as_type_mut::<OperationRegisters>(op_offset)?;
 
+        op_regs.interrupts.update(|i| i.set_usb_int(true));
+        op_regs.interrupts.update(|i| i.set_usb_error_int(false));
+        op_regs.interrupts.update(|i| i.set_port_change_int(false));
+        op_regs.interrupts.update(|i| i.set_frame_list_rollover_int(false));
+        op_regs.interrupts.update(|i| i.set_host_system_error_int(false));
+        op_regs.interrupts.update(|i| i.set_int_on_async_advance(false));
 
         op_regs.segment.write(four_gig_segment);
+        op_regs.command.update(|cmd| cmd.set_frame_list_size(FrameListSize::Full));
         op_regs.command.update(|cmd| cmd.set_async_schedule(false));
         op_regs.command.update(|cmd| cmd.set_periodic_schedule(false));
         op_regs.command.update(|cmd| cmd.set_run_stop(true));
         op_regs.config_flag.update(|cmd| cmd.set_inner(ConfigureFlag::Use));
 
-        // this installs a single dummy queue head in the asynchronous schedule,
-        // which makes asynchronous queue management easier.
-        op_regs.async_list.write({
+        let (dummy_queue_head_addr, periodic_list_addr) = {
             let usb_alloc = usb_alloc.as_type_mut::<UsbAlloc>(0)?;
 
+            for slot in &mut usb_alloc.periodic_list.entries {
+                slot.update(|slot| slot.set_invalid(true));
+            }
+
             let first_qtd_none = PointerNoType::from(1);
-            let dummy_queue_head = create_queue_head(true, 0, 0, first_qtd_none);
-            let (index, dqh_addr) = usb_alloc.queue_heads.allocate(Some(dummy_queue_head))?;
+            let dummy_queue_head = create_queue_head(true, 0, u4::new(0), 0, 0, first_qtd_none);
+            let (index, dummy_queue_head_addr) = usb_alloc.queue_heads.allocate(Some(dummy_queue_head))?;
 
             // close the loop
             let qdh_mut = usb_alloc.queue_heads.get_mut(index)?;
-            qdh_mut.next.write(queue_head_pointer(dqh_addr));
+            qdh_mut.next.write(queue_head_pointer(dummy_queue_head_addr));
 
-            dqh_addr
-        });
+            (dummy_queue_head_addr, usb_addr(&usb_alloc.periodic_list))
+        };
+
+        // this installs a single dummy queue head in the asynchronous schedule,
+        // which makes asynchronous queue management easier.
+        op_regs.async_list.write(dummy_queue_head_addr);
+        op_regs.periodic_list.write(periodic_list_addr);
 
         sleep(Duration::from_millis(10)).unwrap();
+
+        op_regs.command.update(|cmd| cmd.set_periodic_schedule(true));
 
         log::info!("Initialized an EHCI USB controller with {} ports and {} companion controllers",
             hcs_params.port_num(),
@@ -177,29 +196,44 @@ impl EhciController {
                             // todo: read HID descriptor here
                             let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
                             log::warn!("endpoint: {:#x?}", endpoint);
-                            offset = o;
-                        }
 
-                        if interface.class == 3 {
-                            self.request(addr, Request::HidSetProtocol(i as _, request::HidProtocol::Boot), max_packet_size)?;
+                            if interface.class == 3 {
+                                self.request(addr, Request::HidSetProtocol(i as _, request::HidProtocol::Boot), max_packet_size)?;
 
-                            loop {
-                                let report_type = request::HidReportType::Input;
+                                let shmem = self.alloc_mut()?;
+                                let (buf_index, buf_addr) = shmem.common.pages.allocate(None)?;
+                                let (qh_addr, fqtd_index) = create_int_transfer_qh(
+                                    shmem,
+                                    addr,
+                                    endpoint.address,
+                                    8,
+                                    max_packet_size,
+                                    buf_addr,
+                                )?;
+
+                                let qhp = queue_head_pointer(qh_addr);
+                                shmem.periodic_list.entries[0].write(qhp);
+
+                                let shmem = self.alloc()?;
+                                loop {
+                                    let frindex = self.op_regs()?.frame_index.read();
+                                    let qh_active = shmem.queue_heads.get_by_addr(qh_addr)?.token.read().active();
+                                    let qtd_active = shmem.transfer_descriptors.get(fqtd_index)?.token.read().active();
+                                    let report = &shmem.common.pages.get(buf_index)?[..8];
+                                    log::warn!("FRINDEX {}; QUEUE {}; TRANSFER {}; REPORT {:?}", frindex, qh_active, qtd_active, report);
+                                    sleep_ms(10);
+                                }
+
+                                /*
+                                // set leds
+                                let report_type = request::HidReportType::Output;
                                 let report_id = 0;
-                                let mut report = [0u8; 8];
-                                self.request(addr, Request::HidGetReport(i as _, report_type, report_id, &mut report), max_packet_size)?;
-
-                                log::warn!("report: {:x?}", report);
-                                sleep_ms(50);
+                                let report = [0b00011111];
+                                self.request(addr, Request::HidSetReport(i as _, report_type, report_id, &report), max_packet_size)?;
+                                */
                             }
 
-                            /*
-                            // set leds
-                            let report_type = request::HidReportType::Output;
-                            let report_id = 0;
-                            let report = [0b00011111];
-                            self.request(addr, Request::HidSetReport(i as _, report_type, report_id, &report), max_packet_size)?;
-                            */
+                            offset = o;
                         }
 
                         offset = o;
@@ -372,7 +406,7 @@ fn create_request(
     req: RawRequest,
     mut data_size: usize,
     max_packet_size: u8,
-    mut in_buf: u32,
+    mut buffer: u32,
 ) -> Result<(u32, usize, usize), &'static str> {
     let max_packet_size = max_packet_size as usize;
     let (req_index, req_ptr) = shmem.common.requests.allocate(Some(req))?;
@@ -390,7 +424,7 @@ fn create_request(
         PidCode::Setup,
         u2::new(3),
         u3::new(0),
-        true,
+        false,
         u15::new(size_of::<RawRequest>() as _),
         data_toggle,
     );
@@ -425,18 +459,18 @@ fn create_request(
             pid_code,
             u2::new(3),
             u3::new(0),
-            true,
+            false,
             u15::new(progress as _),
             data_toggle,
         );
 
-        let in_buf_bp = BufferPointerWithOffset::from(in_buf);
+        let buffer_bp = BufferPointerWithOffset::from(buffer);
 
         let in_qtd = TransferDescriptor {
             next: Volatile::new(no_next),
             alt_next: Volatile::new(no_next),
             token: Volatile::new(in_token),
-            bp0: Volatile::new(in_buf_bp),
+            bp0: Volatile::new(buffer_bp),
             bp1: Volatile::new(zero_bp),
             bp2: Volatile::new(zero_bp),
             bp3: Volatile::new(zero_bp),
@@ -450,7 +484,7 @@ fn create_request(
 
         prev_qtd_index = part_qtd_index;
 
-        in_buf += progress as u32;
+        buffer += progress as u32;
         data_size -= progress;
         data_toggle = !data_toggle;
     }
@@ -462,7 +496,7 @@ fn create_request(
         PidCode::Out,
         u2::new(3),
         u3::new(0),
-        true,
+        false,
         u15::new(0),
         // force to true?
         data_toggle,
@@ -485,18 +519,104 @@ fn create_request(
     prev_qtd.next.write(PointerNoType::from(status_qtd_ptr));
 
     let first_qtd_bp = PointerNoType::from(first_qtd_ptr);
-    let qh = create_queue_head(false, dev_addr, max_packet_size, first_qtd_bp);
+    let qh = create_queue_head(false, dev_addr, u4::new(0), 0, max_packet_size, first_qtd_bp);
 
     let (_qh_index, queue_head_addr) = shmem.queue_heads.allocate(Some(qh))?;
 
     Ok((queue_head_addr, first_qtd_index, req_index))
 }
 
-fn create_queue_head(is_first_qh: bool, dev_addr: u8, max_packet_size: usize, first_qtd_bp: PointerNoType) -> QueueHead {
+fn create_int_transfer_qh(
+    shmem: &mut UsbAlloc,
+    dev_addr: DeviceAddress,
+    endpoint: EndpointAddress,
+    mut data_size: usize,
+    max_packet_size: u8,
+    mut buffer: u32,
+) -> Result<(u32, usize), &'static str> {
+    let max_packet_size = max_packet_size as usize;
+    let zero_bp = BufferPointer::from(0);
+    let no_next = PointerNoType::from(1);
+    let mut data_toggle = false;
+
+    // these will get a non-zero value
+    let (mut first_qtd_index, mut first_qtd_ptr) = (0, 0);
+    let mut prev_qtd_index = None;
+
+    let pid_code = match endpoint.direction() {
+        Direction::Out => PidCode::Out,
+        Direction::In => PidCode::In,
+    };
+
+    loop {
+        let progress = data_size.min(max_packet_size);
+
+        let in_token = QtdToken::new(
+            // initial status flags:
+            false, false, false, false, false, false, false,
+
+            true,
+            pid_code,
+            u2::new(3),
+            u3::new(0),
+            true,
+            u15::new(progress as _),
+            data_toggle,
+        );
+
+        let buffer_bp = BufferPointerWithOffset::from(buffer);
+
+        let in_qtd = TransferDescriptor {
+            next: Volatile::new(no_next),
+            alt_next: Volatile::new(no_next),
+            token: Volatile::new(in_token),
+            bp0: Volatile::new(buffer_bp),
+            bp1: Volatile::new(zero_bp),
+            bp2: Volatile::new(zero_bp),
+            bp3: Volatile::new(zero_bp),
+            bp4: Volatile::new(zero_bp),
+        };
+
+        let (part_qtd_index, part_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(in_qtd))?;
+
+        if let Some(prev_qtd_index) = prev_qtd_index {
+            let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_index)?;
+            prev_qtd.next.write(PointerNoType::from(part_qtd_ptr));
+        } else {
+            first_qtd_index = part_qtd_index;
+            first_qtd_ptr = part_qtd_ptr;
+        }
+
+        prev_qtd_index = Some(part_qtd_index);
+
+        buffer += progress as u32;
+        data_size -= progress;
+        data_toggle = !data_toggle;
+
+        if data_size == 0 {
+            break;
+        }
+    }
+
+    let first_qtd_bp = PointerNoType::from(first_qtd_ptr);
+    let qh = create_queue_head(false, dev_addr, endpoint.ep_number(), 0xff, max_packet_size, first_qtd_bp);
+    let (_qh_index, queue_head_addr) = shmem.queue_heads.allocate(Some(qh))?;
+
+    Ok((queue_head_addr, first_qtd_index))
+}
+
+fn create_queue_head(
+    is_first_qh: bool,
+    dev_addr: u8,
+    endpoint: u4,
+    int_schedule_mask: u8,
+    max_packet_size: usize,
+    first_qtd_bp: PointerNoType,
+) -> QueueHead {
     let qh_endpoint = QhEndpoint::new(
         u7::new(dev_addr),
         false,
-        u4::new(0),
+        endpoint,
         EndpointSpeed::HighSpeed,
         true,
         is_first_qh,
@@ -506,7 +626,7 @@ fn create_queue_head(is_first_qh: bool, dev_addr: u8, max_packet_size: usize, fi
     );
 
     let qh_uframe = QhMicroFrame::new(
-        0, 0, u7::new(0), u7::new(0),
+        int_schedule_mask, 0, u7::new(0), u7::new(0),
         HighBandwidthPipeMultiplier::One,
     );
 
@@ -609,6 +729,13 @@ struct UsbCmd {
     reserved: u4,
     int_threshold_control: InterruptThreshold,
     reserved: u8,
+}
+
+#[derive(Debug, FromBytes)]
+#[repr(C)]
+#[repr(align(4096))]
+struct PeriodicList {
+    entries: [Volatile<Pointer>; 1024],
 }
 
 // default is EightMicroFrames
