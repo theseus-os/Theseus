@@ -32,7 +32,7 @@ impl Environment {
     /// Changes the current working directory.
     #[doc(alias("change"))]
     pub fn chdir(&mut self, path: &Path) -> Result<()> {
-        let new_dir = self.working_dir.lock().get(path.as_ref());
+        let new_dir = path.get(&self.working_dir);
         match new_dir {
             Some(FileOrDir::Dir(dir_ref)) => {
                 self.working_dir = dir_ref;

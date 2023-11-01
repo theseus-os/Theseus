@@ -252,7 +252,7 @@ build: $(nano_core_binary)
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
-		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
+		-e "$(EXTRA_APP_CRATE_NAMES)"
 	RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
 		-i "$(STD_BUILD_DIR)/aarch64-apple-darwin/stage0-std/$(TARGET)/release/deps" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
@@ -262,7 +262,6 @@ build: $(nano_core_binary)
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
-		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
 
 ## Third, perform partial linking on each object file, which shrinks their size 
 ## and most importantly, accelerates their loading and linking at runtime.

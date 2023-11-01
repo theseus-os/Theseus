@@ -12,3 +12,4 @@ random = { path = "../random" }
 rust-ffi = { path = "../../libs/rust-ffi" }
 task = { path = "../task" }
 thread_local_macro = { path = "../thread_local_macro" }
+log = "*"

@@ -224,11 +224,7 @@ impl<T> FromResidual for FfiOption<T> {
     }
 }
 
-// #[repr(C)]
-// pub struct Error {
-//     pub kind: ErrorKind,
-// }
-
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub enum Error {
     NotFound,
@@ -273,7 +269,7 @@ pub enum Error {
     Other,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct FatPointer {
     _a: *mut (),
@@ -281,4 +277,4 @@ pub struct FatPointer {
 }
 
 const _FAT_POINTER_SIZE: () =
-    assert!(core::mem::size_of::<FatPointer>() == core::mem::size_of::<&dyn core::fmt::Debug>());
+    assert!(core::mem::size_of::<FatPointer>() == core::mem::size_of::<*const dyn core::fmt::Debug>());

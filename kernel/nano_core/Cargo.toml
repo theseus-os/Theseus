@@ -29,6 +29,7 @@ boot_info = { path = "../boot_info" }
 captain = { path = "../captain" }
 early_printer = { path = "../early_printer" }
 logger = { path = "../logger" }
+libtheseus = { path = "../libtheseus" }
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 exceptions_early = { path = "../exceptions_early" }
