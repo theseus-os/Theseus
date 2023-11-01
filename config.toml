@@ -1,6 +1,0 @@
-[rust]
-deny-warnings = false
-
-[build]
-cargo = "/Users/klim/.rustup/toolchains/nightly-2023-10-27-aarch64-apple-darwin/bin/cargo"
-rustc = "/Users/klim/.rustup/toolchains/nightly-2023-10-27-aarch64-apple-darwin/bin/rustc"
