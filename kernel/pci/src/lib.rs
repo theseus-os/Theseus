@@ -18,7 +18,7 @@ use bit_field::BitField;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
-use interrupts::InterruptNumber;
+use interrupts::{InterruptNumber, interrupt_handler, init_pci_interrupts};
 
 #[cfg(target_arch = "x86_64")]
 use port_io::Port;
@@ -207,6 +207,25 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
     Ok(get_pci_buses()?.iter().flat_map(|b| b.devices.iter()))
 }
 
+// Architecture-independent PCI interrupt handler
+interrupt_handler!(pci_int_handler, None, _stack_frame, {
+    let devices = pci_device_iter().unwrap();
+
+    for device in devices {
+        const PCI_COMMAND_INT_DISABLED: u16 = 0b0000010000000000;
+        let interrupt_enabled = (device.command & PCI_COMMAND_INT_DISABLED) == 0;
+        if interrupt_enabled && device.pci_get_interrupt_status() {
+            log::error!("Device {:#?} triggered an interrupt", device);
+        }
+    }
+
+    loop {} // EoiBehaviour::HandlerDidNotSendEoi
+});
+
+/// Initializes the PCI interrupt handler
+pub fn init() -> Result<(), &'static str> {
+    init_pci_interrupts(pci_int_handler)
+}
 
 /// A PCI bus, which contains a list of PCI devices on that bus.
 #[derive(Debug)]
@@ -828,6 +847,12 @@ impl PciDevice {
         };
 
         Ok((int_line, int_pin))
+    }
+
+    /// Reads and returns this PCI device's interrupt status flag.
+    pub fn pci_get_interrupt_status(&self) -> bool {
+        const PCI_STATUS_INT: u16 = 0b0000000000001000;
+        (self.pci_read_16(PCI_STATUS) & PCI_STATUS_INT) != 0
     }
 }
 

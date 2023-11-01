@@ -232,6 +232,25 @@ pub fn init_pl011_rx_interrupt() -> Result<(), &'static str> {
     int_ctrl.set_destination(PL011_RX_SPI, Some(current_cpu()), u8::MAX)
 }
 
+pub fn init_pci_interrupts(handler: InterruptHandler) -> Result<(), &'static str> {
+    let int_ctrl = SystemInterruptController::get();
+    let dst = Some(cpu::bootstrap_cpu().unwrap());
+
+    for i in 3..7 {
+        let int_num = 32 + i;
+
+        if let Err(existing_handler) = register_interrupt(int_num, handler) {
+            if handler as *const InterruptHandler != existing_handler {
+                return Err("A different interrupt handler has already been setup for that IPI");
+            }
+        }
+
+        int_ctrl.set_destination(int_num, dst, u8::MAX)?;
+    }
+
+    Ok(())
+}
+
 /// Disables the timer, schedules its next tick, and re-enables it
 pub fn schedule_next_timer_tick() {
     enable_timer(false);
