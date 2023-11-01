@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(vec_into_raw_parts, try_trait_v2, never_type, exhaustive_patterns)]
+#![allow(non_camel_case_types)]
 
 #[cfg(not(feature = "rustc-dep-of-std"))]
 extern crate alloc;
@@ -11,6 +12,24 @@ use core::{
     ops::{ControlFlow, FromResidual, Try},
     str,
 };
+
+pub type next_u64 = unsafe extern "C" fn() -> u64;
+pub type getcwd = unsafe extern "C" fn() -> FfiString;
+pub type chdir = unsafe extern "C" fn(path: FfiStr<'_>) -> FfiResult<(), Error> ;
+pub type getenv = unsafe extern "C" fn(key: FfiStr<'_>) -> FfiOption<FfiString>;
+pub type setenv = unsafe extern "C" fn(key: FfiStr<'_>, value: FfiStr<'_>) -> FfiResult<(), Error>;
+pub type unsetenv = unsafe extern "C" fn(key: FfiStr<'_>) -> FfiResult<(), Error>;
+pub type exit = unsafe extern "C" fn(code: i32) -> !;
+pub type getpid = unsafe extern "C" fn() -> u32;
+pub type register_dtor = unsafe extern "C" fn(t: *mut u8, dtor: unsafe extern "C" fn(*mut u8));
+pub type stdin = unsafe extern "C" fn() -> FfiResult<FatPointer, Error>;
+pub type stdout = unsafe extern "C" fn() -> FfiResult<FatPointer, Error>;
+pub type stderr = unsafe extern "C" fn() -> FfiResult<FatPointer, Error>;
+pub type read = unsafe extern "C" fn(reader: FatPointer, buf: FfiSliceMut<'_, u8>) -> FfiResult<usize, Error>;
+pub type write = unsafe extern "C" fn(writer: FatPointer, buf: FfiSlice<'_, u8>) -> FfiResult<usize, Error>;
+pub type flush = unsafe extern "C" fn(writer: FatPointer) -> FfiResult<(), Error>;
+pub type drop_reader = unsafe extern "C" fn(reader: FatPointer);
+pub type drop_writer = unsafe extern "C" fn(writer: FatPointer);
 
 #[repr(C)]
 pub struct FfiString {

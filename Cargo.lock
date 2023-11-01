@@ -1858,7 +1858,6 @@ dependencies = [
  "app_io",
  "core2",
  "environment",
- "log",
  "path",
  "random",
  "rust-ffi",
@@ -4022,7 +4021,6 @@ dependencies = [
 name = "theseus-shim"
 version = "0.1.0"
 dependencies = [
- "compiler_builtins",
  "rust-ffi",
  "rustc-std-workspace-alloc",
  "rustc-std-workspace-core",

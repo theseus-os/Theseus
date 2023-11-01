@@ -25,7 +25,7 @@ mod c {
         pub(crate) fn getcwd() -> FfiString;
 
         #[link_name = "libtheseus::chdir"]
-        pub(crate) fn chdir(path: FfiStr<'_>);
+        pub(crate) fn chdir(path: FfiStr<'_>) -> FfiResult<(), Error>;
 
         #[link_name = "libtheseus::getenv"]
         pub(crate) fn getenv(key: FfiStr<'_>) -> FfiOption<FfiString>;
@@ -72,6 +72,24 @@ mod c {
         #[link_name = "libtheseus::drop_writer"]
         pub(crate) fn drop_writer(writer: FatPointer);
     }
+
+    const _: rust_ffi::next_u64 = next_u64;
+    const _: rust_ffi::getcwd = getcwd;
+    const _: rust_ffi::chdir = chdir;
+    const _: rust_ffi::getenv = getenv;
+    const _: rust_ffi::setenv = setenv;
+    const _: rust_ffi::unsetenv = unsetenv;
+    const _: rust_ffi::exit = exit;
+    const _: rust_ffi::getpid = getpid;
+    const _: rust_ffi::register_dtor = register_dtor;
+    const _: rust_ffi::stdin = stdin;
+    const _: rust_ffi::stdout = stdout;
+    const _: rust_ffi::stderr = stderr;
+    const _: rust_ffi::read = read;
+    const _: rust_ffi::write = write;
+    const _: rust_ffi::flush = flush;
+    const _: rust_ffi::drop_reader = drop_reader;
+    const _: rust_ffi::drop_writer = drop_writer;
 }
 
 #[inline(always)]
@@ -85,9 +103,9 @@ pub fn getcwd() -> String {
 }
 
 #[inline(always)]
-pub fn chdir(path: &str) {
+pub fn chdir(path: &str) -> Result<()> {
     let path = path.into();
-    unsafe { c::chdir(path) };
+    unsafe { c::chdir(path) }.into()
 }
 
 #[inline(always)]
@@ -111,7 +129,7 @@ pub fn unsetenv(key: &str) -> Result<()> {
 
 #[inline(always)]
 pub fn exit(code: i32) -> ! {
-    unsafe { c::exit(code) };
+    unsafe { c::exit(code) }
 }
 
 #[inline(always)]
@@ -133,7 +151,7 @@ pub struct Reader {
 impl Drop for Reader {
     #[inline(always)]
     fn drop(&mut self) {
-        unsafe { c::drop_reader(self.inner.clone()) };
+        unsafe { c::drop_reader(self.inner.clone()) }
     }
 }
 
@@ -144,26 +162,29 @@ pub struct Writer {
 impl Drop for Writer {
     #[inline(always)]
     fn drop(&mut self) {
-        unsafe { c::drop_writer(self.inner.clone()) };
+        unsafe { c::drop_writer(self.inner.clone()) }
     }
 }
 
-pub fn stdin() -> Reader {
-    Reader {
-        inner: Result::from(unsafe { c::stdin() }).unwrap(),
-    }
+#[inline(always)]
+pub fn stdin() -> Result<Reader> {
+    Ok(Reader {
+        inner: Result::from(unsafe { c::stdin() })?,
+    })
 }
 
-pub fn stdout() -> Writer {
-    Writer {
-        inner: Result::from(unsafe { c::stdout() }).unwrap(),
-    }
+#[inline(always)]
+pub fn stdout() -> Result<Writer> {
+    Ok(Writer {
+        inner: Result::from(unsafe { c::stdout() })?,
+    })
 }
 
-pub fn stderr() -> Writer {
-    Writer {
-        inner: Result::from(unsafe { c::stderr() }).unwrap(),
-    }
+#[inline(always)]
+pub fn stderr() -> Result<Writer> {
+    Ok(Writer {
+        inner: Result::from(unsafe { c::stderr() })?,
+    })
 }
 
 // TODO: Mutable reference?
