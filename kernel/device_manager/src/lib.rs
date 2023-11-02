@@ -127,11 +127,11 @@ pub fn init(
         if dev.class == 0x0C {
             // Serial Bus Controller
             if dev.subclass == 0x03 {
-                use usb_controller::Standard;
+                use usb::controllers::Controller;
                 // USB controller
                 if dev.prog_if == 0x20 {
                     // EHCI
-                    usb_controller::init(Standard::Ehci(dev))?;
+                    usb::init(Controller::Ehci(dev))?;
                     continue;
                 }
             }

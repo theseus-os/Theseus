@@ -193,11 +193,11 @@ impl EhciController {
                         let (interface, o): (&descriptors::Interface, _) = config.find_desc(offset, DescriptorType::Interface)?;
                         log::warn!("interface: {}", interface.name);
                         for _ in 0..interface.num_endpoints {
-                            // todo: read HID descriptor here
-                            let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
-                            log::warn!("endpoint: {:#x?}", endpoint);
-
                             if interface.class == 3 {
+                                // todo: read HID descriptor here
+                                let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
+                                log::warn!("endpoint: {:#x?}", endpoint);
+
                                 self.request(addr, Request::HidSetProtocol(i as _, request::HidProtocol::Boot), max_packet_size)?;
 
                                 let shmem = self.alloc_mut()?;

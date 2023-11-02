@@ -18,8 +18,9 @@ use sleep::{Duration, sleep};
 use core::{mem::size_of, num::NonZeroU8, str::from_utf8};
 use alloc::string::String;
 
-mod ehci;
+mod classes;
 
+pub mod controllers;
 pub mod descriptors;
 pub mod allocators;
 pub mod request;
@@ -27,14 +28,11 @@ pub mod request;
 use descriptors::DescriptorType;
 use allocators::CommonUsbAlloc;
 use request::Request;
+use controllers::Controller;
 
-pub enum Standard<T> {
-    Ehci(T),
-}
-
-pub fn init(pci_device: Standard<&PciDevice>) -> Result<(), &'static str> {
+pub fn init(pci_device: Controller<&PciDevice>) -> Result<(), &'static str> {
     let mut ctrl = match pci_device {
-        Standard::Ehci(dev) => ehci::EhciController::new(dev)?,
+        Controller::Ehci(dev) => controllers::ehci::EhciController::new(dev)?,
     };
 
     ctrl.probe_ports()?;

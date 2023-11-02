@@ -959,7 +959,7 @@ dependencies = [
  "serial_port",
  "spin 0.9.4",
  "storage_manager",
- "usb_controller",
+ "usb",
 ]
 
 [[package]]
@@ -4331,7 +4331,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "usb_controller"
+name = "usb"
 version = "0.1.0"
 dependencies = [
  "bilge",
