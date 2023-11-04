@@ -214,21 +214,21 @@ impl<'a> Request<'a> {
         }
     }
 
-    pub(crate) fn allocate_payload(&self, shmem: &mut CommonUsbAlloc) -> Result<(usize, u32), &'static str> {
+    pub(crate) fn allocate_payload(&self, shmem: &mut CommonUsbAlloc) -> Result<(AllocSlot, UsbPointer), &'static str> {
         match self {
             // STD
             Request::GetStatus(_target, _dev_status) => shmem.words.allocate(None),
-            Request::ClearFeature(_target, _feature_id) => Ok((0, 0)),
-            Request::SetFeature(_target, _feature_id) => Ok((0, 0)),
-            Request::SetAddress(_dev_addr) => Ok((0, 0)),
+            Request::ClearFeature(_target, _feature_id) => Ok(invalid_ptr_slot()),
+            Request::SetFeature(_target, _feature_id) => Ok(invalid_ptr_slot()),
+            Request::SetAddress(_dev_addr) => Ok(invalid_ptr_slot()),
             Request::GetDeviceDescriptor(_d) => shmem.descriptors.device.allocate(None),
             Request::SetDeviceDescriptor(d) => shmem.descriptors.device.allocate(Some(*d)),
             Request::GetConfigDescriptor(_desc_idx, _d) => shmem.descriptors.configuration.allocate(None),
             Request::SetConfigDescriptor(_desc_idx, d) => shmem.descriptors.configuration.allocate(Some(*d)),
             Request::GetConfiguration(_config) => shmem.bytes.allocate(None),
-            Request::SetConfiguration(_config) => Ok((0, 0)),
+            Request::SetConfiguration(_config) => Ok(invalid_ptr_slot()),
             Request::GetInterfaceAltSetting(_interface_idx, _alt_setting) => shmem.bytes.allocate(None),
-            Request::SetInterfaceAltSetting(_interface_idx, _alt_setting) => Ok((0, 0)),
+            Request::SetInterfaceAltSetting(_interface_idx, _alt_setting) => Ok(invalid_ptr_slot()),
             Request::ReadString(_string_idx, _string) => shmem.descriptors.string.allocate(None),
 
             // HID
@@ -240,11 +240,11 @@ impl<'a> Request<'a> {
                 Ok((i, addr))
             },
             Self::HidGetProtocol(_int_idx, _protocol) => shmem.bytes.allocate(None),
-            Self::HidSetProtocol(_int_idx, _protocol) => Ok((0, 0)),
+            Self::HidSetProtocol(_int_idx, _protocol) => Ok(invalid_ptr_slot()),
         }
     }
 
-    pub(crate) fn adjust_len(&self, shmem: &CommonUsbAlloc, shmem_index: usize) -> Result<Option<u16>, &'static str> {
+    pub(crate) fn adjust_len(&self, shmem: &CommonUsbAlloc, shmem_index: AllocSlot) -> Result<Option<u16>, &'static str> {
         match self {
             Request::ReadString(_string_idx, _string) => {
                 let string_desc = &shmem.descriptors.string.get(shmem_index)?;
@@ -258,7 +258,7 @@ impl<'a> Request<'a> {
         }
     }
 
-    pub(crate) fn free_and_move_payload(self, shmem: &mut CommonUsbAlloc, shmem_index: usize) -> Result<(), &'static str> {
+    pub(crate) fn free_and_move_payload(self, shmem: &mut CommonUsbAlloc, shmem_index: AllocSlot) -> Result<(), &'static str> {
         match self {
             // STD
             Request::GetStatus(_target, status) => shmem.words.free(shmem_index).map(|word| *status = word.into()),

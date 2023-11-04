@@ -35,8 +35,30 @@ pub(crate) struct CommonUsbAlloc {
     pub pages: PageAlloc,
 }
 
-pub(crate) fn usb_addr<T>(t_ref: &T) -> u32 {
-    t_ref as *const T as usize as u32
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub(crate) struct AllocSlot(pub(crate) usize, pub(crate) TypeId);
+
+impl AllocSlot {
+    pub fn check<T: 'static>(&self) -> Result<(), &'static str> {
+        match TypeId::of::<T>() == self.1 {
+            true => Ok(()),
+            false => Err("Invalid AllocSlot"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub(crate) struct UsbPointer(pub u32);
+
+impl UsbPointer {
+    pub(crate) fn from_ref<T>(t_ref: &T) -> Self {
+        // todo: check that it's in range
+        Self(t_ref as *const T as usize as u32)
+    }
+}
+
+pub(crate) fn invalid_ptr_slot() -> (AllocSlot, UsbPointer) {
+    (AllocSlot(0, TypeId::of::<TypeId>()), UsbPointer(0))
 }
 
 #[macro_export]
@@ -60,7 +82,7 @@ macro_rules! allocator {
                 self.occupied.fill(Self::OCCUPIED_FALSE);
             }
 
-            pub fn allocate(&mut self, init_to: Option<$ty>) -> Result<(usize, u32), &'static str> {
+            pub fn allocate(&mut self, init_to: Option<$ty>) -> Result<(AllocSlot, allocators::UsbPointer), &'static str> {
                 for i in 0..$cap {
                     if self.occupied[i] == Self::OCCUPIED_FALSE {
                         self.occupied[i] = Self::OCCUPIED_TRUE;
@@ -68,64 +90,69 @@ macro_rules! allocator {
                         if let Some(value) = init_to {
                             *mut_ref = value;
                         }
-                        let addr = usb_addr(mut_ref);
+                        let addr = allocators::UsbPointer::from_ref(mut_ref);
+                        let slot = allocators::AllocSlot(i, TypeId::of::<$ty>());
 
                         // log::warn!("{}: alloc ({})", stringify!($ty), i);
-                        return Ok((i, addr))
+                        return Ok((slot, addr))
                     }
                 }
 
                 Err(concat!(stringify!($name), ": Out of slots"))
             }
 
-            pub fn free(&mut self, index: usize) -> Result<$ty, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                let occupied = self.occupied.get_mut(index).ok_or(err_msg)?;
+            pub fn free(&mut self, slot: AllocSlot) -> Result<$ty, &'static str> {
+                slot.check::<$ty>()?;
+                let err_msg = concat!(stringify!($name), ": Invalid slot key");
+                let occupied = self.occupied.get_mut(slot.0).ok_or(err_msg)?;
                 *occupied = Self::OCCUPIED_FALSE;
-                // log::warn!("{}: free ({})", stringify!($ty), index);
-                Ok(self.slots.get(index).unwrap().clone())
+                // log::warn!("{}: free ({})", stringify!($ty), slot.0);
+                Ok(self.slots.get(slot.0).unwrap().clone())
             }
 
-            pub fn get(&self, index: usize) -> Result<&$ty, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                self.slots.get(index).ok_or(err_msg)
+            pub fn get(&self, slot: AllocSlot) -> Result<&$ty, &'static str> {
+                slot.check::<$ty>()?;
+                let err_msg = concat!(stringify!($name), ": Invalid slot key");
+                self.slots.get(slot.0).ok_or(err_msg)
             }
 
-            pub fn get_mut(&mut self, index: usize) -> Result<&mut $ty, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                self.slots.get_mut(index).ok_or(err_msg)
+            pub fn get_mut(&mut self, slot: AllocSlot) -> Result<&mut $ty, &'static str> {
+                slot.check::<$ty>()?;
+                let err_msg = concat!(stringify!($name), ": Invalid slot key");
+                self.slots.get_mut(slot.0).ok_or(err_msg)
             }
 
-            pub fn find(&self, addr: u32) -> Result<usize, &'static str> {
+            pub fn find(&self, addr: UsbPointer) -> Result<AllocSlot, &'static str> {
                 let err_msg = concat!(stringify!($name), ": Invalid address");
                 let mut_ref = &self.slots[0];
-                let addr_of_first = usb_addr(mut_ref);
+                let addr_of_first = UsbPointer::from_ref(mut_ref);
 
-                let offset = addr.checked_sub(addr_of_first).ok_or(err_msg)? as usize;
+                let offset = addr.0.checked_sub(addr_of_first.0).ok_or(err_msg)? as usize;
 
                 let type_size = core::mem::size_of::<$ty>();
-                let index = (offset / type_size);
+                let key = (offset / type_size);
 
                 let valid_offset = offset % type_size == 0;
-                let valid_index = index < $cap;
+                let valid_key = key < $cap;
 
-                match (valid_offset, valid_index) {
-                    (true, true) => Ok(index),
+                match (valid_offset, valid_key) {
+                    (true, true) => Ok(AllocSlot(key, TypeId::of::<$ty>())),
                     _ => Err(err_msg),
                 }
             }
 
-            pub fn get_by_addr(&self, addr: u32) -> Result<&$ty, &'static str> {
+            pub fn get_by_addr(&self, addr: UsbPointer) -> Result<&$ty, &'static str> {
                 self.get(self.find(addr)?)
             }
 
-            pub fn get_mut_by_addr(&mut self, addr: u32) -> Result<&mut $ty, &'static str> {
+            pub fn get_mut_by_addr(&mut self, addr: UsbPointer) -> Result<&mut $ty, &'static str> {
                 self.get_mut(self.find(addr)?)
             }
 
-            pub fn address_of(&self, index: usize) -> Result<u32, &'static str> {
-                let err_msg = concat!(stringify!($name), ": Invalid slot index");
-                Ok(usb_addr(self.slots.get(index).ok_or(err_msg)?))
+            pub fn address_of(&self, slot: AllocSlot) -> Result<UsbPointer, &'static str> {
+                slot.check::<$ty>()?;
+                let err_msg = concat!(stringify!($name), ": Invalid slot key");
+                Ok(UsbPointer::from_ref(self.slots.get(slot.0).ok_or(err_msg)?))
             }
         }
 

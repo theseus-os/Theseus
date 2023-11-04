@@ -15,10 +15,10 @@ use zerocopy::FromBytes;
 use volatile::{Volatile, ReadOnly};
 use bilge::prelude::*;
 use sleep::{Duration, sleep};
-use core::{mem::size_of, num::NonZeroU8, str::from_utf8};
+use core::{mem::size_of, num::NonZeroU8, str::from_utf8, any::TypeId};
 use alloc::string::String;
 
-mod classes;
+mod interfaces;
 
 pub mod controllers;
 pub mod descriptors;
@@ -26,7 +26,7 @@ pub mod allocators;
 pub mod request;
 
 use descriptors::DescriptorType;
-use allocators::CommonUsbAlloc;
+use allocators::{CommonUsbAlloc, AllocSlot, UsbPointer, invalid_ptr_slot};
 use request::Request;
 use controllers::Controller;
 

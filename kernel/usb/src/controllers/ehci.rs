@@ -2,8 +2,6 @@
 
 use super::*;
 
-use allocators::usb_addr;
-
 allocator!(TransferDescriptorAlloc, TransferDescriptor, 128);
 allocator!(QueueHeadAlloc, QueueHead, 32);
 
@@ -104,14 +102,15 @@ impl EhciController {
             // close the loop
             let qdh_mut = usb_alloc.queue_heads.get_mut(index)?;
             qdh_mut.next.write(queue_head_pointer(dummy_queue_head_addr));
+            let periodic_list_addr = UsbPointer::from_ref(&usb_alloc.periodic_list);
 
-            (dummy_queue_head_addr, usb_addr(&usb_alloc.periodic_list))
+            (dummy_queue_head_addr, periodic_list_addr)
         };
 
         // this installs a single dummy queue head in the asynchronous schedule,
         // which makes asynchronous queue management easier.
-        op_regs.async_list.write(dummy_queue_head_addr);
-        op_regs.periodic_list.write(periodic_list_addr);
+        op_regs.async_list.write(dummy_queue_head_addr.0);
+        op_regs.periodic_list.write(periodic_list_addr.0);
 
         sleep(Duration::from_millis(10)).unwrap();
 
@@ -175,71 +174,54 @@ impl EhciController {
                     }
 
                     let addr = addr?;
-
                     self.request(0, Request::SetAddress(addr), 8)?;
-
-                    let mut device = descriptors::Device::default();
-                    self.request(addr, Request::GetDeviceDescriptor(&mut device), 8)?;
-                    log::warn!("device_descriptor: {:#x?}", device);
-
-                    let max_packet_size = device.max_packet_size;
-
-                    let mut config = unsafe { core::mem::MaybeUninit::<descriptors::Configuration>::zeroed().assume_init() };
-                    self.request(addr, Request::GetConfigDescriptor(0, &mut config), max_packet_size)?;
-                    log::warn!("config 0: {:#x?}", config.inner);
-
-                    let mut offset = 0;
-                    for i in 0..config.inner.num_interfaces {
-                        let (interface, o): (&descriptors::Interface, _) = config.find_desc(offset, DescriptorType::Interface)?;
-                        log::warn!("interface: {}", interface.name);
-                        for _ in 0..interface.num_endpoints {
-                            if interface.class == 3 {
-                                // todo: read HID descriptor here
-                                let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
-                                log::warn!("endpoint: {:#x?}", endpoint);
-
-                                self.request(addr, Request::HidSetProtocol(i as _, request::HidProtocol::Boot), max_packet_size)?;
-
-                                let shmem = self.alloc_mut()?;
-                                let (buf_index, buf_addr) = shmem.common.pages.allocate(None)?;
-                                let (qh_addr, fqtd_index) = create_int_transfer_qh(
-                                    shmem,
-                                    addr,
-                                    endpoint.address,
-                                    8,
-                                    max_packet_size,
-                                    buf_addr,
-                                )?;
-
-                                let qhp = queue_head_pointer(qh_addr);
-                                shmem.periodic_list.entries[0].write(qhp);
-
-                                let shmem = self.alloc()?;
-                                loop {
-                                    let frindex = self.op_regs()?.frame_index.read();
-                                    let qh_active = shmem.queue_heads.get_by_addr(qh_addr)?.token.read().active();
-                                    let qtd_active = shmem.transfer_descriptors.get(fqtd_index)?.token.read().active();
-                                    let report = &shmem.common.pages.get(buf_index)?[..8];
-                                    log::warn!("FRINDEX {}; QUEUE {}; TRANSFER {}; REPORT {:?}", frindex, qh_active, qtd_active, report);
-                                    sleep_ms(10);
-                                }
-
-                                /*
-                                // set leds
-                                let report_type = request::HidReportType::Output;
-                                let report_id = 0;
-                                let report = [0b00011111];
-                                self.request(addr, Request::HidSetReport(i as _, report_type, report_id, &report), max_packet_size)?;
-                                */
-                            }
-
-                            offset = o;
-                        }
-
-                        offset = o;
-                    }
+                    self.init_device(addr)?;
                 }
             }
+        }
+
+        Ok(())
+    }
+
+    fn init_device(&mut self, addr: DeviceAddress) -> Result<(), &'static str> {
+        let mut device = descriptors::Device::default();
+        self.request(addr, Request::GetDeviceDescriptor(&mut device), 8)?;
+        let max_packet_size = device.max_packet_size;
+
+        let mut config = unsafe { core::mem::MaybeUninit::<descriptors::Configuration>::zeroed().assume_init() };
+        self.request(addr, Request::GetConfigDescriptor(0, &mut config), max_packet_size)?;
+
+        let mut offset = 0;
+        for i in 0..config.inner.num_interfaces {
+            let (interface, o): (&descriptors::Interface, _) = config.find_desc(offset, DescriptorType::Interface)?;
+            log::warn!("interface: {}", interface.name);
+            /*for _ in 0..interface.num_endpoints {
+                if interface.class == 3 {
+                    // todo: read HID descriptor here
+                    let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
+                    log::warn!("endpoint: {:#x?}", endpoint);
+
+                    self.request(addr, Request::HidSetProtocol(i as _, request::HidProtocol::Boot), max_packet_size)?;
+
+                    let shmem = self.alloc_mut()?;
+                    let (buf_index, buf_addr) = shmem.common.pages.allocate(None)?;
+                    let (qh_addr, fqtd_index) = create_int_transfer_qh(
+                        shmem,
+                        addr,
+                        endpoint.address,
+                        8,
+                        max_packet_size,
+                        buf_addr,
+                    )?;
+
+                    let qhp = queue_head_pointer(qh_addr);
+                    shmem.periodic_list.entries[0].write(qhp);
+
+                    offset = interfaces::hid::init(config, offset)?;
+                }
+            }*/
+
+            offset = o;
         }
 
         Ok(())
@@ -288,7 +270,7 @@ impl EhciController {
         request.free_and_move_payload(&mut shmem.common, shmem_index)
     }
 
-    fn free_qh_and_qtd(&mut self, qh_addr: u32, first_qtd_index: usize) -> Result<(), &'static str> {
+    fn free_qh_and_qtd(&mut self, qh_addr: UsbPointer, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
         let shmem = self.alloc_mut()?;
 
         let qh_index = shmem.queue_heads.find(qh_addr)?;
@@ -309,7 +291,7 @@ impl EhciController {
         }
     }
 
-    fn wait_for_all_td_inactive(&self, first_qtd_index: usize) -> Result<(), &'static str> {
+    fn wait_for_all_td_inactive(&self, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
         let transfer_descriptors = &self.alloc()?.transfer_descriptors;
         let mut qtd_index = first_qtd_index;
         let no_next = PointerNoType::from(1);
@@ -335,7 +317,7 @@ impl EhciController {
         Ok(())
     }
 
-    fn get_async_schedule_prev(&self, queue_head_addr: u32) -> Result<usize, &'static str> {
+    fn get_async_schedule_prev(&self, queue_head_addr: UsbPointer) -> Result<AllocSlot, &'static str> {
         let queue_heads = &self.alloc()?.queue_heads;
         let mut current_index = queue_heads.find(queue_head_addr)?;
 
@@ -350,10 +332,14 @@ impl EhciController {
         }
     }
 
-    fn push_to_async_schedule(&mut self, to_push_addr: u32) -> Result<(), &'static str> {
+    fn read_async_list_ptr(&self) -> Result<UsbPointer, &'static str> {
+        Ok(UsbPointer(self.op_regs()?.async_list.read()))
+    }
+
+    fn push_to_async_schedule(&mut self, to_push_addr: UsbPointer) -> Result<(), &'static str> {
         self.enable_async_schedule(false)?;
 
-        let first_addr = self.op_regs()?.async_list.read();
+        let first_addr = self.read_async_list_ptr()?;
         let last_index = self.get_async_schedule_prev(first_addr)?;
 
         let queue_heads = &mut self.alloc_mut()?.queue_heads;
@@ -369,12 +355,12 @@ impl EhciController {
         self.enable_async_schedule(true)
     }
 
-    fn remove_from_async_schedule(&mut self, to_remove_addr: u32) -> Result<(), &'static str> {
+    fn remove_from_async_schedule(&mut self, to_remove_addr: UsbPointer) -> Result<(), &'static str> {
         self.enable_async_schedule(false)?;
 
         // I'm not sure if the controller can actually advance the pointer in ASYNCLISTADDR.
         // If it can, this will probably fail easily.
-        let first_addr = self.op_regs()?.async_list.read();
+        let first_addr = self.read_async_list_ptr()?;
         assert_ne!(first_addr, to_remove_addr, "[USB-EHCI] Tried to remove a queue head while the controller was using it.");
 
         let prev_index = self.get_async_schedule_prev(to_remove_addr)?;
@@ -406,15 +392,16 @@ fn create_request(
     req: RawRequest,
     mut data_size: usize,
     max_packet_size: u8,
-    mut buffer: u32,
-) -> Result<(u32, usize, usize), &'static str> {
+    buffer: UsbPointer,
+) -> Result<(UsbPointer, AllocSlot, AllocSlot), &'static str> {
     let max_packet_size = max_packet_size as usize;
     let (req_index, req_ptr) = shmem.common.requests.allocate(Some(req))?;
-    let req_bp = BufferPointerWithOffset::from(req_ptr);
+    let req_bp = req_ptr.into();
 
     let zero_bp = BufferPointer::from(0);
     let no_next = PointerNoType::from(1);
     let mut data_toggle = false;
+    let mut buffer = buffer.0;
 
     let setup_token = QtdToken::new(
         // initial status flags:
@@ -464,7 +451,7 @@ fn create_request(
             data_toggle,
         );
 
-        let buffer_bp = BufferPointerWithOffset::from(buffer);
+        let buffer_bp = UsbPointer(buffer).into();
 
         let in_qtd = TransferDescriptor {
             next: Volatile::new(no_next),
@@ -480,7 +467,7 @@ fn create_request(
         let (part_qtd_index, part_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(in_qtd))?;
 
         let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_index)?;
-        prev_qtd.next.write(PointerNoType::from(part_qtd_ptr));
+        prev_qtd.next.write(part_qtd_ptr.into());
 
         prev_qtd_index = part_qtd_index;
 
@@ -516,10 +503,9 @@ fn create_request(
     let (_status_qtd_index, status_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(status_qtd))?;
 
     let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_index)?;
-    prev_qtd.next.write(PointerNoType::from(status_qtd_ptr));
+    prev_qtd.next.write(status_qtd_ptr.into());
 
-    let first_qtd_bp = PointerNoType::from(first_qtd_ptr);
-    let qh = create_queue_head(false, dev_addr, u4::new(0), 0, max_packet_size, first_qtd_bp);
+    let qh = create_queue_head(false, dev_addr, u4::new(0), 0, max_packet_size, first_qtd_ptr.into());
 
     let (_qh_index, queue_head_addr) = shmem.queue_heads.allocate(Some(qh))?;
 
@@ -532,15 +518,16 @@ fn create_int_transfer_qh(
     endpoint: EndpointAddress,
     mut data_size: usize,
     max_packet_size: u8,
-    mut buffer: u32,
-) -> Result<(u32, usize), &'static str> {
+    buffer: UsbPointer,
+) -> Result<(UsbPointer, AllocSlot), &'static str> {
     let max_packet_size = max_packet_size as usize;
     let zero_bp = BufferPointer::from(0);
     let no_next = PointerNoType::from(1);
     let mut data_toggle = false;
+    let mut buffer = buffer.0;
 
-    // these will get a non-zero value
-    let (mut first_qtd_index, mut first_qtd_ptr) = (0, 0);
+    // these values will be overwritten
+    let (mut first_qtd_index, mut first_qtd_ptr) = invalid_ptr_slot();
     let mut prev_qtd_index = None;
 
     let pid_code = match endpoint.direction() {
@@ -651,8 +638,8 @@ fn create_queue_head(
     }
 }
 
-fn queue_head_pointer(queue_head_addr: u32) -> Pointer {
-    Pointer::new(false, PointerType::QueueHead, u27::new(queue_head_addr >> 5))
+fn queue_head_pointer(queue_head_addr: UsbPointer) -> Pointer {
+    Pointer::new(false, PointerType::QueueHead, u27::new(queue_head_addr.0 >> 5))
 }
 
 /// Memory-Mapped EHCI Capability Registers
@@ -897,6 +884,13 @@ struct PointerNoTypeNoTerm {
     addr_msbs: u27,
 }
 
+impl From<UsbPointer> for PointerNoTypeNoTerm {
+    fn from(ptr: UsbPointer) -> Self {
+        assert_eq!(ptr.0 & 0b11111, 0, "UsbPointer alignment incompatible with PointerNoTypeNoTerm");
+        Self::from(ptr.0)
+    }
+}
+
 #[bitsize(32)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes, PartialEq)]
 struct PointerNoType {
@@ -905,9 +899,16 @@ struct PointerNoType {
     addr_msbs: u27,
 }
 
+impl From<UsbPointer> for PointerNoType {
+    fn from(ptr: UsbPointer) -> Self {
+        assert_eq!(ptr.0 & 0b11111, 0, "UsbPointer alignment incompatible with PointerNoType");
+        Self::from(ptr.0)
+    }
+}
+
 impl PointerNoType {
-    fn address(&self) -> u32 {
-        self.addr_msbs().value() << 5
+    fn address(&self) -> UsbPointer {
+        UsbPointer(self.addr_msbs().value() << 5)
     }
 }
 
@@ -920,9 +921,16 @@ struct Pointer {
     addr_msbs: u27,
 }
 
+impl From<UsbPointer> for Pointer {
+    fn from(ptr: UsbPointer) -> Self {
+        assert_eq!(ptr.0 & 0b11111, 0, "UsbPointer alignment incompatible with ehci::Pointer");
+        Self::from(ptr.0)
+    }
+}
+
 impl Pointer {
-    fn address(&self) -> u32 {
-        self.addr_msbs().value() << 5
+    fn address(&self) -> UsbPointer {
+        UsbPointer(self.addr_msbs().value() << 5)
     }
 }
 
@@ -1072,11 +1080,24 @@ struct BufferPointerWithOffset {
     _ptr: u20,
 }
 
+impl From<UsbPointer> for BufferPointerWithOffset {
+    fn from(ptr: UsbPointer) -> Self {
+        Self::from(ptr.0)
+    }
+}
+
 #[bitsize(32)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
 struct BufferPointer {
     reserved: u12,
     _ptr: u20,
+}
+
+impl From<UsbPointer> for BufferPointer {
+    fn from(ptr: UsbPointer) -> Self {
+        assert_eq!(ptr.0 & 0xfff, 0, "UsbPointer alignment incompatible with BufferPointer");
+        Self::from(ptr.0)
+    }
 }
 
 /// siTD Buffer Pointer 1
