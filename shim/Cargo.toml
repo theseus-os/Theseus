@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 alloc = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-alloc' }
 core = { version = "1.0.0", optional = true, package = 'rustc-std-workspace-core' }
-rust-ffi = { path = "../libs/rust-ffi" }
+theseus_ffi = { path = "../libs/theseus_ffi" }
 
 [features]
-rustc-dep-of-std = ['alloc', 'core', 'rust-ffi/rustc-dep-of-std']
+rustc-dep-of-std = ['alloc', 'core', 'theseus_ffi/rustc-dep-of-std']

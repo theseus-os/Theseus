@@ -88,6 +88,10 @@ export override RUSTFLAGS += -D unused-must-use
 ## without breaking our loader/linker assumptions.
 export override RUSTFLAGS += -Z share-generics=no
 
+### These profiles fix the new rustc behavior of splitting one crate into many object files. 
+### That messes up our module loading, which is bad!
+### See this link about profiles: https://doc.rust-lang.org/cargo/reference/manifest.html
+### workaround rust-lang/rust#47074
 export override RUSTFLAGS += -C codegen-units=1
 export override RUSTFLAGS += -C incremental=no
 

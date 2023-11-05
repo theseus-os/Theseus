@@ -6,13 +6,13 @@ extern crate alloc;
 
 use alloc::string::String;
 
-pub use rust_ffi::Error;
-use rust_ffi::{FatPointer, FfiString};
+pub use theseus_ffi::Error;
+use theseus_ffi::{FatPointer, FfiString};
 
 type Result<T> = core::result::Result<T, Error>;
 
 mod c {
-    use rust_ffi::{
+    use theseus_ffi::{
         Error, FatPointer, FfiOption, FfiResult, FfiSlice, FfiSliceMut, FfiStr, FfiString,
     };
 
@@ -54,8 +54,6 @@ mod c {
         #[link_name = "libtheseus::stderr"]
         pub(crate) fn stderr() -> FfiResult<FatPointer, Error>;
 
-        // TODO: Mutable reference?
-
         #[link_name = "libtheseus::read"]
         pub(crate) fn read(reader: FatPointer, buf: FfiSliceMut<'_, u8>)
             -> FfiResult<usize, Error>;
@@ -73,71 +71,71 @@ mod c {
         pub(crate) fn drop_writer(writer: FatPointer);
     }
 
-    const _: rust_ffi::next_u64 = next_u64;
-    const _: rust_ffi::getcwd = getcwd;
-    const _: rust_ffi::chdir = chdir;
-    const _: rust_ffi::getenv = getenv;
-    const _: rust_ffi::setenv = setenv;
-    const _: rust_ffi::unsetenv = unsetenv;
-    const _: rust_ffi::exit = exit;
-    const _: rust_ffi::getpid = getpid;
-    const _: rust_ffi::register_dtor = register_dtor;
-    const _: rust_ffi::stdin = stdin;
-    const _: rust_ffi::stdout = stdout;
-    const _: rust_ffi::stderr = stderr;
-    const _: rust_ffi::read = read;
-    const _: rust_ffi::write = write;
-    const _: rust_ffi::flush = flush;
-    const _: rust_ffi::drop_reader = drop_reader;
-    const _: rust_ffi::drop_writer = drop_writer;
+    const _: theseus_ffi::next_u64 = next_u64;
+    const _: theseus_ffi::getcwd = getcwd;
+    const _: theseus_ffi::chdir = chdir;
+    const _: theseus_ffi::getenv = getenv;
+    const _: theseus_ffi::setenv = setenv;
+    const _: theseus_ffi::unsetenv = unsetenv;
+    const _: theseus_ffi::exit = exit;
+    const _: theseus_ffi::getpid = getpid;
+    const _: theseus_ffi::register_dtor = register_dtor;
+    const _: theseus_ffi::stdin = stdin;
+    const _: theseus_ffi::stdout = stdout;
+    const _: theseus_ffi::stderr = stderr;
+    const _: theseus_ffi::read = read;
+    const _: theseus_ffi::write = write;
+    const _: theseus_ffi::flush = flush;
+    const _: theseus_ffi::drop_reader = drop_reader;
+    const _: theseus_ffi::drop_writer = drop_writer;
 }
 
-#[inline(always)]
+#[inline]
 pub fn next_u64() -> u64 {
     unsafe { c::next_u64() }
 }
 
-#[inline(always)]
+#[inline]
 pub fn getcwd() -> String {
     unsafe { c::getcwd() }.into()
 }
 
-#[inline(always)]
+#[inline]
 pub fn chdir(path: &str) -> Result<()> {
     let path = path.into();
     unsafe { c::chdir(path) }.into()
 }
 
-#[inline(always)]
+#[inline]
 pub fn getenv(key: &str) -> Option<String> {
     let key = key.into();
     Into::<Option<FfiString>>::into(unsafe { c::getenv(key) }).map(|s| s.into())
 }
 
-#[inline(always)]
+#[inline]
 pub fn setenv(key: &str, value: &str) -> Result<()> {
     let key = key.into();
     let value = value.into();
     unsafe { c::setenv(key, value) }.into()
 }
 
-#[inline(always)]
+#[inline]
 pub fn unsetenv(key: &str) -> Result<()> {
     let key = key.into();
     unsafe { c::unsetenv(key) }.into()
 }
 
-#[inline(always)]
+#[inline]
 pub fn exit(code: i32) -> ! {
     unsafe { c::exit(code) }
 }
 
-#[inline(always)]
+#[inline]
 pub fn getpid() -> u32 {
     unsafe { c::getpid() }
 }
 
-#[inline(always)]
+#[inline]
 pub unsafe fn register_dtor(t: *mut u8, dtor: unsafe extern "C" fn(*mut u8)) {
     c::register_dtor(t, dtor)
 }
@@ -149,7 +147,7 @@ pub struct Reader {
 }
 
 impl Drop for Reader {
-    #[inline(always)]
+    #[inline]
     fn drop(&mut self) {
         unsafe { c::drop_reader(self.inner.clone()) }
     }
@@ -160,27 +158,27 @@ pub struct Writer {
 }
 
 impl Drop for Writer {
-    #[inline(always)]
+    #[inline]
     fn drop(&mut self) {
         unsafe { c::drop_writer(self.inner.clone()) }
     }
 }
 
-#[inline(always)]
+#[inline]
 pub fn stdin() -> Result<Reader> {
     Ok(Reader {
         inner: Result::from(unsafe { c::stdin() })?,
     })
 }
 
-#[inline(always)]
+#[inline]
 pub fn stdout() -> Result<Writer> {
     Ok(Writer {
         inner: Result::from(unsafe { c::stdout() })?,
     })
 }
 
-#[inline(always)]
+#[inline]
 pub fn stderr() -> Result<Writer> {
     Ok(Writer {
         inner: Result::from(unsafe { c::stderr() })?,
@@ -189,17 +187,17 @@ pub fn stderr() -> Result<Writer> {
 
 // TODO: Mutable reference?
 
-#[inline(always)]
+#[inline]
 pub fn read(reader: &mut Reader, buf: &mut [u8]) -> Result<usize> {
     unsafe { c::read(reader.inner.clone(), buf.into()) }.into()
 }
 
-#[inline(always)]
+#[inline]
 pub fn write(writer: &mut Writer, buf: &[u8]) -> Result<usize> {
     unsafe { c::write(writer.inner.clone(), buf.into()) }.into()
 }
 
-#[inline(always)]
+#[inline]
 pub fn flush(writer: &mut Writer) -> Result<()> {
     unsafe { c::flush(writer.inner.clone()) }.into()
 }

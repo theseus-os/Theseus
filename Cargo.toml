@@ -13,7 +13,6 @@ members = [
 	"theseus_features",  ## Must be included to realize global Cargo features across Theseus.
 	"kernel/[!.]*/",
 	"applications/[!.]*/",
-	"shim",
 ]
 
 
@@ -35,9 +34,6 @@ exclude = [
 	"build",
 	"target",
 
-	## Exclude the `aarch64` directory, which is a WIP port that currently must be built separately.
-	"aarch64",
-
 	## Exclude configuration, tools, scripts, etc
 	"cfg",
 	"compiler_plugins",
@@ -54,7 +50,10 @@ exclude = [
 	"libs",
 	"ports",
 
-	## Exclude tlibc and libtheseus, which are currently built separately.
+	## Exclude shim because it is included in the `std` build.
+	"shim",
+
+	## Exclude tlibc which is currently built separately.
 	"tlibc",
 
 	########################################################################################

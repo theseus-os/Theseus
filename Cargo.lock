@@ -1860,8 +1860,8 @@ dependencies = [
  "environment",
  "path",
  "random",
- "rust-ffi",
  "task",
+ "theseus_ffi",
  "thread_local_macro",
 ]
 
@@ -3117,31 +3117,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "rust-ffi"
-version = "0.1.0"
-dependencies = [
- "compiler_builtins",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
 name = "rustc-demangle"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "410f7acf3cb3a44527c5d9546bad4bf4e6c460915d5f9f2fc524498bfe8f70ce"
-
-[[package]]
-name = "rustc-std-workspace-alloc"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff66d57013a5686e1917ed6a025d54dd591fcda71a41fe07edf4d16726aefa86"
-
-[[package]]
-name = "rustc-std-workspace-core"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1956f5517128a2b6f23ab2dadf1a976f4f5b27962e7724c2bf3d45e539ec098c"
 
 [[package]]
 name = "rustc_version"
@@ -4018,15 +3997,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "theseus-shim"
-version = "0.1.0"
-dependencies = [
- "rust-ffi",
- "rustc-std-workspace-alloc",
- "rustc-std-workspace-core",
-]
-
-[[package]]
 name = "theseus_features"
 version = "0.1.0"
 dependencies = [
@@ -4091,6 +4061,10 @@ dependencies = [
  "upd",
  "wasm",
 ]
+
+[[package]]
+name = "theseus_ffi"
+version = "0.1.0"
 
 [[package]]
 name = "theseus_std"

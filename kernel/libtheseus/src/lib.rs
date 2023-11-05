@@ -7,34 +7,32 @@ use core::mem;
 
 use app_io::{ImmutableRead, ImmutableWrite};
 use path::Path;
-use rust_ffi::{Error, FatPointer, FfiOption, FfiResult, FfiSlice, FfiSliceMut, FfiStr, FfiString};
+use theseus_ffi::{Error, FatPointer, FfiOption, FfiResult, FfiSlice, FfiSliceMut, FfiStr, FfiString};
 use task::{KillReason, TaskRef};
 
-type Result<T> = FfiResult<T, Error>;
-
-// Add the libtheseus:: so mod_mgmt knows which crate to search.
-
-const _: rust_ffi::next_u64 = next_u64;
-const _: rust_ffi::getcwd = getcwd;
-const _: rust_ffi::chdir = chdir;
-const _: rust_ffi::getenv = getenv;
-const _: rust_ffi::setenv = setenv;
-const _: rust_ffi::unsetenv = unsetenv;
-const _: rust_ffi::exit = exit;
-const _: rust_ffi::getpid = getpid;
-const _: rust_ffi::register_dtor = register_dtor;
-const _: rust_ffi::stdin = stdin;
-const _: rust_ffi::stdout = stdout;
-const _: rust_ffi::stderr = stderr;
-const _: rust_ffi::read = read;
-const _: rust_ffi::write = write;
-const _: rust_ffi::flush = flush;
-const _: rust_ffi::drop_reader = drop_reader;
-const _: rust_ffi::drop_writer = drop_writer;
+const _: theseus_ffi::next_u64 = next_u64;
+const _: theseus_ffi::getcwd = getcwd;
+const _: theseus_ffi::chdir = chdir;
+const _: theseus_ffi::getenv = getenv;
+const _: theseus_ffi::setenv = setenv;
+const _: theseus_ffi::unsetenv = unsetenv;
+const _: theseus_ffi::exit = exit;
+const _: theseus_ffi::getpid = getpid;
+const _: theseus_ffi::register_dtor = register_dtor;
+const _: theseus_ffi::stdin = stdin;
+const _: theseus_ffi::stdout = stdout;
+const _: theseus_ffi::stderr = stderr;
+const _: theseus_ffi::read = read;
+const _: theseus_ffi::write = write;
+const _: theseus_ffi::flush = flush;
+const _: theseus_ffi::drop_reader = drop_reader;
+const _: theseus_ffi::drop_writer = drop_writer;
 
 fn current_task() -> TaskRef {
     task::get_my_current_task().expect("failed to get current task")
 }
+
+// Add the libtheseus:: so mod_mgmt knows which crate to search.
 
 #[export_name = "libtheseus::next_u64"]
 pub extern "C" fn next_u64() -> u64 {
@@ -47,7 +45,7 @@ pub extern "C" fn getcwd() -> FfiString {
 }
 
 #[export_name = "libtheseus::chdir"]
-pub extern "C" fn chdir(path: FfiStr<'_>) -> Result<()> {
+pub extern "C" fn chdir(path: FfiStr<'_>) -> FfiResult<(), Error> {
     current_task()
         .get_env()
         .lock()
@@ -70,18 +68,18 @@ pub extern "C" fn getenv(key: FfiStr<'_>) -> FfiOption<FfiString> {
 }
 
 #[export_name = "libtheseus::setenv"]
-pub extern "C" fn setenv(key: FfiStr<'_>, value: FfiStr<'_>) -> Result<()> {
+pub extern "C" fn setenv(key: FfiStr<'_>, value: FfiStr<'_>) -> FfiResult<(), Error> {
     current_task()
         .get_env()
         .lock()
         .set(<&str>::from(key).to_owned(), <&str>::from(value).to_owned());
-    Result::Ok(())
+    FfiResult::Ok(())
 }
 
 #[export_name = "libtheseus::unsetenv"]
-pub extern "C" fn unsetenv(key: FfiStr<'_>) -> Result<()> {
+pub extern "C" fn unsetenv(key: FfiStr<'_>) -> FfiResult<(), Error> {
     current_task().get_env().lock().unset(key.into());
-    Result::Ok(())
+    FfiResult::Ok(())
 }
 
 #[export_name = "libtheseus::exit"]
@@ -110,46 +108,46 @@ pub unsafe extern "C" fn register_dtor(t: *mut u8, dtor: unsafe extern "C" fn(*m
 // TODO: Explain why we shouldn't bother using stabby at least for trait objects.
 
 #[export_name = "libtheseus::stdin"]
-pub extern "C" fn stdin() -> Result<FatPointer> {
-    let ptr: *const dyn ImmutableRead = Arc::into_raw(Result::from(
+pub extern "C" fn stdin() -> FfiResult<FatPointer, Error> {
+    let ptr: *const dyn ImmutableRead = Arc::into_raw(FfiResult::from(
         app_io::stdin().map_err(|_| Error::BrokenPipe),
     )?);
-    Result::Ok(unsafe { mem::transmute(ptr) })
+    FfiResult::Ok(unsafe { mem::transmute(ptr) })
 }
 
 #[export_name = "libtheseus::stdout"]
-pub extern "C" fn stdout() -> Result<FatPointer> {
-    let ptr: *const dyn ImmutableWrite = Arc::into_raw(Result::from(
+pub extern "C" fn stdout() -> FfiResult<FatPointer, Error> {
+    let ptr: *const dyn ImmutableWrite = Arc::into_raw(FfiResult::from(
         app_io::stdout().map_err(|_| Error::BrokenPipe),
     )?);
-    Result::Ok(unsafe { mem::transmute(ptr) })
+    FfiResult::Ok(unsafe { mem::transmute(ptr) })
 }
 
 #[export_name = "libtheseus::stderr"]
-pub extern "C" fn stderr() -> Result<FatPointer> {
-    let ptr: *const dyn ImmutableWrite = Arc::into_raw(Result::from(
+pub extern "C" fn stderr() -> FfiResult<FatPointer, Error> {
+    let ptr: *const dyn ImmutableWrite = Arc::into_raw(FfiResult::from(
         app_io::stderr().map_err(|_| Error::BrokenPipe),
     )?);
-    Result::Ok(unsafe { mem::transmute(ptr) })
+    FfiResult::Ok(unsafe { mem::transmute(ptr) })
 }
 
 #[export_name = "libtheseus::read"]
-pub unsafe extern "C" fn read(reader: FatPointer, buf: FfiSliceMut<'_, u8>) -> Result<usize> {
+pub unsafe extern "C" fn read(reader: FatPointer, buf: FfiSliceMut<'_, u8>) -> FfiResult<usize, Error> {
     let ptr: *const dyn ImmutableRead = unsafe { mem::transmute(reader) };
     let r = unsafe { &*ptr };
-    Result::from(r.read(buf.into()).map_err(from_core2))
+    FfiResult::from(r.read(buf.into()).map_err(from_core2))
 }
 
 #[export_name = "libtheseus::write"]
-pub unsafe extern "C" fn write(writer: FatPointer, buf: FfiSlice<'_, u8>) -> Result<usize> {
+pub unsafe extern "C" fn write(writer: FatPointer, buf: FfiSlice<'_, u8>) -> FfiResult<usize, Error> {
     let ptr: *const dyn ImmutableWrite = unsafe { mem::transmute(writer) };
     let r = unsafe { &*ptr };
-    Result::from(r.write(buf.into()).map_err(from_core2))
+    FfiResult::from(r.write(buf.into()).map_err(from_core2))
 }
 
 #[export_name = "libtheseus::flush"]
-pub unsafe extern "C" fn flush(_writer: FatPointer) -> Result<()> {
-    Result::Ok(())
+pub unsafe extern "C" fn flush(_writer: FatPointer) -> FfiResult<(), Error> {
+    FfiResult::Ok(())
 }
 
 #[export_name = "libtheseus::drop_reader"]

@@ -31,6 +31,7 @@ pub type flush = unsafe extern "C" fn(writer: FatPointer) -> FfiResult<(), Error
 pub type drop_reader = unsafe extern "C" fn(reader: FatPointer);
 pub type drop_writer = unsafe extern "C" fn(writer: FatPointer);
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct FfiString {
     buf: *mut u8,
@@ -61,6 +62,7 @@ impl From<FfiString> for String {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct FfiStr<'a> {
     inner: FfiSlice<'a, u8>,
@@ -80,6 +82,7 @@ impl<'a> From<FfiStr<'a>> for &'a str {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct FfiStrMut<'a> {
     inner: FfiSliceMut<'a, u8>,
@@ -99,6 +102,7 @@ impl<'a> From<FfiStrMut<'a>> for &'a mut str {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct FfiSlice<'a, T> {
     buf: *const T,
@@ -122,6 +126,7 @@ impl<'a, T> From<FfiSlice<'a, T>> for &'a [T] {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub struct FfiSliceMut<'a, T> {
     buf: *mut T,
@@ -145,6 +150,7 @@ impl<'a, T> From<FfiSliceMut<'a, T>> for &'a mut [T] {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub enum FfiResult<T, E> {
     Ok(T),
@@ -194,6 +200,7 @@ impl<T, E> FromResidual for FfiResult<T, E> {
     }
 }
 
+#[derive(Debug)]
 #[repr(C)]
 pub enum FfiOption<T> {
     Some(T),

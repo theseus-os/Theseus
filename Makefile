@@ -48,7 +48,9 @@ endif
 
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
-
+# https://stackoverflow.com/questions/52996949/how-can-i-find-the-current-rust-compilers-default-llvm-target-triple
+HOST_TARGET = $(shell rustc -vV | sed -n 's|host: ||p')
+RUSTUP_HOME = $(shell rustup show home)
 
 ###################################################################################################
 ### Basic directory/file path definitions used throughout the makefile.
@@ -178,7 +180,7 @@ endif
 ###       However, this means we must not explicitly not use it for `cargo run` tool invocations,
 ###       because those should be built as normal for the host OS environment.
 export override RUSTFLAGS += $(patsubst %,--cfg %, $(THESEUS_CONFIG))
-export override RUSTFLAGS += -L $(STD_BUILD_DIR)/aarch64-apple-darwin/stage0-std/$(TARGET)/release/deps
+export override RUSTFLAGS += -L $(STD_BUILD_DIR)/$(HOST_TARGET)/stage0-std/$(TARGET)/release/deps
 
 
 ### Convenience targets for building the entire Theseus workspace
@@ -217,6 +219,12 @@ copy_kernel:
 	@mkdir -p $(ISOFILES)/boot/
 	@cp $(nano_core_binary) $(ISOFILES)/boot/kernel.bin
 
+std_config:
+	@echo "change-id = 116998" > $(ROOT_DIR)/ports/rust/config.toml
+	@echo "[build]" >> $(ROOT_DIR)/ports/rust/config.toml
+	@echo 'cargo = "$(RUSTUP_HOME)/toolchains/nightly-2023-10-27-$(HOST_TARGET)/bin/cargo"' >> $(ROOT_DIR)/ports/rust/config.toml
+	@echo 'rustc = "$(RUSTUP_HOME)/toolchains/nightly-2023-10-27-$(HOST_TARGET)/bin/rustc"' >> $(ROOT_DIR)/ports/rust/config.toml
+	@echo 'rustfmt = "$(RUSTUP_HOME)/toolchains/nightly-2023-10-27-$(HOST_TARGET)/bin/rustfmt"' >> $(ROOT_DIR)/ports/rust/config.toml
 
 ## This first invokes the make target that runs the actual compiler, and then copies all object files into the build dir.
 ## This also classifies crate object files into either "application" or "kernel" crates:
@@ -254,7 +262,7 @@ build: $(nano_core_binary)
 		--app-prefix $(APP_PREFIX) \
 		-e "$(EXTRA_APP_CRATE_NAMES)"
 	RUSTFLAGS="" cargo run --release --manifest-path $(ROOT_DIR)/tools/copy_latest_crate_objects/Cargo.toml -- \
-		-i "$(STD_BUILD_DIR)/aarch64-apple-darwin/stage0-std/$(TARGET)/release/deps" \
+		-i "$(STD_BUILD_DIR)/$(HOST_TARGET)/stage0-std/$(TARGET)/release/deps" \
 		--output-objects $(OBJECT_FILES_BUILD_DIR) \
 		--output-deps $(DEPS_BUILD_DIR) \
 		--output-sysroot $(DEPS_SYSROOT_DIR)/lib/rustlib/$(TARGET)/lib \
@@ -324,10 +332,14 @@ endif
 ### end of "build" target ###
 #############################
 
+std: std_config
+	@mkdir -p $(BUILD_DIR)
+	RUST_TARGET_PATH='$(CFG_DIR)' CARGOFLAGS="" RUSTFLAGS='$(RUSTFLAGS)' ports/rust/x.py build --stage 0 library/std --target $(TARGET) --build-dir $(STD_BUILD_DIR)
+
 
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo:
+cargo: std
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
@@ -336,11 +348,6 @@ cargo:
 ifneq (,$(findstring vga_text_mode, $(THESEUS_CONFIG)))
 	$(eval CFLAGS += -DVGA_TEXT_MODE)
 endif
-
-	printenv
-	echo $(RUSTFLAGS)
-	RUST_TARGET_PATH='$(CFG_DIR)' CARGOFLAGS="" RUSTFLAGS='$(RUSTFLAGS)' ports/rust/x.py build --stage 0 library/std --target $(TARGET) --build-dir $(STD_BUILD_DIR)
-
 	@echo -e "\n=================== BUILDING ALL CRATES ==================="
 	@echo -e "\t TARGET: \"$(TARGET)\""
 	@echo -e "\t KERNEL_PREFIX: \"$(KERNEL_PREFIX)\""
@@ -630,8 +637,7 @@ else ifeq ($(ARCH),aarch64)
 clippy : export override FEATURES := $(subst --workspace,,$(FEATURES))
 endif
 clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
-clippy:
-# TODO: x.py
+clippy: std
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 		cargo clippy \
 		$(FEATURES) \
