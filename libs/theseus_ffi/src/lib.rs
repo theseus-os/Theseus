@@ -1,3 +1,5 @@
+//! This crate defines types that are used in both `shim` and `libtheseus`.
+
 #![no_std]
 #![feature(vec_into_raw_parts, try_trait_v2, never_type, exhaustive_patterns)]
 #![allow(non_camel_case_types)]

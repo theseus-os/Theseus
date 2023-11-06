@@ -1,6 +1,8 @@
 [package]
 name = "libtheseus"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Implementation of shim functions for std linkage boundary"
 edition = "2021"
 
 [dependencies]

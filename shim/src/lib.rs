@@ -1,3 +1,10 @@
+//! Provides Theseus OS functionality without a direct dependency on Theseus
+//! kernel crates.
+//!
+//! It does so by declaring functions that are implemented by the `libtheseus`
+//! kernel crate. These functions are referenced as relocations in the dependent
+//! (i.e. `std`) object file that `mod_mgmt` then fills in at runtime.
+
 #![no_std]
 #![feature(extern_types)]
 
@@ -185,7 +192,10 @@ pub fn stderr() -> Result<Writer> {
     })
 }
 
-// TODO: Mutable reference?
+// TODO: Should we be taking a mutable or immutable reference?
+//
+// Technically, speaking I don't think we need to take a mutable reference, but
+// that limits our options in the future.
 
 #[inline]
 pub fn read(reader: &mut Reader, buf: &mut [u8]) -> Result<usize> {

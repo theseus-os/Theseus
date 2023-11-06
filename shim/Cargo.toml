@@ -1,6 +1,8 @@
 [package]
 name = "theseus-shim"
 version = "0.1.0"
+authors = ["Klim Tsoutsman <klim@tsoutsman.com>"]
+description = "Declaration of shim functions for std linkage boundary"
 edition = "2021"
 
 [dependencies]

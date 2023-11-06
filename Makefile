@@ -69,7 +69,7 @@ THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES             := $(ROOT_DIR)/extra_files
 LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
-RUST_SOURCE				:= $(ROOT_DIR)/ports/rust
+RUST_SOURCE             := $(ROOT_DIR)/ports/rust
 
 
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).

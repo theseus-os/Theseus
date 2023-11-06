@@ -1,3 +1,7 @@
+//! This crate implements the functions defined in `shim`.
+//!
+//! See the `shim` crate for more details.
+
 #![no_std]
 
 extern crate alloc;
@@ -7,8 +11,10 @@ use core::mem;
 
 use app_io::{ImmutableRead, ImmutableWrite};
 use path::Path;
-use theseus_ffi::{Error, FatPointer, FfiOption, FfiResult, FfiSlice, FfiSliceMut, FfiStr, FfiString};
 use task::{KillReason, TaskRef};
+use theseus_ffi::{
+    Error, FatPointer, FfiOption, FfiResult, FfiSlice, FfiSliceMut, FfiStr, FfiString,
+};
 
 const _: theseus_ffi::next_u64 = next_u64;
 const _: theseus_ffi::getcwd = getcwd;
@@ -32,7 +38,7 @@ fn current_task() -> TaskRef {
     task::get_my_current_task().expect("failed to get current task")
 }
 
-// Add the libtheseus:: so mod_mgmt knows which crate to search.
+// Add the libtheseus:: prefix so mod_mgmt knows which crate to search.
 
 #[export_name = "libtheseus::next_u64"]
 pub extern "C" fn next_u64() -> u64 {
@@ -104,8 +110,13 @@ pub unsafe extern "C" fn register_dtor(t: *mut u8, dtor: unsafe extern "C" fn(*m
     unsafe { thread_local_macro::register_dtor(t, dtor) }
 }
 
-// TODO: Something better than transmutations.
-// TODO: Explain why we shouldn't bother using stabby at least for trait objects.
+// TODO: Something better than transmutations?
+
+// One might naively assume that we are better off using `stabby` trait objects,
+// but that means throughtout Theseus we would have to use
+// stabby::alloc::sync::Arc and vtable!(Trait), rather than alloc::sync::Arc and
+// dyn Trait respectively. The current solution isn't great, but it's only funky
+// at the boundary to `shim` and doesn't impact the rest of Theseus.
 
 #[export_name = "libtheseus::stdin"]
 pub extern "C" fn stdin() -> FfiResult<FatPointer, Error> {
@@ -132,14 +143,20 @@ pub extern "C" fn stderr() -> FfiResult<FatPointer, Error> {
 }
 
 #[export_name = "libtheseus::read"]
-pub unsafe extern "C" fn read(reader: FatPointer, buf: FfiSliceMut<'_, u8>) -> FfiResult<usize, Error> {
+pub unsafe extern "C" fn read(
+    reader: FatPointer,
+    buf: FfiSliceMut<'_, u8>,
+) -> FfiResult<usize, Error> {
     let ptr: *const dyn ImmutableRead = unsafe { mem::transmute(reader) };
     let r = unsafe { &*ptr };
     FfiResult::from(r.read(buf.into()).map_err(from_core2))
 }
 
 #[export_name = "libtheseus::write"]
-pub unsafe extern "C" fn write(writer: FatPointer, buf: FfiSlice<'_, u8>) -> FfiResult<usize, Error> {
+pub unsafe extern "C" fn write(
+    writer: FatPointer,
+    buf: FfiSlice<'_, u8>,
+) -> FfiResult<usize, Error> {
     let ptr: *const dyn ImmutableWrite = unsafe { mem::transmute(writer) };
     let r = unsafe { &*ptr };
     FfiResult::from(r.write(buf.into()).map_err(from_core2))
