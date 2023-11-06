@@ -2,25 +2,28 @@
 //!
 //! Current support:
 //! - EHCI controllers:
-//!    * control transfers: full support
-//!    * other transfer types: unused, no API support
+//!    * control transfers (requests): full support
+//!    * interrupt transfers: full support
+//!    * bulk: unused, no API support
+//!    * isochronous transfers: unused, no API support
 
 #![no_std]
 
 extern crate alloc;
 
-use pci::PciDevice;
 use memory::{MappedPages, PhysicalAddress, map_frame_range, create_identity_mapping, PAGE_SIZE, MMIO_FLAGS};
-use zerocopy::FromBytes;
+use core::{mem::size_of, num::NonZeroU8, str::from_utf8, any::TypeId, ops::{Deref, DerefMut}};
+use alloc::{string::String, vec::Vec};
 use volatile::{Volatile, ReadOnly};
-use bilge::prelude::*;
+use pci::{PciDevice, PciLocation};
+use sync_irq::{RwLock, Mutex};
 use sleep::{Duration, sleep};
-use core::{mem::size_of, num::NonZeroU8, str::from_utf8, any::TypeId};
-use alloc::string::String;
+use zerocopy::FromBytes;
+use bilge::prelude::*;
 
 mod interfaces;
 
-pub mod controllers;
+pub(crate) mod controllers;
 pub mod descriptors;
 pub mod allocators;
 pub mod request;
@@ -29,19 +32,26 @@ use descriptors::DescriptorType;
 use allocators::{CommonUsbAlloc, AllocSlot, UsbPointer, invalid_ptr_slot};
 use request::Request;
 use controllers::Controller;
+pub use controllers::PciInterface;
 
-pub fn init(pci_device: Controller<&PciDevice>) -> Result<(), &'static str> {
-    let mut ctrl = match pci_device {
-        Controller::Ehci(dev) => controllers::ehci::EhciController::new(dev)?,
+static CONTROLLERS: RwLock<Vec<(PciLocation, Mutex<Controller>)>> = RwLock::new(Vec::new());
+
+pub fn init(pci_device: PciInterface) -> Result<(), &'static str> {
+    let (location, mut controller) = match pci_device {
+        PciInterface::Ehci(dev) => (dev.location, Controller::Ehci(controllers::ehci::EhciController::init(dev)?)),
     };
 
-    ctrl.probe_ports()?;
-    ctrl.turn_off()?;
+    controller.probe_ports()?;
+
+    let mut controllers = CONTROLLERS.write();
+    controllers.push((location, Mutex::new(controller)));
 
     Ok(())
 }
 
+pub type InterfaceId = usize;
 pub type DeviceAddress = u8;
+pub type MaxPacketSize = u16;
 
 #[bitsize(16)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
@@ -54,7 +64,7 @@ pub struct DeviceStatus {
 /// Specific feature ID; must be appropriate to the recipient
 pub type FeatureId = u16;
 
-pub type InterfaceIndex = u16;
+pub type InterfaceIndex = u8;
 
 #[bitsize(8)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
@@ -80,7 +90,7 @@ impl Target {
     fn index(self) -> u16 {
         match self {
             Self::Device => 0u16,
-            Self::Interface(index) => index,
+            Self::Interface(index) => index as u16,
             Self::Endpoint(addr) => addr.ep_number().value() as u16,
         }
     }

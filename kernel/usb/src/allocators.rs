@@ -5,6 +5,7 @@ use super::*;
 allocator!(pub(crate) RequestAlloc, RawRequest, 16);
 allocator!(pub(crate) ByteAlloc, u8, 16);
 allocator!(pub(crate) WordAlloc, u16, 16);
+allocator!(pub(crate) Buf8Alloc, [u8; 8], 16);
 allocator!(pub(crate) PageAlloc, [u8; 0x1000], 4);
 
 allocator!(pub(crate) DeviceDescAlloc, descriptors::Device, 16);
@@ -32,6 +33,7 @@ pub(crate) struct CommonUsbAlloc {
     pub requests: RequestAlloc,
     pub bytes: ByteAlloc,
     pub words: WordAlloc,
+    pub buf8: Buf8Alloc,
     pub pages: PageAlloc,
 }
 
@@ -108,6 +110,10 @@ macro_rules! allocator {
                 *occupied = Self::OCCUPIED_FALSE;
                 // log::warn!("{}: free ({})", stringify!($ty), slot.0);
                 Ok(self.slots.get(slot.0).unwrap().clone())
+            }
+
+            pub fn free_by_addr(&mut self, addr: UsbPointer) -> Result<$ty, &'static str> {
+                self.free(self.find(addr)?)
             }
 
             pub fn get(&self, slot: AllocSlot) -> Result<&$ty, &'static str> {

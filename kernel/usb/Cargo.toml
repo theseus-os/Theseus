@@ -11,6 +11,7 @@ zerocopy = "0.5.0"
 volatile = "0.2.7"
 bilge = "0.2.0"
 
+sync_irq = { path = "../../libs/sync_irq" }
 memory = { path = "../memory" }
 sleep = { path = "../sleep" }
 pci = { path = "../pci" }

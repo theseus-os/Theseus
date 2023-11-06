@@ -151,7 +151,7 @@ impl<'a> Request<'a> {
                 Direction::In,
                 std_req::GET_INTERFACE_ALT_SETTING,
                 0u16,
-                *interface_idx,
+                *interface_idx as u16,
                 1u16,
             ),
             Self::SetInterfaceAltSetting(interface_idx, alt_setting) => RawRequest::new(
@@ -160,7 +160,7 @@ impl<'a> Request<'a> {
                 Direction::Out,
                 std_req::SET_INTERFACE_ALT_SETTING,
                 *alt_setting as u16,
-                *interface_idx,
+                *interface_idx as u16,
                 0u16,
             ),
             Self::ReadString(string_idx, _string) => RawRequest::new(
@@ -181,7 +181,7 @@ impl<'a> Request<'a> {
                 Direction::In,
                 hid_req::GET_REPORT,
                 ((u8::from(*report_type) as u16) << 8) | (*report_id as u16),
-                *int_idx,
+                *int_idx as u16,
                 report.len() as u16,
             ),
             Self::HidSetReport(int_idx, report_type, report_id, report) => RawRequest::new(
@@ -190,7 +190,7 @@ impl<'a> Request<'a> {
                 Direction::Out,
                 hid_req::SET_REPORT,
                 ((u8::from(*report_type) as u16) << 8) | (*report_id as u16),
-                *int_idx,
+                *int_idx as u16,
                 report.len() as u16,
             ),
             Self::HidGetProtocol(int_idx, _protocol) => RawRequest::new(
@@ -199,7 +199,7 @@ impl<'a> Request<'a> {
                 Direction::In,
                 hid_req::GET_PROTOCOL,
                 0,
-                *int_idx,
+                *int_idx as u16,
                 1,
             ),
             Self::HidSetProtocol(int_idx, protocol) => RawRequest::new(
@@ -208,7 +208,7 @@ impl<'a> Request<'a> {
                 Direction::Out,
                 hid_req::SET_PROTOCOL,
                 u8::from(*protocol) as u16,
-                *int_idx,
+                *int_idx as u16,
                 0,
             ),
         }

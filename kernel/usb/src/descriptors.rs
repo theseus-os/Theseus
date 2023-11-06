@@ -66,6 +66,7 @@ pub struct Device {
     pub device_class: u8,
     pub device_sub_class: u8,
     pub device_protocol: u8,
+    // in this descriptor, this field is a u8
     pub max_packet_size: u8,
     pub vendor_id: u16,
     pub product_id: u16,
@@ -154,7 +155,7 @@ pub struct ConfigurationAttributes {
 pub struct Interface {
     pub length: u8,
     pub descriptor_type: u8,
-    pub interface_number: u8,
+    pub interface_number: InterfaceIndex,
     pub alt_setting: u8,
     pub num_endpoints: u8,
     pub class: u8,
@@ -170,7 +171,8 @@ pub struct Endpoint {
     pub descriptor_type: u8,
     pub address: EndpointAddress,
     pub attributes: EndpointAttributes,
-    pub max_packet_size: u16,
+    // in this descriptor, it's a u16
+    pub max_packet_size: MaxPacketSize,
     /// Interval for polling endpoint for data transfers.
     /// Expressed in frames or microframes depending on the device operating
     /// speed (i.e., either 1 millisecond or 125 μs units).
