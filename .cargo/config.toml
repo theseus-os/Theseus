@@ -1,2 +1,0 @@
-[build]
-rustc = "/Users/klim/Projects/theseus-5/ports/rust/build/aarch64-apple-darwin/stage1/bin/rustc"

@@ -39,3 +39,6 @@ github_pages/doc/
 
 # library lock files
 /libs/**/Cargo.lock
+
+# TODO: Remove once std is upstreamed
+.cargo/
