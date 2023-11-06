@@ -1,0 +1,14 @@
+[package]
+name = "libtheseus"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+app_io = { path = "../app_io" }
+core2 = { version = "0.4.0", default-features = false, features = ["alloc", "nightly"] }
+environment = { path = "../environment" }
+path = { path = "../path" }
+random = { path = "../random" }
+theseus_ffi = { path = "../../libs/theseus_ffi" }
+task = { path = "../task" }
+thread_local_macro = { path = "../thread_local_macro" }

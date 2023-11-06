@@ -46,6 +46,7 @@ else
 $(error Error:unsupported option "boot_spec=$(boot_spec)". Options are 'bios' or 'uefi')
 endif
 
+HOST_TRIPLE = $(shell rustc -vV | sed -n 's|host: ||p')
 ## test for Windows Subsystem for Linux (Linux on Windows)
 IS_WSL = $(shell grep -is 'microsoft' /proc/version)
 
@@ -68,6 +69,7 @@ THESEUS_CARGO           := $(ROOT_DIR)/tools/theseus_cargo
 THESEUS_CARGO_BIN       := $(THESEUS_CARGO)/bin/theseus_cargo
 EXTRA_FILES             := $(ROOT_DIR)/extra_files
 LIMINE_DIR              := $(ROOT_DIR)/limine-prebuilt
+RUST_SOURCE				:= $(ROOT_DIR)/ports/rust
 
 
 ### Set up tool names/locations for cross-compiling on a Mac OS / macOS host (Darwin).
@@ -77,6 +79,7 @@ ifeq ($(UNAME),Darwin)
 	## macOS uses a different unmounting utility
 	UNMOUNT = diskutil unmount
 	USB_DRIVES = $(shell diskutil list external | grep -s "/dev/" | awk '{print $$1}')
+	HEAD = ghead
 else
 	## Handle building for aarch64 on x86_64 Linux/WSL
 	ifeq ($(ARCH),aarch64)
@@ -85,6 +88,7 @@ else
 	## Just use normal umount on Linux/WSL
 	UNMOUNT = umount
 	USB_DRIVES = $(shell lsblk -O | grep -i usb | awk '{print $$2}' | grep --color=never '[^0-9]$$')
+	HEAD = head
 endif
 
 ### Handle multiple bootloader options and ensure the corresponding tools are installed.
@@ -157,7 +161,6 @@ APP_CRATE_NAMES += $(EXTRA_APP_CRATE_NAMES)
 		check-usb \
 		clean clean-doc clean-old-build \
 		orun orun_pause run run_pause iso build cargo copy_kernel $(bootloader) extra_files \
-		libtheseus \
 		simd_personality_sse build_sse simd_personality_avx build_avx \
 		gdb gdb_aarch64 \
 		clippy doc docs view-doc view-docs book view-book
@@ -250,7 +253,6 @@ build: $(nano_core_binary)
 		-a ./applications \
 		--kernel-prefix $(KERNEL_PREFIX) \
 		--app-prefix $(APP_PREFIX) \
-		-e "$(EXTRA_APP_CRATE_NAMES) libtheseus"
 
 ## Third, perform partial linking on each object file, which shrinks their size 
 ## and most importantly, accelerates their loading and linking at runtime.
@@ -313,10 +315,33 @@ endif
 ### end of "build" target ###
 #############################
 
+std:
+##  Cache std/Cargo.toml
+	cp $(RUST_SOURCE)/library/std/Cargo.toml $(ROOT_DIR)/std-cargo.toml
+##	Remove the last line of std/Cargo.toml
+	@$(HEAD) -n -1 $(RUST_SOURCE)/library/std/Cargo.toml > $(ROOT_DIR)/temp-std-cargo.toml
+	@mv $(ROOT_DIR)/temp-std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
+##	Add the correct dependency path, since the dependency path in std/Cargo.toml assumes that std is
+##	being built using -Zbuild-std.
+	@echo "theseus-shim = { path = \"../../../../shim\", features = ['rustc-dep-of-std'] }" >> $(RUST_SOURCE)/library/std/Cargo.toml
 
+##	Build the compiler
+	@cd $(RUST_SOURCE) && RUSTFLAGS="" CARGOFLAGS="" ./x.py build library --stage 1
+	@cd $(ROOT_DIR)
+
+##	Remove the last line of std/Cargo.toml
+	@$(HEAD) -n -1 $(RUST_SOURCE)/library/std/Cargo.toml > $(ROOT_DIR)/temp-std-cargo.toml
+	@mv $(ROOT_DIR)/temp-std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
+## Restore previous std/Cargo.toml
+	mv $(ROOT_DIR)/std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
+
+##	Add .cargo/config.toml
+	@mkdir -p $(ROOT_DIR)/.cargo
+	@echo "[build]" > $(ROOT_DIR)/.cargo/config.toml
+	@echo "rustc = \"$(RUST_SOURCE)/build/$(HOST_TRIPLE)/stage1/bin/rustc\"" >> $(ROOT_DIR)/.cargo/config.toml
 
 ## This target invokes the actual Rust build process via `cargo`.
-cargo:
+cargo: std
 	@mkdir -p $(BUILD_DIR)
 	@mkdir -p $(NANO_CORE_BUILD_DIR)
 	@mkdir -p $(OBJECT_FILES_BUILD_DIR)
@@ -470,14 +495,6 @@ c_test:
 
 
 
-### Demo/test target for building libtheseus
-libtheseus: theseus_cargo $(ROOT_DIR)/libtheseus/Cargo.* $(ROOT_DIR)/libtheseus/src/*
-	@( \
-		cd $(ROOT_DIR)/libtheseus && \
-		$(THESEUS_CARGO_BIN) --input $(DEPS_BUILD_DIR) build; \
-	)
-
-
 ### This target builds the `theseus_cargo` tool as a dedicated binary.
 theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/src/*)
 	@echo -e "\n=================== Building the theseus_cargo tool ==================="
@@ -489,6 +506,26 @@ theseus_cargo: $(wildcard $(THESEUS_CARGO)/Cargo.*)  $(wildcard$(THESEUS_CARGO)/
 clean:
 	@rm -rf $(BUILD_DIR)
 	cargo clean
+
+clean-std: clean
+	@rm -rf $(ROOT_DIR)/.cargo
+##  Cache std/Cargo.toml
+	cp $(RUST_SOURCE)/library/std/Cargo.toml $(ROOT_DIR)/std-cargo.toml
+##	Remove the last line of std/Cargo.toml
+	@$(HEAD) -n -1 $(RUST_SOURCE)/library/std/Cargo.toml > $(ROOT_DIR)/temp-std-cargo.toml
+	@mv $(ROOT_DIR)/temp-std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
+##	Add the correct dependency path, since the dependency path in std/Cargo.toml assumes that std is
+##	being built using -Zbuild-std.
+	@echo "theseus-shim = { path = \"../../../../shim\", features = ['rustc-dep-of-std'] }" >> $(RUST_SOURCE)/library/std/Cargo.toml
+
+	@cd $(RUST_SOURCE) && RUSTFLAGS="" CARGOFLAGS="" ./x.py clean
+	@cd $(ROOT_DIR)
+
+##	Remove the last line of std/Cargo.toml
+	@$(HEAD) -n -1 $(RUST_SOURCE)/library/std/Cargo.toml > $(ROOT_DIR)/temp-std-cargo.toml
+	@mv $(ROOT_DIR)/temp-std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
+## Restore previous std/Cargo.toml
+	mv $(ROOT_DIR)/std-cargo.toml $(RUST_SOURCE)/library/std/Cargo.toml
 	
 
 ### Removes only the old files that were copied into the build directory from a previous build.
@@ -615,7 +652,7 @@ else ifeq ($(ARCH),aarch64)
 clippy : export override FEATURES := $(subst --workspace,,$(FEATURES))
 endif
 clippy : export override RUSTFLAGS = $(patsubst %,--cfg %, $(THESEUS_CONFIG))
-clippy:
+clippy: std
 	RUST_TARGET_PATH='$(CFG_DIR)' RUSTFLAGS='$(RUSTFLAGS)' \
 		cargo clippy \
 		$(BUILD_STD_CARGOFLAGS) $(FEATURES) \

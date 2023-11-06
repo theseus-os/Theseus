@@ -30,6 +30,8 @@ default-members = [
 
 
 exclude = [
+	"shim",
+
 	## Exclude the build directories
 	"build",
 	"target",
