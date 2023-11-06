@@ -46,6 +46,12 @@ pub struct EhciController {
     usb_alloc: MappedPages,
 }
 
+impl Drop for EhciController {
+    fn drop(&mut self) {
+        self.turn_off().unwrap();
+    }
+}
+
 impl EhciController {
     pub fn new(ehci_pci_dev: &PciDevice) -> Result<Self, &'static str> {
         let base = (ehci_pci_dev.bars[0] as usize) & !0xff;
@@ -112,7 +118,7 @@ impl EhciController {
         op_regs.async_list.write(dummy_queue_head_addr.0);
         op_regs.periodic_list.write(periodic_list_addr.0);
 
-        sleep(Duration::from_millis(10)).unwrap();
+        sleep_ms(10);
 
         op_regs.command.update(|cmd| cmd.set_periodic_schedule(true));
 
@@ -158,13 +164,13 @@ impl EhciController {
                     // reset the device; it will now reply to requests targeted at address zero
                     port.update(|port| port.set_port_state(false));
                     port.update(|port| port.set_port_reset(true));
-                    sleep(Duration::from_millis(10)).unwrap();
+                    sleep_ms(10);
                     port.update(|port| port.set_port_reset(false));
-                    log::error!("CONNECTED: {:#?}", port.read());
+                    log::info!("CONNECTED PORT: {}", i);
 
                     let mut addr = Err("Out of device addresses");
 
-                    for i in 0..128 {
+                    for i in 1..128 {
                         let mask = 1 << i;
                         if self.devices & mask == 0 {
                             self.devices |= mask;
@@ -174,7 +180,11 @@ impl EhciController {
                     }
 
                     let addr = addr?;
+                    log::info!("Assigning address: {}", addr);
+
                     self.request(0, Request::SetAddress(addr), 8)?;
+                    log::info!("Assigned address: {}", addr);
+
                     self.init_device(addr)?;
                 }
             }
@@ -186,6 +196,7 @@ impl EhciController {
     fn init_device(&mut self, addr: DeviceAddress) -> Result<(), &'static str> {
         let mut device = descriptors::Device::default();
         self.request(addr, Request::GetDeviceDescriptor(&mut device), 8)?;
+
         let max_packet_size = device.max_packet_size;
 
         let mut config = unsafe { core::mem::MaybeUninit::<descriptors::Configuration>::zeroed().assume_init() };
@@ -194,8 +205,8 @@ impl EhciController {
         let mut offset = 0;
         for i in 0..config.inner.num_interfaces {
             let (interface, o): (&descriptors::Interface, _) = config.find_desc(offset, DescriptorType::Interface)?;
-            log::warn!("interface: {}", interface.name);
-            /*for _ in 0..interface.num_endpoints {
+            log::warn!("interface: {:?}", interface);
+            for _ in 0..interface.num_endpoints {
                 if interface.class == 3 {
                     // todo: read HID descriptor here
                     let (endpoint, o): (&descriptors::Endpoint, _) = config.find_desc(offset, DescriptorType::Endpoint)?;
@@ -215,11 +226,23 @@ impl EhciController {
                     )?;
 
                     let qhp = queue_head_pointer(qh_addr);
-                    shmem.periodic_list.entries[0].write(qhp);
+                    for entry in &mut shmem.periodic_list.entries {
+                        entry.write(qhp);
+                    }
 
-                    offset = interfaces::hid::init(config, offset)?;
+                    let shmem = self.alloc()?;
+                    loop {
+                        let frindex = self.op_regs()?.frame_index.read();
+                        let qh_active = shmem.queue_heads.get_by_addr(qh_addr)?.token.read().active();
+                        let qtd_active = shmem.transfer_descriptors.get(fqtd_index)?.token.read().active();
+                        let report = &shmem.common.pages.get(buf_index)?[..8];
+                        log::warn!("FRINDEX {}; QUEUE {}; TRANSFER {}; REPORT {:?}", frindex, qh_active, qtd_active, report);
+                        sleep_ms(10);
+                    }
+
+                    // offset = interfaces::hid::init(config, offset)?;
                 }
-            }*/
+            }
 
             offset = o;
         }
@@ -249,7 +272,7 @@ impl EhciController {
             self.push_to_async_schedule(qh_addr)?;
             self.wait_for_all_td_inactive(first_qtd_index)?;
             self.remove_from_async_schedule(qh_addr)?;
-            self.free_qh_and_qtd(qh_addr, first_qtd_index)?;
+            self.qh_and_qtd_cleanup(qh_addr, first_qtd_index)?;
 
             let shmem = self.alloc_mut()?;
             shmem.common.requests.free(req_index)?;
@@ -270,17 +293,29 @@ impl EhciController {
         request.free_and_move_payload(&mut shmem.common, shmem_index)
     }
 
-    fn free_qh_and_qtd(&mut self, qh_addr: UsbPointer, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
+    fn qh_and_qtd_cleanup(&mut self, qh_addr: UsbPointer, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
         let shmem = self.alloc_mut()?;
 
         let qh_index = shmem.queue_heads.find(qh_addr)?;
-        shmem.queue_heads.free(qh_index)?;
+        let queue_head = shmem.queue_heads.free(qh_index)?;
 
         let mut qtd_index = first_qtd_index;
         let no_next = PointerNoType::from(1);
 
         loop {
             let qtd_ref = shmem.transfer_descriptors.free(qtd_index)?;
+
+            let token = qtd_ref.token.read();
+            let failure = token.missed_micro_frame()
+                       || token.transaction_error()
+                       || token.babble_detected()
+                       || token.data_buffer_error()
+                       || token.halted();
+
+            if failure {
+                return Err("Transfer status indicates a failed transfer");
+            }
+
             let next_pointer = qtd_ref.next.read();
             if next_pointer == no_next {
                 return Ok(());
@@ -298,7 +333,7 @@ impl EhciController {
 
         loop {
             let qtd_ref = transfer_descriptors.get(qtd_index)?;
-            try_wait_until!(1, 1000, !qtd_ref.token.read().active())?;
+            try_wait_until!(5, 500, !qtd_ref.token.read().active())?;
 
             let next_pointer = qtd_ref.next.read();
             if next_pointer == no_next {
@@ -313,7 +348,7 @@ impl EhciController {
     fn enable_async_schedule(&mut self, enable: bool) -> Result<(), &'static str> {
         let op_regs = self.op_regs_mut()?;
         op_regs.command.update(|cmd| cmd.set_async_schedule(enable));
-        try_wait_until!(1, 1000, op_regs.status.read().async_schedule_running() == enable)?;
+        try_wait_until!(5, 500, op_regs.status.read().async_schedule_running() == enable)?;
         Ok(())
     }
 
@@ -413,6 +448,7 @@ fn create_request(
         u3::new(0),
         false,
         u15::new(size_of::<RawRequest>() as _),
+        // setup stage always uses DATA0
         data_toggle,
     );
 
@@ -430,12 +466,13 @@ fn create_request(
     let (first_qtd_index, first_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(setup_qtd))?;
     let mut prev_qtd_index = first_qtd_index;
 
-    let pid_code = match req.direction() {
-        Direction::Out => PidCode::Out,
-        Direction::In => PidCode::In,
+    let (data_pid_code, status_pid_code) = match req.direction() {
+        Direction::Out => (PidCode::Out, PidCode::In),
+        Direction::In => (PidCode::In, PidCode::Out),
     };
 
     while data_size > 0 {
+        data_toggle = !data_toggle;
         let progress = data_size.min(max_packet_size);
 
         let in_token = QtdToken::new(
@@ -443,11 +480,12 @@ fn create_request(
             false, false, false, false, false, false, false,
 
             true,
-            pid_code,
+            data_pid_code,
             u2::new(3),
             u3::new(0),
             false,
             u15::new(progress as _),
+            // data stage chains DATA0 with DATA1 and vice versa
             data_toggle,
         );
 
@@ -473,20 +511,19 @@ fn create_request(
 
         buffer += progress as u32;
         data_size -= progress;
-        data_toggle = !data_toggle;
     }
 
     let status_token = QtdToken::new(
         // initial status flags:
         false, false, false, false, false, false, false,
         true,
-        PidCode::Out,
+        status_pid_code,
         u2::new(3),
         u3::new(0),
         false,
         u15::new(0),
-        // force to true?
-        data_toggle,
+        // status stage always uses DATA1
+        true,
     );
 
     let status_qtd = TransferDescriptor {
