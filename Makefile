@@ -666,7 +666,7 @@ RUSTDOC_OUT_FILE := $(RUSTDOC_OUT)/___Theseus_Crates___/index.html
 
 ## Builds Theseus's source-level documentation for all Rust crates except applications.
 ## The entire project is built as normal using the `cargo doc` command (`rustdoc` under the hood).
-docs: doc
+docs: doc std
 doc : export override RUSTDOCFLAGS += -A rustdoc::private_intra_doc_links
 doc : export override RUSTFLAGS=
 doc : export override CARGOFLAGS=
