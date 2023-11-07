@@ -13,5 +13,7 @@ bilge = "0.2.0"
 
 sync_irq = { path = "../../libs/sync_irq" }
 memory = { path = "../memory" }
+waker = { path = "../waker" }
+spawn = { path = "../spawn" }
 sleep = { path = "../sleep" }
 pci = { path = "../pci" }

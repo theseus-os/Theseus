@@ -2,6 +2,8 @@
 
 use super::*;
 
+use interfaces::InterruptTransferAction;
+
 allocator!(TransferDescriptorAlloc, TransferDescriptor, 128);
 allocator!(QueueHeadAlloc, QueueHead, 32);
 
@@ -31,6 +33,11 @@ macro_rules! try_wait_until {
     }}
 }
 
+macro_rules! alloc_mut { ($self:ident) => ($self.usb_alloc.as_type_mut::<UsbAlloc>(0).unwrap()) }
+macro_rules! op_regs_mut { ($self:ident) => ($self.config_space.as_type_mut::<OperationRegisters>($self.op_offset).unwrap()) }
+macro_rules! alloc { ($self:ident) => ($self.usb_alloc.as_type::<UsbAlloc>(0).unwrap()) }
+macro_rules! op_regs { ($self:ident) => ($self.config_space.as_type::<OperationRegisters>($self.op_offset).unwrap()) }
+
 #[derive(Debug, FromBytes)]
 pub struct UsbAlloc {
     common: CommonUsbAlloc,
@@ -47,14 +54,16 @@ pub struct EhciController {
     op_offset: usize,
     usb_alloc: MappedPages,
     pending_int_transfers: Vec<InterruptTransfer>,
-    interfaces: Vec<interfaces::Interface>,
+    interfaces: Vec<Option<interfaces::Interface>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct InterruptTransfer {
     interface_id: InterfaceId,
+    endpoint: EndpointAddress,
+    ep_max_packet_size: MaxPacketSize,
     queue_head: UsbPointer,
-    first_qtd: AllocSlot,
+    first_qtd_index: AllocSlot,
     buffer: (UsbPointer, usize),
 }
 
@@ -66,14 +75,14 @@ impl Drop for EhciController {
 
 impl ControllerApi for EhciController {
     fn common_alloc_mut(&mut self) -> Result<&mut CommonUsbAlloc, &'static str> {
-        Ok(&mut self.alloc_mut()?.common)
+        Ok(&mut alloc_mut!(self).common)
     }
 
     fn probe_ports(&mut self) -> Result<(), &'static str> {
         let port_num = self.hcs_params.port_num().value() as usize;
 
         for i in 0..port_num {
-            let port = &mut self.op_regs_mut()?.ports[i];
+            let port = &mut op_regs_mut!(self).ports[i];
             log::error!("P{}.connected_change: {}", i, port.read().connected_change());
             if port.read().connected_change() {
                 // writing true makes it false (spec)
@@ -120,12 +129,12 @@ impl ControllerApi for EhciController {
     ) -> Result<(), &'static str> {
         let mut raw_req = request.get_raw();
 
-        let shmem = self.alloc_mut()?;
+        let shmem = alloc_mut!(self);
         let (shmem_index, shmem_addr) = request.allocate_payload(&mut shmem.common)?;
 
         let mut first_pass = true;
         loop {
-            let shmem = self.alloc_mut()?;
+            let shmem = alloc_mut!(self);
             // todo: handle device descriptors case (smaller data size than needed)
             let data_sz = raw_req.len() as usize;
 
@@ -134,9 +143,10 @@ impl ControllerApi for EhciController {
             self.push_to_async_schedule(qh_addr)?;
             self.wait_for_all_td_inactive(first_qtd_index)?;
             self.remove_from_async_schedule(qh_addr)?;
-            self.qh_and_qtd_cleanup(qh_addr, first_qtd_index)?;
+            self.qtd_error_check(first_qtd_index)?;
+            self.qh_and_qtd_cleanup(Some(qh_addr), first_qtd_index)?;
 
-            let shmem = self.alloc_mut()?;
+            let shmem = alloc_mut!(self);
             shmem.common.requests.free(req_index)?;
 
             if first_pass {
@@ -151,8 +161,8 @@ impl ControllerApi for EhciController {
             }
         }
 
-        let shmem = self.alloc_mut()?;
-        request.free_and_move_payload(&mut shmem.common, shmem_index)
+        let shmem_common = &mut alloc_mut!(self).common;
+        request.free_and_move_payload(shmem_common, shmem_index)
     }
 
     fn setup_interrupt_transfer(
@@ -164,10 +174,10 @@ impl ControllerApi for EhciController {
         buffer: UsbPointer,
         size: usize,
     ) -> Result<(), &'static str> {
-        let shmem = self.alloc_mut()?;
+        // TODO: handle polling interval
 
-        let (queue_head, first_qtd) = create_int_transfer_qh(
-            shmem,
+        let (queue_head, first_qtd_index) = create_int_transfer_qh(
+            alloc_mut!(self),
             device_addr,
             endpoint,
             ep_max_packet_size,
@@ -177,22 +187,79 @@ impl ControllerApi for EhciController {
 
         let new_transfer = InterruptTransfer {
             interface_id,
+            endpoint,
+            ep_max_packet_size,
             queue_head,
-            first_qtd,
+            first_qtd_index,
             buffer: (buffer, size),
         };
 
         self.pending_int_transfers.push(new_transfer);
+        self.enable_periodic_schedule(false)?;
         self.populate_periodic_schedule()
     }
 
     fn handle_interrupt(&mut self) -> Result<(), &'static str> {
-        todo!()
+        let op_regs = op_regs_mut!(self);
+        let status = op_regs.status.read();
+
+        if status.usb_int() {
+            let op_regs = op_regs_mut!(self);
+            op_regs.status.update(|sts| sts.set_usb_int(true));
+
+            let mut i = 0;
+            while let Some(transfer) = self.pending_int_transfers.get(i) {
+                let shmem = alloc_mut!(self);
+                let queue_head = shmem.queue_heads.get_mut_by_addr(transfer.queue_head)?;
+                if !queue_head.token.read().active() {
+                    let dev_addr = u8::from(queue_head.reg0.read().device());
+                    if self.handle_interrupt_transfer(dev_addr, i)? {
+                        i += 1;
+                    }
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
+        let op_regs = op_regs_mut!(self);
+
+        if status.usb_error_int() {
+            op_regs.status.update(|sts| sts.set_usb_error_int(true));
+            log::error!("TODO: USB-EHCI interrupt: USB Error");
+        }
+
+        if status.port_change_int() {
+            op_regs.status.update(|sts| sts.set_port_change_int(true));
+            log::error!("TODO: USB-EHCI interrupt: Port Change");
+        }
+
+        if status.frame_list_rollover_int() {
+            op_regs.status.update(|sts| sts.set_frame_list_rollover_int(true));
+            log::error!("TODO: USB-EHCI interrupt: Frame List Rollover");
+        }
+
+        if status.host_system_error_int() {
+            op_regs.status.update(|sts| sts.set_host_system_error_int(true));
+            log::error!("TODO: USB-EHCI interrupt: Host System Error");
+        }
+
+        if status.int_on_async_advance() {
+            op_regs.status.update(|sts| sts.set_int_on_async_advance(true));
+            log::error!("TODO: USB-EHCI interrupt: Async Advance");
+        }
+
+        log::warn!("Done handling an USB interrupt\n{:#?}", op_regs.status.read());
+
+        Ok(())
     }
 }
 
 impl EhciController {
     pub fn init(ehci_pci_dev: &PciDevice) -> Result<Self, &'static str> {
+        // get rid of interrupts while we're setting things up
+        ehci_pci_dev.pci_enable_interrupts(false);
+
         let base = (ehci_pci_dev.bars[0] as usize) & !0xff;
         let base = PhysicalAddress::new(base).ok_or("Invalid PCI BAR for EHCI USB controller")?;
 
@@ -220,10 +287,10 @@ impl EhciController {
         let op_regs = config_space.as_type_mut::<OperationRegisters>(op_offset)?;
 
         op_regs.interrupts.update(|i| i.set_usb_int(true));
-        op_regs.interrupts.update(|i| i.set_usb_error_int(false));
-        op_regs.interrupts.update(|i| i.set_port_change_int(false));
+        op_regs.interrupts.update(|i| i.set_usb_error_int(true));
+        op_regs.interrupts.update(|i| i.set_port_change_int(true));
         op_regs.interrupts.update(|i| i.set_frame_list_rollover_int(false));
-        op_regs.interrupts.update(|i| i.set_host_system_error_int(false));
+        op_regs.interrupts.update(|i| i.set_host_system_error_int(true));
         op_regs.interrupts.update(|i| i.set_int_on_async_advance(false));
 
         op_regs.segment.write(four_gig_segment);
@@ -275,22 +342,6 @@ impl EhciController {
         })
     }
 
-    fn alloc(&self) -> Result<&UsbAlloc, &'static str> {
-        self.usb_alloc.as_type::<UsbAlloc>(0)
-    }
-
-    fn op_regs(&self) -> Result<&OperationRegisters, &'static str> {
-        self.config_space.as_type::<OperationRegisters>(self.op_offset)
-    }
-
-    fn alloc_mut(&mut self) -> Result<&mut UsbAlloc, &'static str> {
-        self.usb_alloc.as_type_mut::<UsbAlloc>(0)
-    }
-
-    fn op_regs_mut(&mut self) -> Result<&mut OperationRegisters, &'static str> {
-        self.config_space.as_type_mut::<OperationRegisters>(self.op_offset)
-    }
-
     fn init_device(&mut self, addr: DeviceAddress) -> Result<(), &'static str> {
         let mut device = descriptors::Device::default();
         self.request(addr, Request::GetDeviceDescriptor(&mut device), 8)?;
@@ -308,7 +359,7 @@ impl EhciController {
                 let interface_id = self.interfaces.len();
                 let manager = interfaces::init(self, device, interface, interface_id, &config, o);
                 if let Some(interface_mgr) = manager? {
-                    self.interfaces.push(interface_mgr);
+                    self.interfaces.push(Some(interface_mgr));
                 }
             }
 
@@ -318,32 +369,96 @@ impl EhciController {
         Ok(())
     }
 
-    fn populate_periodic_schedule(&mut self) -> Result<(), &'static str> {
-        // turn the periodic schedule off
-        let op_regs = self.op_regs_mut()?;
-        op_regs.command.update(|cmd| cmd.set_periodic_schedule(false));
+    fn handle_interrupt_transfer(&mut self, dev_addr: DeviceAddress, t: usize) -> Result<bool, &'static str> {
+        self.enable_periodic_schedule(false)?;
+
+        let transfer = self.pending_int_transfers[t];
+        self.qtd_error_check(transfer.first_qtd_index)?;
+
+        // destroy these transfer descriptors
+        self.qh_and_qtd_cleanup(None, transfer.first_qtd_index)?;
+
+        // todo: better ownership management
+        let mut interface = self.interfaces[transfer.interface_id].take().unwrap();
+        let action = interface.on_interrupt_transfer(self, transfer.endpoint)?;
+        assert_eq!(self.interfaces[transfer.interface_id].replace(interface), None);
+
+        match action {
+            InterruptTransferAction::Restore => {
+                let pid_code = match transfer.endpoint.direction() {
+                    Direction::Out => PidCode::Out,
+                    Direction::In => PidCode::In,
+                };
+
+                let (buffer, data_size) = transfer.buffer;
+                let transfer_chain = create_transfer_chain(
+                    alloc_mut!(self),
+                    false /* not sure */,
+                    pid_code,
+                    buffer,
+                    data_size,
+                    true,
+                )?;
+
+                // cannot fail, would have failed earlier
+                let (first_qtd_index, first_qtd_ptr, _) = transfer_chain.unwrap();
+
+                let queue_head = alloc_mut!(self).queue_heads.get_mut_by_addr(transfer.queue_head)?;
+                *queue_head = create_queue_head(
+                    false,
+                    dev_addr,
+                    transfer.endpoint.ep_number(),
+                    0xff,
+                    transfer.ep_max_packet_size,
+                    first_qtd_ptr.into(),
+                );
+
+                self.pending_int_transfers[t].first_qtd_index = first_qtd_index;
+                // we didn't actually modify the periodic list; no need to populate it again, but we must restart it.
+                self.enable_periodic_schedule(true)?;
+
+                // this transfer still exists
+                Ok(true)
+            },
+            InterruptTransferAction::Destroy => {
+                alloc_mut!(self).queue_heads.free_by_addr(transfer.queue_head)?;
+                self.pending_int_transfers.remove(t);
+                self.populate_periodic_schedule()?;
+
+                // this transfer was removed
+                Ok(false)
+            },
+        }
+    }
+
+    fn enable_periodic_schedule(&mut self, enable: bool) -> Result<(), &'static str> {
+        let op_regs = op_regs_mut!(self);
+        op_regs.command.update(|cmd| cmd.set_periodic_schedule(enable));
 
         // wait for it to actually stop
-        try_wait_until!(2, 100, !op_regs.status.read().periodic_schedule_running())?;
+        let op_regs = op_regs_mut!(self);
+        try_wait_until!(2, 100, op_regs.status.read().periodic_schedule_running() == enable)?;
 
+        Ok(())
+    }
+
+    // Will enable the periodic schedule if needed
+    fn populate_periodic_schedule(&mut self) -> Result<(), &'static str> {
         let transfer_count = self.pending_int_transfers.len();
         if transfer_count != 0 {
             let mut transfer_index = 0;
-            for i in 0..PERIODIC_LIST_LEN {
-                let queue_head = self.pending_int_transfers[transfer_index].queue_head;
+            for entry in &mut alloc_mut!(self).periodic_list.entries {
+                let transfer = &self.pending_int_transfers[transfer_index];
 
                 transfer_index += 1;
                 if transfer_index == transfer_count {
                     transfer_index = 0;
                 }
 
-                let shmem = self.alloc_mut()?;
-                shmem.periodic_list.entries[i].write(queue_head_pointer(queue_head));
+                entry.write(queue_head_pointer(transfer.queue_head));
             }
 
-            // turn it back on
-            let op_regs = self.op_regs_mut()?;
-            op_regs.command.update(|cmd| cmd.set_periodic_schedule(true));
+            self.enable_periodic_schedule(true)?;
         } else {
             // no transfer => don't turn it back on
         }
@@ -352,20 +467,18 @@ impl EhciController {
     }
 
     fn turn_off(&mut self) -> Result<(), &'static str> {
-        self.op_regs_mut()?.command.update(|cmd| cmd.set_run_stop(false));
+        op_regs_mut!(self).command.update(|cmd| cmd.set_run_stop(false));
         Ok(())
     }
 
-    fn qh_and_qtd_cleanup(&mut self, qh_addr: UsbPointer, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
-        let shmem = self.alloc_mut()?;
-
-        shmem.queue_heads.free_by_addr(qh_addr)?;
+    fn qtd_error_check(&self, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
+        let shmem = alloc!(self);
 
         let mut qtd_index = first_qtd_index;
         let no_next = PointerNoType::from(1);
 
         loop {
-            let qtd_ref = shmem.transfer_descriptors.free(qtd_index)?;
+            let qtd_ref = shmem.transfer_descriptors.get(qtd_index)?;
 
             let token = qtd_ref.token.read();
             let failure = token.missed_micro_frame()
@@ -388,8 +501,31 @@ impl EhciController {
         }
     }
 
+    fn qh_and_qtd_cleanup(&mut self, qh_addr: Option<UsbPointer>, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
+        let shmem = alloc_mut!(self);
+
+        if let Some(qh_addr) = qh_addr {
+            shmem.queue_heads.free_by_addr(qh_addr)?;
+        }
+
+        let mut qtd_index = first_qtd_index;
+        let no_next = PointerNoType::from(1);
+
+        loop {
+            let qtd_ref = shmem.transfer_descriptors.free(qtd_index)?;
+
+            let next_pointer = qtd_ref.next.read();
+            if next_pointer == no_next {
+                return Ok(());
+            } else {
+                let next_addr = next_pointer.address();
+                qtd_index = shmem.transfer_descriptors.find(next_addr)?;
+            }
+        }
+    }
+
     fn wait_for_all_td_inactive(&self, first_qtd_index: AllocSlot) -> Result<(), &'static str> {
-        let transfer_descriptors = &self.alloc()?.transfer_descriptors;
+        let transfer_descriptors = &alloc!(self).transfer_descriptors;
         let mut qtd_index = first_qtd_index;
         let no_next = PointerNoType::from(1);
 
@@ -408,14 +544,14 @@ impl EhciController {
     }
 
     fn enable_async_schedule(&mut self, enable: bool) -> Result<(), &'static str> {
-        let op_regs = self.op_regs_mut()?;
+        let op_regs = op_regs_mut!(self);
         op_regs.command.update(|cmd| cmd.set_async_schedule(enable));
         try_wait_until!(5, 500, op_regs.status.read().async_schedule_running() == enable)?;
         Ok(())
     }
 
     fn get_async_schedule_prev(&self, queue_head_addr: UsbPointer) -> Result<AllocSlot, &'static str> {
-        let queue_heads = &self.alloc()?.queue_heads;
+        let queue_heads = &alloc!(self).queue_heads;
         let mut current_index = queue_heads.find(queue_head_addr)?;
 
         loop {
@@ -430,7 +566,7 @@ impl EhciController {
     }
 
     fn read_async_list_ptr(&self) -> Result<UsbPointer, &'static str> {
-        Ok(UsbPointer(self.op_regs()?.async_list.read()))
+        Ok(UsbPointer(op_regs!(self).async_list.read()))
     }
 
     fn push_to_async_schedule(&mut self, to_push_addr: UsbPointer) -> Result<(), &'static str> {
@@ -439,7 +575,7 @@ impl EhciController {
         let first_addr = self.read_async_list_ptr()?;
         let last_index = self.get_async_schedule_prev(first_addr)?;
 
-        let queue_heads = &mut self.alloc_mut()?.queue_heads;
+        let queue_heads = &mut alloc_mut!(self).queue_heads;
 
         // set `to_push` as next of `last`
         let last_mut = queue_heads.get_mut(last_index)?;
@@ -461,7 +597,7 @@ impl EhciController {
         assert_ne!(first_addr, to_remove_addr, "[USB-EHCI] Tried to remove a queue head while the controller was using it.");
 
         let prev_index = self.get_async_schedule_prev(to_remove_addr)?;
-        let queue_heads = &mut self.alloc_mut()?.queue_heads;
+        let queue_heads = &mut alloc_mut!(self).queue_heads;
 
         // read next of `to_remove`
         let to_remove_ref = queue_heads.get_by_addr(to_remove_addr)?;
@@ -487,7 +623,7 @@ fn create_request(
     shmem: &mut UsbAlloc,
     dev_addr: DeviceAddress,
     req: RawRequest,
-    mut data_size: usize,
+    data_size: usize,
     max_packet_size: MaxPacketSize,
     buffer: UsbPointer,
 ) -> Result<(UsbPointer, AllocSlot, AllocSlot), &'static str> {
@@ -496,8 +632,6 @@ fn create_request(
 
     let zero_bp = BufferPointer::from(0);
     let no_next = PointerNoType::from(1);
-    let mut data_toggle = false;
-    let mut buffer = buffer.0;
 
     let setup_token = QtdToken::new(
         // initial status flags:
@@ -510,7 +644,7 @@ fn create_request(
         false,
         u15::new(size_of::<RawRequest>() as _),
         // setup stage always uses DATA0
-        data_toggle,
+        false,
     );
 
     let setup_qtd = TransferDescriptor {
@@ -524,55 +658,34 @@ fn create_request(
         bp4: Volatile::new(zero_bp),
     };
 
-    let (first_qtd_index, first_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(setup_qtd))?;
-    let mut prev_qtd_index = first_qtd_index;
+    let (setup_qtd_index, setup_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(setup_qtd))?;
 
     let (data_pid_code, status_pid_code) = match req.direction() {
         Direction::Out => (PidCode::Out, PidCode::In),
         Direction::In => (PidCode::In, PidCode::Out),
     };
 
-    while data_size > 0 {
-        data_toggle = !data_toggle;
-        let progress = data_size.min(max_packet_size as usize);
+    let transfer_chain = create_transfer_chain(
+        shmem,
+        true, // data stage builds upon setup stage
+        data_pid_code,
+        buffer,
+        data_size,
+        false,
+    )?;
 
-        let in_token = QtdToken::new(
-            // initial status flags:
-            false, false, false, false, false, false, false,
+    let last_qtd_index = match transfer_chain {
+        Some(tuple) => {
+            let (_, first_data_qtd_ptr, last_qtd_index) = tuple;
 
-            true,
-            data_pid_code,
-            u2::new(3),
-            u3::new(0),
-            false,
-            u15::new(progress as _),
-            // data stage chains DATA0 with DATA1 and vice versa
-            data_toggle,
-        );
+            // link first data qtd
+            let setup_qtd = shmem.transfer_descriptors.get_mut(setup_qtd_index)?;
+            setup_qtd.next.write(first_data_qtd_ptr.into());
 
-        let buffer_bp = UsbPointer(buffer).into();
-
-        let in_qtd = TransferDescriptor {
-            next: Volatile::new(no_next),
-            alt_next: Volatile::new(no_next),
-            token: Volatile::new(in_token),
-            bp0: Volatile::new(buffer_bp),
-            bp1: Volatile::new(zero_bp),
-            bp2: Volatile::new(zero_bp),
-            bp3: Volatile::new(zero_bp),
-            bp4: Volatile::new(zero_bp),
-        };
-
-        let (part_qtd_index, part_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(in_qtd))?;
-
-        let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_index)?;
-        prev_qtd.next.write(part_qtd_ptr.into());
-
-        prev_qtd_index = part_qtd_index;
-
-        buffer += progress as u32;
-        data_size -= progress;
-    }
+            last_qtd_index
+        },
+        None => setup_qtd_index,
+    };
 
     let status_token = QtdToken::new(
         // initial status flags:
@@ -600,14 +713,14 @@ fn create_request(
 
     let (_status_qtd_index, status_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(status_qtd))?;
 
-    let prev_qtd = shmem.transfer_descriptors.get_mut(prev_qtd_index)?;
+    // link setup qtd
+    let prev_qtd = shmem.transfer_descriptors.get_mut(last_qtd_index)?;
     prev_qtd.next.write(status_qtd_ptr.into());
 
-    let qh = create_queue_head(false, dev_addr, u4::new(0), 0, max_packet_size, first_qtd_ptr.into());
-
+    let qh = create_queue_head(false, dev_addr, u4::new(0), 0, max_packet_size, setup_qtd_ptr.into());
     let (_qh_index, queue_head_addr) = shmem.queue_heads.allocate(Some(qh))?;
 
-    Ok((queue_head_addr, first_qtd_index, req_index))
+    Ok((queue_head_addr, setup_qtd_index, req_index))
 }
 
 fn create_int_transfer_qh(
@@ -616,49 +729,94 @@ fn create_int_transfer_qh(
     endpoint: EndpointAddress,
     max_packet_size: MaxPacketSize,
     buffer: UsbPointer,
-    mut data_size: usize,
+    data_size: usize,
 ) -> Result<(UsbPointer, AllocSlot), &'static str> {
-    let zero_bp = BufferPointer::from(0);
+    let pid_code = match endpoint.direction() {
+        Direction::Out => PidCode::Out,
+        Direction::In => PidCode::In,
+    };
+
+    let transfer_chain = create_transfer_chain(
+        shmem,
+        false /* not sure */,
+        pid_code,
+        buffer,
+        data_size,
+        true,
+    )?;
+
+    let (first_qtd_index, first_qtd_ptr) = match transfer_chain {
+        Some((first_qtd_index, first_qtd_ptr, _)) => (first_qtd_index, first_qtd_ptr),
+        None => return Err("Cannot create an interrupt transfer with zero data size"),
+    };
+
+    let first_qtd_ptr = PointerNoType::from(first_qtd_ptr);
+    let qh = create_queue_head(false, dev_addr, endpoint.ep_number(), 0xff, max_packet_size, first_qtd_ptr);
+    let (_qh_index, queue_head_addr) = shmem.queue_heads.allocate(Some(qh))?;
+
+    Ok((queue_head_addr, first_qtd_index))
+}
+
+fn create_transfer_chain(
+    shmem: &mut UsbAlloc,
+    initial_data_toggle: bool,
+    pid_code: PidCode,
+    buffer: UsbPointer,
+    mut data_size: usize,
+    int_on_complete: bool,
+) -> Result<Option<(AllocSlot, UsbPointer, AllocSlot)>, &'static str> {
     let no_next = PointerNoType::from(1);
-    let mut data_toggle = false;
+    let mut data_toggle = initial_data_toggle;
     let mut buffer = buffer.0;
 
     // these values will be overwritten
     let (mut first_qtd_index, mut first_qtd_ptr) = invalid_ptr_slot();
     let mut prev_qtd_index = None;
 
-    let pid_code = match endpoint.direction() {
-        Direction::Out => PidCode::Out,
-        Direction::In => PidCode::In,
-    };
+    while data_size > 0 {
+        // Refer to section 4.10.6 for these computations
+        let over_align = buffer % 0x1000;
+        let first_buffer_len = match over_align {
+            0 => 0x1000, // buffer is aligned, no need to align the next one
+            over_align => 0x1000 - over_align, // bp1, bp2 etc will be aligned to 4KiB
+        };
 
-    loop {
-        let progress = data_size.min(max_packet_size as usize);
+        let max_transfer_progress = 0x4000 + (first_buffer_len as usize);
+        let last_transfer = data_size <= max_transfer_progress;
+        let progress = match last_transfer {
+            true => data_size,
+            false => max_transfer_progress,
+        };
 
         let in_token = QtdToken::new(
-            // initial status flags:
-            false, false, false, false, false, false, false,
-
-            true,
+            false, false, false, false, false, false, false, // initial status/error flags
+            true, // active
             pid_code,
             u2::new(3),
             u3::new(0),
-            true,
+            int_on_complete && last_transfer,
             u15::new(progress as _),
+            // data stage chains DATA0 with DATA1 and vice versa
             data_toggle,
         );
 
-        let buffer_bp = BufferPointerWithOffset::from(buffer);
+        // these might not all be used by the controller
+        // if `progress` is less than 5 x 4KiB
+        let bp0 = UsbPointer(buffer).into();
+        let bp1 = UsbPointer(buffer + first_buffer_len).into();
+        let bp2 = UsbPointer(buffer + first_buffer_len + 0x1000).into();
+        let bp3 = UsbPointer(buffer + first_buffer_len + 0x2000).into();
+        let bp4 = UsbPointer(buffer + first_buffer_len + 0x3000).into();
 
         let in_qtd = TransferDescriptor {
             next: Volatile::new(no_next),
             alt_next: Volatile::new(no_next),
             token: Volatile::new(in_token),
-            bp0: Volatile::new(buffer_bp),
-            bp1: Volatile::new(zero_bp),
-            bp2: Volatile::new(zero_bp),
-            bp3: Volatile::new(zero_bp),
-            bp4: Volatile::new(zero_bp),
+            bp0: Volatile::new(bp0),
+            bp1: Volatile::new(bp1),
+            bp2: Volatile::new(bp2),
+            bp3: Volatile::new(bp3),
+            bp4: Volatile::new(bp4),
         };
 
         let (part_qtd_index, part_qtd_ptr) = shmem.transfer_descriptors.allocate(Some(in_qtd))?;
@@ -673,20 +831,12 @@ fn create_int_transfer_qh(
 
         prev_qtd_index = Some(part_qtd_index);
 
+        data_toggle = !data_toggle;
         buffer += progress as u32;
         data_size -= progress;
-        data_toggle = !data_toggle;
-
-        if data_size == 0 {
-            break;
-        }
     }
 
-    let first_qtd_bp = PointerNoType::from(first_qtd_ptr);
-    let qh = create_queue_head(false, dev_addr, endpoint.ep_number(), 0xff, max_packet_size, first_qtd_bp);
-    let (_qh_index, queue_head_addr) = shmem.queue_heads.allocate(Some(qh))?;
-
-    Ok((queue_head_addr, first_qtd_index))
+    Ok(prev_qtd_index.map(|last_qtd_index| (first_qtd_index, first_qtd_ptr, last_qtd_index)))
 }
 
 fn create_queue_head(
@@ -705,7 +855,8 @@ fn create_queue_head(
         true,
         is_first_qh,
         u11::new(max_packet_size as _),
-        true,
+        // must only be set for LS/FS control endpoints
+        false,
         u4::new(0),
     );
 
@@ -714,6 +865,7 @@ fn create_queue_head(
         HighBandwidthPipeMultiplier::One,
     );
 
+    // note: for interrupt transfers, this may remain an invalid pointer
     let to_be_changed_at_insertion = Pointer::from(1);
     let alt_no_next = AltNextQtdPointer::from(1);
 
@@ -1318,6 +1470,7 @@ struct QhEndpoint {
     head_of_reclamation_list: bool,
     // max value: 0x400
     max_packet_len: u11,
+    // must only be set for LS/FS control endpoints
     control_endpoint: bool,
     nak_count_reload: u4,
 }

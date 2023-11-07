@@ -15,11 +15,13 @@ use memory::{MappedPages, PhysicalAddress, map_frame_range, create_identity_mapp
 use core::{mem::size_of, num::NonZeroU8, str::from_utf8, any::TypeId, ops::{Deref, DerefMut}};
 use alloc::{string::String, vec::Vec};
 use volatile::{Volatile, ReadOnly};
-use pci::{PciDevice, PciLocation};
 use sync_irq::{RwLock, Mutex};
 use sleep::{Duration, sleep};
+use spawn::new_task_builder;
 use zerocopy::FromBytes;
 use bilge::prelude::*;
+use waker::new_waker;
+use pci::PciDevice;
 
 mod interfaces;
 
@@ -34,19 +36,42 @@ use request::Request;
 use controllers::Controller;
 pub use controllers::PciInterface;
 
-static CONTROLLERS: RwLock<Vec<(PciLocation, Mutex<Controller>)>> = RwLock::new(Vec::new());
+static CONTROLLERS: RwLock<Vec<Mutex<Controller>>> = RwLock::new(Vec::new());
 
 pub fn init(pci_device: PciInterface) -> Result<(), &'static str> {
-    let (location, mut controller) = match pci_device {
-        PciInterface::Ehci(dev) => (dev.location, Controller::Ehci(controllers::ehci::EhciController::init(dev)?)),
+    let (dev, mut controller) = match pci_device {
+        PciInterface::Ehci(dev) => (dev, Controller::Ehci(controllers::ehci::EhciController::init(dev)?)),
     };
 
     controller.probe_ports()?;
 
-    let mut controllers = CONTROLLERS.write();
-    controllers.push((location, Mutex::new(controller)));
+    let controller_index;
+    {
+        let mut controllers = CONTROLLERS.write();
+        controller_index = controllers.len();
+        controllers.push(Mutex::new(controller));
+    }
+
+    new_task_builder(pci_usb_bridge_int_handler, (dev, controller_index)).spawn()?;
 
     Ok(())
+}
+
+fn pci_usb_bridge_int_handler(params: (&'static PciDevice, usize)) -> ! {
+    let (device, controller_index) = params;
+    let (waker, blocker) = new_waker();
+    let _ = device.set_interrupt_waker(waker);
+
+    loop {
+        device.pci_enable_interrupts(true);
+        blocker.block();
+        log::info!("Now handling an interrupt in pci_usb_bridge_int_handler");
+
+        let controllers = CONTROLLERS.read();
+        let mut controller = controllers[controller_index].lock();
+
+        controller.handle_interrupt().unwrap();
+    }
 }
 
 pub type InterfaceId = usize;
