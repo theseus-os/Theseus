@@ -2641,6 +2641,7 @@ dependencies = [
  "memory",
  "port_io",
  "spin 0.9.4",
+ "sync_irq",
  "volatile 0.2.7",
  "zerocopy",
 ]
@@ -4339,8 +4340,10 @@ dependencies = [
  "memory",
  "pci",
  "sleep",
+ "spawn",
  "sync_irq",
  "volatile 0.2.7",
+ "waker",
  "zerocopy",
 ]
 

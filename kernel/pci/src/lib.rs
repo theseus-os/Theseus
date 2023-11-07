@@ -10,7 +10,7 @@
 extern crate alloc;
 
 use log::*;
-use core::{fmt, ops::{Deref, DerefMut}, mem::size_of};
+use core::{fmt, ops::{Deref, DerefMut}, mem::size_of, task::Waker};
 use alloc::vec::Vec;
 use spin::{Once, Mutex};
 use memory::{PhysicalAddress, BorrowedSliceMappedPages, Mutable, MappedPages, map_frame_range, MMIO_FLAGS};
@@ -18,7 +18,8 @@ use bit_field::BitField;
 use volatile::Volatile;
 use zerocopy::FromBytes;
 use cpu::CpuId;
-use interrupts::{InterruptNumber, interrupt_handler, init_pci_interrupts};
+use interrupts::{InterruptNumber, EoiBehaviour, interrupt_handler, init_pci_interrupts};
+use sync_irq::RwLock;
 
 #[cfg(target_arch = "x86_64")]
 use port_io::Port;
@@ -121,6 +122,8 @@ pci_register!(PCI_INTERRUPT_PIN,       0x3D, 1);
 pci_register!(PCI_MIN_GRANT,           0x3E, 1);
 pci_register!(PCI_MAX_LATENCY,         0x3F, 1);
 
+const PCI_COMMAND_INT_DISABLED: u16 = 1 << 10;
+
 #[repr(u8)]
 pub enum PciCapability {
     Msi  = 0x05,
@@ -209,17 +212,24 @@ pub fn pci_device_iter() -> Result<impl Iterator<Item = &'static PciDevice>, &'s
 
 // Architecture-independent PCI interrupt handler
 interrupt_handler!(pci_int_handler, None, _stack_frame, {
-    let devices = pci_device_iter().unwrap();
+    // this would fail if pci devices were uninitialized & there was an error initializing them
+    // we expect them to be initialized at this point.
+    let devices = pci_device_iter().expect("Uninitialized PCI buses");
 
     for device in devices {
-        const PCI_COMMAND_INT_DISABLED: u16 = 0b0000010000000000;
-        let interrupt_enabled = (device.command & PCI_COMMAND_INT_DISABLED) == 0;
-        if interrupt_enabled && device.pci_get_interrupt_status() {
-            log::error!("Device {:#?} triggered an interrupt", device);
+        if device.pci_get_interrupt_status() {
+            device.pci_enable_interrupts(false);
+            log::info!("Device {} triggered an interrupt", device.location);
+
+            let reader = device.interrupt_waker.read();
+            match &*reader {
+                Some(waker) => waker.wake_by_ref(),
+                None => panic!("Device doesn't have an interrupt waker!"),
+            }
         }
     }
 
-    loop {} // EoiBehaviour::HandlerDidNotSendEoi
+    EoiBehaviour::HandlerDidNotSendEoi
 });
 
 /// Initializes the PCI interrupt handler
@@ -305,6 +315,7 @@ fn scan_pci() -> Result<Vec<PciBus>, &'static str> {
                     int_pin:          location.pci_read_8(PCI_INTERRUPT_PIN),
                     int_line:         location.pci_read_8(PCI_INTERRUPT_LINE),
                     location,
+                    interrupt_waker: RwLock::new(None),
                 };
 
                 device_list.push(device);
@@ -525,17 +536,20 @@ impl PciLocation {
     }
 
     /// Sets the PCI device's command bit 10 to disable legacy interrupts
-    pub fn pci_set_interrupt_disable_bit(&self) {
+    pub fn pci_set_interrupt_disable_bit(&self, bit: bool) {
         let command = self.pci_read_16(PCI_COMMAND);
-        trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
+        // trace!("pci_set_interrupt_disable_bit: PciDevice: {}, read value: {:#x}", self, command);
 
-        const INTERRUPT_DISABLE: u16 = 1 << 10;
-        self.pci_write_16(PCI_COMMAND, command | INTERRUPT_DISABLE);
+        let new_value = match bit {
+            true => command | PCI_COMMAND_INT_DISABLED,
+            false => command & !PCI_COMMAND_INT_DISABLED,
+        };
+        self.pci_write_16(PCI_COMMAND, new_value);
 
-        trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
+        /*trace!("pci_set_interrupt_disable_bit: PciDevice: {} read value AFTER WRITE CMD: {:#x}", 
             self,
             self.pci_read_16(PCI_COMMAND),
-        );
+        );*/
     }
 
     /// Explores the PCI config space and returns address of requested capability, if present.
@@ -607,6 +621,9 @@ impl fmt::Debug for PciLocation {
 pub struct PciDevice {
     /// the bus, slot, and function number that locates this PCI device in the bus tree.
     pub location: PciLocation,
+
+    /// The handling task for legacy PCI interrupts
+    pub interrupt_waker: RwLock<Option<Waker>>,
 
     /// The class code, used to determine device type.
     pub class: u8,
@@ -850,9 +867,26 @@ impl PciDevice {
     }
 
     /// Reads and returns this PCI device's interrupt status flag.
+    pub fn pci_enable_interrupts(&self, enable: bool) {
+        self.pci_set_interrupt_disable_bit(!enable);
+    }
+
+    /// Reads and returns this PCI device's interrupt status flag.
     pub fn pci_get_interrupt_status(&self) -> bool {
-        const PCI_STATUS_INT: u16 = 0b0000000000001000;
-        (self.pci_read_16(PCI_STATUS) & PCI_STATUS_INT) != 0
+        const PCI_STATUS_INT: u16 = 1 << 3;
+
+        let interrupt_enabled = (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0;
+        let pending_interrupt = (self.pci_read_16(PCI_STATUS)  & PCI_STATUS_INT          ) != 0;
+
+        interrupt_enabled && pending_interrupt
+    }
+
+    /// Sets a a task waker to be used when this device triggers an interrupt
+    ///
+    /// Returns the previous interrupt waker for this device, if there was one.
+    pub fn set_interrupt_waker(&self, waker: Waker) -> Option<Waker> {
+        let mut handle = self.interrupt_waker.write();
+        handle.replace(waker)
     }
 }
 
