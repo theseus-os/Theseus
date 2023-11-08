@@ -150,7 +150,7 @@
 </span><span class="attr">#![no_std]
 
 </span><span class="kw">use </span>core::ops::Deref;
-<span class="kw">use </span>memory_structs::{Frame, FrameRange, PhysicalAddress};
+<span class="kw">use </span>memory_structs::{Frame, FrameRange, PhysicalAddress, PageSize};
 <span class="kw">use </span>zerocopy::FromBytes;
 <span class="kw">use </span>frame_allocator::AllocatedFrame;
 <span class="kw">use </span>pte_flags::{PteFlagsArch, PTE_FRAME_MASK};
@@ -227,7 +227,7 @@
     /// This is the actual mapping action that informs the MMU of a new mapping.
     ///
     /// Note: this performs no checks about the current value of this page table entry.
-    </span><span class="kw">pub fn </span>set_entry(<span class="kw-2">&amp;mut </span><span class="self">self</span>, frame: AllocatedFrame, flags: PteFlagsArch) {
+    </span><span class="kw">pub fn </span>set_entry&lt;P: PageSize&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, frame: AllocatedFrame&lt;P&gt;, flags: PteFlagsArch) {
         <span class="self">self</span>.<span class="number">0 </span>= (frame.start_address().value() <span class="kw">as </span>u64) | flags.bits();
     }
 

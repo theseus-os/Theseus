@@ -926,6 +926,11 @@
 <a href="#926" id="926">926</a>
 <a href="#927" id="927">927</a>
 <a href="#928" id="928">928</a>
+<a href="#929" id="929">929</a>
+<a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
 </pre></div><pre class="rust"><code><span class="doccomment">//! Provides an allocator for virtual memory pages.
 //! The minimum unit of allocation is a single page. 
 //! 
@@ -1145,6 +1150,11 @@
 		<span class="macro">write!</span>(f, <span class="string">&quot;AllocatedPages({:?})&quot;</span>, <span class="self">self</span>.pages)
 	}
 }
+<span class="kw">impl </span>Default <span class="kw">for </span>AllocatedPages {
+	<span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+		<span class="self">Self</span>::empty()
+	}
+}
 
 <span class="kw">impl </span>AllocatedPages {
 	<span class="doccomment">/// Returns an empty AllocatedPages object that performs no page allocation. 
@@ -1156,32 +1166,32 @@
 	}
 
 	<span class="doccomment">/// Returns the starting `VirtualAddress` in this range of pages.
-    </span><span class="kw">pub fn </span>start_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VirtualAddress {
+    </span><span class="kw">pub const fn </span>start_address(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; VirtualAddress {
         <span class="self">self</span>.pages.start_address()
     }
 
 	<span class="doccomment">/// Returns the size in bytes of this range of pages.
-    </span><span class="kw">pub fn </span>size_in_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    </span><span class="kw">pub const fn </span>size_in_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.pages.size_in_bytes()
     }
 
 	<span class="doccomment">/// Returns the size in number of pages of this range of pages.
-    </span><span class="kw">pub fn </span>size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    </span><span class="kw">pub const fn </span>size_in_pages(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.pages.size_in_pages()
     }
 
 	<span class="doccomment">/// Returns the starting `Page` in this range of pages.
-	</span><span class="kw">pub fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+	</span><span class="kw">pub const fn </span>start(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
 		<span class="self">self</span>.pages.start()
 	}
 
 	<span class="doccomment">/// Returns the ending `Page` (inclusive) in this range of pages.
-	</span><span class="kw">pub fn </span>end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
+	</span><span class="kw">pub const fn </span>end(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>Page {
 		<span class="self">self</span>.pages.end()
 	}
 
 	<span class="doccomment">/// Returns a reference to the inner `PageRange`, which is cloneable/iterable.
-	</span><span class="kw">pub fn </span>range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
+	</span><span class="kw">pub const fn </span>range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>PageRange {
 		<span class="kw-2">&amp;</span><span class="self">self</span>.pages
 	}
 

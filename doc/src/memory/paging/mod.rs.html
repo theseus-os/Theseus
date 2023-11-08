@@ -441,6 +441,7 @@
 <a href="#441" id="441">441</a>
 <a href="#442" id="442">442</a>
 <a href="#443" id="443">443</a>
+<a href="#444" id="444">444</a>
 </pre></div><pre class="rust"><code><span class="comment">// Copyright 2016 Philipp Oppermann. See the README.md
 // file at the top-level directory of this distribution.
 //
@@ -473,6 +474,7 @@
 <span class="kw">use </span>log::debug;
 <span class="kw">use super</span>::{
     Frame, FrameRange, PageRange, VirtualAddress, PhysicalAddress,
+    Page4K,
     AllocatedPages, allocate_pages, AllocatedFrames, UnmappedFrames, PteFlags,
     InitialMemoryMappings, tlb_flush_all, tlb_flush_virt_addr,
     get_p4, find_section_memory_bounds,
@@ -657,7 +659,7 @@
 
 
 <span class="doccomment">/// Returns the current top-level (P4) root page table frame.
-</span><span class="kw">pub fn </span>get_current_p4() -&gt; Frame {
+</span><span class="kw">pub fn </span>get_current_p4() -&gt; Frame&lt;Page4K&gt; {
     Frame::containing_address(get_p4())
 }
 
