@@ -346,7 +346,7 @@ impl IxgbeNic {
         let interrupt_num =
             if let Some(interrupt_handlers) = interrupts {
                 ixgbe_pci_dev.pci_enable_msix()?;
-                ixgbe_pci_dev.pci_set_interrupt_disable_bit(true);
+                ixgbe_pci_dev.pci_set_interrupt_disable_bit();
                 Self::enable_msix_interrupts(&mut mapped_registers1, &mut rx_queues, &mut vector_table, &interrupt_handlers)?
             }
             else {

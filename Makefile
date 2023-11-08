@@ -945,10 +945,7 @@ else ifeq ($(ARCH),aarch64)
 	QEMU_FLAGS += -cpu cortex-a72
 	QEMU_FLAGS += -usb
 	QEMU_FLAGS += -device usb-ehci,id=ehci
-	QEMU_FLAGS += -device usb-kbd,bus=ehci.0
-	QEMU_FLAGS += -device usb-mouse,bus=ehci.0
-	QEMU_FLAGS += -d trace:usb_ehci_guest_bug,trace:usb_set_addr
-	# QEMU_FLAGS += -d trace:usb_*
+	QEMU_FLAGS += -device usb-kbd
 else
 	QEMU_FLAGS += -cpu Broadwell
 endif
