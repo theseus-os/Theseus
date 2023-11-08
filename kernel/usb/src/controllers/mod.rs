@@ -3,7 +3,7 @@ use super::*;
 pub mod ehci;
 
 pub enum PciInterface {
-    Ehci(&'static PciDevice),
+    Ehci,
 }
 
 pub(crate) enum Controller {

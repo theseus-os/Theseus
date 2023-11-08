@@ -217,7 +217,7 @@ interrupt_handler!(pci_int_handler, None, _stack_frame, {
     let devices = pci_device_iter().expect("Uninitialized PCI buses");
 
     for device in devices {
-        if device.pci_get_interrupt_status() {
+        if device.pci_get_interrupt_status(true) {
             device.pci_enable_interrupts(false);
             log::info!("Device {} triggered an interrupt", device.location);
 
@@ -872,13 +872,13 @@ impl PciDevice {
     }
 
     /// Reads and returns this PCI device's interrupt status flag.
-    pub fn pci_get_interrupt_status(&self) -> bool {
+    pub fn pci_get_interrupt_status(&self, check_enabled: bool) -> bool {
         const PCI_STATUS_INT: u16 = 1 << 3;
 
-        let interrupt_enabled = (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0;
-        let pending_interrupt = (self.pci_read_16(PCI_STATUS)  & PCI_STATUS_INT          ) != 0;
+        let interrupt_enabled = || (self.pci_read_16(PCI_COMMAND) & PCI_COMMAND_INT_DISABLED) == 0;
+        let pending_interrupt = || (self.pci_read_16(PCI_STATUS)  & PCI_STATUS_INT          ) != 0;
 
-        interrupt_enabled && pending_interrupt
+        ((!check_enabled) || interrupt_enabled()) && pending_interrupt()
     }
 
     /// Sets a a task waker to be used when this device triggers an interrupt

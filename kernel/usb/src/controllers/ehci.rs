@@ -256,13 +256,7 @@ impl ControllerApi for EhciController {
 }
 
 impl EhciController {
-    pub fn init(ehci_pci_dev: &PciDevice) -> Result<Self, &'static str> {
-        // get rid of interrupts while we're setting things up
-        ehci_pci_dev.pci_enable_interrupts(false);
-
-        let base = (ehci_pci_dev.bars[0] as usize) & !0xff;
-        let base = PhysicalAddress::new(base).ok_or("Invalid PCI BAR for EHCI USB controller")?;
-
+    pub fn init(base: PhysicalAddress) -> Result<Self, &'static str> {
         let (mut usb_alloc, four_gig_segment) = {
             // todo 1: make sure this doesn't cross a 4GiB boundary
             // todo 2: no need to ID-map this but then

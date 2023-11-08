@@ -130,7 +130,7 @@ pub fn init(
                 // USB controller
                 if dev.prog_if == 0x20 {
                     // EHCI
-                    usb::init(usb::PciInterface::Ehci(dev))?;
+                    usb::init(dev, usb::PciInterface::Ehci)?;
                     continue;
                 }
             }

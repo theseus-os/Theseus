@@ -38,9 +38,13 @@ pub use controllers::PciInterface;
 
 static CONTROLLERS: RwLock<Vec<Mutex<Controller>>> = RwLock::new(Vec::new());
 
-pub fn init(pci_device: PciInterface) -> Result<(), &'static str> {
-    let (dev, mut controller) = match pci_device {
-        PciInterface::Ehci(dev) => (dev, Controller::Ehci(controllers::ehci::EhciController::init(dev)?)),
+pub fn init(pci_dev: &'static PciDevice, interface: PciInterface) -> Result<(), &'static str> {
+    // get rid of interrupts while we're setting things up
+    pci_dev.pci_enable_interrupts(false);
+
+    let base = pci_dev.determine_mem_base(0)?;
+    let mut controller = match interface {
+        PciInterface::Ehci => Controller::Ehci(controllers::ehci::EhciController::init(base)?),
     };
 
     controller.probe_ports()?;
@@ -52,25 +56,27 @@ pub fn init(pci_device: PciInterface) -> Result<(), &'static str> {
         controllers.push(Mutex::new(controller));
     }
 
-    new_task_builder(pci_usb_bridge_int_handler, (dev, controller_index)).spawn()?;
+    new_task_builder(pci_usb_bridge_int_handler, (pci_dev, controller_index)).spawn()?;
 
     Ok(())
 }
 
 fn pci_usb_bridge_int_handler(params: (&'static PciDevice, usize)) -> ! {
-    let (device, controller_index) = params;
+    let (pci_dev, controller_index) = params;
     let (waker, blocker) = new_waker();
-    let _ = device.set_interrupt_waker(waker);
+    let _ = pci_dev.set_interrupt_waker(waker);
 
     loop {
-        device.pci_enable_interrupts(true);
+        pci_dev.pci_enable_interrupts(true);
         blocker.block();
         log::info!("Now handling an interrupt in pci_usb_bridge_int_handler");
 
         let controllers = CONTROLLERS.read();
         let mut controller = controllers[controller_index].lock();
 
-        controller.handle_interrupt().unwrap();
+        while pci_dev.pci_get_interrupt_status(false) {
+            controller.handle_interrupt().unwrap();
+        }
     }
 }
 

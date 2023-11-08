@@ -28,6 +28,8 @@ pub(crate) fn init(
     config: &Configuration,
     cfg_offset: usize,
 ) -> Result<Option<Interface>, &'static str> {
+    // mass storage (bulk only): C=8, SC => command block def
+
     if interface.class == 3 && interface.sub_class == 1 {
         let interface = hid::BootHidInterface::init(controller, device, interface, interface_id, config, cfg_offset)?;
         Ok(Some(Interface::Hid(interface)))
