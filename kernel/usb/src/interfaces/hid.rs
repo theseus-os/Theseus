@@ -1,3 +1,5 @@
+/// HID (boot protocol) interface support
+
 use super::*;
 
 #[derive(Debug, PartialEq)]
@@ -7,6 +9,7 @@ enum HidBootProtocol {
     None,
 }
 
+/// State of an HID interface
 #[derive(Debug, PartialEq)]
 pub struct BootHidInterface {
     buf_index: AllocSlot,
@@ -22,17 +25,26 @@ impl BootHidInterface {
         config: &Configuration,
         cfg_offset: usize,
     ) -> Result<Self, &'static str> {
-        // todo: read HID descriptor here
-        
         let (protocol, data_size) = match interface.protocol {
             0 => Ok((HidBootProtocol::None, 0)),
+
+            // The keyboard protocol sends eight bytes
+            // byte 1 is modifier keys status
+            // byte 2 is reserved
+            // byte 3 to 8 are pressed keys (0 for none, six simultaneous keys max)
             1 => Ok((HidBootProtocol::Keyboard, 8)),
+
+            // The mouse protocol sends three bytes
+            // byte 1 contains button status
+            // byte 2 contains X displacement
+            // byte 3 contains Y displacement
             2 => Ok((HidBootProtocol::Mouse, 3)),
+
             _ => Err("Invalid Interface Protocol"),
         }?;
 
-        let interface_num = interface.interface_number;
-        controller.request(device.0, Request::HidSetProtocol(interface_num, request::HidProtocol::Boot), device.1)?;
+        // ensure the boot protocol is currently selected by the device
+        controller.request(device.0, Request::HidSetProtocol(interface.interface_number, request::HidProtocol::Boot), device.1)?;
 
         let buf_index = if protocol != HidBootProtocol::None {
             let alloc = controller.common_alloc_mut()?;
@@ -62,6 +74,7 @@ impl InterfaceApi for BootHidInterface {
         _endpoint: EndpointAddress,
     ) -> Result<InterruptTransferAction, &'static str> {
 
+        // simply logs the event type and uninterpreted payload
         let alloc = controller.common_alloc_mut()?;
         let buf = alloc.buf8.get(self.buf_index)?;
         log::error!("{:?} Event: {:?}", self.protocol, buf);

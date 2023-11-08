@@ -1,3 +1,5 @@
+/// USB Descriptors
+
 use super::*;
 
 pub(crate) enum Descriptor {

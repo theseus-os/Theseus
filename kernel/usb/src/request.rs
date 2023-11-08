@@ -1,4 +1,29 @@
+/// USB Requests (sent over control transfers)
+
 use super::*;
+
+mod std_req {
+    pub const GET_STATUS: u8 = 0x00;
+    pub const CLEAR_FEATURE: u8 = 0x01;
+    pub const SET_FEATURE: u8 = 0x03;
+    pub const SET_ADDRESS: u8 = 0x05;
+    pub const GET_DESCRIPTOR: u8 = 0x06;
+    pub const SET_DESCRIPTOR: u8 = 0x07;
+    pub const GET_CONFIGURATION: u8 = 0x08;
+    pub const SET_CONFIGURATION: u8 = 0x09;
+    pub const GET_INTERFACE_ALT_SETTING: u8 = 0x0a;
+    pub const SET_INTERFACE_ALT_SETTING: u8 = 0x0b;
+    pub const _SYNC_FRAME: u8 = 0x0c;
+}
+
+mod hid_req {
+    pub const GET_REPORT: u8 = 0x01;
+    pub const SET_REPORT: u8 = 0x09;
+    pub const GET_PROTOCOL: u8 = 0x03;
+    pub const SET_PROTOCOL: u8 = 0x0B;
+    pub const _GET_IDLE: u8 = 0x02;
+    pub const _SET_IDLE: u8 = 0x0A;
+}
 
 pub(crate) enum Request<'a> {
     GetStatus(Target, &'a mut DeviceStatus),

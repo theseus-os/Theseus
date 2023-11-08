@@ -1,3 +1,5 @@
+/// Built-in USB interface drivers
+
 use super::*;
 
 use descriptors::Configuration;
@@ -5,6 +7,7 @@ use controllers::ControllerApi;
 
 pub mod hid;
 
+/// Supported USB interfaces
 #[derive(Debug, PartialEq)]
 pub(crate) enum Interface {
     Hid(hid::BootHidInterface),
@@ -20,6 +23,7 @@ pub enum InterruptTransferAction {
     Destroy,
 }
 
+/// Tries to select a driver for a USB interface
 pub(crate) fn init(
     controller: &mut dyn ControllerApi,
     device: (DeviceAddress, MaxPacketSize),
@@ -28,7 +32,7 @@ pub(crate) fn init(
     config: &Configuration,
     cfg_offset: usize,
 ) -> Result<Option<Interface>, &'static str> {
-    // mass storage (bulk only): C=8, SC => command block def
+    // mass storage (bulk only): C=8, SC => command set
 
     if interface.class == 3 && interface.sub_class == 1 {
         let interface = hid::BootHidInterface::init(controller, device, interface, interface_id, config, cfg_offset)?;
@@ -38,7 +42,9 @@ pub(crate) fn init(
     }
 }
 
+/// The API implemented by USB interface drivers
 pub(crate) trait InterfaceApi {
+    /// Called when an interrupt transfer is successfully polled by a controller
     fn on_interrupt_transfer(
         &mut self,
         controller: &mut dyn ControllerApi,

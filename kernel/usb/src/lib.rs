@@ -12,7 +12,7 @@
 
 extern crate alloc;
 
-use memory::{MappedPages, PhysicalAddress, map_frame_range, create_identity_mapping, PAGE_SIZE, MMIO_FLAGS};
+use memory::{MappedPages, BorrowedMappedPages, Mutable, PhysicalAddress, map_frame_range, create_identity_mapping, PAGE_SIZE, MMIO_FLAGS};
 use core::{mem::size_of, num::NonZeroU8, str::from_utf8, any::TypeId, ops::{Deref, DerefMut}};
 use alloc::{string::String, vec::Vec};
 use volatile::{Volatile, ReadOnly};
@@ -34,17 +34,19 @@ use descriptors::DescriptorType;
 use allocators::{CommonUsbAlloc, AllocSlot, UsbPointer, invalid_ptr_slot};
 use request::Request;
 use controllers::Controller;
-pub use controllers::PciInterface;
+pub use controllers::ControllerType;
 
+/// Global list of USB controllers in the system
 static CONTROLLERS: RwLock<Vec<Mutex<Controller>>> = RwLock::new(Vec::new());
 
-pub fn init(pci_dev: &'static PciDevice, interface: PciInterface) -> Result<(), &'static str> {
+/// Initializes a USB controllers connected via PCI
+pub fn init_pci(pci_dev: &'static PciDevice, ctrl_type: ControllerType) -> Result<(), &'static str> {
     // get rid of interrupts while we're setting things up
     pci_dev.pci_enable_interrupts(false);
 
     let base = pci_dev.determine_mem_base(0)?;
-    let mut controller = match interface {
-        PciInterface::Ehci => Controller::Ehci(controllers::ehci::EhciController::init(base)?),
+    let mut controller = match ctrl_type {
+        ControllerType::Ehci => Controller::Ehci(controllers::ehci::EhciController::init(base)?),
     };
 
     controller.probe_ports()?;
@@ -56,12 +58,13 @@ pub fn init(pci_dev: &'static PciDevice, interface: PciInterface) -> Result<(), 
         controllers.push(Mutex::new(controller));
     }
 
-    new_task_builder(pci_usb_bridge_int_handler, (pci_dev, controller_index)).spawn()?;
+    new_task_builder(pci_usb_int_task, (pci_dev, controller_index)).spawn()?;
 
     Ok(())
 }
 
-fn pci_usb_bridge_int_handler(params: (&'static PciDevice, usize)) -> ! {
+// background task handling PCI interrupts
+fn pci_usb_int_task(params: (&'static PciDevice, usize)) -> ! {
     let (pci_dev, controller_index) = params;
     let (waker, blocker) = new_waker();
     let _ = pci_dev.set_interrupt_waker(waker);
@@ -69,7 +72,7 @@ fn pci_usb_bridge_int_handler(params: (&'static PciDevice, usize)) -> ! {
     loop {
         pci_dev.pci_enable_interrupts(true);
         blocker.block();
-        log::info!("Now handling an interrupt in pci_usb_bridge_int_handler");
+        log::info!("Now handling an interrupt in pci_usb_int_task");
 
         let controllers = CONTROLLERS.read();
         let mut controller = controllers[controller_index].lock();
@@ -81,8 +84,14 @@ fn pci_usb_bridge_int_handler(params: (&'static PciDevice, usize)) -> ! {
 }
 
 type InterfaceId = usize;
-type DeviceAddress = u8;
 type MaxPacketSize = u16;
+type DeviceAddress = u8;
+type InterfaceIndex = u8;
+type StringIndex = u8;
+type DescriptorIndex = u8;
+
+/// Specific feature ID; must be appropriate to the recipient
+type FeatureId = u16;
 
 #[bitsize(16)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
@@ -92,11 +101,6 @@ struct DeviceStatus {
     reserved: u14,
 }
 
-/// Specific feature ID; must be appropriate to the recipient
-type FeatureId = u16;
-
-type InterfaceIndex = u8;
-
 #[bitsize(8)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
 struct EndpointAddress {
@@ -105,10 +109,6 @@ struct EndpointAddress {
     // Ignored for control endpoints
     direction: Direction,
 }
-
-type StringIndex = u8;
-
-type DescriptorIndex = u8;
 
 #[derive(Debug, Clone, Copy)]
 enum Target {
@@ -177,27 +177,4 @@ enum RequestType {
     Class = 0x1,
     Vendor = 0x2,
     Reserved = 0x3,
-}
-
-mod std_req {
-    pub const GET_STATUS: u8 = 0x00;
-    pub const CLEAR_FEATURE: u8 = 0x01;
-    pub const SET_FEATURE: u8 = 0x03;
-    pub const SET_ADDRESS: u8 = 0x05;
-    pub const GET_DESCRIPTOR: u8 = 0x06;
-    pub const SET_DESCRIPTOR: u8 = 0x07;
-    pub const GET_CONFIGURATION: u8 = 0x08;
-    pub const SET_CONFIGURATION: u8 = 0x09;
-    pub const GET_INTERFACE_ALT_SETTING: u8 = 0x0a;
-    pub const SET_INTERFACE_ALT_SETTING: u8 = 0x0b;
-    pub const _SYNC_FRAME: u8 = 0x0c;
-}
-
-mod hid_req {
-    pub const GET_REPORT: u8 = 0x01;
-    pub const SET_REPORT: u8 = 0x09;
-    pub const GET_PROTOCOL: u8 = 0x03;
-    pub const SET_PROTOCOL: u8 = 0x0B;
-    pub const _GET_IDLE: u8 = 0x02;
-    pub const _SET_IDLE: u8 = 0x0A;
 }
