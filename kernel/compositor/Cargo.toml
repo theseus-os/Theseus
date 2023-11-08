@@ -8,6 +8,9 @@ async_channel = { path = "../async_channel" }
 dreadnought = { path = "../dreadnought" }
 event_types = { path = "../event_types" }
 futures = { version = "0.3.28", default-features = false, features = ["async-await"] }
+hashbrown = "0.11.2"
+log = "0.4.8"
 memory = { path = "../memory" }
+sync_spin = { path = "../../libs/sync_spin" }
 # TODO: Update to 0.7.8
 zerocopy = "0.5.0"

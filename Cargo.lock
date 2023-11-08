@@ -550,7 +550,10 @@ dependencies = [
  "dreadnought",
  "event_types",
  "futures",
+ "hashbrown",
+ "log",
  "memory",
+ "sync_spin",
  "zerocopy",
 ]
 
