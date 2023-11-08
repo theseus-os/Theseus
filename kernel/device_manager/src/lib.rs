@@ -92,8 +92,6 @@ pub fn init(
         debug!("Found PCI device: {:X?}", dev);
     }
 
-    // usb_controller::init();
-
     // store all the initialized ixgbe NICs here to be added to the network interface list
     // No NIC support on aarch64 at the moment
     #[cfg(target_arch = "x86_64")]
@@ -121,18 +119,6 @@ pub fn init(
             Err(e) => {
                 error!("Failed to initialize storage device, it will be unavailable.\n{:?}\nError: {}", dev, e);
                 continue;
-            }
-        }
-
-        if dev.class == 0x0C {
-            // Serial Bus Controller
-            if dev.subclass == 0x03 {
-                // USB controller
-                if dev.prog_if == 0x20 {
-                    // EHCI
-                    usb::init_pci(dev, usb::ControllerType::Ehci)?;
-                    continue;
-                }
             }
         }
 
