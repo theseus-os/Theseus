@@ -8,32 +8,31 @@ extern crate alloc;
 
 mod window;
 
-use alloc::{boxed::Box, sync::Arc};
+use alloc::sync::Arc;
 use core::sync::atomic::{AtomicUsize, Ordering};
 
 use async_channel::Channel;
 use futures::StreamExt;
+use graphics::{AlphaPixel, Framebuffer, GraphicsDriver, Pixel, Rectangle};
 use hashbrown::HashMap;
 use log::error;
-use memory::{BorrowedSliceMappedPages, Mutable};
 use sync_spin::Mutex;
 pub use window::Window;
-use zerocopy::FromBytes;
 
 static COMPOSITOR: Option<Channel<Request>> = None;
 
-static DRIVER: Mutex<Option<Box<dyn GraphicsDriver>>> = Mutex::new(None);
+static DRIVER: Mutex<Option<GraphicsDriver<AlphaPixel>>> = Mutex::new(None);
 
 pub fn init<T>(driver: T) -> Result<Channels, &'static str>
 where
-    T: GraphicsDriver + 'static,
+    T: Into<GraphicsDriver<AlphaPixel>>,
 {
     let mut maybe_driver = DRIVER.lock();
     assert!(
         maybe_driver.is_none(),
         "initialised compositor multiple times"
     );
-    *maybe_driver = Some(Box::new(driver));
+    *maybe_driver = Some(driver.into());
 
     let channels = Channels::new();
     let cloned = channels.clone();
@@ -73,116 +72,31 @@ trait Draw {
     fn set_size(&mut self, width: usize, height: usize);
 }
 
-#[derive(Clone, Copy, PartialEq, Debug, Hash)]
-pub struct Coordinates {
-    pub x: usize,
-    pub y: usize,
-}
-
-#[derive(Clone)]
-pub struct Rectangle {
-    pub coordinates: Coordinates,
-    pub width: usize,
-    pub height: usize,
-}
-
-pub struct Framebuffer<P>
-where
-    P: Pixel,
-{
-    buffer: BorrowedSliceMappedPages<P, Mutable>,
-    stride: usize,
-    width: usize,
-    height: usize,
-}
-
 #[derive(Clone)]
 pub enum Event {
     /// The compositor released the framebuffer.
     Release,
 }
 
-impl<P> Framebuffer<P>
-where
-    P: Pixel,
-{
-    pub fn rows(&self) -> impl Iterator<Item = &[P]> {
-        self.buffer.chunks(self.stride)
-    }
-
-    pub fn rows_mut(&mut self) -> impl Iterator<Item = &mut [P]> {
-        self.buffer.chunks_mut(self.stride)
-    }
-}
-
-// TODO: Should it be sealed?
-pub trait Pixel: private::Sealed + FromBytes {}
-
-mod private {
-    pub trait Sealed {}
-}
-
-pub trait GraphicsDriver: Send + Sync {
-    fn back_mut(&mut self) -> &mut Framebuffer<AlphaPixel>;
-
-    // fn swap(rectangles: &[Rectangle]);
-    fn swap(&self);
-
-    fn post_swap(&self);
-}
-
-fn redraw(window: &window::Inner, _dirty: Rectangle) {
+fn redraw(window: &window::Inner, dirty: Rectangle) {
     let mut locked = DRIVER.lock();
     let driver = locked.as_mut().unwrap();
-    let framebuffer = driver.back_mut();
+    let framebuffer = driver.back();
 
     // TODO: Take into account dirty rectangle.
 
     for (i, row) in window.framebuffer.rows().enumerate() {
-        let start = (window.coordinates.y + i) * framebuffer.stride;
+        let start = (window.coordinates.y + i) * framebuffer.stride();
         let end = start + row.len();
-        framebuffer.buffer[start..end].clone_from_slice(row);
+        framebuffer[start..end].clone_from_slice(row);
     }
 
-    driver.swap();
-    driver.post_swap();
+    driver.swap(&[dirty]);
 }
 
 pub trait SingleBufferGraphicsDriver {
     fn write();
 }
-
-pub struct SimpleDriver {
-    inner: Framebuffer<AlphaPixel>,
-}
-
-impl SimpleDriver {
-    pub unsafe fn new(physical_address: usize, width: usize, height: usize) {
-        todo!();
-    }
-}
-
-impl GraphicsDriver for SimpleDriver {
-    fn back_mut(&mut self) -> &mut Framebuffer<AlphaPixel> {
-        &mut self.inner
-    }
-
-    fn swap(&self) {}
-
-    fn post_swap(&self) {}
-}
-
-pub trait DoubleBufferGraphicsDriver {
-    fn write();
-    fn swap();
-}
-
-#[derive(Clone, FromBytes)]
-pub struct AlphaPixel {}
-
-impl private::Sealed for AlphaPixel {}
-
-impl Pixel for AlphaPixel {}
 
 #[derive(Clone)]
 pub struct Channels {
@@ -217,6 +131,8 @@ pub fn window() -> Window {
 
 async fn compositor_loop(mut channels: Channels) {
     loop {
+        // TODO: Compute overlap.
+
         // The select macro is not available in no_std.
         futures::select_biased!(
             event = channels.window.next() => {

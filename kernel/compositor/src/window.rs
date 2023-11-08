@@ -1,11 +1,10 @@
 use alloc::sync::Arc;
 
 use async_channel::Channel;
+use graphics::{AlphaPixel, Coordinates, Framebuffer, Rectangle};
 use sync_spin::Mutex;
 
-use crate::{
-    AlphaPixel, Coordinates, Event, Framebuffer, Rectangle, Request, RequestType, COMPOSITOR,
-};
+use crate::{Event, Request, RequestType, COMPOSITOR};
 
 pub struct Window {
     pub(crate) id: usize,

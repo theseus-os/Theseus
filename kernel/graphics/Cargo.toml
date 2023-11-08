@@ -1,0 +1,9 @@
+[package]
+name = "graphics"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+memory = { path = "../memory" }
+# TODO: Upgrade to 0.7.25
+zerocopy = "0.5.0"

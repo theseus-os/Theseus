@@ -550,6 +550,7 @@ dependencies = [
  "dreadnought",
  "event_types",
  "futures",
+ "graphics",
  "hashbrown",
  "log",
  "memory",
@@ -1410,6 +1411,14 @@ checksum = "c65cd533b33e3d04c6e393225fa8919ddfcf5862ca8919c7f9a167c312ef41c2"
 dependencies = [
  "plain",
  "scroll",
+]
+
+[[package]]
+name = "graphics"
+version = "0.1.0"
+dependencies = [
+ "memory",
+ "zerocopy",
 ]
 
 [[package]]

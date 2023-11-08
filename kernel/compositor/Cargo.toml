@@ -8,6 +8,7 @@ async_channel = { path = "../async_channel" }
 dreadnought = { path = "../dreadnought" }
 event_types = { path = "../event_types" }
 futures = { version = "0.3.28", default-features = false, features = ["async-await"] }
+graphics = { path = "../graphics" }
 hashbrown = "0.11.2"
 log = "0.4.8"
 memory = { path = "../memory" }
