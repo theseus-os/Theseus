@@ -8,6 +8,7 @@
 //!    * isochronous transfers: unused, no API support
 
 #![no_std]
+#![allow(unused)]
 
 extern crate alloc;
 
@@ -24,11 +25,10 @@ use waker::new_waker;
 use pci::PciDevice;
 
 mod interfaces;
-
-pub(crate) mod controllers;
-pub mod descriptors;
-pub mod allocators;
-pub mod request;
+mod controllers;
+mod descriptors;
+mod allocators;
+mod request;
 
 use descriptors::DescriptorType;
 use allocators::{CommonUsbAlloc, AllocSlot, UsbPointer, invalid_ptr_slot};
@@ -80,38 +80,38 @@ fn pci_usb_bridge_int_handler(params: (&'static PciDevice, usize)) -> ! {
     }
 }
 
-pub type InterfaceId = usize;
-pub type DeviceAddress = u8;
-pub type MaxPacketSize = u16;
+type InterfaceId = usize;
+type DeviceAddress = u8;
+type MaxPacketSize = u16;
 
 #[bitsize(16)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
-pub struct DeviceStatus {
+struct DeviceStatus {
     self_powered: bool,
     remote_wakeup: bool,
     reserved: u14,
 }
 
 /// Specific feature ID; must be appropriate to the recipient
-pub type FeatureId = u16;
+type FeatureId = u16;
 
-pub type InterfaceIndex = u8;
+type InterfaceIndex = u8;
 
 #[bitsize(8)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
-pub struct EndpointAddress {
+struct EndpointAddress {
     ep_number: u4,
     reserved: u3,
     // Ignored for control endpoints
     direction: Direction,
 }
 
-pub type StringIndex = u8;
+type StringIndex = u8;
 
-pub type DescriptorIndex = u8;
+type DescriptorIndex = u8;
 
 #[derive(Debug, Clone, Copy)]
-pub enum Target {
+enum Target {
     Device,
     Interface(InterfaceIndex),
     Endpoint(EndpointAddress),
@@ -130,19 +130,19 @@ impl Target {
 #[bitsize(64)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
 struct RawRequest {
-    pub recipient: RawRequestRecipient,
-    pub req_type: RequestType,
-    pub direction: Direction,
+    recipient: RawRequestRecipient,
+    req_type: RequestType,
+    direction: Direction,
 
-    pub request_name: u8,
-    pub value: u16,
-    pub index: u16,
-    pub len: u16,
+    request_name: u8,
+    value: u16,
+    index: u16,
+    len: u16,
 }
 
 #[bitsize(1)]
 #[derive(Debug, FromBits)]
-pub enum Direction {
+enum Direction {
     /// Host to function
     Out = 0,
     /// Function to host

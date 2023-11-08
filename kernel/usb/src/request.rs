@@ -1,6 +1,6 @@
 use super::*;
 
-pub enum Request<'a> {
+pub(crate) enum Request<'a> {
     GetStatus(Target, &'a mut DeviceStatus),
 
     ClearFeature(Target, FeatureId),
@@ -35,7 +35,7 @@ pub type HidReportId = u8;
 
 #[bitsize(8)]
 #[derive(Copy, Clone, Debug, FromBits)]
-pub enum HidReportType {
+pub(crate) enum HidReportType {
     Input = 1,
     Output = 2,
     Feature = 3,
@@ -45,7 +45,7 @@ pub enum HidReportType {
 
 #[bitsize(8)]
 #[derive(Copy, Clone, Debug, FromBits)]
-pub enum HidProtocol {
+pub(crate) enum HidProtocol {
     Boot = 0,
     Report = 1,
     #[fallback]

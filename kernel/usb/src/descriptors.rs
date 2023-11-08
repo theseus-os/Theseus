@@ -1,6 +1,6 @@
 use super::*;
 
-pub enum Descriptor {
+pub(crate) enum Descriptor {
     Device(Device),
     Configuration(Configuration),
     Interface(Interface),
@@ -35,7 +35,7 @@ impl Descriptor {
 
 #[bitsize(8)]
 #[derive(Debug, Copy, Clone, FromBits)]
-pub enum DescriptorType {
+pub(crate) enum DescriptorType {
     Device = 1,
     Configuration = 2,
 
@@ -59,7 +59,7 @@ pub enum DescriptorType {
 
 #[derive(Copy, Clone, Debug, FromBytes, Default)]
 #[repr(packed)]
-pub struct Device {
+pub(crate) struct Device {
     pub length: u8,
     pub descriptor_type: u8,
     pub usb_version: u16,
@@ -79,7 +79,7 @@ pub struct Device {
 
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
-pub struct DeviceQualifier {
+pub(crate) struct DeviceQualifier {
     pub length: u8,
     pub descriptor_type: u8,
     pub usb_version: u16,
@@ -93,7 +93,7 @@ pub struct DeviceQualifier {
 
 #[derive(Copy, Clone, FromBytes, Debug)]
 #[repr(packed)]
-pub struct Configuration {
+pub(crate) struct Configuration {
     pub inner: ConfigInner,
     // the following are equivalent:
     //
@@ -102,7 +102,7 @@ pub struct Configuration {
 
 #[derive(Copy, Clone, Debug, FromBytes, Default)]
 #[repr(packed)]
-pub struct ConfigInner {
+pub(crate) struct ConfigInner {
     pub length: u8,
     pub descriptor_type: u8,
     pub total_length: u16,
@@ -143,7 +143,7 @@ impl Configuration {
 
 #[bitsize(8)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes, Default)]
-pub struct ConfigurationAttributes {
+pub(crate) struct ConfigurationAttributes {
     reserved: u5,
     remote_wakeup: bool,
     self_powered: bool,
@@ -152,7 +152,7 @@ pub struct ConfigurationAttributes {
 
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
-pub struct Interface {
+pub(crate) struct Interface {
     pub length: u8,
     pub descriptor_type: u8,
     pub interface_number: InterfaceIndex,
@@ -166,7 +166,7 @@ pub struct Interface {
 
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
-pub struct Endpoint {
+pub(crate) struct Endpoint {
     pub length: u8,
     pub descriptor_type: u8,
     pub address: EndpointAddress,
@@ -181,7 +181,7 @@ pub struct Endpoint {
 
 #[bitsize(8)]
 #[derive(DebugBits, Copy, Clone, FromBits, FromBytes)]
-pub struct EndpointAttributes {
+pub(crate) struct EndpointAttributes {
     transfer_type: EndpointTransferType,
     isoc_endpoint_sync_type: IsochronousEndpointSyncType,
     isoc_endpoint_usage_type: IsochronousEndpointUsageType,
@@ -190,7 +190,7 @@ pub struct EndpointAttributes {
 
 #[bitsize(2)]
 #[derive(Debug, FromBits)]
-pub enum EndpointTransferType {
+pub(crate) enum EndpointTransferType {
     Control = 0x0,
     Isochronous = 0x1,
     Bulk = 0x2,
@@ -199,7 +199,7 @@ pub enum EndpointTransferType {
 
 #[bitsize(2)]
 #[derive(Debug, FromBits)]
-pub enum IsochronousEndpointSyncType {
+pub(crate) enum IsochronousEndpointSyncType {
     None = 0x0,
     Asynchronous = 0x1,
     Adaptive = 0x2,
@@ -208,7 +208,7 @@ pub enum IsochronousEndpointSyncType {
 
 #[bitsize(2)]
 #[derive(Debug, FromBits)]
-pub enum IsochronousEndpointUsageType {
+pub(crate) enum IsochronousEndpointUsageType {
     Data = 0x0,
     Feedback = 0x1,
     ImplicitFeedbackData = 0x2,
@@ -217,7 +217,7 @@ pub enum IsochronousEndpointUsageType {
 
 #[derive(Copy, Clone, Debug, FromBytes)]
 #[repr(packed)]
-pub struct UsbString {
+pub(crate) struct UsbString {
     pub length: u8,
     pub descriptor_type: u8,
     pub unicode_bytes: [u8; 253],
